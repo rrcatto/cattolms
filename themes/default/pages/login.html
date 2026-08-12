@@ -1,0 +1,14 @@
+<section class="container cl-narrow py-5">
+  <div class="card shadow-sm border-0"><div class="card-body p-4 p-lg-5">
+    <span class="cl-kicker text-primary">Passwordless access</span>
+    <h1 class="h2 fw-bold mt-2">Register or sign in</h1>
+    <p>Enter your email address. A one-time sign-in link will be sent to you and will expire after 30 minutes.</p>
+    <form action="/login" method="post" novalidate>
+      <input type="hidden" name="csrf" value="{{ @csrf }}">
+      <input type="hidden" name="return_path" value="{{ @return_path }}">
+      <div class="mb-3"><label class="form-label" for="email">Email address</label><input class="form-control form-control-lg" type="email" id="email" name="email" autocomplete="email" required></div>
+      <button class="btn btn-primary btn-lg w-100" type="submit">Email my secure link</button>
+    </form>
+    <p class="small text-secondary mt-3 mb-0">An account is created only after a valid sign-in link is opened.</p>
+  </div></div>
+</section>

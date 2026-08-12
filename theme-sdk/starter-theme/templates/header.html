@@ -1,0 +1,8 @@
+<header class="theme-header">
+  <nav class="theme-nav" data-theme-nav aria-label="Primary navigation">
+    <a href="/" data-nav-item="home">Home</a>
+    <a href="/courses" data-nav-item="catalogue">Catalogue</a>
+    <check if="{{ @is_authenticated }}"><a href="/account/library" data-nav-item="account">My Learning</a></check>
+    <check if="{{ @is_platform_admin }}"><a href="/admin" data-nav-item="administration">Administration</a></check>
+  </nav>
+</header>

@@ -1,0 +1,31 @@
+<section class="cl-hero" style="--cl-hero-image:url('{{ @theme_asset_url }}/img/hero-learning.svg')">
+  <div class="container py-5 py-lg-6">
+    <div class="row align-items-center min-vh-hero">
+      <div class="col-lg-7 py-5">
+        <span class="cl-kicker">Practical self-study learning</span>
+        <h1 class="display-2 fw-bold mt-3">Learn useful things. Prove what you know.</h1>
+        <p class="lead mt-4">Structured modules, meaningful assessments and a course library that remembers your progress securely.</p>
+        <div class="d-flex flex-wrap gap-3 mt-4">
+          <a class="btn btn-primary btn-lg" href="/courses">Browse courses</a>
+          <check if="{{ @is_authenticated }}"><true><a class="btn btn-outline-light btn-lg" href="/account/library">Open my library</a></true><false><a class="btn btn-outline-light btn-lg" href="/login">Create an account</a></false></check>
+        </div>
+      </div>
+      <div class="col-lg-5 d-none d-lg-block"><div class="cl-hero-panel"><span class="cl-kicker text-warning">Built for real learning</span><h2>Read. Practise. Assess. Complete.</h2><ul><li>Course content split into clear modules</li><li>Server-recorded progress and grades</li><li>Secure passwordless access</li><li>Certificates for completed courses</li></ul></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="container py-5 py-lg-6">
+  <div class="row align-items-end mb-4">
+    <div class="col-lg-8"><span class="cl-kicker text-primary">Course catalogue</span><h2 class="display-5 fw-bold mb-2">Choose your next practical skill</h2><p class="lead text-body-secondary mb-0">Courses are designed for independent study, with module assessments and recorded results.</p></div>
+    <div class="col-lg-4 text-lg-end mt-3 mt-lg-0"><a class="btn btn-outline-primary" href="/courses">View all courses</a></div>
+  </div>
+  <check if="{{ @published_course_count > 0 }}">
+    <true><div class="row g-4"><repeat group="{{ @featured_courses }}" value="{{ @course }}"><div class="col-md-6 col-xl-4"><include href="partials/course-card.html" /></div></repeat></div></true>
+    <false><div class="cl-empty-state"><div class="cl-empty-icon">01</div><h3>Courses are being prepared</h3><p class="mb-0">Published courses will appear here as soon as they are ready.</p></div></false>
+  </check>
+</section>
+
+<section class="cl-feature-band py-5 py-lg-6">
+  <div class="container"><div class="row g-4"><div class="col-md-4"><div class="cl-feature"><span>01</span><h3>Structured content</h3><p>Each course is broken into individual modules with its own learning material and assessment.</p></div></div><div class="col-md-4"><div class="cl-feature"><span>02</span><h3>Recorded progress</h3><p>Your progress and grades are stored by the LMS, not left in one browser’s local storage.</p></div></div><div class="col-md-4"><div class="cl-feature"><span>03</span><h3>Clear results</h3><p>See module grades, an overall course result and a certificate where the course provides one.</p></div></div></div></div>
+</section>

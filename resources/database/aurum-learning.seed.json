@@ -1,0 +1,317 @@
+{
+  "name": "Aurum Learning",
+  "slug": "aurum-learning",
+  "author": "Richard Catto / Catto Learning",
+  "generated_by": "ChatGPT",
+  "description": "Gold-on-warm-black LMS theme derived from the approved Gilt palette mockup, rebuilt as a portable Catto Learning Theme Package 1.0 theme.",
+  "version": "1.0.0",
+  "status": "draft",
+  "manifest": {
+    "format": "catto-learning-theme",
+    "schema_version": "1.0",
+    "theme": {
+      "name": "Aurum Learning",
+      "slug": "aurum-learning",
+      "version": "1.0.0",
+      "author": "Richard Catto / Catto Learning",
+      "generated_by": "ChatGPT from supplied Aurum LMS mockup",
+      "created_at": "2026-08-12T02:45:00+02:00",
+      "description": "Gold-on-warm-black LMS theme derived from the approved Gilt palette mockup, rebuilt as a portable Catto Learning Theme Package 1.0 theme."
+    },
+    "templates": {
+      "base": "templates/base.html",
+      "header": "templates/header.html",
+      "footer": "templates/footer.html",
+      "sidebar": null
+    },
+    "pages": {
+      "home": "pages/home.html"
+    },
+    "stylesheets": [
+      "css/style.css"
+    ],
+    "scripts": [
+      "js/theme.js"
+    ],
+    "assets": [],
+    "external": {
+      "stylesheets": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      ],
+      "scripts": []
+    },
+    "palettes": {
+      "gilt": {
+        "name": "Gilt",
+        "colours": [
+          "#100E09",
+          "#D9B44A",
+          "#F5E3A6",
+          "#F9F2DD",
+          "#87681E"
+        ]
+      },
+      "woodland": {
+        "name": "Woodland",
+        "colours": [
+          "#606C38",
+          "#283618",
+          "#FEFAE0",
+          "#DDA15E",
+          "#BC6C25"
+        ]
+      },
+      "tranquil": {
+        "name": "Tranquil",
+        "colours": [
+          "#1F363D",
+          "#40798C",
+          "#70A9A1",
+          "#9EC1A3",
+          "#CFE0C3"
+        ]
+      }
+    },
+    "active_palette": "gilt",
+    "design": {
+      "semantic": {
+        "page_background": "palette:0",
+        "surface": "palette:3",
+        "primary": "palette:1",
+        "secondary": "palette:4",
+        "accent": "palette:2",
+        "heading_text": "auto:page_background",
+        "body_text": "auto:page_background",
+        "links": "palette:1",
+        "navigation_background": "palette:0",
+        "navigation_text": "auto:navigation_background",
+        "navigation_active": "palette:2",
+        "breadcrumb_background": "palette:0",
+        "breadcrumb_text": "auto:breadcrumb_background",
+        "hero_background": "palette:0",
+        "hero_overlay": "palette:1",
+        "hero_text": "auto:hero_background",
+        "button_primary_background": "palette:1",
+        "button_primary_text": "auto:button_primary_background"
+      },
+      "typography": {
+        "preset": "editorial",
+        "body": "Inter",
+        "headings": "Inter"
+      },
+      "layout": {
+        "navbar_position": "top",
+        "navbar_size": 70,
+        "navbar_unit": "px",
+        "navbar_sticky": true,
+        "navbar_border": true,
+        "breadcrumb_visible": true,
+        "breadcrumb_position": "below-nav",
+        "breadcrumb_height": 78,
+        "breadcrumb_show_kicker": true,
+        "breadcrumb_show_title": true,
+        "content_max_width": 1200,
+        "spacing": "comfortable",
+        "card_radius": 14,
+        "card_border": true,
+        "card_shadow": "strong",
+        "footer_style": "band",
+        "nav_items": {
+          "home": {
+            "visible": true,
+            "order": 10
+          },
+          "catalogue": {
+            "visible": true,
+            "order": 20
+          },
+          "help": {
+            "visible": true,
+            "order": 30
+          },
+          "company": {
+            "visible": true,
+            "order": 40
+          },
+          "account": {
+            "visible": true,
+            "order": 50
+          },
+          "administration": {
+            "visible": true,
+            "order": 60
+          },
+          "signout": {
+            "visible": true,
+            "order": 70
+          }
+        }
+      },
+      "hero": {
+        "enabled": true,
+        "asset": "",
+        "focal_position": "center",
+        "height": 600,
+        "overlay_opacity": 20,
+        "text_align": "left"
+      }
+    },
+    "advanced_css": null
+  },
+  "design_config": {
+    "semantic": {
+      "page_background": "palette:0",
+      "surface": "palette:3",
+      "primary": "palette:1",
+      "secondary": "palette:4",
+      "accent": "palette:2",
+      "heading_text": "auto:page_background",
+      "body_text": "auto:page_background",
+      "links": "palette:1",
+      "navigation_background": "palette:0",
+      "navigation_text": "auto:navigation_background",
+      "navigation_active": "palette:2",
+      "breadcrumb_background": "palette:0",
+      "breadcrumb_text": "auto:breadcrumb_background",
+      "hero_background": "palette:0",
+      "hero_overlay": "palette:1",
+      "hero_text": "auto:hero_background",
+      "button_primary_background": "palette:1",
+      "button_primary_text": "auto:button_primary_background"
+    },
+    "typography": {
+      "preset": "editorial",
+      "body": "Inter",
+      "headings": "Inter"
+    },
+    "layout": {
+      "navbar_position": "top",
+      "navbar_size": 70,
+      "navbar_unit": "px",
+      "navbar_sticky": true,
+      "navbar_border": true,
+      "breadcrumb_visible": true,
+      "breadcrumb_position": "below-nav",
+      "breadcrumb_height": 78,
+      "breadcrumb_show_kicker": true,
+      "breadcrumb_show_title": true,
+      "content_max_width": 1200,
+      "spacing": "comfortable",
+      "card_radius": 14,
+      "card_border": true,
+      "card_shadow": "strong",
+      "footer_style": "band",
+      "nav_items": {
+        "home": {
+          "visible": true,
+          "order": 10
+        },
+        "catalogue": {
+          "visible": true,
+          "order": 20
+        },
+        "help": {
+          "visible": true,
+          "order": 30
+        },
+        "company": {
+          "visible": true,
+          "order": 40
+        },
+        "account": {
+          "visible": true,
+          "order": 50
+        },
+        "administration": {
+          "visible": true,
+          "order": 60
+        },
+        "signout": {
+          "visible": true,
+          "order": 70
+        }
+      }
+    },
+    "hero": {
+      "enabled": true,
+      "asset": "",
+      "focal_position": "center",
+      "height": 600,
+      "overlay_opacity": 20,
+      "text_align": "left"
+    }
+  },
+  "palettes": {
+    "gilt": {
+      "name": "Gilt",
+      "colours": [
+        "#100E09",
+        "#D9B44A",
+        "#F5E3A6",
+        "#F9F2DD",
+        "#87681E"
+      ]
+    },
+    "woodland": {
+      "name": "Woodland",
+      "colours": [
+        "#606C38",
+        "#283618",
+        "#FEFAE0",
+        "#DDA15E",
+        "#BC6C25"
+      ]
+    },
+    "tranquil": {
+      "name": "Tranquil",
+      "colours": [
+        "#1F363D",
+        "#40798C",
+        "#70A9A1",
+        "#9EC1A3",
+        "#CFE0C3"
+      ]
+    }
+  },
+  "active_palette_key": "gilt",
+  "advanced_css": "",
+  "files": {
+    "templates/base.html": {
+      "kind": "template",
+      "media_type": "text/html",
+      "content": "<!doctype html>\n<html lang=\"en-GB\">\n<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>{{ @title }} \u00b7 {{ @app_name }}</title><link href=\"/css/bootstrap.min.css\" rel=\"stylesheet\"></head>\n<body data-palette=\"{{ @active_palette }}\" class=\"aurum-body {{ @body_class }} {{ @course_content_mode ? 'cl-course-page' : '' }}\"><include href=\"partials/nav.html\" /><main class=\"aurum-main\"><check if=\"{{ @is_authenticated }}\"><div class=\"aurum-context\" data-theme-breadcrumb><div class=\"aurum-wrap\"><div class=\"page-kicker\">{{ @page_kicker }}</div><div class=\"page-title\">{{ @page_title ?: @title }}</div></div></div></check><div class=\"aurum-page\"><include href=\"partials/flash.html\" />{{ @page_content | raw }}</div></main><include href=\"partials/footer.html\" /><include href=\"partials/quick-actions.html\" /></body></html>",
+      "display_order": 10
+    },
+    "templates/header.html": {
+      "kind": "template",
+      "media_type": "text/html",
+      "content": "<header class=\"aurum-nav\" data-theme-nav><div class=\"aurum-wrap aurum-nav-in\"><a class=\"aurum-brand\" href=\"/\" data-nav-item=\"home\"><b>{{ @app_name }}</b><span>AURUM LEARNING</span><i></i></a><nav class=\"aurum-menu\"><a class=\"aurum-link {{ @active_nav=='catalogue' ? 'active' : '' }}\" href=\"/courses\" data-nav-item=\"catalogue\">Catalogue</a><a class=\"aurum-link {{ @active_nav=='help' ? 'active' : '' }}\" href=\"/help\" data-nav-item=\"help\">Help</a><check if=\"{{ @is_company_admin && !@is_platform_admin }}\"><a class=\"aurum-link\" href=\"/company\" data-nav-item=\"company\">Company</a></check></nav><div class=\"aurum-actions\"><check if=\"{{ @is_authenticated }}\"><details class=\"aurum-dd rl-account-menu\" data-nav-item=\"account\"><summary>Account \u25be</summary><nav class=\"aurum-panel rl-account-panel\"><a href=\"/account/library\">My Learning</a><a href=\"/account/profile\">Profile</a><a href=\"/account/sessions\">Active sessions</a></nav></details><check if=\"{{ @is_platform_admin }}\"><details class=\"aurum-dd rl-account-menu\" data-nav-item=\"administration\"><summary>Administration \u25be</summary><nav class=\"aurum-panel rl-account-panel\"><a href=\"/admin\">Dashboard</a><a href=\"/admin/courses\">Courses</a><a href=\"/admin?tab=people\">People</a><a href=\"/admin?tab=companies\">Companies</a><a href=\"/admin?tab=enrolments\">Enrolments &amp; Requests</a><a href=\"/admin?tab=credits\">Credits &amp; Orders</a><a href=\"/admin?tab=activity\">Activity</a><a href=\"/admin?tab=reports\">Reports</a><a href=\"/admin?tab=themes\">Themes</a><a href=\"/admin?tab=settings\">Settings</a></nav></details></check><form action=\"/logout\" method=\"post\" data-nav-item=\"signout\"><input type=\"hidden\" name=\"csrf\" value=\"{{ @csrf }}\"><button class=\"aurum-signout\">Sign out</button></form></check><check if=\"{{ !@is_authenticated }}\"><a class=\"aurum-signin\" href=\"/login\">Register or sign in</a></check></div></div></header>",
+      "display_order": 20
+    },
+    "templates/footer.html": {
+      "kind": "template",
+      "media_type": "text/html",
+      "content": "<footer class=\"aurum-footer\"><div class=\"aurum-wrap\"><div><strong>{{ @app_name }}</strong><p>Practical self-study learning with secure progress, flexible course formats and verifiable completion.</p></div><div><a href=\"/courses\">Catalogue</a> \u00b7 <a href=\"/help\">Help</a> \u00b7 <a href=\"/privacy\">Privacy</a></div></div></footer>",
+      "display_order": 30
+    },
+    "pages/home.html": {
+      "kind": "template",
+      "media_type": "text/html",
+      "content": "<section class=\"aurum-hero\" data-theme-hero><div class=\"aurum-wrap aurum-hero-grid\"><div><div class=\"aurum-eyebrow\">Self-paced learning \u00b7 South Africa</div><h1>Learn on your own time.<br><em>Keep the proof.</em></h1><p class=\"aurum-lede\">Practical independent-study courses with secure progress tracking. Courses may include assessments and certificates where those features suit the subject and purpose.</p><div class=\"aurum-cta\"><a class=\"aurum-btn aurum-btn-gold\" href=\"/courses\">Browse the catalogue</a><check if=\"{{ @is_authenticated }}\"><a class=\"aurum-btn aurum-btn-ghost\" href=\"/account/library\">Open my learning</a></check></div><div class=\"aurum-meta\"><div><b>{{ @published_course_count }}</b><span>published courses</span></div><div><b>Self-paced</b><span>study when it suits you</span></div><div><b>Flexible</b><span>assessed or content-only</span></div></div></div><div class=\"aurum-seal\" aria-label=\"Aurum Learning gilded seal\"><div class=\"aurum-seal-ring\"><span>CL</span><small>CATTO LEARNING</small></div></div></div></section><section class=\"aurum-wrap aurum-section\"><div class=\"aurum-paper\"><div class=\"aurum-eyebrow dark\">Featured learning</div><div class=\"aurum-section-head\"><h2>Choose your next practical skill</h2><a href=\"/courses\">View all courses \u2192</a></div><check if=\"{{ @published_course_count > 0 }}\"><true><div class=\"row g-4\"><repeat group=\"{{ @featured_courses }}\" value=\"{{ @course }}\"><div class=\"col-md-6 col-xl-4\"><include href=\"partials/course-card.html\" /></div></repeat></div></true><false><p>No courses are published yet.</p></false></check></div></section>",
+      "display_order": 40
+    },
+    "css/style.css": {
+      "kind": "stylesheet",
+      "media_type": "text/css",
+      "content": ":root{--font-display:'Inter',system-ui,sans-serif;--font-body:'Instrument Sans','Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,monospace;--maxw:1200px;--r:14px;--shadow:0 24px 60px -28px rgba(0,0,0,.85);--ease:cubic-bezier(.22,.7,.28,1);--bg:#100E09;--bg2:#1A160E;--line:#3B3122;--accent:#D9B44A;--accent-hi:#F5E3A6;--accent-lo:#87681E;--paper:#F9F2DD;--paper2:#F1E5C4;--ink:#221C10;--muted:#9C8F71;--on-dark:#F0E4C3}\nbody[data-palette=\"gilt\"]{--bg:#100E09;--bg2:#1A160E;--line:#3B3122;--accent:#D9B44A;--accent-hi:#F5E3A6;--accent-lo:#87681E;--paper:#F9F2DD;--paper2:#F1E5C4;--ink:#221C10;--muted:#9C8F71;--on-dark:#F0E4C3}\nbody[data-palette=\"woodland\"]{--bg:#283618;--bg2:#34451f;--line:#606C38;--accent:#DDA15E;--accent-hi:#FEFAE0;--accent-lo:#BC6C25;--paper:#FEFAE0;--paper2:#f5eccf;--ink:#283618;--muted:#b9c69c;--on-dark:#FEFAE0}\nbody[data-palette=\"tranquil\"]{--bg:#1F363D;--bg2:#294750;--line:#40798C;--accent:#70A9A1;--accent-hi:#CFE0C3;--accent-lo:#40798C;--paper:#eef6ee;--paper2:#CFE0C3;--ink:#1F363D;--muted:#a8c2c2;--on-dark:#eef6ee}\n*{box-sizing:border-box}body.aurum-body{margin:0;background:var(--bg);color:var(--on-dark);font-family:var(--font-body);line-height:1.65}.aurum-wrap{max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(18px,4vw,34px)}.aurum-nav{position:sticky;top:0;z-index:900;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(16px);border-bottom:1px solid var(--line);overflow:visible}.aurum-nav::after{content:'';position:absolute;inset:auto 0 -1px;height:1px;background:linear-gradient(90deg,transparent,var(--accent-lo),var(--accent),var(--accent-lo),transparent)}.aurum-nav-in{height:70px;display:flex;align-items:center;gap:20px}.aurum-brand{display:flex;flex-direction:column;color:var(--accent-hi)!important;min-width:max-content}.aurum-brand b{font-weight:900;letter-spacing:.08em}.aurum-brand span{font:600 .55rem/1.2 var(--font-mono);letter-spacing:.2em;color:var(--muted)}.aurum-brand i{height:2px;margin-top:4px;background:linear-gradient(90deg,var(--accent-lo),var(--accent-hi),var(--accent-lo))}.aurum-menu{display:flex;gap:4px;flex:1}.aurum-link{padding:9px 12px;border-radius:8px;color:var(--on-dark)!important;font-weight:700}.aurum-link:hover,.aurum-link.active{background:var(--bg2);color:var(--accent-hi)!important}.aurum-actions{display:flex;align-items:center;gap:8px}.aurum-dd{position:relative}.aurum-dd summary,.aurum-signout,.aurum-signin{list-style:none;padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg2);color:var(--accent-hi);font-weight:700;cursor:pointer}.aurum-panel{position:absolute;right:0;top:calc(100% + 9px);min-width:220px;padding:8px;background:var(--paper)!important;border:1px solid color-mix(in srgb,var(--accent) 40%,#000);border-radius:12px;box-shadow:var(--shadow);display:grid;z-index:1500}.aurum-panel a{padding:9px 10px;border-radius:7px;color:var(--ink)!important;font-weight:700}.aurum-panel a:hover{background:var(--paper2)!important;color:var(--accent-lo)!important}.aurum-main{min-height:70vh}.aurum-context{background:var(--bg2);border-bottom:1px solid var(--line)}.aurum-context .aurum-wrap{padding-block:14px}.aurum-context .page-kicker{font:600 .65rem var(--font-mono);letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}.aurum-context .page-title{font-weight:850;color:var(--accent-hi)}.aurum-page>.section-head,.aurum-page>.admin-shell,.aurum-page>.card,.aurum-page>.container,.aurum-page>.section{max-width:var(--maxw);margin-inline:auto}.aurum-page{min-height:60vh}.aurum-page:not(:has(.aurum-hero)){padding:28px clamp(18px,4vw,34px)}.aurum-hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line);background:radial-gradient(70% 90% at 72% 45%,color-mix(in srgb,var(--accent) 24%,transparent),transparent 70%)}.aurum-hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:50px;align-items:center;padding:70px 34px 85px}.aurum-eyebrow{font:600 .7rem var(--font-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}.aurum-eyebrow.dark{color:var(--accent-lo)}.aurum-hero h1{font:900 clamp(2.6rem,5vw,4.3rem)/1.06 var(--font-display);color:var(--on-dark);margin:18px 0}.aurum-hero h1 em{font-style:normal;color:var(--accent-hi)}.aurum-lede{max-width:48ch;color:var(--muted);font-size:1.06rem}.aurum-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}.aurum-btn{display:inline-flex;padding:11px 20px;border-radius:999px;font-weight:800}.aurum-btn-gold{background:linear-gradient(150deg,var(--accent-hi),var(--accent) 48%,var(--accent-lo));color:#171205!important}.aurum-btn-ghost{border:1px solid var(--accent-lo);color:var(--accent-hi)!important}.aurum-meta{display:flex;gap:24px;flex-wrap:wrap;margin-top:34px;padding-top:22px;border-top:1px solid var(--line)}.aurum-meta b{display:block;color:var(--accent-hi);font:700 1rem var(--font-mono)}.aurum-meta span{color:var(--muted);font-size:.75rem}.aurum-seal{aspect-ratio:1;border-radius:24px;border:1px solid transparent;background:radial-gradient(100% 100% at 30% 15%,var(--bg2),var(--bg)) padding-box,linear-gradient(150deg,var(--accent-lo),var(--accent-hi),var(--accent),var(--accent-lo)) border-box;display:grid;place-items:center;box-shadow:var(--shadow)}.aurum-seal-ring{width:65%;aspect-ratio:1;border-radius:50%;border:8px double var(--accent);display:grid;place-items:center;align-content:center;box-shadow:inset 0 0 0 2px var(--accent-hi)}.aurum-seal-ring span{font:900 clamp(3rem,7vw,6rem) var(--font-display);color:var(--accent-hi)}.aurum-seal-ring small{font:600 .65rem var(--font-mono);letter-spacing:.25em;color:var(--accent)}.aurum-section{padding-block:60px}.aurum-paper{background:var(--paper);color:var(--ink);border-radius:20px;padding:clamp(24px,4vw,44px);border:1px solid var(--accent-lo);box-shadow:var(--shadow)}.aurum-section-head{display:flex;justify-content:space-between;align-items:end;gap:20px;margin:10px 0 28px}.aurum-section-head h2{color:var(--ink)}.aurum-section-head a{color:var(--accent-lo)!important;font-weight:800}.aurum-page .card,.aurum-page .table-wrap,.aurum-page .panel-tabs,.aurum-page .admin-nav{border-color:color-mix(in srgb,var(--accent-lo) 35%,#bbb)}.aurum-page .btn-primary{background:var(--accent)!important;border-color:var(--accent)!important;color:#171205!important}.aurum-footer{border-top:1px solid var(--line);background:var(--bg2);padding:35px 0;color:var(--muted)}.aurum-footer .aurum-wrap{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap}.aurum-footer strong,.aurum-footer a{color:var(--accent-hi)!important}.aurum-footer p{max-width:50ch;margin:.4rem 0 0}@media(max-width:900px){.aurum-hero-grid{grid-template-columns:1fr}.aurum-seal{max-width:460px}.aurum-menu{display:none}.aurum-nav-in{gap:8px}.aurum-actions{margin-left:auto;flex-wrap:wrap}.aurum-context{margin-top:0}}",
+      "display_order": 50
+    },
+    "js/theme.js": {
+      "kind": "script",
+      "media_type": "application/javascript",
+      "content": "(()=>{'use strict';document.querySelectorAll('.aurum-dd').forEach(menu=>menu.addEventListener('toggle',()=>{if(menu.open)document.querySelectorAll('.aurum-dd').forEach(other=>{if(other!==menu)other.open=false;});}));})();\n",
+      "display_order": 60
+    }
+  },
+  "assets": []
+}

@@ -1,0 +1,35 @@
+<check if="{{ @is_platform_admin }}">
+<div class="modal-backdrop" id="quickActionModal" role="dialog" aria-modal="true" aria-labelledby="quickActionTitle">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div><div class="eyebrow">Administration</div><h3 id="quickActionTitle">Quick action</h3></div>
+      <button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="quick-actions">
+        <button class="quick-action" type="button" data-open-modal="quickAddPersonModal"><strong>＋ Add person</strong><span>Open the person form immediately.</span></button>
+        <a class="quick-action" href="/admin/courses"><strong>▦ Manage courses</strong><span>Owners, editors, learners, revisions, import and preview.</span></a>
+        <a class="quick-action" href="/admin?tab=themes"><strong>◈ Theme Studio</strong><span>Inspect, activate, import and export themes.</span></a>
+        <a class="quick-action" href="/admin?tab=reports"><strong>▥ Reports &amp; logs</strong><span>Learning statistics, audit history and operational activity.</span></a>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close-modal>Close</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="quickAddPersonModal" role="dialog" aria-modal="true" aria-labelledby="quickAddPersonTitle">
+  <div class="modal-card">
+    <div class="modal-head"><div><div class="eyebrow">People</div><h3 id="quickAddPersonTitle">Add person</h3></div><button class="close-btn" type="button" data-close-modal aria-label="Close">×</button></div>
+    <form action="/admin/people" method="post">
+      <div class="modal-body"><input type="hidden" name="csrf" value="{{ @csrf }}"><div class="form-grid">
+        <div class="field"><label>First name</label><input name="first_name" required></div>
+        <div class="field"><label>Last name</label><input name="last_name" required></div>
+        <div class="field full"><label>Email address</label><input type="email" name="email" required></div>
+        <div class="field full"><label>Initial role</label><select name="role"><option value="student">Learner</option><option value="course_editor">Course Editor</option><option value="course_owner">Course Owner</option><option value="company_admin">Company Administrator</option><option value="platform_admin">Platform Administrator</option></select><div class="help">The person is initially added to the System Company. Open their full profile afterwards only if they belong to another company.</div></div>
+        <div class="field full"><label><input type="checkbox" name="send_notice" value="1" style="width:auto;margin-right:7px"> Send plain account notification email</label></div>
+      </div></div>
+      <div class="modal-foot"><button class="btn btn-ghost" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Create person</button></div>
+    </form>
+  </div>
+</div>
+</check>
