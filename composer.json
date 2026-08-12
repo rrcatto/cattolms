@@ -1,0 +1,67 @@
+{
+  "name": "catto-learning/lms",
+  "description": "Open-source learning commerce and delivery platform built with PHP, Fat-Free Framework and PostgreSQL.",
+  "type": "project",
+  "require": {
+    "bcosca/fatfree-core": "^3.9",
+    "ext-dom": "*",
+    "ext-fileinfo": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-openssl": "*",
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*",
+    "ext-zip": "*",
+    "mcp/sdk": "^0.7",
+    "php": ">=8.4 <9.0",
+    "robmorgan/phinx": "^0.16",
+    "symfony/mailer": "^7.4",
+    "vlucas/phpdotenv": "^5.6"
+  },
+  "require-dev": {
+    "phpstan/phpstan": "^2.1",
+    "phpunit/phpunit": "^12.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "CattoLearning\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "CattoLearning\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true,
+    "allow-plugins": {
+      "php-http/discovery": true
+    },
+    "platform": {
+      "php": "8.5.9"
+    }
+  },
+  "scripts": {
+    "analyse": "php -d memory_limit=-1 vendor/bin/phpstan analyse",
+    "migrate": "vendor/bin/phinx migrate -c phinx.php -e production",
+    "migrate-dev": "vendor/bin/phinx migrate -c phinx.php -e development",
+    "migrations:status": "vendor/bin/phinx status -c phinx.php -e production",
+    "test": "vendor/bin/phpunit",
+    "architecture:check": "php tools/check-architecture.php",
+    "release:validate": "php tools/validate-release.php",
+    "api-token:create": "php tools/create-api-token.php",
+    "api-token:list": "php tools/list-api-tokens.php",
+    "mcp:serve": "php tools/mcp-server.php",
+    "api-token:revoke": "php tools/revoke-api-token.php",
+    "runtime:check": "php tools/check-runtime-hazards.php"
+  },
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Richard Catto",
+      "role": "Project creator and maintainer"
+    }
+  ],
+  "version": "0.5.4"
+}

@@ -1,0 +1,6 @@
+<section class="container cl-narrow py-5"><div class="card shadow-sm border-0"><div class="card-body p-4 p-lg-5">
+  <span class="cl-kicker text-primary">Organisation account</span><h1 class="h2 fw-bold mt-2">Register a company</h1>
+  <p>No CIPC registration or DNS verification is required in the MVP. The domain is reserved to the company account, and the administrator and future students must use email addresses at that exact domain.</p>
+  <div class="alert alert-secondary">Your current primary email is <strong>{{ @user_email }}</strong>. The entered domain must match the part after <strong>@</strong>.</div>
+  <form action="/company/register" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><div class="mb-3"><label class="form-label" for="name">Company or organisation name</label><input class="form-control" id="name" name="name" maxlength="160" required></div><div class="mb-3"><label class="form-label" for="domain">Company email domain</label><input class="form-control" id="domain" name="domain" placeholder="example.co.za" required><div class="form-text">Enter the domain only. Public webmail domains are not accepted.</div></div><button class="btn btn-primary btn-lg" type="submit">Create company account</button></form>
+</div></div></section>

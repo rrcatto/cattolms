@@ -1,0 +1,102 @@
+<section class="cl-page-head">
+  <div class="container-fluid cl-container-wide py-5">
+    <a class="cl-back-link" href="/admin/courses/{{ @course.id }}">← Course editor</a>
+    <span class="cl-kicker d-block mt-3">Certificate settings</span>
+    <h1 class="display-5 fw-bold">{{ @course.title }}</h1>
+  </div>
+</section>
+<section class="container-fluid cl-container-wide py-5">
+  <div class="row g-4">
+    <div class="col-xl-6">
+      <form class="card" action="/admin/courses/{{ @course.id }}/certificate" method="post">
+        <input type="hidden" name="csrf" value="{{ @csrf }}">
+        <div class="card-body p-4">
+          <h2 class="h4">Basic certificate settings</h2>
+          <p class="text-body-secondary">These fields control the ordinary certificate data. You do not need to edit HTML or CSS to change the wording or signatory.</p>
+
+          <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="certificate-enabled" name="certificate_enabled" value="1" {{ @course.certificate_enabled ? 'checked' : '' }}>
+            <label class="form-check-label" for="certificate-enabled">Issue a certificate after a passing overall result</label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="certificate-title">Certificate title</label>
+            <input class="form-control" id="certificate-title" name="certificate_title" maxlength="240" value="{{ @course.certificate_title }}">
+            <div class="form-text">Used by <code>&#123;&#123;certificate_title&#125;&#125;</code>.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="certificate-body">Certificate body text</label>
+            <input class="form-control" id="certificate-body" name="certificate_body_text" maxlength="500" value="{{ @course.certificate_body_text }}">
+            <div class="form-text">Used by <code>&#123;&#123;certificate_body&#125;&#125;</code>.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="certificate-footer">Certificate footer</label>
+            <input class="form-control" id="certificate-footer" name="certificate_footer_text" maxlength="500" value="{{ @course.certificate_footer_text }}">
+            <div class="form-text">Optional. Used by <code>&#123;&#123;certificate_footer&#125;&#125;</code>.</div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" for="signatory-name">Signatory name</label>
+              <input class="form-control" id="signatory-name" name="certificate_signatory_name" maxlength="160" value="{{ @course.certificate_signatory_name }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="signatory-title">Signatory title</label>
+              <input class="form-control" id="signatory-title" name="certificate_signatory_title" maxlength="160" value="{{ @course.certificate_signatory_title }}">
+            </div>
+          </div>
+
+          <details class="advanced-theme-editor mt-4">
+            <summary><strong>Advanced certificate template</strong><span>HTML and CSS</span></summary>
+            <div class="advanced-theme-body p-3">
+              <div class="mb-3">
+                <label class="form-label" for="certificate-html">Certificate HTML</label>
+                <textarea class="form-control cl-rich-editor" id="certificate-html" name="certificate_template_html" rows="18" required>{{ @course.certificate_template_html }}</textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="certificate-css">Certificate CSS</label>
+                <textarea class="form-control font-monospace" id="certificate-css" name="certificate_template_css" rows="12">{{ @course.certificate_template_css }}</textarea>
+              </div>
+            </div>
+          </details>
+
+          <button class="btn btn-primary mt-4" type="submit">Save certificate settings</button>
+        </div>
+      </form>
+
+      <div class="card mt-4">
+        <div class="card-body p-4">
+          <h2 class="h4">Certificate placeholders</h2>
+          <p class="text-body-secondary">Issued certificates snapshot the rendered certificate and its important course/result data so later course edits do not rewrite an existing certificate.</p>
+          <div class="table-responsive">
+            <table class="table align-middle small">
+              <thead><tr><th>Placeholder</th><th>Meaning and control</th></tr></thead>
+              <tbody>
+                <tr><td><code>&#123;&#123;student_name&#125;&#125;</code></td><td>Learner certificate name from Profile; falls back to display name, then primary email.</td></tr>
+                <tr><td><code>&#123;&#123;course_title&#125;&#125;</code></td><td>The course title controlled in the course editor.</td></tr>
+                <tr><td><code>&#123;&#123;course_provider&#125;&#125;</code></td><td>Automatically uses the owning Course Provider company. Platform-owned courses use the System Company.</td></tr>
+                <tr><td><code>&#123;&#123;completion_date&#125;&#125;</code></td><td>The learner's recorded course completion date.</td></tr>
+                <tr><td><code>&#123;&#123;overall_percentage&#125;&#125;</code></td><td>System-calculated overall course result.</td></tr>
+                <tr><td><code>&#123;&#123;overall_grade&#125;&#125;</code></td><td>System-calculated grade code from the course grade bands.</td></tr>
+                <tr><td><code>&#123;&#123;certificate_number&#125;&#125;</code></td><td>Unique certificate number generated by the LMS.</td></tr>
+                <tr><td><code>&#123;&#123;certificate_verification_url&#125;&#125;</code></td><td>Public verification URL generated by the LMS.</td></tr>
+                <tr><td><code>&#123;&#123;signatory_name&#125;&#125;</code></td><td>Controlled by the Signatory name field above.</td></tr>
+                <tr><td><code>&#123;&#123;signatory_title&#125;&#125;</code></td><td>Controlled by the Signatory title field above.</td></tr>
+                <tr><td><code>&#123;&#123;certificate_title&#125;&#125;</code></td><td>Controlled by the Certificate title field above.</td></tr>
+                <tr><td><code>&#123;&#123;certificate_body&#125;&#125;</code></td><td>Controlled by the Certificate body text field above.</td></tr>
+                <tr><td><code>&#123;&#123;certificate_footer&#125;&#125;</code></td><td>Optional footer text controlled by the Certificate footer field above.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-6">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h4 mb-0">Live sample</h2>
+        <span class="text-body-secondary">Sample learner: {{ @sample_name }}</span>
+      </div>
+      <div class="cl-certificate-preview-frame">{{ @certificate_preview_html | raw }}</div>
+      <p class="form-text mt-3">The sample uses the current saved values. Save the form to refresh the preview.</p>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,98 @@
+{
+  "format": "catto-learning-theme",
+  "schema_version": "1.0",
+  "theme": {
+    "name": "{{THEME_NAME}}",
+    "slug": "{{THEME_SLUG}}",
+    "version": "1.0.0",
+    "author": "",
+    "generated_by": "Catto Learning Theme SDK",
+    "created_at": "{{SAST_TIMESTAMP}}",
+    "description": "A Catto Learning Theme Package 1.0 theme."
+  },
+  "templates": {
+    "base": "templates/base.html",
+    "header": "templates/header.html",
+    "footer": "templates/footer.html",
+    "sidebar": null
+  },
+  "pages": {
+    "home": "pages/home.html"
+  },
+  "stylesheets": [
+    "css/style.css"
+  ],
+  "scripts": [
+    "js/theme.js"
+  ],
+  "assets": [],
+  "external": {
+    "stylesheets": [],
+    "scripts": []
+  },
+  "palettes": {
+    "rose": {
+      "name": "Rose & Ice",
+      "colours": [
+        "#64113F",
+        "#DE4D86",
+        "#F29CA3",
+        "#F7CACD",
+        "#84E6F8"
+      ]
+    },
+    "citrus": {
+      "name": "Citrus",
+      "colours": [
+        "#EAF2E3",
+        "#61E8E1",
+        "#F25757",
+        "#F2E863",
+        "#F2CD60"
+      ]
+    },
+    "ocean": {
+      "name": "Ocean & Sun",
+      "colours": [
+        "#094074",
+        "#3C6997",
+        "#5ADBFF",
+        "#FFDD4A",
+        "#FE9000"
+      ]
+    },
+    "signal": {
+      "name": "Signal",
+      "colours": [
+        "#D00000",
+        "#FFBA08",
+        "#3F88C5",
+        "#032B43",
+        "#136F63"
+      ]
+    },
+    "woodland": {
+      "name": "Woodland",
+      "colours": [
+        "#606C38",
+        "#283618",
+        "#FEFAE0",
+        "#DDA15E",
+        "#BC6C25"
+      ]
+    },
+    "tranquil": {
+      "name": "Tranquil",
+      "colours": [
+        "#1F363D",
+        "#40798C",
+        "#70A9A1",
+        "#9EC1A3",
+        "#CFE0C3"
+      ]
+    }
+  },
+  "active_palette": "ocean",
+  "design": {},
+  "advanced_css": null
+}

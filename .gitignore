@@ -1,0 +1,15 @@
+/vendor/
+/.env
+/.env.local
+/.env.*.local
+/public_html/theme-assets/*
+!/public_html/theme-assets/.gitkeep
+/.phpunit.cache/
+/.phpstan.cache/
+/coverage/
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+*.log
+/generated-themes/

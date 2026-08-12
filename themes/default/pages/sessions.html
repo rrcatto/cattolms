@@ -1,0 +1,9 @@
+<section class="container cl-medium py-5"><div class="d-flex justify-content-between align-items-end mb-4"><div><span class="cl-kicker text-primary">Account security</span><h1 class="h2 fw-bold mb-0">Active sessions</h1></div><a href="/account/profile">Back to profile</a></div>
+  <div class="list-group shadow-sm">
+    <repeat group="{{ @sessions }}" value="{{ @session }}">
+      <div class="list-group-item p-4"><div class="d-flex flex-column flex-md-row justify-content-between gap-3"><div><strong>{{ @session.user_agent }}</strong><check if="{{ @session.is_current }}"><span class="badge text-bg-success ms-2">Current</span></check><div class="small text-secondary mt-2">Created {{ @session.created_at }} · Last active {{ @session.last_seen_at }} · Expires {{ @session.expires_at }}</div><check if="{{ @session.revoked_at }}"><div class="text-danger small">Revoked {{ @session.revoked_at }}</div></check></div>
+        <check if="{{ !@session.revoked_at }}"><form action="/account/sessions/revoke" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><input type="hidden" name="session_id" value="{{ @session.public_id }}"><button class="btn btn-outline-danger" type="submit">Revoke</button></form></check>
+      </div></div>
+    </repeat>
+  </div>
+</section>
