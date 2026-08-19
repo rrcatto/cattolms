@@ -1,5 +1,158 @@
 # Changelog
 
+## 2026-08-19 04:20 SAST — v0.5.7.4 handoff/test/documentation cleanup
+
+- Corrected the remaining auth integration assertion to the canonical uppercase `STUDENT` role key.
+- Consolidated 18 overlapping `docs/` Markdown files into six canonical documents for a cleaner Claude Code handoff.
+- Published a self-contained Theme SDK 3.1 that incorporates navigation, icon, workspace, component, honeypot, pagination and full page-family guidance without requiring private codebase documentation.
+- Reframed 0.5.7.4 as pre-Commerce stabilisation in progress rather than claiming browser acceptance work is complete.
+- No LMS version change, database schema change or theme package change is part of this handoff cleanup.
+
+## 2026-08-19 00:53 SAST — v0.5.7.4 pre-Commerce architecture and theme synchronisation release
+
+- Rebased the disposable development database onto one v0.5.7.4 baseline migration and a clean `audit_log`.
+- Replaced hard-coded role authorization with database-managed Roles/Permissions ACL, a protected `ADMIN` recovery role, 63 secure-action permissions, role-permission assignments and an Administration Roles & ACL editor with explicit Save and structured audit changes.
+- Added consolidated Account and Company workspaces with semantic standalone routes and stable Theme API section objects. Account now separates Dashboard, Profile, My Learning, Sessions and Activity; the Dashboard reports current/completed learning, progress, grades and certificate state.
+- Made standard primary and footer navigation core-owned and permission-filtered, with Company promoted to a first-level navigation family when authorised.
+- Replaced Administration Companies cards with a paginated table and added paginated Activity with raw IP and optional Geocoder PHP/GeoLite2 location flags.
+- Fixed Theme Manager filesystem discovery and re-synchronisation so canonical manifest identity, direct legacy installations and one-enclosing-directory legacy packages are recovered even when database registry rows are absent or stale.
+- Reduced bundled optional theme weight: only Factory Reset remains in `extras/themes`; persistent installed themes remain filesystem-authoritative.
+- Updated Factory Reset to render the core-owned standard navigation and footer arrays.
+- Made Theme SDK guidance self-contained for external theme generators and recorded later certificate PDF, mobile/SMS verification, messaging, social linking/sharing/referral marketing and company-embedding work in the roadmap.
+
+## 2026-08-17 23:56 SAST — v0.5.7.3 Account/error-state and PHPUnit-risk patch
+
+- Added a stable `GET /account` entry route that redirects to the canonical `/account/profile` screen instead of returning a 404.
+- Preserved the current authenticated identity and role flags when rendering ordinary HTML error pages, so a 404/500 no longer falsely presents a signed-in user as logged out when authentication remains available.
+- Restored F3 error and exception handlers after the Administration Theme API reflection test so PHPUnit 12 no longer marks the test risky.
+- Added regression coverage for the `/account` entry route and authenticated error-page rendering contract.
+- No database schema or theme package change is included in this code patch.
+
+## 2026-08-17 23:12 SAST — v0.5.7.3 Administration Theme API patch
+
+- Fixed standalone Administration theme wrappers such as `/admin/themes` failing with `Undefined array key "sections"` by guaranteeing both `@admin.sections` and `@admin.section` as stable arrays on every admin-family render.
+- Added regression coverage for consolidated, standalone and detail/editor Administration Theme API contexts.
+- Corrected the stale Gilded Noir breadcrumb unit contract from `gn-breadcrumb-bar` to the actual bundled `gn-breadcrumb-strip` class.
+- Prevented ThemeRenderer from calling `http_response_code()` again while F3 is already handling an error response, removing the secondary warning seen after rendered 4xx/5xx errors.
+- No theme package or database schema change is included in this patch.
+
+## 2026-08-17 21:26 SAST — v0.5.7.3 presentation-neutral Administration workspace
+
+- Replaced the presentation-coupled `/admin?tab=...` model with one consolidated `/admin` workspace plus semantic standalone routes for Dashboard, Courses, People, Companies, Enrolments & Requests, Credits & Orders, Activity, Reports, Themes and Settings.
+- Added `AdministrationSectionRegistry` as the canonical top-level Administration information architecture; ThemeRenderer now derives Administration navigation and breadcrumb section identities from that registry instead of maintaining a second route/label list.
+- Split Administration data loading into complete `workspace()` and focused `sectionData()` paths so the consolidated page can load every section while standalone pages avoid unrelated datasets.
+- Extracted every top-level Administration area into a reusable platform-owned partial. `/admin` renders those fragments as collapsible sections, while `/admin/<section>` renders the same fragment as a dedicated page.
+- Exposed rendered Administration fragments to Theme Package wrappers through `@admin.sections` and `@admin.section`, allowing themes to choose accordions, tabs, sidebars or another presentation without owning forms, permissions, CSRF or business logic.
+- Removed legacy Administration tab-selection JavaScript and redirects, retained ordinary query parameters only for real data filtering, and added regression contracts for the registry, semantic routes, navigation, breadcrumbs and Theme API.
+- Updated canonical project, navigation, Theme SDK, testing, deployment, upgrade and handoff documentation for the new Administration boundary.
+- No PostgreSQL schema change is required. Gilded Noir 1.0.2 is bundled unchanged; this release does not redesign that theme.
+## 2026-08-17 17:31 SAST — v0.5.7.2 republish, release-manifest repair and complete Gilded Noir redesign
+
+- Rebuilt the 0.5.7.2 release checksum manifest only after removing patch residue; release validation now rejects `.rej` and `.orig` files so stale checksum references cannot recur.
+- Folded the expanded pre-Commerce regression suite directly into the full codebase: route smoke, authorisation matrix, destructive install smoke, theme lifecycle, bundled-theme validation, golden importer fixtures, mail retry, breadcrumb/timestamp and release-layout contracts.
+- Moved all project documentation except `README.md`, `CHANGELOG.md` and `LICENSE` into `docs/`; added `tests-to-run.md`, a current handoff, a standard navigation contract and a complete theme-component styling contract.
+- Rebuilt Gilded Noir 1.0.0 as a complete premium application skin rather than a home-page-only theme. It now styles forms, tables, filters, buttons, cards, tabs, accordions, modals, catalogue/course/assessment surfaces, account/company areas and Administration, while retaining fixed black/gold/silver/ivory colours.
+- Reworked Gilded Noir navigation with icon-enhanced Account and full Administration dropdowns; removed redundant home-header/footer navigation links and duplicate hero controls.
+- Added the supplied serpent artwork as the large footer background while retaining the original gold/black hero artwork for the front-page hero.
+- Reworked Help into native accessible accordions and added presentation-only searchable-table enhancement for substantial tables lacking an existing platform filter.
+
+## 2026-08-17 04:00 SAST — pre-Commerce regression expansion and Gilded Noir repair
+
+- Repaired Gilded Noir 1.0.0 without changing its version: `base.html` now loads platform/theme scripts, uses the platform CSRF field, and opts its dropdowns into core interaction handling.
+- Added release validation of every bundled Theme Package ZIP using the real production validator.
+- Added route smoke, authorisation matrix, explicit destructive install/reset smoke, full theme lifecycle, golden importer fixture, mail retry and breadcrumb UI contracts.
+- Kept `composer qa` non-destructive; the database-reset smoke remains an explicit `composer smoke:install` command using the normal configured development database and `composer migrate`.
+
+
+## 0.5.7.2 — release packaging, native F3 DI routing and Gilded Noir theme — 2026/08/17 03:45 SAST
+
+- Promoted the fully green stabilisation baseline to the owner-approved **0.5.7.2** release.
+- Consolidated the native F3 `CONTAINER` / PHP-DI lazy routing integration into the full shipped source tree and removed the project-local lazy route handler.
+- Carried forward the timestamp fixes, modal/cache regressions, theme-registry work and expanded regression suite already validated on the development VPS.
+- Added **Gilded Noir 1.0.0**, a new luxury gold-and-black boxed-layout theme package with a framed-page presentation, diagonal texture background, sticky dark header, breadcrumb strip, hero-image home page and large social/contact footer.
+
+## 2026-08-17 — Native F3 / PHP-DI routing integration
+
+- Registered PHP-DI directly as F3's PSR-11 `CONTAINER`.
+- Replaced custom `LazyControllerHandler` dispatch with native F3 `Class->method` route callbacks.
+- Simplified `RouteRegistrar` so it owns route declaration only and has no container dependency.
+- Added regression coverage for native F3 container-backed lazy controller resolution.
+
+## 0.5.7.2 — modal/cache repair and flexible palette contract — 2026/08/16 14:41 SAST
+
+### 2026/08/17 00:02 SAST — stabilisation regression-suite expansion
+
+- Expanded PostgreSQL-backed integration coverage for passwordless authentication and failed-mail token cleanup.
+- Added learner access lifecycle tests proving assignment does not start the access clock, Start course starts it only once, previews do not expire and expired enrolments are persisted as expired.
+- Added assessment workflow coverage for practice-vs-graded semantics, attempt limits, module completion, final weighted results and course completion.
+- Added company request coverage proving course credits match exactly by company, course and access period, remain assigned before commencement and become consumed on Start course.
+- Added publication coverage proving a published course requires valid pricing and remains editable in place without changing its public or revision identity.
+- Added importer regression coverage for retained callout markup and final assessments.
+- Added isolated Theme Manager lifecycle coverage proving a defective theme can be uninstalled and replaced by a corrected package with the same logical name/version.
+- Kept the LMS version at 0.5.7.2; this is stabilisation work, not a release/version decision.
+
+### 2026/08/16 23:51 SAST — verified green DI/testing baseline
+
+- Consolidated the PHP-DI/theme-registry development refresh with both QA repair patches into the full 0.5.7.2 source tree.
+- Corrected Theme Manager palette tests, Theme Package ZIP palette-switcher validation, UI-contract assertions and F3 handler cleanup in integration tests.
+- Modelled F3 Mapper dynamic row fields correctly for PHPStan and resolved the remaining iterable/type-analysis findings without weakening the analysis level.
+- Verified on the project PHP 8.5.9 development VPS: all PHPUnit suites pass (47 tests, 217 assertions), PHPStan passes, architecture/integration checks pass and `composer qa` passes.
+- Kept the project-owner database rule: the configured development database is used for development/integration testing regardless of its name, and `composer migrate` is the only migration command.
+
+### 2026/08/16 21:36 SAST — DI/testing and theme-registry development refresh
+
+- Replaced eager `ServiceFactory`/`AppContext` construction with a PHP-DI 7.x / PSR-11 composition root and lazy controller resolution at F3 route dispatch.
+- Made F3 `Base` an injectable framework dependency; CLI bootstrap no longer constructs F3 unless a resolved object actually requires it.
+- Added selective PHP-DI lazy proxying for the mail adapter and retained the adapter's own deferred SMTP transport construction.
+- Added Unit, Architecture and Integration PHPUnit suites plus architecture guards preventing container/service-locator leakage into controllers/services/repositories.
+- Added PostgreSQL-backed integration coverage for real controller resolution, configured database baseline, filesystem/theme-registry reconciliation and permanently consumed company-credit behaviour.
+- Added a rebuildable PostgreSQL `theme_registry` metadata index while retaining filesystem theme manifests/files as the authoritative source; Theme Manager can re-sync and display direct parent/child hierarchy.
+- Formalised Catto Learning LMS Theme SDK 3.1 including same-version defect repair and core-owned palette-switcher rules.
+- Confirmed that database role is defined by the project owner, never inferred from `DB_NAME`: the normal configured database is the current development/test database and `composer migrate` remains the only migration command.
+
+- Fixed the Administration Add Person and company-editor modal regression by making closed modals explicitly `hidden` in platform-owned HTML, CSS and JavaScript.
+- Added release-version cache busting to platform-owned CSS/JavaScript URLs so upgraded pages cannot run against cached assets from an older Catto Learning release.
+- Rolled in the revised Theme Package 3.0 palette contract: zero palettes leaves colours entirely to theme CSS; one palette is auto-sorted/deployed without a switcher; two or more enable the hideable core switcher; there is no upper limit and 3–5 is recommended. Theme Manager warns, but does not reject, themes with more than five palettes.
+- Added platform breadcrumb data and a platform-owned Contact page/form.
+- Added Factory Reset Sidebar 1.0.0 as an optional child-theme package with four palettes, dark left sidebar, Account/Administration submenus, breadcrumb utility header and expanded footer.
+- Included the current protected audio/video and course-access/IP workstream in the canonical roadmap.
+- Preserved all v0.5.7 stabilisation fixes, Factory Reset 1.0.1, Radiant Learning 3.2.1 and PHP 8.5.9 target.
+
+## 0.5.7 — stabilization, core theme interactions and automatic palettes — 2026/08/15 19:16 SAST
+
+- Moved required LMS interaction behaviour out of Factory Reset and into platform-owned JavaScript/CSS, including Administration tabs, generic tabs, modals, dropdown management, filters, Activity polling and SMTP password controls.
+- Added the core three-palette picker. Themes opt in simply by declaring exactly three named palettes of five hex colours; Catto Learning sorts each palette darkest-to-lightest by WCAG relative luminance, calculates readable foregrounds and publishes semantic palette CSS. Themes without palettes retain complete colour control.
+- Advanced Factory Reset to immutable theme release 1.0.1 and applied the generated palette hierarchy to dark navigation/large blocks, active navigation state, accents, page background and edged primary buttons.
+- Restored Radiant Learning as installable Theme Package 3.0 release 3.2.1 with Account and Administration dropdown markup and platform-owned interaction behaviour.
+- Required Theme Package `base.html` files to render the raw `@content` slot and load `@platform.styles` and `@platform.scripts`, preventing apparently valid themes from disabling platform functionality.
+- Fixed reset-progress semantics so historical commencement/expiry and permanently consumed course-credit allocations cannot be erased or returned; cancelled enrolments remain cancelled.
+- Removed direct controller-to-repository shortcuts identified by the architecture audit and strengthened the architecture validator to reject them.
+- Removed obsolete Template API aliases, corrected `@user.name` to use the display name, and moved the homepage hero SVG to platform assets.
+- Removed nine unused Mapper wrapper classes plus dead Theme Studio/design/runtime material.
+- Added error logging for magic-link transport failures and removed the error-renderer HTTP status warning path.
+- Replaced the stale documentation set with the four canonical project documents and rebased the disposable schema to `20260815191600_create_v057_baseline.php`.
+
+## 0.5.6 — filesystem Theme Package 3.0 transition — 2026/08/15
+
+- Removed Theme Studio and database-backed theme source in favour of immutable filesystem Theme Package 3.0 releases.
+- Introduced Factory Reset 1.0.0 as the shipped default theme and platform-owned functional page bodies.
+- Removed theme export and unrelated-theme fallback behaviour.
+- Established exact name+version installation and one-level exact-parent child-theme inheritance.
+- Rebased the disposable development schema to the 0.5.6 baseline.
+- This transition release was superseded by 0.5.7 stabilization of the platform/theme boundary, release packaging and automatic palette contract.
+
+## 0.5.5 — Theme Studio workspace redesign — 2026/08/12 23:56 SAST
+
+- Rebuilt Theme Studio around the approved Claude prototype's application-style workflow without copying its fixed dark colour treatment.
+- Added persistent left-rail section navigation and a compact draft/live action bar.
+- Split the editor into Preview & Source, Identity, Colours, Typography, Navigation, Page Header & Content, Footer, Homepage Hero, Media Assets and Advanced CSS workspaces.
+- Made Theme Studio's own UI colours resolve from the palette currently being designed and update immediately while palette/semantic-role values are edited.
+- Added visual typography, navigation-position, footer and hero previews.
+- Added an independent footer save contract so footer changes do not reset unrelated layout settings.
+- Preserved Theme Package 1.0, draft/live snapshot separation, unsaved-source preview and universal live-site palette switching.
+- Set the development/runtime dependency target to PHP 8.5.9.
+- Rebased the disposable clean development migration to the 0.5.5 release identity; no business-data schema change was required.
+
 ## 0.5.4 — Theme system recovery and regression hardening
 
 ### 2026/08/12 04:03 SAST — Theme Studio colour-system hotfix

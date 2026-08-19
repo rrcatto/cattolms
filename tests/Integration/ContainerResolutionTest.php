@@ -1,0 +1,111 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CattoLearning\Tests\Integration;
+
+use Base;
+use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Http\Controller\AccountController;
+use CattoLearning\Http\Controller\AdminController;
+use CattoLearning\Http\Controller\AdminCourseCategoryController;
+use CattoLearning\Http\Controller\AdminCourseController;
+use CattoLearning\Http\Controller\AssessmentController;
+use CattoLearning\Http\Controller\AuthController;
+use CattoLearning\Http\Controller\CompanyController;
+use CattoLearning\Http\Controller\ContactController;
+use CattoLearning\Http\Controller\CourseController;
+use CattoLearning\Http\Controller\HelpController;
+use CattoLearning\Http\Controller\HomeController;
+use CattoLearning\Http\Controller\LearningController;
+use CattoLearning\Http\Controller\ThemeController;
+use CattoLearning\Http\Controller\Api\ApiCourseController;
+use CattoLearning\Http\Controller\Api\ApiLearningController;
+use CattoLearning\Http\Controller\Api\ApiProfileController;
+use CattoLearning\Http\Controller\Api\ApiStatusController;
+use CattoLearning\Http\Routing\RouteRegistrar;
+use PHPUnit\Framework\Attributes\WithoutErrorHandler;
+use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
+
+final class ContainerResolutionTest extends TestCase
+{
+    #[WithoutErrorHandler]
+    public function testEveryHttpControllerCanBeResolvedAndF3UsesNativePsr11RoutingLazily(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        $controllers = [
+            HomeController::class, AuthController::class, AccountController::class,
+            CompanyController::class, AdminController::class, CourseController::class,
+            AdminCourseController::class, AdminCourseCategoryController::class,
+            LearningController::class, AssessmentController::class, HelpController::class,
+            ContactController::class, ThemeController::class, ApiStatusController::class,
+            ApiProfileController::class, ApiCourseController::class, ApiLearningController::class,
+        ];
+
+        $f3 = null;
+        $previousContainer = null;
+        $previousQuiet = false;
+
+        try {
+            foreach ($controllers as $controller) {
+                self::assertInstanceOf($controller, $container->get($controller));
+            }
+
+            /** @var Base $f3 */
+            $f3 = $container->get(Base::class);
+            $previousContainer = $f3->get('CONTAINER');
+            $previousQuiet = (bool) $f3->get('QUIET');
+
+            $probeContainer = new class implements ContainerInterface {
+                public int $gets = 0;
+
+                public function get(string $id): mixed
+                {
+                    $this->gets++;
+                    if ($id !== NativeContainerProbeController::class) {
+                        throw new \RuntimeException('Unexpected container lookup: ' . $id);
+                    }
+                    return new NativeContainerProbeController();
+                }
+
+                public function has(string $id): bool
+                {
+                    return $id === NativeContainerProbeController::class;
+                }
+            };
+
+            $f3->set('QUIET', true);
+            $f3->set('CONTAINER', $probeContainer);
+            $routes = new RouteRegistrar($f3);
+            $routes->add('GET /__catto_native_di_probe', NativeContainerProbeController::class, 'show');
+
+            self::assertSame(0, $probeContainer->gets, 'Registering a native F3 Class->method route must not resolve its controller.');
+
+            NativeContainerProbeController::$calls = 0;
+            $f3->mock('GET /__catto_native_di_probe');
+
+            self::assertSame(1, $probeContainer->gets, 'F3 must ask the PSR-11 container for the matched controller only when the route is dispatched.');
+            self::assertSame(1, NativeContainerProbeController::$calls, 'The controller resolved by F3 must execute exactly once.');
+        } finally {
+            if ($f3 instanceof Base) {
+                $f3->set('CONTAINER', $previousContainer);
+                $f3->set('QUIET', $previousQuiet);
+            }
+            // F3 installs process-wide handlers when Base is first resolved.
+            // PHPUnit's error handler is disabled for this test; restore F3's handlers explicitly.
+            restore_error_handler();
+            restore_exception_handler();
+        }
+    }
+}
+
+final class NativeContainerProbeController
+{
+    public static int $calls = 0;
+
+    public function show(): void
+    {
+        self::$calls++;
+    }
+}

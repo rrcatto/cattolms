@@ -1,0 +1,32 @@
+{
+  "course": {
+    "title": "Golden Import Course",
+    "subtitle": "Professional Golden Fixture",
+    "summary": "A stable importer fixture for regression testing.",
+    "level": "Intermediate",
+    "default_access_period_seconds": 31536000
+  },
+  "module": {
+    "module_key": "m1",
+    "title": "Foundations",
+    "subtitle": "Golden module subtitle",
+    "assessment_required": true,
+    "question": "Module golden question?",
+    "question_points": 2,
+    "content_markers": ["callout gold-note", "Preserve this callout structure."],
+    "learning_outcome_marker": "Explain the golden rule."
+  },
+  "review": {
+    "module_key": "review",
+    "title": "Golden Review",
+    "subtitle": "Consolidation",
+    "is_review": true,
+    "assessment_required": true,
+    "question": "Review golden question?",
+    "content_marker": "golden rule"
+  },
+  "final": {
+    "question": "Final golden question?",
+    "question_points": 3
+  }
+}

@@ -1,0 +1,24 @@
+<div class="section-head"><div><h2>Courses</h2><p>One canonical list for creating, importing, reviewing and maintaining courses.</p></div><div class="row-actions"><a class="btn btn-soft btn-sm" href="/admin/courses/categories">Categories</a><a class="btn btn-soft btn-sm" href="/admin/courses/import">Import HTML course</a><a class="btn btn-primary btn-sm" href="/admin/courses/new">Create course</a></div></div>
+
+  <check if="{{ @courses }}">
+    <true>
+      <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Course</th><th>Category</th><th>Status</th><th>Structure</th><th>Ownership</th><th>Editors</th><th>Learners</th><th>Started</th><th>Revision</th><th>Updated</th><th>Actions</th></tr></thead>
+        <tbody><repeat group="{{ @courses }}" value="{{ @course }}"><tr>
+          <td><strong>{{ @course.title }}</strong><br><small class="text-body-secondary">/{{ @course.slug }}</small></td>
+          <td><span class="badge text-bg-light border">{{ @course.category_name ?: 'Uncategorised' }}</span></td>
+          <td><span class="badge cl-status-{{ @course.status }}">{{ ucfirst(@course.status) }}</span></td>
+          <td><strong>{{ @course.module_count }}</strong> modules<br><small class="text-body-secondary">{{ @course.question_count }} questions</small></td>
+          <td><strong>{{ @course.owner_company_name ?: '—' }}</strong><br><small class="text-body-secondary">{{ @course.owner_person_name ?: '—' }}</small></td>
+          <td>{{ @course.editor_count }}</td><td>{{ @course.learner_count }}</td><td>{{ @course.started_count }}</td><td>{{ @course.revision_number }}</td><td>{{ @course.updated_at }}</td>
+          <td><div class="d-flex flex-wrap gap-1">
+            <a class="btn btn-sm btn-primary" href="/admin/courses/{{ @course.id }}">Manage</a>
+            <a class="btn btn-sm btn-outline-primary" href="/admin/courses/{{ @course.id }}/preview">Preview</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/admin/courses/{{ @course.id }}/export">Export</a>
+            <check if="{{ @can_delete_courses }}"><form action="/admin/courses/{{ @course.id }}/reset" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><button class="btn btn-sm btn-warning" type="submit" data-confirm="Reset {{ @course.title }}? This removes all course content and learner test data but keeps the empty course shell for re-import.">Reset</button></form><form action="/admin/courses/{{ @course.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><button class="btn btn-sm btn-danger" type="submit" data-confirm="Permanently delete {{ @course.title }} and all associated learner access, progress, attempts and results?">Delete</button></form></check>
+          </div></td>
+        </tr></repeat></tbody>
+      </table></div></div>
+    </true>
+    <false><div class="cl-empty-state"><h2>No courses exist yet</h2><p>Import one of the existing self-study HTML files or create a course manually.</p><div class="d-flex justify-content-center gap-2"><a class="btn btn-primary" href="/admin/courses/import">Import HTML</a><a class="btn btn-outline-primary" href="/admin/courses/new">Create manually</a></div></div></false>
+  </check>

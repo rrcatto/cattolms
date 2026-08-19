@@ -1,0 +1,54 @@
+<div class="section-head admin-person-head">
+  <div><a class="back-link" href="/admin/people">← People</a><div class="eyebrow" style="margin-top:10px">Platform administration</div><h2 style="font-size:1.75rem;margin:7px 0 0">{{ @profile.first_name }} {{ @profile.last_name }}</h2><p>Complete profile, company, roles, learning access and sessions in one place.</p></div>
+  <span class="badge {{ @profile.status=='active' ? 'good' : 'danger' }}">{{ @profile.status }}</span>
+</div>
+
+<div class="card admin-person-summary">
+  <div class="profile-head">
+    <div class="avatar">U</div>
+    <div class="profile-meta">
+      <h2>{{ @profile.first_name }} {{ @profile.last_name }}</h2>
+      <p>{{ @primary_email }}<check if="{{ @company }}"> · {{ @company.name }}</check></p>
+      <div class="chip-row" style="margin-top:10px"><repeat group="{{ @roles }}" value="{{ @role }}"><span class="badge info">{{ @role }}</span></repeat></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2 section admin-person-layout">
+  <div class="card">
+    <div class="section-head"><div><h2>Complete profile</h2><p>Platform Administrators can edit the same profile information that the person can edit themselves, plus company and roles.</p></div></div>
+    <form action="/admin/people/{{ @target_user_id }}" method="post" class="form-grid">
+      <input type="hidden" name="csrf" value="{{ @csrf }}">
+      <div class="field"><label>First name</label><input name="first_name" maxlength="120" value="{{ @profile.first_name }}"></div>
+      <div class="field"><label>Last name</label><input name="last_name" maxlength="120" value="{{ @profile.last_name }}"></div>
+      <div class="field"><label>Identification number</label><input name="identification_number" maxlength="120" value="{{ @profile.identification_number }}"></div>
+      <div class="field"><label>Birthdate</label><input type="date" name="birthdate" value="{{ @profile.birthdate }}"></div>
+      <div class="field"><label>Gender</label><select name="gender"><option value="">Select</option><option {{ @profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ @profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ @profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ @profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select></div>
+      <div class="field"><label>Mobile number</label><input name="mobile_number" maxlength="60" value="{{ @profile.mobile_number }}"></div>
+      <div class="field full"><label>Display name</label><input name="display_name" maxlength="160" value="{{ @profile.display_name }}"></div>
+      <div class="field full"><label>Name on certificates</label><input name="certificate_name" maxlength="160" value="{{ @profile.certificate_name }}"></div>
+      <div class="field full"><label>Primary email</label><input type="email" name="primary_email" value="{{ @primary_email }}" required><div class="help">Administrator changes take effect immediately.</div></div>
+      <div class="field full"><label>Secondary email</label><input type="email" name="secondary_email" value="{{ @secondary_email }}"><div class="help">Leave blank to remove it. An address entered by a Platform Administrator is treated as verified.</div></div>
+      <div class="field full"><label>Company</label><select name="company_id"><repeat group="{{ @companies }}" value="{{ @co }}"><option value="{{ @co.id }}" {{ @co.id==@target_company_id ? 'selected' : '' }}>{{ @co.name }}{{ @co.is_system ? ' · System Company' : '' }}</option></repeat></select></div>
+      <div class="field full"><label>Roles</label><div class="role-checkbox-grid"><repeat group="{{ @role_options }}" value="{{ @roleOption }}"><label class="role-check"><input type="checkbox" name="roles[]" value="{{ @roleOption.role_key }}" {{ @roleOption.selected ? 'checked' : '' }}> <span><strong>{{ @roleOption.role_name }}</strong><small>{{ @roleOption.role_key }}</small></span></label></repeat></div><div class="help">The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.</div></div>
+      <div class="field full"><button class="btn btn-primary" type="submit">Save complete profile</button></div>
+    </form>
+  </div>
+
+  <div class="admin-person-side">
+    <div class="card">
+      <div class="section-head"><div><h2>Account status</h2><p>Created {{ @profile.created_at }} · Last login {{ @profile.last_login_at ?: 'Never' }}</p></div></div>
+      <form action="/admin/people/{{ @target_user_id }}/status" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><input type="hidden" name="status" value="{{ @profile.status=='active' ? 'disabled' : 'active' }}"><button class="btn {{ @profile.status=='active' ? 'btn-danger' : 'btn-primary' }}" type="submit" data-confirm="{{ @profile.status=='active' ? 'Disable this account?' : 'Enable this account?' }}">{{ @profile.status=='active' ? 'Disable account' : 'Enable account' }}</button></form>
+    </div>
+    <div class="card section">
+      <div class="section-head"><div><h2>Active sessions</h2><p>Revoke individual login sessions.</p></div></div>
+      <check if="{{ @sessions }}"><true><div class="list"><repeat group="{{ @sessions }}" value="{{ @session }}"><div class="list-item"><div><strong>{{ @session.user_agent }}</strong><p>Last used {{ @session.last_seen_at }}</p></div><div class="row-actions"><check if="{{ @session.is_current }}"><span class="badge good">Current</span></check><form action="/admin/people/{{ @target_user_id }}/sessions/revoke" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><input type="hidden" name="session_id" value="{{ @session.public_id }}"><button class="btn btn-danger btn-sm" type="submit" data-confirm="Revoke this session?">Revoke</button></form></div></div></repeat></div></true><false><div class="empty">No active sessions.</div></false></check>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-3 section admin-person-records">
+  <div class="card"><div class="section-head"><div><h2>Courses in library</h2><p>Current learner access.</p></div></div><check if="{{ @library_courses }}"><true><div class="list"><repeat group="{{ @library_courses }}" value="{{ @course }}"><div class="list-item"><div><strong>{{ @course.title }}</strong><p>{{ @course.status }} · {{ @course.progress_percentage }}% progress</p></div><a class="btn btn-soft btn-sm" href="/admin/enrolments">Manage</a></div></repeat></div></true><false><div class="empty">No courses in this library.</div></false></check></div>
+  <div class="card"><div class="section-head"><div><h2>Favourites</h2><p>Courses saved for later.</p></div></div><check if="{{ @favourites }}"><true><div class="list"><repeat group="{{ @favourites }}" value="{{ @course }}"><div class="list-item"><div><strong>{{ @course.title }}</strong></div></div></repeat></div></true><false><div class="empty">No favourites.</div></false></check></div>
+  <div class="card"><div class="section-head"><div><h2>Course requests</h2><p>Current and previous requests.</p></div></div><check if="{{ @requests }}"><true><div class="list"><repeat group="{{ @requests }}" value="{{ @request }}"><div class="list-item"><div><strong>{{ @request.course_title }}</strong><p>{{ @request.status }}</p></div></div></repeat></div></true><false><div class="empty">No course requests.</div></false></check></div>
+</div>

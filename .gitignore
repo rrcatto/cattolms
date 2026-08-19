@@ -1,9 +1,10 @@
 /vendor/
+/themes/
 /.env
 /.env.local
 /.env.*.local
-/public_html/theme-assets/*
-!/public_html/theme-assets/.gitkeep
+/public_html/themes/*
+!/public_html/themes/.gitkeep
 /.phpunit.cache/
 /.phpstan.cache/
 /coverage/
@@ -11,5 +12,8 @@
 /.vscode/
 .DS_Store
 Thumbs.db
+20260819-1617-Claude-code-cli-project instructions.md
 *.log
 /generated-themes/
+*.rej
+*.orig

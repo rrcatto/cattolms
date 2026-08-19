@@ -1,0 +1,11 @@
+<section class="section-head cl-admin-section-page-head">
+  <div>
+    <div class="eyebrow">Administration</div>
+    <h1>{{ @admin_section.label }}</h1>
+    <p>{{ @admin_section.description }}</p>
+  </div>
+  <check if="{{ @can_access_admin }}"><a class="btn btn-soft" href="/admin">All administration</a></check>
+</section>
+<section class="section cl-admin-standalone-section" data-admin-section="{{ @admin_section.key }}">
+  {{ @admin_section.content | raw }}
+</section>
