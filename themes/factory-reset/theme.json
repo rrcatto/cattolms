@@ -1,0 +1,52 @@
+{
+  "format": "catto-learning-theme",
+  "schema_version": "3.0",
+  "template_api": "1.0",
+  "theme": {
+    "name": "Factory Reset",
+    "slug": "factory-reset",
+    "version": "1.0.1",
+    "author": "Catto Learning",
+    "description": "Default Catto Learning theme with automatic core palette deployment and clear dark navigation, active-state and action hierarchy.",
+    "created_at": "2026-08-15T19:16:00+02:00"
+  },
+  "parent": null,
+  "styles": [],
+  "scripts": [],
+  "external": {
+    "styles": [],
+    "scripts": []
+  },
+  "palettes": [
+    {
+      "name": "Slate & Peach",
+      "colors": [
+        "#2A324B",
+        "#767B91",
+        "#F7C59F",
+        "#C7CCDB",
+        "#E1E5EE"
+      ]
+    },
+    {
+      "name": "Coastal Blue",
+      "colors": [
+        "#173B57",
+        "#3F88C5",
+        "#F5F9FC",
+        "#9CC7E4",
+        "#DCECF5"
+      ]
+    },
+    {
+      "name": "Forest & Sand",
+      "colors": [
+        "#24362B",
+        "#557A55",
+        "#F7F4EA",
+        "#A8B7A1",
+        "#D8B26E"
+      ]
+    }
+  ]
+}
