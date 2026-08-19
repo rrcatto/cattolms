@@ -1,4 +1,0 @@
-:root{--starter-primary:var(--cl-primary,#094074);--starter-surface:var(--cl-surface,#ffffff);--starter-ink:var(--cl-body-text,#172033)}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--starter-ink);background:var(--cl-page-background,#f5f7fb)}
-.theme-header,.theme-footer{background:var(--starter-surface);padding:1rem 5vw}.theme-nav{display:flex;gap:1rem;align-items:center}.theme-nav a{color:var(--starter-primary);text-decoration:none;font-weight:700}
-#main-content{max-width:1320px;margin:0 auto;padding:2rem 5vw}.theme-hero{min-height:420px;display:grid;align-items:center;padding:3rem;border-radius:20px;background:var(--cl-hero-background,#094074);color:var(--cl-hero-text,#ffffff)}

@@ -1,0 +1,47 @@
+/* Catto Learning v0.5.7.4 core platform CSS.
+   Functional visibility and interaction rules belong to the LMS, never to a theme. */
+.cl-options{margin-left:0!important;display:grid;gap:.65rem}.cl-option{display:grid!important;grid-template-columns:1.25rem minmax(0,1fr);align-items:start!important;justify-content:start!important;gap:.7rem;width:100%;text-align:left!important}.cl-option input[type="radio"]{width:1rem!important;height:1rem!important;min-width:1rem;max-width:1rem;margin:.28rem 0 0!important;padding:0!important;justify-self:start}.cl-option>span{display:block;min-width:0;text-align:left!important}
+.tab-panel{display:none}.tab-panel.active{display:block}.cl-admin-workspace{display:grid;gap:1rem}.cl-admin-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}.cl-admin-section-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-admin-section-summary::-webkit-details-marker{display:none}.cl-admin-section-title{font-weight:800}.cl-admin-section-description{font-size:.875rem;opacity:.72}.cl-admin-section-toggle{justify-self:end}.cl-admin-section-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-admin-section-link{white-space:nowrap}.cl-admin-section-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-admin-section-summary{grid-template-columns:1fr;gap:.35rem}.cl-admin-section-link{justify-self:start}}.modal-backdrop,.modal-backdrop[hidden],.modal-backdrop[aria-hidden="true"]{display:none!important}.modal-backdrop.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
+.account-menu,.rl-account-menu{position:relative}.account-menu>summary,.rl-account-menu>summary{list-style:none;cursor:pointer}.account-menu>summary::-webkit-details-marker,.rl-account-menu>summary::-webkit-details-marker{display:none}.account-menu-panel,.rl-account-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:1040;min-width:190px;padding:7px;background:#fff;border:1px solid var(--cl-border,var(--line,#dfe4ea));border-radius:10px;box-shadow:0 14px 38px rgba(23,33,43,.16);display:grid}.account-menu-panel a,.rl-account-panel a{padding:9px 11px;border-radius:7px;color:var(--ink,#18212b);font-weight:700;white-space:nowrap}.account-menu-panel a:hover,.rl-account-panel a:hover{background:color-mix(in srgb,var(--cl-accent,#274b63) 10%,white);color:var(--cl-darkest,var(--primary,#274b63))}
+.cl-password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.cl-password-control input{min-width:0}.cl-password-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;min-height:42px}.cl-password-toggle svg{width:18px;height:18px;fill:currentColor;display:block}.cl-password-toggle:disabled{opacity:.55;cursor:wait}
+.cl-palette-switcher{position:fixed;right:18px;bottom:18px;z-index:1100;width:min(310px,calc(100vw - 36px));padding:12px;border:1px solid var(--cl-border,#dfe4ea);border-radius:14px;background:#fff;color:#18212b;box-shadow:0 18px 48px rgba(15,23,42,.20)}.cl-palette-switcher[hidden]{display:none!important}.cl-palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.cl-palette-head strong{font-size:.84rem}.cl-palette-hide,.cl-palette-show{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:6px 9px;font:inherit;font-weight:700}.cl-palette-show{position:fixed;right:18px;bottom:18px;z-index:1100;box-shadow:0 8px 24px rgba(15,23,42,.14)}.cl-palette-show[hidden]{display:none!important}.cl-palette-options{display:grid;gap:6px;max-height:min(52vh,430px);overflow:auto;padding-right:2px}.cl-palette-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;border:1px solid #dbe2ea;border-radius:9px;padding:8px 9px;background:#fff;color:#18212b;text-align:left;font:inherit}.cl-palette-option.active{border-color:var(--cl-accent,#64748b);box-shadow:inset 3px 0 var(--cl-accent,#64748b)}.cl-palette-name{font-size:.78rem;font-weight:800}.cl-palette-swatches{display:flex}.cl-palette-swatch{width:17px;height:17px;border:1px solid rgba(0,0,0,.13)}.cl-palette-swatch:first-child{border-radius:5px 0 0 5px}.cl-palette-swatch:last-child{border-radius:0 5px 5px 0}
+
+/* v0.5.7.4 scalable administration/account workspace layout primitives. */
+.activity-filters{width:100%;max-width:none!important}.activity-filters .form-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));width:100%}.pagination-row{display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap}.acl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}.acl-group{min-width:0}.acl-group legend{font-weight:800;padding:0 .35rem}.acl-permission{display:grid;grid-template-columns:1.1rem minmax(0,1fr);gap:.65rem;align-items:start;padding:.6rem 0}.acl-permission input{margin-top:.25rem}.acl-permission span,.acl-permission small{display:block}.cl-account-workspace,.cl-company-workspace{display:grid;gap:1rem}.table-wrap{overflow-x:auto}.table-wrap table{min-width:720px}
+
+
+/* Contact anti-bot honeypot is core-owned functional markup. It must remain
+   available to automated form fillers while being invisible/non-interactive
+   to human visitors regardless of the active theme. */
+.cl-honeypot{position:absolute!important;left:-10000px!important;top:auto!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important}
+/* v0.5.7.4 modal viewport contract repair, 2026-08-19.
+   Core owns modal placement, scrolling and stacking; themes style the surface. */
+.modal-backdrop.open:not([hidden]){
+  position:fixed!important;
+  inset:0!important;
+  z-index:2147483000!important;
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:center!important;
+  padding:1rem!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+}
+.modal-backdrop.open:not([hidden])>.modal-card{
+  position:relative!important;
+  z-index:2147483001!important;
+  width:min(920px,calc(100vw - 2rem))!important;
+  max-width:920px!important;
+  max-height:calc(100dvh - 2rem)!important;
+  margin:auto!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+}
+body.modal-open{overflow:hidden!important}
+@media(max-width:760px){
+  .modal-backdrop.open:not([hidden]){padding:.5rem!important}
+  .modal-backdrop.open:not([hidden])>.modal-card{
+    width:calc(100vw - 1rem)!important;
+    max-height:calc(100dvh - 1rem)!important;
+  }
+}

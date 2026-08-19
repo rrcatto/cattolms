@@ -1,0 +1,11 @@
+<section class="container-fluid cl-container-wide py-5">
+  <a class="cl-back-link" href="/admin/activity">← Activity Centre</a>
+  <div class="card mt-4">
+    <div class="card-header bg-white p-4"><div class="d-flex flex-column flex-md-row justify-content-between gap-3"><div><span class="cl-kicker">{{ @event.family_label }}</span><h1 class="h3 mt-2 mb-1">{{ @event.event_label }}</h1><p class="text-body-secondary mb-0">Event #{{ @event.id }} · {{ @event.created_at }} · {{ @event.source_label }}</p></div><span class="badge text-bg-light align-self-start">{{ @event.result }}</span></div></div>
+    <div class="card-body p-4">
+      <div class="row g-4 mb-4"><div class="col-md-4"><strong>Actor</strong><div>{{ @event.actor_name }}</div></div><div class="col-md-4"><strong>Company</strong><div>{{ @event.company_name ?: '—' }}</div></div><div class="col-md-4"><strong>Subject</strong><div>{{ @event.subject }}</div></div><div class="col-md-4"><strong>IP address</strong><div>{{ @event.ip_address ?: '—' }}</div></div><div class="col-md-8"><strong>GeoIP location</strong><div>{{ @event.geo_location }}</div></div></div>
+      <check if="{{ @event.related_links }}"><div class="d-flex flex-wrap gap-2 mb-4"><repeat group="{{ @event.related_links }}" value="{{ @link }}"><a class="btn btn-outline-primary btn-sm" href="{{ @link.url }}">{{ @link.label }}</a></repeat></div></check>
+      <h2 class="h5">Structured metadata</h2><pre class="p-3 bg-body-tertiary border rounded mb-0" style="white-space:pre-wrap;word-break:break-word">{{ @event.metadata_text }}</pre>
+    </div>
+  </div>
+</section>

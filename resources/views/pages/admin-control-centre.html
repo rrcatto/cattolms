@@ -1,0 +1,23 @@
+<section class="section-head cl-admin-workspace-head">
+  <div>
+    <div class="eyebrow">Administration</div>
+    <h1>Platform administration</h1>
+    <p>Every top-level Administration area is available in one workspace. Open only the sections you need, or use the standalone section links for a dedicated page.</p>
+  </div>
+</section>
+
+<section class="cl-admin-workspace section" data-admin-workspace>
+  <repeat group="{{ @admin_sections }}" value="{{ @section }}">
+    <details class="cl-admin-section" data-admin-section="{{ @section.key }}" {{ @section.key=='dashboard' ? 'open' : '' }}>
+      <summary class="cl-admin-section-summary">
+        <span class="cl-admin-section-title">{{ @section.label }}</span>
+        <span class="cl-admin-section-description">{{ @section.description }}</span>
+        <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
+      </summary>
+      <div class="cl-admin-section-content">
+        <div class="cl-admin-section-actions"><a class="cl-admin-section-link" href="{{ @section.route }}">Open as standalone page</a></div>
+        {{ @section.content | raw }}
+      </div>
+    </details>
+  </repeat>
+</section>

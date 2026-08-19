@@ -5,8 +5,8 @@
          cacheDirectory=".phpunit.cache"
          colors="true">
   <testsuites>
-    <testsuite name="Unit">
-      <directory>tests/Unit</directory>
-    </testsuite>
+    <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>
+    <testsuite name="Architecture"><directory>tests/Architecture</directory></testsuite>
+    <testsuite name="Integration"><directory>tests/Integration</directory></testsuite>
   </testsuites>
 </phpunit>

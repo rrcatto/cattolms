@@ -3,3 +3,32 @@ parameters:
   paths:
     - src
   tmpDir: storage/cache/phpstan
+  universalObjectCratesClasses:
+    - CattoLearning\Infrastructure\Persistence\M\ApiTokensM
+    - CattoLearning\Infrastructure\Persistence\M\AssessmentAttemptsM
+    - CattoLearning\Infrastructure\Persistence\M\AssessmentOptionsM
+    - CattoLearning\Infrastructure\Persistence\M\AssessmentQuestionsM
+    - CattoLearning\Infrastructure\Persistence\M\AssessmentSessionsM
+    - CattoLearning\Infrastructure\Persistence\M\AuditLogM
+    - CattoLearning\Infrastructure\Persistence\M\AuthLoginTokensM
+    - CattoLearning\Infrastructure\Persistence\M\AuthSessionsM
+    - CattoLearning\Infrastructure\Persistence\M\BaseM
+    - CattoLearning\Infrastructure\Persistence\M\CertificatesM
+    - CattoLearning\Infrastructure\Persistence\M\CompaniesM
+    - CattoLearning\Infrastructure\Persistence\M\CourseAssessmentsM
+    - CattoLearning\Infrastructure\Persistence\M\CourseCategoriesM
+    - CattoLearning\Infrastructure\Persistence\M\CourseContentBlocksM
+    - CattoLearning\Infrastructure\Persistence\M\CourseCreditAllocationsM
+    - CattoLearning\Infrastructure\Persistence\M\CourseCreditsM
+    - CattoLearning\Infrastructure\Persistence\M\CourseEditHistoryM
+    - CattoLearning\Infrastructure\Persistence\M\CourseEnrolmentsM
+    - CattoLearning\Infrastructure\Persistence\M\CourseGradeBandsM
+    - CattoLearning\Infrastructure\Persistence\M\CourseMediaM
+    - CattoLearning\Infrastructure\Persistence\M\CourseModulesM
+    - CattoLearning\Infrastructure\Persistence\M\CoursePriceVariantsM
+    - CattoLearning\Infrastructure\Persistence\M\CourseRequestsM
+    - CattoLearning\Infrastructure\Persistence\M\CoursesM
+    - CattoLearning\Infrastructure\Persistence\M\RolesM
+    - CattoLearning\Infrastructure\Persistence\M\UserEmailsM
+    - CattoLearning\Infrastructure\Persistence\M\UsersM
+    - CattoLearning\Infrastructure\Persistence\M\WebSessionsM
