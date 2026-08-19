@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ @title }} · {{ @app_name }}</title>
+  <meta name="description" content="Structured self-study courses, progress tracking and assessments.">
+  <repeat group="{{ @platform.styles }}" value="{{ @resourceUrl }}"><link href="{{ @resourceUrl }}" rel="stylesheet"></repeat>
+  <repeat group="{{ @theme.external_styles }}" value="{{ @resourceUrl }}"><link href="{{ @resourceUrl }}" rel="stylesheet"></repeat>
+  <repeat group="{{ @theme.styles }}" value="{{ @resourceUrl }}"><link href="{{ @resourceUrl }}" rel="stylesheet"></repeat>
+</head>
+<body class="{{ @body_class }} {{ @course_content_mode ? 'cl-course-page' : '' }}">
+<check if="{{ @is_authenticated }}">
+  <true>
+    <div class="app-shell">
+      <include href="partials/navigation.html" />
+      <main class="main">
+        <header class="topbar" data-theme-breadcrumb>
+          <div class="topbar-left">
+            <button class="icon-btn mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
+            <div><div class="page-kicker">{{ @page_kicker }}</div><div class="page-title">{{ @page_title ?: @title }}</div></div>
+          </div>
+          <div class="top-actions"><span class="small muted">{{ @user_name ?: @user_email }}</span></div>
+        </header>
+        <div class="content">
+          <include href="partials/flash.html" />
+          {{ @content | raw }}
+          <include href="partials/footer.html" />
+        </div>
+      </main>
+    </div>
+  </true>
+  <false>
+    <div class="public-shell">
+      <nav class="public-nav" data-theme-nav><div class="public-nav-inner"><a class="brand" href="/"><span class="brand-mark">CL</span><span><strong>{{ @app_name }}</strong><small>Learning platform</small></span></a><div class="public-links"><repeat group="{{ @navigation }}" value="{{ @nav }}"><check if="{{ @nav.method != 'POST' }}"><a class="btn {{ @nav.key=='signin' ? 'btn-primary' : 'btn-ghost' }}" href="{{ @nav.href }}" data-nav-item="{{ @nav.key }}">{{ @nav.label }}</a></check></repeat></div></div></nav>
+      <main class="public-main"><include href="partials/flash.html" />{{ @content | raw }}</main>
+      <include href="partials/footer.html" />
+    </div>
+  </false>
+</check>
+<repeat group="{{ @platform.scripts }}" value="{{ @resourceUrl }}"><script src="{{ @resourceUrl }}"></script></repeat>
+<repeat group="{{ @theme.external_scripts }}" value="{{ @resourceUrl }}"><script src="{{ @resourceUrl }}"></script></repeat>
+<repeat group="{{ @theme.scripts }}" value="{{ @resourceUrl }}"><script src="{{ @resourceUrl }}"></script></repeat>
+</body>
+</html>
