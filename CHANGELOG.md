@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-08-20 06:17 SAST — v0.5.7.5 ACL corrective patch
+
+- Corrected the baseline rollback to drop the actual `enforce_user_role_family()` and `enforce_role_permission_boundary()` functions; obsolete `_universe` names are no longer present.
+- Removed an unused `CompanyService` dependency from `AdminController` and simplified ThemeManager asset fingerprint checking to restore PHPStan level-6 cleanliness.
+- Replaced CompanyController's shared platform-dashboard scope check on write operations with the matching `PLATFORM.PERSON.MANAGE`, `PLATFORM.REQUEST.MANAGE` and `PLATFORM.ENROLMENT.MANAGE` capabilities.
+- Replaced the final controller `hasRole('ADMIN')` media-access bypass with `PLATFORM.DASHBOARD.VIEW`, because the bypass is platform-wide read scope; `COURSE.MEDIA.MANAGE` remains course-management authority and must not become a global media bypass.
+- Added ACL regression coverage for platform write scope and controller role-name bypasses.
+- Removed the invented closed-set documentation restriction from tests, release validation and prose. The six established documents remain the core briefing set, while additional audits, design notes and working documents are allowed.
+- No version bump or Seed Database implementation is included in this same-version corrective patch.
+
+## 2026-08-20 04:20 SAST — v0.5.7.5 ACL simplification and Commerce permission reservation
+
+- Simplified the first v0.5.7.5 ACL design after independent review: removed mirrored `REAL.*` / `SEED.*` business permission namespaces and replaced them with one shared business capability catalogue.
+- Adopted resource-first/action-last uppercase dot notation such as `COMPANY.PERSON.MANAGE`, `COURSE.PUBLICATION.REQUEST` and `PLATFORM.ENROLMENT.VIEW`.
+- Restored normal built-in role keys `STUDENT`, `COMPANY_ADMIN`, `COURSE_EDITOR` and `COURSE_OWNER`; retained separate `SEED_*` role counterparts for future generated identities without duplicating business permissions.
+- Kept `SYSTEM.*` as ADMIN-only platform-infrastructure authority and retained immutable ADMIN recovery semantics.
+- Kept normal/SEED role-family assignment guards while explicitly separating role family from the future REAL/SEED data-universe boundary; Seed Database will enforce data isolation through `seed_token`-aware queries/schema instead of permission-key switching.
+- Retained the genuine ACL fixes from the wider audit: Course Editor/Owner differentiation, separate request/enrolment capabilities, explicit `COMPANY.CREATE`, publication-request vs publish authority, relationship-based scope and removal of duplicate `API.*` ACL keys.
+- Reserved 14 Commerce permissions for cart, checkout, learner/company/platform orders and payments, reconciliation and refunds so Commerce can reuse the established ACL without another permission-schema rename.
+- Updated ACL/navigation/controller contracts, Administration role UI, validators and canonical documentation for the simplified model.
+- Kept Seed Database before Commerce in the approved roadmap. Seed tables, `seed_token`, generation, cleanup and REAL/SEED query filtering remain deliberately unimplemented until the next stage.
+- The disposable development database remains rebased onto one v0.5.7.5 baseline migration, so installation requires an explicit database reset.
+
+## 2026-08-19 17:43 SAST — v0.5.7.4 final handoff repairs
+
+- Restored one path-only `application.log` entry for every dynamic HTTP request; query strings are excluded so magic-link tokens and other parameters are not written to the log.
+- Added content fingerprints to core and theme asset URLs so same-version defect repairs invalidate stale browser caches without changing the LMS or theme version.
+- Confirmed the companion Gilded Noir 1.1.3 same-version repair fixes the front-page information blocks at the actual defective CSS rule: desktop uses two peer columns; responsive layouts return to one column.
+- Confirmed the Gilded Noir modal/footer stacking defect is fixed in the theme itself by promoting the existing main stacking context only while a core modal is open; core retains modal open/close/Escape behaviour.
+- Updated the six canonical documents to record these defects as resolved while keeping remaining pre-Commerce acceptance work explicit.
+- No LMS version bump, database schema change, or theme version bump.
+
 ## 2026-08-19 04:20 SAST — v0.5.7.4 handoff/test/documentation cleanup
 
 - Corrected the remaining auth integration assertion to the canonical uppercase `STUDENT` role key.

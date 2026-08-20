@@ -1,8 +1,8 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.5.7.4  
+**Current approved LMS version:** 0.5.7.5  
 **Runtime target:** PHP 8.5.9  
-**Current phase:** TEST/DEV, pre-Commerce stabilisation
+**Current phase:** TEST/DEV; simplified ACL foundation, Seed Database next, Commerce after seed acceptance
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -18,9 +18,9 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 - Do not release/rebuild/repackage unless explicitly requested in that turn.
 - If a release is requested, build from the latest approved source and canonical documentation; never reuse a stale ZIP/installer.
 - The database is currently disposable TEST/DEV data. Destructive reset/reseed is acceptable until the project owner explicitly declares production.
-- Commerce must not begin until the stabilisation blockers in `HANDOFF.md` are resolved and the VPS QA/browser acceptance gate is clean.
-- Equivalent UI patterns must use the same core markup/classes and the same established theme treatment. Once a component treatment has been accepted (for example the Administration accordion), reuse it for the same interaction pattern in Account, Company and elsewhere; do not invent page-specific variants unless the project owner explicitly requests a different design.
-- Never change an accepted design style merely for variety. Preserve the established visual language and make only the specific visual changes requested.
+- Seed Database is the next feature stage. Commerce follows after the seed-data isolation and representative-data test stage has been accepted.
+- Equivalent UI patterns must use the same core markup/classes and established theme treatment. Do not create page-specific variants unless explicitly requested.
+- Never change an accepted design style merely for variety. Make only the requested visual changes.
 
 ## 3. Runtime and composition architecture
 
@@ -36,17 +36,112 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 
 ## 4. Roles, permissions and ACL
 
-- `roles`: uppercase `role_key`, human `role_name`, `role_description`.
-- `permissions`: canonical system capabilities.
-- `role_permissions`: permissions assigned to roles.
-- `user_roles`: roles assigned to users.
-- There is deliberately no per-user permission override table; create another role when a different capability profile is required.
-- `ADMIN` / `Administrator` / `System Administrator` is the immutable super-role and always receives every permission.
-- `APP_ADMIN_EMAIL` is the ADMIN recovery identity if the database role/assignment is damaged.
-- Controllers use explicit permission guards; themes never enforce authorisation.
-- The current 0.5.7.4 permission catalogue is known to be too coarse for some company-vs-platform resource scopes. The required redesign is in `HANDOFF.md`; do not paper over it by hard-coding role names.
+The ACL deliberately separates three questions:
 
-## 5. Core-owned workspaces and navigation
+```text
+role -> permissions        = what may this identity do?
+data universe             = which REAL or SEED records may it see/use?
+resource relationship     = which specific own/company/assigned/platform records are in scope?
+```
+
+Do not encode all three concerns into permission names.
+
+### Permission catalogue
+
+Business capabilities use **one shared permission catalogue**. There are no parallel `REAL.*` and `SEED.*` business permission namespaces.
+
+Permission keys use uppercase dot notation, broad resource first and action last. Examples:
+
+```text
+ACCOUNT.PROFILE.VIEW
+COMPANY.PERSON.MANAGE
+COURSE.PUBLICATION.REQUEST
+PLATFORM.ENROLMENT.MANAGE
+```
+
+`SYSTEM.*` is reserved for platform infrastructure rather than business data:
+
+```text
+SYSTEM.THEME.VIEW
+SYSTEM.THEME.MANAGE
+SYSTEM.SETTING.VIEW
+SYSTEM.SETTING.MANAGE
+SYSTEM.ROLE.VIEW
+SYSTEM.ROLE.MANAGE
+SYSTEM.DATABASE.PRUNE
+SYSTEM.MAIL.TEST
+SYSTEM.SEED.VIEW
+SYSTEM.SEED.MANAGE
+```
+
+Only genuine `ADMIN` receives SYSTEM authority.
+
+Commerce permission keys are reserved in 0.5.7.5 before Commerce code exists so Commerce does not require another ACL rename/schema sweep. The reserved set is documented in `ROADMAP.md`.
+
+### Built-in roles
+
+Role keys use uppercase snake notation. Human role names may use CamelCase.
+
+```text
+ADMIN
+STUDENT
+COMPANY_ADMIN
+COURSE_EDITOR
+COURSE_OWNER
+SEED_STUDENT
+SEED_COMPANY_ADMIN
+SEED_COURSE_EDITOR
+SEED_COURSE_OWNER
+SEED_ADMIN
+```
+
+- Every normal user receives `STUDENT` as the baseline role.
+- Future generated seed users receive `SEED_STUDENT` as their baseline role.
+- Stronger roles add capabilities rather than replacing the baseline learner role.
+- Normal and `SEED_*` roles may use the same business permission keys but cannot be mixed on one identity.
+- `SEED_ADMIN` is a test business administrator only; it receives no SYSTEM authority.
+- Seed-only roles deliberately cannot receive `COURSE.IMPORT`, `COURSE.EXPORT` or `COURSE.MEDIA.MANAGE`; generated test courses/media are managed by Seed Database rather than external package/file workflows.
+- `ADMIN` / `Administrator` / `System Administrator` is immutable, receives the complete permission catalogue and remains the recovery administrator through `APP_ADMIN_EMAIL`.
+- There is deliberately no per-user permission override table; use roles.
+
+### Scope rules
+
+Authorization is **permission + resource scope**. Do not decide ordinary company/platform/course scope solely from role names.
+
+Examples of resource scope:
+
+- own account: resource belongs to current user;
+- company scope: resource belongs to current user's active company;
+- editor scope: current user is assigned as course editor;
+- owner scope: current user owns the course;
+- platform scope: user holds the corresponding `PLATFORM.*` capability.
+
+The exceptional immutable `ADMIN` recovery boundary may remain explicit where required.
+
+### API and MCP
+
+API/MCP transport scopes are separate from ACL permissions. An API/MCP operation requires its transport scope **and** the same ordinary business permission required by the equivalent Web operation. Do not recreate `API.*` ACL permissions.
+
+## 5. REAL/SEED data isolation for the next stage
+
+REAL versus SEED is a **data-visibility property**, not a duplicated permission catalogue.
+
+Seed Database will make `seed_token` the authoritative provenance/identity-universe signal on seedable data. Repository/service queries and database constraints must enforce the boundary.
+
+Required invariants:
+
+- normal users see/interact only with REAL business records;
+- seeded users see/interact only with SEED business records;
+- genuine `ADMIN` may deliberately see/manage both;
+- REAL and SEED business records must never form cross-universe relationships;
+- seed-set tokens identify provenance/cleanup batches, not security boundaries; different seed sets may interact inside the SEED universe;
+- seed business data cannot belong to a REAL company or REAL user;
+- actions performed by seeded identities create SEED/test records;
+- seed generation uses `APP_DOMAIN` for generated email addresses and sends no email.
+
+The current 0.5.7.5 ACL includes the future `SEED_*` role family and `SYSTEM.SEED.*` infrastructure permissions, but Seed Database tables, `seed_token` columns, generation and query isolation are not implemented yet.
+
+## 6. Core-owned workspaces and navigation
 
 Core owns routes, permission filtering, data loading, forms, business controls and the canonical navigation hierarchy. Themes own presentation only.
 
@@ -60,7 +155,7 @@ Every top-level section also has a semantic standalone route. Do not reintroduce
 
 Core supplies permission-filtered `navigation` and `footer_navigation` arrays. Themes must not maintain separate hard-coded route catalogues.
 
-## 6. Theme architecture
+## 7. Theme architecture
 
 - Theme Package schema 3.0; Template API 1.0; Theme SDK 3.1.
 - Themes are filesystem-authoritative immutable presentation packages. `theme_registry` is a rebuildable database index, not the source of truth.
@@ -72,7 +167,7 @@ Core supplies permission-filtered `navigation` and `footer_navigation` arrays. T
 - Theme JavaScript is presentation-only.
 - Give external theme generators the self-contained `THEME-SDK.md`; they do not need the LMS source tree or other private project docs.
 
-## 7. Course/product invariants
+## 8. Course/product invariants
 
 - Company course credits are specific to course + access period.
 - Approval uses an exact available matching credit before purchase.
@@ -83,7 +178,7 @@ Core supplies permission-filtered `navigation` and `footer_navigation` arrays. T
 - Publication states are `draft`, `published`, `retired`, `archived`.
 - Course HTML import rules live in `COURSE-SPECIFICATION.md`.
 
-## 8. Code quality and comments
+## 9. Code quality and comments
 
 - New/modified PHP classes/interfaces require concise class-level PHPDoc stating responsibility and architectural boundary.
 - Methods should document purpose, important inputs/outputs, side effects, invariants or non-obvious behaviour where useful.
@@ -91,15 +186,15 @@ Core supplies permission-filtered `navigation` and `footer_navigation` arrays. T
 - Add regression tests for confirmed defects and high-value architectural contracts.
 - Do not claim PHPUnit/PHPStan success unless it was actually run on the PHP 8.5.9 VPS environment.
 
-## 9. Canonical documents
+## 10. Core briefing documents
 
-Only these documents are intended to brief future development:
+These documents form the required core briefing set for future development:
 
-1. `PROJECT-INSTRUCTIONS.md` — this developer brief.
-2. `HANDOFF.md` — current defects, acceptance gaps and next work.
-3. `ROADMAP.md` — future sequence and product requirements.
-4. `THEME-SDK.md` — self-contained external theme authoring specification.
-5. `COURSE-SPECIFICATION.md` — current HTML course import/authoring format.
-6. `OPERATIONS.md` — install/reset/GeoIP/testing commands.
+1. `PROJECT-INSTRUCTIONS.md`
+2. `HANDOFF.md`
+3. `ROADMAP.md`
+4. `THEME-SDK.md`
+5. `COURSE-SPECIFICATION.md`
+6. `OPERATIONS.md`
 
-Root `README.md`, `CHANGELOG.md` and `LICENSE` remain the repository-level summary/history/licence.
+Root `README.md`, `CHANGELOG.md` and `LICENSE` remain the repository-level summary/history/licence. Additional project documentation, audits, design proposals, reviews and working notes are permitted in the root or `docs/` when useful. Do not impose a fixed document-count limit; avoid stale duplication through maintenance and consolidation instead.

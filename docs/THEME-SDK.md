@@ -1,9 +1,6 @@
 # Catto Learning LMS Theme SDK 3.1
 
-**Schema:** 3.0
-**Template API:** 1.0
-**Reference LMS:** 0.5.7.4
-**Date:** 2026/08/19 14:13 SAST
+**Schema:** 3.0 · **Template API:** 1.0 · **Reference LMS:** 0.5.7.5
 
 This file is self-contained. A human or AI theme author can build a compliant theme without the LMS source code or any other project document.
 
@@ -249,7 +246,7 @@ A production theme should intentionally style:
 - tables/filtering/pagination;
 - cards/lists/metrics/callouts/empty states;
 - tabs, accordions, alerts, badges, progress/timers;
-- modals without breaking core Close/Cancel/Escape behaviour;
+- modals without breaking core Close/Cancel/Escape behaviour or allowing theme header/footer stacking contexts to paint above an open modal;
 - catalogue, course detail, pricing/favourites/actions;
 - course player, modules, outcomes and imported content wrapper;
 - assessments, options, answers, results, certificates;
@@ -273,7 +270,7 @@ Do not ship a competing palette switcher in a palette-enabled theme.
 
 ## 13. JavaScript boundary
 
-Theme JS may handle presentation such as responsive drawers or decorative transitions. It must not own ACL, routes, LMS state, grading/progress, payment state, business-form persistence, palette persistence, or core modal/dropdown business behaviour. The theme should degrade safely if presentation JS fails.
+Theme JS may handle presentation such as responsive drawers or decorative transitions. It must not own ACL, routes, LMS state, grading/progress, payment state, business-form persistence, palette persistence, or core modal/dropdown business behaviour. The theme should degrade safely if presentation JS fails. If the theme gives `main`, headers, footers or framed shells their own `position`/`z-index` stacking contexts, it must ensure an open core `.modal-backdrop` remains above those layers; fix that in theme CSS rather than replacing core modal JavaScript.
 
 ## 14. Accessibility and resilience
 
