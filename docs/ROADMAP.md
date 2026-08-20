@@ -1,42 +1,112 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.5.7.4  
-**Current stage:** pre-Commerce stabilisation in progress
+**Current LMS version:** 0.5.7.5  
+**Current stage:** simplified ACL foundation; Seed Database next
 
 Only the project owner decides future release numbers.
 
-## 1. Finish 0.5.7.4 stabilisation
+## 1. v0.5.7.5 ACL foundation
 
-Commerce remains blocked until the acceptance work in `HANDOFF.md` is complete. Key workstreams are:
+The accepted ACL architecture is deliberately smaller than the first 0.5.7.5 design:
 
-- clean full VPS QA gate;
-- real filesystem Theme Manager/re-sync diagnosis and regression coverage;
-- standard navigation/workspace cleanup across Account, Company and Administration;
-- shared accessible accordion and pagination contracts;
-- company-vs-platform ACL scope redesign and tests;
-- scalable Companies/Activity presentation;
-- browser acceptance of Factory Reset and the accepted Gilded Noir direction;
-- bounded PHP 8.5.9 compatibility/modernisation review may be performed after functional stabilisation, prioritising deprecations and measurable simplifications over cosmetic rewrites.
+- one shared business capability catalogue; no mirrored `REAL.*` / `SEED.*` permissions;
+- resource-first/action-last uppercase dot notation;
+- `SYSTEM.*` reserved for ADMIN-only platform infrastructure;
+- normal roles plus separate `SEED_*` role family for future generated identities;
+- normal and seed roles may share business permissions but cannot be mixed on one identity;
+- seed-only role profiles omit course import/export/media-management capabilities that do not belong in generated test workflows;
+- REAL/SEED data visibility will be enforced by seed-aware queries/schema, not permission-key switching;
+- differentiated Course Editor and Course Owner defaults;
+- separate request/enrolment and publication-request/publish capabilities;
+- explicit company-creation permission;
+- resource scope based on relationships + permissions rather than ordinary role-name branches;
+- API/MCP transport scope plus the same ordinary business permission used by Web.
 
-## 2. Commerce
+### Commerce permission reservation
 
-Implement one coherent commerce domain before development seeding:
+The following permissions are reserved now so Commerce does not require another ACL schema/naming pass later:
+
+```text
+COMMERCE.CART.VIEW
+COMMERCE.CART.MANAGE
+COMMERCE.CHECKOUT.START
+COMMERCE.ORDER.VIEW
+COMMERCE.PAYMENT.VIEW
+COMPANY.ORDER.VIEW
+COMPANY.PAYMENT.VIEW
+PLATFORM.ORDER.VIEW
+PLATFORM.ORDER.MANAGE
+PLATFORM.PAYMENT.VIEW
+PLATFORM.PAYMENT.MANAGE
+PLATFORM.PAYMENT.RECONCILE
+PLATFORM.REFUND.VIEW
+PLATFORM.REFUND.MANAGE
+```
+
+They are inactive capability reservations until Commerce routes/services exist.
+
+Run the complete PHP 8.5.9 VPS QA gate before treating the ACL refactor as accepted.
+
+## 2. Seed Database — next
+
+Implement Administrator-controlled, live-safe test-data infrastructure before Commerce.
+
+### Seed-set metadata
+
+- `seed_data`: one historical row per generated set, including UUIDv7 token, timestamp, description, requested soft volume, original/lifetime/current counts.
+- `seed_data_tables`: per-set/per-table original/lifetime/current counts.
+- A seed-set row remains as history even after its generated records are removed.
+- Multiple seed sets may coexist. Tokens are provenance/cleanup identifiers, **not** security boundaries; all SEED data may interact with other SEED data.
+
+### Generation
+
+- Administration requests a numeric target record volume across all seeded tables; it is a soft limit and may be exceeded slightly to maintain referential integrity.
+- Use bulk inserts and one transaction; rollback the complete set on failure.
+- Generate realistic South African people, companies, course categories/courses, assessments, enrolments/progress/results, requests, credits, sessions, certificates and audit activity appropriate to the schema.
+- Use `APP_DOMAIN` for generated email addresses; never hard-code a deployment domain.
+- Seed creation sends **zero email**. A login email is sent only when an operator explicitly requests a normal passwordless login for a chosen seed account.
+- Do not seed Themes, role definitions, permission definitions, ACL mappings, API tokens or fake course-media files.
+
+### Isolation
+
+REAL/SEED is a data-universe boundary independent of capability permissions:
+
+- only tables that can hold seed data receive nullable indexed `seed_token` references;
+- normal users and REAL business processes see only `seed_token IS NULL` data;
+- seed identities see only `seed_token IS NOT NULL` data;
+- genuine `ADMIN` may see both and explicitly select All / REAL / SEED in administrative views;
+- REAL business records may reference only REAL records; SEED records may reference only SEED records;
+- generated identities receive `SEED_STUDENT` by default plus additional `SEED_*` roles as required;
+- actions performed by seeded identities create seed/test records;
+- seed cleanup deletes only records belonging to the selected seed token and updates historical/per-table counts.
+
+### Table UI
+
+For paginated seedable datasets:
+
+- ordinary normal users see only REAL counts/data and no seed disclosure;
+- seed identities see only SEED counts/data and no REAL disclosure;
+- genuine ADMIN sees total, REAL and SEED counts plus an All / REAL / SEED filter;
+- counts respect other active filters and business-resource scope.
+
+After implementation, exercise the LMS with representative seed sets before Commerce begins.
+
+## 3. Commerce — after Seed Database acceptance
+
+Implement one coherent commerce domain:
 
 - cart and cart items;
-- orders/order lines;
-- payment attempts/status/history;
-- simulated processor first: success, failure, pending, cancellation, retry and idempotency;
-- successful payment creates exactly the intended learner entitlement/enrolment;
+- orders/order lines with immutable price/access snapshots;
+- payment attempts/status/history with idempotency;
+- simulated processor first: success, failure, pending, cancellation, retry and replay;
+- successful payment creates exactly the intended entitlement/enrolment;
 - failed payment creates none;
-- company approval consumes an exact unused matching course/access-period credit first, otherwise adds a payable item;
-- Administration order/payment/reconciliation views and commerce audit events;
+- company approval consumes an exact unused matching course/access-period credit first, otherwise creates the appropriate payable flow;
+- Administration order/payment/refund/reconciliation views and commerce audit events;
+- extend Seed Database to generate representative commerce transactions after the real Commerce model exists;
 - gateway abstraction; PayFast only after simulator acceptance.
 
-## 3. Development data seeding
-
-After Commerce, add Admin-controlled Low / Medium / Heavy profiles covering realistic users, companies, courses, stub modules/assessments, enrolments, progress/results, requests, credits, activity and commerce transactions. Do not seed themes.
-
-This remains a disposable TEST/DEV tool. Straightforward reset/reseed behaviour is acceptable.
+The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
 ## 4. Course/media portability
 
@@ -87,7 +157,7 @@ Before production is declared:
 - payment/webhook hardening;
 - queue/worker decisions where justified;
 - monitoring/alerting;
-- Heavy-seed load testing;
+- large-volume seed load testing;
 - SQL/index/N+1 review;
 - PHP 8.5.9 modernisation/performance audit;
 - accessibility and browser/mobile acceptance;

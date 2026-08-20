@@ -1,147 +1,117 @@
-# Catto Learning 0.5.7.4 — Claude Code Handoff
+# Catto Learning 0.5.7.5 — Development Handoff
 
-**Date:** 2026-08-19 SAST  
-**Status:** PRE-COMMERCE STABILISATION — do not start Commerce yet  
-**Design baseline for Gilded Noir:** 1.1.1/1.1.2 direction; do not treat the broken later 1.1.3 composition as the visual baseline
+**Date:** 2026-08-20 SAST  
+**Runtime target:** PHP 8.5.9  
+**Status:** Simplified ACL foundation; Seed Database next; Commerce after seed acceptance
 
-Read `PROJECT-INSTRUCTIONS.md` first. This file contains current defects and acceptance work, not long-term product ideas.
+Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
 
-## 1. Current automated-test status
+## 1. ACL simplification decision
 
-The latest VPS run after the immediate runtime/test patch reached 108 tests and had one remaining integration failure:
+An independent review correctly identified that the first 0.5.7.5 ACL design over-engineered REAL/SEED isolation by duplicating every business capability as `REAL.*` and `SEED.*` permissions.
 
-```text
-AuthWorkflowRegressionTest::testMagicLinkConsumptionCreatesStudentAndActiveSession
-Failed asserting that an array contains 'student'.
-```
+The approved correction is now the project architecture:
 
-The application now stores uppercase role keys and `AuthService` assigns `STUDENT`. The handoff source updates this stale assertion to `STUDENT`.
+- **one shared business permission catalogue** describes what an identity may do;
+- `SYSTEM.*` remains a separate ADMIN-only namespace for themes, settings, Roles & ACL, maintenance and future seed infrastructure;
+- permission keys use resource-first/action-last uppercase dot notation, e.g. `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`;
+- normal roles use `STUDENT`, `COMPANY_ADMIN`, `COURSE_EDITOR`, `COURSE_OWNER`;
+- future seed identities use `SEED_STUDENT`, `SEED_COMPANY_ADMIN`, `SEED_COURSE_EDITOR`, `SEED_COURSE_OWNER`, `SEED_ADMIN`;
+- normal and seed roles may hold the same business permission keys, but their role families cannot be mixed;
+- seed-only roles deliberately exclude course import, export and media-management capabilities without creating duplicate SEED permission keys;
+- `ADMIN` remains immutable, receives the complete catalogue and is the only eventual REAL/SEED crossover identity;
+- Course Editor and Course Owner have different default capability profiles;
+- platform/company request authority is separate from enrolment authority;
+- company registration has an explicit `COMPANY.CREATE` capability;
+- requesting publication is separate from publishing;
+- duplicate `API.*` ACL permissions are retired; API/MCP uses transport scope plus the same ordinary business permission as Web;
+- ordinary resource scope is determined from permissions and business relationships, not mutable role names.
 
-Re-run the complete VPS gate before doing feature work. Do not assume further QA stages are clean until `composer qa` completes.
+The baseline migration was rebased for the corrected ACL model, so development installation still requires a database reset.
 
-## 2. Theme filesystem re-sync is not accepted
+## 2. Commerce permissions reserved now
 
-Real filesystem releases reported missing from Theme Manager even after Re-sync include Factory Reset 1.0.0 and Radiant Learning 3.2.0 while newer versions appear.
-
-Required investigation on the VPS:
-
-- enumerate every `/home/prettythings/themes/**/theme.json` with exact path/depth/permissions;
-- validate each real manifest/package and record the precise failure if skipped;
-- never collapse distinct versions by slug/name;
-- remove silent `catch (...) { continue; }` behaviour from discovery diagnostics;
-- make UI/CLI show discovered, registered and skipped themes with reasons;
-- add regression fixtures from the real archived Factory Reset 1.0.0 and Radiant Learning 3.2.0 packages.
-
-Theme import preview must also report useful asset inventory including image count and image names/types/sizes.
-
-## 3. Navigation/workspace corrections
-
-Core must remain the single source of truth for authorised navigation. Themes must consume it rather than retain legacy route lists.
-
-Known defects:
-
-- Account currently produces duplicate dashboard concepts (`/account` plus `/account/dashboard`) in some menus. The Account parent may link to `/account`; children should be exactly Dashboard, Profile, My Learning, Sessions, Activity.
-- A top-level duplicate My Learning indicates legacy theme navigation and must be removed from those themes.
-- Old Sidebar navigation is non-compliant: incomplete Account/Administration menus, missing Company and legacy `/admin?tab=...` links.
-- Company is a top-level family when ACL grants Company access; ADMIN sees platform-wide Company scope.
-- Missing menu icons must be corrected systematically using stable navigation keys, not one-off glyph fixes.
-
-Core owns semantic navigation `key`/hierarchy/route/ACL. Themes own icon artwork and styling. A theme may map stable keys to an SVG sprite; it must always keep readable labels.
-
-## 4. Shared workspace/accordion UI
-
-`/admin`, `/account`, `/company` and Help need one coherent accessible `details/summary` component contract.
-
-Known problems include thin/under-styled summaries, misaligned or duplicate arrows, overlapping titles and mismatched summary classes.
-
-Required direction:
-
-- one right-aligned chevron/icon;
-- suppress native `<details>` marker if a custom marker is drawn;
-- sufficient summary height/padding;
-- title and description wrap without overlap;
-- visible open/focus states;
-- platform markup/classes should be consistent so every theme styles the same contract.
-
-## 5. Account requirements
-
-Canonical consolidated `/account` sections:
+The permission catalogue already reserves the capabilities expected by the Commerce stage, although no Commerce routes/tables/services exist yet:
 
 ```text
-Dashboard
-Profile
-My Learning
-Sessions
-Activity
+COMMERCE.CART.VIEW
+COMMERCE.CART.MANAGE
+COMMERCE.CHECKOUT.START
+COMMERCE.ORDER.VIEW
+COMMERCE.PAYMENT.VIEW
+COMPANY.ORDER.VIEW
+COMPANY.PAYMENT.VIEW
+PLATFORM.ORDER.VIEW
+PLATFORM.ORDER.MANAGE
+PLATFORM.PAYMENT.VIEW
+PLATFORM.PAYMENT.MANAGE
+PLATFORM.PAYMENT.RECONCILE
+PLATFORM.REFUND.VIEW
+PLATFORM.REFUND.MANAGE
 ```
 
-Direct routes remain `/account/dashboard`, `/account/profile`, `/account/library`, `/account/sessions`, `/account/activity`.
+These are reservations only. Do not expose empty Commerce UI merely because the ACL keys exist.
 
-Profile contains identity/profile information only. Dashboard needs at least:
+## 3. Seed Database is deliberately not implemented yet
 
-- account created date;
-- last login;
-- current course/progress summary;
-- completed-course count;
-- complete course history with grade/result and certificate-issued state.
+The current source does **not** add:
 
-Primary email is mandatory; one optional verified secondary email is supported. Sessions means login/device sessions; Activity means audited actions by the account and is separate.
+- `seed_data` or `seed_data_tables`;
+- `seed_token` columns;
+- seed generation or cleanup;
+- REAL/SEED query filtering/counts;
+- seed-aware foreign-key integrity;
+- Seed Database Administration UI.
 
-## 6. Companies, Activity and pagination
+The permanent `SEED_*` roles and `SYSTEM.SEED.VIEW/MANAGE` permissions are preparatory infrastructure only.
 
-- Administration Companies must be a platform-owned paginated table, never one card per company.
-- Every paginated data table should expose the same 25 / 50 / 100 page-size choice and disclose `Showing X–Y of Z`, `Page N of M`, Previous/Next while preserving filters.
-- Activity must show raw IP and optional GeoIP/country flag, have usable full-width filters and follow the same pagination contract.
-- QA/integration tests must leave `audit_log` at its pre-test state. Development seeding is a later explicit Admin feature, not implicit fixture pollution.
+## 4. Next stage — Seed Database
 
-## 7. ACL scope is still too coarse
+Implement the approved Seed Database model before Commerce:
 
-The current permission catalogue exists but is not sufficient for tenant/resource scope. Before Commerce, define a complete permission matrix that distinguishes at least:
+- Administrator supplies a description and numeric soft target volume for the complete generated set;
+- each set receives a UUIDv7 token and historical/per-table counts;
+- only tables capable of containing test data receive nullable indexed `seed_token` fields;
+- multiple sets coexist; seed-set tokens are provenance/cleanup identifiers, not visibility boundaries;
+- all generated email addresses derive from `APP_DOMAIN`;
+- seed creation sends **zero email**; a login email is sent only when an operator explicitly requests a passwordless login for a particular seed account;
+- generated identities receive `SEED_STUDENT` plus appropriate `SEED_*` roles;
+- REAL and SEED visibility is enforced by repository/service queries and database integrity, not by duplicated permission names;
+- REAL data can never reference SEED data and vice versa;
+- genuine `ADMIN` sees both universes and receives All / REAL / SEED table filters; ordinary REAL and SEED identities never see the other universe;
+- generation and cleanup use transactions and bulk SQL;
+- no Themes, role definitions, permission definitions, ACL mappings, API tokens or fake media files are generated.
 
-- own account vs other accounts;
-- current-company people vs all-platform people;
-- current-company courses vs all courses;
-- company-owned courses vs platform/general catalogue courses;
-- selection of platform catalogue courses exposed in a company catalogue;
-- current-company enrolments/requests/credits/activity/reports vs all-platform equivalents;
-- company settings vs platform settings.
+After Seed Database is accepted, use representative seed data to exercise the existing LMS before beginning Commerce.
 
-Do not encode this with hard-coded role names. Authorisation should combine role-assigned capability with business-resource scope. ADMIN remains immutable/all-powerful.
+## 5. Verification state
 
-The Roles UI should use human permission name/description as primary text and show uppercase internal keys only as muted secondary metadata. Permission edits use explicit Save, not autosave, and audit structured additions/removals.
+The authoritative acceptance gate remains the PHP 8.5.9 VPS with Composer/PostgreSQL:
 
-## 8. Contact honeypot
+```bash
+cd /usr/local/lib/php/catto-learning/current
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer migrations:status
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer themes:sync
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer test:unit
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer test:architecture
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer test:integration
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer qa
+```
 
-The contact input named `website` is a bot honeypot, not a human Website field. Core CSS must keep `.cl-honeypot` invisible/non-interactive under every theme. Theme SDK 3.1 documents this requirement.
+Do not claim that gate passed until those commands actually complete successfully on the VPS.
 
-## 9. Theme direction
+## 6. Existing non-ACL acceptance work
 
-Factory Reset remains the recovery/default theme but needs coherent modern styling and complete current navigation/workspace support. Obsolete optional hard-coded themes do not need endless preservation.
+Keep unrelated accepted behaviour intact:
 
-For Gilded Noir, preserve the successful 1.1.1/1.1.2 design language:
+- Gilded Noir 1.1.3 remains the repaired accepted package for the home two-column composition and modal/footer stacking fixes;
+- `storage/logs/application.log` records dynamic request method/path without query strings;
+- core/theme assets use content fingerprints;
+- themes remain filesystem-authoritative and consume core-owned navigation/workspace data;
+- browser rendering remains the final visual acceptance authority.
 
-- full-width top navigation outside the boxed ivory plate;
-- light ivory/paper application surfaces with restrained black/gold/silver structure;
-- readable sans-serif application typography; avoid excessive bold uppercase UI text;
-- new abacus/scales/parchment artwork as the full-width home hero, with only top corners rounded;
-- balance hero copy intelligently rather than creating a huge separate black block or obscuring focal objects;
-- sphere may be used at the footer;
-- serpent should be used as a subtle cropped header texture for Administration, Account, Company and Contact as requested;
-- no duplicate chevrons; complete icon coverage.
+Any remaining theme re-sync, shared pagination, responsive/browser or presentation defects should be handled as bounded stabilisation work rather than folded into Seed Database without cause.
 
-Package validation is necessary but browser rendering is the visual acceptance authority.
+## 7. Documentation layout rule corrected
 
-## 10. Theme SDK and documentation
-
-Theme SDK 3.1 is self-contained and canonical. External theme authors should not need private codebase docs. The codebase documentation has deliberately been reduced to six canonical files to avoid stale duplication.
-
-## 11. Gate before Commerce
-
-Before Commerce starts:
-
-1. complete `composer test:unit`, `test:architecture`, `test:integration` and `composer qa` cleanly on PHP 8.5.9;
-2. resolve the theme re-sync issue using the real filesystem state;
-3. resolve navigation/workspace/accordion defects;
-4. finish scoped ACL design and tests;
-5. apply shared pagination contract;
-6. browser-test Factory Reset and the accepted Gilded Noir baseline at desktop/mobile widths.
+The six established project documents remain the core briefing set, but they are **not** a maximum file count. Additional audits, design proposals, reviews and working notes may be stored in the repository root or `docs/` as useful. Tests and release validators must require the core briefing documents to exist without rejecting additional Markdown files.

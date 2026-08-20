@@ -1,6 +1,6 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.5.7.4  
+**LMS:** 0.5.7.5  
 **Runtime:** PHP >=8.5.9 <9.0  
 **Environment:** disposable TEST/DEV until explicitly declared production
 
@@ -9,11 +9,11 @@
 Supported artifact pair:
 
 ```text
-catto-learning-v0.5.7.4.zip
-deploy-catto-learning-v0.5.7.4.sh
+catto-learning-v0.5.7.5.zip
+deploy-catto-learning-v0.5.7.5.sh
 ```
 
-The development installer stages an immutable release under `/usr/local/lib/php/catto-learning/0.5.7.4`, installs Composer dependencies, validates the release, drops/recreates the development database, runs the single 0.5.7.4 baseline migration, publishes default assets, re-syncs persistent themes and updates the `current` symlink.
+Version 0.5.7.5 rebases the ACL baseline schema. The development installer therefore requires the explicit `reset` argument, resets the disposable database before migration, installs the versioned release under `/usr/local/lib/php/catto-learning/0.5.7.5`, publishes platform/default-theme assets, re-synchronises persistent themes and updates the `current` symlink.
 
 It preserves instance-owned:
 
@@ -22,19 +22,20 @@ It preserves instance-owned:
 /home/<site-user>/themes/
 ```
 
-Example:
+Keep downloaded release artifacts in an instance subdirectory rather than directly in the site home. Example after becoming root with `sudo -i`:
 
 ```bash
-chmod 755 /home/prettythings/deploy-catto-learning-v0.5.7.4.sh
-/home/prettythings/deploy-catto-learning-v0.5.7.4.sh \
-  /home/prettythings/catto-learning-v0.5.7.4.zip \
+mkdir -p /home/prettythings/releases
+chmod 755 /home/prettythings/releases/deploy-catto-learning-v0.5.7.5.sh
+/home/prettythings/releases/deploy-catto-learning-v0.5.7.5.sh \
+  /home/prettythings/releases/catto-learning-v0.5.7.5.zip \
   prettythings \
   reset
 ```
 
 Required PHP extensions: DOM, fileinfo, JSON, mbstring, OpenSSL, PDO/PostgreSQL and ZIP.
 
-`composer migrate` is the only migration command. There is no separate `migrate-test` convention.
+`composer migrate` is the canonical migration command. There is no separate `migrate-test` convention.
 
 ## VPS QA gate
 
@@ -49,13 +50,13 @@ runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prett
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer qa
 ```
 
-`composer qa` is the authoritative pre-handoff/pre-release gate and includes the full PHPUnit suite, PHPStan and the project validators.
+`composer qa` is the authoritative pre-handoff/pre-release gate and includes the full PHPUnit suite, PHPStan and project validators.
 
 The integration suite uses the configured development database. Test fixtures must clean up records they create, including audit events; tests must not masquerade as later seed data.
 
 ## Static validators
 
-The project also maintains:
+The project maintains:
 
 ```text
 tools/check-architecture.php
@@ -66,11 +67,33 @@ tools/validate-release.php
 
 Artifact-generation environments without PHP 8.5.9/Composer/PostgreSQL may run syntax/static validators but must not claim the VPS QA gate passed.
 
+## ACL verification after reset
+
+Version 0.5.7.5 should expose these built-in roles:
+
+```text
+ADMIN
+STUDENT
+COMPANY_ADMIN
+COURSE_EDITOR
+COURSE_OWNER
+SEED_STUDENT
+SEED_COMPANY_ADMIN
+SEED_COURSE_EDITOR
+SEED_COURSE_OWNER
+SEED_ADMIN
+```
+
+Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
+
+The Commerce permission set is reserved in the ACL now but Commerce itself is not installed. The `SEED_*` roles and `SYSTEM.SEED.*` keys are preparatory only; Seed Database tables, `seed_token`, generation and query isolation are the next stage.
+
 ## Browser acceptance after clean QA
 
 At minimum review:
 
 ```text
+/admin
 /admin/themes
 /admin/roles
 /admin/companies
@@ -94,9 +117,21 @@ At minimum review:
 
 Also validate the accepted external theme at desktop and mobile widths.
 
+## Application logging and browser asset cache
+
+The HTTP bootstrap writes PHP errors and one lightweight request line to:
+
+```text
+/home/<site-user>/storage/logs/application.log
+```
+
+Request logging records method + URL path only. Query strings are excluded so login/magic-link tokens and other request parameters are not written to the log.
+
+Core and theme browser assets are emitted with content fingerprints. A repaired CSS/JS file therefore receives a new browser URL automatically after publication.
+
 ## Development database cleanup
 
-The database is disposable. To clear accumulated Activity during development:
+The database is currently disposable. To clear accumulated Activity during development:
 
 ```bash
 runuser -u prettythings -- psql -d prettythings \
@@ -129,4 +164,4 @@ For automatic database updates, install/configure MaxMind `geoipupdate` at the s
 
 ## Theme re-sync diagnostics
 
-Theme source under `/home/prettythings/themes/` is authoritative. `themes:sync` should enumerate discovered/registered/skipped filesystem themes. A skipped theme must have an actionable reason; silent suppression is considered a defect.
+Theme source under `/home/<site-user>/themes/` is authoritative. `themes:sync` should reconcile filesystem releases with the rebuildable registry. A skipped filesystem theme should have an actionable diagnostic rather than being silently suppressed.

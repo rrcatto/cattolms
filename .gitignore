@@ -1,5 +1,4 @@
 /vendor/
-/newthemes/
 /.env
 /.env.local
 /.env.*.local
@@ -12,8 +11,6 @@
 /.vscode/
 .DS_Store
 Thumbs.db
-20260819-1617-Claude-code-cli-project instructions.md
-Git-CLI-commands.md
 *.log
 /generated-themes/
 *.rej
