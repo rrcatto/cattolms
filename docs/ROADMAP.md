@@ -1,11 +1,11 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.5.7.5  
-**Current stage:** simplified ACL foundation; Seed Database next
+**Current LMS version:** 0.5.7.6  
+**Current stage:** pagination, counts and bounded entity pickers complete; Seed Database next
 
 Only the project owner decides future release numbers.
 
-## 1. v0.5.7.5 ACL foundation
+## 1. v0.5.7.5.1 ACL foundation
 
 The accepted ACL architecture is deliberately smaller than the first 0.5.7.5 design:
 
@@ -46,6 +46,19 @@ PLATFORM.REFUND.MANAGE
 They are inactive capability reservations until Commerce routes/services exist.
 
 Run the complete PHP 8.5.9 VPS QA gate before treating the ACL refactor as accepted.
+
+## 1b. v0.5.7.6 pagination, counts and bounded entity pickers — complete
+
+Accepted before Seed Database on purpose: **make the UI tell the truth about large datasets before generating large datasets.**
+
+- one shared `Pagination` contract and one core-owned pagination control for every standalone list;
+- every paginated dataset reports a real total from a count query using the identical membership rule as its row query;
+- consolidated `/admin` and `/company` render bounded previews with a "View all" link and no per-section aggregate query;
+- Activity, Credits and the person profile use bounded htmx entity lookups instead of whole-table dropdowns;
+- the Administration course list is scoped to the courses the actor may actually manage;
+- no schema change, no migration and no database reset.
+
+Deferred from this stage: Gilded Noir has no `.acl-*` rules, so the Roles and ACL editor still falls back to core CSS in the dark skin. That needs a theme version number from the project owner.
 
 ## 2. Seed Database — next
 

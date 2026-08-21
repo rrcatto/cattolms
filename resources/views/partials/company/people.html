@@ -1,1 +1,15 @@
 <div class="toolbar"><div><h2>People</h2><p class="muted small">People in the current company context.</p></div><check if="{{ !@company_platform_wide }}"><details><summary class="btn btn-primary">＋ Add person</summary><form action="/company/people" method="post" class="card form-grid popover-form"><input type="hidden" name="csrf" value="{{ @csrf }}"><div class="field"><label>First name</label><input name="first_name" required></div><div class="field"><label>Last name</label><input name="last_name" required></div><div class="field full"><label>Company email</label><input type="email" name="email" required></div><div class="field full"><label>Role</label><select name="role"><option value="STUDENT">Student</option><option value="COURSE_EDITOR">CourseEditor</option><option value="COURSE_OWNER">CourseOwner</option><option value="COMPANY_ADMIN">CompanyAdministrator</option></select></div><div class="field full"><button class="btn btn-primary">Create account</button></div></form></details></check></div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Role</th><th>Courses</th><th>Status</th><th></th></tr></thead><tbody><repeat group="{{ @people }}" value="{{ @person }}"><tr><td><strong>{{ @person.name }}</strong><div class="small muted">{{ @person.email }}</div></td><td>{{ @person.company_role ?: @person.roles_label }}</td><td>{{ @person.course_count }}</td><td>{{ @person.status }}</td><td><check if="{{ !@company_platform_wide }}"><form action="/company/people/{{ @person.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ @csrf }}"><button class="btn btn-danger btn-sm" data-confirm="Remove this person from the company?">Remove</button></form></check></td></tr></repeat></tbody></table></div>
+
+<check if="{{ @people_pagination }}">
+  <true>
+    <include href="partials/pagination.html" with="pg=@people_pagination" />
+  </true>
+  <false>
+    <check if="{{ @people_preview_has_more }}">
+      <div class="pagination-row">
+        <span class="pagination-summary">Showing the first {{ @preview_page_size }} people.</span>
+        <a class="btn btn-soft btn-sm" href="/company/people">View all people</a>
+      </div>
+    </check>
+  </false>
+</check>

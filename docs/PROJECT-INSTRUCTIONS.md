@@ -1,6 +1,6 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.5.7.5  
+**Current approved LMS version:** 0.5.7.6  
 **Runtime target:** PHP 8.5.9  
 **Current phase:** TEST/DEV; simplified ACL foundation, Seed Database next, Commerce after seed acceptance
 
@@ -76,7 +76,7 @@ SYSTEM.SEED.MANAGE
 
 Only genuine `ADMIN` receives SYSTEM authority.
 
-Commerce permission keys are reserved in 0.5.7.5 before Commerce code exists so Commerce does not require another ACL rename/schema sweep. The reserved set is documented in `ROADMAP.md`.
+Commerce permission keys are reserved as of 0.5.7.5.1, before Commerce code exists, so Commerce does not require another ACL rename/schema sweep. The reserved set is documented in `ROADMAP.md`.
 
 ### Built-in roles
 
@@ -139,7 +139,7 @@ Required invariants:
 - actions performed by seeded identities create SEED/test records;
 - seed generation uses `APP_DOMAIN` for generated email addresses and sends no email.
 
-The current 0.5.7.5 ACL includes the future `SEED_*` role family and `SYSTEM.SEED.*` infrastructure permissions, but Seed Database tables, `seed_token` columns, generation and query isolation are not implemented yet.
+The current ACL includes the future `SEED_*` role family and `SYSTEM.SEED.*` infrastructure permissions, but Seed Database tables, `seed_token` columns, generation and query isolation are not implemented yet.
 
 ## 6. Core-owned workspaces and navigation
 

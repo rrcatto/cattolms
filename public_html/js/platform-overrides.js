@@ -74,6 +74,34 @@
     const passwordInput=document.querySelector('form[action="/admin/settings/mail"] input[name="smtp_password"]');
     if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const control=document.createElement('div');control.className='cl-password-control';passwordInput.parentNode.insertBefore(control,passwordInput);control.appendChild(passwordInput);const toggle=document.createElement('button');toggle.type='button';toggle.className='btn btn-ghost cl-password-toggle';toggle.disabled=true;toggle.textContent='Show';control.appendChild(toggle);toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
 
+    /* Entity lookup selection.
+       htmx fetches and swaps the results fragment; this only handles the click that commits a
+       chosen result into the hidden field the surrounding form actually submits. Delegated
+       from document so it works on fragments htmx inserts after page load. */
+    document.addEventListener('click', event => {
+      const choice = event.target instanceof Element ? event.target.closest('[data-lookup-target]') : null;
+      if (choice) {
+        const name = choice.getAttribute('data-lookup-target') || '';
+        const value = document.getElementById(`${name}-value`);
+        const selected = document.getElementById(`${name}-selected`);
+        const search = document.getElementById(`${name}-search`);
+        const results = document.getElementById(`${name}-results`);
+        if (value instanceof HTMLInputElement) value.value = choice.getAttribute('data-lookup-id') || '';
+        if (selected) selected.innerHTML = `<strong></strong>`, selected.firstChild.textContent = choice.getAttribute('data-lookup-label') || '';
+        if (search instanceof HTMLInputElement) search.value = '';
+        if (results) results.innerHTML = '';
+        return;
+      }
+      const clear = event.target instanceof Element ? event.target.closest('[data-lookup-clear]') : null;
+      if (clear) {
+        const name = clear.getAttribute('data-lookup-clear') || '';
+        const value = document.getElementById(`${name}-value`);
+        const selected = document.getElementById(`${name}-selected`);
+        if (value instanceof HTMLInputElement) value.value = '';
+        if (selected) selected.innerHTML = '<span class="muted">Nothing selected</span>';
+      }
+    });
+
     const preview = new URL(location.href).searchParams.get('theme_preview');
     const paletteUrl = new URL('/theme/palette', location.origin); if (preview) paletteUrl.searchParams.set('theme_preview', preview);
     fetch(paletteUrl,{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'}).then(response=>response.ok?response.json():null).then(config=>{

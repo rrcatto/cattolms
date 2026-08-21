@@ -2,7 +2,10 @@
 
   <check if="{{ @courses }}">
     <true>
-      <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+      <!-- .table-wrap is the core responsive wrapper and the only one core CSS defines. This
+           table previously used a Bootstrap-style wrapper class that core never styles, so it
+           had no horizontal scroll except under themes that happen to define that class. -->
+      <div class="card"><div class="table-wrap"><table class="table table-hover align-middle mb-0">
         <thead><tr><th>Course</th><th>Category</th><th>Status</th><th>Structure</th><th>Ownership</th><th>Editors</th><th>Learners</th><th>Started</th><th>Revision</th><th>Updated</th><th>Actions</th></tr></thead>
         <tbody><repeat group="{{ @courses }}" value="{{ @course }}"><tr>
           <td><strong>{{ @course.title }}</strong><br><small class="text-body-secondary">/{{ @course.slug }}</small></td>
@@ -19,6 +22,22 @@
           </div></td>
         </tr></repeat></tbody>
       </table></div></div>
+
+      <check if="{{ @courses_pagination }}">
+        <true>
+          <include href="partials/pagination.html" with="pg=@courses_pagination" />
+        </true>
+        <false>
+          <!-- Consolidated workspace preview: bounded rows plus a link to the deep-paging
+               route, and no COUNT query merely to render a dashboard panel. -->
+          <check if="{{ @courses_preview_has_more }}">
+            <div class="pagination-row">
+              <span class="pagination-summary">Showing the first {{ @preview_page_size }} courses.</span>
+              <a class="btn btn-soft btn-sm" href="/admin/courses">View all courses</a>
+            </div>
+          </check>
+        </false>
+      </check>
     </true>
     <false><div class="cl-empty-state"><h2>No courses exist yet</h2><p>Import one of the existing self-study HTML files or create a course manually.</p><div class="d-flex justify-content-center gap-2"><a class="btn btn-primary" href="/admin/courses/import">Import HTML</a><a class="btn btn-outline-primary" href="/admin/courses/new">Create manually</a></div></div></false>
   </check>

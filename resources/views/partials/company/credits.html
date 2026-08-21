@@ -1,1 +1,15 @@
 <div class="notice"><span>ⓘ</span><div>Credits are tied to a course and access period and are consumed when the learner starts the course.</div></div><div class="table-wrap section"><table><thead><tr><th>Course</th><th>Period</th><th>Total</th><th>Available</th><th>Assigned</th><th>Consumed</th></tr></thead><tbody><repeat group="{{ @credits }}" value="{{ @credit }}"><tr><td>{{ @credit.course_title }}</td><td>{{ @credit.access_period_label }}</td><td>{{ @credit.quantity }}</td><td>{{ @credit.available_count }}</td><td>{{ @credit.assigned_count }}</td><td>{{ @credit.consumed_count }}</td></tr></repeat></tbody></table></div>
+
+<check if="{{ @credits_pagination }}">
+  <true>
+    <include href="partials/pagination.html" with="pg=@credits_pagination" />
+  </true>
+  <false>
+    <check if="{{ @credits_preview_has_more }}">
+      <div class="pagination-row">
+        <span class="pagination-summary">Showing the first {{ @preview_page_size }} credit records.</span>
+        <a class="btn btn-soft btn-sm" href="/company/credits">View all credit records</a>
+      </div>
+    </check>
+  </false>
+</check>

@@ -1,8 +1,8 @@
-# Catto Learning 0.5.7.5 — Development Handoff
+# Catto Learning 0.5.7.6 — Development Handoff
 
-**Date:** 2026-08-20 SAST  
+**Date:** 2026-08-21 SAST  
 **Runtime target:** PHP 8.5.9  
-**Status:** Simplified ACL foundation; Seed Database next; Commerce after seed acceptance
+**Status:** Pagination, counts and bounded entity pickers complete on the 0.5.7.5.1 ACL foundation; Seed Database next; Commerce after seed acceptance
 
 Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
 
@@ -110,8 +110,36 @@ Keep unrelated accepted behaviour intact:
 - themes remain filesystem-authoritative and consume core-owned navigation/workspace data;
 - browser rendering remains the final visual acceptance authority.
 
-Any remaining theme re-sync, shared pagination, responsive/browser or presentation defects should be handled as bounded stabilisation work rather than folded into Seed Database without cause.
+Shared pagination was the largest item of that bounded stabilisation work and is complete in 0.5.7.6 (see section 8). Any remaining theme re-sync, responsive/browser or presentation defects should continue to be handled as bounded stabilisation work rather than folded into Seed Database without cause.
 
 ## 7. Documentation layout rule corrected
 
 The six established project documents remain the core briefing set, but they are **not** a maximum file count. Additional audits, design proposals, reviews and working notes may be stored in the repository root or `docs/` as useful. Tests and release validators must require the core briefing documents to exist without rejecting additional Markdown files.
+
+## 8. v0.5.7.6 implementation boundary
+
+Complete in this version:
+
+- one shared `Pagination` value object and one core-owned pagination control used by every standalone paginated list;
+- real count queries for every paginated dataset, each using the identical membership rule as its row query;
+- bounded previews on the consolidated `/admin` and `/company` workspaces, with no aggregate query per section;
+- bounded htmx entity lookups replacing whole-table dropdowns on Activity, Credits and the person profile;
+- the Administration course list scoped to the courses the actor owns, edits or administers.
+
+Explicitly **not** part of this version: any Seed Database schema, `seed_token` column, generation, cleanup or REAL/SEED query filtering. Section 3 still applies unchanged.
+
+No database schema change, no new migration and no database reset. The baseline migration differs from 0.5.7.5.1 only in its header metadata.
+
+### Deploy-time hazards specific to this stage
+
+Two caches key on the unchanged `current/...` paths and will keep serving the previous version after the symlink is repointed:
+
+- F3's compiled templates, because `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so the compiled filename hash does not change between versions and F3 only recompiles when the source is newer than the compiled file;
+- PHP's opcache, for the same reason.
+
+Clear the instance `storage/cache` compiled templates and reload PHP-FPM as part of every deployment. `OPERATIONS.md` carries the commands.
+
+### Known gaps carried forward
+
+- Gilded Noir v1.1.4 styles the pagination control and the entity lookup but has no `.acl-*` rules, so the Roles and ACL permission editor falls back to core CSS inside the dark skin. Updating the theme requires a version number from the project owner.
+- No automated test issues a real HTTP request to an HTML page; `tests/Integration/HttpRouteSmokeTest.php` covers API routes only. Browser rendering remains the visual acceptance authority.
