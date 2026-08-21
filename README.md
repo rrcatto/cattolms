@@ -1,10 +1,24 @@
-# Catto Learning LMS 0.5.7.5.1
+# Catto Learning LMS 0.5.7.6
 
 Catto Learning is a PHP/Fat-Free Framework/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9**.
 
-Version 0.5.7.5.1 establishes the ACL foundation required before Seed Database. Following independent review, the ACL was deliberately simplified: business capabilities now use **one shared permission catalogue**, while REAL/SEED data visibility will be enforced separately by seed-aware identity/query/schema rules. `SYSTEM.*` remains reserved for platform infrastructure, and the Commerce capability keys are reserved now so Commerce does not require another ACL naming/schema pass later.
+Version 0.5.7.6 is the **pagination, counts and entity-picker stage**. Its purpose is to make the interface tell the truth about large datasets *before* the next stage starts generating them. Every Administration, Company and catalogue list now pages through a single shared contract, reports a genuine total from a count query that matches its row query, and resolves person/company/course selections through bounded lookups instead of loading whole tables into dropdowns.
 
-Seed-data generation itself is **not implemented in 0.5.7.5.1**. The next development stage is the Administrator-controlled Seed Database system described in `docs/ROADMAP.md`; Commerce follows after representative seed-data testing.
+Version 0.5.7.5.1 established the ACL foundation, and that model is unchanged here: business capabilities use **one shared permission catalogue**, while REAL/SEED data visibility will be enforced separately by seed-aware identity/query/schema rules. `SYSTEM.*` remains reserved for platform infrastructure, and the Commerce capability keys stay reserved so Commerce does not require another ACL naming/schema pass later.
+
+Seed-data generation is **not implemented in 0.5.7.6**. The next development stage is the Administrator-controlled Seed Database system described in `docs/ROADMAP.md`; Commerce follows after representative seed-data testing.
+
+## What 0.5.7.6 changes
+
+- **One pagination contract.** `src/Support/Pagination.php` is a pure value object that normalises untrusted page/page-size input, clamps an over-range page once the true total is known, and derives offset and display values. Only five page sizes may ever reach SQL, so a tampered request cannot widen a page.
+- **Real counts.** Every paginated dataset has a count query that uses the identical membership rule as its row query. The Company workspace previously derived totals with `count()` over an already-capped array, which made the displayed number *wrong* rather than merely truncated.
+- **No unbounded list queries.** `/admin/courses`, `/admin/credits`, `/courses` and the home page were unbounded; `/admin/people` and `/admin/enrolments` truncated silently at a hard limit with no total and no control.
+- **Bounded consolidated workspaces.** `/admin` and `/company` render a fixed small preview per section with a "View all" link, and issue no `COUNT` per section — a single probe row decides whether the link is warranted.
+- **Bounded entity pickers.** Activity, Credits and the person profile replaced whole-table `<select>` controls with htmx-driven lookups over `GET /admin/lookup/@type`. Activity previously loaded the people, companies and courses tables in full just to populate three filters.
+- **Scoped Administration course list.** The course list is now restricted to courses the actor owns, edits or administers through their company. Both course surfaces previously showed every course on the platform to any course manager.
+- **Activity counts honestly.** Activity now counts with the identical filter set it queries with, and re-emits filters on every paging link so a filtered list stays filtered.
+
+No database schema change, no new migration and **no database reset** are required to move from 0.5.7.5.1 to 0.5.7.6. The bundled Factory Reset theme remains version `1.0.1`; theme versions are independent of the LMS version.
 
 ## Architecture summary
 
@@ -18,6 +32,8 @@ Seed-data generation itself is **not implemented in 0.5.7.5.1**. The next develo
 - Commerce permissions for cart/checkout/order/payment/refund/reconciliation are reserved but no Commerce implementation exists yet.
 - Core-owned permission-filtered primary/footer navigation.
 - Consolidated `/admin`, `/account` and `/company` workspaces plus semantic direct section routes.
+- One shared pagination control, `resources/views/partials/pagination.html`, used by every standalone paginated list. Themes style it; a theme never recreates it.
+- htmx is a platform-owned progressive enhancement: every surface that uses it renders and works server-side first, so the page degrades to plain navigation if the script is absent.
 - Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata.
 - Theme Package schema 3.0 / Template API 1.0 / Theme SDK 3.1.
 - Course authoring/import, assessments, progress/results, certificates and company credit workflows.
@@ -38,4 +54,8 @@ External theme generators need only `docs/THEME-SDK.md` plus any reference theme
 
 ## Development deployment
 
-The current database is disposable TEST/DEV state. The 0.5.7.5.1 installer requires the explicit `reset` argument because this version rebases the ACL baseline schema. It preserves the instance `.env` and persistent theme directory while recreating the development database and deploying the versioned application release. See `docs/OPERATIONS.md`.
+The current database is disposable TEST/DEV state.
+
+0.5.7.6 does not rebase the schema, so unlike 0.5.7.5.1 it does **not** require the installer's `reset` argument. Deploying is a matter of installing the versioned release alongside the existing one and repointing the `current` symlink; the instance `.env` and persistent theme directory are untouched.
+
+Two caches will otherwise keep serving the previous version after the symlink moves — F3's compiled templates and PHP's opcache, both of which key on the unchanged `current/...` paths. `docs/OPERATIONS.md` has the upgrade sequence and the commands.

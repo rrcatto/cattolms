@@ -1,1 +1,15 @@
 <div class="section-head"><div><h2>Courses</h2><p>Courses owned by or currently available to this company context.</p></div></div><div class="table-wrap"><table><thead><tr><th>Course</th><th>Status</th><th>Category</th></tr></thead><tbody><repeat group="{{ @courses }}" value="{{ @course }}"><tr><td><strong>{{ @course.title }}</strong></td><td>{{ @course.status }}</td><td>{{ @course.category_name ?: '—' }}</td></tr></repeat></tbody></table></div>
+
+<check if="{{ @courses_pagination }}">
+  <true>
+    <include href="partials/pagination.html" with="pg=@courses_pagination" />
+  </true>
+  <false>
+    <check if="{{ @courses_preview_has_more }}">
+      <div class="pagination-row">
+        <span class="pagination-summary">Showing the first {{ @preview_page_size }} courses.</span>
+        <a class="btn btn-soft btn-sm" href="/company/courses">View all courses</a>
+      </div>
+    </check>
+  </false>
+</check>

@@ -4,6 +4,8 @@
 /.env.*.local
 /public_html/themes/*
 !/public_html/themes/.gitkeep
+# composer analyse writes its PHPStan tmpDir here (phpstan.neon); build cache never ships.
+/storage/
 /.phpunit.cache/
 /.phpstan.cache/
 /coverage/

@@ -1,19 +1,41 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.5.7.5  
+**LMS:** 0.5.7.6  
 **Runtime:** PHP >=8.5.9 <9.0  
 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Install/reset
+## Upgrading 0.5.7.5.1 to 0.5.7.6
 
-Supported artifact pair:
+0.5.7.6 makes **no schema change and adds no migration**; the baseline migration differs from 0.5.7.5.1 only in its header metadata. It therefore needs no database reset and no installer run. Deploy it alongside the existing version and repoint the `current` symlink.
 
-```text
-catto-learning-v0.5.7.5.zip
-deploy-catto-learning-v0.5.7.5.sh
+```bash
+sudo ln -sfn /usr/local/lib/php/catto-learning/0.5.7.6 /usr/local/lib/php/catto-learning/current.tmp
+sudo mv -Tf /usr/local/lib/php/catto-learning/current.tmp /usr/local/lib/php/catto-learning/current
 ```
 
-Version 0.5.7.5 rebases the ACL baseline schema. The development installer therefore requires the explicit `reset` argument, resets the disposable database before migration, installs the versioned release under `/usr/local/lib/php/catto-learning/0.5.7.5`, publishes platform/default-theme assets, re-synchronises persistent themes and updates the `current` symlink.
+`mv -T` replaces the link with a single rename, so no in-flight request ever sees a missing `current`. The common `ln -sfn <target> current` one-liner unlinks and re-creates, leaving a brief window in which the path does not exist.
+
+Then clear the two caches that key on the unchanged `current/...` paths and would otherwise keep serving the previous version:
+
+```bash
+rm -f /home/prettythings/storage/cache/*.php
+sudo systemctl reload php8.5-fpm
+```
+
+The first is F3's compiled templates. `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so the compiled-template filename hash is identical across versions and F3 recompiles only when the source is newer than the compiled file. A deployment that preserves timestamps can leave the source older, in which case the old markup keeps being served. The second is opcache, which has the same exposure on the same paths.
+
+After deploying, run the QA gate below, then the browser acceptance pass.
+
+## Full install/reset
+
+A full reset is only required for a version that rebases the schema, such as 0.5.7.5.1. Supported artifact pair:
+
+```text
+catto-learning-v0.5.7.5.1.zip
+deploy-catto-learning-v0.5.7.5.1.sh
+```
+
+Version 0.5.7.5.1 rebased the ACL baseline schema. Its installer therefore requires the explicit `reset` argument, resets the disposable database before migration, installs the versioned release under `/usr/local/lib/php/catto-learning/0.5.7.5.1`, publishes platform/default-theme assets, re-synchronises persistent themes and updates the `current` symlink. **0.5.7.6 does not need any of this** — see the upgrade section above.
 
 It preserves instance-owned:
 
@@ -26,9 +48,9 @@ Keep downloaded release artifacts in an instance subdirectory rather than direct
 
 ```bash
 mkdir -p /home/prettythings/releases
-chmod 755 /home/prettythings/releases/deploy-catto-learning-v0.5.7.5.sh
-/home/prettythings/releases/deploy-catto-learning-v0.5.7.5.sh \
-  /home/prettythings/releases/catto-learning-v0.5.7.5.zip \
+chmod 755 /home/prettythings/releases/deploy-catto-learning-v0.5.7.5.1.sh
+/home/prettythings/releases/deploy-catto-learning-v0.5.7.5.1.sh \
+  /home/prettythings/releases/catto-learning-v0.5.7.5.1.zip \
   prettythings \
   reset
 ```
@@ -69,7 +91,7 @@ Artifact-generation environments without PHP 8.5.9/Composer/PostgreSQL may run s
 
 ## ACL verification after reset
 
-Version 0.5.7.5 should expose these built-in roles:
+0.5.7.6 should expose the same built-in roles as 0.5.7.5.1, unchanged:
 
 ```text
 ADMIN

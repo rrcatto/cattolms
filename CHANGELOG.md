@@ -1,5 +1,80 @@
 # Changelog
 
+## 2026-08-21 14:48 SAST — v0.5.7.6 pagination, counts and bounded entity pickers
+
+Purpose of this version: make the interface tell the truth about large datasets **before** the Seed Database stage starts generating them. Most list surfaces previously failed by silent truncation rather than by a visible break.
+
+### Pagination and counts
+
+- Added `src/Support/Pagination.php`, a pure value object shared by every paginated list. It normalises untrusted page and page-size input, clamps an over-range page once the true total is known, and derives offset, `from`/`to` and page counts. Only the five approved page sizes may reach SQL, so a tampered request cannot widen a page beyond the contract.
+- Added `resources/views/partials/pagination.html` as the single core-owned pagination control. Filters are re-emitted on every paging link and in the page-size form, so a filtered list stays filtered when the reader moves to page 2.
+- Routed every Administration and Company dataset through that contract: People, Companies, Courses, Enrolments, Requests, Credits, Activity, and the public catalogue. Enrolments and Requests share one screen but hold entirely separate pagination state, because the two datasets grow at very different rates.
+- Removed the unbounded queries behind `/admin/courses`, `/admin/credits`, `/courses` and the home page, and the silent hard limits behind `/admin/people` (250 rows) and `/admin/enrolments` (500 rows). A truncated list that does not say it is truncated is worse than a slow one.
+- Every count query now uses the identical membership rule as its row query, so the "Showing X-Y of Z" line cannot lie. Where an INNER join affects membership, the count repeats the join rather than simplifying it away.
+- Replaced the Company workspace's `count()`-over-a-capped-array totals with real SQL counts. Those figures were **wrong**, not merely truncated: "People: 250" could mean "at least 250, we stopped looking".
+- The home page asked PostgreSQL for the whole published catalogue and then discarded all but six rows in PHP; it now asks for six.
+
+### Consolidated workspaces
+
+- `/admin` and `/company` now render a bounded preview per section with a "View all" link to the deep-paging route, instead of loading every section's complete dataset in one request. `/admin` was the single most expensive page in the platform.
+- The previews issue no `COUNT` per section. One extra probe row is fetched and discarded, which is enough to decide whether "View all" is warranted; seven aggregate queries to draw a dashboard is exactly the cost this version exists to remove.
+- Each `/company/*` route now loads only its own dataset. Opening Company People previously also fetched requests, enrolments, credits and the entire course list.
+
+### Bounded entity pickers
+
+- Added `GET /admin/lookup/@type` with `AdminLookupController` and `EntityLookupRepository`, plus the `entity-lookup` and `entity-lookup-results` partials, and registered htmx as a platform-owned script.
+- Activity, Credits and the person profile replaced whole-table `<select>` controls with those bounded lookups. Activity previously loaded the people, companies and courses tables in full purely to populate three filter dropdowns.
+- Added `ThemeRenderer::renderFragment()` so htmx fragments render as bare core markup without theme chrome, navigation or a page-family wrapper.
+- The pickers degrade correctly without JavaScript: the hidden field still holds the current value and the surrounding form still submits.
+
+### Authorization and correctness fixes
+
+- Scoped the Administration course list to courses the actor owns, edits, or administers through their company. Both Administration course surfaces previously showed every course on the platform to any course manager. The row query and the count share one membership rule verbatim.
+- Activity now counts with the identical filter set it queries with, and resolves its person/company/course filter entities through bounded lookups rather than three whole-table loads.
+- Fixed the Administration courses table wrapper, which used a class core CSS does not define. The table therefore had no horizontal scroll under core-only CSS, while looking correct under Gilded Noir, which happens to define it.
+
+### Render defects found and fixed during this stage
+
+- `/admin/courses` returned HTTP 500 with an undefined `courses_pagination` template variable. The controller assembled a bespoke payload while the partial is shared with the consolidated workspace and reads the full paginated view contract. It now builds its payload through the same Administration section loader as every other section.
+- Added `PlatformAdministrationService::datasetDefaults()` so every list variable a partial reads exists on every code path. F3 turns an undefined template variable into a 500 for the whole page, and consolidated previews and standalone pages legitimately set different subsets.
+- Fixed a defaults-ordering defect where per-section defaults overwrote the previous section's real values, so the consolidated workspace silently lost the "View all" affordance for all but the last section.
+- Restored the platform-wide "All companies" table on the Company workspace, which the bounded-preview rewrite had left permanently empty.
+- Removed a hand-built pagination nav left behind on Companies. It rendered as a second control directly above the shared one, and its links used a bare `page` parameter that no controller reads, so every one of them returned page 1.
+- Fixed the entity picker's hidden field, which was emitting no value at all. A comment had been opened inside the input's start tag; a comment cannot be opened there, so the element ended early and every attribute after it was dropped and printed as page text. The field submitted an empty id, silently discarding an already-selected person, company or course.
+
+### Template and test contracts added
+
+- Template comments are now **plain prose only**: no angle brackets, no comment delimiters, no template tokens and no code. Three separate traps justify the strict rule, and none of them raises an error. F3 parses its own tags inside comments, so a documented example becomes a real tag; a comment terminator written inside a comment body ends that comment early and leaks the rest onto the page; and a comment opened inside a start tag drops every attribute after it. `tools/validate-ui-contracts.php` enforces this across every view.
+- Added `tests/Unit/PaginationRenderSmokeTest.php`, which actually renders every list partial through F3 in both consolidated-preview and standalone modes. A literal-token validator cannot catch a template that reads a variable the current code path never set: the markup is present and correct, and the page still returns 500.
+- That smoke test takes its expected view variables from `PlatformAdministrationService` itself rather than a hand-written copy, so a partial that starts reading a new variable keeps failing until the service genuinely produces it on every path.
+- Fixed a defect in the smoke test itself. F3's constructor installs global error and exception handlers; PHPUnit reported the first test as risky for leaving them installed and then stripped them, which silently disabled the suite's own error capture for the remaining 29 data sets. The suite now captures errors through its own handler, pushed and popped around each render, and constructs F3 once outside the window PHPUnit inspects. Verified by injecting an undefined variable into a later data set and confirming it now fails rather than passing.
+- Added `tests/Unit/PaginationTest.php` and `tests/Unit/PaginationUiContractTest.php`.
+- Replaced the Companies `@companies_page` / `@companies_total_pages` assertion in `tools/validate-ui-contracts.php` and `tests/Unit/CompanyWorkspaceContractTest.php` with the shared-control contract. Those tokens pinned the retired hand-built nav, so the validator was holding a defect in place.
+
+### Documentation and versioning
+
+- Wrote a full verification procedure for this version - expected results per suite, targeted regression checks, the browser acceptance pass, and the two caches that must be cleared when the `current` symlink is repointed. It is kept with the project owner's working notes outside the repository rather than shipped in `docs/`.
+- Updated the current-version statements in `README.md` and the six core `docs/` files to 0.5.7.6, and added the 0.5.7.6 upgrade sequence to `docs/OPERATIONS.md`.
+- Added `tests/bootstrap.php` and pointed `phpunit.xml` at it, so F3's one-time global error and exception handler installation happens before any test runs. Left to the tests, PHPUnit charged whichever test touched F3 first as risky and then stripped those handlers for the rest of the run. Removed the three per-test `restore_error_handler()` compensations that existed only to work around it.
+- Functional version identifiers were already aligned to 0.5.7.6: `composer.json`, `ThemeRenderer::PLATFORM_ASSET_VERSION` (which also invalidates stale cached core assets), the REST `application_version` and the MCP `application_version`.
+- **No database schema change and no new migration.** The baseline migration differs from 0.5.7.5.1 only in its header metadata, so 0.5.7.6 does not require a database reset.
+- The bundled Factory Reset theme remains version `1.0.1`. Theme versions are independent of the LMS version.
+
+### Known gaps at 0.5.7.6
+
+- Gilded Noir v1.1.4 styles the pagination control and the entity lookup, but has no `.acl-*` rules, so the Roles and ACL permission editor still falls back to core CSS inside the dark skin. Updating the theme requires a version number from the project owner.
+- No automated test issues a real HTTP request to any HTML page; `tests/Integration/HttpRouteSmokeTest.php` covers API routes only. Browser rendering remains the visual acceptance authority.
+
+## 2026-08-20 14:38 SAST — v0.5.7.5.1 version alignment
+
+- Aligned every version identifier in the tree to `0.5.7.5.1`. The tree previously self-identified as `0.5.7.5` in `composer.json` and in 172 file metadata headers while being released and tagged as `0.5.7.5.1`.
+- Updated the functional version constants: `composer.json` `version`, `ThemeRenderer::PLATFORM_ASSET_VERSION` (which also invalidates stale cached core assets), the REST `application_version` in `ApiStatusController`, the MCP `application_version` in `LmsMcpTools` and the MCP server info version in `McpServerFactory`.
+- Updated the matching assertions so the gate stays honest rather than being loosened: `tools/validate-release.php` (`composer.json` version and the `PLATFORM_ASSET_VERSION` token), `tools/validate-ui-contracts.php` (the `PLATFORM_ASSET_VERSION` token), `tests/Unit/ThemeUiContractTest.php` and `tests/Integration/HttpRouteSmokeTest.php`.
+- Updated the current-version statements in `docs/PROJECT-INSTRUCTIONS.md`, `docs/HANDOFF.md`, `docs/ROADMAP.md`, `docs/OPERATIONS.md`, `docs/COURSE-SPECIFICATION.md` and `docs/THEME-SDK.md`, including the deployment artefact names and the versioned deployment path in `OPERATIONS.md`.
+- Deliberately **not** rewritten: the dated changelog entries below, the dated in-file changelog entries in file headers (for example the `2026/08/20 02:43 SAST` line in the baseline migration), and the two passages that contrast this ACL with the superseded first `0.5.7.5` design (`docs/HANDOFF.md`, `docs/ROADMAP.md`). Those are historical record and rewriting them would falsify it. File header `Version:` fields, `Description:` fields and current-version statements were all updated.
+- The bundled Factory Reset theme remains version `1.0.1`. Theme versions are independent of the LMS version and are unchanged.
+- No behavioural change beyond the asset-version cache invalidation.
+
 ## 2026-08-20 06:17 SAST — v0.5.7.5 ACL corrective patch
 
 - Corrected the baseline rollback to drop the actual `enforce_user_role_family()` and `enforce_role_permission_boundary()` functions; obsolete `_universe` names are no longer present.

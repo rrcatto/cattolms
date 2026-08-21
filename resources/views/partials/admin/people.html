@@ -19,3 +19,17 @@
   </div>
 </div>
 </check>
+
+<check if="{{ @people_pagination }}">
+  <true>
+    <include href="partials/pagination.html" with="pg=@people_pagination" />
+  </true>
+  <false>
+    <check if="{{ @people_preview_has_more }}">
+      <div class="pagination-row">
+        <span class="pagination-summary">Showing the first {{ @preview_page_size }} people.</span>
+        <a class="btn btn-soft btn-sm" href="/admin/people">View all people</a>
+      </div>
+    </check>
+  </false>
+</check>

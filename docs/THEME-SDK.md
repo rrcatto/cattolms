@@ -1,6 +1,6 @@
 # Catto Learning LMS Theme SDK 3.1
 
-**Schema:** 3.0 · **Template API:** 1.0 · **Reference LMS:** 0.5.7.5
+**Schema:** 3.0 · **Template API:** 1.0 · **Reference LMS:** 0.5.7.6
 
 This file is self-contained. A human or AI theme author can build a compliant theme without the LMS source code or any other project document.
 
