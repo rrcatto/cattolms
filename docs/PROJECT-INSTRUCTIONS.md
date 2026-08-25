@@ -1,8 +1,9 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.5.7.6  
+**Current approved LMS version:** 0.5.8.2  
+**Date time:** 2026/08/24 17:45 SAST  
 **Runtime target:** PHP 8.5.9  
-**Current phase:** TEST/DEV; simplified ACL foundation, Seed Database next, Commerce after seed acceptance
+**Current phase:** TEST/DEV; simplified ACL foundation and Seed Database implemented, Commerce after seed acceptance
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -137,9 +138,14 @@ Required invariants:
 - seed-set tokens identify provenance/cleanup batches, not security boundaries; different seed sets may interact inside the SEED universe;
 - seed business data cannot belong to a REAL company or REAL user;
 - actions performed by seeded identities create SEED/test records;
-- seed generation uses `APP_DOMAIN` for generated email addresses and sends no email.
+- seed generation gives each generated company a domain on the reserved `.seed.invalid` suffix, keeps every generated local part unique, and sends no email at all; delivery for any seed address is re-routed to `SEED_SYSTEM_COMPANY_DOMAIN`.
 
-The current ACL includes the future `SEED_*` role family and `SYSTEM.SEED.*` infrastructure permissions, but Seed Database tables, `seed_token` columns, generation and query isolation are not implemented yet.
+Two further rules govern what happens after generation:
+
+- **A new row's universe comes from the resource it belongs to, never from the identity that created it.** A genuine `ADMIN` operating on a generated aggregate writes a SEED business row and remains the recorded actor on it. Only the explicit actor/audit allowlist may name a REAL identity from a SEED row; ownership, membership, subject and learner references may not.
+- **Course import and export are REAL-only.** A generated course cannot be exported and a seed identity cannot import, so generated content cannot be laundered into the genuine universe through a portable package.
+
+All of this is implemented: `seed_token` on 31 application tables, the two metadata tables, generation, cleanup, query isolation, the PostgreSQL constraint triggers, and the visible genuine-`ADMIN` All / Real / Seed control.
 
 ## 6. Core-owned workspaces and navigation
 

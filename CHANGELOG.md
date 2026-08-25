@@ -1,5 +1,295 @@
 # Changelog
 
+**LMS version:** 0.5.8.2  
+**Date time:** 2026/08/24 17:45 SAST  
+
+## 2026-08-24 17:45 SAST — v0.5.8.2 corrective build
+
+The first VPS run of v0.5.8 exposed four defects. Three were in the tests themselves and one was a
+genuine application fault. All are fixed here. No feature work: the Settings and Platform ADMIN
+company-context stages are deliberately held until this build is verified.
+
+### The Integration suite could not start
+
+- `SeedGenerationIntegrationTest` and `SeedCleanupIntegrationTest` each declared a private helper
+  named `count()`, which collides with the final `PHPUnit\Framework\TestCase::count()`. PHP
+  rejects that when the class is *declared*, so `php -l` passed, the Unit and Architecture suites
+  passed because they never load those files, and the Integration suite plus `composer qa` died
+  with a fatal before a single test ran. Renamed to `rowCount()`.
+- Added `tools/check-test-suite.php` and wired it into `composer qa` as the first gate. It is a
+  source scan, not a test, and the reason matters: PHPUnit builds every suite named in
+  `phpunit.xml` before executing anything, so one unloadable class kills the run during suite
+  construction, before any guard could execute. **A PHPUnit test cannot protect against a class
+  that stops PHPUnit from starting.** The scan never loads a class, which is exactly why it
+  survives one that cannot be loaded. `TestSuiteLoadabilityTest` keeps the tool wired into the
+  gate.
+
+### The render tests could not write their compiled templates
+
+- `RenderHarness` used one fixed `sys_get_temp_dir() . '/catto-render-smoke/'`. On Windows that is
+  per-user and never collided; on Linux it is `/tmp`, where a directory left by another account is
+  simply unwritable. F3 then wrote nothing and `require`d a file that did not exist, which
+  presented as 32 assertion failures and 7 errors that all looked like template defects. Each run
+  now gets its own directory, named by pid plus random bytes, created with a checked `mkdir` at
+  0700, verified writable, and removed at shutdown. A preparation failure now raises a named
+  diagnostic instead of masquerading as 39 broken templates.
+- The harness now records the output-buffer depth before rendering and unwinds to it afterwards.
+  F3's `sandbox()` does `ob_start()`, `require`, `ob_get_clean()`, so a failed `require` leaves the
+  buffer open and PHPUnit reports the test as risky — burying the real assertion under a second,
+  unrelated-looking complaint. This was secondary to the directory problem, but it would have
+  obscured any genuine template error in the one harness that exists to surface them.
+
+### `/admin/companies?universe=seed` returned 500
+
+- Rendering the Companies page performed a write. `systemCompanyContext()` called
+  `ensureSystemCompany()`, which unconditionally called `assignUser()` — trying to make the genuine
+  REAL administrator an owner of the SEED System Company. `SeedProvenance::forPair()` refused, and
+  was right to. The write was the defect, not the guard.
+- `ensureSystemCompany()` no longer assigns membership. Resolving a company, bootstrapping missing
+  infrastructure, and making somebody a business member of it are now three separate things. The
+  read path uses `systemCompany()` and never writes; SEED never bootstraps, because the shared SEED
+  System Company is created by the baseline with the reserved infrastructure token and a second one
+  must never appear. `assignSystemCompanyOwner()` makes the remaining membership write an explicit
+  act with a visible caller.
+- **The 500 was the visible half.** `assignUser()` deactivated the actor's existing active
+  membership *before* provenance was checked, and `systemCompanyContext()` runs outside any
+  transaction, so each failed page load committed that deactivation and only then threw — leaving
+  the administrator with no active company on what was a GET request. Provenance is now resolved
+  before anything is modified, and both statements run inside one transaction.
+- `TransactionManager::run()` now joins an already-open transaction instead of calling `begin()` a
+  second time. PDO does not nest, which had made it unsafe for any repository to protect its own
+  multi-statement write when a service might already have opened one.
+- No cross-universe exception was added. `company_users.user_id` is **not** on the actor allowlist
+  and must not be: an administrator's authority over seed data comes from ADMIN capability plus a
+  deliberate universe scope, never from business membership.
+
+### Regression coverage
+
+- `AdministrationUniverseRouteIntegrationTest` loads all seven Administration sections in `real`,
+  `seed` and `all`, and asserts that `company_users` is unchanged afterwards. That second
+  assertion is the one that would have caught this: the damaged row belonged to the administrator,
+  and a row count would not have moved because the row was deactivated rather than deleted.
+
+### Version
+
+- Every current-release identifier is now `0.5.8.2`: `composer.json`, `PLATFORM_ASSET_VERSION`, the
+  REST and MCP status payloads, both validators, the tests asserting them, and the version line of
+  every shipped document. Historical changelog entries naming 0.5.8 are left alone — that release
+  happened. Per-file metadata headers were updated only on files this round actually changed.
+
+### Roadmap
+
+- Recorded the owner's new product direction as planning only: three-level course taxonomy plus
+  tags, search and browsing, learner and company Favourites, the five distinct company course
+  concepts, promotions and recommendations, ratings and reviews and testimonials, and Analytics
+  explicitly after Commerce. Nothing from those sections is implemented.
+
+## 2026-08-23 04:19 SAST — v0.5.8 Seed Database
+
+Administrator-controlled, live-safe test-data infrastructure. An operator can now generate a
+disposable set of realistic records and exercise every list screen at volume, which is what the
+v0.5.7.6 pagination work existed to make possible.
+
+The architectural rule this stage rests on is unchanged and deliberately narrow: permissions
+answer *what an identity may do*; `seed_token` plus universe-aware query scope answers *which
+business rows that identity may see or touch*. There are exactly two business-data universes,
+`REAL = seed_token IS NULL` and `SEED = seed_token IS NOT NULL`.
+
+### Schema
+
+- Rebased the baseline as the single v0.5.8 migration. **A destructive database reset is
+  required**; there is no incremental upgrade path from 0.5.7.6.
+- Added `seed_token` with a partial index to 31 application tables, and the `seed_data` and
+  `seed_data_tables` metadata tables.
+- Added a single cross-universe integrity trigger function applied to 27 tables through
+  constraint triggers, so PostgreSQL rejects a REAL to SEED business relationship even if
+  application code regresses. The guard compares universes rather than set tokens, because seed
+  tokens are provenance and different sets may legitimately reference one another.
+- Widened the System Company uniqueness index to admit one REAL and one shared SEED System
+  Company (decision D1), and created the SEED one with a reserved infrastructure token that
+  cleaning up an ordinary seed set can never remove.
+- Generated the columns, indexes and triggers from `SeedTableCatalog` rather than hand-written
+  SQL, so the schema guards and the contract tests read one declaration.
+
+### Seed module
+
+- `SeedTableCatalog` freezes the table policy: 31 seed-aware tables, the tables that deliberately
+  are not, the 52 guarded foreign keys, and the 14-column actor/audit allowlist that may
+  legitimately reference a genuine ADMIN across the boundary (decision D4).
+- `SeedGenerationPlan` turns one requested volume into entity counts. The request is a soft
+  whole-set target and lands within about 1% from 1,000 records upward; below that a floor keeps
+  the graph coherent.
+- `SeedGenerator` builds the graph across 29 tables in one transaction: people with `SEED_*`
+  roles, companies, categories, courses with modules, content blocks, assessments, questions and
+  options, grade bands, price variants, editors, enrolments with progress, attempts, responses,
+  sessions, results, certificates, favourites, requests, credits, allocations, edit history and
+  audit activity. Randomness is seeded from the set token, so one token rebuilds one graph.
+- `SeedRepository` owns the SQL: batched inserts, the metadata writes, the derived counts and
+  cleanup.
+- `SeedDatabaseService` orchestrates generation, listing and selective cleanup.
+- Generation sends **zero email**, fabricates no `course_media`, `auth_sessions`,
+  `auth_login_tokens`, `api_tokens` or `web_sessions`, and never assigns a normal role or ADMIN.
+- Current counts are derived from the physical rows through the indexed `seed_token` every time
+  they are read. Historical counts are written once. There are no counter triggers and nothing
+  stores a remaining count, because a stored figure can drift from the rows it describes
+  (decision D2).
+
+### Universe isolation
+
+- Added `DataUniverse`, the REAL/SEED/ALL scope vocabulary, and the identity universe on
+  `CurrentUser`, derived from `users.seed_token` rather than from any role name.
+- Only a genuine immutable ADMIN may deliberately select a scope. An ordinary identity, a seed
+  identity and an anonymous visitor are each pinned to their own universe regardless of what the
+  query string asks for; `BaseController::universe()` is the single place a request value is read.
+- Scoped every Administration and Company list, all eighteen count queries introduced in
+  v0.5.7.6, the dashboard and report scalars, the bounded entity pickers, direct slug lookups,
+  the anonymous home page and catalogue, and the REST and MCP surfaces.
+- Fixed the unassigned-user sweep, which runs on ordinary Administration page loads and would
+  otherwise have attached every generated identity to the genuine System Company — creating
+  exactly the cross-universe row the new trigger rejects, and returning 500 on the workspace that
+  hosts the Seed section.
+- Added `DataUniverseScopeTest`, an architecture test that fails the build when a repository
+  method returning business rows or a count does not take a universe, when a count and its row
+  query are scoped differently, when a universe parameter is given a default, or when a
+  controller reads the universe filter itself instead of going through `BaseController`.
+
+### Seed mail routing
+
+- Generated company domains now end in `.seed.invalid`. RFC 2606 reserves that TLD so it can
+  never be registered or resolved, which makes an un-rewritten seed address undeliverable by
+  construction rather than by convention.
+- Added `SeedMailRouter` and the `SeedAwareMailer` decorator. A generated address is stored and
+  displayed with its synthetic domain, but the delivery envelope is rewritten to the local part
+  at `SEED_SYSTEM_COMPANY_DOMAIN`, so one real inbox receives every seed message. A genuine
+  address is never rewritten, and with no domain configured nothing is rewritten at all.
+- Generated local parts are unique on their own rather than merely within their domain, because
+  the rewrite discards the domain and two identities differing only by company would otherwise
+  share an inbox.
+- Added `SEED_SYSTEM_COMPANY_NAME` and `SEED_SYSTEM_COMPANY_DOMAIN` to `.env.example`. The
+  domain must differ from `APP_DOMAIN`; the migration fails with an explanatory error if it does
+  not, because `companies.domain` is unique platform-wide.
+
+### Administration
+
+- Added the Seed Database section at `/admin/seed` with generation, set history showing
+  historical and current counts, a cleanup impact preview and cleanup.
+- The preview shows SEED rows in *other* sets that depend on the one being removed. REAL rows are
+  never eligible for collateral deletion.
+- Guarded by `SYSTEM.SEED.VIEW` and `SYSTEM.SEED.MANAGE`. `SEED_ADMIN` receives no `SYSTEM.*`
+  authority and cannot reach the section.
+
+### ACL
+
+- Decision D5: course import and export remain REAL-only for every seed role, but
+  `COURSE.MEDIA.MANAGE` is now assignable to `SEED_COURSE_EDITOR` and `SEED_COURSE_OWNER`, so a
+  SEED course may hold genuine uploaded test media. The database role-permission boundary trigger
+  was updated to match the catalogue.
+
+### Live write provenance
+
+- Added `SeedProvenance`, which resolves the universe of a new row from the resource it belongs
+  to. A course child row takes its course, a learning row takes its enrolment, an identity row
+  takes its identity. Nothing takes it from the acting identity: a genuine ADMIN is a REAL
+  identity, so deriving provenance from the actor would write a REAL row into a SEED aggregate
+  and be rejected a step later by the trigger, naming a column rather than the feature that
+  broke.
+- Threaded it through roughly twenty create paths across nine repositories - identities, roles,
+  sessions, company membership, courses and every child row, enrolments, module progress,
+  attempts, responses, results, certificates, favourites, requests, credits and audit rows.
+- A row with two parents goes through `forPair()`, which refuses a cross-universe pairing by
+  naming both sides. The database would refuse it anyway; the difference is a diagnosable message
+  instead of a puzzling constraint violation.
+- Added `SeedProvenanceWriteTest`: every literal INSERT into a seed-aware table must name
+  `seed_token`, and every class that persists to one must be able to resolve provenance.
+
+### The visible All / Real / Seed control
+
+- Added `resources/views/partials/universe-switch.html`, included by the seven Administration
+  list families. It renders the record split - `1,247 total · 1,031 real · 216 seed` - and three
+  links.
+- Counts are two indexed queries per dataset rather than three: the universes partition each
+  table exactly, so the genuine figure is the difference and a third scan could only disagree
+  with the other two. Each count query is the counterpart of its list's row query, so the strip
+  always describes the list beneath it and never a page of it.
+- The selection travels with every pagination link, the rows-per-page form and the bounded
+  previews' "View all" links, but deliberately not with a page number: page 9 of one universe is
+  rarely page 9 of the other, so carrying it across would strand the reader on an empty page
+  immediately after switching.
+- Only a genuine non-seed ADMIN receives the model, so nobody else has anything to render.
+  `CurrentUser::canSelectUniverse()` is the one test, and it is the same test that decides whether
+  a requested scope is honoured - the control can never appear to someone whose choice would be
+  ignored, nor be hidden from someone whose choice is honoured.
+- Reports carries the selector without a records strip: it lists no rows, and its figures are
+  recomputed for the selected universe instead.
+- Added `.universe-switch` and its four companion classes to the core CSS with an explicit active
+  state and focus ring, so the control is usable under a theme that has never heard of it.
+- Added `UniverseRenderSmokeTest`, covering a genuine ADMIN in each of the three scopes, an
+  ordinary identity and a seed identity, and asserting both what renders and what must not.
+
+### Decision D5 enforced
+
+- `CoursePortabilityService` now refuses to export a course that carries a token, and refuses an
+  import from an identity that carries one. The rule is the course's universe, not the actor's
+  permission: a genuine ADMIN holds `COURSE.EXPORT` and may legitimately view generated data, but
+  the resulting package would re-import as genuine content.
+- Cloning a revision is export followed by import, so it is refused for the same reason - it was
+  otherwise the one path that could launder generated content into the genuine universe.
+- An import now states its REAL token explicitly rather than deriving it from the owning company,
+  which makes "an imported course is genuine" true by construction.
+- The export controller serialises before emitting the download headers. A refusal afterwards
+  would have reached the browser as an error page wearing a JSON content type and an attachment
+  filename, and been saved rather than shown.
+
+### Cleanup and maintenance
+
+- Seed cleanup now invalidates a set's outstanding login tokens two ways: by `user_id`, and by
+  the set's verified addresses. `auth_login_tokens.user_id` is nullable, so a token raised before
+  the account was resolved carried only the address and would otherwise have outlived its
+  identity as a live magic link naming an address nobody owns. Both branches are bounded by the
+  set, so no genuine identity loses a token.
+- Documented `MaintenanceRepository` as deliberately universe-agnostic. Expired sessions and
+  spent login links are authentication infrastructure, not business records; an expired SEED
+  session is as much rubbish as an expired REAL one, and `web_sessions` could not be scoped in
+  any case because it is not seed-aware. Added `MaintenanceUniverseContractTest` so the decision
+  cannot drift in either direction.
+
+### PostgreSQL integration coverage
+
+- Added six integration classes under `tests/Integration/`, 70 tests in total, all running
+  against the configured development database and cleaning up after themselves:
+  `SeedSchemaIntegrationTest` reads the installed catalogue rather than the SQL this codebase
+  would generate, so a database that was never migrated fails there instead of failing later as a
+  confusing constraint error; `SeedGenerationIntegrationTest` generates a minimum-volume set and
+  checks its shape, provenance, derived counts and transactional rollback;
+  `SeedIsolationIntegrationTest` proves read scope on real rows and provokes actual PostgreSQL
+  rejections in both directions, including the two intended exceptions;
+  `SeedWriteProvenanceIntegrationTest` runs real workflows and reads the stored token back;
+  `SeedCleanupIntegrationTest` compares the preview with the deletion and covers cross-set
+  collateral and login tokens; `SeedPortabilityIntegrationTest` exercises the D5 refusals against
+  real courses.
+- Extracted the F3 render harness into `tests/Support/RenderHarness.php` so the pagination and
+  universe render tests share one implementation. A second copy of that error capture would drift
+  and start reporting success for a template that returns 500.
+
+### Housekeeping
+
+- Fixed `tools/check-architecture.php` on Windows. Every rule compares the relative path against
+  a literal like `src/Infrastructure/Persistence/`, and the path was never normalised, so on
+  Windows the persistence classes and the documented container exceptions were all reported as
+  violations. The false count grew by one whenever a legitimate file joined those directories,
+  which made the documented "five expected violations" a trap. Any name it reports is now real.
+- Added `Uuid::v7()` for time-ordered set tokens.
+- Removed `resources/views/partials/assessment-form.html` and
+  `src/Infrastructure/Persistence/M/RolesM.php` with its `phpstan.neon` entry, per `REMOVE.md`.
+- The baseline migration is now discovered by glob rather than named in eight places, so a future
+  rebase does not require editing every call site.
+- Added `public_html/robots.txt`. Every request for it previously fell through to the front
+  controller and was logged as a 404 with a stack trace. It disallows `/auth/`, which matters:
+  a crawler following a magic link would consume the token and stop the recipient signing in.
+- Added a late-project search-engine discoverability stage to the roadmap covering a generated,
+  bounded, REAL-only sitemap.
+- Advanced every functional version identifier to 0.5.8.
+
 ## 2026-08-21 14:48 SAST — v0.5.7.6 pagination, counts and bounded entity pickers
 
 Purpose of this version: make the interface tell the truth about large datasets **before** the Seed Database stage starts generating them. Most list surfaces previously failed by silent truncation rather than by a visible break.
@@ -351,8 +641,6 @@ Purpose of this version: make the interface tell the truth about large datasets 
 - Split Reports from Activity and added course/company learning summaries.
 - Removed the obsolete `/dashboard` route/template and the bundled Linux Mint Beginner v2 import resource/workflow.
 - Radiant Learning is now the active theme in the clean 0.5.0 baseline; the filesystem default remains the recovery theme.
-
-# Changelog
 
 ## 0.5.0 — importer level metadata fix
 

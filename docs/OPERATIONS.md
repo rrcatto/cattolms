@@ -1,15 +1,40 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.5.7.6  
+**LMS:** 0.5.8.2  
+**Date time:** 2026/08/24 17:45 SAST  
 **Runtime:** PHP >=8.5.9 <9.0  
 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Upgrading 0.5.7.5.1 to 0.5.7.6
+## Upgrading 0.5.7.6 to 0.5.8
 
-0.5.7.6 makes **no schema change and adds no migration**; the baseline migration differs from 0.5.7.5.1 only in its header metadata. It therefore needs no database reset and no installer run. Deploy it alongside the existing version and repoint the `current` symlink.
+0.5.8 **rebases the baseline migration**, so unlike 0.5.7.6 it requires a destructive development
+database reset. There is no incremental upgrade path.
+
+Set these before migrating:
+
+```text
+SEED_SYSTEM_COMPANY_NAME="SEED System Company"
+SEED_SYSTEM_COMPANY_DOMAIN=seed.your-domain.example
+```
+
+`SEED_SYSTEM_COMPANY_DOMAIN` must differ from `APP_DOMAIN` — `companies.domain` is unique across
+the whole platform and the migration stops with an explanatory error otherwise — and it must be a
+domain you genuinely receive mail for, because every message addressed to a generated identity is
+delivered there. Leave it blank to disable the rewrite; seed mail then simply bounces, which is
+safe for an installation that never signs in as a generated identity.
+
+Then deploy alongside the existing version, repoint the `current` symlink and reset:
 
 ```bash
-sudo ln -sfn /usr/local/lib/php/catto-learning/0.5.7.6 /usr/local/lib/php/catto-learning/current.tmp
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer install
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer smoke:install
+```
+
+`smoke:install` is destructive by design and is acceptable only while the database is disposable
+TEST/DEV state.
+
+```bash
+sudo ln -sfn /usr/local/lib/php/catto-learning/0.5.8 /usr/local/lib/php/catto-learning/current.tmp
 sudo mv -Tf /usr/local/lib/php/catto-learning/current.tmp /usr/local/lib/php/catto-learning/current
 ```
 
@@ -74,7 +99,18 @@ runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prett
 
 `composer qa` is the authoritative pre-handoff/pre-release gate and includes the full PHPUnit suite, PHPStan and project validators.
 
-The integration suite uses the configured development database. Test fixtures must clean up records they create, including audit events; tests must not masquerade as later seed data.
+**Check the suites can start before running them.** `composer qa` begins with
+`tools/check-test-suite.php` for a reason: a test class that cannot be declared kills PHPUnit
+during suite construction, before any test — including any guard written as a test — can run. The
+companion command is:
+
+```bash
+php vendor/bin/phpunit --list-tests --testsuite Integration
+```
+
+Test files present and zero tests discovered is a failure, not an empty directory.
+
+The integration suite uses the configured development database. Test fixtures must clean up records they create, including audit events; tests must not masquerade as later seed data. The Seed integration tests create both REAL and SEED fixtures and remove their seed sets through the catalogue's own cleanup order, so a failed run leaves nothing that a later generation could collide with.
 
 ## Static validators
 
@@ -91,7 +127,7 @@ Artifact-generation environments without PHP 8.5.9/Composer/PostgreSQL may run s
 
 ## ACL verification after reset
 
-0.5.7.6 should expose the same built-in roles as 0.5.7.5.1, unchanged:
+0.5.8 should expose the same built-in roles as 0.5.7.5.1, unchanged:
 
 ```text
 ADMIN
@@ -108,7 +144,7 @@ SEED_ADMIN
 
 Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
 
-The Commerce permission set is reserved in the ACL now but Commerce itself is not installed. The `SEED_*` roles and `SYSTEM.SEED.*` keys are preparatory only; Seed Database tables, `seed_token`, generation and query isolation are the next stage.
+The Commerce permission set is reserved in the ACL now but Commerce itself is not installed. The `SEED_*` roles and `SYSTEM.SEED.*` keys are no longer preparatory: `seed_token`, generation, cleanup and query isolation are all present in this version.
 
 ## Browser acceptance after clean QA
 
@@ -187,3 +223,55 @@ For automatic database updates, install/configure MaxMind `geoipupdate` at the s
 ## Theme re-sync diagnostics
 
 Theme source under `/home/<site-user>/themes/` is authoritative. `themes:sync` should reconcile filesystem releases with the rebuildable registry. A skipped filesystem theme should have an actionable diagnostic rather than being silently suppressed.
+
+## Seed Database
+
+Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.VIEW` and
+`SYSTEM.SEED.MANAGE`. `SEED_ADMIN` administers seed *business* data and cannot reach this section.
+
+**Generating.** Enter an approximate record count. It is a soft whole-set target across every
+seeded table, not a per-table quota, and lands within about 1% of the request from 1,000 upward.
+Generation runs in one transaction, so a failure rolls the whole set back and leaves nothing
+behind. Start at 1,000 to confirm the graph looks right, then scale to 25,000 and beyond.
+
+**What a set contains.** People with `SEED_*` roles, companies, categories, courses with modules,
+content blocks, assessments, questions and options, grade bands, price variants, editors,
+enrolments with progress, attempts, responses, sessions, results, certificates, favourites,
+requests, credits, allocations, edit history and audit activity — 29 tables.
+
+Never fabricated: `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tokens`,
+`web_sessions`. Generation sends **zero email**.
+
+**Signing in as a generated identity.** Request an ordinary passwordless login for the generated
+address. The stored address uses a synthetic `.seed.invalid` domain, but the message is delivered
+to the local part at `SEED_SYSTEM_COMPANY_DOMAIN`, so it arrives in the one inbox you configured.
+
+**Cleaning up.** The Clean up action previews what it will remove first, including SEED rows in
+other sets that depend on the one being removed — seed tokens record where data came from, they
+are not separate tenancies. REAL rows are never eligible. Current counts are recalculated from the
+physical rows afterwards; nothing stores a remaining count.
+
+**Switching universe.** A genuine ADMIN sees an All / Real / Seed control above every
+Administration list, with the record split beside it. Switching keeps your filters and
+rows-per-page but returns you to page 1, because a deep page number rarely exists in the other
+population. Nobody else sees the control, and a hand-typed `?universe=all` does nothing for an
+ordinary or a seed identity.
+
+Gilded Noir has no rules for the control yet, so it falls back to core CSS inside the dark skin.
+Core styles it completely, including the active state and the focus ring; enhancing the theme
+needs a version number from you.
+
+**Verifying isolation.** The Seed integration suite does this automatically as part of
+`composer qa`, including both directions and the intended exceptions. To check by hand, this must
+be rejected by the database:
+
+```sql
+INSERT INTO course_enrolments (public_id, user_id, course_id, access_period_seconds)
+SELECT gen_random_uuid(),
+       (SELECT id FROM users WHERE seed_token IS NULL LIMIT 1),
+       (SELECT id FROM courses WHERE seed_token IS NOT NULL LIMIT 1),
+       31536000;
+```
+
+If it succeeds, the cross-universe guard is not working and no other isolation claim can be
+trusted.

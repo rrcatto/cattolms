@@ -30,7 +30,7 @@ final class RouteSmokeContractTest extends TestCase
         $source = (string) file_get_contents(__DIR__ . '/../../src/Application/App.php');
         preg_match_all('/use\s+([^;]+);/', $source, $useMatches);
         $imports = [];
-        foreach ($useMatches[1] ?? [] as $fqcn) {
+        foreach ($useMatches[1] as $fqcn) {
             $fqcn = trim((string) $fqcn);
             $imports[basename(str_replace('\\', '/', $fqcn))] = $fqcn;
         }
