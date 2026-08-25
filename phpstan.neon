@@ -2,6 +2,11 @@ parameters:
   level: 6
   paths:
     - src
+    # tests/ is analysed too. Two defects reached the VPS that PHPStan would have caught in a
+    # second: an undefined $db after a refactor, and a PostgreSQL dollar-quote tag written inside a
+    # double-quoted PHP string, which PHP read as a variable. Static analysis that stops at the
+    # application boundary cannot see the code that proves the application works.
+    - tests
   tmpDir: storage/cache/phpstan
   universalObjectCratesClasses:
     - CattoLearning\Infrastructure\Persistence\M\ApiTokensM
@@ -28,7 +33,6 @@ parameters:
     - CattoLearning\Infrastructure\Persistence\M\CoursePriceVariantsM
     - CattoLearning\Infrastructure\Persistence\M\CourseRequestsM
     - CattoLearning\Infrastructure\Persistence\M\CoursesM
-    - CattoLearning\Infrastructure\Persistence\M\RolesM
     - CattoLearning\Infrastructure\Persistence\M\UserEmailsM
     - CattoLearning\Infrastructure\Persistence\M\UsersM
     - CattoLearning\Infrastructure\Persistence\M\WebSessionsM

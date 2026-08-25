@@ -58,10 +58,12 @@
     "mcp:serve": "php tools/mcp-server.php",
     "api-token:revoke": "php tools/revoke-api-token.php",
     "runtime:check": "php tools/check-runtime-hazards.php",
+    "test-suite:check": "php tools/check-test-suite.php",
     "test:unit": "vendor/bin/phpunit --testsuite Unit",
     "test:architecture": "vendor/bin/phpunit --testsuite Architecture",
     "test:integration": "vendor/bin/phpunit --testsuite Integration",
     "qa": [
+      "@test-suite:check",
       "@test",
       "@analyse",
       "@architecture:check",
@@ -85,5 +87,5 @@
       "role": "Project creator and maintainer"
     }
   ],
-  "version": "0.5.7.6"
+  "version": "0.5.8.2"
 }

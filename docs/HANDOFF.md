@@ -1,10 +1,34 @@
-# Catto Learning 0.5.7.6 — Development Handoff
+# Catto Learning 0.5.8.2 — Development Handoff
 
-**Date:** 2026-08-21 SAST  
+**LMS version:** 0.5.8.2  
+**Date time:** 2026/08/24 17:45 SAST  
 **Runtime target:** PHP 8.5.9  
-**Status:** Pagination, counts and bounded entity pickers complete on the 0.5.7.5.1 ACL foundation; Seed Database next; Commerce after seed acceptance
+**Status:** v0.5.8.2 corrective build. The first VPS run of v0.5.8 found three test defects and one application defect; all are fixed and the tree is awaiting a second VPS pass. Stage C (editable SEED System Company Settings) and Stage D (Platform ADMIN selected-company context) are approved and deliberately deferred until that pass is green.
 
 Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
+
+## 0. v0.5.8.2 corrective round
+
+The first authoritative VPS run of v0.5.8 failed. What it found, and what changed, is in
+`CHANGELOG.md` under 2026-08-24. In short:
+
+| Defect | Fix |
+|---|---|
+| Integration suite could not load: two classes declared `count()` | Renamed to `rowCount()`; `tools/check-test-suite.php` added to `composer qa` |
+| Render tests could not write to a shared `/tmp` directory | Per-run private directory with a named diagnostic on failure |
+| Renders left output buffers open, reported as 39 risky tests | Buffer depth recorded and unwound |
+| `/admin/companies?universe=seed` 500, and a GET deactivating ADMIN membership | Read path resolves without writing; `assignUser()` validates before mutating and is transactional |
+
+**Two rules this round established, worth keeping:**
+
+1. A GET/read path must not mutate business membership. `AdministrationUniverseRouteIntegrationTest`
+   asserts `company_users` is unchanged after loading every Administration section in every
+   universe.
+2. A PHPUnit test cannot guard against a class that stops PHPUnit from starting. Guards of that
+   kind belong in `tools/check-*.php`, which run before the suites.
+
+Still outstanding and unchanged: nothing in v0.5.8 has been through a green `composer qa` on
+PostgreSQL, and the Integration suite has now grown to 100 tests that have still never executed.
 
 ## 1. ACL simplification decision
 
@@ -52,37 +76,47 @@ PLATFORM.REFUND.MANAGE
 
 These are reservations only. Do not expose empty Commerce UI merely because the ACL keys exist.
 
-## 3. Seed Database is deliberately not implemented yet
+## 3. Seed Database, as built
 
-The current source does **not** add:
+Present in this version, and section 9 is the authoritative boundary:
 
-- `seed_data` or `seed_data_tables`;
-- `seed_token` columns;
-- seed generation or cleanup;
-- REAL/SEED query filtering/counts;
-- seed-aware foreign-key integrity;
-- Seed Database Administration UI.
+- `seed_data` and `seed_data_tables`;
+- `seed_token` on 31 application tables, each with a partial index;
+- generation and cleanup, both transactional;
+- REAL/SEED query scope and per-universe counts on every Administration data family;
+- seed-aware referential integrity enforced by PostgreSQL constraint triggers;
+- the Seed Database Administration section, and the genuine-ADMIN All / Real / Seed control.
 
-The permanent `SEED_*` roles and `SYSTEM.SEED.VIEW/MANAGE` permissions are preparatory infrastructure only.
+`SEED_*` roles and `SYSTEM.SEED.VIEW` / `SYSTEM.SEED.MANAGE` are no longer preparatory: they are
+the identities and the authority the module actually uses.
 
-## 4. Next stage — Seed Database
+## 4. The approved Seed Database model
 
-Implement the approved Seed Database model before Commerce:
+Implemented as specified below. Kept here because it remains the specification the code answers
+to, not because any of it is outstanding:
 
 - Administrator supplies a description and numeric soft target volume for the complete generated set;
 - each set receives a UUIDv7 token and historical/per-table counts;
 - only tables capable of containing test data receive nullable indexed `seed_token` fields;
 - multiple sets coexist; seed-set tokens are provenance/cleanup identifiers, not visibility boundaries;
-- all generated email addresses derive from `APP_DOMAIN`;
+- generated company domains use the reserved `.seed.invalid` suffix (RFC 2606), which can never
+  resolve, while delivery for any seed address is re-routed to `SEED_SYSTEM_COMPANY_DOMAIN`;
+- the local part of every generated address is unique across all seed identities;
 - seed creation sends **zero email**; a login email is sent only when an operator explicitly requests a passwordless login for a particular seed account;
 - generated identities receive `SEED_STUDENT` plus appropriate `SEED_*` roles;
 - REAL and SEED visibility is enforced by repository/service queries and database integrity, not by duplicated permission names;
 - REAL data can never reference SEED data and vice versa;
-- genuine `ADMIN` sees both universes and receives All / REAL / SEED table filters; ordinary REAL and SEED identities never see the other universe;
+- genuine `ADMIN` sees both universes and receives a visible All / Real / Seed control with a
+  `total · real · seed` record split; ordinary REAL and SEED identities never see the other
+  universe, and neither is offered the control;
 - generation and cleanup use transactions and bulk SQL;
 - no Themes, role definitions, permission definitions, ACL mappings, API tokens or fake media files are generated.
 
 After Seed Database is accepted, use representative seed data to exercise the existing LMS before beginning Commerce.
+
+Ordinary writes inherit provenance from the resource they belong to, never from the acting
+identity: a genuine `ADMIN` operating on a generated aggregate writes a SEED business row and
+stays the recorded actor on it (decision D4). Course portability is REAL-only (decision D5).
 
 ## 5. Verification state
 
@@ -141,5 +175,53 @@ Clear the instance `storage/cache` compiled templates and reload PHP-FPM as part
 
 ### Known gaps carried forward
 
-- Gilded Noir v1.1.4 styles the pagination control and the entity lookup but has no `.acl-*` rules, so the Roles and ACL permission editor falls back to core CSS inside the dark skin. Updating the theme requires a version number from the project owner.
+- Gilded Noir v1.1.4 styles the pagination control and the entity lookup but has no `.acl-*` rules and no `.universe-switch` rules, so the Roles and ACL permission editor and the data-universe control both fall back to core CSS inside the dark skin. Core defines both completely, including the active state and focus ring, so each is usable without a theme update. Updating the theme requires a version number from the project owner.
 - No automated test issues a real HTTP request to an HTML page; `tests/Integration/HttpRouteSmokeTest.php` covers API routes only. Browser rendering remains the visual acceptance authority.
+
+## 9. v0.5.8 implementation boundary
+
+Complete in this version:
+
+- `seed_token` on 31 application tables with partial indexes, plus `seed_data` and
+  `seed_data_tables`;
+- one cross-universe integrity trigger function applied to 27 tables, comparing universes rather
+  than set tokens so different seed sets may reference one another;
+- one REAL and one shared SEED System Company, with a universe-scoped unassigned-user sweep;
+- the Seed module: frozen table catalogue, volume plan, generator, repository and service;
+- universe-aware reads everywhere, enforced by `DataUniverseScopeTest` rather than by review;
+- the Seed Database Administration section with generation, history, cleanup preview and cleanup;
+- seed mail routing to one configured inbox.
+
+Completed in the second and third implementation rounds, and no longer outstanding:
+
+1. **Seed provenance on ordinary writes.** `SeedProvenance` resolves a new row's universe from the
+   resource it belongs to, and roughly twenty create paths across nine repositories use it. A row
+   with two parents goes through `forPair()`, which refuses a cross-universe pairing by name
+   rather than leaving the trigger to report a column.
+2. **The visible All / Real / Seed control.** `resources/views/partials/universe-switch.html`,
+   included by the seven Administration list families, showing a `total · real · seed` split and
+   three links. Only a genuine non-seed `ADMIN` receives the model, so nobody else has anything to
+   render.
+3. **Integration tests for the Seed module.** Six classes under `tests/Integration/` covering
+   schema, generation, rollback, read isolation, the PostgreSQL guards, live-write provenance,
+   cleanup with cross-set collateral, login-token invalidation and decision D5.
+4. **`MaintenanceRepository`, `LoginTokenRepository`** and the decision D5 refusals. The prune is
+   deliberately universe-agnostic and documented as such; seed cleanup invalidates login tokens by
+   identity, including a token raised against a set address before the account was resolved; export
+   and import refuse a generated course and a generated identity at the service layer.
+
+**Still outstanding**, and not coding work:
+
+- the migration, the triggers and the whole Integration suite have never met PostgreSQL;
+- browser acceptance of the universe control under Factory Reset and Gilded Noir;
+- the volume pass itself, which is what this release exists to make possible.
+
+`docs/tests-v0.5.8.md` in the workarea splits these three ways: implemented and automated,
+implemented but requiring VPS execution, and manual browser/volume acceptance.
+
+### Deploy-time requirements specific to this stage
+
+This version rebases the baseline, so a destructive development reset is required. Two new
+environment values must be set before migrating: `SEED_SYSTEM_COMPANY_NAME` and
+`SEED_SYSTEM_COMPANY_DOMAIN`. The domain must differ from `APP_DOMAIN` or the migration stops with
+an explanatory error, because `companies.domain` is unique platform-wide.
