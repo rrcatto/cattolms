@@ -164,6 +164,27 @@ final class UserRepository
         return $this->findById((int) $user['id']) ?? $user;
     }
 
+    /**
+     * Whether this user's active company is suspended.
+     *
+     * A membership row is unique per active user, so there is at most one company to ask about.
+     * Asked as a single EXISTS rather than by loading the company, because the caller only needs
+     * the yes or no and this sits on the sign-in path.
+     */
+    public function hasSuspendedCompany(int $userId): bool
+    {
+        $rows = $this->db->exec(
+            "SELECT EXISTS (
+                 SELECT 1 FROM company_users cu
+                 JOIN companies c ON c.id = cu.company_id
+                 WHERE cu.user_id = :user_id AND cu.status = 'active' AND c.status <> 'active'
+             ) AS suspended",
+            [':user_id' => $userId]
+        );
+
+        return in_array($rows[0]['suspended'] ?? false, [true, 1, '1', 't', 'true'], true);
+    }
+
     public function setStatus(int $userId, string $status): void
     {
         if (!in_array($status, ['active','disabled'], true)) {

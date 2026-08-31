@@ -45,6 +45,17 @@ use RuntimeException;
 
 final class AuthService
 {
+    /**
+     * What a member of a suspended company is told.
+     *
+     * Deliberately non-technical and deliberately not "your account is not attached to an active
+     * company", which is what the workspace used to say and which reads as a fault in the reader's
+     * own account. The company is suspended; the person has done nothing, and nothing of theirs has
+     * been deleted.
+     */
+    public const SUSPENDED_COMPANY_MESSAGE = 'Your organisation\'s access to the platform is currently suspended. '
+        . 'Your account and your course progress are safe. Please contact your company administrator.';
+
     private ?CurrentUser $currentUser = null;
 
     public function __construct(
@@ -116,6 +127,15 @@ final class AuthService
                 $email,
                 Env::string('APP_ADMIN_EMAIL')
             );
+
+            // A suspended company's members may not obtain a session. Checked here, after the
+            // identity is known and before the session is created, so the magic link is consumed
+            // by nobody and no session exists to clean up. The token is left unused deliberately:
+            // the sign-in did not happen, so burning the link would also cost them the retry once
+            // the company is active again.
+            if ($this->companySuspensionBlocks((int) $user['id'])) {
+                throw new RuntimeException(self::SUSPENDED_COMPANY_MESSAGE);
+            }
 
             $this->tokens->markUsed((int) $row['id']);
             $this->users->markLogin((int) $user['id']);
@@ -224,6 +244,22 @@ final class AuthService
             $roles[] = 'ADMIN';
         }
         $roles = array_values(array_unique(array_map('strtoupper', $roles)));
+
+        // The central suspension boundary. Every authenticated request resolves its identity here,
+        // so this one test covers the whole application: there is no controller that can forget it,
+        // and no company-status check anywhere else.
+        //
+        // The session is revoked as well as refused. Suspension is not a momentary condition to be
+        // re-evaluated on each request while a valid session sits in the database looking usable -
+        // and revoking here catches a session that outlived the sweep done at suspension time, for
+        // instance one created moments before it.
+        if (self::isTrue($session['company_suspended'] ?? false) && !in_array('ADMIN', $roles, true)) {
+            $this->sessions->revokeByTokenHash(Token::hash($rawToken));
+            $this->clearSessionCookie();
+
+            return null;
+        }
+
         $permissions = $this->acl->permissionsForUser($userId, $roles);
 
         $this->currentUser = new CurrentUser(
@@ -356,6 +392,39 @@ final class AuthService
     {
         $this->users->removeSecondaryEmail($userId, $emailId);
         $this->audit->record($userId, 'user.secondary_email_removed', ['email_id' => $emailId]);
+    }
+
+    /**
+     * Whether company suspension should stop this identity signing in.
+     *
+     * Two questions, in this order: is the person's active company suspended, and are they exempt.
+     * A genuine platform administrator is exempt, because company suspension is a company-level
+     * decision and must never become a way to lock the owner out of their own installation.
+     *
+     * A person with no company membership at all is unaffected, which is the right answer: they are
+     * not a member of anything that has been suspended.
+     */
+    private function companySuspensionBlocks(int $userId): bool
+    {
+        if (!$this->users->hasSuspendedCompany($userId)) {
+            return false;
+        }
+
+        try {
+            $roles = array_map('strtoupper', $this->roles->roles($userId));
+        } catch (\Throwable) {
+            // Failing to read roles must not grant the exemption: the safe answer to "might this
+            // be an administrator" is no, because guessing yes would defeat the suspension.
+            $roles = [];
+        }
+
+        return !in_array('ADMIN', $roles, true);
+    }
+
+    /** PostgreSQL booleans arrive through this driver in several shapes. */
+    private static function isTrue(mixed $value): bool
+    {
+        return in_array($value, [true, 1, '1', 't', 'true', 'TRUE'], true);
     }
 
     private function withinRateLimits(string $email): bool

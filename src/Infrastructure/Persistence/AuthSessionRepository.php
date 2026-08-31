@@ -65,8 +65,19 @@ final class AuthSessionRepository
     public function findActive(string $tokenHash): ?array
     {
         // SQL is justified because the session, user and primary email are joined.
+        //
+        // company_suspended is reported rather than filtered on. Whether the company is suspended
+        // is a fact about the row; whether that ends this particular session is policy, and policy
+        // belongs in AuthService where the platform-administrator exemption lives and can be read.
+        // Encoding the exemption in this query would bury the one rule that prevents a company
+        // suspension from locking an administrator out of their own installation.
         $rows = $this->db->exec(
-            'SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, u.seed_token AS user_seed_token, ue.email AS primary_email
+            "SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, u.seed_token AS user_seed_token, ue.email AS primary_email,
+                    EXISTS (
+                        SELECT 1 FROM company_users cu
+                        JOIN companies c ON c.id = cu.company_id
+                        WHERE cu.user_id = u.id AND cu.status = 'active' AND c.status <> 'active'
+                    ) AS company_suspended
              FROM auth_sessions s
              JOIN users u ON u.id = s.user_id
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
@@ -74,7 +85,7 @@ final class AuthSessionRepository
                AND s.revoked_at IS NULL
                AND s.expires_at > NOW()
                AND u.status = :status
-             LIMIT 1',
+             LIMIT 1",
             [':token_hash' => $tokenHash, ':status' => 'active']
         );
 
@@ -131,6 +142,61 @@ final class AuthSessionRepository
 
         $session->revoked_at = gmdate('Y-m-d H:i:sP');
         $session->save();
+    }
+
+    /**
+     * Revokes every live session a user holds, and reports how many were ended.
+     *
+     * Disabling an account has to take effect now, not at the next sign-in. `users.status` stops
+     * a new magic link being consumed, but it is read only during login: an already-authenticated
+     * session would otherwise keep working until it expired, so a disabled learner could carry on
+     * with a course for the rest of the session lifetime.
+     *
+     * Written as one UPDATE rather than a load-and-save loop because it must be atomic with the
+     * status change that accompanies it. The count is returned so the caller can record in the
+     * audit trail what actually happened.
+     */
+    public function revokeAllForUser(int $userId): int
+    {
+        $this->db->exec(
+            "UPDATE auth_sessions SET revoked_at = NOW()
+             WHERE user_id = :user_id AND revoked_at IS NULL",
+            [':user_id' => $userId]
+        );
+
+        return (int) $this->db->count();
+    }
+
+    /**
+     * Revokes the live sessions of a company's ordinary members, and reports how many ended.
+     *
+     * Used when a company is suspended. Suspension has to take effect at once rather than as each
+     * session happens to expire, and a per-request rejection alone would leave real sessions alive
+     * in the database looking valid.
+     *
+     * A platform administrator is deliberately exempt. Company suspension is a company-level
+     * decision, and an installation whose administrator can be signed out by one is an installation
+     * that can be locked away from its owner. The exemption is expressed here as well as in
+     * AuthService because this statement is the one that would otherwise do the damage.
+     */
+    public function revokeCompanyMemberSessions(int $companyId): int
+    {
+        $this->db->exec(
+            "UPDATE auth_sessions SET revoked_at = NOW()
+             WHERE revoked_at IS NULL
+               AND user_id IN (
+                   SELECT cu.user_id FROM company_users cu
+                   WHERE cu.company_id = :company_id AND cu.status = 'active'
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM user_roles ur
+                   JOIN roles r ON r.id = ur.role_id
+                   WHERE ur.user_id = auth_sessions.user_id AND r.role_key = 'ADMIN'
+               )",
+            [':company_id' => $companyId]
+        );
+
+        return (int) $this->db->count();
     }
 
     public function revokeByTokenHash(string $tokenHash): void

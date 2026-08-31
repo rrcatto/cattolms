@@ -1,11 +1,58 @@
-# Catto Learning 0.5.8.2 — Development Handoff
+# Catto Learning 0.5.8.3 — Development Handoff
 
-**LMS version:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
+**LMS version:** 0.5.8.3  
+**Date time:** 2026/08/25 14:29 SAST  
 **Runtime target:** PHP 8.5.9  
-**Status:** v0.5.8.2 corrective build. The first VPS run of v0.5.8 found three test defects and one application defect; all are fixed and the tree is awaiting a second VPS pass. Stage C (editable SEED System Company Settings) and Stage D (Platform ADMIN selected-company context) are approved and deliberately deferred until that pass is green.
+**Status:** v0.5.8.2 was accepted on the VPS on 2026/08/25 — full QA green, browser pass, a seed set generated — and is tagged and pushed. v0.5.8.3 implements Stage C (editable SEED System Company Settings) and Stage D (Platform ADMIN selected-company context), which were approved and deferred pending that acceptance. Local gates are green; PostgreSQL Integration and browser acceptance for v0.5.8.3 are still pending.
 
 Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
+
+## 0a. v0.5.8.3 — Stage C and Stage D
+
+**Stage C, editable SEED System Company Settings.** Administration Settings now edits the shared
+SEED System Company. The row is the one the baseline created with the reserved infrastructure
+token and it is edited in place: the token is never rewritten, `is_system` is never cleared, and
+the administrator never becomes a member of it.
+
+The interesting half is mail consistency. The SEED domain is both what Administration displays and
+where seed mail is delivered, so it resolves through `RuntimeSettings` — `app_options` row, then
+`.env`, then a built-in default — and `SeedMailRouter` is built from that rather than from `Env`.
+Had the container gone on reading `.env`, a saved domain would have been displayed everywhere and
+used nowhere, with no symptom until someone waited for a message that had gone elsewhere.
+
+Guarded by `SYSTEM.SEED.MANAGE`, so `SEED_ADMIN` — which holds no `SYSTEM.*` authority — cannot
+reach it. Every legality check runs before the first write, and both writes are in one transaction.
+
+**Stage D, Platform ADMIN selected-company context.** The Company workspace had two modes: own
+company, or the "All companies" overview. There was no way to say "administer company X", so an
+action taken from the platform-wide view had no company to act on.
+
+Three modes now, resolved by `src/Company/SelectedCompanyContext.php`:
+
+| Mode | Who | Scope |
+|---|---|---|
+| `own` | every ordinary Company Administrator | their own active company |
+| `platform` | a platform administrator with nothing selected | the All-companies read overview |
+| `selected` | a platform administrator who chose one | company X |
+
+The selection lives in the session and is **re-validated on every read** against permission,
+company status and universe agreement. It is never read from a request parameter: selecting is
+`POST /company/context` with a CSRF token, because which company is being administered is an
+authorisation boundary rather than a display preference. A stale or tampered selection is
+discarded, never honoured. Administering a company creates no `company_users` membership in either
+universe.
+
+**Company Courses was also wrong and is corrected here.** The section describes itself as
+"Company-owned and company-available courses" but ran `allCourses()` platform-wide and
+`publishedCourses()` otherwise, so every company was shown the entire platform catalogue as though
+it were theirs. `CourseRepository::companyCourses()` and `companyCoursesCount()` now share one
+`COMPANY_COURSES_WHERE`:
+
+> courses the company **owns** (`courses.owner_company_id`), plus courses it **holds credits for**
+> (`course_credits.company_id`).
+
+The consolidated workspace preview uses the same rule as the standalone section, so the two cannot
+describe different populations.
 
 ## 0. v0.5.8.2 corrective round
 

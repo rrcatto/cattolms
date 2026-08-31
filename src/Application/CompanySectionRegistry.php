@@ -16,7 +16,7 @@ final class CompanySectionRegistry
             $this->s('dashboard','Dashboard','dashboard','/company/dashboard','partials/company/dashboard.html','Company learning and account overview.'),
             $this->s('people','People','people','/company/people','partials/company/people.html','People belonging to this company.'),
             $this->s('requests','Course Requests','requests','/company/requests','partials/company/requests.html','Incoming learner course requests.'),
-            $this->s('learning','Learning','learning','/company/learning','partials/company/learning.html','Company learner enrolments and progress.'),
+            $this->s('enrolments','Enrolments','enrolments','/company/enrolments','partials/company/enrolments.html','Company learner enrolments and progress.'),
             $this->s('credits','Course Credits','credits','/company/credits','partials/company/credits.html','Course and access-period credit pools.'),
             $this->s('courses','Courses','courses','/company/courses','partials/company/courses.html','Company-owned and company-available courses.'),
         ];

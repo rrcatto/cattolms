@@ -242,6 +242,23 @@ final class RenderHarness
     }
 
     /**
+     * The base hive with a caller's own values taking precedence.
+     *
+     * Use this rather than `baseHive() + $mine`. PHP's `+` keeps the LEFT operand on a key
+     * collision, so that idiom silently discards the caller's value for any key the base hive
+     * happens to define - and the base hive grows, because it mirrors datasetDefaults(). Adding
+     * one default there has already flipped a test's explicit `true` back to `false` without the
+     * test changing at all, which reads as the template being broken.
+     *
+     * @param array<string,mixed> $overrides
+     * @return array<string,mixed>
+     */
+    public static function hiveWith(array $overrides): array
+    {
+        return $overrides + self::baseHive();
+    }
+
+    /**
      * Mirrors PlatformAdministrationService::datasetDefaults() plus the chrome every controller
      * render supplies, so the hive here matches what a real request produces.
      *
@@ -317,6 +334,9 @@ final class RenderHarness
                 'role_options' => [], 'course_count' => 0, 'created_at' => '2026-01-01',
                 'last_login_at' => '2026-01-01', 'first_name' => 'A', 'last_name' => 'B',
                 'display_name' => 'A B', 'company_role' => 'student', 'role_keys' => 'STUDENT',
+                // Read by the Company People editor. normalisePeople() guarantees both keys on
+                // every row, so a fixture without them would test a shape the code never emits.
+                'certificate_name' => 'A B', 'mobile_number' => '',
             ]],
             'companies' => [[
                 'id' => 1, 'name' => 'C', 'domain' => 'c.test', 'status' => 'active', 'is_system' => false,

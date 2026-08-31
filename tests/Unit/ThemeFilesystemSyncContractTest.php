@@ -47,8 +47,8 @@ final class ThemeFilesystemSyncContractTest extends TestCase
             $keys = array_column($themes, 'key');
             self::assertContains('factory-reset-v1.0.0', $keys);
             self::assertContains('radiant-learning-v3.2.0', $keys);
-            self::assertContains('factory-reset-v1.0.1', $keys, 'Bundled default must remain visible alongside older persistent Factory Reset releases.');
-            $default = array_values(array_filter($themes, static fn(array $theme): bool => (string) $theme['key'] === 'factory-reset-v1.0.1'))[0] ?? [];
+            self::assertContains('factory-reset-v1.0.2', $keys, 'Bundled default must remain visible alongside older persistent Factory Reset releases.');
+            $default = array_values(array_filter($themes, static fn(array $theme): bool => (string) $theme['key'] === 'factory-reset-v1.0.2'))[0] ?? [];
             self::assertSame($project . '/themes/factory-reset', $default['root'] ?? null, 'Bundled Factory Reset must win over a stale persistent same-version duplicate.');
         } finally {
             $this->removeDirectory($instance);

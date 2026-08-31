@@ -141,6 +141,27 @@ final class CompanyRepository
         return $company->count(['domain = ? AND id <> ?', $domain, $companyId]) > 0;
     }
     /**
+     * Whether this user's active company is suspended.
+     *
+     * Distinguishes "your company is suspended" from "you belong to no company", which
+     * findForUser() cannot: it returns null for both, and the single message that covered them
+     * told an ordinary member of a suspended company that something was wrong with their account.
+     */
+    public function userCompanyIsSuspended(int $userId): bool
+    {
+        $rows = $this->db->exec(
+            "SELECT EXISTS (
+                 SELECT 1 FROM company_users cu
+                 JOIN companies c ON c.id = cu.company_id
+                 WHERE cu.user_id = :user_id AND cu.status = 'active' AND c.status <> 'active'
+             ) AS suspended",
+            [':user_id' => $userId]
+        );
+
+        return $this->databaseBoolean($rows[0]['suspended'] ?? false);
+    }
+
+    /**
      * The System Company for one universe.
      *
      * There is one per universe (decision D1), so this must be asked which one it means rather

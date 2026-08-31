@@ -29,9 +29,27 @@
       if (focusTarget) setTimeout(() => focusTarget.focus(), 10);
     };
     document.querySelectorAll('.modal-backdrop').forEach(modal => { if (!modal.classList.contains('open')) { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); } });
-    document.querySelectorAll('[data-open-modal]').forEach(button => button.addEventListener('click', event => { event.preventDefault(); openModal(button.dataset.openModal, button); }));
-    document.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop'))));
-    document.querySelectorAll('.modal-backdrop').forEach(modal => modal.addEventListener('click', event => { if (event.target === modal) closeModal(modal); }));
+
+    /* Delegated from document rather than bound per element, so a trigger or a close button that
+       arrives in an htmx swap works without rebinding. The Switch Company picker replaces its own
+       results region on every search, and directly bound handlers would be lost with the markup
+       they were attached to. */
+    document.addEventListener('click', event => {
+      if (!(event.target instanceof Element)) return;
+      const opener = event.target.closest('[data-open-modal]');
+      if (opener) { event.preventDefault(); openModal(opener.dataset.openModal, opener); return; }
+      const closer = event.target.closest('[data-close-modal]');
+      if (closer) { closeModal(closer.closest('.modal-backdrop')); return; }
+      if (event.target.classList.contains('modal-backdrop')) closeModal(event.target);
+    });
+
+    /* Escape closes the top-most open modal. Without this a keyboard user who opens the company
+       picker has no way out of it except a mouse. */
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      const open = document.querySelector('.modal-backdrop.open');
+      if (open) { event.preventDefault(); closeModal(open); }
+    });
 
     document.querySelectorAll('[data-tab-target]').forEach(button => button.addEventListener('click', () => {
       const group = button.dataset.tabGroup || 'default'; const target = button.dataset.tabTarget || '';
@@ -58,7 +76,24 @@
       const type = flash.dataset.flashType || 'info'; if (type === 'success' || type === 'info') setTimeout(dismiss, type === 'success' ? 4500 : 6500);
     });
     document.querySelectorAll('[data-confirm]').forEach(element => element.addEventListener('click', event => { if (!confirm(element.dataset.confirm || 'Continue?')) event.preventDefault(); }));
-    document.querySelectorAll('[data-filter-input]').forEach(input => input.addEventListener('input', () => { const q = input.value.toLowerCase().trim(); document.querySelectorAll(input.dataset.filterInput || '').forEach(row => { row.hidden = q !== '' && !row.textContent.toLowerCase().includes(q); }); }));
+    /* Live dataset search. The debounce, the abort-in-flight and the loading indicator are all
+       declared on the form and handled by the platform script library; the only thing left for
+       this file is to hide the submit button, because with the live trigger present typing is
+       enough. The button stays in the markup and keeps working when the library is absent, which
+       is the whole of the no-JavaScript fallback. */
+    if (window.htmx) {
+      document.querySelectorAll('.dataset-search-submit').forEach(button => { button.hidden = true; });
+    }
+
+    /* Current-page row filtering. This hides rows already rendered; it is not a search of the
+       dataset, so it must never be attached to a paginated table - saying "3 of 25 rows" while
+       the dataset holds thousands is a lie about what was searched. Surfaces with real
+       server-side search mark themselves data-server-search and are skipped here, and themes are
+       asked to stand down on the same marker. */
+    document.querySelectorAll('[data-filter-input]').forEach(input => {
+      if (input.closest('[data-server-search]')) return;
+      input.addEventListener('input', () => { const q = input.value.toLowerCase().trim(); document.querySelectorAll(input.dataset.filterInput || '').forEach(row => { row.hidden = q !== '' && !row.textContent.toLowerCase().includes(q); }); });
+    });
 
     document.querySelectorAll('[data-category-picker]').forEach(picker => {
       const select=picker.querySelector('[data-category-select]'), toggle=picker.querySelector('[data-category-create-toggle]'), panel=picker.querySelector('[data-category-create-panel]'), cancel=picker.querySelector('[data-category-create-cancel]'), create=picker.querySelector('[data-category-create]'), name=picker.querySelector('[data-category-name]'), description=picker.querySelector('[data-category-description]'), error=picker.querySelector('[data-category-error]');
