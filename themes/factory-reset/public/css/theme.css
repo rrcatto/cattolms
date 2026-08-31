@@ -467,7 +467,7 @@ input,select,textarea{border-radius:8px;padding:9px 10px;border-color:var(--line
 @media(max-width:860px){.sidebar{width:246px}.main{margin-left:0}.content{padding:16px}.topbar{padding:9px 14px}.theme-popover-form{left:12px;right:12px;width:auto}}
 
 
-/* v1.0.1 semantic palette deployment. Catto Learning generates the actual
+/* v1.0.2 semantic palette deployment. Catto Learning generates the actual
    --cl-* palette variables after sorting each supplied palette darkest→lightest. */
 body[data-cl-palette-managed="1"]{--primary:var(--cl-darkest);--secondary:var(--cl-dark);--accent:var(--cl-accent);--highlight:var(--cl-accent);--warm:var(--cl-light);--bg:var(--cl-lightest);--ink:var(--cl-darkest);--ink-2:var(--cl-dark);--line:var(--cl-light)}
 body[data-cl-palette-managed="1"] .sidebar{background:var(--cl-darkest)!important;color:var(--cl-on-color-1)!important;border-right-color:var(--cl-dark)!important;box-shadow:10px 0 28px color-mix(in srgb,var(--cl-darkest) 18%,transparent)}

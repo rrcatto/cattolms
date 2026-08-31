@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
-**Current stage:** Seed Database implemented; v0.5.8.2 corrective build awaiting VPS verification, then volume acceptance; Commerce next
+**Current LMS version:** 0.5.8.3  
+**Date time:** 2026/08/25 14:29 SAST  
+**Current stage:** v0.5.8.2 accepted and tagged 2026/08/25. v0.5.8.3 adds Stage C (editable SEED System Company Settings) and Stage D (Platform ADMIN selected-company context), awaiting VPS verification and browser acceptance; then volume acceptance; Commerce next
 
 Only the project owner decides future release numbers.
 

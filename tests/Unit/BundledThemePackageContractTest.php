@@ -33,7 +33,7 @@ final class BundledThemePackageContractTest extends TestCase
         // not how many there are.
         $packages = glob(__DIR__ . '/../../extras/themes/*.zip') ?: [];
         self::assertContains(
-            'factory-reset-v1.0.1.zip',
+            'factory-reset-v1.0.2.zip',
             array_map('basename', $packages),
             'The default Factory Reset package must remain bundled; ThemeManager falls back to it.'
         );

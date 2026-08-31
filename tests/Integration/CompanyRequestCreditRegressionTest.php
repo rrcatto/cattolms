@@ -27,6 +27,7 @@ use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
+use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\EntityLookupRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
@@ -132,7 +133,8 @@ final class CompanyRequestCreditRegressionTest extends TestCase
             $container->get(AuditRepository::class),
             $mailer,
             $container->get(GeoIpLocator::class),
-            $container->get(EntityLookupRepository::class)
+            $container->get(EntityLookupRepository::class),
+            $container->get(AuthSessionRepository::class)
         );
     }
 }

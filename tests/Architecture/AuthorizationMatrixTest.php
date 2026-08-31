@@ -105,20 +105,50 @@ final class AuthorizationMatrixTest extends TestCase
         $adminRenderer = $this->methodSource(AdminController::class, 'renderAdministrationSection');
         self::assertStringContainsString('canAccessAdministrationSection($user, $key)', $adminRenderer);
 
-        foreach (['dashboard','people','requests','learning','credits','courses'] as $method) {
+        foreach (['dashboard','people','requests','enrolments','credits','courses'] as $method) {
             self::assertStringContainsString('standalone(', $this->methodSource(CompanyController::class, $method));
         }
         self::assertStringContainsString('requirePermission($permission)', $this->methodSource(CompanyController::class, 'standalone'));
     }
 
-    public function testCompanyPlatformWideWritesRequireMatchingManagePermissions(): void
+    /**
+     * Every Company workspace write acts on the company in context, and on no other.
+     *
+     * This replaced an assertion that these methods branch on a PLATFORM.*.MANAGE permission to
+     * take an unrestricted platform-wide path. That branch was the defect: holding the platform
+     * permission made the write ignore which company the workspace was showing, so a platform
+     * administrator viewing company X could act on company Y - or, for createPerson, was refused
+     * outright because the guard asked whether the *actor* belonged to a company.
+     *
+     * The rule is now the stronger one. Resolve the company from SelectedCompanyContext, never
+     * from the actor's own membership, and never by escaping to the unscoped service method. The
+     * unrestricted paths still exist for Administration, which is where platform-wide authority
+     * belongs; they are not reachable from here.
+     */
+    public function testCompanyWorkspaceWritesActOnTheCompanyInContext(): void
     {
-        self::assertStringContainsString("hasPermission('PLATFORM.PERSON.MANAGE')", $this->methodSource(CompanyController::class, 'createPerson'));
-        self::assertStringContainsString("hasPermission('PLATFORM.REQUEST.MANAGE')", $this->methodSource(CompanyController::class, 'decideRequest'));
-        self::assertStringContainsString("hasPermission('PLATFORM.ENROLMENT.MANAGE')", $this->methodSource(CompanyController::class, 'removeEnrolment'));
-        self::assertStringContainsString("hasPermission('PLATFORM.ENROLMENT.MANAGE')", $this->methodSource(CompanyController::class, 'restoreEnrolment'));
-        foreach (['createPerson','decideRequest','removeEnrolment','restoreEnrolment'] as $method) {
-            self::assertStringNotContainsString("hasPermission('PLATFORM.DASHBOARD.VIEW')", $this->methodSource(CompanyController::class, $method));
+        $mutations = ['createPerson','updatePerson','setPersonStatus','removePerson','decideRequest','removeEnrolment','restoreEnrolment'];
+
+        foreach ($mutations as $method) {
+            $source = $this->methodSource(CompanyController::class, $method);
+
+            self::assertTrue(
+                str_contains($source, 'contextCompanyId(') || str_contains($source, 'companyContext->resolve('),
+                $method . '() must resolve its company through SelectedCompanyContext.'
+            );
+            self::assertStringNotContainsString(
+                'companies->forUser(',
+                $source,
+                $method . '() must not read the actor\'s own company membership as a substitute for the selected company.'
+            );
+        }
+
+        // The unscoped enrolment methods belong to Administration. Reaching them from the Company
+        // workspace is how a company-scoped action becomes a platform-wide one.
+        foreach (['removeEnrolment' => 'removeCompanyEnrolment', 'restoreEnrolment' => 'restoreCompanyEnrolment'] as $method => $scoped) {
+            $source = $this->methodSource(CompanyController::class, $method);
+            self::assertStringContainsString($scoped . '(', $source);
+            self::assertStringNotContainsString('platformAdministration->' . $method . '(', $source);
         }
     }
 

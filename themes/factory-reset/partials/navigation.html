@@ -5,14 +5,14 @@
     <repeat group="{{ @navigation }}" value="{{ @nav }}">
       <check if="{{ count(@nav.children) > 0 }}">
         <details class="account-menu" data-cl-dropdown {{ @nav.active ? 'open' : '' }}>
-          <summary class="nav-link {{ @nav.active ? 'active' : '' }}" data-nav-item="{{ @nav.key }}"><span class="nav-icon">{{ @nav.icon }}</span>{{ @nav.label }}</summary>
+          <summary class="nav-link {{ @nav.active ? 'active' : '' }}" data-nav-item="{{ @nav.key }}"><svg class="nav-icon" aria-hidden="true"><use href="{{ @platform.icon_sprite }}#{{ @nav.icon_id }}"></use></svg>{{ @nav.label }}</summary>
           <div class="account-menu-panel">
-            <repeat group="{{ @nav.children }}" value="{{ @child }}"><a class="nav-link" href="{{ @child.href }}" data-nav-item="{{ @child.key }}"><span class="nav-icon">{{ @child.icon }}</span>{{ @child.label }}</a></repeat>
+            <repeat group="{{ @nav.children }}" value="{{ @child }}"><a class="nav-link" href="{{ @child.href }}" data-nav-item="{{ @child.key }}"><svg class="nav-icon" aria-hidden="true"><use href="{{ @platform.icon_sprite }}#{{ @child.icon_id }}"></use></svg>{{ @child.label }}</a></repeat>
           </div>
         </details>
       </check>
-      <check if="{{ count(@nav.children) == 0 && @nav.method != 'POST' }}"><a class="nav-link {{ @nav.active ? 'active' : '' }}" href="{{ @nav.href }}" data-nav-item="{{ @nav.key }}"><span class="nav-icon">{{ @nav.icon }}</span>{{ @nav.label }}</a></check>
-      <check if="{{ @nav.method == 'POST' }}"><form action="{{ @nav.href }}" method="post" data-nav-item="{{ @nav.key }}"><input type="hidden" name="csrf" value="{{ @nav.csrf }}"><button class="nav-link" type="submit"><span class="nav-icon">{{ @nav.icon }}</span>{{ @nav.label }}</button></form></check>
+      <check if="{{ count(@nav.children) == 0 && @nav.method != 'POST' }}"><a class="nav-link {{ @nav.active ? 'active' : '' }}" href="{{ @nav.href }}" data-nav-item="{{ @nav.key }}"><svg class="nav-icon" aria-hidden="true"><use href="{{ @platform.icon_sprite }}#{{ @nav.icon_id }}"></use></svg>{{ @nav.label }}</a></check>
+      <check if="{{ @nav.method == 'POST' }}"><form action="{{ @nav.href }}" method="post" data-nav-item="{{ @nav.key }}"><input type="hidden" name="csrf" value="{{ @nav.csrf }}"><button class="nav-link" type="submit"><svg class="nav-icon" aria-hidden="true"><use href="{{ @platform.icon_sprite }}#{{ @nav.icon_id }}"></use></svg>{{ @nav.label }}</button></form></check>
     </repeat>
   </nav>
   <check if="{{ @is_authenticated }}"><div class="sidebar-bottom"><div class="user-mini"><div class="avatar">CL</div><div><strong>{{ @user_email }}</strong><span>{{ @user_name ?: 'Signed in' }}</span></div></div></div></check>

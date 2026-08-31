@@ -115,6 +115,81 @@ SQL);
     }
 
     /**
+     * The WHERE clause a paginated dataset and its count query must both use.
+     *
+     * One builder for every searchable dataset. The guarantee that matters is not that the two
+     * queries happen to agree today but that there is no second place to change: a count that
+     * describes a different population from the rows it heads is a defect this project has already
+     * shipped, and it is caused by two hand-written predicates drifting apart.
+     *
+     * The universe predicate is query structure and originates in DataUniverse, never in request
+     * input. The search term is the opposite - it is user input, so it is bound once and reused by
+     * every column rather than interpolated. `%` and `_` are escaped so a reader searching for a
+     * literal underscore finds one instead of matching any character.
+     *
+     * An empty term contributes no predicate at all, so clearing a search returns the whole
+     * selected universe rather than nothing.
+     *
+     * @param list<string> $columns SQL expressions to match against, e.g. 'c.name'
+     * @return array{0:string,1:array<string,string>}
+     */
+    private static function searchFilter(DataUniverse $universe, string $alias, string $search, array $columns): array
+    {
+        $conditions = [];
+        $bindings = [];
+
+        $predicate = $universe->predicate($alias);
+        if ($predicate !== null) {
+            $conditions[] = $predicate;
+        }
+
+        $term = trim($search);
+        if ($term !== '' && $columns !== []) {
+            $matches = array_map(static fn(string $column): string => $column . ' ILIKE :search_term', $columns);
+            $conditions[] = '(' . implode(' OR ', $matches) . ')';
+            $bindings[':search_term'] = '%' . addcslashes($term, '%_\\') . '%';
+        }
+
+        return [$conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions), $bindings];
+    }
+
+    /**
+     * The same search predicate as an AND-fragment, for a query that already has a WHERE clause.
+     *
+     * Enrolments, Requests and Credits all filter on `is_preview` or a status before anything
+     * else, so their search cannot open a WHERE of its own. The matching rule is identical to
+     * {@see searchFilter()}; only the joining keyword differs.
+     *
+     * @param list<string> $columns
+     * @return array{0:string,1:array<string,string>}
+     */
+    private static function andSearch(string $search, array $columns): array
+    {
+        $term = trim($search);
+        if ($term === '' || $columns === []) {
+            return ['', []];
+        }
+
+        $matches = array_map(static fn(string $column): string => $column . ' ILIKE :search_term', $columns);
+
+        return [
+            ' AND (' . implode(' OR ', $matches) . ')',
+            [':search_term' => '%' . addcslashes($term, '%_\\') . '%'],
+        ];
+    }
+
+    /** Columns each shared dataset search matches on; the page and its count use the same list. */
+    // Each expression is written to match a trigram index in
+    // 20260830220000_add_search_trigram_indexes character for character. A predicate that differs
+    // from its index - even by a cast - simply will not use it, and the search silently falls back
+    // to a sequential scan. DatasetSearchIndexTest asserts the pairing.
+    private const FULLNAME = "(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,''))";
+    private const PEOPLE_SEARCH = [self::FULLNAME, 'u.display_name::text', 'ue.email::text'];
+    private const ENROLMENT_SEARCH = [self::FULLNAME, 'u.display_name::text', 'ue.email::text', 'c.title::text'];
+    private const REQUEST_SEARCH = [self::FULLNAME, 'u.display_name::text', 'ue.email::text', 'c.title::text'];
+    private const CREDIT_SEARCH = ['co.name::text', self::FULLNAME, 'u.display_name::text', 'ue.email::text', 'c.title::text'];
+
+    /**
      * Builds the LIMIT/OFFSET clause for a paginated query.
      *
      * PostgreSQL rejects a text-bound parameter in LIMIT/OFFSET through this driver, so these
@@ -137,7 +212,7 @@ SQL);
      *
      * @return list<array<string,mixed>>
      */
-    public function people(DataUniverse $universe, int $limit, int $offset): array
+    public function people(DataUniverse $universe, int $limit, int $offset, string $search = ''): array
     {
         $sql = <<<'SQL'
 SELECT
@@ -168,8 +243,11 @@ GROUP BY u.id, ue.email, c.id, c.name
 ORDER BY COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, ue.email), u.id
 SQL;
 
+        [$where, $bindings] = self::searchFilter($universe, 'u', $search, self::PEOPLE_SEARCH);
+
         return $this->db->exec(
-            $sql . self::whereScope($universe, 'u') . "\n" . $tail . $this->limitOffset($limit, $offset)
+            $sql . $where . "\n" . $tail . $this->limitOffset($limit, $offset),
+            $bindings
         );
     }
 
@@ -179,13 +257,15 @@ SQL;
      * Membership must match {@see people()} exactly: the primary-email join is an INNER join
      * there, so a user without a primary email is absent from both the page and the total.
      */
-    public function peopleCount(DataUniverse $universe): int
+    public function peopleCount(DataUniverse $universe, string $search = ''): int
     {
+        [$where, $bindings] = self::searchFilter($universe, 'u', $search, self::PEOPLE_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM users u
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE'
-            . self::whereScope($universe, 'u')
+            . $where,
+            $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -198,7 +278,7 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function companies(DataUniverse $universe, int $limit, int $offset): array
+    public function companies(DataUniverse $universe, int $limit, int $offset, string $search = ''): array
     {
         $sql = <<<'SQL'
 SELECT c.*,
@@ -215,16 +295,24 @@ SQL;
 GROUP BY c.id
 ORDER BY c.is_system DESC, c.name, c.id
 SQL;
+        [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COMPANY_SEARCH);
+
         return $this->db->exec(
-            $sql . self::whereScope($universe, 'c') . "\n" . $tail . $this->limitOffset($limit, $offset)
+            $sql . $where . "\n" . $tail . $this->limitOffset($limit, $offset),
+            $bindings
         );
     }
 
-    public function companyCount(DataUniverse $universe): int
+    public function companyCount(DataUniverse $universe, string $search = ''): int
     {
-        $rows = $this->db->exec('SELECT COUNT(*)::int AS total FROM companies c' . self::whereScope($universe, 'c'));
+        [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COMPANY_SEARCH);
+        $rows = $this->db->exec('SELECT COUNT(*)::int AS total FROM companies c' . $where, $bindings);
+
         return (int) ($rows[0]['total'] ?? 0);
     }
+
+    /** Columns the Companies search matches on; used by both the page and the count. */
+    private const COMPANY_SEARCH = ['c.name::text', 'c.domain::text'];
 
     /**
      * One page of the Administration Enrolments list. This replaced a hard `LIMIT 500` that
@@ -233,8 +321,10 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function enrolments(DataUniverse $universe, int $limit, int $offset): array
+    public function enrolments(DataUniverse $universe, int $limit, int $offset, string $search = ''): array
     {
+        [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
+
         return $this->db->exec(
             'SELECT ce.id, ce.public_id, ce.status, ce.assigned_at, ce.started_at, ce.expires_at, ce.completed_at,
                     ce.access_removed_at, ce.access_removed_reason,
@@ -247,9 +337,10 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . '
+             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match . '
              ORDER BY ce.updated_at DESC, ce.assigned_at DESC, ce.id DESC'
-            . $this->limitOffset($limit, $offset)
+            . $this->limitOffset($limit, $offset),
+            $bindings
         );
     }
 
@@ -258,15 +349,17 @@ SQL;
      * because the primary-email join is an INNER join in {@see enrolments()} and therefore
      * affects membership, not just the projected columns.
      */
-    public function enrolmentsCount(DataUniverse $universe): int
+    public function enrolmentsCount(DataUniverse $universe, string $search = ''): int
     {
+        [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM course_enrolments ce
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce')
+             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match,
+            $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -279,8 +372,10 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function requests(DataUniverse $universe, int $limit, int $offset): array
+    public function requests(DataUniverse $universe, int $limit, int $offset, string $search = ''): array
     {
+        [$where, $bindings] = self::searchFilter($universe, 'cr', $search, self::REQUEST_SEARCH);
+
         return $this->db->exec(
             'SELECT cr.*, c.title AS course_title, c.slug,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
@@ -290,22 +385,25 @@ SQL;
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              LEFT JOIN companies co ON co.id=cr.company_id'
-            . self::whereScope($universe, 'cr') . '
+            . $where . '
              ORDER BY CASE cr.status WHEN \'pending\' THEN 0 WHEN \'approved\' THEN 1 ELSE 2 END, cr.requested_at DESC, cr.id DESC'
-            . $this->limitOffset($limit, $offset)
+            . $this->limitOffset($limit, $offset),
+            $bindings
         );
     }
 
     /** Total Administration Course Requests rows, using the same membership joins as {@see requests()}. */
-    public function requestsCount(DataUniverse $universe): int
+    public function requestsCount(DataUniverse $universe, string $search = ''): int
     {
+        [$where, $bindings] = self::searchFilter($universe, 'cr', $search, self::REQUEST_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE'
-            . self::whereScope($universe, 'cr')
+            . $where,
+            $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -317,8 +415,10 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function creditLedger(DataUniverse $universe, int $limit, int $offset): array
+    public function creditLedger(DataUniverse $universe, int $limit, int $offset, string $search = ''): array
     {
+        [$where, $bindings] = self::searchFilter($universe, 'cc', $search, self::CREDIT_SEARCH);
+
         return $this->db->exec(
             'SELECT cc.id, cc.public_id, cc.company_id, cc.user_id, cc.course_id, cc.access_period_seconds,
                     cc.quantity, cc.source_type, cc.note, cc.created_at,
@@ -333,10 +433,11 @@ SQL;
              LEFT JOIN users u ON u.id=cc.user_id
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id'
-            . self::whereScope($universe, 'cc') . '
+            . $where . '
              GROUP BY cc.id,c.title,co.name,u.first_name,u.last_name,u.display_name,ue.email
              ORDER BY cc.created_at DESC, cc.id DESC'
-            . $this->limitOffset($limit, $offset)
+            . $this->limitOffset($limit, $offset),
+            $bindings
         );
     }
 
@@ -347,23 +448,37 @@ SQL;
      * allocations it has. Counting `course_credits` with only the membership-affecting INNER
      * join to `courses` therefore yields the same population without the allocation fan-out.
      */
-    public function creditLedgerCount(DataUniverse $universe): int
+    public function creditLedgerCount(DataUniverse $universe, string $search = ''): int
     {
+        // The holder joins are repeated here because the search matches on them. They are LEFT
+        // joins onto single-valued columns, so they add no rows and the population is unchanged
+        // whether or not a term is supplied - which is what keeps this count describing exactly
+        // the rows creditLedger() returns.
+        [$where, $bindings] = self::searchFilter($universe, 'cc', $search, self::CREDIT_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM course_credits cc
-             JOIN courses c ON c.id=cc.course_id'
-            . self::whereScope($universe, 'cc')
+             JOIN courses c ON c.id=cc.course_id
+             LEFT JOIN companies co ON co.id=cc.company_id
+             LEFT JOIN users u ON u.id=cc.user_id
+             LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE'
+            . $where,
+            $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyPeople(DataUniverse $universe, int $companyId, int $limit, int $offset): array
+    public function companyPeople(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = ''): array
     {
+        [$match, $bindings] = self::andSearch($search, self::PEOPLE_SEARCH);
         return $this->db->exec(
+            // certificate_name and mobile_number are selected because the Company People editor
+            // offers them. A template that reads a column the query never selected is an
+            // undefined-variable 500, not a blank field.
             'SELECT u.id,u.public_id,u.first_name,u.last_name,u.display_name,u.status,u.last_login_at,
+                    u.certificate_name,u.mobile_number,
                     ue.email,cu.company_role,
                     COALESCE(string_agg(DISTINCT r.role_key,\',\' ORDER BY r.role_key),\'\') AS role_keys,
                     COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN (\'assigned\',\'active\',\'completed\'))::int AS course_count
@@ -373,11 +488,11 @@ SQL;
              LEFT JOIN user_roles ur ON ur.user_id=u.id
              LEFT JOIN roles r ON r.id=ur.role_id
              LEFT JOIN course_enrolments ce ON ce.user_id=u.id AND ce.is_preview=FALSE
-             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u') . '
+             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u') . $match . '
              GROUP BY u.id,ue.email,cu.company_role
              ORDER BY COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email), u.id'
             . $this->limitOffset($limit, $offset),
-            [':company_id' => $companyId]
+            [':company_id' => $companyId] + $bindings
         );
     }
 
@@ -388,23 +503,25 @@ SQL;
      * them afterwards, because that reintroduces exactly the unbounded query pagination exists
      * to remove.
      */
-    public function companyPeopleCount(DataUniverse $universe, int $companyId): int
+    public function companyPeopleCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
+        [$match, $bindings] = self::andSearch($search, self::PEOPLE_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM company_users cu
              JOIN users u ON u.id=cu.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u'),
-            [':company_id' => $companyId]
+             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u') . $match,
+            [':company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyRequests(DataUniverse $universe, int $companyId, int $limit, int $offset): array
+    public function companyRequests(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = ''): array
     {
+        [$match, $bindings] = self::andSearch($search, self::REQUEST_SEARCH);
         return $this->db->exec(
             'SELECT cr.*,c.title AS course_title,c.slug,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
@@ -413,32 +530,34 @@ SQL;
              JOIN courses c ON c.id=cr.course_id
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr') . '
+             WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr') . $match . '
              ORDER BY CASE cr.status WHEN \'pending\' THEN 0 WHEN \'approved\' THEN 1 ELSE 2 END,cr.requested_at DESC,cr.id DESC'
             . $this->limitOffset($limit, $offset),
-            [':company_id' => $companyId]
+            [':company_id' => $companyId] + $bindings
         );
     }
 
     /** Total course requests raised by one company. */
-    public function companyRequestsCount(DataUniverse $universe, int $companyId): int
+    public function companyRequestsCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
+        [$match, $bindings] = self::andSearch($search, self::REQUEST_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr'),
-            [':company_id' => $companyId]
+             WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr') . $match,
+            [':company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyEnrolments(DataUniverse $universe, int $companyId, int $limit, int $offset): array
+    public function companyEnrolments(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = ''): array
     {
+        [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
         return $this->db->exec(
             'SELECT ce.id,ce.public_id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,
                     ce.access_removed_at,ce.access_removed_reason,c.id AS course_id,c.title AS course_title,c.slug,
@@ -451,10 +570,10 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . '
+             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match . '
              ORDER BY ce.updated_at DESC, ce.id DESC'
             . $this->limitOffset($limit, $offset),
-            [':company_id' => $companyId]
+            [':company_id' => $companyId] + $bindings
         );
     }
 
@@ -464,8 +583,9 @@ SQL;
      * The `company_users` join is what scopes this to the company, so it must be repeated
      * verbatim in the count or the total would describe a different population from the page.
      */
-    public function companyEnrolmentsCount(DataUniverse $universe, int $companyId): int
+    public function companyEnrolmentsCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
+        [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM course_enrolments ce
@@ -473,16 +593,17 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce'),
-            [':company_id' => $companyId]
+             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match,
+            [':company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyCredits(DataUniverse $universe, int $companyId, int $limit, int $offset): array
+    public function companyCredits(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = ''): array
     {
+        [$match, $bindings] = self::andSearch($search, self::CREDIT_SEARCH);
         return $this->db->exec(
             'SELECT cc.id,cc.public_id,cc.company_id,cc.course_id,cc.access_period_seconds,cc.quantity,cc.source_type,cc.note,cc.created_at,
                     c.title AS course_title,
@@ -491,24 +612,31 @@ SQL;
                     GREATEST(cc.quantity-COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
              FROM course_credits cc
              JOIN courses c ON c.id=cc.course_id
+             LEFT JOIN companies co ON co.id=cc.company_id
+             LEFT JOIN users u ON u.id=cc.user_id
+             LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
-             WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc') . '
+             WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc') . $match . '
              GROUP BY cc.id,c.title
              ORDER BY cc.created_at DESC, cc.id DESC'
             . $this->limitOffset($limit, $offset),
-            [':company_id' => $companyId]
+            [':company_id' => $companyId] + $bindings
         );
     }
 
     /** Total credits held by one company. */
-    public function companyCreditsCount(DataUniverse $universe, int $companyId): int
+    public function companyCreditsCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
+        [$match, $bindings] = self::andSearch($search, self::CREDIT_SEARCH);
         $rows = $this->db->exec(
             'SELECT COUNT(*)::int AS total
              FROM course_credits cc
              JOIN courses c ON c.id=cc.course_id
-             WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc'),
-            [':company_id' => $companyId]
+             LEFT JOIN companies co ON co.id=cc.company_id
+             LEFT JOIN users u ON u.id=cc.user_id
+             LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
+             WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc') . $match,
+            [':company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);

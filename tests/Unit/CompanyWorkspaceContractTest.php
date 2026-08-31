@@ -22,7 +22,7 @@ final class CompanyWorkspaceContractTest extends TestCase
     public function testCompanyRegistryDefinesSemanticWorkspaceSections(): void
     {
         $sections = (new CompanySectionRegistry())->all();
-        self::assertSame(['dashboard','people','requests','learning','credits','courses'], array_column($sections, 'key'));
+        self::assertSame(['dashboard','people','requests','enrolments','credits','courses'], array_column($sections, 'key'));
         foreach ($sections as $section) {
             self::assertStringStartsWith('/company/', $section['route']);
             self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
@@ -34,7 +34,7 @@ final class CompanyWorkspaceContractTest extends TestCase
         $root = dirname(__DIR__, 2);
         $app = (string) file_get_contents($root . '/src/Application/App.php');
         $renderer = (string) file_get_contents($root . '/src/View/ThemeRenderer.php');
-        foreach (['GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/learning','GET /company/credits','GET /company/courses'] as $route) self::assertStringContainsString($route, $app);
+        foreach (['GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses'] as $route) self::assertStringContainsString($route, $app);
         self::assertStringNotContainsString('/company?tab=', $app);
         foreach (['company_sections','company_section',"\$company['sections']","\$company['section']"] as $token) self::assertStringContainsString($token, $renderer);
     }

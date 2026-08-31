@@ -96,7 +96,7 @@ final class PaginationUiContractTest extends TestCase
             ['resources/views/partials/admin/activity.html', 'activity'],
             ['resources/views/partials/company/people.html', 'people'],
             ['resources/views/partials/company/requests.html', 'requests'],
-            ['resources/views/partials/company/learning.html', 'enrolments'],
+            ['resources/views/partials/company/enrolments.html', 'enrolments'],
             ['resources/views/partials/company/credits.html', 'credits'],
             ['resources/views/partials/company/courses.html', 'courses'],
         ];
@@ -238,8 +238,10 @@ final class PaginationUiContractTest extends TestCase
     {
         $repository = self::read('src/Course/CourseRepository.php');
 
-        self::assertStringContainsString('public function manageableCourses(int $userId, DataUniverse $universe, int $limit, int $offset): array', $repository);
-        self::assertStringContainsString('public function manageableCoursesCount(int $userId, DataUniverse $universe): int', $repository);
+        // The signatures are matched up to the bounding parameters rather than in full, so adding
+        // an optional filter does not fail a test whose subject is the membership rule.
+        self::assertStringContainsString('public function manageableCourses(int $userId, DataUniverse $universe, int $limit, int $offset', $repository);
+        self::assertStringContainsString('public function manageableCoursesCount(int $userId, DataUniverse $universe', $repository);
         self::assertSame(
             2,
             substr_count($repository, 'self::MANAGEABLE_COURSES_WHERE'),

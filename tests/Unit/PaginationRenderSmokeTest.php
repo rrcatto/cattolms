@@ -115,7 +115,7 @@ final class PaginationRenderSmokeTest extends TestCase
             ['partials/admin/activity.html', 'activity', '/admin/activity'],
             ['partials/company/people.html', 'people', '/company/people'],
             ['partials/company/requests.html', 'requests', '/company/requests'],
-            ['partials/company/learning.html', 'enrolments', '/company/learning'],
+            ['partials/company/enrolments.html', 'enrolments', '/company/enrolments'],
             ['partials/company/credits.html', 'credits', '/company/credits'],
             ['partials/company/courses.html', 'courses', '/company/courses'],
         ];
