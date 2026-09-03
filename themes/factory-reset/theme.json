@@ -5,7 +5,7 @@
   "theme": {
     "name": "Factory Reset",
     "slug": "factory-reset",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "author": "Catto Learning",
     "description": "Default Catto Learning theme with automatic core palette deployment and clear dark navigation, active-state and action hierarchy.",
     "created_at": "2026-08-15T19:16:00+02:00"

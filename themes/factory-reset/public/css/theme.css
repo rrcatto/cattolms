@@ -467,7 +467,7 @@ input,select,textarea{border-radius:8px;padding:9px 10px;border-color:var(--line
 @media(max-width:860px){.sidebar{width:246px}.main{margin-left:0}.content{padding:16px}.topbar{padding:9px 14px}.theme-popover-form{left:12px;right:12px;width:auto}}
 
 
-/* v1.0.2 semantic palette deployment. Catto Learning generates the actual
+/* v1.0.3 semantic palette deployment. Catto Learning generates the actual
    --cl-* palette variables after sorting each supplied palette darkest→lightest. */
 body[data-cl-palette-managed="1"]{--primary:var(--cl-darkest);--secondary:var(--cl-dark);--accent:var(--cl-accent);--highlight:var(--cl-accent);--warm:var(--cl-light);--bg:var(--cl-lightest);--ink:var(--cl-darkest);--ink-2:var(--cl-dark);--line:var(--cl-light)}
 body[data-cl-palette-managed="1"] .sidebar{background:var(--cl-darkest)!important;color:var(--cl-on-color-1)!important;border-right-color:var(--cl-dark)!important;box-shadow:10px 0 28px color-mix(in srgb,var(--cl-darkest) 18%,transparent)}
@@ -485,3 +485,6 @@ body[data-cl-palette-managed="1"] .card,body[data-cl-palette-managed="1"] .stat-
 
 /* v0.5.7.4 standard-navigation repair: nested sidebar menus remain inside the sidebar rather than using the public/topbar popover geometry. */
 .sidebar .account-menu{display:block}.sidebar .account-menu>summary{width:100%}.sidebar .account-menu-panel{position:static;right:auto;top:auto;min-width:0;margin:4px 0 8px 28px;padding:4px;border:0;border-left:1px solid var(--line);border-radius:0;box-shadow:none;background:transparent}.sidebar .account-menu-panel .nav-link{padding:8px 10px}.sidebar form[data-nav-item]{margin:0}.sidebar form[data-nav-item]>.nav-link{width:100%;text-align:left;border:0;background:transparent}.public-links{flex-wrap:wrap;justify-content:flex-end}
+/* Icon sizing, v1.0.3. Both dimensions, because the icon is now an SVG rather than a glyph span:
+   a width-only rule leaves the height to default, and an SVG with no height renders 150px tall. */
+.nav-icon{width:18px;height:18px;flex:0 0 auto;vertical-align:-.15em;text-align:initial}
