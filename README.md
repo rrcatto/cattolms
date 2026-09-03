@@ -3,7 +3,7 @@
 **LMS version:** 0.5.8.3  
 **Date time:** 2026/09/03 05:10 SAST  
 
-Catto Learning is a PHP/Fat-Free Framework/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9**.
+Catto Learning is a PHP/Fat-Free Framework/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
 
 Version 0.5.8 is the **Seed Database stage**. An administrator can generate a disposable set of realistic SEED records — people, companies, courses, assessments, enrolments, results and audit activity — so the interface can be exercised at realistic volume without anyone building test data by hand. Every generated row lives in a separate data universe that ordinary users, the public catalogue and the REST/MCP surfaces never see.
 
@@ -95,7 +95,7 @@ reset.** There is no incremental path across that boundary. Upgrading *within* 0
 
 ## Architecture summary
 
-- PHP 8.5.9, F3 3.9, PHP-DI 7/PSR-11 and PostgreSQL.
+- PHP >=8.5.9 <9.0, F3 3.9, PHP-DI 7/PSR-11 and PostgreSQL. Verified on PHP 8.5.10 and PostgreSQL 16.15.
 - Database-backed roles and one shared business capability catalogue using resource-first/action-last uppercase dot notation.
 - `SYSTEM.*` permissions are ADMIN-only infrastructure capabilities, including `SYSTEM.SEED.VIEW` and `SYSTEM.SEED.MANAGE`. `SEED_ADMIN` administers seed *business* data and receives no `SYSTEM.*` authority, so it can never reach the Seed Database section.
 - Built-in roles: `ADMIN`, `STUDENT`, `COMPANY_ADMIN`, `COURSE_EDITOR`, `COURSE_OWNER` and five `SEED_*` counterparts.

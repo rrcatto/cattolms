@@ -2,7 +2,7 @@
 
 **LMS version:** 0.5.8.3  
 **Date time:** 2026/08/25 14:29 SAST  
-**Runtime target:** PHP 8.5.9  
+**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
 **Status:** v0.5.8.2 was accepted on the VPS on 2026/08/25 — full QA green, browser pass, a seed set generated — and is tagged and pushed. v0.5.8.3 implements Stage C (editable SEED System Company Settings) and Stage D (Platform ADMIN selected-company context), which were approved and deferred pending that acceptance. Local gates are green; PostgreSQL Integration and browser acceptance for v0.5.8.3 are still pending.
 
 Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
@@ -167,7 +167,7 @@ stays the recorded actor on it (decision D4). Course portability is REAL-only (d
 
 ## 5. Verification state
 
-The authoritative acceptance gate remains the PHP 8.5.9 VPS with Composer/PostgreSQL:
+The authoritative acceptance gate remains the VPS with Composer/PostgreSQL:
 
 ```bash
 cd /usr/local/lib/php/catto-learning/current

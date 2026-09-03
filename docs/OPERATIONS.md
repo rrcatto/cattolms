@@ -1,8 +1,8 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
-**Runtime:** PHP >=8.5.9 <9.0  
+**LMS:** 0.5.8.3  
+**Date time:** 2026/09/03 05:40 SAST  
+**Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
 **Environment:** disposable TEST/DEV until explicitly declared production
 
 ## Upgrading 0.5.7.6 to 0.5.8
@@ -123,7 +123,7 @@ tools/validate-ui-contracts.php
 tools/validate-release.php
 ```
 
-Artifact-generation environments without PHP 8.5.9/Composer/PostgreSQL may run syntax/static validators but must not claim the VPS QA gate passed.
+Artifact-generation environments without the VPS PHP/Composer/PostgreSQL may run syntax/static validators but must not claim the VPS QA gate passed.
 
 ## ACL verification after reset
 
