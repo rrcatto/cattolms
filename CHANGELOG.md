@@ -1,7 +1,117 @@
 # Changelog
 
-**LMS version:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
+**LMS version:** 0.5.8.3  
+**Date time:** 2026/09/03 05:10 SAST  
+
+## 2026-09-03 05:10 SAST — v0.5.8.3 Stage C and D, company administration, and one control per job
+
+Deployed to the VPS and confirmed in the browser. `main` remains at v0.5.8.2 until the owner accepts
+a release.
+
+### Stage C and Stage D
+
+- The SEED System Company settings are editable, resolving `app_options`, then `.env`, then a
+  built-in default.
+- A platform administrator selects the company they are administering, and the company in context
+  decides the workspace universe. The two had been resolved separately and the request refused when
+  they disagreed, which made a SEED company impossible to select at all.
+- Every Company workspace write acts on the company in context rather than the actor's own
+  membership. Administering another company had been read-only in practice.
+- Company Courses means owned or credited. It ran `publishedCourses()`, so every company was shown
+  the entire platform catalogue as though it were its own.
+
+### Company suspension is an authentication boundary
+
+- Disabling a company revokes its ordinary members' sessions in the same transaction, refuses
+  sign-in with a non-technical message, and is enforced once in `AuthService::currentUser()` — the
+  suspension arrives as an EXISTS column on the session query, so there is no extra query per
+  request.
+- A genuine platform administrator is exempt in all three places. A company-level control that can
+  sign the administrator out is a way to lose the installation.
+
+### One shared control per job
+
+- Every paginated list searches through `partials/dataset-search.html`, pages through
+  `partials/pagination.html` and scopes through `partials/universe-switch.html` and the `universe`
+  query parameter. Search is server-side across the whole dataset, debounced, aborts a request still
+  in flight, returns to the first page, and works as an ordinary GET form without JavaScript.
+- Trigram indexes back the searched columns, added by an additive migration.
+- The Switch Company picker, its standalone page and the Administration Courses route had each grown
+  a search of their own; the picker also had a select element for the data universe. All three now
+  use the shared controls, and `SharedControlContractTest` fails the build on a second search input,
+  a universe select, or a search whose results region does not exist.
+- `GET /admin/courses` moved from `AdminCourseController::index` to `AdminController::courses`. Its
+  own request array listed page and page size only, so the search box sent a term nothing read while
+  every other Administration list worked. A guard now fails the build when any controller reads a
+  dataset request key by name.
+
+### Navigation icons are core-owned
+
+- `public_html/img/nav-icons.svg` holds one symbol per semantic key plus a fallback. Core resolves
+  the symbol and publishes the sprite; every theme renders the same one-line reference, so a menu
+  item added or renamed no longer needs a theme edit.
+- Icons carry explicit `width`, `height` and `viewBox`. Three themes had sized them by CSS width
+  alone, and an SVG with no height renders 150 pixels tall — their menus ran off the page.
+- Two bundled themes had hard-coded their navigation and never showed new menu items at all; one was
+  still linking retired `/admin?tab=` URLs.
+
+### Surfaces rebuilt
+
+- `/account/library` is four accordions of paginated, searchable tables — current, completed,
+  favourites and requests — built by one view model shared with the `/account` workspace. It had
+  been four unbounded arrays filtered in PHP.
+- `/admin/reports` paginates and searches both tables in the database.
+- Company Requests renders as the standard table; the Company dashboard gained a Courses figure
+  counted by the same rule the Courses tab lists by.
+- HTML comments are stripped from responses, so template metadata headers stay private.
+
+### Renames
+
+- **My Learning** is **My Course Library**. Route `/account/library` and `LearningController` are
+  unchanged; the class carries a comment explaining why.
+- **Company Learning** is **Company Enrolments**, route and label.
+
+### Defects fixed after the first deployment
+
+- Administration Courses returned a SQL syntax error for every search in the All scope. The scope and
+  the search were appended as separate fragments and ALL contributes no `WHERE`, so the search's
+  `AND` attached to nothing. They are composed together now.
+- `/account` and `/account/library` returned 500 on an undefined `universe` variable once the Course
+  Library began using the shared search. An absent hive key is an undefined variable in F3, which
+  takes down the whole page. The key is supplied by both Account render paths, set only for an
+  identity that may choose a scope, and the control tolerates its absence.
+- The shared search submit button moved into `noscript`. It had been hidden by a script that ran once
+  at page load, so every section arriving later by lazy load or swap brought a button nothing hid.
+- Every results region carries `data-server-search-target`, so a theme's row filter stands down
+  wherever core searches. Core emitted it on one template out of eleven.
+
+### Tests and gates
+
+- `DatasetSearchReachesTheQueryTest` drives real repository reads through a recording SQL layer and
+  asserts the predicate, the binding, and that the statement is well formed in all three universes.
+  The previous check was a substring search of the service source.
+- `DatasetSearchIndexTest` had been examining nothing: it split method bodies on a literal newline
+  pattern this tree does not use, so every body came back empty and it passed by inspecting zero
+  queries. Its own "did I find anything" assertion caught it.
+- Two theme contract tests and two validators no longer pin an owner-chosen version as a literal;
+  `validate-release` now asserts that a bundled theme bump is accompanied by the migration that moves
+  `active_theme` to it.
+
+### Migrations
+
+Additive only. Trigram search indexes, and two option updates moving the recorded active theme to
+`factory-reset-v1.0.3`. **The baseline is not rebased and no database reset is required.**
+
+### Themes
+
+All five bumped: factory-reset 1.0.3 (bundled), gilded-noir 1.1.7, light-default 1.1.2,
+factory-reset-sidebar 1.0.2, radiant-learning 3.2.3.
+
+### Not yet done
+
+Integration and `composer qa` have not been run. Seed generation still produces duplicate names and
+transactional data that does not tie back to the companies, courses and people it references; that
+rewrite is its own stage.
 
 ## 2026-08-24 17:45 SAST — v0.5.8.2 corrective build
 

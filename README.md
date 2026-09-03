@@ -1,7 +1,7 @@
-# Catto Learning LMS 0.5.8.2
+# Catto Learning LMS 0.5.8.3
 
-**LMS version:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
+**LMS version:** 0.5.8.3  
+**Date time:** 2026/09/03 05:10 SAST  
 
 Catto Learning is a PHP/Fat-Free Framework/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9**.
 
@@ -15,44 +15,83 @@ The rule the whole stage rests on:
 
 There are exactly two business-data universes: `REAL = seed_token IS NULL` and `SEED = seed_token IS NOT NULL`.
 
-## What 0.5.8.2 changes
+## What 0.5.8.3 changes
 
-A corrective build. The first VPS run of 0.5.8 found three defects in the tests themselves and one
-genuine application fault; all four are fixed and nothing else was added.
+Stage C and Stage D, the Company workspace they unblocked, and one consistency rule applied across
+every list in the platform. Full detail is in `CHANGELOG.md`.
 
-- The Integration suite could not load at all: two test classes declared a helper named `count()`,
-  colliding with the final `PHPUnit\Framework\TestCase::count()`. `tools/check-test-suite.php`
-  now catches that class of defect before PHPUnit starts, because a PHPUnit test cannot guard
-  against a class that stops PHPUnit from starting.
-- The render tests shared one fixed `/tmp` directory, which another account already owned on the
-  VPS. Each run now gets its own, and a failure to prepare it says so instead of presenting as 39
-  broken templates.
-- `/admin/companies?universe=seed` returned 500 because rendering the page tried to make the
-  genuine administrator a member of the SEED System Company. Reading a company no longer writes
-  membership, and `assignUser()` now validates before it mutates — previously the failed request
-  had already deactivated the administrator's active membership.
+**Administering a company.** A platform administrator selects the company they are administering and
+the Company workspace acts on it. Previously every Company write resolved the actor's *own*
+membership, so administering another company was read-only in practice, and Company Courses ran the
+published-catalogue query — showing every company the entire platform catalogue as though it were
+their own. Courses now means owned or credited. The SEED System Company settings are editable, and
+the company in context is what decides the workspace universe rather than the two being resolved
+separately and refused when they disagreed.
 
-Full detail is in `CHANGELOG.md`. The Seed Database feature set below is unchanged.
+**Company suspension is a real boundary.** Disabling a company revokes its ordinary members' sessions
+in the same transaction, refuses their sign-in with a non-technical message, and is enforced once on
+the authenticated-request path rather than checked in several places. A genuine platform
+administrator is exempt in all three, because a company-level control that can sign the administrator
+out is a way to lose the installation.
 
-## What 0.5.8 changes
+**One control per job, across every list.** A table searches through `partials/dataset-search.html`,
+pages through `partials/pagination.html`, and chooses its data scope through
+`partials/universe-switch.html` and the `universe` query parameter. Search is server-side over the
+whole dataset — not a filter over the rows already on screen — debounced, aborting a request still in
+flight, resetting to the first page, and degrading to an ordinary GET form with no JavaScript.
+Trigram indexes back the searched columns. `SharedControlContractTest` fails the build on a second
+search input, a data universe offered as a select element, or a search whose results region does not
+exist, because a rule that is only written down is enforced by whoever happens to remember it.
+
+**Navigation icons belong to the LMS.** `public_html/img/nav-icons.svg` holds one symbol per semantic
+key; core resolves the symbol and every theme renders the same reference, so a menu item added or
+renamed no longer needs a theme edit. Icons carry their own dimensions, so a missing or partial
+stylesheet cannot resize them. `NavigationIconContractTest` fails if a key core can emit has no
+symbol.
+
+**The learner's Course Library** is four independent datasets — current, completed, favourites and
+requests — each counted and paged in the database, replacing four unbounded arrays filtered in PHP.
+Administration Reports is paginated and searched the same way.
+
+Renames: **My Learning** is **My Course Library**; **Company Learning** is **Company Enrolments**.
+
+**Migrations are additive from 0.5.8 onwards.** 0.5.8.3 adds trigram search indexes and two option
+updates that move the recorded active theme forward. **It does not rebase the baseline and does not
+require a database reset** — see *Development deployment* below.
+
+## What 0.5.8.2 changed
+
+A corrective build after the first VPS run of 0.5.8: two Integration test classes declared a helper
+named `count()` that collided with the final `PHPUnit\Framework\TestCase::count()` and stopped the
+suite loading at all; the render tests shared one fixed `/tmp` directory another account already
+owned; and `/admin/companies?universe=seed` returned 500 because rendering the page tried to make the
+genuine administrator a member of the SEED System Company. Reading a company no longer writes
+membership, and `assignUser()` validates before it mutates — previously the failed request had
+already deactivated the administrator's active membership.
+
+`tools/check-test-suite.php` exists because of the first of those: a PHPUnit test cannot guard against
+a class that stops PHPUnit from starting.
+
+## What 0.5.8 changed
 
 - **Seed generation.** Administration → Seed Database (`/admin/seed`) generates a coherent graph across 29 tables in one transaction. The requested figure is a soft whole-set target and lands within about 1% of the request from 1,000 records upward. A failure rolls the whole set back, so a partial set never survives.
 - **A frozen table policy.** `SeedTableCatalog` declares the 31 seed-aware tables, the tables that deliberately are not, and the narrow actor/audit allowlist. The baseline migration, the generator, cleanup and the contract tests all read that one declaration, so the schema guards and the code cannot drift apart.
-- **Database-enforced isolation.** Every guarded foreign key carries a constraint trigger that rejects a REAL↔SEED business relationship even if application code regresses. Seed tokens are provenance, not tenancy: different seed sets may reference one another freely.
-- **Universe-aware queries.** Every list, every count, every dashboard and report scalar, the bounded entity pickers, direct slug lookups and the anonymous catalogue all take an explicit data universe. An architecture test fails the build if a new repository read forgets one.
+- **Database-enforced isolation.** All 52 guarded foreign keys across 27 tables carry a constraint trigger that rejects a REAL↔SEED business relationship even if application code regresses. Seed tokens are provenance, not tenancy: different seed sets may reference one another freely.
+- **Universe-aware queries.** Every list, every count, every dashboard and report scalar, the bounded entity pickers, direct slug lookups and the anonymous catalogue all take an explicit data universe. An architecture test fails the build if a new repository read forgets one, if a count and its row query are scoped differently, or if a controller reads the universe filter anywhere but the single place that resolves it.
 - **One System Company per universe.** The uniqueness rule was widened so a REAL and a shared SEED System Company can coexist. The unassigned-user sweep that runs on Administration page loads is scoped to one universe, so it can never attach a generated identity to the genuine System Company.
 - **Derived counts.** Historical figures are written once at generation; the current count is always derived from the physical rows through an indexed `seed_token`. There are no counter triggers and nothing stores a remaining count, because a stored figure can drift from the rows it describes.
 - **Selective cleanup with a preview.** Removing a set shows what it will delete, including SEED rows in *other* sets that depend on it. REAL rows are never eligible.
 - **Seed mail routing.** Generated companies get synthetic domains ending in `.seed.invalid`, a TLD RFC 2606 reserves so it can never resolve. Mail to a generated identity is delivered to the local part at `SEED_SYSTEM_COMPANY_DOMAIN` instead, so one real inbox receives every seed message and an un-rewritten address bounces rather than reaching a stranger.
-- **Live write provenance.** A record created through the ordinary UI inherits its universe from the resource it belongs to, never from whoever created it. A generated learner enrolling themselves writes a SEED enrolment; a genuine `ADMIN` granting a credit to a generated company writes a SEED credit and stays the recorded actor on it. A row with two parents goes through one helper that refuses a cross-universe pairing by name, rather than leaving the database trigger to report a column.
-- **A visible All / Real / Seed control.** Every Administration list family shows a genuine administrator the record split — `1,247 total · 1,031 real · 216 seed` — and three links to switch between them. The counts are two indexed queries per dataset, never derived from a page of rows, and the selection travels with pagination, filters and rows-per-page. Nobody else receives the model at all, so an ordinary reader never learns that a second population exists and a seed identity never sees a genuine figure. A crafted `?universe=all` changes nothing for either.
+- **Live write provenance.** A record created through the ordinary UI inherits its universe from the resource it belongs to, never from whoever created it. A generated learner enrolling themselves writes a SEED enrolment; a genuine `ADMIN` granting a credit to a generated company writes a SEED credit and stays the recorded actor on it. Only the 14 allowlisted actor/audit columns across 11 tables may cross. A row with two parents goes through one helper that refuses a cross-universe pairing by name, rather than leaving the database trigger to report a column.
+- **A visible All / Real / Seed control.** Every Administration list family shows a genuine administrator the record split — `1,247 total · 1,031 real · 216 seed` — and three links to switch between them. The counts are two indexed queries per dataset, never derived from a page of rows, and the selection travels with pagination, filters, search and rows-per-page. Nobody else receives the model at all, so an ordinary reader never learns that a second population exists and a seed identity never sees a genuine figure. A crafted `?universe=all` changes nothing for either.
 - **REAL-only course portability.** A generated course cannot be exported and a seed identity cannot import, refused in the service rather than left to permissions. Cloning a revision is export followed by import, so it is refused for the same reason: it would otherwise be the one path that turns generated content into genuine content.
 
 Generation sends **zero email**, fabricates no media files, no sessions and no API tokens, and assigns generated identities `SEED_*` roles only.
 
 The Seed module carries its own PostgreSQL integration suite covering the installed schema, generation and rollback, read isolation, the database guards in both directions, the stored provenance of ordinary writes, cleanup with cross-set collateral, login-token invalidation and portability. It runs as part of `composer qa`.
 
-**This version rebases the baseline migration, so the development database must be reset.**
+**0.5.8 rebased the baseline migration, so upgrading to it from 0.5.7.6 required a destructive
+reset.** There is no incremental path across that boundary. Upgrading *within* 0.5.8.x does not.
 
 ## Architecture summary
 
@@ -63,11 +102,11 @@ The Seed module carries its own PostgreSQL integration suite covering the instal
 - Normal and seed role families cannot be mixed on one identity; `users.seed_token`, not any role name, is the identity-universe source of truth.
 - Course import and export remain REAL-only; SEED course-management roles may upload genuine test media.
 - API/MCP authorization uses transport scope plus the same ordinary business permission model as Web, and both surfaces are REAL-only because an API token is never issued to a seed identity.
-- Core-owned permission-filtered primary/footer navigation.
+- Core-owned permission-filtered primary/footer navigation, and a core-owned navigation icon sprite that every theme renders identically.
 - Consolidated `/admin`, `/account` and `/company` workspaces plus semantic direct section routes.
-- One shared pagination control used by every standalone paginated list.
-- htmx is a platform-owned progressive enhancement: every surface using it renders server-side first.
-- Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata.
+- **One shared control per job**: pagination, live dataset search and the All/Real/Seed scope switch. Every paginated list uses all three; a second implementation fails the build.
+- htmx is a platform-owned progressive enhancement: every surface using it renders server-side first, and every control works as an ordinary form without JavaScript.
+- Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata. Bundled default is Factory Reset 1.0.3, with further installable packages in `extras/themes/`.
 - Theme Package schema 3.0 / Template API 1.0 / Theme SDK 3.1.
 - Course authoring/import, assessments, progress/results, certificates and company credit workflows.
 - Optional local GeoIP through Geocoder PHP/GeoLite2.
@@ -87,8 +126,25 @@ External theme generators need only `docs/THEME-SDK.md` plus any reference theme
 
 ## Development deployment
 
-The current database is disposable TEST/DEV state.
+The database is disposable TEST/DEV state, and stops being so the moment the owner declares
+production.
 
-0.5.8 rebases the baseline, so it **does** require a destructive reset — `composer smoke:install`. Two new environment values must be set before migrating: `SEED_SYSTEM_COMPANY_NAME` and `SEED_SYSTEM_COMPANY_DOMAIN`. The domain must differ from `APP_DOMAIN`, because `companies.domain` is unique platform-wide, and it must be a domain you genuinely receive mail for. See `.env.example` and `docs/OPERATIONS.md`.
+**Upgrading within 0.5.8.x is additive.** Deploy the new code root, repoint the `current` symlink and
+run `composer migrate`. **Do not run `composer smoke:install`**: it resets the database, and on an
+installation that already holds generated seed data or real records that is destructive. It is for a
+first install or a deliberate wipe, not an upgrade.
 
-Two caches will otherwise keep serving the previous version after the `current` symlink moves — F3's compiled templates and PHP's opcache, both of which key on the unchanged `current/...` paths. `docs/OPERATIONS.md` has the upgrade sequence and the commands.
+A first install, or an upgrade from 0.5.7.6, does require the reset, because 0.5.8 rebased the
+baseline. Two environment values must be set before migrating: `SEED_SYSTEM_COMPANY_NAME` and
+`SEED_SYSTEM_COMPANY_DOMAIN`. The domain must differ from `APP_DOMAIN`, because `companies.domain` is
+unique platform-wide, and it must be a domain you genuinely receive mail for. See `.env.example` and
+`docs/OPERATIONS.md`.
+
+**Code, instance and public web roots are three distinct trees.** `public_html/` in the code root is
+the *source* of the served web root, not the served directory itself — the deployed `index.php` sets
+the public root to its own directory. A new or changed file under `public_html/` must be published to
+the web root as a separate step, or it returns 404 while the rest of the deployment looks healthy.
+
+Two caches will otherwise keep serving the previous version after the `current` symlink moves — F3's
+compiled templates and PHP's opcache, both of which key on the unchanged `current/...` paths.
+`docs/OPERATIONS.md` has the upgrade sequence and the commands.
