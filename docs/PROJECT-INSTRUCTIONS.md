@@ -1,8 +1,8 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
-**Runtime target:** PHP 8.5.9  
+**Current approved LMS version:** 0.5.8.3  
+**Date time:** 2026/09/03 05:40 SAST  
+**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
 **Current phase:** TEST/DEV; simplified ACL foundation and Seed Database implemented, Commerce after seed acceptance
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
@@ -25,7 +25,7 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 
 ## 3. Runtime and composition architecture
 
-- PHP 8.5.9; F3 3.9; PHP-DI 7; PSR-11; PostgreSQL.
+- PHP >=8.5.9 <9.0; F3 3.9; PHP-DI 7; PSR-11; PostgreSQL.
 - F3 receives the PHP-DI container through native `CONTAINER`; normal HTTP routes remain `Class->method`.
 - PHP-DI autowiring stays enabled.
 - HTTP controllers must not extend F3 `Prefab` because that bypasses PSR-11 controller resolution.
@@ -190,7 +190,7 @@ Core supplies permission-filtered `navigation` and `footer_navigation` arrays. T
 - Methods should document purpose, important inputs/outputs, side effects, invariants or non-obvious behaviour where useful.
 - Comments explain intent/why, not obvious syntax.
 - Add regression tests for confirmed defects and high-value architectural contracts.
-- Do not claim PHPUnit/PHPStan success unless it was actually run on the PHP 8.5.9 VPS environment.
+- Do not claim PHPUnit/PHPStan success unless it was actually run on the VPS environment.
 
 ## 10. Core briefing documents
 

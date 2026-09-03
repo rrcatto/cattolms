@@ -384,6 +384,6 @@ Before production is declared:
 - monitoring/alerting;
 - large-volume seed load testing;
 - SQL/index/N+1 review;
-- PHP 8.5.9 modernisation/performance audit;
+- PHP 8.5.x modernisation/performance audit;
 - accessibility and browser/mobile acceptance;
 - privacy/retention policy appropriate to real user data.
