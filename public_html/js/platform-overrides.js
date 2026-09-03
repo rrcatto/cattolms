@@ -76,14 +76,15 @@
       const type = flash.dataset.flashType || 'info'; if (type === 'success' || type === 'info') setTimeout(dismiss, type === 'success' ? 4500 : 6500);
     });
     document.querySelectorAll('[data-confirm]').forEach(element => element.addEventListener('click', event => { if (!confirm(element.dataset.confirm || 'Continue?')) event.preventDefault(); }));
-    /* Live dataset search. The debounce, the abort-in-flight and the loading indicator are all
-       declared on the form and handled by the platform script library; the only thing left for
-       this file is to hide the submit button, because with the live trigger present typing is
-       enough. The button stays in the markup and keeps working when the library is absent, which
-       is the whole of the no-JavaScript fallback. */
-    if (window.htmx) {
-      document.querySelectorAll('.dataset-search-submit').forEach(button => { button.hidden = true; });
-    }
+    /* Live dataset search needs nothing from this file. The debounce, the abort-in-flight and the
+       loading indicator are declared on the input itself, and the submit button now lives inside a
+       noscript element, so it is never in the document when scripting is available and is a real
+       submit button when it is not.
+
+       It used to be hidden here instead, and that was wrong twice over: this runs once at load, so
+       every section arriving later by lazy load or htmx swap brought a button nothing hid, and the
+       whole behaviour depended on a script file reaching the browser. Markup that is correct on
+       arrival cannot drift out of step with a listener. */
 
     /* Current-page row filtering. This hides rows already rendered; it is not a search of the
        dataset, so it must never be attached to a paginated table - saying "3 of 25 rows" while
