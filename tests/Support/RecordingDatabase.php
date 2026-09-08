@@ -35,10 +35,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Support;
 
-use DB\SQL;
+use CattoLearning\Infrastructure\Persistence\Database;
 use ReflectionClass;
 
-final class RecordingDatabase extends SQL
+final class RecordingDatabase implements Database
 {
     /** @var list<string> Every statement passed to exec(), in order. */
     public array $statements = [];
@@ -46,25 +46,69 @@ final class RecordingDatabase extends SQL
     /** @var list<array<string,mixed>> The bindings that accompanied each statement. */
     public array $bindings = [];
 
-    // No parent call on purpose: DB\SQL::__construct() connects.
-    public function __construct()
+    /**
+     * @param array<string,mixed> $params
+     * @return list<array<string,mixed>>
+     */
+    public function fetchAllAssociative(string $sql, array $params = []): array
     {
+        $this->record($sql, $params);
+
+        return [];
     }
 
     /**
-     * @param string|array<int,string> $cmds
-     * @param array<string,mixed>|null $args
-     * @param int $ttl
-     * @param bool $log
-     * @param bool $stringify
-     * @return list<array<string,mixed>>
+     * @param array<string,mixed> $params
+     * @return array<string,mixed>|false
      */
-    public function exec($cmds, $args = null, $ttl = 0, $log = true, $stringify = true): array
+    public function fetchAssociative(string $sql, array $params = []): array|false
     {
-        $this->statements[] = is_array($cmds) ? implode(' ', $cmds) : (string) $cmds;
-        $this->bindings[] = is_array($args) ? $args : [];
+        $this->record($sql, $params);
+
+        return false;
+    }
+
+    /** @param array<string,mixed> $params */
+    public function fetchOne(string $sql, array $params = []): mixed
+    {
+        $this->record($sql, $params);
+
+        return 0;
+    }
+
+    /** @return list<mixed> */
+    public function fetchFirstColumn(string $sql, array $params = []): array
+    {
+        $this->record($sql, $params);
 
         return [];
+    }
+
+    /** @param array<string,mixed> $params */
+    public function executeStatement(string $sql, array $params = []): int
+    {
+        $this->record($sql, $params);
+
+        return 0;
+    }
+
+    public function beginTransaction(): void
+    {
+    }
+
+    public function commit(): void
+    {
+    }
+
+    public function rollBack(): void
+    {
+    }
+
+    /** @param array<string,mixed> $params */
+    private function record(string $sql, array $params): void
+    {
+        $this->statements[] = $sql;
+        $this->bindings[] = $params;
     }
 
     /** Every statement recorded so far, as one string to assert against. */
@@ -98,12 +142,40 @@ final class RecordingDatabase extends SQL
      */
     public function inject(string $repositoryClass): object
     {
+        return self::injectInto($repositoryClass, $this);
+    }
+
+    /**
+     * Builds a repository with a recorder in place of its database, choosing the recorder that
+     * matches the type the repository declares.
+     *
+     * Two exist during the persistence migration: most repositories take the Database interface,
+     * CourseRepository still takes DB\SQL, and a property type is enforced on assignment - so one
+     * double cannot stand for both. When the last repository is converted this loses its branch and
+     * RecordingSqlDatabase goes.
+     *
+     * @return array{0:object,1:RecordingDatabase|RecordingSqlDatabase} The repository and its recorder.
+     */
+    public static function forRepository(string $repositoryClass): array
+    {
+        $reflection = new ReflectionClass($repositoryClass);
+        $property = $reflection->getProperty('db');
+        $type = $property->getType();
+        $declared = $type instanceof \ReflectionNamedType ? $type->getName() : '';
+
+        $recorder = $declared === 'DB\\SQL' ? new RecordingSqlDatabase() : new RecordingDatabase();
+
+        return [self::injectInto($repositoryClass, $recorder), $recorder];
+    }
+
+    private static function injectInto(string $repositoryClass, object $recorder): object
+    {
         $reflection = new ReflectionClass($repositoryClass);
         $repository = $reflection->newInstanceWithoutConstructor();
 
         foreach ($reflection->getProperties() as $property) {
             if ($property->getName() === 'db') {
-                $property->setValue($repository, $this);
+                $property->setValue($repository, $recorder);
             }
         }
 

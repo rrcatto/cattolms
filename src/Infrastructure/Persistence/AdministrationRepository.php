@@ -63,21 +63,17 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\CourseCreditAllocationsM;
-use CattoLearning\Infrastructure\Persistence\M\CourseCreditsM;
-use CattoLearning\Infrastructure\Persistence\M\CourseEnrolmentsM;
-use CattoLearning\Infrastructure\Persistence\M\CourseRequestsM;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Auth\DataUniverse;
-use DB\SQL;
+
 use RuntimeException;
 
 final class AdministrationRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Database $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -89,7 +85,7 @@ final class AdministrationRepository
         // an unscoped scalar reports REAL+SEED to anyone holding PLATFORM.DASHBOARD.VIEW without
         // any list being visibly wrong - the failure mode this release exists to prevent.
         $scope = self::andScope($universe, '');
-        $rows = $this->db->exec(<<<SQL
+        $rows = $this->db->fetchAllAssociative(<<<SQL
 SELECT
  (SELECT COUNT(*) FROM users WHERE status='active'{$scope})::int AS people,
  (SELECT COUNT(*) FROM courses WHERE status='published'{$scope})::int AS published_courses,
@@ -160,7 +156,7 @@ SQL);
         if ($term !== '' && $columns !== []) {
             $matches = array_map(static fn(string $column): string => $column . ' ILIKE :search_term', $columns);
             $conditions[] = '(' . implode(' OR ', $matches) . ')';
-            $bindings[':search_term'] = '%' . addcslashes($term, '%_\\') . '%';
+            $bindings['search_term'] = '%' . addcslashes($term, '%_\\') . '%';
         }
 
         return [$conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions), $bindings];
@@ -187,7 +183,7 @@ SQL);
 
         return [
             ' AND (' . implode(' OR ', $matches) . ')',
-            [':search_term' => '%' . addcslashes($term, '%_\\') . '%'],
+            ['search_term' => '%' . addcslashes($term, '%_\\') . '%'],
         ];
     }
 
@@ -376,7 +372,7 @@ SQL;
 
         [$where, $bindings] = self::searchFilter($universe, 'u', $search, self::PEOPLE_SEARCH);
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys . $where, $detail, $order, $limit, $offset),
             $bindings
         );
@@ -391,7 +387,7 @@ SQL;
     public function peopleCount(DataUniverse $universe, string $search = ''): int
     {
         [$where, $bindings] = self::searchFilter($universe, 'u', $search, self::PEOPLE_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM users u
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE'
@@ -488,7 +484,7 @@ SQL;
         [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COMPANY_SEARCH);
         $where = self::companyAudienceWhere($where, $audience);
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys . $where, $detail, $order, $limit, $offset),
             $bindings
         );
@@ -499,7 +495,7 @@ SQL;
         // The identical audience predicate the rows use.
         [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COMPANY_SEARCH);
         $where = self::companyAudienceWhere($where, $audience);
-        $rows = $this->db->exec('SELECT COUNT(*)::int AS total FROM companies c' . $where, $bindings);
+        $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM companies c' . $where, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -704,7 +700,7 @@ SQL;
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
             $bindings
         );
@@ -718,7 +714,7 @@ SQL;
     public function enrolmentsCount(DataUniverse $universe, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_enrolments ce
              JOIN courses c ON c.id=ce.course_id
@@ -762,7 +758,7 @@ SQL;
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              LEFT JOIN companies co ON co.id=cr.company_id';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
             $bindings
         );
@@ -783,7 +779,7 @@ SQL;
         $allowed = ['pending', 'approved', 'fulfilled', 'rejected', 'cancelled'];
 
         return in_array($status, $allowed, true)
-            ? [' AND cr.status = :request_status', [':request_status' => $status]]
+            ? [' AND cr.status = :request_status', ['request_status' => $status]]
             : ['', []];
     }
 
@@ -795,7 +791,7 @@ SQL;
         [$statusMatch, $statusBinding] = self::andRequestStatus($status);
         $where .= $statusMatch;
         $bindings += $statusBinding;
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
@@ -845,7 +841,7 @@ SQL;
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
              GROUP BY cc.id,c.title,co.name,u.first_name,u.last_name,u.display_name,ue.email';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
             $bindings
         );
@@ -865,7 +861,7 @@ SQL;
         // whether or not a term is supplied - which is what keeps this count describing exactly
         // the rows creditLedger() returns.
         [$where, $bindings] = self::searchFilter($universe, 'cc', $search, self::CREDIT_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_credits cc
              JOIN courses c ON c.id=cc.course_id
@@ -908,9 +904,9 @@ SQL;
              LEFT JOIN course_enrolments ce ON ce.user_id=u.id AND ce.is_preview=FALSE
              GROUP BY u.id,ue.email,cu.company_role';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
     }
 
@@ -924,13 +920,13 @@ SQL;
     public function companyPeopleCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::PEOPLE_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM company_users cu
              JOIN users u ON u.id=cu.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u') . $match,
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -958,9 +954,9 @@ SQL;
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
     }
 
@@ -968,14 +964,14 @@ SQL;
     public function companyRequestsCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::REQUEST_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr') . $match,
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -1007,9 +1003,9 @@ SQL;
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
     }
 
@@ -1022,7 +1018,7 @@ SQL;
     public function companyEnrolmentsCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_enrolments ce
              JOIN company_users cu ON cu.user_id=ce.user_id AND cu.company_id=:company_id AND cu.status=\'active\'
@@ -1030,7 +1026,7 @@ SQL;
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match,
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -1061,9 +1057,9 @@ SQL;
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
              GROUP BY cc.id,c.title';
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
     }
 
@@ -1071,7 +1067,7 @@ SQL;
     public function companyCreditsCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::CREDIT_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_credits cc
              JOIN courses c ON c.id=cc.course_id
@@ -1079,7 +1075,7 @@ SQL;
              LEFT JOIN users u ON u.id=cc.user_id
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc') . $match,
-            [':company_id' => $companyId] + $bindings
+            ['company_id' => $companyId] + $bindings
         );
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -1087,13 +1083,13 @@ SQL;
 
     public function enrolmentBelongsToCompany(int $enrolmentId, int $companyId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT EXISTS(
                 SELECT 1 FROM course_enrolments ce
                 JOIN company_users cu ON cu.user_id=ce.user_id AND cu.status=\'active\'
                 WHERE ce.id=:enrolment_id AND cu.company_id=:company_id AND ce.is_preview=FALSE
             ) AS allowed',
-            [':enrolment_id' => $enrolmentId, ':company_id' => $companyId]
+            ['enrolment_id' => $enrolmentId, 'company_id' => $companyId]
         );
         return in_array($rows[0]['allowed'] ?? false, [true,1,'1','t','true'], true);
     }
@@ -1132,34 +1128,34 @@ SQL;
 
         if ($eventId > 0) {
             $where[] = 'al.id=:event_id';
-            $params[':event_id'] = $eventId;
+            $params['event_id'] = $eventId;
         }
         if ($afterId > 0) {
             $where[] = 'al.id>:after_id';
-            $params[':after_id'] = $afterId;
+            $params['after_id'] = $afterId;
         }
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) === 1) {
             $where[] = 'al.created_at >= CAST(:from AS date)';
-            $params[':from'] = $from;
+            $params['from'] = $from;
         }
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $to) === 1) {
             $where[] = "al.created_at < CAST(:to AS date) + INTERVAL '1 day'";
-            $params[':to'] = $to;
+            $params['to'] = $to;
         }
         if ($family !== '' && preg_match('/^[a-z][a-z0-9_-]*$/', $family) === 1) {
             $where[] = "split_part(al.event_key,'.',1)=:family";
-            $params[':family'] = $family;
+            $params['family'] = $family;
         }
         if ($actorId > 0) {
             $where[] = 'al.user_id=:actor_id';
-            $params[':actor_id'] = $actorId;
+            $params['actor_id'] = $actorId;
         }
         if ($courseId > 0) {
             $courseText = (string) $courseId;
-            $params[':course_direct'] = $courseText;
-            $params[':course_enrolment'] = $courseText;
-            $params[':course_assessment'] = $courseText;
-            $params[':course_request'] = $courseText;
+            $params['course_direct'] = $courseText;
+            $params['course_enrolment'] = $courseText;
+            $params['course_assessment'] = $courseText;
+            $params['course_request'] = $courseText;
             $where[] = "(
                 al.metadata->>'course_id'=:course_direct
                 OR EXISTS (SELECT 1 FROM course_enrolments ace WHERE ace.id::text=al.metadata->>'enrolment_id' AND ace.course_id::text=:course_enrolment)
@@ -1169,10 +1165,10 @@ SQL;
         }
         if ($companyId > 0) {
             $companyText = (string) $companyId;
-            $params[':company_direct'] = $companyText;
-            $params[':company_request'] = $companyText;
-            $params[':company_enrolment'] = $companyText;
-            $params[':company_actor'] = $companyText;
+            $params['company_direct'] = $companyText;
+            $params['company_request'] = $companyText;
+            $params['company_enrolment'] = $companyText;
+            $params['company_actor'] = $companyText;
             $where[] = "(
                 al.metadata->>'company_id'=:company_direct
                 OR EXISTS (SELECT 1 FROM course_requests arq WHERE arq.id::text=al.metadata->>'request_id' AND arq.company_id::text=:company_request)
@@ -1186,9 +1182,9 @@ SQL;
         }
         if ($query !== '') {
             $like = '%' . $query . '%';
-            $params[':query_event'] = $like;
-            $params[':query_actor'] = $like;
-            $params[':query_metadata'] = $like;
+            $params['query_event'] = $like;
+            $params['query_actor'] = $like;
+            $params['query_metadata'] = $like;
             $where[] = "(al.event_key ILIKE :query_event OR COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email,'System') ILIKE :query_actor OR al.metadata::text ILIKE :query_metadata)";
         }
 
@@ -1255,7 +1251,7 @@ SQL;
             $keys .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
             $params
         );
@@ -1282,7 +1278,7 @@ SQL;
             . ($needsActor ? self::ACTIVITY_ACTOR_JOINS : '');
         if ($where !== []) $sql .= ' WHERE ' . implode(' AND ', $where);
 
-        $rows = $this->db->exec($sql, $params);
+        $rows = $this->db->fetchAllAssociative($sql, $params);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -1290,7 +1286,7 @@ SQL;
     /** @return list<string> */
     public function activityFamilies(DataUniverse $universe): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT DISTINCT split_part(event_key,'.',1) AS family FROM audit_log WHERE event_key<>''"
             . self::andScope($universe, '') . ' ORDER BY family'
         );
@@ -1305,7 +1301,7 @@ SQL;
         // performance figure with nothing on screen to suggest it happened.
         $scope = self::andScope($universe, '');
         $enrolmentScope = self::andScope($universe, 'e');
-        $rows = $this->db->exec(<<<SQL
+        $rows = $this->db->fetchAllAssociative(<<<SQL
 SELECT
   (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE{$scope})::int AS enrolments,
   (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='assigned'{$scope})::int AS assigned,
@@ -1342,13 +1338,13 @@ SQL;
         // A limit of zero means the whole report, which no screen asks for but the signature still
         // allows. There is nothing to defer in that case: every course is on the page.
         if ($limit <= 0) {
-            return $this->db->exec(
+            return $this->db->fetchAllAssociative(
                 sprintf($detail, 'courses c', $courseScope) . "\nORDER BY " . $order,
                 $bindings
             );
         }
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred(
                 'SELECT c.id FROM courses c' . $courseScope,
                 sprintf($detail, 'page JOIN courses c ON c.id=page.id', ''),
@@ -1379,7 +1375,7 @@ SQL;
     {
         $order = self::orderFor($sort, self::companyCourseReportSorts(), self::COURSE_REPORT_ORDER, 'c.id');
         [$courseScope, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
-        $bindings[':report_company_id'] = $companyId;
+        $bindings['report_company_id'] = $companyId;
         $where = $courseScope === ''
             ? ' WHERE ' . self::COMPANY_LEARNER_COURSE
             : $courseScope . ' AND ' . self::COMPANY_LEARNER_COURSE;
@@ -1398,7 +1394,7 @@ LEFT JOIN course_results cr ON cr.enrolment_id=ce.id
 GROUP BY c.id
 SQL;
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred('SELECT c.id FROM courses c' . $where, $detail, $order, $limit, $offset),
             $bindings
         );
@@ -1408,11 +1404,11 @@ SQL;
     public function companyCourseReportCount(DataUniverse $universe, int $companyId, string $search = ''): int
     {
         [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
-        $bindings[':report_company_id'] = $companyId;
+        $bindings['report_company_id'] = $companyId;
         $where = $where === ''
             ? ' WHERE ' . self::COMPANY_LEARNER_COURSE
             : $where . ' AND ' . self::COMPANY_LEARNER_COURSE;
-        $rows = $this->db->exec('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
+        $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -1461,7 +1457,7 @@ SQL;
     public function courseReportCount(DataUniverse $universe, string $search = ''): int
     {
         [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
-        $rows = $this->db->exec('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
+        $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -1487,14 +1483,14 @@ GROUP BY co.id
 SQL;
 
         if ($limit <= 0) {
-            return $this->db->exec(
+            return $this->db->fetchAllAssociative(
                 sprintf($detail, 'companies co', "WHERE co.status='active'" . $companyScope)
                 . "\nORDER BY " . $order,
                 $bindings
             );
         }
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             PageQuery::deferred(
                 "SELECT co.id FROM companies co WHERE co.status='active'" . $companyScope,
                 sprintf($detail, 'page JOIN companies co ON co.id=page.id', ''),
@@ -1511,7 +1507,7 @@ SQL;
     {
         $scope = self::andScope($universe, 'co');
         [$match, $bindings] = self::andSearch($search, self::COMPANY_REPORT_SEARCH);
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM companies co WHERE co.status='active'" . $scope . $match,
             $bindings
         );
@@ -1533,7 +1529,7 @@ SQL;
     {
         [$sql, $bindings] = self::favouritesQuery($userId, $universe, $search);
 
-        return $this->db->exec($sql . ' ORDER BY cf.created_at DESC', $bindings);
+        return $this->db->fetchAllAssociative($sql . ' ORDER BY cf.created_at DESC', $bindings);
     }
 
     /**
@@ -1548,7 +1544,7 @@ SQL;
         // `cf.course_id` completes the ordering: this table is keyed by the user and course pair
         // rather than by a surrogate id, and two favourites added in the same instant were free to
         // change places between one page view and the next.
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             $sql . ' ORDER BY cf.created_at DESC, cf.course_id DESC' . $this->limitOffset($limit, $offset),
             $bindings
         );
@@ -1558,7 +1554,7 @@ SQL;
     public function favouritesCount(int $userId, DataUniverse $universe, string $search = ''): int
     {
         [$sql, $bindings] = self::favouritesQuery($userId, $universe, $search, 'COUNT(*)::int AS total');
-        $rows = $this->db->exec($sql, $bindings);
+        $rows = $this->db->fetchAllAssociative($sql, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -1576,7 +1572,7 @@ SQL;
         return [
             'SELECT ' . $select . ' FROM course_favourites cf JOIN courses c ON c.id=cf.course_id
              WHERE cf.user_id=:user_id' . ($scope === null ? '' : ' AND ' . $scope) . $match,
-            [':user_id' => $userId] + $bindings,
+            ['user_id' => $userId] + $bindings,
         ];
     }
 
@@ -1590,7 +1586,7 @@ SQL;
     {
         [$sql, $bindings] = self::userRequestsQuery($userId, $universe, $search);
 
-        return $this->db->exec($sql . ' ORDER BY cr.requested_at DESC', $bindings);
+        return $this->db->fetchAllAssociative($sql . ' ORDER BY cr.requested_at DESC', $bindings);
     }
 
     /**
@@ -1602,7 +1598,7 @@ SQL;
     {
         [$sql, $bindings] = self::userRequestsQuery($userId, $universe, $search);
 
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             $sql . ' ORDER BY cr.requested_at DESC, cr.id DESC' . $this->limitOffset($limit, $offset),
             $bindings
         );
@@ -1612,7 +1608,7 @@ SQL;
     public function userRequestsCount(int $userId, DataUniverse $universe, string $search = ''): int
     {
         [$sql, $bindings] = self::userRequestsQuery($userId, $universe, $search, 'COUNT(*)::int AS total');
-        $rows = $this->db->exec($sql, $bindings);
+        $rows = $this->db->fetchAllAssociative($sql, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -1629,26 +1625,26 @@ SQL;
             'SELECT ' . $select . ' FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
              WHERE cr.user_id=:user_id' . ($scope === null ? '' : ' AND ' . $scope) . $match,
-            [':user_id' => $userId] + $bindings,
+            ['user_id' => $userId] + $bindings,
         ];
     }
 
     public function toggleFavourite(int $userId, int $courseId): bool
     {
-        $deleted = $this->db->exec(
+        $deleted = $this->db->fetchAllAssociative(
             'DELETE FROM course_favourites WHERE user_id=:user_id AND course_id=:course_id RETURNING course_id',
-            [':user_id' => $userId, ':course_id' => $courseId]
+            ['user_id' => $userId, 'course_id' => $courseId]
         );
         if ($deleted !== []) {
             return false;
         }
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO course_favourites (user_id,course_id,created_at,seed_token)
              VALUES (:user_id,:course_id,NOW(),:seed_token::uuid) ON CONFLICT (user_id,course_id) DO NOTHING',
             [
-                ':user_id' => $userId,
-                ':course_id' => $courseId,
-                ':seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
+                'user_id' => $userId,
+                'course_id' => $courseId,
+                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
             ]
         );
         return true;
@@ -1656,62 +1652,76 @@ SQL;
 
     public function createRequest(int $userId, ?int $companyId, int $courseId, int $accessPeriodSeconds, string $note): int
     {
-        $existing = new CourseRequestsM($this->db);
-        $existing->load([
-            "user_id = ? AND course_id = ? AND status IN ('pending','approved')",
-            $userId,
-            $courseId,
-        ]);
-        if (!$existing->dry()) {
+        $open = (int) $this->db->fetchOne(
+            "SELECT COUNT(*)::int FROM course_requests
+              WHERE user_id = :user_id AND course_id = :course_id AND status IN ('pending','approved')",
+            ['user_id' => $userId, 'course_id' => $courseId]
+        );
+        if ($open > 0) {
             throw new RuntimeException('You already have an open request for this course.');
         }
-        $model = new CourseRequestsM($this->db);
-        $model->public_id = Uuid::v4();
-        // A request is raised by a learner about a course, so both parents must agree.
-        $model->seed_token = $this->provenance->forPair('users', $userId, 'courses', $courseId);
-        $model->user_id = $userId;
-        $model->company_id = $companyId;
-        $model->course_id = $courseId;
-        $model->access_period_seconds = $accessPeriodSeconds;
-        $model->learner_note = trim($note);
-        $model->decision_note = '';
-        $model->status = 'pending';
-        $model->requested_at = gmdate('Y-m-d H:i:sP');
-        $model->save();
-        return (int) $model->id;
+
+        $rows = $this->db->fetchAllAssociative(
+            'INSERT INTO course_requests
+                (public_id, seed_token, user_id, company_id, course_id, access_period_seconds,
+                 learner_note, decision_note, status, requested_at)
+             VALUES
+                (:public_id, :seed_token, :user_id, :company_id, :course_id, :access_period_seconds,
+                 :learner_note, :decision_note, :status, :requested_at)
+             RETURNING id',
+            [
+                'public_id' => Uuid::v4(),
+                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
+                'user_id' => $userId,
+                'company_id' => $companyId,
+                'course_id' => $courseId,
+                'access_period_seconds' => $accessPeriodSeconds,
+                'learner_note' => trim($note),
+                'decision_note' => '',
+                'status' => 'pending',
+                'requested_at' => gmdate('Y-m-d H:i:sP'),
+            ]
+        );
+
+        return (int) ($rows[0]['id'] ?? 0);
     }
 
     /** @return array<string,mixed>|null */
     public function requestForUpdate(int $requestId): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT cr.*, c.title AS course_title, c.slug, ue.email, co.name AS company_name
              FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
              JOIN user_emails ue ON ue.user_id=cr.user_id AND ue.is_primary=TRUE
              LEFT JOIN companies co ON co.id=cr.company_id
              WHERE cr.id=:id FOR UPDATE OF cr',
-            [':id' => $requestId]
+            ['id' => $requestId]
         );
         return $rows[0] ?? null;
     }
 
     public function decideRequest(int $requestId, string $status, string $note, int $actorUserId, ?int $enrolmentId = null): void
     {
-        $model = new CourseRequestsM($this->db);
-        $model->load(['id = ?', $requestId]);
-        if ($model->dry()) {
+        $values = [
+            'status' => $status,
+            'decision_note' => trim($note),
+            'decided_at' => gmdate('Y-m-d H:i:sP'),
+            'decided_by_user_id' => $actorUserId,
+        ];
+        if ($enrolmentId !== null) {
+            $values['enrolment_id'] = $enrolmentId;
+            $values['fulfilled_at'] = gmdate('Y-m-d H:i:sP');
+        }
+        $assignments = implode(', ', array_map(static fn(string $c): string => $c . ' = :' . $c, array_keys($values)));
+
+        $affected = $this->db->executeStatement(
+            'UPDATE course_requests SET ' . $assignments . ' WHERE id = :id',
+            $values + ['id' => $requestId]
+        );
+        if ($affected === 0) {
             throw new RuntimeException('The course request no longer exists.');
         }
-        $model->status = $status;
-        $model->decision_note = trim($note);
-        $model->decided_at = gmdate('Y-m-d H:i:sP');
-        $model->decided_by_user_id = $actorUserId;
-        if ($enrolmentId !== null) {
-            $model->enrolment_id = $enrolmentId;
-            $model->fulfilled_at = gmdate('Y-m-d H:i:sP');
-        }
-        $model->save();
     }
 
     /**
@@ -1723,10 +1733,10 @@ SQL;
      */
     public function isActiveCompanyMember(int $companyId, int $userId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT 1 FROM company_users
               WHERE company_id = :company_id AND user_id = :user_id AND status = 'active' LIMIT 1",
-            [':company_id' => $companyId, ':user_id' => $userId]
+            ['company_id' => $companyId, 'user_id' => $userId]
         );
 
         return $rows !== [];
@@ -1742,14 +1752,14 @@ SQL;
      */
     public function learnerNotice(int $userId, int $courseId): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT ue.email, c.title AS course_title, c.slug
                FROM users u
                JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
                CROSS JOIN courses c
               WHERE u.id = :user_id AND c.id = :course_id
               LIMIT 1',
-            [':user_id' => $userId, ':course_id' => $courseId]
+            ['user_id' => $userId, 'course_id' => $courseId]
         );
 
         return $rows[0] ?? null;
@@ -1771,9 +1781,9 @@ SQL;
             return false;
         }
 
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT 1 AS owns FROM courses WHERE id = :course_id AND owner_company_id = :company_id LIMIT 1',
-            [':course_id' => $courseId, ':company_id' => $companyId]
+            ['course_id' => $courseId, 'company_id' => $companyId]
         );
 
         return $rows !== [];
@@ -1784,7 +1794,7 @@ SQL;
     {
         // A correlated count keeps the candidate row lock legal in PostgreSQL.
         // GROUP BY queries cannot be combined safely with FOR UPDATE.
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT cc.*,
                     (SELECT COUNT(*) FROM course_credit_allocations cca
                      WHERE cca.credit_id=cc.id AND cca.status IN (\'assigned\',\'consumed\'))::int AS used_count
@@ -1799,119 +1809,158 @@ SQL;
              ORDER BY cc.created_at, cc.id
              FOR UPDATE OF cc SKIP LOCKED
              LIMIT 1',
-            [':company_id' => $companyId, ':course_id' => $courseId, ':period' => $accessPeriodSeconds]
+            ['company_id' => $companyId, 'course_id' => $courseId, 'period' => $accessPeriodSeconds]
         );
         return $rows[0] ?? null;
     }
 
     public function allocateCredit(int $creditId, int $userId, int $enrolmentId, int $actorUserId): void
     {
-        $model = new CourseCreditAllocationsM($this->db);
-        // The allocation belongs to the credit being drawn down; assigned_by_user_id is an
-        // allowlisted attribution column and may name a genuine ADMIN.
-        $model->seed_token = $this->provenance->fromCredit($creditId);
-        $model->credit_id = $creditId;
-        $model->user_id = $userId;
-        $model->enrolment_id = $enrolmentId;
-        $model->status = 'assigned';
-        $model->assigned_by_user_id = $actorUserId;
-        $model->assigned_at = gmdate('Y-m-d H:i:sP');
-        $model->save();
+        $this->db->executeStatement(
+            'INSERT INTO course_credit_allocations
+                (seed_token, credit_id, user_id, enrolment_id, status, assigned_by_user_id, assigned_at)
+             VALUES
+                (:seed_token, :credit_id, :user_id, :enrolment_id, :status, :assigned_by_user_id, :assigned_at)',
+            [
+                'seed_token' => $this->provenance->fromCredit($creditId),
+                'credit_id' => $creditId,
+                'user_id' => $userId,
+                'enrolment_id' => $enrolmentId,
+                'status' => 'assigned',
+                'assigned_by_user_id' => $actorUserId,
+                'assigned_at' => gmdate('Y-m-d H:i:sP'),
+            ]
+        );
     }
 
     public function addCredit(?int $companyId, ?int $userId, int $courseId, int $period, int $quantity, string $reason, string $note, int $actorUserId): int
     {
-        $model = new CourseCreditsM($this->db);
-        $model->public_id = Uuid::v4();
-        // A credit is held by exactly one of a company or a person, and covers one course; the
-        // holder is the subject, so the row follows the holder and the course must agree.
-        $model->seed_token = $companyId !== null
-            ? $this->provenance->forPair('companies', $companyId, 'courses', $courseId)
-            : $this->provenance->forPair('users', $userId, 'courses', $courseId);
-        $model->company_id = $companyId;
-        $model->user_id = $userId;
-        $model->course_id = $courseId;
-        $model->access_period_seconds = $period;
-        $model->quantity = $quantity;
-        $model->source_type = $reason;
-        $model->note = trim($note);
-        $model->created_by_user_id = $actorUserId;
-        $model->created_at = gmdate('Y-m-d H:i:sP');
-        $model->save();
-        return (int) $model->id;
+        $rows = $this->db->fetchAllAssociative(
+            'INSERT INTO course_credits
+                (public_id, seed_token, company_id, user_id, course_id, access_period_seconds,
+                 quantity, source_type, note, created_by_user_id, created_at)
+             VALUES
+                (:public_id, :seed_token, :company_id, :user_id, :course_id, :access_period_seconds,
+                 :quantity, :source_type, :note, :created_by_user_id, :created_at)
+             RETURNING id',
+            [
+                'public_id' => Uuid::v4(),
+                'seed_token' => $companyId !== null
+                    ? $this->provenance->forPair('companies', $companyId, 'courses', $courseId)
+                    : $this->provenance->forPair('users', $userId, 'courses', $courseId),
+                'company_id' => $companyId,
+                'user_id' => $userId,
+                'course_id' => $courseId,
+                'access_period_seconds' => $period,
+                'quantity' => $quantity,
+                'source_type' => $reason,
+                'note' => trim($note),
+                'created_by_user_id' => $actorUserId,
+                'created_at' => gmdate('Y-m-d H:i:sP'),
+            ]
+        );
+
+        return (int) ($rows[0]['id'] ?? 0);
     }
 
     /** @return list<int> */
     public function activeCompanyUserEnrolmentIds(int $companyId, int $userId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT ce.id
              FROM course_enrolments ce
              JOIN company_users cu ON cu.user_id=ce.user_id AND cu.company_id=:company_id
              WHERE ce.user_id=:user_id AND ce.is_preview=FALSE AND ce.status IN ('assigned','active','completed')",
-            [':company_id' => $companyId, ':user_id' => $userId]
+            ['company_id' => $companyId, 'user_id' => $userId]
         );
-        return array_values(array_map(static fn(array $row): int => (int) $row['id'], $rows));
+        return array_map(static fn(array $row): int => (int) $row['id'], $rows);
     }
 
     public function removeEnrolmentAccess(int $enrolmentId, int $actorUserId, string $reason): void
     {
-        $model = new CourseEnrolmentsM($this->db);
-        $model->load(['id = ? AND is_preview = FALSE', $enrolmentId]);
-        if ($model->dry()) {
+        $rows = $this->db->fetchAllAssociative(
+            'UPDATE course_enrolments
+                SET status = :status,
+                    access_removed_at = :removed_at,
+                    access_removed_by_user_id = :removed_by,
+                    access_removed_reason = :reason,
+                    updated_at = :updated_at
+              WHERE id = :id AND is_preview = FALSE
+             RETURNING started_at',
+            [
+                'status' => 'cancelled',
+                'removed_at' => gmdate('Y-m-d H:i:sP'),
+                'removed_by' => $actorUserId,
+                'reason' => trim($reason),
+                'updated_at' => gmdate('Y-m-d H:i:sP'),
+                'id' => $enrolmentId,
+            ]
+        );
+        if ($rows === []) {
             throw new RuntimeException('The enrolment does not exist.');
         }
-        $model->status = 'cancelled';
-        $model->access_removed_at = gmdate('Y-m-d H:i:sP');
-        $model->access_removed_by_user_id = $actorUserId;
-        $model->access_removed_reason = trim($reason);
-        $model->updated_at = gmdate('Y-m-d H:i:sP');
-        $model->save();
 
-        // Unstarted allocations may return to the holder's pool. Once the
-        // learner has started, the course credit remains permanently consumed.
-        if ($model->started_at === null || $model->started_at === '') {
-            $this->db->exec(
+        // A credit is only returned when the learner never started: starting consumes it
+        // permanently, which is the rule CreditConsumptionRegressionTest defends.
+        $startedAt = $rows[0]['started_at'] ?? null;
+        if ($startedAt === null || $startedAt === '') {
+            $this->db->executeStatement(
                 "UPDATE course_credit_allocations
                  SET status='returned', returned_at=NOW()
                  WHERE enrolment_id=:enrolment_id AND status='assigned'",
-                [':enrolment_id' => $enrolmentId]
+                ['enrolment_id' => $enrolmentId]
             );
         }
     }
 
     public function restoreEnrolmentAccess(int $enrolmentId, int $actorUserId): void
     {
-        $model = new CourseEnrolmentsM($this->db);
-        $model->load(['id = ? AND is_preview = FALSE', $enrolmentId]);
-        if ($model->dry()) {
+        $enrolment = $this->db->fetchAssociative(
+            'SELECT id, user_id, course_id, started_at FROM course_enrolments
+              WHERE id = :id AND is_preview = FALSE',
+            ['id' => $enrolmentId]
+        );
+        if ($enrolment === false) {
             throw new RuntimeException('The enrolment does not exist.');
         }
 
-        $duplicate = new CourseEnrolmentsM($this->db);
-        $duplicate->load([
-            "id <> ? AND user_id = ? AND course_id = ? AND is_preview = FALSE AND status IN ('assigned','active','completed')",
-            $enrolmentId,
-            (int) $model->user_id,
-            (int) $model->course_id,
-        ]);
-        if (!$duplicate->dry()) {
+        $duplicates = (int) $this->db->fetchOne(
+            "SELECT COUNT(*)::int FROM course_enrolments
+              WHERE id <> :id AND user_id = :user_id AND course_id = :course_id
+                AND is_preview = FALSE AND status IN ('assigned','active','completed')",
+            [
+                'id' => $enrolmentId,
+                'user_id' => (int) $enrolment['user_id'],
+                'course_id' => (int) $enrolment['course_id'],
+            ]
+        );
+        if ($duplicates > 0) {
             throw new RuntimeException('This learner already has active access to the course. Remove the duplicate access before restoring this enrolment.');
         }
 
-        $model->status = ($model->started_at === null || $model->started_at === '') ? 'assigned' : 'active';
-        $model->access_removed_at = null;
-        $model->access_removed_by_user_id = null;
-        $model->access_removed_reason = '';
-        $model->updated_at = gmdate('Y-m-d H:i:sP');
-        $model->save();
+        $startedAt = $enrolment['started_at'] ?? null;
+        $this->db->executeStatement(
+            'UPDATE course_enrolments
+                SET status = :status,
+                    access_removed_at = NULL,
+                    access_removed_by_user_id = NULL,
+                    access_removed_reason = :reason,
+                    updated_at = :updated_at
+              WHERE id = :id',
+            [
+                'status' => ($startedAt === null || $startedAt === '') ? 'assigned' : 'active',
+                'reason' => '',
+                'updated_at' => gmdate('Y-m-d H:i:sP'),
+                'id' => $enrolmentId,
+            ]
+        );
 
-        $this->db->exec(
+        $this->db->executeStatement(
             "UPDATE course_credit_allocations
              SET status=CASE WHEN consumed_at IS NOT NULL OR status='consumed' THEN 'consumed' ELSE 'assigned' END,
                  returned_at=CASE WHEN consumed_at IS NULL AND status<>'consumed' THEN NULL ELSE returned_at END
              WHERE enrolment_id=:enrolment_id AND status IN ('returned','assigned','consumed')",
-            [':enrolment_id' => $enrolmentId]
+            ['enrolment_id' => $enrolmentId]
         );
     }
 }

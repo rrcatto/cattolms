@@ -39,6 +39,8 @@ use CattoLearning\Seed\SeedMailRouter;
 use CattoLearning\Seed\SeedNamePools;
 use CattoLearning\Infrastructure\Mail\SymfonyMailerAdapter;
 use CattoLearning\Infrastructure\Persistence\ConnectionFactory;
+use CattoLearning\Infrastructure\Persistence\Database;
+use CattoLearning\Infrastructure\Persistence\DbalDatabase;
 use CattoLearning\Infrastructure\Persistence\SharedPdoDriver;
 use Doctrine\DBAL\Configuration as DbalConfiguration;
 use Doctrine\DBAL\Connection as DbalConnection;
@@ -101,6 +103,9 @@ final class ContainerFactory
             // connection through DriverManager in the ordinary way.
             // Repositories inject Database, not the connection: it infers the PDO parameter type
             // from the PHP value the way DB\SQL did, which DBAL does not.
+            // Repositories depend on the Database interface; this is the implementation behind it.
+            Database::class => autowire(DbalDatabase::class),
+
             DbalConnection::class => factory(static fn(SQL $db): DbalConnection => new DbalConnection(
                 [],
                 new SharedPdoDriver($db->pdo()),

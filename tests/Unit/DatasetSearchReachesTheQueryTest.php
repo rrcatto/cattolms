@@ -83,8 +83,7 @@ final class DatasetSearchReachesTheQueryTest extends TestCase
         array $countTail
     ): void {
         foreach ([[$rowMethod, $rowTail], [$countMethod, $countTail]] as [$method, $tail]) {
-            $recorder = new RecordingDatabase();
-            $repository = $recorder->inject($class);
+            [$repository, $recorder] = RecordingDatabase::forRepository($class);
 
             $repository->{$method}(...self::arguments($class, $method, $tail, 'zzqqxx'));
 
@@ -130,8 +129,7 @@ final class DatasetSearchReachesTheQueryTest extends TestCase
         foreach ([DataUniverse::All, DataUniverse::Real, DataUniverse::Seed] as $universe) {
             foreach ([[$rowMethod, $rowTail], [$countMethod, $countTail]] as [$method, $tail]) {
                 foreach (['', 'zzqqxx'] as $term) {
-                    $recorder = new RecordingDatabase();
-                    $repository = $recorder->inject($class);
+                    [$repository, $recorder] = RecordingDatabase::forRepository($class);
                     $repository->{$method}(...self::arguments($class, $method, $tail, $term, $universe));
 
                     foreach ($recorder->statements as $sql) {
@@ -201,8 +199,7 @@ final class DatasetSearchReachesTheQueryTest extends TestCase
     /** An empty term must add no predicate at all, rather than one matching everything. */
     public function testAnEmptyTermAddsNoPredicate(): void
     {
-        $recorder = new RecordingDatabase();
-        $repository = $recorder->inject(AdministrationRepository::class);
+        [$repository, $recorder] = RecordingDatabase::forRepository(AdministrationRepository::class);
         $repository->people(DataUniverse::All, 50, 0, '');
 
         self::assertStringNotContainsString(
