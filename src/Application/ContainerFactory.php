@@ -39,6 +39,9 @@ use CattoLearning\Seed\SeedMailRouter;
 use CattoLearning\Seed\SeedNamePools;
 use CattoLearning\Infrastructure\Mail\SymfonyMailerAdapter;
 use CattoLearning\Infrastructure\Persistence\ConnectionFactory;
+use CattoLearning\Infrastructure\Persistence\SharedPdoDriver;
+use Doctrine\DBAL\Configuration as DbalConfiguration;
+use Doctrine\DBAL\Connection as DbalConnection;
 use CattoLearning\View\ThemeManager;
 use DB\SQL;
 use DI\Container;
@@ -85,6 +88,22 @@ final class ContainerFactory
                 : factory(static fn(): Base => Base::instance()),
 
             SQL::class => factory(static fn(): SQL => ConnectionFactory::create()),
+
+            // DBAL over the connection F3 already opened, not a second one.
+            //
+            // Repositories are converted from mappers and DB\SQL to DBAL a few at a time, so for the
+            // whole of that phase both wrappers are in use - and fifty call sites run inside
+            // TransactionManager::run(). A transaction belongs to a connection: a second session
+            // would put a converted repository's writes outside the transaction an unconverted one
+            // began, and a rollback would leave half the work committed with nothing failing.
+            //
+            // Temporary. When the last repository is converted, DB\SQL goes and DBAL opens its own
+            // connection through DriverManager in the ordinary way.
+            DbalConnection::class => factory(static fn(SQL $db): DbalConnection => new DbalConnection(
+                [],
+                new SharedPdoDriver($db->pdo()),
+                new DbalConfiguration()
+            )),
 
             GeoIpLocator::class => autowire()
                 ->constructorParameter('databasePath', Env::string('GEOIP_DATABASE')),
