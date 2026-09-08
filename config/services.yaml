@@ -57,6 +57,25 @@ services:
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
 
+    # The Twig theme layer.
+    CattoLearning\View\Twig\:
+        resource: '../src/View/Twig/'
+
+    # ThemeTemplates takes the filesystem loader itself rather than the Environment, because
+    # pointing @theme at the theme a request renders in is a loader operation.
+    CattoLearning\View\Twig\ThemeTemplates:
+        arguments:
+            $loader: '@twig.loader.native_filesystem'
+
+    # The view model is shared with the Fat-Free renderer, which is what keeps one set of
+    # navigation and breadcrumb rules while both engines are in use.
+    CattoLearning\View\ThemeRenderer: ~
+    CattoLearning\View\ThemeManager:
+        arguments:
+            $codeRoot: '%catto.code_root%'
+            $instanceRoot: '%catto.instance_root%'
+            $publicRoot: '%catto.public_root%'
+
     CattoLearning\Course\:
         resource: '../src/Course/'
         exclude: '../src/Course/{CatalogueFilter.php,*Exception.php}'
