@@ -87,7 +87,9 @@ final class SeedSchemaIntegrationTest extends TestCase
         $actual = array_values(array_diff($actual, ['seed_data']));
 
         self::assertSame($expected, $actual, 'The installed seed-aware tables must match SeedTableCatalog exactly.');
-        self::assertCount(31, $expected, 'The approved table policy is 31 seed-aware application tables.');
+        // Thirty since v0.6: course_categories left the policy when categories became
+        // universe-free labels. The amendment to decision D3 is recorded in SeedTableCatalog.
+        self::assertCount(30, $expected, 'The approved table policy is 30 seed-aware application tables.');
     }
 
     /** Decision D3, asserted against the database rather than against the catalogue. */

@@ -21,6 +21,10 @@ signatures or trigger text would pass just as happily against a database that wa
 
 Changelog:
 
+2026/09/04 20:08 SAST
+
+- testCountQueriesAgreeWithRowScope now pages through each dataset instead of requesting one 5,000-row page. Both repositories clamp LIMIT to the largest approved page size, so the oversized read measured the clamp rather than the scope and the test could only pass while every universe held 250 rows or fewer - a threshold any realistic seed set crosses. people (1,282 rows) failed; courses (317) would have failed next; companies (65) passed only for being small.
+
 2026/08/25 05:10 SAST
 
 - The D4 actor test now inserts with RETURNING and inspects the persisted row; it previously used a helper that rolls back, so it queried for evidence it had just deleted.
@@ -40,6 +44,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\DataUniverse;
@@ -49,6 +54,7 @@ use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\EntityLookupRepository;
 use CattoLearning\Seed\SeedTableCatalog;
+use CattoLearning\Support\Pagination;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\SeedIntegrationFixture;
@@ -121,7 +127,7 @@ final class SeedIsolationIntegrationTest extends TestCase
         /** @var CourseService $courses */
         $courses = $this->container->get(CourseService::class);
 
-        $slugs = self::slugs($courses->catalogue(DataUniverse::Real, 500, 0));
+        $slugs = self::slugs($courses->catalogue(DataUniverse::Real, CatalogueFilter::none(), 500, 0));
 
         self::assertContains($this->realSlug(), $slugs, 'A genuine published course must be in the catalogue.');
         self::assertNotContains($this->seedSlug(), $slugs, 'A generated course must never reach the public catalogue.');
@@ -208,15 +214,21 @@ final class SeedIsolationIntegrationTest extends TestCase
         foreach ([
             'people' => [
                 fn(DataUniverse $u): int => $administration->peopleCount($u),
-                fn(DataUniverse $u): int => count($administration->people($u, 5000, 0)),
+                fn(DataUniverse $u): int => $this->countByPaging(
+                    fn(int $limit, int $offset): array => $administration->people($u, $limit, $offset)
+                ),
             ],
             'companies' => [
                 fn(DataUniverse $u): int => $administration->companyCount($u),
-                fn(DataUniverse $u): int => count($administration->companies($u, 5000, 0)),
+                fn(DataUniverse $u): int => $this->countByPaging(
+                    fn(int $limit, int $offset): array => $administration->companies($u, $limit, $offset)
+                ),
             ],
             'courses' => [
                 fn(DataUniverse $u): int => $courses->allCoursesCount($u),
-                fn(DataUniverse $u): int => count($courses->allCourses($u, 5000, 0)),
+                fn(DataUniverse $u): int => $this->countByPaging(
+                    fn(int $limit, int $offset): array => $courses->allCourses($u, $limit, $offset)
+                ),
             ],
         ] as $dataset => [$count, $rows]) {
             foreach ([DataUniverse::Real, DataUniverse::Seed, DataUniverse::All] as $universe) {
@@ -612,6 +624,33 @@ final class SeedIsolationIntegrationTest extends TestCase
             SeedTableCatalog::isActorColumn('course_enrolments', 'user_id'),
             'The learner on an enrolment is its subject, not its actor.'
         );
+    }
+
+    /**
+     * Every row of a paginated dataset, gathered one page at a time.
+     *
+     * The repositories deliberately clamp any LIMIT to the largest approved page size, so a single
+     * oversized read cannot return a whole population and never could. Asking for one 5,000-row
+     * page therefore measured the clamp rather than the scope: the row count stopped at 250 while
+     * the count query kept reporting the true total, so this assertion failed on any dataset
+     * larger than one page - which a seed set is built to exceed. Paging is what a screen does, so
+     * it is what this test should do too.
+     *
+     * @param callable(int, int): list<array<string,mixed>> $page
+     */
+    private function countByPaging(callable $page): int
+    {
+        $pageSize = max(Pagination::PAGE_SIZES);
+        $total = 0;
+        $offset = 0;
+
+        do {
+            $rows = $page($pageSize, $offset);
+            $total += count($rows);
+            $offset += $pageSize;
+        } while (count($rows) === $pageSize);
+
+        return $total;
     }
 
     private function realSlug(): string

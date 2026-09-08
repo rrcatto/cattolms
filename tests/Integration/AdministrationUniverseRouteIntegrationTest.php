@@ -30,6 +30,8 @@ lived and where the universe is resolved; HttpRouteSmokeTest covers transport se
 
 Changelog:
 
+2026/09/04 21:00 SAST
+- Compared the membership table as a database-computed digest rather than as two PHP arrays. The assertion is unchanged and the rows are still fetched to report what moved; materialising them unconditionally exhausted PHP's memory limit as soon as a hundred thousand people existed.
 2026/08/25 05:10 SAST
 
 - Shared the Integration container so the suite opens one database connection instead of one per test method; the VPS run exhausted PostgreSQL connection slots.
@@ -112,19 +114,30 @@ final class AdministrationUniverseRouteIntegrationTest extends TestCase
     /**
      * The sections a genuine ADMIN can scope, and the capabilities each needs.
      *
+     * Read from the registry rather than written out. A hand-kept list only covers the sections
+     * somebody remembered to add to it, which is how Company Enrolments reached the browser as a
+     * 500 on /admin: it was registered, routed and rendering, and no test here knew it existed.
+     *
      * @return array<string,array{0:string,1:array<string,bool>}>
      */
     public static function scopedSections(): array
     {
-        return [
-            'people' => ['people', []],
-            'companies' => ['companies', []],
-            'courses' => ['courses', ['view_all_courses' => true]],
-            'enrolments' => ['enrolments', ['view_requests' => true, 'view_enrolments' => true]],
-            'credits' => ['credits', []],
-            'activity' => ['activity', []],
-            'reports' => ['reports', []],
-        ];
+        $sections = [];
+        foreach ((new AdministrationSectionRegistry())->all() as $section) {
+            $key = (string) $section['key'];
+            // The two sections that carry no business dataset of their own. Their content comes
+            // from RoleAdministrationService and SeedDatabaseService through the controller's
+            // presentation step, and sectionData() does not know them - which is exactly what
+            // workspacePreview() skips them for.
+            if ($key === 'roles' || $key === 'seed') {
+                continue;
+            }
+            // Every capability granted, because this test is about whether a section loads at all.
+            // What each capability hides is asserted where that decision lives.
+            $sections[$key] = [$key, ['view_all_courses' => true, 'view_requests' => true, 'view_enrolments' => true]];
+        }
+
+        return $sections;
     }
 
     /** @return list<array{0:DataUniverse}> */
@@ -141,6 +154,23 @@ final class AdministrationUniverseRouteIntegrationTest extends TestCase
      *
      * @return list<array<string,mixed>>
      */
+    /**
+     * A digest of every company membership, computed in the database.
+     *
+     * Any insert, delete or field change anywhere in the table changes it, so it is exactly as
+     * strong as comparing the rows and costs one string to hold.
+     */
+    private function membershipDigest(): string
+    {
+        return (string) ($this->db->exec(
+            "SELECT COUNT(*)::text || ':' || COALESCE(md5(string_agg(
+                        company_id || ':' || user_id || ':' || company_role || ':' || status
+                        || ':' || COALESCE(seed_token::text, ''), '|' ORDER BY company_id, user_id)), '') AS digest
+             FROM company_users"
+        )[0]['digest'] ?? '');
+    }
+
+    /** @return list<array<string,mixed>> */
     private function membershipSnapshot(): array
     {
         return (array) $this->db->exec(
@@ -209,6 +239,37 @@ final class AdministrationUniverseRouteIntegrationTest extends TestCase
     }
 
     /**
+     * The consolidated workspace builds every registered section.
+     *
+     * /admin loads a bounded preview of each section the reader may see, and a section the preview
+     * builder does not know throws rather than being skipped. Splitting Reports in two put a new
+     * section in the registry and not in that builder, so /admin returned 500 - "Unknown
+     * Administration section: company_report" - on every load, while all thirteen standalone
+     * routes returned 200 and nothing in the suite noticed.
+     */
+    public function testTheConsolidatedWorkspaceBuildsEveryRegisteredSection(): void
+    {
+        $keys = array_column((new AdministrationSectionRegistry())->all(), 'key');
+        $capabilities = [];
+        foreach ($keys as $key) {
+            $capabilities[(string) $key] = ['view_all_courses' => true, 'view_requests' => true, 'view_enrolments' => true];
+        }
+
+        try {
+            $data = $this->administration->workspacePreview(
+                array_map(strval(...), $keys),
+                $this->adminUserId,
+                DataUniverse::Real,
+                $capabilities
+            );
+        } catch (Throwable $exception) {
+            self::fail('/admin failed to build: ' . $exception::class . ': ' . $exception->getMessage());
+        }
+
+        self::assertNotSame([], $data, '/admin must return a view payload.');
+    }
+
+    /**
      * Loading every section in every universe modifies no existing company membership.
      *
      * This is the assertion that would have caught the original defect, and its shape matters.
@@ -224,7 +285,13 @@ final class AdministrationUniverseRouteIntegrationTest extends TestCase
      */
     public function testLoadingEverySectionInEveryUniverseModifiesNoExistingMembership(): void
     {
-        $before = $this->membershipSnapshot();
+        // The whole table is compared, because the defect this covers changed a row nobody was
+        // looking at. It is compared as a digest computed in the database rather than as an array
+        // in PHP: `company_users` is one row per person, and materialising it twice exhausted the
+        // 128MB limit outright once the v0.6 benchmark dataset put a hundred thousand people in it.
+        // The rows are only ever fetched when the digest has already said something changed, which
+        // is the one case where the memory is worth spending and the detail is needed.
+        $beforeDigest = $this->membershipDigest();
 
         foreach (self::universes() as [$universe]) {
             foreach (self::scopedSections() as [$section, $capabilities]) {
@@ -232,6 +299,14 @@ final class AdministrationUniverseRouteIntegrationTest extends TestCase
             }
         }
 
+        $afterDigest = $this->membershipDigest();
+        if ($afterDigest === $beforeDigest) {
+            self::assertSame($beforeDigest, $afterDigest, 'No company membership changed.');
+
+            return;
+        }
+
+        $before = $this->membershipSnapshot();
         $after = [];
         foreach ($this->membershipSnapshot() as $row) {
             $after[$row['company_id'] . ':' . $row['user_id']] = $row;
@@ -425,11 +500,27 @@ final class AdministrationUniverseRouteIntegrationTest extends TestCase
         );
     }
 
-    /** Whether one company id appears in the Companies section for a universe. */
+    /**
+     * Whether one company id appears in the Companies section for a universe.
+     *
+     * Searched for by its own name rather than looked for on the first page of the list. Scanning a
+     * page of 250 assumed the whole development database fitted in one, which stopped being true
+     * the moment the v0.6 benchmark dataset put a hundred thousand companies in it - the fixture
+     * company was still perfectly visible and simply on page four hundred.
+     *
+     * The visibility rule under test is unchanged: the search shares one WHERE clause with the
+     * list, so a company the universe hides is hidden from both.
+     */
     private function companyIsListed(DataUniverse $universe, int $companyId): bool
     {
+        $name = (string) ($this->db->exec(
+            'SELECT name FROM companies WHERE id = :id',
+            [':id' => $companyId]
+        )[0]['name'] ?? '');
+
         $data = $this->administration->sectionData('companies', $this->adminUserId, $universe, [
             'companies_page_size' => 250,
+            'companies_q' => $name,
         ], [], true);
 
         foreach ((array) ($data['companies'] ?? []) as $company) {

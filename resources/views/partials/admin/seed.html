@@ -42,7 +42,7 @@ Changelog:
 
         <div class="table-wrap">
           <table class="table table-sm align-middle mb-0">
-            <thead><tr><th>Table</th><th>Records</th></tr></thead>
+            <thead><tr><th style="width:76%">Table</th><th style="width:24%">Records</th></tr></thead>
             <tbody>
               <repeat group="{{ @seed_cleanup_preview.tables }}" key="{{ @preview_table }}" value="{{ @preview_count }}">
                 <tr><td class="mono small">{{ @preview_table }}</td><td>{{ @preview_count }}</td></tr>
@@ -107,13 +107,16 @@ Changelog:
   <true>
     <div class="card"><div class="table-wrap"><table class="table table-hover align-middle mb-0">
       <thead><tr>
-        <th>Token</th><th>Description</th><th>Requested</th><th>Generated</th>
-        <th>Current</th><th>Time</th><th>Created</th><th>By</th><th>Actions</th>
+      	<th style="width:26%">Token</th><th style="width:23%">Description</th>
+      	<th style="width:6%">Requested</th><th style="width:6%">Generated</th>
+      	<th style="width:6%">Current</th><th style="width:5%">Time</th>
+      	<th style="width:10%">Created</th><th style="width:12%">By</th>
+      	<th class="cell-actions" style="width:6%">Actions</th>
       </tr></thead>
       <tbody>
         <repeat group="{{ @seed_sets }}" value="{{ @seed_set }}">
           <tr>
-            <td class="mono small">{{ @seed_set.seed_token }}</td>
+            <td class="mono small"><a href="/admin/seed/{{ @seed_set.seed_token }}">{{ @seed_set.seed_token }}</a></td>
             <td>{{ @seed_set.description ?: '—' }}</td>
             <td>{{ @seed_set.requested_volume }}</td>
             <td>{{ @seed_set.initial_record_count }}</td>
@@ -126,10 +129,16 @@ Changelog:
             <td>{{ @seed_set.generation_seconds }}s</td>
             <td>{{ @seed_set.created_at }}</td>
             <td>{{ @seed_set.created_by_name }}</td>
-            <td>
-              <check if="{{ @can_manage_seed && !@seed_set.is_cleaned }}">
-                <a class="btn btn-sm btn-outline-danger" href="/admin/seed/{{ @seed_set.seed_token }}/cleanup">Clean up</a>
-              </check>
+            <td class="cell-actions">
+            	<details class="row-menu" data-cl-dropdown>
+            		<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+            		<div class="row-menu-panel">
+            			<a class="btn btn-sm btn-soft" href="/admin/seed/{{ @seed_set.seed_token }}">Breakdown</a>
+            			<check if="{{ @can_manage_seed && !@seed_set.is_cleaned }}">
+            				<a class="btn btn-sm btn-outline-danger" href="/admin/seed/{{ @seed_set.seed_token }}/cleanup">Clean up</a>
+            			</check>
+            		</div>
+            	</details>
             </td>
           </tr>
         </repeat>

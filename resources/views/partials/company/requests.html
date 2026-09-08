@@ -32,6 +32,10 @@ Changelog:
 <div id="requests-region" data-server-search-target>
 <div id="requests-results">
 
+	<check if="{{ @requests_pagination }}">
+		<include href="partials/pagination.html" with="pg=@requests_pagination" />
+	</check>
+
 	<div class="section-head">
 		<div>
 			<h2>Course requests</h2>
@@ -44,7 +48,7 @@ Changelog:
 			<div class="table-wrap">
 				<table>
 					<thead>
-						<tr><th>Learner</th><th>Course</th><th>Requested</th><th>Status</th><th></th></tr>
+						<tr><repeat group="{{ @requests_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@requests_region,sort_results=@requests_results" /></repeat></tr>
 					</thead>
 					<tbody>
 						<repeat group="{{ @requests }}" value="{{ @request }}">
@@ -52,14 +56,19 @@ Changelog:
 								<td><strong>{{ @request.learner_name }}</strong></td>
 								<td>{{ @request.course_title }}</td>
 								<td class="small">{{ @request.requested_at }}</td>
-								<td><span class="badge {{ @request.status=='pending' ? 'warn' : 'info' }}">{{ @request.status }}</span></td>
-								<td>
+								<td><span class="badge {{ @request.status_tone }}">{{ @request.status_label }}</span></td>
+								<td class="cell-actions">
 									<check if="{{ @request.status=='pending' }}">
-										<form action="/company/requests/{{ @request.id }}/decision" method="post" class="row-actions">
-											<input type="hidden" name="csrf" value="{{ @csrf }}">
-											<button class="btn btn-primary btn-sm" name="decision" value="approve">Approve</button>
-											<button class="btn btn-danger btn-sm" name="decision" value="reject">Reject</button>
-										</form>
+										<details class="row-menu" data-cl-dropdown>
+											<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+											<div class="row-menu-panel">
+												<form action="/company/requests/{{ @request.id }}/decision" method="post">
+													<input type="hidden" name="csrf" value="{{ @csrf }}">
+													<button class="btn btn-primary btn-sm" name="decision" value="approve">Approve</button>
+													<button class="btn btn-danger btn-sm" name="decision" value="reject">Reject</button>
+												</form>
+											</div>
+										</details>
 									</check>
 								</td>
 							</tr>

@@ -54,34 +54,161 @@ final class SeedGenerationPlan
     /** Fixed shape of one generated enrolment that has been worked through. */
     public const ATTEMPTS_PER_ENROLMENT = 2;
 
+    /**
+     * The share of the requested volume that is people, and how the rest is apportioned.
+     *
+     * People are the figure the interface is judged on, so they are set as a fraction of the
+     * request rather than falling out of a divisor: a request for 100,000 yields 7,500 of them,
+     * inside the 5-10% band. Everything else is scaled from the same request.
+     */
+    private const PEOPLE_SHARE = 0.075;
+    private const COURSE_SHARE = 0.010;
+    private const ENROLMENT_SHARE = 0.080;
+    private const FAVOURITE_SHARE = 0.030;
+    private const REQUEST_SHARE = 0.030;
+    private const CREDIT_SHARE = 0.015;
+
+    /** People per company, which decides how many companies a request produces. */
+    private const PEOPLE_PER_COMPANY = 8;
+
+    /**
+     * How much of the catalogue is a real course rather than a catalogue entry.
+     *
+     * A course with modules, assessments, questions and answer options costs about 126 rows; one
+     * with only its metadata costs about seven. Giving every course the full treatment made a
+     * thousand courses cost 126,000 rows on their own, which is why the old plan could only afford
+     * three hundred of them. A minority are built out and the rest are listed, which is both
+     * affordable and closer to a real catalogue, where most of what exists is not what anyone opens.
+     */
+    private const RICH_COURSE_SHARE = 0.15;
+
+    /**
+     * How many enrolments carry a full history of attempts, answers and progress.
+     *
+     * The other nine in ten are ordinary enrolments with no assessment activity, which is also
+     * what a real cohort looks like: most people who are signed up have not finished.
+     */
+    private const WORKED_ENROLMENT_SHARE = 0.10;
+
     public readonly int $requestedVolume;
     public readonly int $companies;
     public readonly int $users;
-    public readonly int $categories;
     public readonly int $courses;
+
+    /** Courses that get modules, assessments, questions and options. The rest are metadata only. */
+    public readonly int $richCourses;
+
     public readonly int $enrolments;
+
+    /** Enrolments that carry progress, attempts and answers. The rest are enrolments and nothing more. */
+    public readonly int $workedEnrolments;
+
     public readonly int $requests;
     public readonly int $credits;
     public readonly int $favourites;
+
+    /**
+     * Audit entries, computed last as whatever is left of the budget.
+     *
+     * This is what makes a request land on the number that was asked for. Every other figure is a
+     * ratio and each rounds independently, so their sum drifts; an audit row costs exactly one row
+     * and references only rows that already exist, so it is the one quantity that can absorb the
+     * difference without distorting the shape of the graph. A request for 100,000 now delivers
+     * 100,000, rather than the 87,510 the previous plan promised and the projection mis-stated.
+     */
+    public readonly int $auditEntries;
 
     private function __construct(int $requestedVolume)
     {
         $this->requestedVolume = $requestedVolume;
 
-        // Roots are derived from the volume; everything else hangs off them.
-        //
-        // Divisors are chosen so projectedTotal() lands within a few percent of the request,
-        // splitting the budget roughly 60/40 between people and course content. One generated
-        // person costs about 47 rows once their enrolment history exists; one generated course
-        // costs about 126 once its modules, assessments, questions and options do.
-        $this->courses = max(3, (int) round($requestedVolume / 315));
-        $this->users = max(12, (int) round($requestedVolume / 78));
-        $this->companies = max(2, (int) round($this->users / 20));
-        $this->categories = max(3, min(12, (int) round($this->courses / 3)));
-        $this->enrolments = $this->users * 2;
-        $this->requests = max(2, (int) round($this->users / 4));
-        $this->credits = max(2, (int) round($this->companies * 3));
-        $this->favourites = max(2, (int) round($this->users / 2));
+        // Every figure is a share of the request rather than a divisor chosen to make a total
+        // come out. The previous plan worked the other way round and it showed: a request for
+        // 100,000 produced 1,282 people, because people were whatever was left after course
+        // content had taken its share.
+        $this->users = max(12, (int) round($requestedVolume * self::PEOPLE_SHARE));
+        $this->companies = max(2, (int) round($this->users / self::PEOPLE_PER_COMPANY));
+        $this->courses = max(3, (int) round($requestedVolume * self::COURSE_SHARE));
+        $this->richCourses = max(1, min($this->courses, (int) round($this->courses * self::RICH_COURSE_SHARE)));
+
+        // No more enrolments than there are people: the schema permits one open enrolment per
+        // person and course, and a plan that asks for more would spend the difference colliding.
+        $this->enrolments = max(2, min($this->users, (int) round($requestedVolume * self::ENROLMENT_SHARE)));
+        $this->workedEnrolments = max(1, min($this->enrolments, (int) round($this->enrolments * self::WORKED_ENROLMENT_SHARE)));
+
+        $this->favourites = max(2, min($this->users, (int) round($requestedVolume * self::FAVOURITE_SHARE)));
+        $this->requests = max(2, min($this->users, (int) round($requestedVolume * self::REQUEST_SHARE)));
+        $this->credits = max(2, (int) round($requestedVolume * self::CREDIT_SHARE));
+
+        // Whatever is left. Never negative, and never zero: a set with no audit trail would leave
+        // the Activity screen empty at every volume.
+        $this->auditEntries = max(
+            $this->users,
+            $requestedVolume - $this->rowsBeforeAudit()
+        );
+    }
+
+    /**
+     * Every row the plan projects except the audit trail.
+     *
+     * Kept separate so the audit figure can be the remainder without projectedRows() having to
+     * call itself.
+     */
+    private function rowsBeforeAudit(): int
+    {
+        return array_sum($this->businessRows());
+    }
+
+    /**
+     * The projected rows for everything except audit_log.
+     *
+     * The assessment tables are projected from `workedEnrolments`, not from every enrolment. That
+     * disagreement is the whole of the old 12.5% shortfall: the projection assumed each enrolment
+     * produced attempts, sessions and answers, while the generator skipped every enrolment that had
+     * not been started - exactly one third of them - so four tables under-delivered by precisely
+     * that third and the operator was shown a total the generator never intended to write.
+     *
+     * @return array<string,int>
+     */
+    private function businessRows(): array
+    {
+        $modules = $this->richCourses * self::MODULES_PER_COURSE;
+        $assessments = $this->richCourses * $this->assessmentsPerCourse();
+        $questions = $assessments * self::QUESTIONS_PER_ASSESSMENT;
+        $worked = $this->workedEnrolments;
+        $completed = intdiv($worked, 3);
+
+        return [
+            'users' => $this->users,
+            'user_emails' => $this->users,
+            'user_roles' => $this->users,
+            'companies' => $this->companies,
+            'company_users' => $this->users,
+            'courses' => $this->courses,
+            'course_modules' => $modules,
+            'course_content_blocks' => $modules * self::BLOCKS_PER_MODULE,
+            'course_assessments' => $assessments,
+            'assessment_questions' => $questions,
+            'assessment_options' => $questions * self::OPTIONS_PER_QUESTION,
+            'course_grade_bands' => $this->courses * self::GRADE_BANDS_PER_COURSE,
+            'course_price_variants' => $this->courses,
+            'course_editors' => $this->courses,
+            'course_enrolments' => $this->enrolments,
+            'module_progress' => $worked * self::MODULES_PER_COURSE,
+            'assessment_attempts' => $worked * self::ATTEMPTS_PER_ENROLMENT,
+            'assessment_responses' => $worked * self::ATTEMPTS_PER_ENROLMENT * self::QUESTIONS_PER_ASSESSMENT,
+            'assessment_sessions' => $worked,
+            'assessment_session_questions' => $worked * self::QUESTIONS_PER_ASSESSMENT,
+            'course_results' => $completed,
+            // One per completed enrolment. This used to project half of them, against a generator
+            // that issued one each and carried a cap that never bound.
+            'certificates' => $completed,
+            'course_favourites' => $this->favourites,
+            'course_requests' => $this->requests,
+            'course_credits' => $this->credits,
+            'course_credit_allocations' => $this->credits,
+            'course_edit_history' => $this->courses,
+        ];
     }
 
     public static function forVolume(mixed $requestedVolume): self
@@ -125,43 +252,18 @@ final class SeedGenerationPlan
      */
     public function projectedRows(): array
     {
-        $modules = $this->courses * self::MODULES_PER_COURSE;
-        $assessments = $this->courses * $this->assessmentsPerCourse();
-        $questions = $assessments * self::QUESTIONS_PER_ASSESSMENT;
-        $completed = intdiv($this->enrolments, 3);
-
-        return [
-            'users' => $this->users,
-            'user_emails' => $this->users,
-            'user_roles' => $this->users,
-            'companies' => $this->companies,
-            'company_users' => $this->users,
-            'course_categories' => $this->categories,
-            'courses' => $this->courses,
-            'course_modules' => $modules,
-            'course_content_blocks' => $modules * self::BLOCKS_PER_MODULE,
-            'course_assessments' => $assessments,
-            'assessment_questions' => $questions,
-            'assessment_options' => $questions * self::OPTIONS_PER_QUESTION,
-            'course_grade_bands' => $this->courses * self::GRADE_BANDS_PER_COURSE,
-            'course_price_variants' => $this->courses,
-            'course_editors' => $this->courses,
-            'course_enrolments' => $this->enrolments,
-            'module_progress' => $this->enrolments * self::MODULES_PER_COURSE,
-            'assessment_attempts' => $this->enrolments * self::ATTEMPTS_PER_ENROLMENT,
-            'assessment_responses' => $this->enrolments * self::ATTEMPTS_PER_ENROLMENT * self::QUESTIONS_PER_ASSESSMENT,
-            'assessment_sessions' => $this->enrolments,
-            'assessment_session_questions' => $this->enrolments * self::QUESTIONS_PER_ASSESSMENT,
-            'course_results' => $completed,
-            'certificates' => intdiv($completed, 2),
-            'course_favourites' => $this->favourites,
-            'course_requests' => $this->requests,
-            'course_credits' => $this->credits,
-            'course_credit_allocations' => $this->credits,
-            'course_edit_history' => $this->courses,
-            'audit_log' => $this->users + $this->courses,
-        ];
+        return $this->businessRows() + ['audit_log' => $this->auditEntries];
     }
+
+    /**
+     * Tags attached to each generated course.
+     *
+     * Not projected and not counted. A tag association carries no seed token - the tag itself is
+     * shared with the genuine catalogue - so it is not part of the set's manifest, and the rows go
+     * with their courses through the cascade rather than being removed by token.
+     */
+    public const TAGS_PER_COURSE = 3;
+
 
     public function projectedTotal(): int
     {

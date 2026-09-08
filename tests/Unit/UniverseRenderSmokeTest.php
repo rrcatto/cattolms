@@ -52,10 +52,11 @@ final class UniverseRenderSmokeTest extends TestCase
             'people' => ['partials/admin/people.html', 'people', '/admin/people'],
             'companies' => ['partials/admin/companies.html', 'companies', '/admin/companies'],
             'courses' => ['partials/admin/courses.html', 'courses', '/admin/courses'],
-            'credits' => ['partials/admin/credits.html', 'credits', '/admin/credits'],
+            'credits' => ['partials/admin/credits.html', 'credits', '/admin/course/credits'],
             'activity' => ['partials/admin/activity.html', 'activity', '/admin/activity'],
-            'requests' => ['partials/admin/enrolments.html', 'requests', '/admin/enrolments'],
-            'enrolments' => ['partials/admin/enrolments.html', 'enrolments', '/admin/enrolments'],
+            // Two screens with two routes since v0.6, not two tabs on one.
+            'requests' => ['partials/admin/requests.html', 'requests', '/admin/course/requests'],
+            'enrolments' => ['partials/admin/enrolments.html', 'enrolments', '/admin/course/enrolments'],
         ];
     }
 

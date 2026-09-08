@@ -32,24 +32,28 @@ Changelog:
 -->
 <div id="picker-results">
 
+	<check if="{{ @picker_pagination }}">
+		<include href="partials/pagination.html" with="pg=@picker_pagination" />
+	</check>
+
 	<check if="{{ @picker_companies }}">
 		<true>
 			<div class="table-wrap">
 				<table>
 					<thead>
-						<tr><th>Company</th><th>Domain</th><th>Data</th><th>Status</th><th></th></tr>
+						<tr><th style="width:46%">Company</th><th style="width:24%">Domain</th><th style="width:8%">Data</th><th style="width:10%">Status</th><th class="cell-actions" style="width:12%">Actions</th></tr>
 					</thead>
 					<tbody>
 						<repeat group="{{ @picker_companies }}" value="{{ @company }}">
 							<tr>
 								<td>
 									<strong>{{ @company.name }}</strong>
-									<check if="{{ @company.is_system }}"><div><span class="badge permanent">System Company</span></div></check>
+									<check if="{{ @company.is_system }}"><span class="badge permanent">System</span></check>
 								</td>
 								<td class="mono small">{{ @company.domain }}</td>
 								<td><span class="badge {{ @company.is_seed ? 'warn' : 'info' }}">{{ @company.universe_label }}</span></td>
 								<td><span class="badge {{ @company.status=='active' ? 'good' : 'danger' }}">{{ @company.status_label }}</span></td>
-								<td>
+								<td class="cell-actions">
 									<check if="{{ @company.id == @company_context_id }}">
 										<true><span class="badge good">Administering</span></true>
 										<false>

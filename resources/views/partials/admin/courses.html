@@ -27,6 +27,8 @@ Changelog:
   2026/08/23 04:19 SAST
   - Added the shared genuine-ADMIN data-universe control above the list.
 -->
+<include href="partials/admin/course-group-nav.html" />
+
 <include href="partials/dataset-search.html" with="ds_name='courses',ds_label='Search courses',ds_value=@courses_search,ds_action='/admin/courses'" />
 
 <div class="section-head">
@@ -48,6 +50,10 @@ Changelog:
 <div id="courses-region" data-server-search-target>
 <div id="courses-results">
 
+	<check if="{{ @courses_pagination }}">
+		<include href="partials/pagination.html" with="pg=@courses_pagination" />
+	</check>
+
 	<check if="{{ @courses }}">
 		<true>
 			<!--
@@ -59,37 +65,40 @@ Changelog:
 				<div class="table-wrap">
 					<table class="table table-hover align-middle mb-0">
 						<thead>
-							<tr><th>Course</th><th>Category</th><th>Status</th><th>Structure</th><th>Ownership</th><th>Editors</th><th>Learners</th><th>Started</th><th>Revision</th><th>Updated</th><th>Actions</th></tr>
+							<tr><repeat group="{{ @courses_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@courses_region,sort_results=@courses_results" /></repeat></tr>
 						</thead>
 						<tbody>
 							<repeat group="{{ @courses }}" value="{{ @course }}">
 								<tr>
-									<td><strong>{{ @course.title }}</strong><br><small class="text-body-secondary">/{{ @course.slug }}</small></td>
+									<td><strong title="{{ @course.title }}">{{ @course.title }}</strong></td>
 									<td><span class="badge text-bg-light border">{{ @course.category_name ?: 'Uncategorised' }}</span></td>
 									<td><span class="badge cl-status-{{ @course.status }}">{{ ucfirst(@course.status) }}</span></td>
-									<td><strong>{{ @course.module_count }}</strong> modules<br><small class="text-body-secondary">{{ @course.question_count }} questions</small></td>
-									<td><strong>{{ @course.owner_company_name ?: '—' }}</strong><br><small class="text-body-secondary">{{ @course.owner_person_name ?: '—' }}</small></td>
-									<td>{{ @course.editor_count }}</td>
+									
+									<td title="{{ @course.owner_company_name }}"><strong>{{ @course.owner_company_name ?: '—' }}</strong><br><small class="text-body-secondary">{{ @course.owner_person_name ?: '—' }}</small></td>
+									
 									<td>{{ @course.learner_count }}</td>
 									<td>{{ @course.started_count }}</td>
-									<td>{{ @course.revision_number }}</td>
+									
 									<td>{{ @course.updated_at }}</td>
-									<td>
-										<div class="d-flex flex-wrap gap-1">
-											<a class="btn btn-sm btn-primary" href="/admin/courses/{{ @course.id }}">Manage</a>
-											<a class="btn btn-sm btn-outline-primary" href="/admin/courses/{{ @course.id }}/preview">Preview</a>
-											<a class="btn btn-sm btn-outline-secondary" href="/admin/courses/{{ @course.id }}/export">Export</a>
-											<check if="{{ @can_delete_courses }}">
-												<form action="/admin/courses/{{ @course.id }}/reset" method="post">
-													<input type="hidden" name="csrf" value="{{ @csrf }}">
-													<button class="btn btn-sm btn-warning" type="submit" data-confirm="Reset {{ @course.title }}? This removes all course content and learner test data but keeps the empty course shell for re-import.">Reset</button>
-												</form>
-												<form action="/admin/courses/{{ @course.id }}/delete" method="post">
-													<input type="hidden" name="csrf" value="{{ @csrf }}">
-													<button class="btn btn-sm btn-danger" type="submit" data-confirm="Permanently delete {{ @course.title }} and all associated learner access, progress, attempts and results?">Delete</button>
-												</form>
-											</check>
-										</div>
+									<td class="cell-actions">
+										<details class="row-menu" data-cl-dropdown>
+											<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+											<div class="row-menu-panel">
+												<a class="btn btn-sm btn-primary" href="/admin/courses/{{ @course.id }}">Manage</a>
+												<a class="btn btn-sm btn-outline-primary" href="/admin/courses/{{ @course.id }}/preview">Preview</a>
+												<a class="btn btn-sm btn-outline-secondary" href="/admin/courses/{{ @course.id }}/export">Export</a>
+												<check if="{{ @can_delete_courses }}">
+													<form action="/admin/courses/{{ @course.id }}/reset" method="post">
+														<input type="hidden" name="csrf" value="{{ @csrf }}">
+														<button class="btn btn-sm btn-warning" type="submit" data-confirm="Reset {{ @course.title }}? This removes all course content and learner test data but keeps the empty course shell for re-import.">Reset</button>
+													</form>
+													<form action="/admin/courses/{{ @course.id }}/delete" method="post">
+														<input type="hidden" name="csrf" value="{{ @csrf }}">
+														<button class="btn btn-sm btn-danger" type="submit" data-confirm="Permanently delete {{ @course.title }} and all associated learner access, progress, attempts and results?">Delete</button>
+													</form>
+												</check>
+											</div>
+										</details>
 									</td>
 								</tr>
 							</repeat>

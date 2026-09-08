@@ -1,11 +1,13 @@
-# Catto Learning LMS 0.5.8.3
+# Catto Learning LMS 0.6
 
-**LMS version:** 0.5.8.3  
-**Date time:** 2026/09/03 05:10 SAST  
+**LMS version:** 0.6  
+**Date time:** 2026/09/08 03:30 SAST  
 
 Catto Learning is a PHP/Fat-Free Framework/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
 
-Version 0.5.8 is the **Seed Database stage**. An administrator can generate a disposable set of realistic SEED records — people, companies, courses, assessments, enrolments, results and audit activity — so the interface can be exercised at realistic volume without anyone building test data by hand. Every generated row lives in a separate data universe that ordinary users, the public catalogue and the REST/MCP surfaces never see.
+Version 0.6 is the **catalogue and scale stage**. It collapses the 0.5.8 schema and everything after it into one canonical baseline, makes the course taxonomy a real one, and takes every list to a size the platform can actually be judged at.
+
+Version 0.5.8 was the **Seed Database stage**, and its model is unchanged. An administrator can generate a disposable set of realistic SEED records — people, companies, courses, assessments, enrolments, results and audit activity — so the interface can be exercised at realistic volume without anyone building test data by hand. Every generated row lives in a separate data universe that ordinary users, the public catalogue and the REST/MCP surfaces never see.
 
 Version 0.5.7.6 made this possible by paginating every list and pairing it with a count query describing the same population; version 0.5.7.5.1 established the ACL foundation. Both models are unchanged here.
 
@@ -14,6 +16,76 @@ The rule the whole stage rests on:
 > Permissions answer **what an identity may do**. `seed_token` and universe-aware query scope answer **which business rows that identity may see or touch**. They are separate mechanisms and must never be merged.
 
 There are exactly two business-data universes: `REAL = seed_token IS NULL` and `SEED = seed_token IS NOT NULL`.
+
+## What 0.6 changes
+
+Five things, and the first one is why this release cannot be upgraded into.
+
+**One baseline, and a reset install.** `database/migrations/` holds a single migration describing all
+41 tables, plus one additive migration after it. The 0.5.8 baseline and the five migrations that
+followed it are gone. **There is no upgrade path from 0.5.8.3** — installing 0.6 means
+`composer smoke:install` and a discarded database. That is acceptable only because the database is
+still disposable TEST/DEV state. `release:validate` enforces the shape: exactly one baseline, any
+number of additive migrations, and a non-baseline migration that drops or recreates a table fails the
+build, because that is a rebase wearing a later timestamp and it would destroy a populated database on
+a routine upgrade.
+
+**Categories and tags are labels, not business data.** They carried `seed_token` and should not have:
+a generated course could then only be filed in a generated category, so seed data never exercised the
+real taxonomy, and generated category names needed a set suffix to avoid colliding with genuine ones.
+They are shared vocabulary now, exactly as roles and permissions already were — 30 tables are
+seed-aware, and these are not among them. The trap this creates is worth knowing before touching any
+category query: **the label is shared, what is counted under it is not.** Per-category counts, browse
+listings, tag weights and the administration charts are all still filtered by the reader's universe. A
+category page reporting a thousand courses when three are genuine is a universe leak.
+
+Around that, the taxonomy became something you can use: category browsing down three levels with
+counts for the whole branch behind each child, a tag index, tag pages, faceted search that narrows by
+category and tag together, and distribution charts. An `is_active` flag on categories and tags was
+removed along with a description field on tags — a category exists or it does not, and a tag is a
+name.
+
+**Generated data stops looking generated.** Ten editable word lists live in `storage/seeds/`,
+published there from the release and never overwritten once edited. Three are combined per name, every
+combination is remembered, and a repeat is redrawn — primed with the names already in the database.
+**Nothing is appended to a name to make it unique:** no digits, no set suffix. Uniqueness comes from
+the size of the combination space. Technical identifiers are the exception, because a slug is an
+identifier rather than a name. Randomness comes from a seeded `Random\Randomizer`; the generator it
+replaced returned the low bits of an LCG modulo the pool size, and those bits alternate with a period
+of two, so half of every even-sized list was unreachable. Courses are now named after the category
+they are filed under and tagged from the same taxonomy, so a course, its category and its tags finally
+describe the same thing.
+
+**Every list is paginated, sorted and deterministic at scale.** A paginated read is a deferred join:
+the page's identifiers are selected first with the same WHERE, ORDER BY, LIMIT and OFFSET, and only
+then does the query join outwards for those rows — so a page cannot hold the right rows in the wrong
+sequence. Every ordering ends in a unique column, and `PaginationOrderingContractTest` proves it by
+reading the ordering constants rather than by paging a fixture, because PostgreSQL is permitted to
+break a tie either way and on one plan it reliably picks the same one. Sorting is offered on every
+paginated list through a whitelist per dataset: the request supplies a key, never a column, because an
+ORDER BY takes an expression and no parameter binding can make a supplied column safe. A paging or
+search request builds only the table being swapped. Two measurement tools ship for this, run by hand
+and never part of the gate — one writes about 920,000 rows into the paginated tables, the other times
+every list at its first, middle and last page.
+
+**One row is one line.** Tables use `table-layout: fixed` with a percentage width declared per column
+in the header model the service builds, which is the only layout in which a table cannot outgrow its
+box. A cell with two or more actions is a menu rather than a row of buttons; anything truncated
+carries its full text as a tooltip. Four contract tests hold the line: widths must total 100, no
+column may be nameless, no cell may carry a row of buttons, and no action in a table may be styled as
+bare text. A page header partial is used on every screen except the front page, and in a compact form
+in the course player, where the course carries its own.
+
+Elsewhere: Companies split into **Course Consumers** and **Course Creators**, Reports into **Course
+Performance** and **Company Enrolments**, and Enrolments and Requests into routes of their own — each
+half was carrying the other's empty columns, and neither of the combined screens could be linked to or
+reloaded. The Company workspace gained Courses Bought, Favourites and Performance, and a three-level
+menu. Commerce has its foundations but not its behaviour: money is stored in minor units and formatted
+per locale through `intl`, prices are per course and access period, and the trading currency, country
+and VAT rate are `.env` settings. Credits are held by a company and by nothing else.
+
+Removed: the enrolment progress reset. It deleted issued certificates along with the results behind
+them, irreversibly, and nothing in the interface reached it.
 
 ## What 0.5.8.3 changes
 
@@ -55,9 +127,9 @@ Administration Reports is paginated and searched the same way.
 
 Renames: **My Learning** is **My Course Library**; **Company Learning** is **Company Enrolments**.
 
-**Migrations are additive from 0.5.8 onwards.** 0.5.8.3 adds trigram search indexes and two option
-updates that move the recorded active theme forward. **It does not rebase the baseline and does not
-require a database reset** — see *Development deployment* below.
+**Migrations were additive from 0.5.8 onwards.** 0.5.8.3 adds trigram search indexes and two option
+updates that move the recorded active theme forward. It does not rebase the baseline and does not
+require a database reset. **0.6 does rebase it** — see *What 0.6 changes* above.
 
 ## What 0.5.8.2 changed
 
@@ -106,7 +178,7 @@ reset.** There is no incremental path across that boundary. Upgrading *within* 0
 - Consolidated `/admin`, `/account` and `/company` workspaces plus semantic direct section routes.
 - **One shared control per job**: pagination, live dataset search and the All/Real/Seed scope switch. Every paginated list uses all three; a second implementation fails the build.
 - htmx is a platform-owned progressive enhancement: every surface using it renders server-side first, and every control works as an ordinary form without JavaScript.
-- Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata. Bundled default is Factory Reset 1.0.3, with further installable packages in `extras/themes/`.
+- Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata. Bundled default is Factory Reset 1.0.4, with further installable packages in `extras/themes/`.
 - Theme Package schema 3.0 / Template API 1.0 / Theme SDK 3.1.
 - Course authoring/import, assessments, progress/results, certificates and company credit workflows.
 - Optional local GeoIP through Geocoder PHP/GeoLite2.

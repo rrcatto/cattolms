@@ -143,7 +143,182 @@ For paginated seedable datasets:
 
 After implementation, exercise the LMS with representative seed sets before Commerce begins.
 
-## 3. Commerce — after Seed Database acceptance
+## 2b. Build order — owner decision, 2026/09/06
+
+Commerce was section 3 and everything else read "after Commerce foundations". That ordering was
+wrong and this document contradicted itself on it: promotions are placed on "category, sub-category
+and sub-sub-category pages" that did not exist, similar-courses is defined in terms of categories
+and tags, and the sitemap depends on a catalogue the taxonomy had not yet shaped.
+
+**The approved order is now:**
+
+1. **Course taxonomy and discovery (3b)** — everything discovery- and commerce-related sits on it.
+   Building checkout against a flat category list means reworking every catalogue and search query
+   when the hierarchy lands.
+2. **Company course lifecycle (3d)** — Commerce transacts against credits and entitlements. Getting
+   those five overloaded concepts separated first means Commerce is built against a settled model.
+3. **Favourites (3c)** — small, and wishlist-to-cart is a natural commerce path.
+4. **Commerce (3).**
+5. Promotions (3e), ratings (3f), SEO (9), analytics (9b).
+
+This does not contradict the recorded decision in 9b. That decision is that *analytics* must not
+postpone Commerce, and it stands.
+
+### Pricing visibility and email capture — owner decision, 2026/09/06
+
+**Prices and the catalogue are public. The cart works anonymously. The email address is captured at
+the first checkout step, not at the first price view.**
+
+Considered and rejected: requiring sign-in before a price is shown, in order to capture an address
+for marketing. It captures addresses only from people who were already committed and loses the much
+larger group still deciding. Three specific reasons it was rejected:
+
+- it fights section 9. A price behind a login is invisible to search engines and disqualifies the
+  catalogue from product rich results, so organic discovery would be built and blocked in the same
+  project;
+- company administrators specifying training research anonymously, get approval, then buy. The wall
+  blocks the research phase, which is when the decision is actually made;
+- sign-in is a magic link. Putting an email round trip between a visitor and a price is a heavier
+  interruption than a password form would be.
+
+An address entered at checkout is a better lead than an anonymous browser, and abandonment from that
+point is recoverable. **Company and member pricing may require sign-in** — "sign in to see your
+company's price" makes the login worth something instead of a toll gate.
+
+**This constrains the Commerce data model and must be settled before section 3 is built, not during
+it.** An anonymous cart needs an identity that is not a user id, plus a defined merge into the
+user's cart at sign-in. A login-first cart would simply be user-scoped. The two produce different
+tables.
+
+---
+
+## 2c. How a company pays for training — owner decision, 2026/09/07
+
+The rules, in the owner's own terms:
+
+- **A company that owns a course trains its own staff on it for free.** Ownership is the entitlement;
+  no credit is involved and none should be looked for.
+- **A company that does not own a course must hold a credit for it** before its staff can be enrolled.
+- Two workflows reach an enrolment, and both are legitimate:
+  1. the staff member requests the course, and the company administrator buys what is needed and
+     approves, or rejects;
+  2. the administrator buys credits and assigns courses to staff directly, telling them outside the
+     LMS.
+
+### The three decisions taken with it
+
+**Approving a request the company cannot yet pay for takes the administrator into checkout.** Not
+"approve and wait", and not "you must buy this first, come back later". Approve is one action that
+ends in the staff member being enrolled: pay on the way through, and the enrolment happens on the way
+back. The rejected alternatives both leave a request in a state that means "yes, but nothing
+happened", which is the state the current code already produces by accident and which nobody watching
+the screen can tell apart from a failure.
+
+**Enrolment always emails the learner**, whether it came from an approved request or from an
+administrator assigning directly, with the course name and a link to start it. The owner may tell
+staff in person as well; the platform does not rely on that having happened.
+
+**An individual buying for themselves is enrolled on payment.** No credit is created. A credit is a
+company mechanism for buying access it will hand to someone else later; a person buying their own
+course has nobody to hand it to, and giving them a balance to understand would be machinery for its
+own sake.
+
+### What is missing today, measured against those rules
+
+- Approval looks for a credit whatever the course is, so a company approving a request for its **own**
+  course finds none and leaves the request approved with nobody enrolled. The ownership rule is not
+  implemented at all.
+- `/company/credits` only displays the ledger. Request approval is the single code path that
+  allocates a credit, so workflow 2 has no route.
+- No enrolment notification exists. The mailer sends magic links, staff-added notices and request
+  decisions, and nothing that tells a learner they are on a course.
+
+---
+
+## 2d. Money, tax and locale — owner decision, 2026/09/07
+
+**Launch is South Africa, in rands.** Everything below follows from that plus the intention to launch
+elsewhere later, so nothing is allowed to hardcode the first country.
+
+### Currency
+
+- Prices are stored in **minor units** with an ISO 4217 code beside them. `course_price_variants`
+  already does this: `price_minor_units BIGINT` and `currency_code CHAR(3) DEFAULT 'ZAR'`. Integer
+  cents rather than a decimal, because a payment processor takes cents and floating-point money is a
+  class of bug rather than a rounding preference.
+- The platform's currency and country are **`.env` settings**, not constants. An ISO 4217 code and an
+  ISO 3166 country code.
+- **No currency symbol in `.env`, and no currency table.** The `intl` extension formats an amount
+  from the ISO code and a locale, and gets the things a hand-kept symbol gets wrong: where the symbol
+  sits, which character separates thousands, which separates decimals. `R 1 234,56` in South Africa,
+  `£1,234.56` in the United Kingdom, `1.234,56 €` in Germany - one call, no table to maintain and
+  no second country to get wrong. `intl` was added to the PHP image on 2026/09/07.
+
+### Country
+
+`.env` carries the country code. **No country table yet.** One is worth building when something
+actually reads an attribute from it - a dialling code, a tax rule, an address format - and today
+nothing does. Adding it now would be a table with one row and no reader.
+
+### VAT — deferred, and the shape recorded
+
+Not built. The owner is not VAT registered and will register on turnover. Recorded now so the
+decision is not re-taken under pressure later:
+
+- **The database stores the price excluding VAT.** That is the number the owner sets and keeps.
+- **The interface calculates VAT and displays the inclusive price.** A customer sees one number, and
+  it is the number they pay.
+- **The rate is configurable, never hardcoded.** It changes by statute and by country.
+- **A tax invoice must be issuable** once registered, which means the VAT amount is stored per order
+  line rather than recomputed later from a rate that may since have changed.
+
+The last point is the one that reaches into Commerce before VAT exists: order lines carry a VAT
+amount from the start, set to zero until registration. Storing zero costs nothing; adding the column
+afterwards means every historical order has no VAT figure and no honest way to produce one.
+
+### Free courses do not go through the cart
+
+A course priced at zero is not a purchase. The learner enrols directly and the access period starts
+**at enrolment**, not when they first open the course. The cart holds priced items only - a cart
+containing something free is a checkout that can total zero, and a payment of zero is a state the
+processor, the order and the refund path all have to special-case for no benefit.
+
+The period comes from the zero-priced variant where one exists, and from the course default
+otherwise.
+
+### Refunds revoke access immediately
+
+A refunded order removes the learner's access at once. Not at period end, and not left in place.
+
+### Who may buy
+
+Both, and they are separate paths:
+
+- **An individual** buys their own course from the public catalogue and is enrolled on payment. No
+  company, no credit - there is nobody to hand it to later.
+- **Inside a company, only an administrator buys.** Staff favourite courses and request access;
+  they cannot spend the company's money.
+
+---
+
+## 9c. Multiple languages — not started, not scheduled
+
+The owner wants multi-language support. It is recorded here rather than built because it is two
+different problems that are routinely mistaken for one:
+
+- **Interface translation.** Every label, button, validation message and email the platform emits.
+  Mechanical, large, and bounded - it ends when the strings are extracted and translated.
+- **Content translation.** Course titles, modules, assessments, categories, tags and certificates.
+  Not mechanical at all: it is a schema question (a translations table, or a language column on every
+  content row), an authoring question (who translates a course and how a partial translation
+  behaves), and a discovery question (does a Portuguese learner see an English course at all).
+
+Doing the first is worth little on its own if the catalogue stays in one language, and doing the
+second changes the shape of the course schema. Neither should be started inside another phase.
+
+---
+
+## 3. Commerce — after taxonomy, company lifecycle and favourites
 
 Implement one coherent commerce domain:
 
@@ -160,10 +335,84 @@ Implement one coherent commerce domain:
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
-## 3b. Course taxonomy and discovery — after Commerce foundations
+## 3b. Course taxonomy and discovery — in progress
 
-Planning only. Nothing in this section is implemented, and none of it may be built without its own
-work order.
+**The schema is implemented in v0.6. The surfaces are not.**
+
+Built: `course_categories` carries `parent_id` and `level` with a three-level cap enforced by a
+CHECK constraint and a trigger, unique `name` and `slug`, and `ON DELETE RESTRICT` on the parent so
+nobody removes three levels of taxonomy by accident. `tags` and `course_tags` exist, with the slug
+as the canonical key so casing and spacing cannot produce three versions of one tag. Both are
+universe-free labels — see PROJECT-INSTRUCTIONS section 5.
+
+Built since, 2026/09/06: **browsing by category.** `/courses/category/<slug>` is the same catalogue
+body told which branch it is showing. The descendant query is one predicate — self, children,
+grandchildren — stated once in `CourseRepository::inBranchOf()` and shared by the taxonomy rollup,
+the browse count and the browse rows, so a faceted count cannot disagree with its own list. The
+breadcrumb is a recursive ancestry walk bounded by the depth cap, and each child category offers the
+count of the whole branch behind it. Only active categories are addressable. Every count takes an
+explicit `DataUniverse`, and `CategoryBrowseIntegrationTest` proves the same branch reports a
+different population in REAL and in SEED.
+
+Built since, 2026/09/07: **tag management, tag pages and keyword search.** Administration → Courses →
+Course Tags is a searched, paginated list on the three shared controls, guarded by its own
+`COURSE.TAG.MANAGE`. The slug is derived from the name rather than typed, so casing and spacing
+cannot make three tags out of one, and a clash is refused rather than silently suffixed. Deleting a
+tag needs no replacement, unlike a category: a course with one fewer tag is still classified, a
+course with no category is not. `/courses/tag/<slug>` browses it, tag chips appear on every card, and
+the catalogue's client-side box that filtered rendered rows was replaced by the shared server-side
+search over title, subtitle and summary.
+
+Category, tag and keyword are one `CatalogueFilter` handed to both the count and the rows, so a facet
+cannot reach one and miss the other, and combining them means the intersection. The tag predicate is
+an EXISTS rather than a join, because a course carries several tags and a join would return it once
+per tag.
+
+Built since, 2026/09/07: **faceted search.** Every option in the category and tag rails carries the
+number of courses choosing it would return, and tags multi-select: several tags mean *any* of them,
+because intersecting tags collapses to nothing almost immediately and a facet whose options can only
+narrow gives a reader no way back.
+
+The rule that makes it work: **a facet's own counts are taken with that facet relaxed.** Apply the
+tag facet to its own counts and choosing one tag drives every other tag to zero — no course carries a
+tag it does not carry — and the rail becomes a single live option and a dead end. Counted with the
+tag facet dropped but the category and keyword still applied, each figure means "how many more this
+would add". `CatalogueBrowseIntegrationTest` asserts both the relaxed figure and what the applied one
+would have done.
+
+Built since, 2026/09/07: **the distribution charts and the public tag index.** Both taxonomy
+administration screens open with a bar chart of where the published catalogue actually is — per
+top-level branch, and per most-used tag — each naming its remainder rather than leaving it implied.
+The uncategorised and untagged rows are the point of those charts as much as the bars are: a course
+with no category is invisible to every browse path there is, and nothing else on the platform says
+how many exist. `/courses/tags` lists every active label weighted in five steps.
+
+No charting library. A bar is a div with a width, the figures are text beside it, and the whole thing
+renders server-side with no script — which also makes it legible to a screen reader, which a canvas
+is not.
+
+**Section 3b is complete.** The remaining discovery work belongs to later sections: search ranking
+and SEO (9), and analytics (9b).
+
+### The built-in taxonomy needs to be designed, not generated — owner decision, 2026/09/06
+
+v0.6 ships 369 categories: 16 top-level, 77 sub and 276 sub-sub. **That is too many, and they were
+invented to demonstrate the hierarchy rather than chosen to organise a catalogue.** They are a
+placeholder.
+
+The owner will map out the categories and the structure the catalogue actually needs. Until then:
+
+- do not extend the built-in set, and do not treat its shape as a decision that has been made;
+- the schema, the three-level cap, the unique names and the management screens are settled and are
+  not what needs revisiting;
+- replacing the list is a data change, not a schema change — the baseline seeds it and nothing in
+  the code depends on any particular category existing.
+
+The practical consequence today is that the categories screen renders 369 rows in one unpaginated
+table. Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent
+in sight is worse than a long page; collapsible branches or filtering to one branch at a time are
+the right ones. Both are cheaper to build once the real taxonomy is known and its actual size is
+settled.
 
 ### Category hierarchy
 
@@ -204,7 +453,7 @@ from missing data.
 
 ---
 
-## 3c. Favourites — after Commerce foundations
+## 3c. Favourites — before Commerce
 
 Planning only.
 
@@ -230,10 +479,41 @@ the moment that person changed.
 
 ---
 
-## 3d. Company course lifecycle — after Commerce foundations
+## 3d. Company course lifecycle — the split is built
 
-Planning only. Five distinct concepts, currently overloaded onto one Courses page. The future
-Company information architecture must separate them.
+**Done, 2026/09/07.** The five concepts are five sections. What is still owed to this section is the
+buying, which is Commerce.
+
+| Section | Route | What it holds |
+|---|---|---|
+| Company Courses | `/company/courses` | Courses the company owns and offers. Free for its own staff. |
+| Training Courses | `/company/training` | Courses it has bought access to, with seats bought, seats free, staff enrolled and staff completed. |
+| Favourites | `/company/favourites` | Courses it may want for staff and has not bought. |
+| Enrolments | `/company/enrolments` | Individual staff access and progress. |
+| Course Credits | `/company/credits` | The entitlement ledger and its accounting. |
+
+`COMPANY_OWNED_WHERE` and `COMPANY_TRAINING_WHERE` are two constants and never recombined; one
+resolver picks between them and is shared by the rows and the count. The old single predicate flat-
+tened a course a company both owned and had bought into one row, so the two figures could not even be
+recovered by subtraction.
+
+`company_favourites` is a company-to-course table with its own cross-universe trigger. It is not a
+user favourite: staff favouriting a course for themselves changes nothing here, and the company's
+interest outlives whoever added it — owner decision, 2026/09/07. It carries no `seed_token`, for the
+same reason `course_tags` does not: the company already carries the universe and the row cascades
+with it.
+
+### Still outstanding
+
+- Buying credits, which is Commerce.
+
+Assigning an existing credit to a staff member was built on 2026/09/07: the form is on
+`/company/enrolments`, the rules are the same two that approval uses, and the pickers are a
+company-scoped lookup rather than the platform-wide one.
+
+### The original statement of the problem, kept for the record
+
+Five distinct concepts were overloaded onto one Courses page.
 
 | Concept | Meaning |
 |---|---|
@@ -246,10 +526,11 @@ Company information architecture must separate them.
 Training Courses will likely want per-course metrics: credits purchased, credits available, credits
 allocated, staff enrolled, staff completed.
 
-**Known defect this section will fix.** The current Company Courses section shows `allCourses()` in
-platform-wide mode and `publishedCourses()` otherwise — every published course on the platform,
-which is none of the five meanings above. It is recorded here rather than patched in isolation
-because the correct query depends on which of these concepts the page is meant to show.
+**Defect fixed in 0.5.8.3 Stage D, recorded here for history.** Company Courses showed
+`allCourses()` in platform-wide mode and `publishedCourses()` otherwise — every published course on
+the platform, which is none of the five meanings above. `CourseRepository::companyCourses()` now
+shares one `COMPANY_COURSES_WHERE` with its count. The information-architecture work above is still
+outstanding; only the wrong query was corrected.
 
 ---
 

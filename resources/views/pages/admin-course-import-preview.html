@@ -1,4 +1,5 @@
-<section class="cl-page-head"><div class="container py-5"><a class="cl-back-link" href="/admin/courses/import">← Import another file</a><span class="cl-kicker d-block mt-3">Import preview</span><h1 class="display-5 fw-bold">{{ @analysis.course.title }}</h1><check if="{{ @analysis.course.subtitle }}"><p class="h4 text-white-50">{{ @analysis.course.subtitle }}</p></check><check if="{{ @analysis.course.summary }}"><p class="lead mb-2">{{ @analysis.course.summary }}</p></check><check if="{{ @analysis.course.level }}"><p class="mb-2"><span class="badge text-bg-light">Level: {{ @analysis.course.level }}</span></p></check><p class="mb-0">Nothing has been inserted yet. Review the detected structure before committing it.</p></div></section>
+<set ph_back_href="/admin/courses/import" ph_back_label="Import another file" ph_kicker="Import preview" ph_title="{{ @analysis.course.title }}" ph_lead="{{ @analysis.course.summary }}" />
+<include href="partials/page-head.html" />
 <section class="container-fluid cl-container-wide py-5"><div class="row g-4"><div class="col-xl-8">
 <div class="row g-3 mb-4">
   <div class="col-md-4 col-xl-2"><div class="cl-stat h-100"><span>Modules</span><strong>{{ @analysis.display_module_count }}</strong></div></div>

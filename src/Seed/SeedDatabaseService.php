@@ -128,16 +128,59 @@ final class SeedDatabaseService
                 'current_record_count' => array_sum($current),
                 'current_table_counts' => $current,
                 'is_cleaned' => $row['cleaned_at'] !== null,
+                // To the minute. Every other list trims its timestamps; this one printed the
+                // microseconds and the UTC offset, which made it the widest column on the screen
+                // after the token and left nothing for the description.
+                'created_at' => self::toMinute((string) ($row['created_at'] ?? '')),
             ];
         }
 
         return $sets;
     }
 
+    /**
+     * A timestamp trimmed to the minute.
+     *
+     * PostgreSQL returns `2026-09-06 03:31:55.118635+02`. Nobody reads a seed set's microseconds,
+     * and printing them cost about a fifth of the table.
+     */
+    private static function toMinute(string $timestamp): string
+    {
+        return $timestamp === '' ? '' : substr($timestamp, 0, 16);
+    }
+
     /** Total SEED rows across the whole platform, for the section summary. */
     public function totalSeedRecords(): int
     {
         return $this->seeds->totalSeedRows();
+    }
+
+    /**
+     * One seed set with its per-table breakdown, for the detail screen.
+     *
+     * Written and remaining answer different questions. Written is what generation recorded and
+     * never changes; remaining is counted from the physical rows now, so it falls when a cleanup
+     * runs or when another set's cleanup takes dependent rows with it.
+     *
+     * @return array{set:array<string,mixed>,breakdown:list<array{table:string,initial:int,current:int,removed:int}>,totals:array{initial:int,current:int}}
+     */
+    public function setDetail(string $token): array
+    {
+        $set = $this->seeds->findSet($token);
+        if ($set === null) {
+            throw new InvalidArgumentException('That seed set does not exist.');
+        }
+
+        $breakdown = $this->seeds->setTableBreakdown($token);
+
+        return [
+            'set' => $set,
+            'breakdown' => $breakdown,
+            'totals' => [
+                'initial' => array_sum(array_column($breakdown, 'initial')),
+                'current' => array_sum(array_column($breakdown, 'current')),
+            ],
+        ];
     }
 
     /**

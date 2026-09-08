@@ -111,8 +111,41 @@ key, label, href, icon, active, method, csrf, children
 Child fields:
 
 ```text
-key, label, href, icon, method
+key, label, href, icon, method, children
 ```
+
+A child may itself hold `children`. That third level is not optional decoration: Administration is
+grouped rather than flat, and a theme that renders only two levels shows twelve sections as one
+undifferentiated list. Render a group as a heading plus its members.
+
+Core supplies the classes and the behaviour, so a theme needs no JavaScript and no state of its own:
+
+```html
+<div class="nav-group" data-nav-item="{{ @child.key }}">
+  <button class="nav-group-label" type="button" aria-haspopup="true">
+    icon, then {{ @child.label }}, then a span.nav-group-caret
+  </button>
+  <div class="nav-subpanel">
+    one anchor per {{ @child.children }} member
+  </div>
+</div>
+```
+
+`catto-platform.css` keeps `.nav-subpanel` hidden and reveals it on `:hover` and `:focus-within`, so
+the members fly out to the side of the parent panel and the whole control works with scripting off.
+Two things about it are load-bearing:
+
+- **The heading is a `button`, not a `span`.** The members are `display:none` until the group opens,
+  so unless something inside the group can take focus first, Tab can never reach them and the level
+  becomes mouse-only. A span renders identically and silently removes keyboard access.
+- **Add `nav-flyout-left` to the group** when the parent panel is right-aligned in a top bar. The
+  default opens to the right, which leaves the viewport on a right-aligned menu. A left rail wants
+  the default.
+
+Below 1080px core returns the members to an indented list, because a narrow viewport has nowhere to
+fly out to and a finger has no hover. A theme adds colour: the flyout panel carries its own
+background and text colour rather than inheriting, so a dark menu must restate them on
+`.nav-subpanel` or it will be handed the light page's ink.
 
 Logout is POST and must preserve its supplied CSRF token.
 
@@ -130,26 +163,50 @@ Account /account
   Activity /account/activity
 
 Company /company                         [permission-gated]
+  All company sections /company
   Dashboard /company/dashboard
-  People /company/people
-  Course Requests /company/requests
-  Learning /company/learning
-  Course Credits /company/credits
-  Courses /company/courses
+  People                                 [group]
+    People /company/people
+    Course Requests /company/requests
+    Enrolments /company/enrolments
+    Performance /company/performance
+  Courses                                [group]
+    Courses Created /company/courses
+    Favourites /company/favourites
+    Courses Bought /company/training
+    Credits /company/credits
 
 Administration /admin                    [permission-gated]
+  All administration /admin
   Dashboard /admin/dashboard
-  Courses /admin/courses
-  People /admin/people
-  Companies /admin/companies
-  Enrolments & Requests /admin/enrolments
-  Credits & Orders /admin/credits
-  Activity /admin/activity
-  Reports /admin/reports
-  Themes /admin/themes
-  Roles & ACL /admin/roles
-  Settings /admin/settings
+  Courses                                [group]
+    Courses /admin/courses
+    Course Categories /admin/courses/categories
+    Course Tags /admin/courses/tags
+    Course Requests /admin/course/requests
+    Enrolments /admin/course/enrolments
+  People & Companies                     [group]
+    People /admin/people
+    Course Consumers /admin/companies
+    Course Creators /admin/companies/creators
+  Credits                                [group]
+    Credits /admin/course/credits
+  Insights                               [group]
+    Activity /admin/activity
+    Course Performance /admin/reports
+    Company Enrolments /admin/reports/companies
+  System                                 [group]
+    Themes /admin/themes
+    Roles & ACL /admin/roles
+    Seed Database /admin/seed
+    Settings /admin/settings
 ```
+
+Both the Company and the Administration menus are three levels. A theme that renders only two still
+produces working links, because a group's own `href` is its first member.
+
+A `[group]` row is a child carrying `children`; its own `href` is its first member, so a theme that
+renders only two levels still produces a working link rather than a dead one.
 
 Core may omit unauthorised items. Account children must not contain a second `/account` dashboard duplicate.
 

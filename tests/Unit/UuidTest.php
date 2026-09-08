@@ -16,6 +16,8 @@ scattering. A v7 that did not actually sort by time would still look correct in 
 respect, so ordering is asserted directly.
 
 Changelog:
+2026/09/06 18:40 SAST
+- Covered isValid(). A seed set token arrives from a route parameter and is compared against a UUID column, so an unparseable one used to surface a PostgreSQL cast error to the reader instead of "no such record".
 2026/08/23 04:19 SAST
 - Created for the v0.5.8 Seed Database phase.
 */
@@ -89,5 +91,28 @@ final class UuidTest extends TestCase
 
         self::assertGreaterThanOrEqual($before - 1, $embedded);
         self::assertLessThanOrEqual($after + 1, $embedded);
+    }
+
+    /**
+     * A route parameter is whatever the reader typed, and seed_token is a UUID column, so a
+     * malformed token used to fail inside PostgreSQL and print SQLSTATE[22P02] on the page.
+     */
+    public function testIsValidAcceptsGeneratedIdentifiersAndRejectsAnythingElse(): void
+    {
+        self::assertTrue(Uuid::isValid(Uuid::v7()));
+        self::assertTrue(Uuid::isValid(Uuid::v4()));
+        self::assertTrue(Uuid::isValid(strtoupper(Uuid::v7())), 'Case is not part of a UUID.');
+
+        foreach ([
+            '',
+            'not-a-token',
+            '01a07457-8485-798c-ab54-f49814b9bbf',
+            '01a07457-8485-798c-ab54-f49814b9bbfff',
+            '01a074578485798cab54f49814b9bbff',
+            "01a07457-8485-798c-ab54-f49814b9bbff' OR '1'='1",
+            "01a07457-8485-798c-ab54-f49814b9bbff\n",
+        ] as $candidate) {
+            self::assertFalse(Uuid::isValid($candidate), $candidate . ' is not a UUID.');
+        }
     }
 }

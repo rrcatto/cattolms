@@ -40,7 +40,10 @@ $baselineMatches = glob($root . '/database/migrations/*_baseline.php') ?: [];
 $need(count($baselineMatches) === 1, 'Expected exactly one baseline migration, found ' . count($baselineMatches) . '.');
 $baseline = $baselineMatches === [] ? '' : $read($baselineMatches[0]);
 foreach (['theme_definitions','theme_files','theme_assets'] as $token) $need(!str_contains($baseline,'CREATE TABLE '.$token),'Theme source table must not exist: '.$token);
-$need(str_contains($baseline,"('active_theme', 'factory-reset-v1.0.1')"),'Default active_theme seed is missing.');
+// The baseline must record *an* active theme, not a particular version. It pinned 1.0.1 while two
+// later migrations advanced the value; v0.6 collapsed those into one baseline that records the
+// bundled version directly, and validate-release.php is what checks the two agree.
+$need((bool) preg_match("/\('active_theme', 'factory-reset-v\d+\.\d+\.\d+'\)/", $baseline), 'Default active_theme seed is missing.');
 $need(str_contains($baseline,'CREATE TABLE theme_registry'),'Rebuildable theme metadata registry is missing.');
 $need(str_contains($baseline,'CREATE TABLE permissions') && str_contains($baseline,'CREATE TABLE role_permissions'),'ACL schema is missing.');
 $auditStart = strpos($baseline, 'CREATE TABLE audit_log');

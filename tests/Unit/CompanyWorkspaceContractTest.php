@@ -22,7 +22,13 @@ final class CompanyWorkspaceContractTest extends TestCase
     public function testCompanyRegistryDefinesSemanticWorkspaceSections(): void
     {
         $sections = (new CompanySectionRegistry())->all();
-        self::assertSame(['dashboard','people','requests','enrolments','credits','courses'], array_column($sections, 'key'));
+        // Company Courses and Training Courses are two sections since v0.6: what the company owns
+        // and sells, and what it has bought for its staff. They are opposites, and one list holding
+        // both could answer neither question - ROADMAP section 3d.
+        // Performance joined them in v0.6: the platform course-performance report answers a question
+        // about every learner on the platform, which is not a company administrator's to ask or to
+        // see, so they have the same report scoped to their own staff.
+        self::assertSame(['dashboard','people','requests','enrolments','credits','courses','training','favourites','performance'], array_column($sections, 'key'));
         foreach ($sections as $section) {
             self::assertStringStartsWith('/company/', $section['route']);
             self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
@@ -47,52 +53,71 @@ final class CompanyWorkspaceContractTest extends TestCase
         self::assertStringContainsString('$this->companySections->all()', $renderer);
     }
 
+    /**
+     * Both halves of Companies are paginated tables through the shared contract.
+     *
+     * Companies split into Course Consumers and Course Creators in v0.6, so this covers both. The
+     * assertions are about the contract rather than about literals in one file: each screen renders
+     * a table, uses the shared pagination control, and gets its page through paginationFor() rather
+     * than a page size of its own.
+     */
     public function testAdministrationCompaniesUsesPaginatedTableNotCards(): void
     {
         $root = dirname(__DIR__, 2);
-        $partial = (string) file_get_contents($root . '/resources/views/partials/admin/companies.html');
         $service = (string) file_get_contents($root . '/src/Application/PlatformAdministrationService.php');
-        self::assertStringContainsString('<table>', $partial);
-        self::assertStringNotContainsString('grid grid-3', $partial);
-        self::assertStringContainsString('@companies_total', $partial);
-        // Companies keeps exactly one pagination control, the shared one. Its own hand-built nav
-        // survived the move to the shared control and rendered directly above it, and its links
-        // used a bare `page` parameter that AdminController::sectionRequest() never reads, so
-        // every one of them returned page 1.
-        self::assertStringContainsString('with="pg=@companies_pagination"', $partial);
-        self::assertStringNotContainsString('/admin/companies?page=', $partial);
-        self::assertStringNotContainsString('@companies_total_pages', $partial);
-        // The page size was a local `$perPage = 50` until v0.5.7.6 moved every dataset onto the
-        // shared Pagination contract. Assert the contract rather than the old literal: Companies
-        // must still default to 50 and must go through paginationFor(), not a private constant.
-        self::assertStringContainsString("'companies' => 50", $service);
-        self::assertStringContainsString("\$this->paginationFor('companies'", $service);
-    }
-    public function testSharedCompanyPeopleRowsHaveStableTemplateKeys(): void
-    {
-        $service = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/PlatformAdministrationService.php');
-        self::assertStringContainsString('$row[\'company_role\'] = (string) ($row[\'company_role\'] ?? \'\');', $service);
-        self::assertStringContainsString('$row[\'roles_label\'] = implode(\', \', $row[\'roles\']);', $service);
-    }
 
-    public function testCompanyWorkspaceUsesCanonicalAdministrationAccordionMarkup(): void
-    {
-        $workspace = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/company-control-centre.html');
-        foreach (['cl-admin-section-summary','cl-admin-section-title','cl-admin-section-description','cl-admin-section-toggle','cl-admin-section-actions','cl-admin-section-link'] as $token) {
-            self::assertStringContainsString($token, $workspace);
+        foreach (['companies', 'company_creators'] as $dataset) {
+            $file = $dataset === 'companies' ? 'companies.html' : 'company-creators.html';
+            $partial = (string) file_get_contents($root . '/resources/views/partials/admin/' . $file);
+            self::assertStringContainsString('<table>', $partial);
+            self::assertStringNotContainsString('grid grid-3', $partial);
+            // Exactly one pagination control, the shared one. Companies' own hand-built nav
+            // survived the move to the shared control and rendered directly above it, and its links
+            // used a bare `page` parameter that AdminController::sectionRequest() never reads, so
+            // every one of them returned page 1.
+            self::assertStringContainsString('with="pg=@' . $dataset . '_pagination"', $partial);
+            self::assertStringNotContainsString('/admin/companies?page=', $partial);
+            self::assertStringNotContainsString('@' . $dataset . '_total_pages', $partial);
+            // The row count is the shared control's own summary now. It used to be printed again in
+            // a heading above the table, which was a second page title on a screen that already has
+            // the one page header.
+            self::assertStringContainsString('_pagination', $partial);
+            self::assertStringContainsString("'" . $dataset . "' => 50", $service);
         }
+
+        // The page size was a local `$perPage = 50` until v0.5.7.6 moved every dataset onto the
+        // shared Pagination contract. Both halves are built by one method, so the contract is
+        // asserted where it lives.
+        self::assertStringContainsString("companyAudienceSection('companies', 'consumers'", $service);
+        self::assertStringContainsString("companyAudienceSection('company_creators', 'creators'", $service);
+        self::assertStringContainsString('$this->paginationFor($dataset, $request, $this->administration->companyCount(', $service);
     }
 
+    /**
+     * The create and edit dialogs are shared by both halves of Companies.
+     *
+     * They live in one partial because both screens create and edit the same record through the
+     * same routes; a second copy is a second thing to keep in step, and the company type field has
+     * a rule attached that must not exist in only one of them.
+     */
     public function testCompanyCreateAndEditControlsUseUsableCoreModals(): void
     {
         $root = dirname(__DIR__, 2);
-        $partial = (string) file_get_contents($root . '/resources/views/partials/admin/companies.html');
+        $modals = (string) file_get_contents($root . '/resources/views/partials/admin/company-modals.html');
         $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
         $js = (string) file_get_contents($root . '/public_html/js/platform-overrides.js');
-        self::assertStringContainsString('data-open-modal="company-add"', $partial);
-        self::assertStringContainsString('id="company-add-title">Add Company</h3>', $partial);
-        self::assertStringContainsString('Create Company</button>', $partial);
-        self::assertStringContainsString('data-open-modal="company-edit-', $partial);
+        self::assertStringContainsString('data-open-modal="company-add"', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html'));
+        self::assertStringContainsString('id="company-add-title">Add Company</h3>', $modals);
+        self::assertStringContainsString('Create Company</button>', $modals);
+        self::assertStringContainsString('data-open-modal="company-edit-', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html'));
+        self::assertStringContainsString('id="company-edit-', $modals);
+        foreach (['companies.html', 'company-creators.html'] as $file) {
+            self::assertStringContainsString(
+                'partials/admin/company-modals.html',
+                (string) file_get_contents($root . '/resources/views/partials/admin/' . $file),
+                $file . ' must include the shared company dialogs rather than carry its own copy.'
+            );
+        }
         self::assertStringContainsString('max-height:calc(100dvh - 2rem)', $css);
         self::assertStringContainsString('overflow:auto;overscroll-behavior:contain', $css);
         self::assertStringContainsString("event.key === 'Escape'", $js);

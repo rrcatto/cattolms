@@ -29,6 +29,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseService;
 
 use CattoLearning\View\ThemeRenderer;
@@ -60,7 +61,7 @@ final class HomeController extends BaseController
         $this->render('home', [
             'title' => 'Practical self-study courses',
             'featured_courses' => $this->courses->featuredCourses($this->universe(), 6),
-            'published_course_count' => $this->courses->catalogueCount($this->universe()),
+            'published_course_count' => $this->courses->catalogueCount($this->universe(), CatalogueFilter::none()),
         ]);
     }
 

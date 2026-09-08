@@ -1,9 +1,9 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.5.8.3  
-**Date time:** 2026/09/03 05:40 SAST  
+**Current approved LMS version:** 0.5.8.3 (VPS) · 0.6 published, not deployed  
+**Date time:** 2026/09/06 14:00 SAST  
 **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
-**Current phase:** TEST/DEV; simplified ACL foundation and Seed Database implemented, Commerce after seed acceptance
+**Current phase:** TEST/DEV; v0.6 rebases the schema onto one canonical baseline and adds the course taxonomy, so it is a reset-required install rather than an upgrade from 0.5.8.3
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -145,7 +145,29 @@ Two further rules govern what happens after generation:
 - **A new row's universe comes from the resource it belongs to, never from the identity that created it.** A genuine `ADMIN` operating on a generated aggregate writes a SEED business row and remains the recorded actor on it. Only the explicit actor/audit allowlist may name a REAL identity from a SEED row; ownership, membership, subject and learner references may not.
 - **Course import and export are REAL-only.** A generated course cannot be exported and a seed identity cannot import, so generated content cannot be laundered into the genuine universe through a portable package.
 
-All of this is implemented: `seed_token` on 31 application tables, the two metadata tables, generation, cleanup, query isolation, the PostgreSQL constraint triggers, and the visible genuine-`ADMIN` All / Real / Seed control.
+### What is not in a universe: labels
+
+**A category and a tag classify a course; they do not describe a person, a company or a
+transaction.** They are shared vocabulary, exactly as `roles` and `permissions` already are — a
+generated identity holds `SEED_STUDENT` from the same `roles` table a genuine identity holds
+`STUDENT` from — and they carry no `seed_token`.
+
+`course_categories` was seed-aware until v0.6. It should not have been: owner decision D3 approved
+the table inventory in bulk with two named changes, and categories were never considered
+individually. The cost showed in two places. A generated course could only sit in a generated
+category, so seed data could never exercise the real taxonomy and browsing a category would never
+show the volume that had been generated to test it; and generated category names had to carry a set
+suffix to avoid colliding with the genuine ones, which is the kind of appended nonsense the naming
+rules forbid everywhere else. `tags` and `course_tags` were built universe-free from the start.
+
+**The label is shared; what is counted under it is not.** Per-category counts, browse listings, tag
+weights and the administration distribution charts are all filtered by the reader's data universe. A
+category page reporting a thousand courses when three of them are genuine would be a universe leak
+in a new costume, and it is the specific mistake this exception makes possible.
+
+All of this is implemented: `seed_token` on 30 application tables, the two metadata tables,
+generation, cleanup, query isolation, the PostgreSQL constraint triggers, and the visible
+genuine-`ADMIN` All / Real / Seed control.
 
 ## 6. Core-owned workspaces and navigation
 
@@ -153,9 +175,12 @@ Core owns routes, permission filtering, data loading, forms, business controls a
 
 Canonical consolidated workspaces:
 
-- `/admin` — Dashboard, Courses, People, Companies, Enrolments & Requests, Credits & Orders, Activity, Reports, Themes, Roles & ACL, Settings.
+- `/admin` — Dashboard, Courses, People, Course Consumers, Course Creators, Course Requests,
+  Enrolments, Credits, Activity, Course Performance, Company Enrolments, Themes, Roles & ACL,
+  Seed Database, Settings.
 - `/account` — Dashboard, Profile, My Learning, Sessions, Activity.
-- `/company` — Dashboard, People, Course Requests, Learning, Course Credits, Courses.
+- `/company` — Dashboard, People, Course Requests, Enrolments, Performance, Courses Created,
+  Favourites, Courses Bought, Credits.
 
 Every top-level section also has a semantic standalone route. Do not reintroduce `/admin?tab=...` as a section-selection contract.
 

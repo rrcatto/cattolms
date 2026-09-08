@@ -10,6 +10,10 @@ Description:
 Defines the canonical Catto Learning ACL permission catalogue. Business permissions describe capabilities once; REAL/SEED data visibility is a separate identity/query concern. SYSTEM.* remains reserved for platform infrastructure.
 
 Changelog:
+
+2026/09/07 00:50 SAST
+
+- Reserved COURSE.TAG.MANAGE. Tags and categories are separate decisions and may be separately delegated.
 2026/08/23 04:19 SAST
 - Decision D5: stopped withholding COURSE.MEDIA.MANAGE from seed roles; course portability remains REAL-only.
 2026/08/20 04:20 SAST
@@ -102,6 +106,7 @@ final class PermissionCatalog
             $this->p('COURSE.PUBLICATION.REQUEST', 'RequestCoursePublication', 'Courses', 'Submit a course for publication approval.'),
             $this->p('COURSE.PUBLISH', 'PublishCourse', 'Courses', 'Approve or change course publication state.'),
             $this->p('COURSE.CATEGORY.MANAGE', 'ManageCourseCategories', 'Courses', 'Create, edit, move and delete course categories.'),
+            $this->p('COURSE.TAG.MANAGE', 'ManageCourseTags', 'Courses', 'Create, edit, activate and delete course tags.'),
             $this->p('COURSE.PRICING.MANAGE', 'ManageCoursePricing', 'Courses', 'Manage course price and access variants.'),
             $this->p('COURSE.OWNERSHIP.MANAGE', 'ManageCourseOwnership', 'Courses', 'Assign owner company/person and course editors within scope.'),
             $this->p('COURSE.MEDIA.MANAGE', 'ManageCourseMedia', 'Courses', 'Upload and maintain private course media.'),

@@ -67,6 +67,11 @@ final class SeedAwareMailer implements MailerInterface
         $this->mailer->sendCourseRequestDecision($this->router->deliveryAddress($email), $courseTitle, $approved);
     }
 
+    public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void
+    {
+        $this->mailer->sendCourseEnrolmentNotice($this->router->deliveryAddress($email), $courseTitle, $courseSlug);
+    }
+
     /**
      * The contact form's address identifies who wrote in, and the message goes to the platform.
      * Rewriting it would corrupt the reply-to of a genuine enquiry.

@@ -58,12 +58,16 @@ Changelog:
 	<div id="course_report-region" data-server-search-target>
 	<div id="course_report-results">
 
+	<check if="{{ @course_report_pagination }}">
+		<include href="partials/pagination.html" with="pg=@course_report_pagination" />
+	</check>
+
 		<check if="{{ @course_report }}">
 			<true>
 				<div class="table-wrap">
 					<table>
 						<thead>
-							<tr><th>Course</th><th>Status</th><th>Enrolments</th><th>Started</th><th>Completed</th><th>Completion</th><th>Average result</th></tr>
+							<tr><repeat group="{{ @course_report_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@course_report_region,sort_results=@course_report_results" /></repeat></tr>
 						</thead>
 						<tbody>
 							<repeat group="{{ @course_report }}" value="{{ @row }}">
@@ -84,49 +88,6 @@ Changelog:
 				<include href="partials/pagination.html" with="pg=@course_report_pagination" />
 			</true>
 			<false><div class="empty">No courses match this search.</div></false>
-		</check>
-
-	</div>
-	</div>
-</div>
-
-<div class="card section admin-wide-card">
-	<div class="section-head">
-		<div>
-			<h2>Company Enrolments</h2>
-			<p>Learner and completion figures by organisation.</p>
-		</div>
-	</div>
-
-	<include href="partials/dataset-search.html" with="ds_name='company_report',ds_label='Search companies',ds_value=@company_report_search,ds_action='/admin/reports'" />
-
-	<div id="company_report-region" data-server-search-target>
-	<div id="company_report-results">
-
-		<check if="{{ @company_report }}">
-			<true>
-				<div class="table-wrap">
-					<table>
-						<thead>
-							<tr><th>Company</th><th>People</th><th>Enrolments</th><th>Completed</th><th>Completion</th></tr>
-						</thead>
-						<tbody>
-							<repeat group="{{ @company_report }}" value="{{ @row }}">
-								<tr>
-									<td><strong>{{ @row.name }}</strong></td>
-									<td>{{ @row.people }}</td>
-									<td>{{ @row.enrolments }}</td>
-									<td>{{ @row.completed }}</td>
-									<td>{{ @row.completion_rate }}%</td>
-								</tr>
-							</repeat>
-						</tbody>
-					</table>
-				</div>
-
-				<include href="partials/pagination.html" with="pg=@company_report_pagination" />
-			</true>
-			<false><div class="empty">No companies match this search.</div></false>
 		</check>
 
 	</div>

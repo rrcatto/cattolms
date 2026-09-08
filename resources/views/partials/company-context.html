@@ -30,6 +30,12 @@ Description:
   remainder onto the page. Keep every comment plain prose: no angle brackets, no comment
   delimiters, no template tokens and no code, not even to document one.
 Changelog:
+  2026/09/07 19:45 SAST
+  - Dropped the section-head class. This is the administering-company banner, not the page's
+    heading - the page header partial is - and carrying a heading class meant every theme's
+    page-heading treatment landed on it. Gilded Noir styles the first section-head of a company
+    page as a dark serpent panel, so the identical banner rendered dark on a standalone section and
+    light on the workspace, purely because of where it sat in the markup.
 	2026/09/03 03:18 SAST
 	- Fixed the ALL-universe SQL error on Administration Courses search, the undefined universe 500 on Account routes, and rebuilt the Switch Company picker on the shared search, the shared pagination and the standard universe query parameter.
   2026/08/29 21:05 SAST
@@ -39,7 +45,7 @@ Changelog:
   - Created for the v0.5.8.3 Stage D Platform ADMIN selected-company context.
 -->
 <check if="{{ @can_select_company }}">
-	<div class="section-head company-context" data-company-context="{{ @company_context_mode }}">
+	<div class="company-context" data-company-context="{{ @company_context_mode }}">
 		<div>
 			<h2>{{ @company_context_name }}</h2>
 			<p>Administering this company. Every action on this page applies to it.</p>

@@ -45,7 +45,11 @@ final class AdministrationSectionContractTest extends TestCase
     {
         $sections = (new AdministrationSectionRegistry())->all();
         self::assertSame(
-            ['dashboard','courses','people','companies','enrolments','credits','activity','reports','themes','roles','seed','settings'],
+            // Requests and Enrolments are two sections since v0.6, each with its own route: they had
+            // shared /admin/course/enrolments behind in-page tab buttons, so neither could be linked to,
+            // bookmarked or reloaded on its own. Companies and Reports split for the same reason plus
+            // one more: each half asks a different question and carried the other's empty columns.
+            ['dashboard','courses','people','companies','company_creators','requests','enrolments','credits','activity','reports','company_report','themes','roles','seed','settings'],
             array_column($sections, 'key')
         );
         foreach ($sections as $section) {
@@ -98,7 +102,11 @@ final class AdministrationSectionContractTest extends TestCase
         self::assertStringContainsString('<details class="acl-group">', $roleEdit);
         self::assertStringContainsString('class="acl-group-summary"', $roleEdit);
         self::assertStringContainsString('class="acl-permission-table"', $roleEdit);
-        self::assertStringContainsString('<th>Assign</th><th>Permission</th><th>Internal key</th><th>Description</th>', $roleEdit);
+        // The four columns, each now declaring its share of the width: the description is the only
+        // one carrying prose and was being given a quarter of the table like the checkbox beside it.
+        foreach (['>Assign</th>', '>Permission</th>', '>Internal key</th>', '>Description</th>'] as $column) {
+            self::assertStringContainsString($column, $roleEdit);
+        }
         self::assertStringContainsString('name="permissions[]"', $roleEdit);
         self::assertStringNotContainsString('class="acl-grid"', $roleEdit);
         self::assertStringNotContainsString('<fieldset class="card acl-group">', $roleEdit);
@@ -171,6 +179,32 @@ final class AdministrationSectionContractTest extends TestCase
                 self::assertStringNotContainsString('/admin?tab=', $source, $file->getPathname());
                 self::assertStringNotContainsString('data-admin-tab', $source, $file->getPathname());
             }
+        }
+    }
+
+    /**
+     * Every section that gates its content on a capability is given that capability.
+     *
+     * The Requests section shipped for about ten minutes rendering an empty screen: the section was
+     * registered, routed and rendering, and `sectionCapabilities()` still recognised only the old
+     * combined key, so it received an empty capability set and its own guard closed. Nothing
+     * errored, the page returned 200, and the table was simply absent.
+     */
+    public function testEverySectionGuardIsGivenItsCapability(): void
+    {
+        $service = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/PlatformAdministrationService.php');
+        $controller = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/AdminController.php');
+
+        preg_match_all("/empty\(\\\$capabilities\['([a-z_]+)'\]\)/", $service, $matches);
+        $guards = array_values(array_unique($matches[1]));
+
+        self::assertNotSame([], $guards, 'The scan found no capability guards, so it is proving nothing.');
+        foreach ($guards as $capability) {
+            self::assertStringContainsString(
+                "'" . $capability . "' =>",
+                $controller,
+                'sectionData() gates on ' . $capability . ' and sectionCapabilities() never supplies it.'
+            );
         }
     }
 }

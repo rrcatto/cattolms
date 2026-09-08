@@ -70,11 +70,11 @@ final class AdminCourseController extends BaseController
 
     public function createForm(): void
     {
-        $this->requirePermission('COURSE.CREATE');
+        $user = $this->requirePermission('COURSE.CREATE');
         $this->render('admin-course-form', [
             'title' => 'Create course',
             'course' => $this->blankCourse(),
-            'categories' => $this->courses->categories(true),
+            'categories' => $this->courses->categories($this->universe($user), true),
             'form_action' => '/admin/courses',
             'form_heading' => 'Create a new course',
             'load_ckeditor' => true,
@@ -112,7 +112,7 @@ final class AdminCourseController extends BaseController
             unset($person);
             $companies = (array) ($companyData['companies'] ?? []);
         }
-        $categoryOptions = $this->courses->categories(true);
+        $categoryOptions = $this->courses->categories($this->universe($user), true);
         $currentCategoryId = (int) ($course['category_id'] ?? 0);
         if ($currentCategoryId > 0 && !array_filter($categoryOptions, static fn(array $category): bool => (int) $category['id'] === $currentCategoryId)) {
             $categoryOptions[] = $this->courses->category($currentCategoryId);
@@ -577,10 +577,10 @@ final class AdminCourseController extends BaseController
 
     public function importForm(): void
     {
-        $this->requirePermission('COURSE.IMPORT');
+        $user = $this->requirePermission('COURSE.IMPORT');
         $this->render('admin-course-import', [
             'title' => 'Import an HTML or JSON course',
-            'categories' => $this->courses->categories(true),
+            'categories' => $this->courses->categories($this->universe($user), true),
         ]);
     }
 
@@ -662,7 +662,7 @@ final class AdminCourseController extends BaseController
             $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
-                'categories' => $this->courses->categories(true),
+                'categories' => $this->courses->categories($this->universe($user), true),
                 'replaceable_courses' => $replaceable,
             ]);
         }, '/admin/courses/import');

@@ -40,6 +40,7 @@ use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\ClientFingerprint;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
+use CattoLearning\Support\PersonName;
 use CattoLearning\Support\Token;
 use RuntimeException;
 
@@ -290,8 +291,15 @@ final class AuthService
     /** @return array<string,mixed> */
     public function profile(int $userId): array
     {
-        return $this->users->profile($userId)
+        $profile = $this->users->profile($userId)
             ?? throw new RuntimeException('The user account does not exist.');
+
+        // The person's whole name, composed once rather than assembled in the markup of each screen
+        // that shows one - which is how the profile header came to print the first and last name
+        // only, to a reader who had just typed their middle names into the form below it.
+        $profile['full_name'] = PersonName::full($profile);
+
+        return $profile;
     }
 
     /** @param array<string,mixed> $data */

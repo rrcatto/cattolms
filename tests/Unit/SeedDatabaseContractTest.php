@@ -16,6 +16,8 @@ and that the section template renders in each of its three states. The behaviour
 needs PostgreSQL - generation, isolation and cleanup - belongs in the Integration suite.
 
 Changelog:
+2026/09/06 18:40 SAST
+- Covered the seed set detail screen: the history list opens it, it renders for an intact and a cleaned set, and a malformed token is rejected before it reaches the UUID column.
 
 2026/08/25 08:14 SAST
 
@@ -170,6 +172,7 @@ final class SeedDatabaseContractTest extends TestCase
 
         foreach ([
             "GET /admin/seed', AdminSeedController::class, 'index'",
+            "GET /admin/seed/@token', AdminSeedController::class, 'detail'",
             "POST /admin/seed/generate', AdminSeedController::class, 'generate'",
             "GET /admin/seed/@token/cleanup', AdminSeedController::class, 'cleanupPreview'",
             "POST /admin/seed/@token/cleanup', AdminSeedController::class, 'cleanup'",
@@ -223,6 +226,81 @@ final class SeedDatabaseContractTest extends TestCase
         // rather than the source text, because the source legitimately mentions the column name
         // in prose explaining why it does not exist.
         self::assertStringNotContainsString('remaining_record_count', \CattoLearning\Seed\SeedSchema::metadataTablesSql());
+    }
+
+    /**
+     * The per-table breakdown is reachable, and reachable from the set it describes.
+     *
+     * Generation has always recorded what it wrote into each table, and for three releases nothing
+     * displayed it: the history list showed two whole-set totals and the detail behind them stayed
+     * in seed_data_tables. A set that came out smaller than requested gave no way to see which
+     * tables were short.
+     */
+    public function testASeedSetOpensItsPerTableBreakdown(): void
+    {
+        $list = self::read('resources/views/partials/admin/seed.html');
+        self::assertStringContainsString(
+            'href="/admin/seed/{{ @seed_set.seed_token }}"',
+            $list,
+            'The token in the history list must open the set it names.'
+        );
+
+        self::assertFileExists(self::root() . '/resources/views/pages/admin-seed-set.html');
+        self::assertStringContainsString(
+            'public function setTableBreakdown(',
+            self::read('src/Infrastructure/Persistence/SeedRepository.php')
+        );
+
+        $page = self::read('resources/views/pages/admin-seed-set.html');
+        foreach (['@seed_row.table', '@seed_row.initial', '@seed_row.current', '@seed_row.removed'] as $token) {
+            self::assertStringContainsString($token, $page, 'The breakdown must show ' . $token . '.');
+        }
+    }
+
+    /** The detail page renders whether the set is intact or has been cleaned up. */
+    public function testSeedSetDetailRendersForAnIntactAndACleanedSet(): void
+    {
+        $base = [
+            'csrf' => 'token',
+            'can_manage_seed' => true,
+            'seed_breakdown' => [
+                ['table' => 'users', 'initial' => 7500, 'current' => 7500, 'removed' => 0],
+                ['table' => 'courses', 'initial' => 1000, 'current' => 0, 'removed' => 1000],
+            ],
+            'seed_totals' => ['initial' => 8500, 'current' => 7500],
+        ];
+        $set = [
+            'seed_token' => '01a07457-8485-798c-ab54-f49814b9bbff',
+            'description' => 'Development test data',
+            'requested_volume' => 100000,
+            'generation_seconds' => '22.282',
+            'created_at' => '2026-09-06 03:31:50',
+            'cleaned_at' => null,
+        ];
+
+        foreach ([
+            'intact set' => $base + ['seed_set' => $set],
+            'cleaned set' => $base + ['seed_set' => ['cleaned_at' => '2026-09-06 04:00:00'] + $set],
+            'set with no description' => $base + ['seed_set' => ['description' => ''] + $set],
+        ] as $name => $hive) {
+            self::assertNull(self::renderError('pages/admin-seed-set.html', $hive), $name . ' failed to render.');
+        }
+    }
+
+    /**
+     * A token arrives from a route parameter, and seed_token is a UUID column, so PostgreSQL casts
+     * rather than compares. An unparseable token therefore failed inside the database and put
+     * SQLSTATE[22P02] in front of the reader instead of "no such record".
+     */
+    public function testAMalformedTokenNeverReachesTheDatabase(): void
+    {
+        $repository = self::read('src/Infrastructure/Persistence/SeedRepository.php');
+        $lookup = strpos($repository, 'public function findSet(');
+        self::assertIsInt($lookup);
+
+        $body = substr($repository, $lookup, strpos($repository, 'WHERE seed_token = :token::uuid', $lookup) - $lookup);
+        self::assertStringContainsString('Uuid::isValid($token)', $body, 'findSet must reject a non-UUID before querying.');
+        self::assertStringContainsString('return null;', $body);
     }
 
     /** The section renders in each of its three states. */

@@ -19,6 +19,10 @@ Architectural boundary: persistence only. Permission checks and HTML rendering b
 controller and the view; this class never decides who may search, only what a search matches.
 
 Changelog:
+
+2026/09/07 23:45 SAST
+
+- assignable_courses: what this company may put somebody on right now - owned, or holding a credit with a free seat.
 2026/08/23 04:19 SAST
 - Scoped every lookup and describe query to the caller's data universe. Unscoped, a REAL administration form offered SEED people, companies and courses for selection, and choosing one would have created exactly the cross-universe reference the database now rejects.
 2026/08/21 01:00 SAST
@@ -46,7 +50,7 @@ final class EntityLookupRepository
     public const MAX_QUERY_LENGTH = 120;
 
     /** The only entity types that may be searched. Anything else is rejected by the caller. */
-    public const TYPES = ['people', 'companies', 'courses'];
+    public const TYPES = ['people', 'companies', 'courses', 'assignable_courses'];
 
     public function __construct(private readonly SQL $db)
     {
@@ -78,6 +82,7 @@ final class EntityLookupRepository
             'people' => $this->searchPeople($term, $companyId, $universe),
             'companies' => $this->searchCompanies($term, $universe),
             'courses' => $this->searchCourses($term, $companyId, $universe),
+            'assignable_courses' => $this->searchAssignableCourses($term, $companyId, $universe),
             default => [],
         };
     }
@@ -171,6 +176,49 @@ final class EntityLookupRepository
                AND (c.title ILIKE :term OR c.slug ILIKE :term)' . self::andScope($universe, 'c') . '
              ORDER BY c.title, c.id
              LIMIT ' . self::MAX_RESULTS,
+            [':term' => $term, ':company_id' => $companyId]
+        ));
+    }
+
+    /**
+     * The courses a company may put a staff member on right now.
+     *
+     * Two things qualify and they qualify for different reasons. A course the company **owns** costs
+     * nothing to train its own staff on - ownership is the entitlement. A course it does not own
+     * qualifies only while it holds a credit with a **free seat**: a credit that is fully allocated
+     * buys nothing more, and offering it would produce an assignment that fails at the last step.
+     *
+     * A company with no company id selected gets nothing rather than everything. This lookup answers
+     * "what may *this* company assign", and with no company that question has no answer - returning
+     * the platform catalogue would be the Stage D defect in a new place.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function searchAssignableCourses(string $term, int $companyId, DataUniverse $universe): array
+    {
+        if ($companyId <= 0) {
+            return [];
+        }
+
+        return $this->rows($this->db->exec(
+            "SELECT c.id, c.title AS label,
+                    CASE WHEN c.owner_company_id = :company_id THEN 'Owned - free for staff'
+                         ELSE 'Seats available' END AS detail
+             FROM courses c
+             WHERE (c.title ILIKE :term OR c.slug ILIKE :term)
+               AND (
+                    c.owner_company_id = :company_id
+                    OR EXISTS (
+                        SELECT 1 FROM course_credits cr
+                         WHERE cr.course_id = c.id AND cr.company_id = :company_id
+                           AND cr.quantity > (
+                                SELECT COUNT(*) FROM course_credit_allocations cca
+                                 WHERE cca.credit_id = cr.id AND cca.status IN ('assigned','consumed')
+                           )
+                    )
+               )" . self::andScope($universe, 'c') . "
+             ORDER BY c.title, c.id
+             LIMIT " . self::MAX_RESULTS,
             [':term' => $term, ':company_id' => $companyId]
         ));
     }

@@ -19,6 +19,10 @@ Description:
   remainder onto the page. Keep every comment plain prose: no angle brackets, no comment
   delimiters, no template tokens and no code, not even to document one.
 Changelog:
+  2026/09/07 17:00 SAST
+  - The page header sits above the section wrapper rather than inside it. Inside, the wrapper's own top padding pushed the header down the page, which is why only the Company routes showed a band of white space above their heading.
+  2026/09/07 15:10 SAST
+  - Uses the shared page header rather than a heading block of its own.
   2026/08/29 14:32 SAST
   - Added the required file metadata header and reindented with tabs; the entire file was
     previously a single unreadable line.
@@ -26,16 +30,10 @@ Changelog:
   - Stage D: included the selected-company control so the administering company can be changed
     from a standalone section page.
 -->
-<section class="cl-company-section">
-	<div class="section-head">
-		<div>
-			<div class="eyebrow">Company</div>
-			<h1>{{ @company_section.label }}</h1>
-			<p>{{ @company_section.description }}</p>
-		</div>
-		<a class="btn btn-soft btn-sm" href="/company">All company sections</a>
-	</div>
+<set ph_kicker="Company" ph_title="{{ @company_section.label }}" ph_lead="{{ @company_section.description }}" ph_action_href="/company" ph_action_label="All company sections" />
+<include href="partials/page-head.html" />
 
+<section class="cl-company-section">
 	<include href="partials/company-context.html" />
 
 	<!--

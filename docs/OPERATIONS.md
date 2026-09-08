@@ -1,9 +1,29 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.5.8.3  
-**Date time:** 2026/09/03 05:40 SAST  
+**LMS:** 0.6 (in development; 0.5.8.3 is the accepted VPS version)  
+**Date time:** 2026/09/06 14:00 SAST  
 **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
 **Environment:** disposable TEST/DEV until explicitly declared production
+
+## v0.6 is a reset, not an upgrade
+
+**There is no migration path from 0.5.8.3 to v0.6.** v0.6 collapses the 0.5.8 baseline and the five
+migrations that followed it into one canonical baseline, which is a schema rebase — the same
+situation 0.5.7.5.1 was in, and the reason `validate-release.php` forbids rebasing by default.
+Installing v0.6 means the full install/reset path below, and the database is discarded.
+
+That is acceptable only while the database is disposable TEST/DEV state. Once production is
+declared it stops being an option, and any change of this shape needs a real migration instead.
+
+Two v0.6 install steps that did not exist before:
+
+- `composer seeds:publish` copies the bundled name lists into `storage/seeds/`, where the Seed
+  Database reads them and the operator edits them. It never overwrites a file the instance already
+  has, so an upgrade that adds two hundred surnames leaves an edited list alone. It runs as part of
+  `composer smoke:install`.
+- Course categories and tags are no longer generated per seed set. They are universe-free labels
+  installed by the baseline and managed in Administration, so a seed set files its generated courses
+  under the same taxonomy a genuine course uses.
 
 ## Upgrading 0.5.7.6 to 0.5.8
 
@@ -123,7 +143,69 @@ tools/validate-ui-contracts.php
 tools/validate-release.php
 ```
 
+Development instruments, run by hand and never part of the gate:
+
+```text
+tools/seed-benchmark-dataset.php
+tools/benchmark-pagination.php
+```
+
 Artifact-generation environments without the VPS PHP/Composer/PostgreSQL may run syntax/static validators but must not claim the VPS QA gate passed.
+
+## Pagination benchmark (v0.6)
+
+Pagination 2.0 is measured rather than assumed, and the two tools that do it are development
+instruments only — both refuse to run unless `APP_ENV=development`.
+
+The Seed Database generates a *realistic* graph: a volume of 100,000 is a budget of 100,000 rows
+spread across roughly thirty tables, so it produces about 1,300 people and 2,500 enrolments. That is
+right for exercising the interface and useless for measuring pagination, because a list of 1,300
+rows is fast however it is written. `seed-benchmark-dataset.php` writes the opposite shape: one
+hundred thousand rows in each of the tables the paginated lists actually read, and nothing
+underneath them.
+
+```bash
+catto 'php tools/seed-benchmark-dataset.php'          # ~920,000 rows, about 2.5 minutes
+catto 'php tools/benchmark-pagination.php --runs=3'   # every list at page 1, the middle and the last
+catto 'php tools/seed-benchmark-dataset.php --list'   # the seed batches present
+catto 'php tools/seed-benchmark-dataset.php --remove=<token>'
+```
+
+The batch is ordinary SEED data registered in `seed_data`, so Administration → Seed Database cleans
+it up like any other set; `--remove` is the same operation from the command line.
+
+`composer qa` passes with the batch loaded — 580 tests in about four and a half minutes rather than
+the usual one — but it is close to Composer's 300-second per-script process timeout, so a slower
+machine may need `COMPOSER_PROCESS_TIMEOUT=0 composer qa`. That is a timeout, not a failure. Before
+the v0.6 foreign-key indexes the same suite took eight minutes and could not finish inside it at
+all.
+
+Read the benchmark output as relative rather than absolute; a development container shares a
+machine. What matters is the shape: a healthy list costs roughly the same on its last page as on its
+first. A list whose deepest page costs seconds is the signal to look at. In v0.6 that signal found
+the Companies cartesian aggregate, the Activity metadata lookups, a course sub-select the planner
+was answering by scanning a partial index end to end, and thirty-four unindexed foreign keys.
+
+The v0.6 baseline, at 100,000 rows in every paginated table, page size 25, median of three runs:
+
+```text
+dataset                        rows   count ms     page 1     middle       last
+admin people                 100000       31.6        4.0      124.0      101.1
+admin companies              100002        6.8       32.4        6.9       11.7
+admin enrolments             100000       72.8        3.4      105.1      166.8
+admin requests               100000       68.2        3.8      105.8      109.9
+admin credits                100000       57.2        3.8       81.7      114.0
+admin activity               100000        7.3        3.6       13.5       23.2
+admin courses                 20000        1.7        7.3        3.8        4.7
+course report                 20000        1.5       17.1        2.4        3.8
+company report               100002       14.1       46.4       11.8       25.0
+public catalogue              13334        1.7        1.5        2.3        2.9
+company people                20000       30.1        3.9       53.6       52.5
+```
+
+A number several times these is worth investigating; the same number is not, because the machine
+underneath is shared. The one list that grows with depth is Administration People, and that is the
+OFFSET walk itself rather than a defect: reaching row 100,000 means passing the 99,999 before it.
 
 ## ACL verification after reset
 
@@ -234,7 +316,7 @@ seeded table, not a per-table quota, and lands within about 1% of the request fr
 Generation runs in one transaction, so a failure rolls the whole set back and leaves nothing
 behind. Start at 1,000 to confirm the graph looks right, then scale to 25,000 and beyond.
 
-**What a set contains.** People with `SEED_*` roles, companies, categories, courses with modules,
+**What a set contains.** People with `SEED_*` roles, companies, courses with modules,
 content blocks, assessments, questions and options, grade bands, price variants, editors,
 enrolments with progress, attempts, responses, sessions, results, certificates, favourites,
 requests, credits, allocations, edit history and audit activity — 29 tables.

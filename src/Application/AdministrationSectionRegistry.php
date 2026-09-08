@@ -11,6 +11,10 @@ Description:
 Defines the presentation-neutral Platform Administration section catalogue shared by the consolidated Administration workspace, standalone section routes and Theme API.
 
 Changelog:
+
+2026/09/07 14:00 SAST
+
+- Course Requests became its own section with its own route; Enrolments is enrolments alone.
 2026/08/23 04:19 SAST
 - Registered the Seed Database section so it appears in the consolidated workspace and gets a semantic standalone route like every other section.
 2026/08/17 21:20 SAST
@@ -41,11 +45,14 @@ final class AdministrationSectionRegistry
             $this->section('dashboard', 'Dashboard', 'dashboard', '/admin/dashboard', 'partials/admin/dashboard.html', 'Platform health, priorities and recent activity.'),
             $this->section('courses', 'Courses', 'courses', '/admin/courses', 'partials/admin/courses.html', 'Create, import, review and maintain courses.'),
             $this->section('people', 'People', 'people', '/admin/people', 'partials/admin/people.html', 'People, roles, organisations and learner access.'),
-            $this->section('companies', 'Companies', 'companies', '/admin/companies', 'partials/admin/companies.html', 'Client companies, providers and the System Company.'),
-            $this->section('enrolments', 'Enrolments & Requests', 'enrolments', '/admin/enrolments', 'partials/admin/enrolments.html', 'Course requests, assignments, access and progress.'),
-            $this->section('credits', 'Credits & Orders', 'credits', '/admin/credits', 'partials/admin/credits.html', 'Course credits and the purchasing foundation.'),
+            $this->section('companies', 'Companies', 'companies', '/admin/companies', 'partials/admin/companies.html', 'Companies whose staff are trained, and the System Company.'),
+            $this->section('company_creators', 'Course Creators', 'companies', '/admin/companies/creators', 'partials/admin/company-creators.html', 'Companies that own courses and offer them to others.'),
+            $this->section('requests', 'Course Requests', 'requests', '/admin/course/requests', 'partials/admin/requests.html', 'Learner requests for course access, approved or rejected.'),
+            $this->section('enrolments', 'Enrolments', 'enrolments', '/admin/course/enrolments', 'partials/admin/enrolments.html', 'Learner access to courses, and how far each has got.'),
+            $this->section('credits', 'Credits', 'credits', '/admin/course/credits', 'partials/admin/credits.html', 'Course credits held by companies, and how many remain.'),
             $this->section('activity', 'Activity', 'activity', '/admin/activity', 'partials/admin/activity.html', 'Searchable audited activity across the LMS.'),
-            $this->section('reports', 'Reports', 'reports', '/admin/reports', 'partials/admin/reports.html', 'Learning and operational summary reporting.'),
+            $this->section('reports', 'Course Performance', 'reports', '/admin/reports', 'partials/admin/reports.html', 'Enrolment, completion and result figures by course.'),
+            $this->section('company_report', 'Company Enrolments', 'reports', '/admin/reports/companies', 'partials/admin/company-report.html', 'Learner and completion figures by organisation.'),
             $this->section('themes', 'Themes', 'themes', '/admin/themes', 'partials/admin/themes.html', 'Install, inspect, activate and reconcile themes.'),
             $this->section('roles', 'Roles & ACL', 'roles', '/admin/roles', 'partials/admin/roles.html', 'Roles, permissions and access-control assignments.'),
             $this->section('seed', 'Seed Database', 'seed', '/admin/seed', 'partials/admin/seed.html', 'Generate and remove disposable SEED test data.'),

@@ -1,0 +1,133 @@
+Advanced Industrial
+Aeronautical
+Agricultural
+Airside
+Applied
+Aquaculture
+Automotive
+Aviation
+Banking
+Biomedical
+Broadcast
+Chemical
+Civil
+Clinical
+Coastal
+Commercial
+Community
+Construction
+Contract
+Corporate
+Cryogenic
+Customer Facing
+Cyber
+Dairy
+Defence
+Dental
+Digital
+Distribution
+Domestic
+Downstream
+Educational
+Electrical
+Electronic
+Emergency
+Energy Sector
+Engineering
+Environmental
+Executive
+Fabrication
+Facilities
+Field
+Financial
+Fisheries
+Fleet
+Food Sector
+Forensic
+Forestry
+Foundry
+Frontline
+Geotechnical
+Government
+Healthcare
+Heavy Industrial
+Horticultural
+Hospital
+Hospitality
+Hydraulic
+Industrial
+Information Systems
+Infrastructure
+Institutional
+Instrumentation
+Insurance
+Laboratory
+Legal
+Light Industrial
+Logistics
+Maintenance
+Managerial
+Manufacturing
+Marine
+Maritime
+Mechanical
+Medical
+Metallurgical
+Military
+Mining
+Mobile Plant
+Municipal
+National
+Naval
+Nuclear
+Offshore
+Onshore
+Opencast
+Operational
+Petrochemical
+Pharmaceutical
+Pipeline
+Plant
+Port
+Poultry
+Power Sector
+Primary Care
+Process
+Production
+Professional
+Public Sector
+Quarry
+Rail
+Refinery
+Regional
+Regulatory
+Renewable Energy
+Residential
+Retail
+Rural
+Security Sector
+Shipboard
+Site
+Smelter
+Statutory
+Steelworks
+Strategic
+Structural
+Supervisory
+Surface Mining
+Surveying
+Technical
+Telecommunications
+Textile
+Thermal
+Transport
+Underground
+Urban
+Utility
+Veterinary
+Warehouse
+Waste Sector
+Wastewater
+Water Sector
+Wholesale
+Workshop

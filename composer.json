@@ -72,11 +72,14 @@
       "@release:validate"
     ],
     "themes:sync": "php tools/sync-themes.php",
+    "seeds:publish": "php tools/publish-seed-names.php",
+    "seeds:generate": "php tools/seed-generate.php",
     "smoke:install": [
       "php tools/reset-development-database.php --force",
       "@migrate",
       "@migrations:status",
       "@themes:sync",
+      "@seeds:publish",
       "php tools/smoke-app-boot.php"
     ]
   },
@@ -87,5 +90,5 @@
       "role": "Project creator and maintainer"
     }
   ],
-  "version": "0.5.8.3"
+  "version": "0.6"
 }

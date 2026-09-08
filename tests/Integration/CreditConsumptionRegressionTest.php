@@ -13,7 +13,15 @@ use PHPUnit\Framework\TestCase;
 
 final class CreditConsumptionRegressionTest extends TestCase
 {
-    public function testConsumedCreditCannotBecomeReturnableAfterProgressResetAndAccessChanges(): void
+    /**
+     * A credit consumed by starting a course stays consumed, whatever happens to access afterwards.
+     *
+     * The scenario used to begin by resetting the learner's progress, because that was the harshest
+     * thing an administrator could do to an enrolment. Progress reset was removed in v0.6 - it
+     * deleted issued certificates along with the results behind them, and nothing in the interface
+     * reached it - so the sequence now starts at the access changes, which are what remain.
+     */
+    public function testConsumedCreditCannotBecomeReturnableAfterAccessChanges(): void
     {
         $container = CliBootstrap::boot()['container'];
         /** @var SQL $db */
@@ -69,7 +77,6 @@ final class CreditConsumptionRegressionTest extends TestCase
             )[0]['id'];
 
             $courses->startEnrolment($enrolmentId, $learnerId);
-            $administration->resetEnrolmentProgress($enrolmentId);
             $administration->removeEnrolmentAccess($enrolmentId, $adminId, 'QA regression test');
             $administration->restoreEnrolmentAccess($enrolmentId, $adminId);
             $administration->removeEnrolmentAccess($enrolmentId, $adminId, 'QA regression test again');

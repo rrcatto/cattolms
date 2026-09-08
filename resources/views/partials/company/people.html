@@ -34,6 +34,10 @@ Changelog:
 <include href="partials/dataset-search.html" with="ds_name='people',ds_label='Search people',ds_value=@people_search,ds_action='/company/people'" />
 <div id="people-region" data-server-search-target>
 <div id="people-results">
+
+	<check if="{{ @people_pagination }}">
+		<include href="partials/pagination.html" with="pg=@people_pagination" />
+	</check>
 <div class="toolbar">
 	<div>
 		<h2>People</h2>
@@ -57,7 +61,7 @@ Changelog:
 <div class="table-wrap">
 	<table>
 		<thead>
-			<tr><th>Person</th><th>Role</th><th>Courses</th><th>Account</th><th></th></tr>
+			<tr><repeat group="{{ @people_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@people_region,sort_results=@people_results" /></repeat></tr>
 		</thead>
 		<tbody>
 			<repeat group="{{ @people }}" value="{{ @person }}">
@@ -69,32 +73,33 @@ Changelog:
 					<td>{{ @person.company_role ?: @person.roles_label }}</td>
 					<td>{{ @person.course_count }}</td>
 					<td><span class="badge {{ @person.status=='active' ? 'good' : 'danger' }}">{{ @person.status=='active' ? 'Active' : 'Disabled' }}</span></td>
-					<td>
-						<div class="row-actions">
-							<button class="btn btn-soft btn-sm" type="button" data-open-modal="company-person-{{ @person.id }}">Edit</button>
-
-							<check if="{{ @person.status=='active' }}">
-								<true>
-									<form action="/company/people/{{ @person.id }}/status" method="post">
-										<input type="hidden" name="csrf" value="{{ @csrf }}">
-										<input type="hidden" name="status" value="disabled">
-										<button class="btn btn-soft btn-sm" data-confirm="Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.">Disable</button>
-									</form>
-								</true>
-								<false>
-									<form action="/company/people/{{ @person.id }}/status" method="post">
-										<input type="hidden" name="csrf" value="{{ @csrf }}">
-										<input type="hidden" name="status" value="active">
-										<button class="btn btn-primary btn-sm">Enable</button>
-									</form>
-								</false>
-							</check>
-
-							<form action="/company/people/{{ @person.id }}/remove" method="post">
-								<input type="hidden" name="csrf" value="{{ @csrf }}">
-								<button class="btn btn-danger btn-sm" data-confirm="Remove this person from the company? Course access this company granted them ends. Their account and learning history are kept, and this does not stop them signing in.">Remove</button>
-							</form>
-						</div>
+					<td class="cell-actions">
+						<details class="row-menu" data-cl-dropdown>
+							<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+							<div class="row-menu-panel">
+								<button class="btn btn-soft btn-sm" type="button" data-open-modal="company-person-{{ @person.id }}">Edit</button>
+								<check if="{{ @person.status=='active' }}">
+									<true>
+										<form action="/company/people/{{ @person.id }}/status" method="post">
+											<input type="hidden" name="csrf" value="{{ @csrf }}">
+											<input type="hidden" name="status" value="disabled">
+											<button class="btn btn-soft btn-sm" data-confirm="Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.">Disable</button>
+										</form>
+									</true>
+									<false>
+										<form action="/company/people/{{ @person.id }}/status" method="post">
+											<input type="hidden" name="csrf" value="{{ @csrf }}">
+											<input type="hidden" name="status" value="active">
+											<button class="btn btn-primary btn-sm">Enable</button>
+										</form>
+									</false>
+								</check>
+								<form action="/company/people/{{ @person.id }}/remove" method="post">
+									<input type="hidden" name="csrf" value="{{ @csrf }}">
+									<button class="btn btn-danger btn-sm" data-confirm="Remove this person from the company? Course access this company granted them ends. Their account and learning history are kept, and this does not stop them signing in.">Remove</button>
+								</form>
+							</div>
+						</details>
 					</td>
 				</tr>
 			</repeat>
@@ -114,6 +119,7 @@ Changelog:
 				<div class="modal-body">
 					<div class="form-grid">
 						<div class="field"><label>First name</label><input name="first_name" value="{{ @person.first_name }}"></div>
+						<div class="field"><label>Middle names</label><input name="middle_names" maxlength="160" value="{{ @person.middle_names }}"></div>
 						<div class="field"><label>Last name</label><input name="last_name" value="{{ @person.last_name }}"></div>
 						<div class="field full">
 							<label>Certificate name</label><input name="certificate_name" value="{{ @person.certificate_name }}">

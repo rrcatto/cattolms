@@ -27,6 +27,10 @@ token would rebuild the same graph - useful when reproducing a defect found at v
 
 Changelog:
 
+
+2026/09/07 00:50 SAST
+
+- tagCourses() built its rows and never wrote them, so every generated course came out untagged. It writes through SeedRepository::attachCourseTags() now.
 2026/08/25 08:14 SAST
 
 - Extracted the per-set uniqueness key into setUniqueKey(), lengthened it to sixteen hex characters, lowercased the token first, and documented the collision reasoning and the five globally unique columns it feeds.
@@ -46,51 +50,13 @@ namespace CattoLearning\Seed;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Infrastructure\Persistence\SeedRepository;
 use CattoLearning\Support\Slug;
+use Random\Engine\Mt19937;
+use Random\Randomizer;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 
 final class SeedGenerator
 {
-    private const FIRST_NAMES = [
-        'Thabo', 'Lerato', 'Sipho', 'Naledi', 'Ayanda', 'Zanele', 'Mandla', 'Nomsa', 'Bongani',
-        'Palesa', 'Kagiso', 'Refilwe', 'Tebogo', 'Nandi', 'Sizwe', 'Thandiwe', 'Johan', 'Anke',
-        'Pieter', 'Marike', 'Riaan', 'Elmarie', 'Divan', 'Chantelle', 'Yusuf', 'Fatima',
-        'Ridwaan', 'Aisha', 'Priya', 'Ravi', 'Shanice', 'Devon', 'Nicolene', 'Lungile',
-    ];
-
-    private const LAST_NAMES = [
-        'Nkosi', 'Dlamini', 'Mokoena', 'Khumalo', 'Ndlovu', 'Mahlangu', 'Sithole', 'Mthembu',
-        'Zulu', 'Molefe', 'Botha', 'van der Merwe', 'Pretorius', 'Nel', 'Fourie', 'Venter',
-        'Jacobs', 'Adams', 'Petersen', 'Isaacs', 'Naidoo', 'Pillay', 'Govender', 'Reddy',
-        'Maritz', 'Steyn', 'Coetzee', 'Mabaso',
-    ];
-
-    private const COMPANY_PREFIXES = [
-        'Highveld', 'Table Bay', 'Karoo', 'Drakensberg', 'Sandton', 'Umhlanga', 'Garden Route',
-        'Vaal', 'Kalahari', 'Winelands', 'Midrand', 'Zululand', 'Overberg', 'Bushveld',
-    ];
-
-    private const COMPANY_SUFFIXES = [
-        'Mining', 'Logistics', 'Financial Services', 'Healthcare', 'Engineering', 'Agriculture',
-        'Retail Group', 'Energy', 'Construction', 'Telecoms', 'Training Academy', 'Manufacturing',
-    ];
-
-    private const CATEGORY_NAMES = [
-        'Occupational Health and Safety', 'Financial Compliance', 'Mining Safety',
-        'Data Protection and POPIA', 'Leadership and Supervision', 'Technical Skills',
-        'Customer Service', 'Environmental Management', 'Quality Assurance',
-        'Human Resources', 'Fire and Emergency', 'Driver Safety',
-    ];
-
-    private const COURSE_TOPICS = [
-        'Working at Heights', 'Hazardous Substances', 'Incident Investigation',
-        'POPIA Essentials', 'Anti-Money Laundering Basics', 'Conflict Resolution',
-        'First Aid Level 1', 'Fire Marshal Training', 'Forklift Operation',
-        'Confined Space Entry', 'Risk Assessment Fundamentals', 'Supervisory Skills',
-        'Cyber Awareness', 'Environmental Compliance', 'Quality Control Basics',
-        'Defensive Driving', 'Machine Guarding', 'Noise and Hearing Conservation',
-    ];
-
     /** Seed roles a generated identity may hold. Never a normal role, never ADMIN. */
     private const SEED_ROLE_MIX = [
         RoleCatalog::SEED_STUDENT,
@@ -111,14 +77,33 @@ final class SeedGenerator
         ['FAIL', 'Not yet competent', 0.0, false],
     ];
 
-    /** Deterministic per-set randomness, so one token always rebuilds the same graph. */
-    private int $randomState = 0;
+    /**
+     * Names for this set, drawn from the operator-editable pools in storage/seeds.
+     *
+     * Built per generation because it carries the set's own random seed and the record of every
+     * name it has issued. Null outside a generation.
+     */
+    private ?SeedNameFactory $names = null;
+
+    /**
+     * Numeric randomness for the set: prices, marks, which answer is the correct one.
+     *
+     * A seeded Mt19937 through Random\Randomizer, so a token rebuilds the same graph and nothing
+     * else in the process can shift the sequence. It replaces a hand-written linear congruential
+     * generator whose result was taken modulo the bound - and the low bits of that generator have a
+     * period of two, so `next(40)` could only ever return twenty of its forty values, and
+     * `next(4)` two of its four. Every generated course had its correct answer in one of two
+     * positions.
+     */
+    private ?Randomizer $random = null;
 
     /** @var array<string,int> */
     private array $counts = [];
 
-    public function __construct(private readonly SeedRepository $repository)
-    {
+    public function __construct(
+        private readonly SeedRepository $repository,
+        private readonly SeedNamePools $pools
+    ) {
     }
 
     /**
@@ -132,7 +117,17 @@ final class SeedGenerator
     public function generate(SeedGenerationPlan $plan, string $token): array
     {
         $this->counts = [];
-        $this->randomState = abs(crc32($token)) ?: 1;
+
+        // Seeded from this set's own token, so one token always rebuilds the same graph, and primed
+        // with the names the database already holds, so a second set never repeats a person, a
+        // company or a course title from the first.
+        $this->random = new Randomizer(new Mt19937(abs(crc32($token)) ?: 1));
+        $this->names = new SeedNameFactory($this->pools, $token);
+        $this->names->reserve(
+            $this->repository->existingDisplayNames(),
+            $this->repository->existingCompanyNames(),
+            $this->repository->existingCourseTitles()
+        );
 
         $roleIds = $this->repository->roleIdsByKey();
         foreach (self::SEED_ROLE_MIX as $roleKey) {
@@ -145,11 +140,11 @@ final class SeedGenerator
 
         $companies = $this->generateCompanies($plan, $token, $suffix);
         $people = $this->generatePeople($plan, $token, $suffix, $companies, $roleIds);
-        $categories = $this->generateCategories($plan, $token, $suffix);
+        $categories = $this->assignableCategories();
         $courses = $this->generateCourses($plan, $token, $suffix, $categories, $companies, $people);
         $this->generateEnrolmentActivity($plan, $token, $suffix, $courses, $people);
         $this->generateCommercialRecords($plan, $token, $courses, $companies, $people);
-        $this->generateAuditTrail($token, $courses, $people);
+        $this->generateAuditTrail($plan, $token, $courses, $people);
 
         return $this->counts;
     }
@@ -186,24 +181,28 @@ final class SeedGenerator
         return substr(hash('sha256', strtolower($token)), 0, 16);
     }
 
-    /**
-     * Deterministic pseudo-random integer in [0, $bound).
-     *
-     * A linear congruential step rather than mt_rand, so the graph depends only on the seed set
-     * token and not on process state. Reproducibility matters when a defect only appears at
-     * volume: the same token rebuilds the same data.
-     */
-    private function next(int $bound): int
-    {
-        $this->randomState = ($this->randomState * 1103515245 + 12345) & 0x7fffffff;
 
-        return $bound < 1 ? 0 : $this->randomState % $bound;
+    /**
+     * The name factory for the generation in progress.
+     *
+     * Generation is the only time names are drawn, so the factory exists only then; asking for one
+     * outside a generation is a programming error rather than something to build a fresh one for,
+     * because a fresh one would not know what the set had already issued.
+     */
+    private function names(): SeedNameFactory
+    {
+        return $this->names ?? throw new RuntimeException('Seed names are only available during a generation.');
     }
 
-    /** @param list<string> $values */
-    private function pick(array $values): string
+    /** A number from 0 to one below the bound, from this set's own seeded sequence. */
+    private function next(int $bound): int
     {
-        return $values[$this->next(count($values))];
+        if ($bound < 1) {
+            return 0;
+        }
+        $random = $this->random ?? throw new RuntimeException('Seed randomness is only available during a generation.');
+
+        return $random->getInt(0, $bound - 1);
     }
 
     /**
@@ -227,7 +226,7 @@ final class SeedGenerator
         $rows = [];
         $meta = [];
         for ($i = 0; $i < $plan->companies; $i++) {
-            $name = $this->pick(self::COMPANY_PREFIXES) . ' ' . $this->pick(self::COMPANY_SUFFIXES);
+            $name = $this->names()->company();
             // Domains are globally unique across both universes, so every generated one carries
             // the company index and the set suffix. The .seed.invalid suffix is reserved by
             // RFC 2606 and can never resolve, so an address here is undeliverable unless the
@@ -262,17 +261,28 @@ final class SeedGenerator
         $userRows = [];
         $identities = [];
         for ($i = 0; $i < $plan->users; $i++) {
-            $first = $this->pick(self::FIRST_NAMES);
-            $last = $this->pick(self::LAST_NAMES);
+            $person = $this->names()->person();
             $roleKey = self::SEED_ROLE_MIX[$i % count(self::SEED_ROLE_MIX)];
-            $company = $companies[$i % count($companies)];
+            // Deliberately lopsided. Spread evenly, a set of 7,500 people across 938 companies
+            // gives every company eight staff, and a company screen is never tested against
+            // anything bigger than a page. Every fifth person joins the first company instead, so
+            // one company holds a fifth of the set and the rest keep a realistic long tail.
+            $company = $i % 5 === 0
+                ? $companies[0]
+                : $companies[$i % count($companies)];
 
-            $identities[] = ['first' => $first, 'last' => $last, 'role' => $roleKey, 'company' => $company];
+            $identities[] = [
+                'first' => $person['first'],
+                'last' => $person['last'],
+                'role' => $roleKey,
+                'company' => $company,
+            ];
             $userRows[] = [
                 Uuid::v4(),
-                trim($first . ' ' . $last),
-                $first,
-                $last,
+                $person['display'],
+                $person['first'],
+                $person['middle'],
+                $person['last'],
                 'active',
                 $token,
             ];
@@ -280,7 +290,7 @@ final class SeedGenerator
 
         $userIds = $this->write(
             'users',
-            ['public_id', 'display_name', 'first_name', 'last_name', 'status', 'seed_token'],
+            ['public_id', 'display_name', 'first_name', 'middle_names', 'last_name', 'status', 'seed_token'],
             $userRows,
             true
         );
@@ -342,26 +352,30 @@ final class SeedGenerator
         };
     }
 
-    /** @return list<int> */
-    private function generateCategories(SeedGenerationPlan $plan, string $token, string $suffix): array
+    /**
+     * The categories generated courses are filed under.
+     *
+     * A seed set no longer creates categories. They are universe-free labels shared with the
+     * genuine catalogue, so a generated course goes into the same "Mining Safety" a real one does -
+     * which is the point: seed data that sat in its own cloned taxonomy could never exercise the
+     * real one, and browsing a category would never show the volume that was generated to test it.
+     *
+     * An installation with no categories at all yields an empty list, and the courses below are
+     * filed under none. That is a legitimate state - the schema allows a course without a category
+     * - rather than a reason to start inventing taxonomy.
+     *
+     * Each row carries its ancestry, because the course is named after its category and tagged with
+     * the branch it belongs to. See SeedRepository::categoryTaxonomy().
+     *
+     * @return list<array{id:int,name:string,level:int,root:string,branch:string}>
+     */
+    private function assignableCategories(): array
     {
-        $rows = [];
-        for ($i = 0; $i < $plan->categories; $i++) {
-            $name = self::CATEGORY_NAMES[$i % count(self::CATEGORY_NAMES)];
-            $rows[] = [
-                $name . ' (seed ' . $suffix . ')',
-                Slug::from($name) . '-' . $i . '-' . $suffix,
-                $i + 1,
-                true,
-                $token,
-            ];
-        }
-
-        return $this->write('course_categories', ['name', 'slug', 'position', 'is_active', 'seed_token'], $rows, true);
+        return $this->repository->categoryTaxonomy();
     }
 
     /**
-     * @param list<int> $categories
+     * @param list<array{id:int,name:string,level:int,root:string,branch:string}> $categories
      * @param list<array{id:int,domain:string,name:string}> $companies
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
      * @return list<array{id:int,modules:list<int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}>
@@ -376,8 +390,16 @@ final class SeedGenerator
     ): array {
         $courseRows = [];
         $titles = [];
+        // The category each course belongs to, kept so the tags can be drawn from the same place
+        // the title was. Before this the two were unrelated: a course called "Abattoir Hygiene"
+        // could be filed under Cloud Infrastructure and tagged by arithmetic on its row number.
+        $courseCategories = [];
         for ($i = 0; $i < $plan->courses; $i++) {
-            $title = self::COURSE_TOPICS[$i % count(self::COURSE_TOPICS)];
+            $category = $categories === [] ? null : $categories[$i % count($categories)];
+            $courseCategories[] = $category;
+            $title = $category === null
+                ? $this->names()->courseTitle()
+                : $this->names()->courseTitleFor((string) $category['name']);
             $owner = $people['owners'][$i % count($people['owners'])];
             $company = $companies[$i % count($companies)];
             // Two thirds published so the catalogue has volume, the rest draft so the
@@ -387,7 +409,7 @@ final class SeedGenerator
             $titles[] = $title;
             $courseRows[] = [
                 Uuid::v4(),
-                $categories[$i % count($categories)],
+                $category === null ? null : $category['id'],
                 Slug::from($title) . '-' . $i . '-' . $suffix,
                 $title,
                 'Generated seed course for volume testing.',
@@ -423,12 +445,23 @@ final class SeedGenerator
             true
         );
 
+        // Grade bands, a price and an editor are cheap and belong to every course: they are what a
+        // catalogue row displays. Modules, assessments, questions and answer options are the
+        // expensive part - about 120 rows a course - and go to the planned minority.
+        //
+        // A catalogue where most entries are listings and a minority are built out is also closer
+        // to a real one than a catalogue where every course is complete. The rich courses are taken
+        // from the front of the list rather than sampled, so the same request always builds out the
+        // same courses and a set is reproducible.
         $this->generateGradeBands($courseIds, $token);
         $this->generatePriceVariants($courseIds, $token, $people);
         $this->generateEditors($courseIds, $token, $people);
 
-        $modulesByCourse = $this->generateModules($courseIds, $token);
-        $assessments = $this->generateAssessments($courseIds, $modulesByCourse, $token);
+        $this->tagCourses($courseIds, $courseCategories);
+
+        $richCourseIds = array_slice($courseIds, 0, $plan->richCourses);
+        $modulesByCourse = $this->generateModules($richCourseIds, $token);
+        $assessments = $this->generateAssessments($richCourseIds, $modulesByCourse, $token);
         $questionBank = $this->generateQuestions($assessments['ids'], $token);
 
         $courses = [];
@@ -501,6 +534,91 @@ final class SeedGenerator
         }
 
         $this->write('course_editors', ['course_id', 'user_id', 'seed_token'], $rows);
+    }
+
+    /**
+     * Attaches tags to every generated course.
+     *
+     * Tags carry no seed token, exactly as categories no longer do: a tag classifies a course
+     * rather than describing anybody, and it is shared with the genuine catalogue. So this writes
+     * into `course_tags` only, and the tags themselves are whatever the installation already has.
+     *
+     * The association rows do carry the token - they hang off a generated course and must go when
+     * it does - which is why `course_tags` is deliberately absent from the seed-aware catalogue and
+     * relies on the ON DELETE CASCADE from `courses` instead. Removing a seed set removes its
+     * courses, and the associations go with them; the tags stay, because they were never the set's.
+     *
+     * @param list<int> $courseIds
+     * @param list<array{id:int,name:string,level:int,root:string,branch:string}|null> $courseCategories
+     *        The category each course was filed under, in the same order.
+     */
+    private function tagCourses(array $courseIds, array $courseCategories): void
+    {
+        if ($courseIds === []) {
+            return;
+        }
+
+        // A tag now says something true about the course wearing it.
+        //
+        // Three of the four come from the course's own place in the taxonomy - the discipline, the
+        // area within it, and the subject itself - so a course filed under Health and Safety ›
+        // Occupational Health › Hearing Conservation is tagged with exactly those. The fourth says
+        // what kind of course it is. Together that is what somebody would actually search a
+        // catalogue by.
+        //
+        // The old version picked tags by arithmetic on the row index against whatever tags happened
+        // to exist, so every course got three unrelated words and the tag pages listed courses with
+        // nothing in common.
+        $delivery = ['Online', 'Classroom', 'Blended', 'Self Study'];
+        $purpose = ['Induction', 'Refresher', 'Certification', 'Assessment', 'Practical'];
+
+        $namesByCourse = [];
+        $wanted = [];
+        foreach ($courseIds as $index => $courseId) {
+            $category = $courseCategories[$index] ?? null;
+            $names = $category === null
+                ? []
+                : array_values(array_unique([
+                    (string) $category['root'],
+                    (string) $category['branch'],
+                    (string) $category['name'],
+                ]));
+            $names[] = $delivery[$index % count($delivery)];
+            $names[] = $purpose[($index * 3) % count($purpose)];
+
+            $namesByCourse[$courseId] = $names;
+            foreach ($names as $name) {
+                $wanted[$name] = true;
+            }
+        }
+
+        // One round trip for the whole set. Tags are universe-free labels shared with the genuine
+        // catalogue, so any that do not exist yet are created here and are not the set's to remove.
+        $ids = $this->repository->ensureTags(array_keys($wanted));
+
+        $rows = [];
+        $seen = [];
+        foreach ($namesByCourse as $courseId => $names) {
+            foreach ($names as $name) {
+                $tagId = $ids[$name] ?? null;
+                if ($tagId === null) {
+                    continue;
+                }
+                $pair = $courseId . ':' . $tagId;
+                if (isset($seen[$pair])) {
+                    continue;
+                }
+                $seen[$pair] = true;
+                $rows[] = [$courseId, $tagId];
+            }
+        }
+
+        // The one insert that does not go through write(), and it has its own repository method so
+        // that stays visible. write() adds its rows to the reported counts, and those counts are the
+        // set's manifest: every table in the manifest must be removable by token, and `course_tags`
+        // carries none, because a tag association is not seed-provenanced data. The rows still go
+        // when the set does, through the cascade from `courses`, which owns them.
+        $this->repository->attachCourseTags($rows);
     }
 
     /**
@@ -680,12 +798,17 @@ final class SeedGenerator
         $enrolmentRows = [];
         $context = [];
         $seenPairs = [];
+        // How many enrolments have been given a full history so far. The plan caps it.
+        $worked = 0;
         for ($i = 0; $i < $plan->enrolments; $i++) {
             $learner = $learners[$i % count($learners)];
             $course = $courses[($i * 7 + intdiv($i, count($learners))) % count($courses)];
 
             // One active enrolment per learner and course: the schema enforces it with a partial
-            // unique index, so a duplicate pair is skipped rather than allowed to fail the batch.
+            // unique index. The plan never asks for more enrolments than there are people and each
+            // pass takes the next person in turn, so a repeat should be impossible - but the guard
+            // stays, because a skipped row here is a silent under-delivery rather than an error,
+            // which is precisely how the old shortfall stayed invisible.
             $pair = $learner . ':' . $course['id'];
             if (isset($seenPairs[$pair])) {
                 continue;
@@ -728,6 +851,21 @@ final class SeedGenerator
             $course = $entry['course'];
             $complete = $entry['status'] === 'completed';
 
+            // Only the planned share of enrolments is worked through, and the projection counts
+            // the same figure. The two used to disagree in both directions: the projection assumed
+            // every enrolment produced attempts, sessions and answers while the generator skipped
+            // every one that had not been started, so those four tables under-delivered by exactly
+            // a third; and progress was written for every enrolment whose course happened to have
+            // modules, which the projection had no way to predict, so that one over-delivered.
+            //
+            // Progress belongs inside this gate rather than above it. Module progress means
+            // somebody opened the modules, and an enrolment with no assessment activity at all did
+            // not.
+            if ($worked >= $plan->workedEnrolments || $course['assessments'] === []) {
+                continue;
+            }
+            $worked++;
+
             foreach ($course['modules'] as $moduleId) {
                 $progressRows[] = [
                     $enrolmentId, $moduleId, $now, $now,
@@ -736,10 +874,6 @@ final class SeedGenerator
                     $complete ? 'MERIT' : null,
                     $token,
                 ];
-            }
-
-            if ($entry['status'] === 'assigned' || $course['assessments'] === []) {
-                continue;
             }
 
             $assessmentId = $course['assessments'][0];
@@ -767,13 +901,11 @@ final class SeedGenerator
                 $overall = round(60 + $this->next(40), 2);
                 $resultRows[] = [$enrolmentId, $overall, $overall, $overall, $this->gradeFor($overall), $overall >= 50.0, $token];
 
-                if (count($certificateRows) < intdiv(count($enrolmentIds), 6)) {
-                    $certificateRows[] = [
-                        Uuid::v4(), $enrolmentId,
-                        'SEED-' . strtoupper($suffix) . '-' . str_pad((string) count($certificateRows), 6, '0', STR_PAD_LEFT),
-                        'Seed Learner', $course['title'], $this->gradeFor($overall), $overall, $now, $token,
-                    ];
-                }
+                $certificateRows[] = [
+                    Uuid::v4(), $enrolmentId,
+                    'SEED-' . strtoupper($suffix) . '-' . str_pad((string) count($certificateRows), 6, '0', STR_PAD_LEFT),
+                    'Seed Learner', $course['title'], $this->gradeFor($overall), $overall, $now, $token,
+                ];
             }
         }
 
@@ -933,7 +1065,7 @@ final class SeedGenerator
      * @param list<array{id:int,modules:list<int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
      */
-    private function generateAuditTrail(string $token, array $courses, array $people): void
+    private function generateAuditTrail(SeedGenerationPlan $plan, string $token, array $courses, array $people): void
     {
         $historyRows = [];
         foreach ($courses as $course) {
@@ -952,12 +1084,15 @@ final class SeedGenerator
             $historyRows
         );
 
+        // The audit trail is the balancing figure: every other quantity is a ratio that rounds on
+        // its own, and an audit row costs exactly one row and references only rows that already
+        // exist. Writing precisely what the plan projected is what makes a request for 100,000
+        // deliver 100,000 rather than something several percent short of it.
+        $events = ['seed.person_created', 'seed.course_published', 'auth.login', 'course.enrolment.created'];
+        $actors = $people['all'] !== [] ? $people['all'] : [null];
         $auditRows = [];
-        foreach ($people['all'] as $userId) {
-            $auditRows[] = [$userId, 'seed.person_created', $token];
-        }
-        foreach ($courses as $course) {
-            $auditRows[] = [$people['owners'][0] ?? null, 'seed.course_published', $token];
+        for ($i = 0; $i < $plan->auditEntries; $i++) {
+            $auditRows[] = [$actors[$i % count($actors)], $events[$i % count($events)], $token];
         }
         $this->write('audit_log', ['user_id', 'event_key', 'seed_token'], $auditRows);
     }

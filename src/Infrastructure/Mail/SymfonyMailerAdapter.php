@@ -116,6 +116,18 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void
+    {
+        $url = rtrim(Env::string('APP_URL'), '/') . '/courses/' . $courseSlug;
+        $this->send(
+            $email,
+            'You have been enrolled: ' . $courseTitle,
+            '<p>You have been enrolled on <strong>' . $this->escape($courseTitle) . '</strong>.</p>'
+            . '<p><a href="' . $this->escape($url) . '">Start the course</a></p>',
+            "You have been enrolled on {$courseTitle}.\n\nStart the course: {$url}"
+        );
+    }
+
     public function sendContactMessage(string $name, string $email, string $subject, string $message): void
     {
         $configuration = $this->settings->mailConfiguration();

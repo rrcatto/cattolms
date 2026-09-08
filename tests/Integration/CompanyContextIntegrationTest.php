@@ -43,6 +43,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Company\SelectedCompanyContext;
+use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
@@ -524,12 +525,12 @@ final class CompanyContextIntegrationTest extends TestCase
             'Owned by Beta ' . $suffix
         );
 
-        $rows = $courses->companyCourses(DataUniverse::Real, $this->real['a'], 100, 0);
+        $rows = $courses->companyCourses(DataUniverse::Real, $this->real['a'], 'owned', 100, 0);
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
 
         self::assertContains($ownedByA, $ids, 'A company must see the course it owns.');
         self::assertSame(
-            $courses->companyCoursesCount(DataUniverse::Real, $this->real['a']),
+            $courses->companyCoursesCount(DataUniverse::Real, $this->real['a'], 'owned'),
             count($rows),
             'The count and the rows must describe the same population.'
         );
@@ -538,7 +539,7 @@ final class CompanyContextIntegrationTest extends TestCase
         $everything = $courses->allCoursesCount(DataUniverse::Real);
         self::assertLessThan(
             $everything,
-            $courses->companyCoursesCount(DataUniverse::Real, $this->real['a']),
+            $courses->companyCoursesCount(DataUniverse::Real, $this->real['a'], 'owned'),
             'A company course list that equals the platform catalogue is the defect Stage D fixed.'
         );
     }
@@ -557,6 +558,148 @@ final class CompanyContextIntegrationTest extends TestCase
             (int) $section['courses_count'],
             (int) $workspace['courses_count'],
             'The preview and the section it links to must describe one population.'
+        );
+    }
+
+    /**
+     * What a company owns and what it has bought are two populations, and neither is their union.
+     *
+     * They were one list called "Courses" meaning owned OR credited. That is not a rounding error in
+     * naming: a course the company made costs nothing to train its own staff on, and a course it
+     * bought has a fixed number of seats. A single list answers neither question, and where a
+     * company both owns and has bought the same course the union silently counted it once - so the
+     * two figures could not even be recovered by subtraction. See ROADMAP section 3d.
+     */
+    public function testOwnedAndBoughtAreSeparatePopulations(): void
+    {
+        /** @var CourseRepository $courses */
+        $courses = $this->container->get(CourseRepository::class);
+        $suffix = $this->fixture->suffix();
+        $company = $this->real['a'];
+
+        $owned = $this->fixture->createCourse($this->adminUserId, $company, 'split-owned-' . $suffix, 'Owned ' . $suffix);
+
+        // Bought from somebody else, which is what a credit is for.
+        $providerAdmin = $this->fixture->createUser('Split provider ' . $suffix, 'split-provider-' . $suffix . '@example.test');
+        $provider = $this->fixture->createCompany($providerAdmin, 'Split Provider ' . $suffix, 'split-' . $suffix . '.example.test');
+        $bought = $this->fixture->createCourse($providerAdmin, $provider, 'split-bought-' . $suffix, 'Bought ' . $suffix);
+
+        /** @var AdministrationRepository $administration */
+        $administration = $this->container->get(AdministrationRepository::class);
+        // Not tracked separately: the fixture removes a course's credits and their allocations with
+        // the course itself, and the course is tracked.
+        $administration->addCredit($company, null, $bought, 31536000, 4, 'qa', 'split', $this->adminUserId);
+
+        $ownedIds = array_map(static fn(array $r): int => (int) $r['id'], $courses->companyCourses(DataUniverse::Real, $company, 'owned', 100, 0));
+        $boughtIds = array_map(static fn(array $r): int => (int) $r['id'], $courses->companyCourses(DataUniverse::Real, $company, 'training', 100, 0));
+
+        self::assertContains($owned, $ownedIds, 'A course the company made is one it owns.');
+        self::assertNotContains($bought, $ownedIds, 'Buying seats does not make a company the owner.');
+        self::assertContains($bought, $boughtIds, 'A course it bought seats for is a training course.');
+        self::assertNotContains($owned, $boughtIds, 'Owning a course is not the same as having bought it.');
+
+        // Each half's count is the count of that half, not of the union.
+        self::assertSame(
+            count($ownedIds),
+            $courses->companyCoursesCount(DataUniverse::Real, $company, 'owned'),
+            'The owned count and the owned rows must describe one population.'
+        );
+        self::assertSame(
+            count($boughtIds),
+            $courses->companyCoursesCount(DataUniverse::Real, $company, 'training'),
+            'The training count and the training rows must describe one population.'
+        );
+    }
+
+    /** A training row carries the entitlement figures the screen exists to show. */
+    public function testATrainingRowReportsItsSeatsAndItsStaff(): void
+    {
+        /** @var CourseRepository $courses */
+        $courses = $this->container->get(CourseRepository::class);
+        /** @var AdministrationRepository $administration */
+        $administration = $this->container->get(AdministrationRepository::class);
+        $suffix = $this->fixture->suffix();
+        $company = $this->real['a'];
+
+        $providerAdmin = $this->fixture->createUser('Seat provider ' . $suffix, 'seat-provider-' . $suffix . '@example.test');
+        $provider = $this->fixture->createCompany($providerAdmin, 'Seat Provider ' . $suffix, 'seat-' . $suffix . '.example.test');
+        $course = $this->fixture->createCourse($providerAdmin, $provider, 'seat-course-' . $suffix, 'Seats ' . $suffix);
+
+        $administration->addCredit($company, null, $course, 31536000, 5, 'qa', 'seats', $this->adminUserId);
+
+        $rows = array_values(array_filter(
+            $courses->companyCourses(DataUniverse::Real, $company, 'training', 100, 0),
+            static fn(array $r): bool => (int) $r['id'] === $course
+        ));
+        self::assertCount(1, $rows);
+
+        self::assertSame(5, (int) $rows[0]['credits_bought'], 'Five seats were bought.');
+        self::assertSame(0, (int) $rows[0]['credits_used'], 'None has been handed out yet.');
+        self::assertSame(0, (int) $rows[0]['staff_enrolled']);
+        self::assertSame(0, (int) $rows[0]['staff_completed']);
+    }
+
+    /**
+     * Company favourites belong to the company, not to the person who added them.
+     *
+     * Owner decision, 2026/09/07: "the company admin chooses this. company staff who favourite
+     * courses, do not affect company favourites." Modelled as a user favourite it would leave with
+     * whoever administered the company that week, which is why it is its own table and why this
+     * asserts the two lists cannot reach each other.
+     */
+    public function testCompanyFavouritesAreSeparateFromStaffFavourites(): void
+    {
+        /** @var CourseRepository $courses */
+        $courses = $this->container->get(CourseRepository::class);
+        $suffix = $this->fixture->suffix();
+        $company = $this->real['a'];
+        $course = $this->fixture->createCourse($this->adminUserId, $company, 'fav-course-' . $suffix, 'Fav ' . $suffix);
+        $staff = $this->fixture->createUser('Fav staff ' . $suffix, 'fav-staff-' . $suffix . '@example.test');
+
+        // A staff member favouriting it for themselves changes nothing for the company.
+        $this->db->exec(
+            'INSERT INTO course_favourites (user_id, course_id) VALUES (:user_id, :course_id)',
+            [':user_id' => $staff, ':course_id' => $course]
+        );
+        self::assertSame(0, $courses->companyFavouritesCount(DataUniverse::Real, $company));
+
+        self::assertTrue($courses->toggleCompanyFavourite($company, $course, $this->adminUserId), 'The first toggle adds.');
+        self::assertSame(1, $courses->companyFavouritesCount(DataUniverse::Real, $company));
+
+        $rows = $courses->companyFavourites(DataUniverse::Real, $company, 100, 0);
+        self::assertCount(1, $rows);
+        self::assertSame($course, (int) $rows[0]['id']);
+        self::assertTrue((bool) $rows[0]['is_company_owned'], 'The row says where the course already stands with this company.');
+
+        self::assertFalse($courses->toggleCompanyFavourite($company, $course, $this->adminUserId), 'The second toggle removes.');
+        self::assertSame(0, $courses->companyFavouritesCount(DataUniverse::Real, $company));
+
+        // And the staff member still has their own.
+        $own = $this->db->exec(
+            'SELECT COUNT(*)::int AS total FROM course_favourites WHERE user_id = :user_id',
+            [':user_id' => $staff]
+        );
+        self::assertSame(1, (int) $own[0]['total'], 'A company removing its favourite must not touch anybody else\'s.');
+
+        $this->db->exec('DELETE FROM course_favourites WHERE user_id = :user_id', [':user_id' => $staff]);
+    }
+
+    /**
+     * A genuine company cannot favourite a generated course.
+     *
+     * The generic cross-universe trigger cannot be reused on this table - it compares a row against
+     * its own seed_token and this table deliberately has none - so the guard is written for it, and
+     * a guard nobody tests is a guard nobody has.
+     */
+    public function testACompanyFavouriteCannotSpanTwoUniverses(): void
+    {
+        $suffix = $this->fixture->suffix();
+        $seed = $this->fixture->createSeedSet('Fav universe ' . $suffix);
+
+        $this->expectExceptionMessageMatches('/Cross-universe relationship rejected on company_favourites/');
+        $this->db->exec(
+            'INSERT INTO company_favourites (company_id, course_id) VALUES (:company_id, :course_id)',
+            [':company_id' => $this->real['a'], ':course_id' => $seed['course']]
         );
     }
 }

@@ -35,6 +35,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Mcp;
 
+use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Api\ApiIdentity;
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Api\AuthorizationService;
@@ -79,10 +80,10 @@ final class LmsMcpTools
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::COURSES_READ, 'CATALOGUE.VIEW');
 
-        $pagination = Pagination::create($page, $pageSize, $this->courses->catalogueCount(DataUniverse::Real));
+        $pagination = Pagination::create($page, $pageSize, $this->courses->catalogueCount(DataUniverse::Real, CatalogueFilter::none()));
 
         return [
-            'courses' => $this->courses->catalogue(DataUniverse::Real, $pagination->pageSize, $pagination->offset),
+            'courses' => $this->courses->catalogue(DataUniverse::Real, CatalogueFilter::none(), $pagination->pageSize, $pagination->offset),
             'meta' => $pagination->toArray(),
         ];
     }
