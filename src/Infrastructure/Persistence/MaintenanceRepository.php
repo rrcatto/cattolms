@@ -27,14 +27,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\AuthLoginTokensM;
-use CattoLearning\Infrastructure\Persistence\M\AuthSessionsM;
-use CattoLearning\Infrastructure\Persistence\M\WebSessionsM;
-use DB\SQL;
 
 final class MaintenanceRepository
 {
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Database $db)
     {
     }
 
@@ -58,25 +54,23 @@ final class MaintenanceRepository
         $authCutoff = gmdate('Y-m-d H:i:sP', time() - 30 * 86400);
         $webCutoff = gmdate('Y-m-d H:i:sP', time() - $webSessionTtl);
 
-        $loginTokens = new AuthLoginTokensM($this->db);
-        $authSessions = new AuthSessionsM($this->db);
-        $webSessions = new WebSessionsM($this->db);
+        // One statement rather than three round trips. The three counts are independent, so the
+        // planner runs them as three cheap aggregates and the result arrives in a single row.
+        $row = $this->db->fetchAssociative(
+            'SELECT
+                (SELECT COUNT(*)::int FROM auth_login_tokens
+                  WHERE expires_at < :login_cutoff OR used_at < :login_cutoff) AS login_tokens,
+                (SELECT COUNT(*)::int FROM auth_sessions
+                  WHERE expires_at < :auth_cutoff OR revoked_at < :auth_cutoff) AS auth_sessions,
+                (SELECT COUNT(*)::int FROM web_sessions
+                  WHERE last_activity < :web_cutoff) AS web_sessions',
+            ['login_cutoff' => $loginCutoff, 'auth_cutoff' => $authCutoff, 'web_cutoff' => $webCutoff]
+        );
 
         return [
-            'login_tokens' => $loginTokens->count([
-                '(expires_at < ? OR used_at < ?)',
-                $loginCutoff,
-                $loginCutoff,
-            ]),
-            'auth_sessions' => $authSessions->count([
-                '(expires_at < ? OR revoked_at < ?)',
-                $authCutoff,
-                $authCutoff,
-            ]),
-            'web_sessions' => $webSessions->count([
-                'last_activity < ?',
-                $webCutoff,
-            ]),
+            'login_tokens' => (int) ($row['login_tokens'] ?? 0),
+            'auth_sessions' => (int) ($row['auth_sessions'] ?? 0),
+            'web_sessions' => (int) ($row['web_sessions'] ?? 0),
         ];
     }
 
@@ -98,17 +92,17 @@ final class MaintenanceRepository
         $webCutoff = gmdate('Y-m-d H:i:sP', time() - $webSessionTtl);
 
         // SQL is used for efficient bulk deletion. This remains confined to a repository.
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM auth_login_tokens WHERE expires_at < :cutoff OR used_at < :cutoff',
-            [':cutoff' => $loginCutoff]
+            ['cutoff' => $loginCutoff]
         );
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM auth_sessions WHERE expires_at < :cutoff OR revoked_at < :cutoff',
-            [':cutoff' => $authCutoff]
+            ['cutoff' => $authCutoff]
         );
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM web_sessions WHERE last_activity < :cutoff',
-            [':cutoff' => $webCutoff]
+            ['cutoff' => $webCutoff]
         );
 
         return $pending;

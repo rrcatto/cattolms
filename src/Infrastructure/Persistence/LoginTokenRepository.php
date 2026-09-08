@@ -25,12 +25,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\AuthLoginTokensM;
-use DB\SQL;
 
 final class LoginTokenRepository
 {
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Database $db)
     {
     }
 
@@ -44,77 +42,74 @@ final class LoginTokenRepository
         int $ttlSeconds,
         string $ipHash
     ): void {
-        $token = new AuthLoginTokensM($this->db);
-        $token->user_id = $userId;
-        $token->email = $email;
-        $token->purpose = $purpose;
-        $token->token_hash = $tokenHash;
-        $token->context = json_encode($context, JSON_THROW_ON_ERROR);
-        $token->expires_at = gmdate('Y-m-d H:i:sP', time() + $ttlSeconds);
-        $token->requested_ip_hash = $ipHash;
-        $token->created_at = gmdate('Y-m-d H:i:sP');
-        $token->save();
+        $this->db->executeStatement(
+            'INSERT INTO auth_login_tokens
+                (user_id, email, purpose, token_hash, context, expires_at, requested_ip_hash, created_at)
+             VALUES
+                (:user_id, :email, :purpose, :token_hash, :context, :expires_at, :requested_ip_hash, :created_at)',
+            [
+                'user_id' => $userId,
+                'email' => $email,
+                'purpose' => $purpose,
+                'token_hash' => $tokenHash,
+                'context' => json_encode($context, JSON_THROW_ON_ERROR),
+                'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
+                'requested_ip_hash' => $ipHash,
+                'created_at' => gmdate('Y-m-d H:i:sP'),
+            ]
+        );
     }
 
     /** @return array<string,mixed>|null */
     public function findUsableForUpdate(string $tokenHash, string $purpose): ?array
     {
         // SQL is required for the row lock that makes token consumption atomic.
-        $rows = $this->db->exec(
+        $row = $this->db->fetchAssociative(
             'SELECT * FROM auth_login_tokens
              WHERE token_hash = :token_hash AND purpose = :purpose AND used_at IS NULL AND expires_at > NOW()
              FOR UPDATE',
-            [':token_hash' => $tokenHash, ':purpose' => $purpose]
+            ['token_hash' => $tokenHash, 'purpose' => $purpose]
         );
 
-        return $rows[0] ?? null;
+        return $row === false ? null : $row;
     }
 
     public function markUsed(int $id): void
     {
-        $token = new AuthLoginTokensM($this->db);
-        $token->load(['id = ?', $id]);
-        if ($token->dry()) {
-            return;
-        }
-
-        $token->used_at = gmdate('Y-m-d H:i:sP');
-        $token->save();
+        $this->db->executeStatement(
+            'UPDATE auth_login_tokens SET used_at = :used_at WHERE id = :id',
+            ['used_at' => gmdate('Y-m-d H:i:sP'), 'id' => $id]
+        );
     }
 
     public function deleteByHash(string $tokenHash): void
     {
-        $token = new AuthLoginTokensM($this->db);
-        $token->load(['token_hash = ? AND used_at IS NULL', $tokenHash]);
-        if (!$token->dry()) {
-            $token->erase();
-        }
+        $this->db->executeStatement(
+            'DELETE FROM auth_login_tokens WHERE token_hash = :token_hash AND used_at IS NULL',
+            ['token_hash' => $tokenHash]
+        );
     }
 
     public function recentEmailCount(string $email, int $windowSeconds): int
     {
-        $token = new AuthLoginTokensM($this->db);
-        return $token->count([
-            'email = ? AND created_at > ?',
-            $email,
-            gmdate('Y-m-d H:i:sP', time() - $windowSeconds),
-        ]);
+        return (int) $this->db->fetchOne(
+            'SELECT COUNT(*)::int FROM auth_login_tokens WHERE email = :email AND created_at > :since',
+            ['email' => $email, 'since' => gmdate('Y-m-d H:i:sP', time() - $windowSeconds)]
+        );
     }
 
     public function recentIpCount(string $ipHash, int $windowSeconds): int
     {
-        $token = new AuthLoginTokensM($this->db);
-        return $token->count([
-            'requested_ip_hash = ? AND created_at > ?',
-            $ipHash,
-            gmdate('Y-m-d H:i:sP', time() - $windowSeconds),
-        ]);
+        return (int) $this->db->fetchOne(
+            'SELECT COUNT(*)::int FROM auth_login_tokens WHERE requested_ip_hash = :ip_hash AND created_at > :since',
+            ['ip_hash' => $ipHash, 'since' => gmdate('Y-m-d H:i:sP', time() - $windowSeconds)]
+        );
     }
 
     public function prune(): int
     {
         // SQL is used because PostgreSQL interval arithmetic is clearer here.
-        return (int) $this->db->exec(
+        return $this->db->executeStatement(
             "DELETE FROM auth_login_tokens
              WHERE expires_at < NOW() - INTERVAL '7 days'
                 OR used_at < NOW() - INTERVAL '7 days'"

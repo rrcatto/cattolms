@@ -25,14 +25,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\AuditLogM;
 use CattoLearning\Support\ClientFingerprint;
-use DB\SQL;
 
 final class AuditRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Database $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -43,14 +41,18 @@ final class AuditRepository
         // An audit row records what an identity did, so it belongs to that identity's universe.
         // A genuine ADMIN acting on seed data therefore still writes a REAL audit row, which is
         // exactly the accountability the decision D4 allowlist exists to preserve.
-        $audit = new AuditLogM($this->db);
-        $audit->seed_token = $this->provenance->fromUser($userId);
-        $audit->user_id = $userId;
-        $audit->event_key = $event;
-        $audit->metadata = json_encode($metadata, JSON_THROW_ON_ERROR);
         $ipAddress = ClientFingerprint::ipAddress();
-        $audit->ip_address = $ipAddress !== '' ? $ipAddress : null;
-        $audit->created_at = gmdate('Y-m-d H:i:sP');
-        $audit->save();
+        $this->db->executeStatement(
+            'INSERT INTO audit_log (seed_token, user_id, event_key, metadata, ip_address, created_at)
+             VALUES (:seed_token, :user_id, :event_key, :metadata, :ip_address, :created_at)',
+            [
+                'seed_token' => $this->provenance->fromUser($userId),
+                'user_id' => $userId,
+                'event_key' => $event,
+                'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
+                'ip_address' => $ipAddress !== '' ? $ipAddress : null,
+                'created_at' => gmdate('Y-m-d H:i:sP'),
+            ]
+        );
     }
 }

@@ -25,14 +25,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\ApiTokensM;
 use CattoLearning\Support\ClientFingerprint;
 use CattoLearning\Support\Uuid;
-use DB\SQL;
 
 final class ApiTokenRepository
 {
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Database $db)
     {
     }
 
@@ -47,18 +45,22 @@ final class ApiTokenRepository
     ): string {
         $publicId = Uuid::v4();
 
-        $token = new ApiTokensM($this->db);
-        $token->public_id = $publicId;
-        $token->user_id = $userId;
-        $token->name = $name;
-        $token->token_hash = $tokenHash;
-        $token->scopes = json_encode($scopes, JSON_THROW_ON_ERROR);
-        $token->created_by_user_id = $createdByUserId;
-        $token->created_at = gmdate('Y-m-d H:i:sP');
-        $token->expires_at = $ttlSeconds === null
-            ? null
-            : gmdate('Y-m-d H:i:sP', time() + $ttlSeconds);
-        $token->save();
+        $this->db->executeStatement(
+            'INSERT INTO api_tokens
+                (public_id, user_id, name, token_hash, scopes, created_by_user_id, created_at, expires_at)
+             VALUES
+                (:public_id, :user_id, :name, :token_hash, :scopes, :created_by_user_id, :created_at, :expires_at)',
+            [
+                'public_id' => $publicId,
+                'user_id' => $userId,
+                'name' => $name,
+                'token_hash' => $tokenHash,
+                'scopes' => json_encode($scopes, JSON_THROW_ON_ERROR),
+                'created_by_user_id' => $createdByUserId,
+                'created_at' => gmdate('Y-m-d H:i:sP'),
+                'expires_at' => $ttlSeconds === null ? null : gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
+            ]
+        );
 
         return $publicId;
     }
@@ -68,7 +70,7 @@ final class ApiTokenRepository
     {
         // SQL is justified because token authentication joins the owning user
         // and the user's primary verified email in one atomic lookup.
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT t.*, u.public_id AS user_public_id, u.status AS user_status,
                     ue.email AS primary_email
              FROM api_tokens t
@@ -82,7 +84,7 @@ final class ApiTokenRepository
                AND (t.expires_at IS NULL OR t.expires_at > NOW())
                AND u.status = :status
              LIMIT 1',
-            [':token_hash' => $tokenHash, ':status' => 'active']
+            ['token_hash' => $tokenHash, 'status' => 'active']
         );
 
         return $rows[0] ?? null;
@@ -90,55 +92,50 @@ final class ApiTokenRepository
 
     public function touch(int $tokenId): void
     {
-        $token = new ApiTokensM($this->db);
-        $token->load(['id = ?', $tokenId]);
-        if ($token->dry()) {
-            return;
-        }
-
-        $token->last_used_at = gmdate('Y-m-d H:i:sP');
-        $token->last_used_ip_hash = ClientFingerprint::ipHash();
-        $token->last_used_user_agent = ClientFingerprint::userAgent();
-        $token->save();
+        $this->db->executeStatement(
+            'UPDATE api_tokens
+                SET last_used_at = :last_used_at,
+                    last_used_ip_hash = :ip_hash,
+                    last_used_user_agent = :user_agent
+              WHERE id = :id',
+            [
+                'last_used_at' => gmdate('Y-m-d H:i:sP'),
+                'ip_hash' => ClientFingerprint::ipHash(),
+                'user_agent' => ClientFingerprint::userAgent(),
+                'id' => $tokenId,
+            ]
+        );
     }
 
     public function revoke(int $userId, string $publicId): void
     {
-        $token = new ApiTokensM($this->db);
-        $token->load([
-            'user_id = ? AND public_id = ? AND revoked_at IS NULL',
-            $userId,
-            $publicId,
-        ]);
-        if ($token->dry()) {
-            return;
-        }
-
-        $token->revoked_at = gmdate('Y-m-d H:i:sP');
-        $token->save();
+        $this->db->executeStatement(
+            'UPDATE api_tokens SET revoked_at = :revoked_at
+              WHERE user_id = :user_id AND public_id = :public_id AND revoked_at IS NULL',
+            ['revoked_at' => gmdate('Y-m-d H:i:sP'), 'user_id' => $userId, 'public_id' => $publicId]
+        );
     }
 
     /** @return list<array<string,mixed>> */
     public function listForUser(int $userId): array
     {
-        $token = new ApiTokensM($this->db);
-        $rows = $token->find(
-            ['user_id = ?', $userId],
-            ['order' => 'created_at DESC']
-        ) ?: [];
-        /** @var list<ApiTokensM> $rows */
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT public_id, name, scopes, created_at, last_used_at, expires_at, revoked_at
+               FROM api_tokens WHERE user_id = :user_id ORDER BY created_at DESC',
+            ['user_id' => $userId]
+        );
 
         return array_map(
-            static function (ApiTokensM $row): array {
-                $scopes = json_decode((string) $row->scopes, true);
+            static function (array $row): array {
+                $scopes = json_decode((string) $row['scopes'], true);
                 return [
-                    'public_id' => (string) $row->public_id,
-                    'name' => (string) $row->name,
+                    'public_id' => (string) $row['public_id'],
+                    'name' => (string) $row['name'],
                     'scopes' => is_array($scopes) ? array_values($scopes) : [],
-                    'created_at' => $row->created_at,
-                    'last_used_at' => $row->last_used_at,
-                    'expires_at' => $row->expires_at,
-                    'revoked_at' => $row->revoked_at,
+                    'created_at' => $row['created_at'],
+                    'last_used_at' => $row['last_used_at'],
+                    'expires_at' => $row['expires_at'],
+                    'revoked_at' => $row['revoked_at'],
                 ];
             },
             $rows
