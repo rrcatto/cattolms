@@ -99,6 +99,8 @@ final class ContainerFactory
             //
             // Temporary. When the last repository is converted, DB\SQL goes and DBAL opens its own
             // connection through DriverManager in the ordinary way.
+            // Repositories inject Database, not the connection: it infers the PDO parameter type
+            // from the PHP value the way DB\SQL did, which DBAL does not.
             DbalConnection::class => factory(static fn(SQL $db): DbalConnection => new DbalConnection(
                 [],
                 new SharedPdoDriver($db->pdo()),

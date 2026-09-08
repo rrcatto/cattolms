@@ -36,7 +36,6 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Auth\DataUniverse;
-use DB\SQL;
 
 final class EntityLookupRepository
 {
@@ -52,7 +51,7 @@ final class EntityLookupRepository
     /** The only entity types that may be searched. Anything else is rejected by the caller. */
     public const TYPES = ['people', 'companies', 'courses', 'assignable_courses'];
 
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Database $db)
     {
     }
 
@@ -104,7 +103,7 @@ final class EntityLookupRepository
         $companyScope = self::andScope($universe, 'c');
 
         $rows = match ($type) {
-            'people' => $this->db->exec(
+            'people' => $this->db->fetchAllAssociative(
                 'SELECT u.id,
                         COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS label,
                         ue.email AS detail
@@ -113,18 +112,18 @@ final class EntityLookupRepository
                  LEFT JOIN company_users cu ON cu.user_id=u.id AND cu.status=\'active\'
                  WHERE u.id=:id AND (:company_id=0 OR cu.company_id=:company_id)' . $scope . '
                  LIMIT 1',
-                [':id' => $id, ':company_id' => $companyId]
+                ['id' => $id, 'company_id' => $companyId]
             ),
-            'companies' => $this->db->exec(
+            'companies' => $this->db->fetchAllAssociative(
                 'SELECT c.id, c.name AS label, c.domain AS detail FROM companies c WHERE c.id=:id' . $companyScope . ' LIMIT 1',
-                [':id' => $id]
+                ['id' => $id]
             ),
-            'courses' => $this->db->exec(
+            'courses' => $this->db->fetchAllAssociative(
                 'SELECT c.id, c.title AS label, c.slug AS detail
                  FROM courses c
                  WHERE c.id=:id AND (:company_id=0 OR c.owner_company_id=:company_id)' . $companyScope . '
                  LIMIT 1',
-                [':id' => $id, ':company_id' => $companyId]
+                ['id' => $id, 'company_id' => $companyId]
             ),
             default => [],
         };
@@ -135,7 +134,7 @@ final class EntityLookupRepository
     /** @return list<array{id:int,label:string,detail:string}> */
     private function searchPeople(string $term, int $companyId, DataUniverse $universe): array
     {
-        return $this->rows($this->db->exec(
+        return $this->rows($this->db->fetchAllAssociative(
             'SELECT DISTINCT u.id,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS label,
                     ue.email AS detail
@@ -149,34 +148,34 @@ final class EntityLookupRepository
                )' . self::andScope($universe, 'u') . '
              ORDER BY label, u.id
              LIMIT ' . self::MAX_RESULTS,
-            [':term' => $term, ':company_id' => $companyId]
+            ['term' => $term, 'company_id' => $companyId]
         ));
     }
 
     /** @return list<array{id:int,label:string,detail:string}> */
     private function searchCompanies(string $term, DataUniverse $universe): array
     {
-        return $this->rows($this->db->exec(
+        return $this->rows($this->db->fetchAllAssociative(
             'SELECT c.id, c.name AS label, c.domain AS detail
              FROM companies c
              WHERE (c.name ILIKE :term OR c.domain ILIKE :term)' . self::andScope($universe, 'c') . '
              ORDER BY c.is_system DESC, c.name, c.id
              LIMIT ' . self::MAX_RESULTS,
-            [':term' => $term]
+            ['term' => $term]
         ));
     }
 
     /** @return list<array{id:int,label:string,detail:string}> */
     private function searchCourses(string $term, int $companyId, DataUniverse $universe): array
     {
-        return $this->rows($this->db->exec(
+        return $this->rows($this->db->fetchAllAssociative(
             'SELECT c.id, c.title AS label, c.slug AS detail
              FROM courses c
              WHERE (:company_id=0 OR c.owner_company_id=:company_id)
                AND (c.title ILIKE :term OR c.slug ILIKE :term)' . self::andScope($universe, 'c') . '
              ORDER BY c.title, c.id
              LIMIT ' . self::MAX_RESULTS,
-            [':term' => $term, ':company_id' => $companyId]
+            ['term' => $term, 'company_id' => $companyId]
         ));
     }
 
@@ -200,7 +199,7 @@ final class EntityLookupRepository
             return [];
         }
 
-        return $this->rows($this->db->exec(
+        return $this->rows($this->db->fetchAllAssociative(
             "SELECT c.id, c.title AS label,
                     CASE WHEN c.owner_company_id = :company_id THEN 'Owned - free for staff'
                          ELSE 'Seats available' END AS detail
@@ -219,7 +218,7 @@ final class EntityLookupRepository
                )" . self::andScope($universe, 'c') . "
              ORDER BY c.title, c.id
              LIMIT " . self::MAX_RESULTS,
-            [':term' => $term, ':company_id' => $companyId]
+            ['term' => $term, 'company_id' => $companyId]
         ));
     }
 

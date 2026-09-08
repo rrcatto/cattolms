@@ -19,7 +19,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use Doctrine\DBAL\Connection;
 use Throwable;
 
 /**
@@ -27,7 +26,7 @@ use Throwable;
  */
 final class ThemeRegistryRepository
 {
-    public function __construct(private readonly Connection $db)
+    public function __construct(private readonly Database $db)
     {
     }
 
