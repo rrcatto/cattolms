@@ -12,7 +12,7 @@ Verifies that F3 resolves controllers through the native PSR-11 container lazily
 
 Changelog:
 2026/09/08 21:10 SAST
-- Dropped ApiStatusController, which is no longer an F3 controller.
+- Dropped ApiStatusController and ApiProfileController, which are no longer F3 controllers.
 2026/08/21 15:04 SAST
 - Removed the compensating restore_error_handler()/restore_exception_handler() calls. They existed only to undo the global handlers F3 installs when Base is first resolved; tests/bootstrap.php now performs that construction once before any test runs, so these calls would pop handlers this test does not own.
 - Added the required file metadata header, which this file was missing.
@@ -39,7 +39,6 @@ use CattoLearning\Http\Controller\LearningController;
 use CattoLearning\Http\Controller\ThemeController;
 use CattoLearning\Http\Controller\Api\ApiCourseController;
 use CattoLearning\Http\Controller\Api\ApiLearningController;
-use CattoLearning\Http\Controller\Api\ApiProfileController;
 use CattoLearning\Http\Routing\RouteRegistrar;
 use PHPUnit\Framework\Attributes\WithoutErrorHandler;
 use PHPUnit\Framework\TestCase;
@@ -57,7 +56,7 @@ final class ContainerResolutionTest extends TestCase
             AdminCourseController::class, AdminCourseCategoryController::class,
             LearningController::class, AssessmentController::class, HelpController::class,
             ContactController::class, ThemeController::class,
-            ApiProfileController::class, ApiCourseController::class, ApiLearningController::class,
+            ApiCourseController::class, ApiLearningController::class,
         ];
 
         $f3 = null;

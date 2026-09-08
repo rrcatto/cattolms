@@ -75,7 +75,7 @@ final class SymfonyKernelRouteTest extends TestCase
     public function testFatFreeRoutesAreNotMatched(): void
     {
         foreach ([['GET', '/'], ['GET', '/courses'], ['GET', '/courses/anything'],
-                  ['GET', '/api/v1/me'], ['POST', '/api/v1'], ['POST', '/contact']] as [$method, $path]) {
+                  ['GET', '/api/v1/library'], ['POST', '/api/v1'], ['POST', '/contact']] as [$method, $path]) {
             self::assertFalse(
                 $this->kernelMatches(Request::create($path, $method)),
                 $method . ' ' . $path . ' must fall through to Fat-Free.'
