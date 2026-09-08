@@ -41,6 +41,18 @@ services:
     CattoLearning\Configuration\SecretCipher: ~
     CattoLearning\Configuration\RuntimeSettings: ~
 
+    # The API firewall: the authenticator, the two voters that answer its orthogonal questions, and
+    # the listener that keeps every failure in the API's own error document.
+    CattoLearning\Infrastructure\Persistence\ApiTokenRepository: ~
+    CattoLearning\Infrastructure\Persistence\RoleRepository: ~
+    CattoLearning\Infrastructure\Persistence\SeedProvenance: ~
+    CattoLearning\Api\ApiAuthService: ~
+    CattoLearning\Api\Security\ApiTokenAuthenticator: ~
+    CattoLearning\Api\Security\ApiScopeVoter: ~
+    CattoLearning\Api\Security\ApiExceptionListener: ~
+    CattoLearning\Auth\PermissionCatalog: ~
+    CattoLearning\Auth\Security\PermissionVoter: ~
+
     # Applied to DoctrineBundle's connection. The platform's own ConnectionFactory registers the
     # same middleware, so both connections agree about the session timezone.
     CattoLearning\Infrastructure\Persistence\SessionTimeZoneMiddleware:

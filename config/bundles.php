@@ -12,6 +12,9 @@ rather than installing the standard edition and pruning afterwards. DoctrineBund
 DBAL only - the ORM is not installed, and config/packages/doctrine.yaml records why.
 
 Changelog:
+2026/09/08 22:15 SAST
+- SecurityBundle, for the stateless API firewall. The web routes are still Fat-Free's and are
+  excluded by config/packages/security.yaml rather than by this list.
 2026/09/08 SAST
 - Created for the v0.7 Symfony kernel.
 */
@@ -22,4 +25,5 @@ return [
     Symfony\Bundle\FrameworkBundle\FrameworkBundle::class => ['all' => true],
     Symfony\Bundle\TwigBundle\TwigBundle::class => ['all' => true],
     Doctrine\Bundle\DoctrineBundle\DoctrineBundle::class => ['all' => true],
+    Symfony\Bundle\SecurityBundle\SecurityBundle::class => ['all' => true],
 ];

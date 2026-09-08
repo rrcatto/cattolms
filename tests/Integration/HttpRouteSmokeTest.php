@@ -12,7 +12,7 @@ Exercises representative HTTP routes through Fat-Free's own mock dispatcher and 
 
 Changelog:
 2026/09/08 21:10 SAST
-- Dropped GET /api/v1; the Symfony kernel serves it and SymfonyKernelRouteTest covers it.
+- Dropped GET /api/v1 and GET /api/v1/me; the Symfony kernel serves them, and SymfonyKernelRouteTest and ApiFirewallIntegrationTest cover them.
 
 2026/08/24 17:45 SAST
 
@@ -30,7 +30,6 @@ namespace CattoLearning\Tests\Integration;
 use Base;
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Http\Controller\Api\ApiCourseController;
-use CattoLearning\Http\Controller\Api\ApiProfileController;
 use CattoLearning\Http\Routing\RouteRegistrar;
 use PHPUnit\Framework\Attributes\WithoutErrorHandler;
 use PHPUnit\Framework\TestCase;
@@ -51,18 +50,11 @@ final class HttpRouteSmokeTest extends TestCase
             $f3->set('QUIET', true);
             $f3->set('CONTAINER', $container);
             $routes = new RouteRegistrar($f3);
-            // GET /api/v1 is no longer here: the Symfony kernel owns it, and
-            // SymfonyKernelRouteTest exercises it there.
-            $routes->add('GET /api/v1/me', ApiProfileController::class, 'me');
+            // GET /api/v1 and GET /api/v1/me are no longer here: the Symfony kernel owns them, and
+            // SymfonyKernelRouteTest and ApiFirewallIntegrationTest exercise them there.
             $routes->add('POST /api/v1/admin/courses', ApiCourseController::class, 'create');
 
             unset($_SERVER['HTTP_AUTHORIZATION']);
-            http_response_code(200);
-            $f3->mock('GET /api/v1/me');
-            self::assertSame(401, http_response_code());
-            $payload = json_decode((string) $f3->get('RESPONSE'), true, 512, JSON_THROW_ON_ERROR);
-            self::assertSame('unauthenticated', $payload['error']['code'] ?? null);
-
             http_response_code(200);
             $f3->mock('POST /api/v1/admin/courses', []);
             self::assertSame(401, http_response_code());

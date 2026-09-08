@@ -1,0 +1,35 @@
+# The API firewall.
+#
+# Stateless on purpose: an API request carries a Bearer token and nothing else, so there is no
+# session to read and no cookie to trust. The web interface is not behind a firewall at all yet -
+# Fat-Free still owns those routes, and `security: false` says so rather than leaving it implied.
+#
+# There is no role hierarchy and no access_control matching on roles. Authorization here is two
+# orthogonal questions - does the token carry the transport scope, and does the account hold the
+# business permission - and each route states both. Writing either of them as a Symfony ROLE_ would
+# create a second vocabulary for rules the platform already has one vocabulary for.
+security:
+    providers:
+        # Never consulted: ApiTokenAuthenticator resolves the identity itself and hands back a
+        # SelfValidatingPassport. Symfony requires the key to exist, so it exists and is empty.
+        api_tokens:
+            memory: ~
+
+    firewalls:
+        # The status document is the API's front door and has never required a token: a client
+        # reads it to find out that authentication is by Bearer token. Firewalls match in order, so
+        # naming it before the API firewall is what keeps it public.
+        api_status:
+            pattern: ^/api/v1$
+            security: false
+
+        api:
+            pattern: ^/api/
+            stateless: true
+            provider: api_tokens
+            custom_authenticators:
+                - CattoLearning\Api\Security\ApiTokenAuthenticator
+            entry_point: CattoLearning\Api\Security\ApiTokenAuthenticator
+
+        web:
+            security: false
