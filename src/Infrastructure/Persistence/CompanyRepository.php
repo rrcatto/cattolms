@@ -31,16 +31,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\CompaniesM;
 use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Uuid;
-use DB\SQL;
+use Doctrine\DBAL\Connection;
 use RuntimeException;
 
 final class CompanyRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Connection $db,
         private readonly SeedProvenance $provenance,
         // Same namespace, so no import: membership changes more than one row and must not be
         // separable by a failure between the statements.
@@ -55,34 +54,41 @@ final class CompanyRepository
 
         // A company created through the ordinary registration flow belongs to whichever
         // universe its owner does, so a SEED company administrator registers a SEED company.
-        $companyM = new CompaniesM($this->db);
-        $companyM->public_id = Uuid::v4();
-        $companyM->seed_token = $this->provenance->fromUser($ownerUserId);
-        $companyM->name = $name;
-        $companyM->domain = $domain;
-        $companyM->status = 'active';
-        $companyM->created_by_user_id = $ownerUserId;
-        $companyM->created_at = $now;
-        $companyM->updated_at = $now;
-        $companyM->save();
+        $rows = $this->db->fetchAllAssociative(
+            'INSERT INTO companies
+                (public_id, seed_token, name, domain, status, created_by_user_id, created_at, updated_at)
+             VALUES
+                (:public_id, :seed_token, :name, :domain, :status, :created_by_user_id, :created_at, :updated_at)
+             RETURNING id',
+            [
+                'public_id' => Uuid::v4(),
+                'seed_token' => $this->provenance->fromUser($ownerUserId),
+                'name' => $name,
+                'domain' => $domain,
+                'status' => 'active',
+                'created_by_user_id' => $ownerUserId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]
+        );
 
-        $companyId = (int) $companyM->id;
+        $companyId = (int) ($rows[0]['id'] ?? 0);
         if ($companyId < 1) {
             throw new RuntimeException('Unable to create company.');
         }
 
-        $this->db->exec(
+        $this->db->executeStatement(
             "INSERT INTO company_users (company_id,user_id,company_role,status,created_at,seed_token)
              VALUES (:company_id,:user_id,'owner','active',:created_at,:seed_token::uuid)
              ON CONFLICT (company_id,user_id) DO UPDATE
              SET company_role=EXCLUDED.company_role,status='active'",
             [
-                ':company_id' => $companyId,
-                ':user_id' => $ownerUserId,
-                ':created_at' => $now,
+                'company_id' => $companyId,
+                'user_id' => $ownerUserId,
+                'created_at' => $now,
                 // A membership belongs to both parents at once, so a mismatch is refused here
                 // with both sides named rather than left to the trigger's column-level message.
-                ':seed_token' => $this->provenance->forPair('companies', $companyId, 'users', $ownerUserId),
+                'seed_token' => $this->provenance->forPair('companies', $companyId, 'users', $ownerUserId),
             ]
         );
 
@@ -93,17 +99,16 @@ final class CompanyRepository
     /** @return array<string,mixed>|null */
     public function findById(int $companyId): ?array
     {
-        $company = new CompaniesM($this->db);
-        $company->load(['id = ?', $companyId]);
+        $row = $this->db->fetchAssociative('SELECT * FROM companies WHERE id = :id', ['id' => $companyId]);
 
-        return $company->dry() ? null : $company->row();
+        return $row === false ? null : $row;
     }
 
     /** @return array<string,mixed>|null */
     public function findForUser(int $userId): ?array
     {
         // SQL is justified because company membership and company details are joined.
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT c.*, cu.company_role
              FROM companies c
              JOIN company_users cu ON cu.company_id = c.id
@@ -112,7 +117,7 @@ final class CompanyRepository
                AND c.status = :status
              ORDER BY c.created_at ASC
              LIMIT 1',
-            [':user_id' => $userId, ':status' => 'active']
+            ['user_id' => $userId, 'status' => 'active']
         );
 
         return $rows[0] ?? null;
@@ -131,14 +136,18 @@ final class CompanyRepository
 
     public function domainExists(string $domain): bool
     {
-        $company = new CompaniesM($this->db);
-        return $company->count(['domain = ?', $domain]) > 0;
+        return (int) $this->db->fetchOne(
+            'SELECT COUNT(*)::int FROM companies WHERE domain = :domain',
+            ['domain' => $domain]
+        ) > 0;
     }
 
     public function domainExistsForOther(string $domain, int $companyId): bool
     {
-        $company = new CompaniesM($this->db);
-        return $company->count(['domain = ? AND id <> ?', $domain, $companyId]) > 0;
+        return (int) $this->db->fetchOne(
+            'SELECT COUNT(*)::int FROM companies WHERE domain = :domain AND id <> :id',
+            ['domain' => $domain, 'id' => $companyId]
+        ) > 0;
     }
     /**
      * Whether this user's active company is suspended.
@@ -149,13 +158,13 @@ final class CompanyRepository
      */
     public function userCompanyIsSuspended(int $userId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT EXISTS (
                  SELECT 1 FROM company_users cu
                  JOIN companies c ON c.id = cu.company_id
                  WHERE cu.user_id = :user_id AND cu.status = 'active' AND c.status <> 'active'
              ) AS suspended",
-            [':user_id' => $userId]
+            ['user_id' => $userId]
         );
 
         return $this->databaseBoolean($rows[0]['suspended'] ?? false);
@@ -171,9 +180,12 @@ final class CompanyRepository
      */
     public function systemCompany(DataUniverse $universe): ?array
     {
-        $company = new CompaniesM($this->db);
-        $company->load(['is_system = TRUE AND ' . ($universe->predicate('') ?? 'seed_token IS NULL')]);
-        return $company->dry() ? null : $company->row();
+        $row = $this->db->fetchAssociative(
+            'SELECT * FROM companies WHERE is_system = TRUE AND '
+                . ($universe->predicate('') ?? 'seed_token IS NULL') . ' LIMIT 1'
+        );
+
+        return $row === false ? null : $row;
     }
 
     /**
@@ -201,56 +213,79 @@ final class CompanyRepository
         $configuredDomain = strtolower(trim($domain));
         $configuredDomain = ltrim($configuredDomain !== '' ? $configuredDomain : 'local', '.');
 
-        $company = new CompaniesM($this->db);
-        $company->load(['is_system = TRUE AND ' . $systemScope]);
-        if ($company->dry()) {
-            // Prefer the administrator's existing active company when it already
-            // uses APP_DOMAIN. This avoids creating a duplicate host organisation.
-            $rows = $this->db->exec(
+        $existing = $this->db->fetchAssociative(
+            'SELECT * FROM companies WHERE is_system = TRUE AND ' . $systemScope . ' LIMIT 1'
+        );
+
+        if ($existing === false) {
+            // No System Company in this universe yet. Adopt an existing company on the configured
+            // domain if there is one - preferring a company the actor already belongs to - rather
+            // than creating a second organisation alongside it.
+            $adopt = $this->db->fetchAssociative(
                 "SELECT c.id FROM companies c
                  LEFT JOIN company_users cu ON cu.company_id=c.id AND cu.user_id=:user_id AND cu.status='active'
                  WHERE c.status='active' AND lower(c.domain)=:domain AND c." . $systemScope . "
                  ORDER BY (cu.user_id IS NOT NULL) DESC, c.created_at ASC
                  LIMIT 1",
-                [':user_id' => $actorUserId, ':domain' => $configuredDomain]
+                ['user_id' => $actorUserId, 'domain' => $configuredDomain]
             );
-            if (isset($rows[0]['id'])) {
-                $company->load(['id = ?', (int) $rows[0]['id']]);
-                $company->is_system = true;
-                $company->company_type = 'system';
-                if (trim((string) $company->name) === '') {
-                    $company->name = trim($name) !== '' ? trim($name) : 'System Company';
-                }
-                $company->updated_at = gmdate('Y-m-d H:i:sP');
-                $company->save();
+
+            if ($adopt !== false) {
+                $companyId = (int) $adopt['id'];
+                $adopted = $this->findById($companyId);
+                $this->db->executeStatement(
+                    'UPDATE companies
+                        SET is_system = TRUE, company_type = :company_type, name = :name,
+                            updated_at = :updated_at
+                      WHERE id = :id',
+                    [
+                        'company_type' => 'system',
+                        'name' => trim((string) ($adopted['name'] ?? '')) !== ''
+                            ? (string) $adopted['name']
+                            : (trim($name) !== '' ? trim($name) : 'System Company'),
+                        'updated_at' => gmdate('Y-m-d H:i:sP'),
+                        'id' => $companyId,
+                    ]
+                );
             } else {
                 $now = gmdate('Y-m-d H:i:sP');
-                $company->public_id = Uuid::v4();
-                $company->name = trim($name) !== '' ? trim($name) : 'System Company';
-                // The permanent host company starts on APP_DOMAIN exactly.
-                $company->domain = $configuredDomain;
-                $company->status = 'active';
-                $company->is_system = true;
-                $company->company_type = 'system';
-                $company->created_by_user_id = $actorUserId;
-                $company->created_at = $now;
-                $company->updated_at = $now;
-                $company->save();
+                $created = $this->db->fetchAllAssociative(
+                    // seed_token is NULL, which is what the mapper wrote by leaving it unset. The
+                    // REAL System Company is the only one this path creates: the SEED one is
+                    // created by the seed generator with its reserved infrastructure token and is
+                    // never created on demand.
+                    'INSERT INTO companies
+                        (public_id, seed_token, name, domain, status, is_system, company_type,
+                         created_by_user_id, created_at, updated_at)
+                     VALUES
+                        (:public_id, NULL, :name, :domain, :status, TRUE, :company_type,
+                         :created_by_user_id, :created_at, :updated_at)
+                     RETURNING id',
+                    [
+                        'public_id' => Uuid::v4(),
+                        'name' => trim($name) !== '' ? trim($name) : 'System Company',
+                        'domain' => $configuredDomain,
+                        'status' => 'active',
+                        'company_type' => 'system',
+                        'created_by_user_id' => $actorUserId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
+                );
+                $companyId = (int) ($created[0]['id'] ?? 0);
             }
         } else {
-            // Correct only the legacy v0.4.0-generated system.<APP_DOMAIN> value.
-            // Once the administrator edits the domain, their choice is preserved.
-            $currentDomain = strtolower(trim((string) $company->domain));
+            $companyId = (int) $existing['id'];
+            $currentDomain = strtolower(trim((string) $existing['domain']));
             $legacyGenerated = $currentDomain === 'system.' . $configuredDomain
                 || preg_match('/^system-\d+\.' . preg_quote($configuredDomain, '/') . '$/', $currentDomain) === 1;
-            if ($legacyGenerated && !$this->domainExistsForOther($configuredDomain, (int) $company->id)) {
-                $company->domain = $configuredDomain;
-                $company->updated_at = gmdate('Y-m-d H:i:sP');
-                $company->save();
+            if ($legacyGenerated && !$this->domainExistsForOther($configuredDomain, $companyId)) {
+                $this->db->executeStatement(
+                    'UPDATE companies SET domain = :domain, updated_at = :updated_at WHERE id = :id',
+                    ['domain' => $configuredDomain, 'updated_at' => gmdate('Y-m-d H:i:sP'), 'id' => $companyId]
+                );
             }
         }
-
-        $companyId = (int) $company->id;
 
         return $this->findById($companyId) ?? throw new RuntimeException('System Company could not be loaded.');
     }
@@ -270,7 +305,7 @@ final class CompanyRepository
         $userScope = $writeUniverse->predicate('u');
         $companyScope = $writeUniverse->predicate('c');
 
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'INSERT INTO company_users (company_id,user_id,company_role,status,created_at,seed_token)
              SELECT c.id,u.id,\'student\',\'active\',NOW(),u.seed_token
              FROM users u
@@ -281,7 +316,7 @@ final class CompanyRepository
              ON CONFLICT (company_id,user_id)
              DO UPDATE SET status=\'active\', company_role=EXCLUDED.company_role
              RETURNING user_id',
-            [':company_id' => $companyId]
+            ['company_id' => $companyId]
         );
         return count($rows);
     }
@@ -312,22 +347,22 @@ final class CompanyRepository
         // between them.
         $this->transactions->run(function () use ($companyId, $userId, $companyRole, $seedToken): void {
             // A user has one active company membership. Composite-key tables are
-            // updated with SQL rather than DB\SQL\Mapper.
-            $this->db->exec(
+            // updated with one statement rather than a mapper round trip.
+            $this->db->executeStatement(
                 "UPDATE company_users SET status='inactive'
                  WHERE user_id=:user_id AND status='active' AND company_id<>:company_id",
-                [':user_id' => $userId, ':company_id' => $companyId]
+                ['user_id' => $userId, 'company_id' => $companyId]
             );
-            $this->db->exec(
+            $this->db->executeStatement(
                 "INSERT INTO company_users (company_id,user_id,company_role,status,created_at,seed_token)
                  VALUES (:company_id,:user_id,:company_role,'active',NOW(),:seed_token::uuid)
                  ON CONFLICT (company_id,user_id) DO UPDATE
                  SET company_role=EXCLUDED.company_role,status='active'",
                 [
-                    ':company_id' => $companyId,
-                    ':user_id' => $userId,
-                    ':company_role' => $companyRole,
-                    ':seed_token' => $seedToken,
+                    'company_id' => $companyId,
+                    'user_id' => $userId,
+                    'company_role' => $companyRole,
+                    'seed_token' => $seedToken,
                 ]
             );
         });
@@ -337,34 +372,54 @@ final class CompanyRepository
     public function createManaged(int $actorUserId, string $name, string $domain, string $type): array
     {
         $now = gmdate('Y-m-d H:i:sP');
-        $company = new CompaniesM($this->db);
-        $company->public_id = Uuid::v4();
-        $company->name = trim($name);
-        $company->domain = strtolower(trim($domain));
-        $company->status = 'active';
-        $company->is_system = false;
-        $company->company_type = in_array($type, ['client','course_provider'], true) ? $type : 'client';
-        $company->created_by_user_id = $actorUserId;
-        $company->created_at = $now;
-        $company->updated_at = $now;
-        $company->save();
-        return $this->findById((int) $company->id) ?? throw new RuntimeException('The company could not be created.');
+        $rows = $this->db->fetchAllAssociative(
+            // seed_token is stated rather than defaulted. A company created from Administration
+            // is REAL by definition - there is no parent row to inherit provenance from - and
+            // writing NULL explicitly records that decision where the guard can see it.
+            'INSERT INTO companies
+                (public_id, seed_token, name, domain, status, is_system, company_type,
+                 created_by_user_id, created_at, updated_at)
+             VALUES
+                (:public_id, NULL, :name, :domain, :status, FALSE, :company_type,
+                 :created_by_user_id, :created_at, :updated_at)
+             RETURNING id',
+            [
+                'public_id' => Uuid::v4(),
+                'name' => trim($name),
+                'domain' => strtolower(trim($domain)),
+                'status' => 'active',
+                'company_type' => in_array($type, ['client','course_provider'], true) ? $type : 'client',
+                'created_by_user_id' => $actorUserId,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]
+        );
+
+        return $this->findById((int) ($rows[0]['id'] ?? 0))
+            ?? throw new RuntimeException('The company could not be created.');
     }
 
     public function updateManaged(int $companyId, string $name, string $domain, string $type): void
     {
-        $company = new CompaniesM($this->db);
-        $company->load(['id = ?', $companyId]);
-        if ($company->dry()) {
-            throw new RuntimeException('The company does not exist.');
-        }
-        $company->name = trim($name);
-        $company->domain = strtolower(trim($domain));
-        $company->company_type = $this->databaseBoolean($company->is_system)
-            ? 'system'
-            : (in_array($type, ['client','course_provider'], true) ? $type : 'client');
-        $company->updated_at = gmdate('Y-m-d H:i:sP');
-        $company->save();
+        $company = $this->findById($companyId)
+            ?? throw new RuntimeException('The company does not exist.');
+
+        $this->db->executeStatement(
+            'UPDATE companies SET name = :name, domain = :domain, company_type = :company_type,
+                    updated_at = :updated_at
+              WHERE id = :id',
+            [
+                'name' => trim($name),
+                'domain' => strtolower(trim($domain)),
+                // The System Company keeps its type whatever the form said; the invariant is the
+                // repository's to hold, not the screen's.
+                'company_type' => $this->databaseBoolean($company['is_system'])
+                    ? 'system'
+                    : (in_array($type, ['client','course_provider'], true) ? $type : 'client'),
+                'updated_at' => gmdate('Y-m-d H:i:sP'),
+                'id' => $companyId,
+            ]
+        );
     }
 
     public function setStatus(int $companyId, string $status): void
@@ -372,34 +427,33 @@ final class CompanyRepository
         if (!in_array($status, ['active','disabled'], true)) {
             throw new RuntimeException('Invalid company status.');
         }
-        $company = new CompaniesM($this->db);
-        $company->load(['id = ?', $companyId]);
-        if ($company->dry()) {
-            throw new RuntimeException('The company does not exist.');
-        }
-        if ($this->databaseBoolean($company->is_system) && $status !== 'active') {
+        $company = $this->findById($companyId)
+            ?? throw new RuntimeException('The company does not exist.');
+        if ($this->databaseBoolean($company['is_system']) && $status !== 'active') {
             throw new RuntimeException('The System Company cannot be disabled.');
         }
-        $company->status = $status;
-        $company->updated_at = gmdate('Y-m-d H:i:sP');
-        $company->save();
+
+        $this->db->executeStatement(
+            'UPDATE companies SET status = :status, updated_at = :updated_at WHERE id = :id',
+            ['status' => $status, 'updated_at' => gmdate('Y-m-d H:i:sP'), 'id' => $companyId]
+        );
     }
 
     public function userBelongsToCompany(int $companyId, int $userId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT 1 FROM company_users WHERE company_id=:company_id AND user_id=:user_id AND status='active' LIMIT 1",
-            [':company_id' => $companyId, ':user_id' => $userId]
+            ['company_id' => $companyId, 'user_id' => $userId]
         );
         return isset($rows[0]);
     }
 
     public function removeUser(int $companyId, int $userId): void
     {
-        $affected = $this->db->exec(
+        $affected = $this->db->executeStatement(
             "UPDATE company_users SET status='inactive'
              WHERE company_id=:company_id AND user_id=:user_id AND status='active'",
-            [':company_id' => $companyId, ':user_id' => $userId]
+            ['company_id' => $companyId, 'user_id' => $userId]
         );
         if ((int) $affected < 1) {
             throw new RuntimeException('The person is not an active member of this company.');
@@ -408,17 +462,19 @@ final class CompanyRepository
 
     public function updateCompany(int $companyId, string $name, string $type): void
     {
-        $company = new CompaniesM($this->db);
-        $company->load(['id = ?', $companyId]);
-        if ($company->dry()) {
-            throw new RuntimeException('The company does not exist.');
+        $company = $this->findById($companyId)
+            ?? throw new RuntimeException('The company does not exist.');
+
+        $values = ['name' => trim($name), 'updated_at' => gmdate('Y-m-d H:i:sP')];
+        if (!$this->databaseBoolean($company['is_system'])) {
+            $values['company_type'] = in_array($type, ['client','course_provider'], true) ? $type : 'client';
         }
-        $company->name = trim($name);
-        if (!$this->databaseBoolean($company->is_system)) {
-            $company->company_type = in_array($type, ['client','course_provider'], true) ? $type : 'client';
-        }
-        $company->updated_at = gmdate('Y-m-d H:i:sP');
-        $company->save();
+        $assignments = implode(', ', array_map(static fn(string $c): string => $c . ' = :' . $c, array_keys($values)));
+
+        $this->db->executeStatement(
+            'UPDATE companies SET ' . $assignments . ' WHERE id = :id',
+            $values + ['id' => $companyId]
+        );
     }
 
     private function databaseBoolean(mixed $value): bool

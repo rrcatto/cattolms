@@ -465,7 +465,10 @@ final class SeedDatabaseContractTest extends TestCase
         $body = $match[1];
         self::assertStringNotContainsString('seed_token', $body);
         self::assertStringNotContainsString('DataUniverse', $body);
-        self::assertStringContainsString("':status' => 'active'", $body, 'The existing verification rules must stand.');
+        // The binding key lost its leading colon when the repository moved to DBAL, which binds by
+        // bare name. What is asserted is the rule, not the spelling: the lookup still admits only
+        // an active account.
+        self::assertStringContainsString("'status' => 'active'", $body, 'The existing verification rules must stand.');
     }
 
     /**
