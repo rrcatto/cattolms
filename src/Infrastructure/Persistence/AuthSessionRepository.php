@@ -27,14 +27,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\AuthSessionsM;
 use CattoLearning\Support\Uuid;
-use DB\SQL;
 
 final class AuthSessionRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Database $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -46,17 +44,25 @@ final class AuthSessionRepository
 
         // A session belongs to the identity that signed in. auth_sessions is seed-aware
         // precisely so a signed-in seed identity has a session the cleanup can remove.
-        $session = new AuthSessionsM($this->db);
-        $session->public_id = $publicId;
-        $session->seed_token = $this->provenance->fromUser($userId);
-        $session->user_id = $userId;
-        $session->token_hash = $tokenHash;
-        $session->ip_hash = $ipHash;
-        $session->user_agent = $agent;
-        $session->created_at = $now;
-        $session->last_seen_at = $now;
-        $session->expires_at = gmdate('Y-m-d H:i:sP', time() + $ttlSeconds);
-        $session->save();
+        $this->db->executeStatement(
+            'INSERT INTO auth_sessions
+                (public_id, seed_token, user_id, token_hash, ip_hash, user_agent,
+                 created_at, last_seen_at, expires_at)
+             VALUES
+                (:public_id, :seed_token, :user_id, :token_hash, :ip_hash, :user_agent,
+                 :created_at, :last_seen_at, :expires_at)',
+            [
+                'public_id' => $publicId,
+                'seed_token' => $this->provenance->fromUser($userId),
+                'user_id' => $userId,
+                'token_hash' => $tokenHash,
+                'ip_hash' => $ipHash,
+                'user_agent' => $agent,
+                'created_at' => $now,
+                'last_seen_at' => $now,
+                'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
+            ]
+        );
 
         return $publicId;
     }
@@ -71,7 +77,7 @@ final class AuthSessionRepository
         // belongs in AuthService where the platform-administrator exemption lives and can be read.
         // Encoding the exemption in this query would bury the one rule that prevents a company
         // suspension from locking an administrator out of their own installation.
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, u.seed_token AS user_seed_token, ue.email AS primary_email,
                     EXISTS (
                         SELECT 1 FROM company_users cu
@@ -86,7 +92,7 @@ final class AuthSessionRepository
                AND s.expires_at > NOW()
                AND u.status = :status
              LIMIT 1",
-            [':token_hash' => $tokenHash, ':status' => 'active']
+            ['token_hash' => $tokenHash, 'status' => 'active']
         );
 
         return $rows[0] ?? null;
@@ -94,35 +100,36 @@ final class AuthSessionRepository
 
     public function touch(int $id, int $ttlSeconds): void
     {
-        $session = new AuthSessionsM($this->db);
-        $session->load(['id = ?', $id]);
-        if ($session->dry()) {
-            return;
-        }
-
-        $session->last_seen_at = gmdate('Y-m-d H:i:sP');
-        $session->expires_at = gmdate('Y-m-d H:i:sP', time() + $ttlSeconds);
-        $session->save();
+        $this->db->executeStatement(
+            'UPDATE auth_sessions SET last_seen_at = :last_seen_at, expires_at = :expires_at
+              WHERE id = :id',
+            [
+                'last_seen_at' => gmdate('Y-m-d H:i:sP'),
+                'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),
+                'id' => $id,
+            ]
+        );
     }
 
     /** @return list<array<string,mixed>> */
     public function listForUser(int $userId): array
     {
-        $session = new AuthSessionsM($this->db);
-        $rows = $session->find(
-            ['user_id = ? AND revoked_at IS NULL AND expires_at > ?', $userId, gmdate('Y-m-d H:i:sP')],
-            ['order' => 'created_at DESC']
-        ) ?: [];
-        /** @var list<AuthSessionsM> $rows */
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT public_id, user_agent, created_at, last_seen_at, expires_at, revoked_at
+               FROM auth_sessions
+              WHERE user_id = :user_id AND revoked_at IS NULL AND expires_at > :now
+              ORDER BY created_at DESC',
+            ['user_id' => $userId, 'now' => gmdate('Y-m-d H:i:sP')]
+        );
 
         return array_map(
-            static fn(AuthSessionsM $row): array => [
-                'public_id' => (string) $row->public_id,
-                'user_agent' => (string) $row->user_agent,
-                'created_at' => $row->created_at,
-                'last_seen_at' => $row->last_seen_at,
-                'expires_at' => $row->expires_at,
-                'revoked_at' => $row->revoked_at,
+            static fn(array $row): array => [
+                'public_id' => (string) $row['public_id'],
+                'user_agent' => (string) $row['user_agent'],
+                'created_at' => $row['created_at'],
+                'last_seen_at' => $row['last_seen_at'],
+                'expires_at' => $row['expires_at'],
+                'revoked_at' => $row['revoked_at'],
             ],
             $rows
         );
@@ -130,18 +137,11 @@ final class AuthSessionRepository
 
     public function revoke(int $userId, string $publicId): void
     {
-        $session = new AuthSessionsM($this->db);
-        $session->load([
-            'user_id = ? AND public_id = ? AND revoked_at IS NULL',
-            $userId,
-            $publicId,
-        ]);
-        if ($session->dry()) {
-            return;
-        }
-
-        $session->revoked_at = gmdate('Y-m-d H:i:sP');
-        $session->save();
+        $this->db->executeStatement(
+            'UPDATE auth_sessions SET revoked_at = :revoked_at
+              WHERE user_id = :user_id AND public_id = :public_id AND revoked_at IS NULL',
+            ['revoked_at' => gmdate('Y-m-d H:i:sP'), 'user_id' => $userId, 'public_id' => $publicId]
+        );
     }
 
     /**
@@ -158,13 +158,11 @@ final class AuthSessionRepository
      */
     public function revokeAllForUser(int $userId): int
     {
-        $this->db->exec(
-            "UPDATE auth_sessions SET revoked_at = NOW()
-             WHERE user_id = :user_id AND revoked_at IS NULL",
-            [':user_id' => $userId]
+        return $this->db->executeStatement(
+            'UPDATE auth_sessions SET revoked_at = NOW()
+              WHERE user_id = :user_id AND revoked_at IS NULL',
+            ['user_id' => $userId]
         );
-
-        return (int) $this->db->count();
     }
 
     /**
@@ -181,7 +179,7 @@ final class AuthSessionRepository
      */
     public function revokeCompanyMemberSessions(int $companyId): int
     {
-        $this->db->exec(
+        return $this->db->executeStatement(
             "UPDATE auth_sessions SET revoked_at = NOW()
              WHERE revoked_at IS NULL
                AND user_id IN (
@@ -193,28 +191,23 @@ final class AuthSessionRepository
                    JOIN roles r ON r.id = ur.role_id
                    WHERE ur.user_id = auth_sessions.user_id AND r.role_key = 'ADMIN'
                )",
-            [':company_id' => $companyId]
+            ['company_id' => $companyId]
         );
-
-        return (int) $this->db->count();
     }
 
     public function revokeByTokenHash(string $tokenHash): void
     {
-        $session = new AuthSessionsM($this->db);
-        $session->load(['token_hash = ? AND revoked_at IS NULL', $tokenHash]);
-        if ($session->dry()) {
-            return;
-        }
-
-        $session->revoked_at = gmdate('Y-m-d H:i:sP');
-        $session->save();
+        $this->db->executeStatement(
+            'UPDATE auth_sessions SET revoked_at = :revoked_at
+              WHERE token_hash = :token_hash AND revoked_at IS NULL',
+            ['revoked_at' => gmdate('Y-m-d H:i:sP'), 'token_hash' => $tokenHash]
+        );
     }
 
     public function prune(): int
     {
         // SQL is used because PostgreSQL interval arithmetic is clearer here.
-        return (int) $this->db->exec(
+        return $this->db->executeStatement(
             "DELETE FROM auth_sessions
              WHERE expires_at < NOW() - INTERVAL '30 days'
                 OR revoked_at < NOW() - INTERVAL '30 days'"

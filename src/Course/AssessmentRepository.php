@@ -25,16 +25,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
-use CattoLearning\Infrastructure\Persistence\M\AssessmentSessionsM;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Infrastructure\Persistence\SeedProvenance;
-use DB\SQL;
+use Doctrine\DBAL\Connection;
 use RuntimeException;
 
 final class AssessmentRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Connection $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -42,7 +41,7 @@ final class AssessmentRepository
     /** @return array<string,mixed>|null */
     public function activeSession(int $enrolmentId, int $assessmentId, string $mode): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT s.*, a.title AS assessment_title, a.assessment_type, a.module_id,
                     a.pass_mark, a.score_policy, a.negative_marking, a.maximum_attempts,
                     a.time_limit_seconds, a.practice_enabled, a.assessment_key,
@@ -52,7 +51,7 @@ final class AssessmentRepository
              WHERE s.enrolment_id=:enrolment_id AND s.assessment_id=:assessment_id
                AND s.attempt_mode=:mode AND s.status='in_progress'
              ORDER BY s.id DESC LIMIT 1",
-            [':enrolment_id' => $enrolmentId, ':assessment_id' => $assessmentId, ':mode' => $mode]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'mode' => $mode]
         );
         return isset($rows[0]) ? $this->normalise($rows[0]) : null;
     }
@@ -62,11 +61,11 @@ final class AssessmentRepository
         if (!in_array($mode, ['graded', 'diagnostic'], true)) {
             throw new \InvalidArgumentException('Select a valid completed-attempt mode.');
         }
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM assessment_sessions
              WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id
                AND attempt_mode=:mode AND status IN ('submitted','timed_out')",
-            [':enrolment_id' => $enrolmentId, ':assessment_id' => $assessmentId, ':mode' => $mode]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'mode' => $mode]
         );
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -82,29 +81,43 @@ final class AssessmentRepository
         string $mode,
         array $questions
     ): array {
-        $attemptRows = $this->db->exec(
+        $attemptRows = $this->db->fetchAllAssociative(
             'SELECT COALESCE(MAX(attempt_number),0)+1 AS next_number FROM assessment_sessions WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id AND attempt_mode=:mode',
-            [':enrolment_id' => $enrolmentId, ':assessment_id' => (int) $assessment['id'], ':mode' => $mode]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => (int) $assessment['id'], 'mode' => $mode]
         );
         $attemptNumber = (int) ($attemptRows[0]['next_number'] ?? 1);
         $started = time();
-        $sessionM = new AssessmentSessionsM($this->db);
-        $sessionM->public_id = Uuid::v4();
-        $sessionM->seed_token = $this->provenance->fromEnrolment($enrolmentId);
-        $sessionM->enrolment_id = $enrolmentId;
-        $sessionM->assessment_id = (int) $assessment['id'];
-        $sessionM->attempt_mode = $mode;
-        $sessionM->attempt_number = $attemptNumber;
-        $sessionM->status = 'in_progress';
-        $sessionM->selected_question_count = count($questions);
-        $sessionM->current_sequence = 1;
-        $sessionM->earned_points = 0;
-        $sessionM->maximum_points = array_sum(array_map(static fn(array $q): int => (int) $q['points'], $questions));
-        $sessionM->started_at = gmdate('Y-m-d H:i:sP', $started);
-        $sessionM->deadline_at = gmdate('Y-m-d H:i:sP', $started + (int) $assessment['time_limit_seconds']);
-        $sessionM->created_at = gmdate('Y-m-d H:i:sP', $started);
-        $sessionM->save();
-        $sessionId = (int) $sessionM->id;
+        // Held in a variable rather than generated inline: the session is reloaded by public id
+        // once its questions are written.
+        $sessionPublicId = Uuid::v4();
+        $sessionRows = $this->db->fetchAllAssociative(
+            'INSERT INTO assessment_sessions
+                (public_id, seed_token, enrolment_id, assessment_id, attempt_mode, attempt_number,
+                 status, selected_question_count, current_sequence, earned_points, maximum_points,
+                 started_at, deadline_at, created_at)
+             VALUES
+                (:public_id, :seed_token, :enrolment_id, :assessment_id, :attempt_mode, :attempt_number,
+                 :status, :selected_question_count, :current_sequence, :earned_points, :maximum_points,
+                 :started_at, :deadline_at, :created_at)
+             RETURNING id',
+            [
+                'public_id' => $sessionPublicId,
+                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
+                'enrolment_id' => $enrolmentId,
+                'assessment_id' => (int) $assessment['id'],
+                'attempt_mode' => $mode,
+                'attempt_number' => $attemptNumber,
+                'status' => 'in_progress',
+                'selected_question_count' => count($questions),
+                'current_sequence' => 1,
+                'earned_points' => 0,
+                'maximum_points' => array_sum(array_map(static fn(array $q): int => (int) $q['points'], $questions)),
+                'started_at' => gmdate('Y-m-d H:i:sP', $started),
+                'deadline_at' => gmdate('Y-m-d H:i:sP', $started + (int) $assessment['time_limit_seconds']),
+                'created_at' => gmdate('Y-m-d H:i:sP', $started),
+            ]
+        );
+        $sessionId = (int) ($sessionRows[0]['id'] ?? 0);
         if ($sessionId < 1) {
             throw new RuntimeException('Unable to start the assessment.');
         }
@@ -113,28 +126,28 @@ final class AssessmentRepository
             if ((bool) ($assessment['randomise_options'] ?? true)) {
                 shuffle($optionIds);
             }
-            $this->db->exec(
+            $this->db->executeStatement(
                 "INSERT INTO assessment_session_questions
                  (session_id,question_id,sequence,answer_order,response_status,points_awarded,seed_token)
                  VALUES (:session_id,:question_id,:sequence,:answer_order,'pending',0,:seed_token::uuid)
                  ON CONFLICT (session_id,question_id) DO NOTHING",
                 [
-                    ':seed_token' => $this->provenance->fromSession($sessionId),
-                    ':session_id' => $sessionId,
-                    ':question_id' => (int) $question['id'],
-                    ':sequence' => $sequence + 1,
-                    ':answer_order' => json_encode($optionIds, JSON_THROW_ON_ERROR),
+                    'seed_token' => $this->provenance->fromSession($sessionId),
+                    'session_id' => $sessionId,
+                    'question_id' => (int) $question['id'],
+                    'sequence' => $sequence + 1,
+                    'answer_order' => json_encode($optionIds, JSON_THROW_ON_ERROR),
                 ]
             );
         }
-        return $this->sessionByPublicId((string) $sessionM->public_id)
+        return $this->sessionByPublicId($sessionPublicId)
             ?? throw new RuntimeException('Unable to reload the assessment session.');
     }
 
     /** @return array<string,mixed>|null */
     public function sessionByPublicId(string $publicId): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT s.*, a.title AS assessment_title, a.assessment_type, a.module_id,
                     a.pass_mark, a.score_policy, a.negative_marking, a.maximum_attempts,
                     a.time_limit_seconds, a.practice_enabled, a.course_id, a.assessment_key,
@@ -147,7 +160,7 @@ final class AssessmentRepository
              JOIN courses c ON c.id=ce.course_id
              LEFT JOIN course_modules cm ON cm.id=a.module_id
              WHERE s.public_id=:public_id LIMIT 1",
-            [':public_id' => $publicId]
+            ['public_id' => $publicId]
         );
         return isset($rows[0]) ? $this->normalise($rows[0]) : null;
     }
@@ -155,24 +168,24 @@ final class AssessmentRepository
     /** @return array<string,mixed>|null */
     public function nextQuestion(int $sessionId): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT sq.*, q.question_html, q.points, q.explanation_html, q.incorrect_points,
                     q.difficulty
              FROM assessment_session_questions sq
              JOIN assessment_questions q ON q.id=sq.question_id
              WHERE sq.session_id=:session_id AND sq.response_status='pending'
              ORDER BY sq.sequence LIMIT 1",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         );
         if (!isset($rows[0])) {
-            $rows = $this->db->exec(
+            $rows = $this->db->fetchAllAssociative(
                 "SELECT sq.*, q.question_html, q.points, q.explanation_html, q.incorrect_points,
                         q.difficulty
                  FROM assessment_session_questions sq
                  JOIN assessment_questions q ON q.id=sq.question_id
                  WHERE sq.session_id=:session_id AND sq.response_status='skipped'
                  ORDER BY sq.sequence LIMIT 1",
-                [':session_id' => $sessionId]
+                ['session_id' => $sessionId]
             );
         }
         if (!isset($rows[0])) {
@@ -184,7 +197,7 @@ final class AssessmentRepository
             return null;
         }
         $placeholders = implode(',', array_fill(0, count($order), '?'));
-        $options = $this->db->exec(
+        $options = $this->db->fetchAllAssociative(
             "SELECT id, public_id, option_html FROM assessment_options WHERE id IN ($placeholders)",
             $order
         );
@@ -201,32 +214,32 @@ final class AssessmentRepository
 
     public function markPresented(int $sessionId, int $questionId): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             "UPDATE assessment_session_questions
              SET presented_at=CASE WHEN response_status='skipped' THEN NOW() ELSE COALESCE(presented_at,NOW()) END,
                  submitted_at=CASE WHEN response_status='skipped' THEN NULL ELSE submitted_at END
              WHERE session_id=:session_id AND question_id=:question_id",
-            [':session_id' => $sessionId, ':question_id' => $questionId]
+            ['session_id' => $sessionId, 'question_id' => $questionId]
         );
     }
 
     /** @return array<string,mixed> */
     public function recordResponse(int $sessionId, int $questionId, ?int $optionId, bool $skip, bool $negativeMarking): array
     {
-        $this->db->exec('SELECT id FROM assessment_sessions WHERE id=:id FOR UPDATE', [':id' => $sessionId]);
-        $rows = $this->db->exec(
+        $this->db->fetchAllAssociative('SELECT id FROM assessment_sessions WHERE id=:id FOR UPDATE', ['id' => $sessionId]);
+        $rows = $this->db->fetchAllAssociative(
             "SELECT sq.*, q.points, q.incorrect_points, q.explanation_html
              FROM assessment_session_questions sq
              JOIN assessment_questions q ON q.id=sq.question_id
              WHERE sq.session_id=:session_id AND sq.question_id=:question_id LIMIT 1",
-            [':session_id' => $sessionId, ':question_id' => $questionId]
+            ['session_id' => $sessionId, 'question_id' => $questionId]
         );
         if (!isset($rows[0])) {
             throw new RuntimeException('The assessment question does not belong to this attempt.');
         }
         $row = $this->normalise($rows[0]);
         if ($skip) {
-            $this->db->exec(
+            $this->db->fetchAllAssociative(
                 "WITH next_sequence AS (
                      SELECT COALESCE(MAX(sequence),0)+1 AS value
                      FROM assessment_session_questions
@@ -238,13 +251,13 @@ final class AssessmentRepository
                      response_seconds=GREATEST(0, EXTRACT(EPOCH FROM (NOW()-COALESCE(presented_at,NOW())))::int),
                      sequence=(SELECT value FROM next_sequence)
                  WHERE session_id=:session_id AND question_id=:question_id",
-                [':session_id' => $sessionId, ':question_id' => $questionId]
+                ['session_id' => $sessionId, 'question_id' => $questionId]
             );
             return ['status' => 'skipped', 'is_correct' => null, 'points_awarded' => 0, 'explanation_html' => ''];
         }
-        $options = $this->db->exec(
+        $options = $this->db->fetchAllAssociative(
             'SELECT id, is_correct, option_html FROM assessment_options WHERE question_id=:question_id',
-            [':question_id' => $questionId]
+            ['question_id' => $questionId]
         );
         $selected = null;
         $correctOption = null;
@@ -261,18 +274,18 @@ final class AssessmentRepository
         }
         $correct = $this->boolean($selected['is_correct'] ?? false);
         $points = $correct ? (float) $row['points'] : ($negativeMarking ? (float) $row['incorrect_points'] : 0.0);
-        $this->db->exec(
+        $this->db->executeStatement(
             "UPDATE assessment_session_questions
              SET response_status='answered', selected_option_id=:option_id, is_correct=:is_correct,
                  points_awarded=:points, submitted_at=NOW(),
                  response_seconds=GREATEST(0, EXTRACT(EPOCH FROM (NOW()-COALESCE(presented_at,NOW())))::int)
              WHERE session_id=:session_id AND question_id=:question_id",
             [
-                ':option_id' => $optionId,
-                ':is_correct' => $correct,
-                ':points' => $points,
-                ':session_id' => $sessionId,
-                ':question_id' => $questionId,
+                'option_id' => $optionId,
+                'is_correct' => $correct,
+                'points' => $points,
+                'session_id' => $sessionId,
+                'question_id' => $questionId,
             ]
         );
         return [
@@ -286,10 +299,10 @@ final class AssessmentRepository
 
     public function hasRemainingQuestions(int $sessionId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM assessment_session_questions
              WHERE session_id=:session_id AND response_status IN ('pending','skipped')",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         );
         return (int) ($rows[0]['total'] ?? 0) > 0;
     }
@@ -297,26 +310,26 @@ final class AssessmentRepository
 
     public function markRemainingUnanswered(int $sessionId): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             "UPDATE assessment_session_questions SET response_status='unanswered', points_awarded=0 WHERE session_id=:session_id AND response_status='pending'",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         );
     }
 
     public function markExpiredQuestions(int $sessionId): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             "UPDATE assessment_session_questions
              SET response_status='unanswered', points_awarded=0
              WHERE session_id=:session_id AND response_status='pending'",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         );
     }
 
     /** @return array<string,mixed> */
     public function calculateSession(int $sessionId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT COALESCE(SUM(points_awarded),0)::numeric AS earned,
                     COALESCE(SUM(q.points),0)::numeric AS maximum,
                     COUNT(*) FILTER (WHERE sq.response_status='answered')::int AS answered,
@@ -328,7 +341,7 @@ final class AssessmentRepository
              FROM assessment_session_questions sq
              JOIN assessment_questions q ON q.id=sq.question_id
              WHERE sq.session_id=:session_id",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         );
         $row = $rows[0] ?? [];
         $earned = max(0.0, (float) ($row['earned'] ?? 0));
@@ -351,27 +364,27 @@ final class AssessmentRepository
      */
     public function completeSession(int $sessionId, string $status, array $result, string $gradeCode, bool $passed): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             "UPDATE assessment_sessions SET status=:status, earned_points=:earned, maximum_points=:maximum,
                     percentage=:percentage, grade_code=:grade_code, passed=:passed, completed_at=NOW()
              WHERE id=:session_id AND status='in_progress'",
             [
-                ':status' => $status,
-                ':earned' => $result['earned_points'],
-                ':maximum' => $result['maximum_points'],
-                ':percentage' => $result['percentage'],
-                ':grade_code' => $gradeCode,
-                ':passed' => $passed,
-                ':session_id' => $sessionId,
+                'status' => $status,
+                'earned' => $result['earned_points'],
+                'maximum' => $result['maximum_points'],
+                'percentage' => $result['percentage'],
+                'grade_code' => $gradeCode,
+                'passed' => $passed,
+                'session_id' => $sessionId,
             ]
         );
     }
 
     public function attachLegacyAttempt(int $sessionId, int $attemptId): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'UPDATE assessment_sessions SET legacy_attempt_id=:attempt_id WHERE id=:session_id AND legacy_attempt_id IS NULL',
-            [':attempt_id' => $attemptId, ':session_id' => $sessionId]
+            ['attempt_id' => $attemptId, 'session_id' => $sessionId]
         );
     }
 
@@ -379,7 +392,7 @@ final class AssessmentRepository
     /** @return array<string,int> */
     public function sessionCounts(int $sessionId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total,
                     COUNT(*) FILTER (WHERE response_status='answered')::int AS answered,
                     COUNT(*) FILTER (WHERE response_status='answered' AND is_correct=TRUE)::int AS correct,
@@ -389,7 +402,7 @@ final class AssessmentRepository
                     COUNT(*) FILTER (WHERE response_status='timed_out')::int AS timed_out,
                     COUNT(*) FILTER (WHERE response_status='unanswered')::int AS unanswered
              FROM assessment_session_questions WHERE session_id=:session_id",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         );
         $row = $rows[0] ?? [];
         return [
@@ -407,7 +420,7 @@ final class AssessmentRepository
     /** @return list<array<string,mixed>> */
     public function sessionResponses(int $sessionId): array
     {
-        return array_map(fn(array $r): array => $this->normalise($r), $this->db->exec(
+        return array_map(fn(array $r): array => $this->normalise($r), $this->db->fetchAllAssociative(
             "SELECT sq.*, q.question_html, q.explanation_html, q.points, q.remediation_module_keys,
                     selected.option_html AS selected_option_html,
                     correct.option_html AS correct_option_html
@@ -416,19 +429,19 @@ final class AssessmentRepository
              LEFT JOIN assessment_options selected ON selected.id=sq.selected_option_id
              LEFT JOIN assessment_options correct ON correct.question_id=q.id AND correct.is_correct=TRUE
              WHERE sq.session_id=:session_id ORDER BY sq.sequence",
-            [':session_id' => $sessionId]
+            ['session_id' => $sessionId]
         ));
     }
 
     /** @return list<float> */
     public function completedPercentages(int $enrolmentId, int $assessmentId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT percentage FROM assessment_sessions
              WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id
                AND attempt_mode='graded' AND status IN ('submitted','timed_out')
              ORDER BY completed_at, id",
-            [':enrolment_id' => $enrolmentId, ':assessment_id' => $assessmentId]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId]
         );
         return array_map(static fn(array $r): float => (float) $r['percentage'], $rows);
     }
