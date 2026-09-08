@@ -70,12 +70,14 @@ final class SymfonyKernelRouteTest extends TestCase
      * Paths Fat-Free still owns are declined, and a half-ported path is declined per method.
      *
      * The list is deliberately a sample of each shape the platform routes: a themed page, a page
-     * with a placeholder, an API document behind a token, and a POST.
+     * with a placeholder, a form target, and two method mismatches - POST to a path Symfony owns
+     * only for GET, and a verb no ported route declares at all.
      */
     public function testFatFreeRoutesAreNotMatched(): void
     {
         foreach ([['GET', '/'], ['GET', '/courses'], ['GET', '/courses/anything'],
-                  ['GET', '/api/v1/library'], ['POST', '/api/v1'], ['POST', '/contact']] as [$method, $path]) {
+                  ['GET', '/login'], ['POST', '/api/v1'], ['POST', '/contact'],
+                  ['DELETE', '/api/v1/admin/courses/1']] as [$method, $path]) {
             self::assertFalse(
                 $this->kernelMatches(Request::create($path, $method)),
                 $method . ' ' . $path . ' must fall through to Fat-Free.'

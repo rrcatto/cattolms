@@ -20,38 +20,54 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+        bind:
+            # The three roots, published as parameters by Kernel::build(). Several services take one
+            # as a constructor string, and binding by name here keeps the path out of every
+            # definition.
+            $codeRoot: '%catto.code_root%'
+            $instanceRoot: '%catto.instance_root%'
+            $publicRoot: '%catto.public_root%'
+            $storageRoot: '%catto.instance_root%/storage'
+            $bundledImportRoot: '%catto.code_root%/resources/course-imports'
 
     # The controllers the Symfony kernel routes to. Registered as a namespace rather than one at a
     # time because a controller that is not a service is a 500 with no route name in it, and that
     # is a poor way to find out you forgot a line.
     CattoLearning\Http\Symfony\:
         resource: '../src/Http/Symfony/'
-        exclude: '../src/Http/Symfony/Listener/'
+        exclude: '../src/Http/Symfony/{Listener,ApiResponse.php,ApiRequest.php}'
         tags: ['controller.service_arguments']
 
     CattoLearning\Http\Symfony\Listener\:
         resource: '../src/Http/Symfony/Listener/'
 
+    # The application graph a ported route reaches. Registered by namespace: listing services one at
+    # a time meant every port added five lines, and forgetting one was a container error at the far
+    # end of a request. The excludes are the things in those namespaces that are not services -
+    # enums, value objects with private constructors, exceptions - and the connection factory, which
+    # the PHP-DI container calls statically.
+    CattoLearning\Api\:
+        resource: '../src/Api/'
+        exclude: '../src/Api/{ApiIdentity.php,ApiScope.php,Security/ApiUser.php,*Exception.php}'
+
+    CattoLearning\Auth\:
+        resource: '../src/Auth/'
+        exclude: '../src/Auth/{CurrentUser.php,DataUniverse.php,RoleCatalog.php,RoleFamily.php}'
+
+    CattoLearning\Configuration\:
+        resource: '../src/Configuration/'
+
+    CattoLearning\Course\:
+        resource: '../src/Course/'
+        exclude: '../src/Course/{CatalogueFilter.php,*Exception.php}'
+
+    CattoLearning\Infrastructure\Persistence\:
+        resource: '../src/Infrastructure/Persistence/'
+        exclude: '../src/Infrastructure/Persistence/{ConnectionFactory.php,PageQuery.php,SeedTableCatalog.php,SessionTimeZoneDriver.php}'
+
     # Repositories depend on Database, not on Doctrine's Connection, because Database infers each
     # bound parameter's PDO type from the PHP value. Same reason as in the PHP-DI container.
     CattoLearning\Infrastructure\Persistence\Database: '@CattoLearning\Infrastructure\Persistence\DbalDatabase'
-    CattoLearning\Infrastructure\Persistence\DbalDatabase: ~
-    CattoLearning\Infrastructure\Persistence\OptionRepository: ~
-
-    CattoLearning\Configuration\SecretCipher: ~
-    CattoLearning\Configuration\RuntimeSettings: ~
-
-    # The API firewall: the authenticator, the two voters that answer its orthogonal questions, and
-    # the listener that keeps every failure in the API's own error document.
-    CattoLearning\Infrastructure\Persistence\ApiTokenRepository: ~
-    CattoLearning\Infrastructure\Persistence\RoleRepository: ~
-    CattoLearning\Infrastructure\Persistence\SeedProvenance: ~
-    CattoLearning\Api\ApiAuthService: ~
-    CattoLearning\Api\Security\ApiTokenAuthenticator: ~
-    CattoLearning\Api\Security\ApiScopeVoter: ~
-    CattoLearning\Api\Security\ApiExceptionListener: ~
-    CattoLearning\Auth\PermissionCatalog: ~
-    CattoLearning\Auth\Security\PermissionVoter: ~
 
     # Applied to DoctrineBundle's connection. The platform's own ConnectionFactory registers the
     # same middleware, so both connections agree about the session timezone.
