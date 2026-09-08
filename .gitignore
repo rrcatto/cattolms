@@ -18,3 +18,7 @@ Thumbs.db
 *.rej
 *.orig
 *.orig.*
+
+# Symfony writes this while building the container, and its contents depend on which environment
+# was warmed last, so a tracked copy churns between commits. It is an IDE helper; nothing reads it.
+/config/reference.php
