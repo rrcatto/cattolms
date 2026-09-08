@@ -1,0 +1,10 @@
+twig:
+    file_name_pattern: '*.twig'
+    # An undefined variable is an error, not a silent blank. F3 turns one into a 500 for the whole
+    # page; Twig's default is to render nothing at all, which is worse because it is invisible.
+    strict_variables: true
+    paths:
+        # Functional page bodies are platform-owned and live in their own namespace, so a theme
+        # cannot shadow one. check-runtime-hazards.php enforces the same rule for the F3 tree.
+        '%kernel.project_dir%/resources/views': platform
+    # '@theme' is set per request from the active theme: child release first, then its parent.

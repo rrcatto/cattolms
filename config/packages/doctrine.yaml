@@ -1,0 +1,20 @@
+# DBAL only. The ORM is deliberately absent.
+#
+# The repositories own their SQL: deferred-join pagination, FILTER clauses, string_agg, correlated
+# sub-selects tuned against a benchmark and constraint triggers on 27 tables. An identity map and a
+# deferred unit of work would sit between all of that and the database for no gain, and mixing ORM
+# writes with raw SQL in one transaction produces stale reads the current mapper model cannot have,
+# because F3 mappers write immediately.
+#
+# DoctrineBundle's recipe ships an `orm:` block with auto_mapping, which fails the container build
+# unless doctrine/orm is installed. Its absence here is the whole of turning the ORM off.
+doctrine:
+    dbal:
+        driver: pdo_pgsql
+        host: '%env(DB_HOST)%'
+        port: '%env(int:DB_PORT)%'
+        dbname: '%env(DB_NAME)%'
+        user: '%env(DB_USER)%'
+        password: '%env(DB_PASSWORD)%'
+        server_version: '16'
+        charset: utf8

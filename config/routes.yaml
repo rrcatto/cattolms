@@ -1,0 +1,7 @@
+# Routes move here one at a time. Fat-Free still owns every route it owned before; this file grows
+# as they are ported, and the front controller switches over once enough of them have.
+controllers:
+    resource:
+        path: ../src/Http/Symfony/
+        namespace: CattoLearning\Http\Symfony
+    type: attribute
