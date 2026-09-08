@@ -10,6 +10,8 @@ Description:
 Manages filesystem-authoritative Catto Learning Theme Package 3.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
 
 Changelog:
+2026/09/09 01:20 SAST
+- Added themeTemplateRoots(), the child-then-parent search order as a list, for the Twig loader.
 2026/08/20 06:17 SAST
 - Simplified asset fingerprint hash validation to the actual hash_file() failure contract for PHPStan level 6.
 2026/08/19 17:43 SAST
@@ -345,6 +347,26 @@ final class ThemeManager
     public function platformViewsRoot(): string
     {
         return rtrim($this->codeRoot, '/') . '/resources/views';
+    }
+
+    /**
+     * The theme's template roots, most specific first.
+     *
+     * A child release is searched before its parent, so a child that ships only a footer inherits
+     * every other template. themeUiPath() says the same thing in the semicolon-separated form F3
+     * wants; this is the form a Twig loader wants, and both are built from themeLayers() so they
+     * cannot disagree about the order.
+     *
+     * @return list<string>
+     */
+    public function themeTemplateRoots(string $key): array
+    {
+        $roots = [];
+        foreach (array_reverse($this->themeLayers($key)) as $layer) {
+            $roots[] = rtrim((string) $layer['root'], '/');
+        }
+
+        return $roots;
     }
 
     public function themeUiPath(string $key): string
