@@ -257,7 +257,7 @@
    These are stated with !important because themes load after core and each redeclares table padding,
    row-action wrapping and cell sizing at a higher specificity. Functional layout belongs to the LMS.
 */
-:root{--cl-table-pad-y:6px;--cl-table-pad-x:9px;--cl-table-font:.78rem;--cl-table-head-font:.66rem;--cl-table-btn-font:.7rem}
+:root{--cl-danger-soft:color-mix(in srgb,var(--cl-danger,#a8452f) 12%,white);--cl-table-pad-y:6px;--cl-table-pad-x:9px;--cl-table-font:.78rem;--cl-table-head-font:.66rem;--cl-table-btn-font:.7rem}
 /* !important, and the reason matters. Gilded Noir declares `.gn-main .table-wrap{overflow:auto}`
    at specificity (0,2,0) and loads after core, so a bare `.table-wrap` rule loses to it. The
    wrapper then clips, and the row menu - which is absolutely positioned and has to escape the cell
@@ -306,14 +306,57 @@
 .row-menu>summary.row-menu-trigger::after{content:none!important}
 .row-menu[open]>summary.row-menu-trigger{outline:1px solid var(--cl-border,#dfe4ea)}
 .row-menu>.row-menu-panel{padding:6px!important;margin:0!important}
-.row-menu-panel .btn,.row-menu-panel form{width:100%;display:block}
-.row-menu-panel form .btn{width:100%}
+
 /* A row menu can open again now the wrapper does not clip. */
 .row-menu>summary{list-style:none;cursor:pointer}
 .row-menu>summary::-webkit-details-marker{display:none}
 .row-menu-panel,.table-wrap .row-menu-panel{position:absolute!important;right:0;top:calc(100% + 4px);z-index:1050;display:grid!important;gap:2px;min-width:11rem;width:max-content;padding:6px!important;border:1px solid var(--cl-border,#dfe4ea)!important;border-radius:10px!important;background:var(--cl-page-surface,#fff)!important;color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)!important;text-align:left;white-space:nowrap}
-.row-menu-panel .btn,.row-menu-panel form{width:100%}
-.row-menu-panel .btn{justify-content:flex-start;text-align:left}
+/* Actions in a menu stack, one per line, always.
+   
+   A form is a grid too, not just a block: Approve and Reject live inside one form element, so
+   making only the form full-width left the two buttons inline next to each other inside it. Every
+   control in the panel is a block-level, full-width row whatever nests it.
+
+   Each action carries a border and a background so it reads as a control rather than as a line of
+   text, and changes on hover so it is obvious which one the pointer is on. The colours come from
+   the palette variables every theme sets, so a theme with a colour switcher restyles these along
+   with everything else instead of needing its own rules. */
+.row-menu-panel form,.row-menu-panel form[class]{display:grid!important;gap:2px;width:100%!important;margin:0!important}
+.row-menu-panel .btn,.row-menu-panel form .btn,.table-wrap .row-menu-panel .btn{
+  display:block!important;width:100%!important;box-sizing:border-box;
+  justify-content:flex-start;text-align:left;
+  padding:.34rem .55rem!important;border-radius:6px;
+  border:1px solid var(--cl-border,#dfe4ea)!important;
+  background:var(--cl-page-surface,#fff);
+  color:var(--cl-ink,var(--ink,#18212b));
+  transition:background .12s ease,border-color .12s ease,color .12s ease}
+.row-menu-panel .btn:hover,.row-menu-panel form .btn:hover{
+  background:var(--cl-primary-soft,var(--cl-accent-soft,#eef2f8));
+  border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))!important;
+  color:var(--cl-primary-dark,var(--cl-primary,#24405f))}
+.row-menu-panel .btn:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}
+/* The primary action of the row reads as the primary action. */
+.row-menu-panel .btn-primary{
+  background:var(--cl-primary,var(--cl-accent,#2f4a7c));
+  border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))!important;
+  color:var(--cl-on-color-1,#fff)}
+.row-menu-panel .btn-primary:hover{
+  background:var(--cl-primary-dark,#24405f);
+  border-color:var(--cl-primary-dark,#24405f)!important;
+  color:var(--cl-on-color-1,#fff)}
+/* Anything destructive is red before it is read, not after. */
+.row-menu-panel .btn-danger,.row-menu-panel .btn-outline-danger,
+.row-menu-panel form .btn-danger,.row-menu-panel form .btn-outline-danger{
+  background:var(--cl-danger-soft,#fdecea);
+  border-color:var(--cl-danger,#a8452f)!important;
+  color:var(--cl-danger,#a8452f)}
+.row-menu-panel .btn-danger:hover,.row-menu-panel .btn-outline-danger:hover,
+.row-menu-panel form .btn-danger:hover,.row-menu-panel form .btn-outline-danger:hover{
+  background:var(--cl-danger,#a8452f);
+  border-color:var(--cl-danger,#a8452f)!important;
+  color:#fff}
+/* A separator only where two groups of actions meet, never a border on every item. */
+.row-menu-panel form + form,.row-menu-panel form + .btn,.row-menu-panel .btn + form{margin-top:2px!important}
 
 /* v0.6 sortable column headings. Core owns them because sorting is functional navigation: the
    direction indicator has to be legible under a theme that has never heard of this control, and a

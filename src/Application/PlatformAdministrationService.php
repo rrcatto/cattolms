@@ -1215,7 +1215,7 @@ final class PlatformAdministrationService
             ),
             'requests' => empty($capabilities['view_requests'])
                 ? ['requests' => [], 'requests_preview_has_more' => false]
-                : $bounded('requests', fn(int $l, int $o): array => $this->administration->requests($universe, $l, $o), static fn(array $r): array => $r),
+                : $bounded('requests', fn(int $l, int $o): array => $this->administration->requests($universe, $l, $o), fn(array $r): array => $this->normaliseRequests($r)),
             'enrolments' => empty($capabilities['view_enrolments'])
                 ? ['enrolments' => [], 'enrolments_preview_has_more' => false]
                 : $bounded('enrolments', fn(int $l, int $o): array => $this->administration->enrolments($universe, $l, $o), fn(array $r): array => $this->normaliseEnrolments($r)),

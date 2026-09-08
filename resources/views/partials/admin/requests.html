@@ -76,7 +76,7 @@ Changelog:
 													<form action="/admin/course/requests/{{ @request.id }}/decision" method="post">
 														<input type="hidden" name="csrf" value="{{ @csrf }}">
 														<button class="btn btn-primary btn-sm" name="decision" value="approve">Approve</button>
-														<button class="btn btn-danger btn-sm" name="decision" value="reject">Reject</button>
+														<button class="btn btn-danger btn-sm" name="decision" value="reject" data-confirm="Reject this course request? The learner is told it was declined.">Reject</button>
 													</form>
 												</div>
 											</details>
