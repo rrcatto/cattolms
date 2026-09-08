@@ -8,131 +8,59 @@ Date time: 2026/09/08 SAST
 Version: 0.7
 
 Description:
-The platform's database access, over Doctrine DBAL.
+What a repository needs from the database.
 
-Architectural boundary: parameter binding and result shape only. It holds no SQL of its own and no
-business rules; repositories pass statements through it.
+Architectural boundary: the seam between a repository and whatever runs its SQL. It declares the
+result shape of each call and nothing else - no connection, no transaction policy, no driver.
 
-Why this exists rather than repositories injecting Doctrine's Connection directly.
+It exists because the repositories should not name a vendor, and because a test double has to be
+able to stand where the real one does. RecordingDatabase asserts which statement a dataset search
+reaches the database with; before this it extended F3's DB\SQL, and when the repositories moved to
+DBAL it could no longer stand in for one. Extending the concrete class instead would have meant
+dropping `final` from it, which is a worse trade: a seam is a deliberate extension point and `final`
+is a statement that a class is not one.
 
-F3's `DB\SQL::exec()` inferred the PDO parameter type from the PHP value: null bound as NULL, a bool
-as BOOL, an int as INT. DBAL binds everything as a string unless a type is declared alongside, so a
-`false` reaches PostgreSQL as `''` and a boolean column rejects it - `invalid input syntax for type
-boolean: ""`. Five repositories were converted before an integration test found it, and the failure
-is a runtime error on a specific row rather than anything visible at conversion time.
-
-Declaring types at 289 call sites would be the alternative. Inferring them once here keeps the call
-sites reading exactly as they did, and keeps the inference in one place where it can be corrected.
-
-Method names deliberately match DBAL's, so a repository converted against Connection needs only its
-constructor type changed, and so the eventual removal of this class - if the types are ever declared
-properly at each call - is a type change and nothing more.
+DbalDatabase is the implementation. Method names follow DBAL's so a repository converted against a
+Doctrine connection needs only its constructor type changed.
 
 Changelog:
 2026/09/08 SAST
-- Created after DBAL bound a PHP false as an empty string.
+- Extracted from the Database class so a test double can implement it.
 */
 
 declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use Doctrine\DBAL\ArrayParameterType;
-use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\ParameterType;
-
-final class Database
+interface Database
 {
-    public function __construct(private readonly Connection $connection)
-    {
-    }
-
-    /**
-     * The PDO type for one bound value, matching what F3 inferred.
-     *
-     * @return ParameterType|ArrayParameterType
-     */
-    private static function typeOf(mixed $value): ParameterType|ArrayParameterType
-    {
-        return match (true) {
-            $value === null => ParameterType::NULL,
-            is_bool($value) => ParameterType::BOOLEAN,
-            is_int($value) => ParameterType::INTEGER,
-            is_resource($value) => ParameterType::BINARY,
-            // An array binds as a list, which is what an IN (:ids) clause needs; DBAL expands it.
-            is_array($value) => $value !== [] && is_int(reset($value))
-                ? ArrayParameterType::INTEGER
-                : ArrayParameterType::STRING,
-            default => ParameterType::STRING,
-        };
-    }
-
-    /**
-     * @param array<string,mixed> $params
-     * @return array<string,ParameterType|ArrayParameterType>
-     */
-    private static function typesFor(array $params): array
-    {
-        return array_map(self::typeOf(...), $params);
-    }
-
     /**
      * @param array<string,mixed> $params
      * @return list<array<string,mixed>>
      */
-    public function fetchAllAssociative(string $sql, array $params = []): array
-    {
-        return $this->connection->fetchAllAssociative($sql, $params, self::typesFor($params));
-    }
+    public function fetchAllAssociative(string $sql, array $params = []): array;
 
     /**
      * @param array<string,mixed> $params
      * @return array<string,mixed>|false
      */
-    public function fetchAssociative(string $sql, array $params = []): array|false
-    {
-        return $this->connection->fetchAssociative($sql, $params, self::typesFor($params));
-    }
+    public function fetchAssociative(string $sql, array $params = []): array|false;
 
     /** @param array<string,mixed> $params */
-    public function fetchOne(string $sql, array $params = []): mixed
-    {
-        return $this->connection->fetchOne($sql, $params, self::typesFor($params));
-    }
+    public function fetchOne(string $sql, array $params = []): mixed;
 
     /**
      * @param array<string,mixed> $params
      * @return list<mixed>
      */
-    public function fetchFirstColumn(string $sql, array $params = []): array
-    {
-        return $this->connection->fetchFirstColumn($sql, $params, self::typesFor($params));
-    }
+    public function fetchFirstColumn(string $sql, array $params = []): array;
 
     /** @param array<string,mixed> $params */
-    public function executeStatement(string $sql, array $params = []): int
-    {
-        return (int) $this->connection->executeStatement($sql, $params, self::typesFor($params));
-    }
+    public function executeStatement(string $sql, array $params = []): int;
 
-    public function beginTransaction(): void
-    {
-        $this->connection->beginTransaction();
-    }
+    public function beginTransaction(): void;
 
-    public function commit(): void
-    {
-        $this->connection->commit();
-    }
+    public function commit(): void;
 
-    public function rollBack(): void
-    {
-        $this->connection->rollBack();
-    }
-
-    /** The underlying connection, for the few places that legitimately need DBAL itself. */
-    public function connection(): Connection
-    {
-        return $this->connection;
-    }
+    public function rollBack(): void;
 }
