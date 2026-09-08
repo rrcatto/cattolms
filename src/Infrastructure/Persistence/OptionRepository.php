@@ -27,11 +27,11 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use DB\SQL;
+use Doctrine\DBAL\Connection;
 
 final class OptionRepository
 {
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Connection $db)
     {
     }
 
@@ -42,9 +42,9 @@ final class OptionRepository
 
     public function find(string $key): ?string
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT option_value FROM app_options WHERE option_key=:key LIMIT 1',
-            [':key' => $key]
+            ['key' => $key]
         );
         return isset($rows[0]) ? (string) $rows[0]['option_value'] : null;
     }
@@ -52,19 +52,19 @@ final class OptionRepository
 
     public function set(string $key, string $value, ?int $updatedByUserId = null): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO app_options (option_key,option_value,updated_at,updated_by_user_id)
              VALUES (:key,:value,NOW(),:user_id)
              ON CONFLICT (option_key) DO UPDATE
              SET option_value=EXCLUDED.option_value,updated_at=EXCLUDED.updated_at,updated_by_user_id=EXCLUDED.updated_by_user_id',
-            [':key' => $key, ':value' => $value, ':user_id' => $updatedByUserId]
+            ['key' => $key, 'value' => $value, 'user_id' => $updatedByUserId]
         );
     }
 
 
     public function delete(string $key): void
     {
-        $this->db->exec('DELETE FROM app_options WHERE option_key=:key', [':key' => $key]);
+        $this->db->executeStatement('DELETE FROM app_options WHERE option_key=:key', ['key' => $key]);
     }
 
 }

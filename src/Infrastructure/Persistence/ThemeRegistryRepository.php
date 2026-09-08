@@ -19,7 +19,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use DB\SQL;
+use Doctrine\DBAL\Connection;
 use Throwable;
 
 /**
@@ -27,14 +27,14 @@ use Throwable;
  */
 final class ThemeRegistryRepository
 {
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Connection $db)
     {
     }
 
     /** @return list<array<string,mixed>> */
     public function all(): array
     {
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             "SELECT tr.*, p.install_key AS resolved_parent_key,
                     EXISTS(SELECT 1 FROM theme_registry c WHERE c.parent_theme_id=tr.id) AS has_children
              FROM theme_registry tr
@@ -60,12 +60,12 @@ final class ThemeRegistryRepository
      */
     public function rebuild(array $themes): void
     {
-        $this->db->begin();
+        $this->db->beginTransaction();
         try {
-            $this->db->exec('TRUNCATE TABLE theme_registry RESTART IDENTITY');
+            $this->db->executeStatement('TRUNCATE TABLE theme_registry RESTART IDENTITY');
             $ids = [];
             foreach ($themes as $theme) {
-                $rows = $this->db->exec(
+                $rows = $this->db->fetchAllAssociative(
                     "INSERT INTO theme_registry
                         (install_key,name,slug,version,author,description,schema_version,template_api,
                          theme_created_at,parent_name,parent_version,palette_count,manifest_sha256,synced_at)
@@ -74,19 +74,19 @@ final class ThemeRegistryRepository
                          :theme_created_at,:parent_name,:parent_version,:palette_count,:manifest_sha256,NOW())
                      RETURNING id",
                     [
-                        ':install_key' => (string) $theme['key'],
-                        ':name' => (string) $theme['name'],
-                        ':slug' => (string) $theme['slug'],
-                        ':version' => (string) $theme['version'],
-                        ':author' => (string) ($theme['manifest']['theme']['author'] ?? ''),
-                        ':description' => (string) ($theme['description'] ?? ''),
-                        ':schema_version' => (string) ($theme['manifest']['schema_version'] ?? ''),
-                        ':template_api' => (string) ($theme['manifest']['template_api'] ?? ''),
-                        ':theme_created_at' => $this->nullable((string) ($theme['manifest']['theme']['created_at'] ?? '')),
-                        ':parent_name' => $this->nullable((string) ($theme['parent_name'] ?? '')),
-                        ':parent_version' => $this->nullable((string) ($theme['parent_version'] ?? '')),
-                        ':palette_count' => count((array) ($theme['manifest']['palettes'] ?? [])),
-                        ':manifest_sha256' => (string) ($theme['manifest_sha256'] ?? ''),
+                        'install_key' => (string) $theme['key'],
+                        'name' => (string) $theme['name'],
+                        'slug' => (string) $theme['slug'],
+                        'version' => (string) $theme['version'],
+                        'author' => (string) ($theme['manifest']['theme']['author'] ?? ''),
+                        'description' => (string) ($theme['description'] ?? ''),
+                        'schema_version' => (string) ($theme['manifest']['schema_version'] ?? ''),
+                        'template_api' => (string) ($theme['manifest']['template_api'] ?? ''),
+                        'theme_created_at' => $this->nullable((string) ($theme['manifest']['theme']['created_at'] ?? '')),
+                        'parent_name' => $this->nullable((string) ($theme['parent_name'] ?? '')),
+                        'parent_version' => $this->nullable((string) ($theme['parent_version'] ?? '')),
+                        'palette_count' => count((array) ($theme['manifest']['palettes'] ?? [])),
+                        'manifest_sha256' => (string) ($theme['manifest_sha256'] ?? ''),
                     ]
                 );
                 $ids[(string) $theme['key']] = (int) ($rows[0]['id'] ?? 0);
@@ -106,14 +106,14 @@ final class ThemeRegistryRepository
                 }
                 if ($parentKey === null || !isset($ids[$parentKey])) continue;
 
-                $this->db->exec(
+                $this->db->executeStatement(
                     'UPDATE theme_registry SET parent_theme_id=:parent_id WHERE install_key=:install_key',
-                    [':parent_id' => $ids[$parentKey], ':install_key' => (string) $theme['key']]
+                    ['parent_id' => $ids[$parentKey], 'install_key' => (string) $theme['key']]
                 );
             }
             $this->db->commit();
         } catch (Throwable $exception) {
-            $this->db->rollback();
+            $this->db->rollBack();
             throw $exception;
         }
     }
