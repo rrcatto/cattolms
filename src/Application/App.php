@@ -14,6 +14,7 @@ Changelog:
 2026/09/08 21:10 SAST
 - Offers each request to the Symfony kernel before Fat-Free, and returns when it owns the route. GET /api/v1 is the first route it owns.
 - GET /api/v1/me moved to the Symfony kernel, behind the API firewall.
+- The remaining seven /api/v1 routes moved with it, so Fat-Free registers no API route at all.
 2026/09/08 19:52 SAST
 - The session handler is given a Database over the DBAL connection ConnectionFactory returns, rather than F3's DB\SQL.
 2026/09/03 00:08 SAST
@@ -77,8 +78,6 @@ use CattoLearning\Http\Controller\AccountController;
 use CattoLearning\Http\Controller\HomeController;
 use CattoLearning\Http\Controller\HelpController;
 use CattoLearning\Http\Controller\ThemeController;
-use CattoLearning\Http\Controller\Api\ApiCourseController;
-use CattoLearning\Http\Controller\Api\ApiLearningController;
 use CattoLearning\Event\EventDispatcher;
 use CattoLearning\Http\Routing\RouteRegistrar;
 use CattoLearning\Infrastructure\Persistence\ConnectionFactory;
@@ -169,14 +168,7 @@ final class App
 
         $routes = new RouteRegistrar($f3);
 
-        // GET /api/v1 and GET /api/v1/me are served by the Symfony kernel; see src/Http/Symfony/.
-        $routes->add('GET /api/v1/courses', ApiCourseController::class, 'index');
-        $routes->add('GET /api/v1/courses/@slug', ApiCourseController::class, 'show');
-        $routes->add('GET /api/v1/library', ApiLearningController::class, 'library');
-        $routes->add('POST /api/v1/courses/@slug/start', ApiLearningController::class, 'start');
-        $routes->add('POST /api/v1/admin/courses', ApiCourseController::class, 'create');
-        $routes->add('PUT /api/v1/admin/courses/@id', ApiCourseController::class, 'update');
-        $routes->add('POST /api/v1/admin/courses/@id/status', ApiCourseController::class, 'status');
+        // The whole of /api/v1 is served by the Symfony kernel now; see src/Http/Symfony/.
 
         $routes->add('GET /', HomeController::class, 'index');
         $routes->add('GET /privacy', HomeController::class, 'privacy');

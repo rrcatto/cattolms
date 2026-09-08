@@ -26,6 +26,8 @@ three-root deployment model that App::run() already encodes:
     platform ends up with a setting that is displayed from one place and used from another.
 
 Changelog:
+2026/09/09 00:20 SAST
+- Publishes the three roots as container parameters, so services.yaml can bind them by name.
 2026/09/08 SAST
 - Created for the v0.7 Symfony migration.
 */
@@ -35,6 +37,7 @@ declare(strict_types=1);
 namespace CattoLearning;
 
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 final class Kernel extends BaseKernel
@@ -77,5 +80,23 @@ final class Kernel extends BaseKernel
     public function getInstanceRoot(): string
     {
         return $this->instanceRoot;
+    }
+
+    /**
+     * The three roots, as container parameters.
+     *
+     * Several services take one of them as a constructor string - where a course's media is
+     * written, where the bundled imports are read from - and the value is a property of the
+     * deployment rather than of the service. Setting them here means config/services.yaml can bind
+     * them by name once, instead of every definition repeating a path.
+     *
+     * They are baked into the compiled container. That is correct: the cache lives under the
+     * instance root, so a container compiled for one instance is never read by another.
+     */
+    protected function build(ContainerBuilder $container): void
+    {
+        $container->setParameter('catto.code_root', $this->getProjectDir());
+        $container->setParameter('catto.instance_root', $this->instanceRoot);
+        $container->setParameter('catto.public_root', $this->instanceRoot . '/public_html');
     }
 }

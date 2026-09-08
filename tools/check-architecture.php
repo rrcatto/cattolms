@@ -79,7 +79,6 @@ foreach ($iterator as $file) {
     }
 
     if (str_contains($relative, '/Http/Controller/') && $basename !== 'BaseController'
-        && $basename !== 'BaseApiController'
         && !str_ends_with($basename, 'Controller')
     ) {
         $errors[] = $relative . ': controller classes must end with Controller.';
