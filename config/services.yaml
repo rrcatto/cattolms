@@ -1,0 +1,24 @@
+# The Symfony container.
+#
+# v0.6 builds its object graph with PHP-DI in ContainerFactory: nine explicit definitions and
+# autowiring for everything else. Both containers exist during the migration, and a class is
+# registered here only once a Symfony route reaches it - a service registered before anything uses
+# it is a service nothing proves.
+#
+# Note on what may be registered at all. `src/` is not uniformly services:
+#
+#   Support/                  value objects - Money, Pagination, SortOrder, Slug, Uuid. Private
+#                             constructors and static factories. Callers build them; nothing injects
+#                             them. Registering the namespace makes the container refuse to compile.
+#   Application/, Course/,
+#   Auth/, Seed/, View/       services, constructor-injected.
+#   Infrastructure/Persistence/  repositories, constructor-injected.
+#   Http/Controller/          F3 controllers; the Symfony ones live in Http/Symfony/.
+#
+# So registration follows that split rather than pointing at `src/` wholesale.
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Nothing yet. The first entry arrives with the first ported route.

@@ -1,0 +1,17 @@
+framework:
+    secret: '%env(APP_KEY)%'
+    # The platform validates APP_KEY itself in App::run() and refuses to start without a private
+    # random value, so the same key is the framework secret rather than a second one to manage.
+    http_method_override: false
+    trusted_hosts: ~
+    php_errors:
+        log: true
+    session:
+        # The platform's own DatabaseSessionHandler owns sessions; it implements PHP's
+        # SessionHandlerInterface, so it plugs in unchanged. Wired in phase 3 with the rest of auth.
+        enabled: false
+
+when@prod:
+    framework:
+        router:
+            strict_requirements: null
