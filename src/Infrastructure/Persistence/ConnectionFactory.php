@@ -8,11 +8,16 @@ Date time: 2026/09/08 19:52 SAST
 Version: 0.7
 
 Description:
-Provides PostgreSQL persistence infrastructure for connection factory within Catto Learning.
+Opens the platform's PostgreSQL connection.
+
+Architectural boundary: connection plumbing only. It knows the environment variables that describe
+the database and nothing about what is stored in it.
 
 Changelog:
 2026/09/08 19:52 SAST
-- Added dbal(), the single place that attaches DBAL to the connection this process already opened. It goes when DB\SQL does.
+- Opens a Doctrine DBAL connection through DriverManager rather than an F3 DB\SQL wrapped by a
+  shared-PDO driver. The sharing existed only so converted and unconverted repositories could take
+  part in one transaction while both wrappers were in use; nothing speaks DB\SQL any more.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -29,44 +34,31 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Support\Env;
-use DB\SQL;
-use Doctrine\DBAL\Configuration as DbalConfiguration;
-use Doctrine\DBAL\Connection as DbalConnection;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 
 final class ConnectionFactory
 {
-    public static function create(): SQL
+    public static function create(): Connection
     {
-        $dsn = sprintf(
-            'pgsql:host=%s;port=%d;dbname=%s;sslmode=%s',
-            Env::string('DB_HOST', '127.0.0.1'),
-            Env::int('DB_PORT', 5432),
-            Env::string('DB_NAME', 'catto_learning'),
-            Env::string('DB_SSLMODE', 'prefer')
+        $connection = DriverManager::getConnection([
+            'driver' => 'pdo_pgsql',
+            'host' => Env::string('DB_HOST', '127.0.0.1'),
+            'port' => Env::int('DB_PORT', 5432),
+            'dbname' => Env::string('DB_NAME', 'catto_learning'),
+            'user' => Env::string('DB_USER', 'catto_learning'),
+            'password' => Env::string('DB_PASSWORD'),
+            'sslmode' => Env::string('DB_SSLMODE', 'prefer'),
+        ]);
+
+        // Timestamps are written and read in the application's timezone, so the session must agree
+        // with it rather than with whatever the server was initialised to. This is also what forces
+        // the connection open, which is what the caller expects of a factory named create().
+        $connection->executeStatement(
+            "SELECT set_config('TimeZone', ?, false)",
+            [Env::string('APP_TIMEZONE', 'Africa/Johannesburg')]
         );
 
-        $db = new SQL(
-            $dsn,
-            Env::string('DB_USER', 'catto_learning'),
-            Env::string('DB_PASSWORD'),
-            [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
-        );
-        $db->exec(
-            "SELECT set_config('TimeZone', :timezone, false)",
-            [':timezone' => Env::string('APP_TIMEZONE', 'Africa/Johannesburg')]
-        );
-        return $db;
-    }
-
-    /**
-     * DBAL over a connection this process already opened, rather than a second one.
-     *
-     * A transaction belongs to a connection, so while both wrappers are in use they must sit on
-     * one PDO or a rollback would leave one wrapper's work committed. This is the single place
-     * that knows how the two are joined, and it goes when DB\SQL does.
-     */
-    public static function dbal(SQL $db): DbalConnection
-    {
-        return new DbalConnection([], new SharedPdoDriver($db->pdo()), new DbalConfiguration());
+        return $connection;
     }
 }
