@@ -27,16 +27,14 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Infrastructure\Persistence\M\UserEmailsM;
-use CattoLearning\Infrastructure\Persistence\M\UsersM;
 use CattoLearning\Support\Uuid;
-use DB\SQL;
+use Doctrine\DBAL\Connection;
 use RuntimeException;
 
 final class UserRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Connection $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -46,7 +44,7 @@ final class UserRepository
     {
         // SQL is justified here because the result spans users and user_emails
         // and must test verified ownership independently of the primary address.
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT u.*, ue.email AS primary_email
              FROM users u
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
@@ -55,7 +53,7 @@ final class UserRepository
                  WHERE verified.user_id = u.id AND verified.email = :email AND verified.verified_at IS NOT NULL
              ) AND u.status = :status
              LIMIT 1',
-            [':email' => $email, ':status' => 'active']
+            ['email' => $email, 'status' => 'active']
         );
 
         return $rows[0] ?? null;
@@ -65,12 +63,12 @@ final class UserRepository
     public function findById(int $userId): ?array
     {
         // SQL is justified because the primary email is joined onto the user.
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT u.*, ue.email AS primary_email
              FROM users u
              JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
              WHERE u.id = :id LIMIT 1',
-            [':id' => $userId]
+            ['id' => $userId]
         );
 
         return $rows[0] ?? null;
@@ -83,30 +81,35 @@ final class UserRepository
 
         // An identity is the root of its own universe: there is no parent row to inherit from,
         // so the caller states it. Everything else in this class derives the token from the user.
-        $user = new UsersM($this->db);
-        $user->public_id = Uuid::v4();
-        $user->seed_token = $seedToken;
-        $user->status = 'active';
-        $user->created_at = $now;
-        $user->updated_at = $now;
-        // Account creation is not authentication. markLogin() is the only path
-        // that records a successful login timestamp.
-        $user->last_login_at = null;
-        $user->save();
+        $rows = $this->db->fetchAllAssociative(
+            'INSERT INTO users (public_id, seed_token, status, created_at, updated_at, last_login_at)
+             VALUES (:public_id, :seed_token, :status, :created_at, :updated_at, NULL)
+             RETURNING id',
+            [
+                'public_id' => Uuid::v4(),
+                'seed_token' => $seedToken,
+                'status' => 'active',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]
+        );
 
-        $userId = (int) $user->id;
+        $userId = (int) ($rows[0]['id'] ?? 0);
         if ($userId < 1) {
             throw new RuntimeException('Unable to create user account.');
         }
 
-        $emailM = new UserEmailsM($this->db);
-        $emailM->user_id = $userId;
-        $emailM->email = $email;
-        $emailM->is_primary = true;
-        $emailM->verified_at = $now;
-        $emailM->created_at = $now;
-        $emailM->seed_token = $seedToken;
-        $emailM->save();
+        $this->db->executeStatement(
+            'INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at, seed_token)
+             VALUES (:user_id, :email, TRUE, :verified_at, :created_at, :seed_token)',
+            [
+                'user_id' => $userId,
+                'email' => $email,
+                'verified_at' => $now,
+                'created_at' => $now,
+                'seed_token' => $seedToken,
+            ]
+        );
 
         return $this->findById($userId)
             ?? throw new RuntimeException('Created user cannot be loaded.');
@@ -121,32 +124,39 @@ final class UserRepository
     /** @param array<string,mixed> $data */
     public function updateProfile(int $userId, array $data): void
     {
-        $user = new UsersM($this->db);
-        $user->load(['id = ?', $userId]);
-        if ($user->dry()) {
-            throw new RuntimeException('The user account does not exist.');
-        }
+        // The read stays because the write depends on it: display_name is derived from the names
+        // after the supplied values are applied, so the current row has to be known first.
+        $current = $this->findById($userId)
+            ?? throw new RuntimeException('The user account does not exist.');
 
+        $values = [];
         foreach ([
             'first_name', 'middle_names', 'last_name', 'identification_number', 'gender',
             'mobile_number', 'display_name', 'certificate_name'
         ] as $field) {
             if (array_key_exists($field, $data)) {
                 $value = trim((string) $data[$field]);
-                $user->{$field} = $value !== '' ? $value : null;
+                $values[$field] = $value !== '' ? $value : null;
             }
         }
         if (array_key_exists('birthdate', $data)) {
             $birthdate = trim((string) $data['birthdate']);
-            $user->birthdate = $birthdate !== '' ? $birthdate : null;
+            $values['birthdate'] = $birthdate !== '' ? $birthdate : null;
         }
-        $first = trim((string) ($user->first_name ?? ''));
-        $last = trim((string) ($user->last_name ?? ''));
-        if (($user->display_name === null || trim((string) $user->display_name) === '') && ($first !== '' || $last !== '')) {
-            $user->display_name = trim($first . ' ' . $last);
+
+        $merged = $values + $current;
+        $first = trim((string) ($merged['first_name'] ?? ''));
+        $last = trim((string) ($merged['last_name'] ?? ''));
+        if (trim((string) ($merged['display_name'] ?? '')) === '' && ($first !== '' || $last !== '')) {
+            $values['display_name'] = trim($first . ' ' . $last);
         }
-        $user->updated_at = gmdate('Y-m-d H:i:sP');
-        $user->save();
+
+        $values['updated_at'] = gmdate('Y-m-d H:i:sP');
+        $assignments = implode(', ', array_map(static fn(string $c): string => $c . ' = :' . $c, array_keys($values)));
+        $this->db->executeStatement(
+            'UPDATE users SET ' . $assignments . ' WHERE id = :id',
+            $values + ['id' => $userId]
+        );
     }
 
     /**
@@ -173,13 +183,13 @@ final class UserRepository
      */
     public function hasSuspendedCompany(int $userId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT EXISTS (
                  SELECT 1 FROM company_users cu
                  JOIN companies c ON c.id = cu.company_id
                  WHERE cu.user_id = :user_id AND cu.status = 'active' AND c.status <> 'active'
              ) AS suspended",
-            [':user_id' => $userId]
+            ['user_id' => $userId]
         );
 
         return in_array($rows[0]['suspended'] ?? false, [true, 1, '1', 't', 'true'], true);
@@ -190,43 +200,32 @@ final class UserRepository
         if (!in_array($status, ['active','disabled'], true)) {
             throw new RuntimeException('Invalid user status.');
         }
-        $user = new UsersM($this->db);
-        $user->load(['id = ?', $userId]);
-        if ($user->dry()) {
+        $affected = $this->db->executeStatement(
+            'UPDATE users SET status = :status, updated_at = :updated_at WHERE id = :id',
+            ['status' => $status, 'updated_at' => gmdate('Y-m-d H:i:sP'), 'id' => $userId]
+        );
+        if ($affected === 0) {
             throw new RuntimeException('The user account does not exist.');
         }
-        $user->status = $status;
-        $user->updated_at = gmdate('Y-m-d H:i:sP');
-        $user->save();
     }
 
     public function markLogin(int $userId): void
     {
-        $user = new UsersM($this->db);
-        $user->load(['id = ?', $userId]);
-        if ($user->dry()) {
-            return;
-        }
-
         $now = gmdate('Y-m-d H:i:sP');
-        $user->last_login_at = $now;
-        $user->updated_at = $now;
-        $user->save();
+        $this->db->executeStatement(
+            'UPDATE users SET last_login_at = :now, updated_at = :now WHERE id = :id',
+            ['now' => $now, 'id' => $userId]
+        );
     }
 
     /** @return list<array<string,mixed>> */
     public function emails(int $userId): array
     {
-        $emailM = new UserEmailsM($this->db);
-        $rows = $emailM->find(
-            ['user_id = ?', $userId],
-            ['order' => 'is_primary DESC, created_at ASC']
-        ) ?: [];
-
-        return array_values(array_map(
-            static fn(UserEmailsM $row): array => $row->row(),
-            $rows
-        ));
+        return $this->db->fetchAllAssociative(
+            'SELECT * FROM user_emails WHERE user_id = :user_id
+              ORDER BY is_primary DESC, created_at ASC',
+            ['user_id' => $userId]
+        );
     }
 
     public function addVerifiedSecondaryEmail(int $userId, string $email): void
@@ -235,89 +234,91 @@ final class UserRepository
         // secondary email. Verification of a replacement therefore retires
         // the previous secondary address atomically inside the caller's
         // transaction before the new address is persisted.
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM user_emails WHERE user_id=:user_id AND is_primary=FALSE AND LOWER(email)<>LOWER(:email)',
-            [':user_id' => $userId, ':email' => $email]
+            ['user_id' => $userId, 'email' => $email]
         );
 
-        $emailM = new UserEmailsM($this->db);
-        $emailM->load(['email = ?', $email]);
+        $existing = $this->db->fetchAssociative(
+            'SELECT id, user_id, is_primary FROM user_emails WHERE email = :email LIMIT 1',
+            ['email' => $email]
+        );
 
-        if (!$emailM->dry()) {
-            if ((int) $emailM->user_id !== $userId) {
+        if ($existing !== false) {
+            if ((int) $existing['user_id'] !== $userId) {
                 throw new RuntimeException('That email address belongs to another account.');
             }
-            if ($this->databaseBoolean($emailM->is_primary)) {
+            if ($this->databaseBoolean($existing['is_primary'])) {
                 return;
             }
-            $emailM->verified_at = gmdate('Y-m-d H:i:sP');
-            $emailM->save();
+            $this->db->executeStatement(
+                'UPDATE user_emails SET verified_at = :verified_at WHERE id = :id',
+                ['verified_at' => gmdate('Y-m-d H:i:sP'), 'id' => (int) $existing['id']]
+            );
             return;
         }
 
-        $emailM->reset();
-        $emailM->user_id = $userId;
-        $emailM->email = $email;
-        $emailM->is_primary = false;
-        $emailM->verified_at = gmdate('Y-m-d H:i:sP');
-        $emailM->created_at = gmdate('Y-m-d H:i:sP');
-        $emailM->seed_token = $this->provenance->fromUser($userId);
-        $emailM->save();
+        $this->db->executeStatement(
+            'INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at, seed_token)
+             VALUES (:user_id, :email, FALSE, :verified_at, :created_at, :seed_token)',
+            [
+                'user_id' => $userId,
+                'email' => $email,
+                'verified_at' => gmdate('Y-m-d H:i:sP'),
+                'created_at' => gmdate('Y-m-d H:i:sP'),
+                'seed_token' => $this->provenance->fromUser($userId),
+            ]
+        );
     }
 
     public function removeSecondaryEmail(int $userId, int $emailId): void
     {
-        $emailM = new UserEmailsM($this->db);
-        $emailM->load([
-            'id = ? AND user_id = ? AND is_primary = FALSE',
-            $emailId,
-            $userId,
-        ]);
-        if (!$emailM->dry()) {
-            $emailM->erase();
-        }
+        $this->db->executeStatement(
+            'DELETE FROM user_emails WHERE id = :id AND user_id = :user_id AND is_primary = FALSE',
+            ['id' => $emailId, 'user_id' => $userId]
+        );
     }
 
     public function replacePrimaryEmail(int $userId, string $email): void
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT id,user_id,is_primary FROM user_emails WHERE lower(email)=lower(:email) LIMIT 1',
-            [':email' => $email]
+            ['email' => $email]
         );
         if (isset($rows[0]) && (int) $rows[0]['user_id'] !== $userId) {
             throw new RuntimeException('That email address belongs to another account.');
         }
 
-        $this->db->exec(
+        $this->db->executeStatement(
             'UPDATE user_emails SET is_primary=FALSE WHERE user_id=:user_id AND is_primary=TRUE',
-            [':user_id' => $userId]
+            ['user_id' => $userId]
         );
         if (isset($rows[0])) {
-            $this->db->exec(
+            $this->db->executeStatement(
                 'UPDATE user_emails SET is_primary=TRUE, verified_at=COALESCE(verified_at,NOW()) WHERE id=:id',
-                [':id' => (int) $rows[0]['id']]
+                ['id' => (int) $rows[0]['id']]
             );
             return;
         }
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at,seed_token)
              VALUES (:user_id,:email,TRUE,NOW(),NOW(),:seed_token::uuid)',
-            [':user_id' => $userId, ':email' => $email, ':seed_token' => $this->provenance->fromUser($userId)]
+            ['user_id' => $userId, 'email' => $email, 'seed_token' => $this->provenance->fromUser($userId)]
         );
     }
 
     public function replaceSecondaryEmail(int $userId, ?string $email): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM user_emails WHERE user_id=:user_id AND is_primary=FALSE',
-            [':user_id' => $userId]
+            ['user_id' => $userId]
         );
         if ($email === null || $email === '') {
             return;
         }
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT id,user_id,is_primary FROM user_emails WHERE lower(email)=lower(:email) LIMIT 1',
-            [':email' => $email]
+            ['email' => $email]
         );
         if (isset($rows[0])) {
             if ((int) $rows[0]['user_id'] !== $userId) {
@@ -327,11 +328,11 @@ final class UserRepository
                 return;
             }
         }
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at,seed_token)
              VALUES (:user_id,:email,FALSE,NOW(),NOW(),:seed_token::uuid)
              ON CONFLICT (email) DO UPDATE SET verified_at=NOW()',
-            [':user_id' => $userId, ':email' => $email, ':seed_token' => $this->provenance->fromUser($userId)]
+            ['user_id' => $userId, 'email' => $email, 'seed_token' => $this->provenance->fromUser($userId)]
         );
     }
 

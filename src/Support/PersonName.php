@@ -56,7 +56,20 @@ final class PersonName
         // what the person chose to be called; the primary email is the last thing that is certainly
         // present, because an identity cannot exist without one.
         $fallback = trim((string) ($row['display_name'] ?? ''));
+        if ($fallback !== '') {
+            return $fallback;
+        }
 
-        return $fallback !== '' ? $fallback : trim((string) ($row['email'] ?? ''));
+        // The address, under either of the two names a user row carries it by. A profile row joins
+        // it as primary_email; a listing row calls it email. Checking only one of them is why a
+        // person with no name at all rendered an empty heading.
+        foreach (['primary_email', 'email'] as $key) {
+            $address = trim((string) ($row[$key] ?? ''));
+            if ($address !== '') {
+                return $address;
+            }
+        }
+
+        return '';
     }
 }
