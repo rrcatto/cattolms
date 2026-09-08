@@ -18,6 +18,8 @@ Changelog:
 - Opens a Doctrine DBAL connection through DriverManager rather than an F3 DB\SQL wrapped by a
   shared-PDO driver. The sharing existed only so converted and unconverted repositories could take
   part in one transaction while both wrappers were in use; nothing speaks DB\SQL any more.
+- The session timezone moved to SessionTimeZoneMiddleware, which DoctrineBundle's connection also
+  applies. Setting it here left the connection eagerly opened and the other connection unconfigured.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -34,6 +36,7 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Support\Env;
+use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 
@@ -41,7 +44,13 @@ final class ConnectionFactory
 {
     public static function create(): Connection
     {
-        $connection = DriverManager::getConnection([
+        // The session timezone is applied by a middleware rather than by a statement here, so that
+        // DoctrineBundle's connection - configured separately, in config/packages/doctrine.yaml -
+        // gets it on exactly the same terms. See SessionTimeZoneMiddleware.
+        $configuration = new Configuration();
+        $configuration->setMiddlewares([new SessionTimeZoneMiddleware()]);
+
+        return DriverManager::getConnection([
             'driver' => 'pdo_pgsql',
             'host' => Env::string('DB_HOST', '127.0.0.1'),
             'port' => Env::int('DB_PORT', 5432),
@@ -49,16 +58,6 @@ final class ConnectionFactory
             'user' => Env::string('DB_USER', 'catto_learning'),
             'password' => Env::string('DB_PASSWORD'),
             'sslmode' => Env::string('DB_SSLMODE', 'prefer'),
-        ]);
-
-        // Timestamps are written and read in the application's timezone, so the session must agree
-        // with it rather than with whatever the server was initialised to. This is also what forces
-        // the connection open, which is what the caller expects of a factory named create().
-        $connection->executeStatement(
-            "SELECT set_config('TimeZone', ?, false)",
-            [Env::string('APP_TIMEZONE', 'Africa/Johannesburg')]
-        );
-
-        return $connection;
+        ], $configuration);
     }
 }
