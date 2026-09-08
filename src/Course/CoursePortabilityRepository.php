@@ -25,17 +25,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
-use CattoLearning\Infrastructure\Persistence\M\CourseContentBlocksM;
-use CattoLearning\Infrastructure\Persistence\M\CourseEnrolmentsM;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Infrastructure\Persistence\SeedProvenance;
-use DB\SQL;
+use Doctrine\DBAL\Connection;
 use RuntimeException;
 
 final class CoursePortabilityRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Connection $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -43,9 +41,9 @@ final class CoursePortabilityRepository
     /** @return list<array<string,mixed>> */
     public function contentBlocks(int $moduleId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT * FROM course_content_blocks WHERE module_id = :module_id ORDER BY parent_block_id NULLS FIRST, position',
-            [':module_id' => $moduleId]
+            ['module_id' => $moduleId]
         );
         $byParent = [];
         foreach ($rows as $row) {
@@ -68,15 +66,15 @@ final class CoursePortabilityRepository
     /** @param list<array<string,mixed>> $blocks */
     public function replaceContentBlocks(int $moduleId, array $blocks): void
     {
-        $this->db->exec('DELETE FROM course_content_blocks WHERE module_id = :module_id', [':module_id' => $moduleId]);
+        $this->db->executeStatement('DELETE FROM course_content_blocks WHERE module_id = :module_id', ['module_id' => $moduleId]);
         $this->insertBlocks($moduleId, null, $blocks);
     }
 
     public function hasStartedLearners(int $courseId): bool
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total FROM course_enrolments WHERE course_id = :course_id AND is_preview = FALSE AND started_at IS NOT NULL',
-            [':course_id' => $courseId]
+            ['course_id' => $courseId]
         );
         return (int) ($rows[0]['total'] ?? 0) > 0;
     }
@@ -84,9 +82,9 @@ final class CoursePortabilityRepository
     /** @return list<string> */
     public function mediaStorageKeys(int $courseId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT storage_key FROM course_media WHERE course_id=:course_id',
-            [':course_id' => $courseId]
+            ['course_id' => $courseId]
         );
         return array_values(array_filter(array_map(
             static fn(array $row): string => (string) ($row['storage_key'] ?? ''),
@@ -99,20 +97,20 @@ final class CoursePortabilityRepository
         // Reset is deliberately destructive during platform development: keep
         // only the course shell so a corrected import can replace its content.
         // Certificates restrict enrolment deletion, so remove them first.
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)',
-            [':course_id' => $courseId]
+            ['course_id' => $courseId]
         );
-        $this->db->exec('DELETE FROM course_enrolments WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec('DELETE FROM course_assessments WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec('DELETE FROM course_modules WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec('DELETE FROM course_grade_bands WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec('DELETE FROM course_media WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec(
+        $this->db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_assessments WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_modules WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_grade_bands WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_media WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement(
             "UPDATE courses SET status='draft', publication_approval_status='pending', source_filename=NULL,
                     updated_at=NOW(), certificate_template_html='', certificate_template_css='', presentation_css=''
              WHERE id=:course_id",
-            [':course_id' => $courseId]
+            ['course_id' => $courseId]
         );
     }
 
@@ -120,18 +118,18 @@ final class CoursePortabilityRepository
     {
         // Platform Administrator deletion scrubs the course and all dependent
         // learner/test data. Explicit RESTRICT relationships are removed first.
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM course_credit_allocations WHERE credit_id IN (SELECT id FROM course_credits WHERE course_id=:course_id)',
-            [':course_id' => $courseId]
+            ['course_id' => $courseId]
         );
-        $this->db->exec('DELETE FROM course_credits WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec('DELETE FROM course_requests WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec(
+        $this->db->executeStatement('DELETE FROM course_credits WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_requests WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement(
             'DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)',
-            [':course_id' => $courseId]
+            ['course_id' => $courseId]
         );
-        $this->db->exec('DELETE FROM course_enrolments WHERE course_id=:course_id', [':course_id' => $courseId]);
-        $this->db->exec('DELETE FROM courses WHERE id=:course_id', [':course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM courses WHERE id=:course_id', ['course_id' => $courseId]);
     }
 
     public function updateCertificateTemplate(
@@ -146,7 +144,7 @@ final class CoursePortabilityRepository
         string $css,
         int $userId
     ): void {
-        $this->db->exec(
+        $this->db->executeStatement(
             'UPDATE courses
              SET certificate_enabled=:enabled,
                  certificate_title=:title,
@@ -160,16 +158,16 @@ final class CoursePortabilityRepository
                  updated_at=NOW()
              WHERE id=:course_id',
             [
-                ':enabled' => $enabled,
-                ':title' => $title,
-                ':body' => $body,
-                ':footer' => $footer !== '' ? $footer : null,
-                ':signatory_name' => $signatoryName !== '' ? $signatoryName : null,
-                ':signatory_title' => $signatoryTitle !== '' ? $signatoryTitle : null,
-                ':html' => $html,
-                ':css' => $css,
-                ':user_id' => $userId,
-                ':course_id' => $courseId,
+                'enabled' => $enabled,
+                'title' => $title,
+                'body' => $body,
+                'footer' => $footer !== '' ? $footer : null,
+                'signatory_name' => $signatoryName !== '' ? $signatoryName : null,
+                'signatory_title' => $signatoryTitle !== '' ? $signatoryTitle : null,
+                'html' => $html,
+                'css' => $css,
+                'user_id' => $userId,
+                'course_id' => $courseId,
             ]
         );
     }
@@ -177,49 +175,64 @@ final class CoursePortabilityRepository
     /** @return array<string,mixed> */
     public function ensurePreviewEnrolment(int $userId, int $courseId): array
     {
-        $enrolmentM = new CourseEnrolmentsM($this->db);
-        $enrolmentM->load(['user_id = ? AND course_id = ? AND is_preview = TRUE', $userId, $courseId]);
-        if ($enrolmentM->dry()) {
-            $now = gmdate('Y-m-d H:i:sP');
-            $enrolmentM->public_id = Uuid::v4();
-            // A preview enrolment is still an enrolment: the previewer and the course must be in
-            // the same universe, so an ADMIN previewing a SEED course gets a SEED preview row.
-            $enrolmentM->seed_token = $this->provenance->forPair('users', $userId, 'courses', $courseId);
-            $enrolmentM->user_id = $userId;
-            $enrolmentM->course_id = $courseId;
-            $enrolmentM->source_type = 'preview';
-            $enrolmentM->source_reference = 'administrator-preview';
-            $enrolmentM->status = 'assigned';
-            $enrolmentM->access_period_seconds = 315360000;
-            $enrolmentM->assigned_at = $now;
-            $enrolmentM->started_at = null;
-            $enrolmentM->expires_at = null;
-            $enrolmentM->assigned_by_user_id = $userId;
-            $enrolmentM->is_preview = true;
-            $enrolmentM->created_at = $now;
-            $enrolmentM->updated_at = $now;
-            $enrolmentM->save();
-        }
-        return $enrolmentM->row();
+        // Insert-if-absent in one statement rather than load, branch, save. The mapper form read
+        // the row and wrote it back as two steps, so two administrators previewing the same course
+        // at once could both find it absent and both insert.
+        $this->db->executeStatement(
+            'INSERT INTO course_enrolments
+                (public_id, seed_token, user_id, course_id, source_type, source_reference, status,
+                 access_period_seconds, assigned_at, started_at, expires_at, assigned_by_user_id,
+                 is_preview, created_at, updated_at)
+             SELECT :public_id, :seed_token, :user_id, :course_id, :source_type, :source_reference,
+                    :status, :access_period_seconds, :assigned_at, NULL, NULL, :assigned_by_user_id,
+                    TRUE, :created_at, :updated_at
+              WHERE NOT EXISTS (
+                    SELECT 1 FROM course_enrolments
+                     WHERE user_id = :user_id AND course_id = :course_id AND is_preview = TRUE)',
+            [
+                'public_id' => Uuid::v4(),
+                // A preview enrolment is still an enrolment: the previewer and the course must be
+                // in the same universe, so an ADMIN previewing a SEED course gets a SEED row.
+                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
+                'user_id' => $userId,
+                'course_id' => $courseId,
+                'source_type' => 'preview',
+                'source_reference' => 'administrator-preview',
+                'status' => 'assigned',
+                'access_period_seconds' => 315360000,
+                'assigned_at' => gmdate('Y-m-d H:i:sP'),
+                'assigned_by_user_id' => $userId,
+                'created_at' => gmdate('Y-m-d H:i:sP'),
+                'updated_at' => gmdate('Y-m-d H:i:sP'),
+            ]
+        );
+
+        $row = $this->db->fetchAssociative(
+            'SELECT * FROM course_enrolments
+              WHERE user_id = :user_id AND course_id = :course_id AND is_preview = TRUE',
+            ['user_id' => $userId, 'course_id' => $courseId]
+        );
+
+        return $row === false ? [] : $row;
     }
 
     public function resetPreview(int $userId, int $courseId): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM course_enrolments WHERE user_id=:user_id AND course_id=:course_id AND is_preview=TRUE',
-            [':user_id' => $userId, ':course_id' => $courseId]
+            ['user_id' => $userId, 'course_id' => $courseId]
         );
     }
 
     public function setRevisionMetadata(int $courseId, ?int $parentCourseId, int $revisionNumber, string $approvalStatus): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'UPDATE courses SET parent_course_id=:parent, revision_number=:revision, publication_approval_status=:approval, updated_at=NOW() WHERE id=:course_id',
             [
-                ':parent' => $parentCourseId,
-                ':revision' => $revisionNumber,
-                ':approval' => $approvalStatus,
-                ':course_id' => $courseId,
+                'parent' => $parentCourseId,
+                'revision' => $revisionNumber,
+                'approval' => $approvalStatus,
+                'course_id' => $courseId,
             ]
         );
     }
@@ -228,20 +241,29 @@ final class CoursePortabilityRepository
     private function insertBlocks(int $moduleId, ?int $parentId, array $blocks): void
     {
         foreach ($blocks as $position => $block) {
-            $blockM = new CourseContentBlocksM($this->db);
-            $blockM->public_id = Uuid::v4();
-            $blockM->seed_token = $this->provenance->fromModule($moduleId);
-            $blockM->module_id = $moduleId;
-            $blockM->parent_block_id = $parentId;
-            $blockM->position = $position + 1;
-            $blockM->block_type = (string) ($block['type'] ?? $block['block_type'] ?? 'html');
-            $blockM->title = ($block['title'] ?? null) !== '' ? ($block['title'] ?? null) : null;
-            $blockM->content_html = (string) ($block['content_html'] ?? '');
-            $blockM->settings = json_encode((array) ($block['settings'] ?? []), JSON_THROW_ON_ERROR);
-            $blockM->created_at = gmdate('Y-m-d H:i:sP');
-            $blockM->updated_at = gmdate('Y-m-d H:i:sP');
-            $blockM->save();
-            $id = (int) $blockM->id;
+            $rows = $this->db->fetchAllAssociative(
+                'INSERT INTO course_content_blocks
+                    (public_id, seed_token, module_id, parent_block_id, position, block_type,
+                     title, content_html, settings, created_at, updated_at)
+                 VALUES
+                    (:public_id, :seed_token, :module_id, :parent_block_id, :position, :block_type,
+                     :title, :content_html, :settings, :created_at, :updated_at)
+                 RETURNING id',
+                [
+                    'public_id' => Uuid::v4(),
+                    'seed_token' => $this->provenance->fromModule($moduleId),
+                    'module_id' => $moduleId,
+                    'parent_block_id' => $parentId,
+                    'position' => $position + 1,
+                    'block_type' => (string) ($block['type'] ?? $block['block_type'] ?? 'html'),
+                    'title' => ($block['title'] ?? null) !== '' ? ($block['title'] ?? null) : null,
+                    'content_html' => (string) ($block['content_html'] ?? ''),
+                    'settings' => json_encode((array) ($block['settings'] ?? []), JSON_THROW_ON_ERROR),
+                    'created_at' => gmdate('Y-m-d H:i:sP'),
+                    'updated_at' => gmdate('Y-m-d H:i:sP'),
+                ]
+            );
+            $id = (int) ($rows[0]['id'] ?? 0);
             if ($id < 1) {
                 throw new RuntimeException('Unable to create course content block.');
             }
