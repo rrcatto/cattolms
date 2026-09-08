@@ -16,9 +16,9 @@ reaches its predicate, whether a count applies the same filter as its rows, and 
 joins the tables its predicate names are all decidable from the SQL text alone. Those checks then
 run on any machine and fail in milliseconds, rather than only where PostgreSQL is configured.
 
-It is deliberately not a mock framework double. The repositories take a concrete DB\SQL, so the
-substitute has to be a real subclass; the parent constructor is skipped because it would open a
-PDO connection.
+It is deliberately not a mock framework double. The repositories take the Database interface, so the
+substitute is an ordinary implementation of it; the repository is built without its constructor
+because that would open a PDO connection.
 
 This is a test collaborator rather than a TestCase, which is also why it may declare a constructor
 at all - tools/check-test-suite.php forbids that inside a TestCase, because PHPUnit marks
@@ -27,6 +27,7 @@ __construct final there and the whole suite then fails to load.
 Changelog:
 2026/09/08 19:52 SAST
 - Added isTransactionActive(), which the Database interface now declares.
+- forRepository() lost its DB\SQL branch; every repository now declares the Database interface.
 2026/08/31 19:05 SAST
 - Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
 2026/08/31 19:55 SAST
@@ -153,24 +154,13 @@ final class RecordingDatabase implements Database
     }
 
     /**
-     * Builds a repository with a recorder in place of its database, choosing the recorder that
-     * matches the type the repository declares.
+     * Builds a repository with a recorder in place of its database.
      *
-     * Two exist during the persistence migration: most repositories take the Database interface,
-     * CourseRepository still takes DB\SQL, and a property type is enforced on assignment - so one
-     * double cannot stand for both. When the last repository is converted this loses its branch and
-     * RecordingSqlDatabase goes.
-     *
-     * @return array{0:object,1:RecordingDatabase|RecordingSqlDatabase} The repository and its recorder.
+     * @return array{0:object,1:RecordingDatabase} The repository and its recorder.
      */
     public static function forRepository(string $repositoryClass): array
     {
-        $reflection = new ReflectionClass($repositoryClass);
-        $property = $reflection->getProperty('db');
-        $type = $property->getType();
-        $declared = $type instanceof \ReflectionNamedType ? $type->getName() : '';
-
-        $recorder = $declared === 'DB\\SQL' ? new RecordingSqlDatabase() : new RecordingDatabase();
+        $recorder = new RecordingDatabase();
 
         return [self::injectInto($repositoryClass, $recorder), $recorder];
     }

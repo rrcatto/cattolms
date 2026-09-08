@@ -12,7 +12,7 @@ Provides application-layer coordination for app, connecting Catto Learning domai
 
 Changelog:
 2026/09/08 19:52 SAST
-- The session handler is given a Database rather than F3's DB\SQL.
+- The session handler is given a Database over the DBAL connection ConnectionFactory returns, rather than F3's DB\SQL.
 2026/09/03 00:08 SAST
 - Moved GET /admin/courses onto AdminController::courses so the Courses list uses the shared section renderer; its own request array had listed page and page size only, so the search term was never read.
 
@@ -132,8 +132,7 @@ final class App
         $f3->set('ESCAPE', true);
         $f3->set('AUTOLOAD', $codeRoot . '/src/');
 
-        $db = ConnectionFactory::create();
-        self::startSession(new DbalDatabase(ConnectionFactory::dbal($db)));
+        self::startSession(new DbalDatabase(ConnectionFactory::create()));
 
         $container = ContainerFactory::build(
             $codeRoot,
