@@ -7,6 +7,14 @@ Description:
 Validates the Catto Learning v0.5.8 Seed Database release contract: PHP 8.5.9, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/09/08 03:30 SAST
+- Advanced the asserted release version to 0.6.
+
+2026/09/07 21:00 SAST
+
+- The additive-migration rule judges CREATE TABLE and DROP TABLE by which table is named rather than by the words, so a new table can be added without recreating a baseline one.
+2026/09/07 20:15 SAST
+- The additive-migration rule now judges CREATE TABLE and DROP TABLE by which table is named rather than by the words. Banning them outright made it impossible to add a new table, which is the ordinary reason an additive migration exists; the rule it was written to enforce - never drop or recreate a table the baseline owns - is unchanged and now actually stated.
 2026/08/31 19:05 SAST
 - Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
 
@@ -37,7 +45,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.5.8.3', 'composer.json version must be 0.5.8.3.');
+$need(($composer['version'] ?? '') === '0.6', 'composer.json version must be 0.6.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 foreach (['php-di/php-di','psr/container','friendsofphp/proxy-manager-lts','geocoder-php/geoip2-provider'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
@@ -73,10 +81,32 @@ foreach ($migrations as $migration) {
         continue;
     }
     $body = $read($migration);
-    foreach (['DROP TABLE', 'CREATE TABLE', 'TRUNCATE'] as $forbidden) {
+    $name = basename($migration);
+
+    // TRUNCATE is never additive whatever it names.
+    $need(!str_contains(strtoupper($body), 'TRUNCATE'), 'Non-baseline migration ' . $name . ' must be additive; it contains TRUNCATE.');
+
+    // CREATE TABLE and DROP TABLE are judged by *which* table, not by the words. The rule this
+    // enforces is the one stated above - a migration must not drop or recreate a table the baseline
+    // owns - and a blanket ban on the words made it impossible to add a new table at all, which is
+    // the ordinary reason to write an additive migration in the first place.
+    preg_match_all('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/i', $body, $created);
+    preg_match_all('/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/i', $body, $dropped);
+    $createdTables = array_map('strtolower', $created[1] ?? []);
+
+    foreach ($createdTables as $table) {
         $need(
-            !str_contains(strtoupper($body), $forbidden),
-            'Non-baseline migration ' . basename($migration) . ' must be additive; it contains ' . $forbidden . '.'
+            !preg_match('/CREATE\s+TABLE\s+' . preg_quote($table, '/') . '\b/i', $baseline),
+            'Non-baseline migration ' . $name . ' recreates the baseline table ' . $table
+                . '. That is a rebase wearing a later timestamp and would destroy a populated database.'
+        );
+    }
+    foreach (array_map('strtolower', $dropped[1] ?? []) as $table) {
+        // A migration may roll back what it created itself. Anything else it drops belongs to
+        // somebody else's schema, and a routine upgrade would take the data with it.
+        $need(
+            in_array($table, $createdTables, true),
+            'Non-baseline migration ' . $name . ' drops ' . $table . ', which it did not create.'
         );
     }
 }
@@ -84,17 +114,23 @@ $auditStart = strpos($baseline, 'CREATE TABLE audit_log');
 $auditEnd = $auditStart === false ? false : strpos($baseline, 'CREATE INDEX audit_log_user', $auditStart);
 $auditBlock = ($auditStart !== false && $auditEnd !== false) ? substr($baseline, $auditStart, $auditEnd - $auditStart) : '';
 $need(!str_contains($auditBlock, 'ip_hash'), 'audit_log must store raw IP only, not ip_hash.');
-$need(str_contains($baseline, "('active_theme', 'factory-reset-v1.0.1')"), 'Factory Reset 1.0.1 must be the baseline active theme.');
+// The baseline records whichever Factory Reset the release actually bundles, checked below
+// against extras/themes rather than pinned to a literal here. The v0.5.8 baseline seeded 1.0.1 and
+// two later migrations advanced it; the v0.6 baseline records the bundled version directly, so
+// there is nothing left to advance and nothing to keep in step by hand.
 $need(str_contains($baseline, 'user_emails_one_secondary_per_user'), 'Baseline must enforce at most one secondary email per account.');
 
 $catalog = $read($root . '/src/Auth/PermissionCatalog.php');
 preg_match_all("/->p\\('([A-Z]+(?:\\.[A-Z]+)+)'/", $catalog, $permissionMatches);
 $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
-$need(count($permissionKeys) === 80, 'PermissionCatalog must define exactly 80 reserved/current secure actions for this release.');
+// 81 since v0.6: COURSE.TAG.MANAGE. Tags and categories are separate keys because they are separate
+// decisions - a tag is cross-cutting classification, a category is the catalogue's structure - and an
+// installation may well delegate one and not the other.
+$need(count($permissionKeys) === 81, 'PermissionCatalog must define exactly 81 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 70, 'ACL catalogue must contain 10 SYSTEM and 70 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 71, 'ACL catalogue must contain 10 SYSTEM and 71 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -124,7 +160,18 @@ $need(str_contains($baseline, 'user_roles_family_guard'), 'Baseline must prevent
 $need(str_contains($baseline, 'SeedSchema::upSql()'), 'The v0.5.8 baseline must build the Seed Database schema from SeedSchema.');
 $need(str_contains($baseline, 'SeedSchema::downSql()'), 'The v0.5.8 baseline must reverse the Seed Database schema from SeedSchema.');
 $need(str_contains($baseline, 'SeedTableCatalog::INFRASTRUCTURE_TOKEN'), 'The v0.5.8 baseline must create the shared SEED System Company.');
-$need(count(CattoLearning\Seed\SeedTableCatalog::seedAwareTables()) === 31, 'The frozen seed-aware table catalogue must hold 31 tables.');
+// Thirty since v0.6. `course_categories` left the catalogue because a category is a label rather
+// than a business record - the reasoning is recorded on decision D3 in SeedTableCatalog - and
+// `tags` and `course_tags` were never in it for the same reason. The count is pinned so that
+// removing a table stays a deliberate act with a written justification.
+$need(count(CattoLearning\Seed\SeedTableCatalog::seedAwareTables()) === 30, 'The frozen seed-aware table catalogue must hold 30 tables.');
+$need(!in_array('course_categories', CattoLearning\Seed\SeedTableCatalog::seedAwareTables(), true), 'Course categories are universe-free labels and must not carry seed provenance.');
+foreach (['CREATE TABLE tags', 'CREATE TABLE course_tags', 'course_categories_depth', 'enforce_category_depth'] as $token) {
+    $need(str_contains($baseline, $token), 'Baseline schema missing the v0.6 taxonomy: ' . $token);
+}
+// The depth cap is what keeps the descendant query bounded and the breadcrumb honest, so it is
+// enforced by the database rather than only by whoever remembers it.
+$need(str_contains($baseline, 'CHECK (level BETWEEN 1 AND 3)'), 'Course categories must be capped at three levels.');
 $need(!CattoLearning\Seed\SeedTableCatalog::isSeedAware('web_sessions'), 'web_sessions must not be seed-aware (decision D3).');
 $need(CattoLearning\Seed\SeedTableCatalog::isSeedAware('course_media'), 'course_media must be seed-aware (decision D3).');
 $acl = $read($root . '/src/Auth/AclService.php');
@@ -136,7 +183,7 @@ $app = $read($root . '/src/Application/App.php');
 $requiredRoutes = [
     'GET /account','GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity',
     'GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses',
-    'GET /admin','GET /admin/dashboard','GET /admin/courses','GET /admin/people','GET /admin/companies','GET /admin/enrolments','GET /admin/credits','GET /admin/activity','GET /admin/reports','GET /admin/themes','GET /admin/roles','GET /admin/settings',
+    'GET /admin','GET /admin/dashboard','GET /admin/courses','GET /admin/people','GET /admin/companies','GET /admin/course/enrolments','GET /admin/course/credits','GET /admin/activity','GET /admin/reports','GET /admin/themes','GET /admin/roles','GET /admin/settings',
     'POST /admin/roles/@id/permissions','POST /admin/themes/resync',
 ];
 foreach ($requiredRoutes as $route) $need(str_contains($app, $route), 'Required semantic route missing: ' . $route);
@@ -145,7 +192,7 @@ $need(!str_contains($app, '/admin?tab=') && !str_contains($app, '/account?tab=')
 $need(!str_contains($app, 'http_response_code('), 'App ONERROR must not call http_response_code() after F3 has already emitted an HTTP status header.');
 
 $renderer = $read($root . '/src/View/ThemeRenderer.php');
-foreach (["PLATFORM_ASSET_VERSION = '0.5.8.3'","set('navigation'","set('footer_navigation'","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.6'","set('navigation'","set('footer_navigation'","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 
@@ -194,17 +241,15 @@ $need(in_array($factoryPackage, $bundledNames, true), 'extras/themes must ship t
 // The recorded active theme is an install key, so a bundled bump that is not accompanied by a
 // migration leaves an upgraded database pointing at a theme directory that does not exist.
 // The baseline seeds 1.0.1; every version after that needs a migration naming it.
-if ($factoryVersion !== '1.0.1') {
-    $migrations = '';
-    foreach (glob($root . '/database/migrations/*.php') ?: [] as $migrationFile) {
-        $migrations .= (string) file_get_contents($migrationFile);
-    }
-    $need(
-        str_contains($migrations, "factory-reset-v" . $factoryVersion),
-        'The bundled Factory Reset is ' . $factoryVersion . ' but no migration moves active_theme to it, '
-        . 'so an upgraded database would activate a theme key with nothing behind it.'
-    );
+$migrations = '';
+foreach (glob($root . '/database/migrations/*.php') ?: [] as $migrationFile) {
+    $migrations .= (string) file_get_contents($migrationFile);
 }
+$need(
+    str_contains($migrations, "factory-reset-v" . $factoryVersion),
+    'The bundled Factory Reset is ' . $factoryVersion . ' but no migration records active_theme as it, '
+    . 'so an installed database would activate a theme key with nothing behind it.'
+);
 foreach ($bundledNames as $bundledName) {
     $need(preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*-v\d+\.\d+\.\d+\.zip$/', $bundledName) === 1, 'Bundled theme package must be named <slug>-v<version>.zip: ' . $bundledName);
 }
@@ -242,4 +287,4 @@ if ($errors !== []) {
     fwrite(STDERR, "Release validation failed:\n- " . implode("\n- ", $errors) . "\n");
     exit(1);
 }
-echo 'Release validation passed: Catto Learning 0.5.8.3, ' . count($pages) . " platform pages, simplified ACL/workspace/theme-sync contracts, PHP 8.5.9 target.\n";
+echo 'Release validation passed: Catto Learning 0.6, ' . count($pages) . " platform pages, simplified ACL/workspace/theme-sync contracts, PHP 8.5.9 target.\n";

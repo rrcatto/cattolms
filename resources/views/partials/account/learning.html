@@ -48,12 +48,16 @@ Changelog:
 		<div id="current-region" data-server-search-target>
 		<div id="current-results">
 
+	<check if="{{ @current_pagination }}">
+		<include href="partials/pagination.html" with="pg=@current_pagination" />
+	</check>
+
 			<check if="{{ @current }}">
 				<true>
 					<div class="table-wrap">
 						<table>
 							<thead>
-								<tr><th>Course</th><th>Status</th><th>Progress</th><th>Access</th><th></th></tr>
+								<tr><th style="width:52%">Course</th><th style="width:10%">Status</th><th style="width:10%">Progress</th><th style="width:16%">Access</th><th class="cell-actions" style="width:12%">Actions</th></tr>
 							</thead>
 							<tbody>
 								<repeat group="{{ @current }}" value="{{ @course }}">
@@ -65,16 +69,19 @@ Changelog:
 											<span class="small muted">{{ @course.progress_percentage }}%</span>
 										</td>
 										<td class="small">{{ @course.access_period_label }}</td>
-										<td>
-											<div class="row-actions">
-												<a class="btn btn-primary btn-sm" href="/learn/{{ @course.slug }}">{{ @course.is_started ? 'Resume' : 'Review and start' }}</a>
-												<check if="{{ @is_platform_admin }}">
-													<form action="/account/library/enrolments/{{ @course.id }}/remove" method="post">
-														<input type="hidden" name="csrf" value="{{ @csrf }}">
-														<button class="btn btn-danger btn-sm" type="submit" data-confirm="Remove this test course from your library?">Remove</button>
-													</form>
-												</check>
-											</div>
+										<td class="cell-actions">
+											<details class="row-menu" data-cl-dropdown>
+												<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+												<div class="row-menu-panel">
+													<a class="btn btn-primary btn-sm" href="/learn/{{ @course.slug }}">{{ @course.is_started ? 'Resume' : 'Review and start' }}</a>
+													<check if="{{ @is_platform_admin }}">
+														<form action="/account/library/enrolments/{{ @course.id }}/remove" method="post">
+															<input type="hidden" name="csrf" value="{{ @csrf }}">
+															<button class="btn btn-danger btn-sm" type="submit" data-confirm="Remove this test course from your library?">Remove</button>
+														</form>
+													</check>
+												</div>
+											</details>
 										</td>
 									</tr>
 								</repeat>
@@ -106,12 +113,16 @@ Changelog:
 		<div id="completed-region" data-server-search-target>
 		<div id="completed-results">
 
+	<check if="{{ @completed_pagination }}">
+		<include href="partials/pagination.html" with="pg=@completed_pagination" />
+	</check>
+
 			<check if="{{ @completed }}">
 				<true>
 					<div class="table-wrap">
 						<table>
 							<thead>
-								<tr><th>Course</th><th>Result</th><th>Grade</th><th></th></tr>
+								<tr><th style="width:60%">Course</th><th style="width:12%">Result</th><th style="width:14%">Grade</th><th class="cell-actions" style="width:14%">Actions</th></tr>
 							</thead>
 							<tbody>
 								<repeat group="{{ @completed }}" value="{{ @course }}">
@@ -154,12 +165,16 @@ Changelog:
 		<div id="favourites-region" data-server-search-target>
 		<div id="favourites-results">
 
+	<check if="{{ @favourites_pagination }}">
+		<include href="partials/pagination.html" with="pg=@favourites_pagination" />
+	</check>
+
 			<check if="{{ @favourites }}">
 				<true>
 					<div class="table-wrap">
 						<table>
 							<thead>
-								<tr><th>Course</th><th>Level</th><th></th></tr>
+								<tr><th style="width:70%">Course</th><th style="width:16%">Level</th><th class="cell-actions" style="width:14%">Actions</th></tr>
 							</thead>
 							<tbody>
 								<repeat group="{{ @favourites }}" value="{{ @course }}">
@@ -200,12 +215,16 @@ Changelog:
 		<div id="requests-region" data-server-search-target>
 		<div id="requests-results">
 
+	<check if="{{ @requests_pagination }}">
+		<include href="partials/pagination.html" with="pg=@requests_pagination" />
+	</check>
+
 			<check if="{{ @requests }}">
 				<true>
 					<div class="table-wrap">
 						<table>
 							<thead>
-								<tr><th>Course</th><th>Requested</th><th>Status</th><th></th></tr>
+								<tr><th style="width:58%">Course</th><th style="width:12%">Requested</th><th style="width:16%">Status</th><th class="cell-actions" style="width:14%">Actions</th></tr>
 							</thead>
 							<tbody>
 								<repeat group="{{ @requests }}" value="{{ @request }}">

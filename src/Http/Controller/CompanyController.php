@@ -7,6 +7,18 @@ Description:
 Handles the consolidated Company workspace, standalone semantic Company sections and company-scoped management actions. Read and write scope is permission-driven so platform-wide write authority cannot be inferred from a dashboard/view capability.
 
 Changelog:
+
+
+
+2026/09/07 23:45 SAST
+
+- The assign form, and a company-scoped entity lookup so a company administrator never needs the platform-wide one.
+2026/09/07 21:00 SAST
+
+- Training Courses and Favourites routes, and the favourite toggle, which takes the company from the context being administered rather than from the request.
+2026/09/07 11:00 SAST
+
+- Collects sort state for every Company dataset, as the Administration controller already did.
 2026/09/03 03:18 SAST
 - Fixed the ALL-universe SQL error on Administration Courses search, the undefined universe 500 on Account routes, and rebuilt the Switch Company picker on the shared search, the shared pagination and the standard universe query parameter.
 
@@ -85,6 +97,129 @@ final class CompanyController extends BaseController
     public function enrolments(): void { $this->standalone('enrolments', 'COMPANY.ENROLMENT.VIEW'); }
     public function credits(): void { $this->standalone('credits', 'COMPANY.CREDIT.VIEW'); }
     public function courses(): void { $this->standalone('courses', 'COMPANY.COURSE.VIEW'); }
+
+    /**
+     * Courses the company has bought access to for its staff.
+     *
+     * Its own section since v0.6. "Courses" had meant owned *or* credited, which are opposites - one
+     * is stock the company sells, the other is stock it consumes - and a single list could answer
+     * neither question. See ROADMAP section 3d.
+     */
+    public function training(): void { $this->standalone('training', 'COMPANY.COURSE.VIEW'); }
+
+    /**
+     * The bounded pickers the assign form uses, scoped to the company being administered.
+     *
+     * Its own route rather than the Administration one, because that lookup is guarded by
+     * PLATFORM.* permissions a company administrator does not hold - and must not be given, since
+     * they would then be able to search every person and course on the platform.
+     */
+    public function lookup(): void
+    {
+        $user = $this->requirePermission('COMPANY.PERSON.VIEW');
+        $type = strtolower(trim((string) $this->f3->get('PARAMS.type')));
+        if (!in_array($type, ['people', 'assignable_courses'], true)) {
+            $this->f3->error(400, 'Unknown lookup type.');
+
+            return;
+        }
+
+        $context = $this->companyContext->resolve($user, $this->universe($user));
+        $companyId = (int) $context['company_id'];
+        $target = preg_replace('/[^a-z0-9_-]/i', '', (string) ($_GET['target'] ?? '')) ?? '';
+        $query = (string) ($_GET['q'] ?? '');
+
+        // The company is taken from the context being administered and never from the request: the
+        // query string says what to search for, and must not be able to say whose data to search.
+        $results = $this->platformAdministration->lookupEntities($type, $this->universe($user), $query, $companyId);
+
+        $this->renderFragment('partials/entity-lookup-results', [
+            'lookup_type' => $type,
+            'lookup_target' => $target,
+            'lookup_query' => trim($query),
+            'lookup_results' => $results,
+            'lookup_min_length' => 2,
+            'lookup_max_results' => 20,
+            'lookup_searched' => mb_strlen(trim($query)) >= 2,
+        ]);
+    }
+
+    /**
+     * Assigns a course to a staff member.
+     *
+     * The owner's second workflow: buy credits, assign, tell the person outside the LMS. The rules
+     * live in the service; this checks the permission, reads the form and reports the outcome.
+     */
+    public function assignCourse(): void
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
+
+        $this->handle(function () use ($user): void {
+            $context = $this->companyContext->resolve($user, $this->universe($user));
+            $companyId = (int) $context['company_id'];
+            if ($companyId <= 0) {
+                throw new RuntimeException('Select a company before assigning a course.');
+            }
+
+            $courseId = (int) ($_POST['course_id'] ?? 0);
+            $targetUserId = (int) ($_POST['user_id'] ?? 0);
+            $days = max(1, (int) ($_POST['access_days'] ?? 365));
+            if ($courseId <= 0 || $targetUserId <= 0) {
+                throw new RuntimeException('Choose both a staff member and a course.');
+            }
+
+            $result = $this->platformAdministration->assignCourseToStaff(
+                $companyId,
+                $courseId,
+                $targetUserId,
+                $days * 86400,
+                $user->id
+            );
+
+            $this->flash('success', $result['entitlement'] === 'owned'
+                ? 'Assigned. The course is owned by this company, so no credit was used.'
+                : 'Assigned, and one credit seat was used.');
+            $this->redirect('/company/enrolments');
+        }, '/company/enrolments');
+    }
+
+    /** Courses the company may want for its staff but has not bought. */
+    public function favourites(): void { $this->standalone('favourites', 'COMPANY.COURSE.VIEW'); }
+
+    /**
+     * Course performance for this company's own staff.
+     *
+     * The platform report answers a question about every learner on the platform and is not a
+     * company administrator's to see. This asks the same question of their own people, which is the
+     * one they actually have.
+     */
+    public function performance(): void { $this->standalone('performance', 'COMPANY.ENROLMENT.VIEW'); }
+
+    /**
+     * Adds or removes one company favourite.
+     *
+     * The company is taken from the context the reader is administering, never from the request: a
+     * course id in a URL says which course, and it must not be able to say whose favourite it is.
+     */
+    public function toggleFavourite(): void
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.COURSE.MANAGE');
+        $courseId = (int) $this->f3->get('PARAMS.id');
+
+        $this->handle(function () use ($user, $courseId): void {
+            $context = $this->companyContext->resolve($user, $this->universe($user));
+            $companyId = (int) $context['company_id'];
+            if ($companyId <= 0) {
+                throw new RuntimeException('Select a company before changing its favourites.');
+            }
+
+            $added = $this->platformAdministration->toggleCompanyFavourite($companyId, $courseId, $user->id);
+            $this->flash('success', $added ? 'Added to company favourites.' : 'Removed from company favourites.');
+            $this->redirect('/company/favourites');
+        }, '/company/favourites');
+    }
 
     public function createPerson(): void
     {
@@ -301,9 +436,14 @@ final class CompanyController extends BaseController
     private function sectionRequest(): array
     {
         $request = [];
-        foreach (['people', 'requests', 'enrolments', 'credits', 'courses'] as $dataset) {
+        foreach (['people', 'requests', 'enrolments', 'credits', 'courses', 'training', 'company_favourites', 'company_performance'] as $dataset) {
             $request[$dataset . '_page'] = $_GET[$dataset . '_page'] ?? null;
             $request[$dataset . '_page_size'] = $_GET[$dataset . '_page_size'] ?? null;
+            // Sort state is dataset state like page and page size, collected for every dataset
+            // rather than the ones that currently sort: a list that gains sorting and is forgotten
+            // here would show working headers whose clicks did nothing.
+            $request[$dataset . '_sort'] = $_GET[$dataset . '_sort'] ?? null;
+            $request[$dataset . '_dir'] = $_GET[$dataset . '_dir'] ?? null;
         }
 
         // Search terms come from the shared declaration for the same reason they do in

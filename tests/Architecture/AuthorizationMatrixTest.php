@@ -49,7 +49,7 @@ final class AuthorizationMatrixTest extends TestCase
             [AdminController::class, ['createPerson','updatePerson','changePersonStatus','revokePersonSession'], 'PLATFORM.PERSON.MANAGE'],
             [AdminController::class, ['createCompany','updateCompany','changeCompanyStatus'], 'PLATFORM.COMPANY.MANAGE'],
             [AdminController::class, ['decideRequest'], 'PLATFORM.REQUEST.MANAGE'],
-            [AdminController::class, ['removeEnrolment','restoreEnrolment','resetEnrolment'], 'PLATFORM.ENROLMENT.MANAGE'],
+            [AdminController::class, ['removeEnrolment','restoreEnrolment'], 'PLATFORM.ENROLMENT.MANAGE'],
             [AdminController::class, ['addCredit'], 'PLATFORM.CREDIT.MANAGE'],
             [AdminCourseCategoryController::class, ['index','create','inlineCreate','edit','update','move','delete'], 'COURSE.CATEGORY.MANAGE'],
             [AdminCourseController::class, ['createForm','create','cloneRevision'], 'COURSE.CREATE'],

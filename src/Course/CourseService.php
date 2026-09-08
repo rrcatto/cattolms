@@ -11,6 +11,22 @@ Description:
 Implements Catto Learning business and application logic for course operations.
 
 Changelog:
+
+
+
+
+2026/09/07 03:10 SAST
+
+- Distributions arrive scaled against their largest row, so a template never divides and an empty catalogue draws bars of width zero rather than a warning.
+2026/09/07 02:00 SAST
+
+- browseContext() replaced categoryBrowseContext(): breadcrumb, category facet and tag facet together, each option counted against the reader's other choices. A chosen tag is always offered.
+2026/09/07 00:50 SAST
+
+- Tag administration and tag browsing. The tag list and its count are universe-free because both describe the tags that exist; how many courses carry each is a separate, explicitly scoped read.
+2026/09/06 22:45 SAST
+
+- catalogue() and catalogueCount() take the category being browsed, and categoryBrowseContext() supplies the breadcrumb trail and the narrowing list.
 2026/08/23 04:19 SAST
 - Threaded the Seed Database data universe through this file so every business read states which universe it means.
 2026/08/21 04:31 SAST
@@ -43,6 +59,7 @@ use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\EmailAddress;
+use CattoLearning\Support\Money;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Slug;
 use InvalidArgumentException;
@@ -68,15 +85,300 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function catalogue(DataUniverse $universe, int $limit = 25, int $offset = 0): array
+    public function catalogue(DataUniverse $universe, CatalogueFilter $filter, int $limit = 25, int $offset = 0): array
     {
-        return $this->decorateCatalogue($this->courses->publishedCourses($universe, $limit, $offset));
+        $courses = $this->decorateCatalogue($this->courses->publishedCourses($universe, $filter, $limit, $offset));
+
+        // One statement for the whole page rather than one per card.
+        $tags = $this->courses->tagsForCourses(array_map(static fn(array $row): int => (int) $row['id'], $courses));
+        foreach ($courses as &$course) {
+            $course['tags'] = $tags[(int) $course['id']] ?? [];
+        }
+
+        return $courses;
     }
 
-    /** Total published courses, for the catalogue's "Showing X-Y of Z" contract. */
-    public function catalogueCount(DataUniverse $universe): int
+    /** Total published courses in the same scope the rows use, for "Showing X-Y of Z". */
+    public function catalogueCount(DataUniverse $universe, CatalogueFilter $filter): int
     {
-        return $this->courses->publishedCoursesCount($universe);
+        return $this->courses->publishedCoursesCount($universe, $filter);
+    }
+
+    /**
+     * The tag a browse URL names, or null when the slug is empty or retired.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function browsableTag(string $slug, DataUniverse $universe): ?array
+    {
+        return $slug === '' ? null : $this->courses->browsableTag($slug, $universe);
+    }
+
+    /**
+     * A distribution ready to render: every row given its share of the largest bar.
+     *
+     * The percentage is computed here rather than in markup for the reason every other derived
+     * figure is: a template that divides is a template that will one day divide by zero. An empty
+     * catalogue produces bars of width zero rather than a warning on the page.
+     *
+     * Scaled against the largest row, not against the total. Against the total, a catalogue spread
+     * evenly over sixteen branches draws sixteen bars at six percent each and says nothing; against
+     * the largest, the shape is legible whatever the spread.
+     *
+     * @return list<array{label:string,slug:string,total:int,share:int}>
+     */
+    public function categoryDistribution(DataUniverse $universe): array
+    {
+        return self::scaled($this->courses->categoryDistribution($universe));
+    }
+
+    /**
+     * @return list<array{label:string,slug:string,total:int,share:int}>
+     */
+    public function tagDistribution(DataUniverse $universe, int $limit = 15): array
+    {
+        return self::scaled($this->courses->tagDistribution($universe, $limit));
+    }
+
+    /**
+     * Every active tag with its published-course count, for the public tag index.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function tagIndex(DataUniverse $universe): array
+    {
+        return $this->courses->tagIndex($universe);
+    }
+
+    /**
+     * @param list<array{label:string,slug:string,total:int}> $rows
+     * @return list<array{label:string,slug:string,total:int,share:int}>
+     */
+    private static function scaled(array $rows): array
+    {
+        $largest = 0;
+        foreach ($rows as $row) {
+            $largest = max($largest, $row['total']);
+        }
+
+        $scaled = [];
+        foreach ($rows as $row) {
+            $scaled[] = $row + ['share' => $largest === 0 ? 0 : (int) round($row['total'] / $largest * 100)];
+        }
+
+        return $scaled;
+    }
+
+    /**
+     * The tags worth offering as a browse rail.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function popularTags(DataUniverse $universe, int $limit = 24): array
+    {
+        return $this->courses->popularTags($universe, $limit);
+    }
+
+    /**
+     * One page of the tag administration list.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function tags(DataUniverse $universe, string $search, int $limit, int $offset): array
+    {
+        $tags = $this->courses->tags($search, $limit, $offset);
+
+        // The tags are the population; the courses under them are the reader's universe. Two reads
+        // because they answer two different questions - see CourseRepository::tags().
+        $counts = $this->courses->courseCountsForTags(
+            array_map(static fn(array $tag): int => (int) $tag['id'], $tags),
+            $universe
+        );
+        foreach ($tags as &$tag) {
+            $tag['course_count'] = $counts[(int) $tag['id']] ?? 0;
+        }
+
+        return $tags;
+    }
+
+    public function tagsCount(string $search): int
+    {
+        return $this->courses->tagsCount($search);
+    }
+
+    /** @return array<string,mixed> */
+    public function tag(int $id): array
+    {
+        $tag = $this->courses->tag($id);
+        if ($tag === null) {
+            throw new InvalidArgumentException('That tag does not exist.');
+        }
+
+        return $tag;
+    }
+
+    /**
+     * Creates a tag.
+     *
+     * The slug is the canonical key, derived from the name rather than typed, so "Cyber Security",
+     * "cyber security" and "Cyber  Security" cannot become three tags meaning one thing. A clash is
+     * refused rather than silently suffixed: two tags whose slugs collide are the same tag, and the
+     * operator should merge or rename, not end up with "cyber-security-2".
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    public function createTag(array $data, int $actorUserId): array
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            throw new InvalidArgumentException('A tag needs a name.');
+        }
+
+        $slug = Slug::from($name);
+        if ($this->courses->tagBySlug($slug) !== null) {
+            throw new InvalidArgumentException('The tag “' . $name . '” already exists.');
+        }
+
+        // A tag is a name. It had a description nobody wrote and an active flag nobody set, and
+        // both were on screen taking space from the only column that says anything.
+        $id = $this->courses->createTag(['name' => $name, 'slug' => $slug]);
+        $this->audit->record($actorUserId, 'course.tag.created', ['tag_id' => $id, 'name' => $name]);
+
+        return $this->tag($id);
+    }
+
+    /** @param array<string,mixed> $data */
+    public function updateTag(int $id, array $data, int $actorUserId): void
+    {
+        $tag = $this->tag($id);
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            throw new InvalidArgumentException('A tag needs a name.');
+        }
+
+        $slug = Slug::from($name);
+        $clash = $this->courses->tagBySlug($slug);
+        if ($clash !== null && (int) $clash['id'] !== $id) {
+            throw new InvalidArgumentException('Another tag already uses the name “' . $name . '”.');
+        }
+
+        $this->courses->updateTag($id, ['name' => $name, 'slug' => $slug]);
+        $this->audit->record($actorUserId, 'course.tag.updated', [
+            'tag_id' => $id, 'from' => (string) $tag['name'], 'to' => $name,
+        ]);
+    }
+
+    /**
+     * Deletes a tag, detaching it from every course that carried it.
+     *
+     * No replacement is asked for, unlike a category. A course with one fewer tag is still
+     * classified; a course with no category is not.
+     */
+    public function deleteTag(int $id, int $actorUserId): void
+    {
+        $tag = $this->tag($id);
+        $this->courses->deleteTag($id);
+        $this->audit->record($actorUserId, 'course.tag.deleted', ['tag_id' => $id, 'name' => (string) $tag['name']]);
+    }
+
+    /**
+     * The category a browse URL names, or null when the slug is empty.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function browsableCategory(string $slug, DataUniverse $universe): ?array
+    {
+        return $slug === '' ? null : $this->courses->browsableCategory($slug, $universe);
+    }
+
+    /**
+     * Everything a browse page needs to describe where the reader is and where they can go next:
+     * the breadcrumb trail, the sibling branches to narrow into, and the tag rail - each option
+     * carrying the number of courses choosing it would return.
+     *
+     * Each facet's own counts are taken with that facet relaxed. Apply the tag facet to its own
+     * counts and picking one tag drives every other tag to zero, because no course carries a tag it
+     * does not carry, and the rail becomes a dead end. Relaxed, the figure means "how many more this
+     * would add", which is what a reader is asking.
+     *
+     * @param array<string,mixed>|null $category
+     * @param list<array<string,mixed>> $selectedTags
+     * @return array{trail:list<array<string,mixed>>,children:list<array<string,mixed>>,tags:list<array<string,mixed>>}
+     */
+    public function browseContext(?array $category, CatalogueFilter $filter, DataUniverse $universe, int $tagLimit = 24, array $selectedTags = []): array
+    {
+        $children = $this->courses->browsableChildCategories(
+            $category === null ? null : (int) $category['id'],
+            $universe
+        );
+        if ($children !== []) {
+            $counts = $this->courses->categoryFacetCounts(
+                array_map(static fn(array $row): int => (int) $row['id'], $children),
+                $universe,
+                $filter->withoutCategory()
+            );
+            foreach ($children as &$child) {
+                $child['course_count'] = $counts[(int) $child['id']] ?? 0;
+            }
+            unset($child);
+        }
+
+        // The rail offers the tags worth offering, then re-counts them against the reader's other
+        // choices. Choosing which to show and saying how many each holds are two questions.
+        //
+        // A chosen tag is always offered, whether or not it made the popular list. Without this a
+        // reader who arrives on a link to an uncommon tag sees a rail that does not contain it: the
+        // filter is on, nothing on screen says so, and there is no control to turn it off.
+        $tags = $this->withSelectedFirst($this->courses->popularTags($universe, $tagLimit), $selectedTags);
+        if ($tags !== []) {
+            $counts = $this->courses->tagFacetCounts(
+                array_map(static fn(array $row): int => (int) $row['id'], $tags),
+                $universe,
+                $filter->withoutTags()
+            );
+            foreach ($tags as &$tag) {
+                $tag['course_count'] = $counts[(int) $tag['id']] ?? 0;
+                $tag['is_selected'] = $filter->hasTag((int) $tag['id']);
+            }
+            unset($tag);
+        }
+
+        return [
+            'trail' => $category === null ? [] : $this->courses->categoryAncestry((int) $category['id']),
+            'children' => $children,
+            'tags' => $tags,
+        ];
+    }
+
+    /**
+     * The offered tags, with any chosen ones the offer did not already contain.
+     *
+     * @param list<array<string,mixed>> $offered
+     * @param list<array<string,mixed>> $selected
+     * @return list<array<string,mixed>>
+     */
+    private function withSelectedFirst(array $offered, array $selected): array
+    {
+        $known = array_map(static fn(array $tag): int => (int) $tag['id'], $offered);
+        foreach ($selected as $tag) {
+            if (!in_array((int) $tag['id'], $known, true)) {
+                $offered[] = $tag;
+            }
+        }
+
+        return $offered;
+    }
+
+    /**
+     * The active tags named by a browse URL, in the order they will be shown.
+     *
+     * @param list<string> $slugs
+     * @return list<array<string,mixed>>
+     */
+    public function activeTagsBySlug(array $slugs): array
+    {
+        return $slugs === [] ? [] : $this->courses->activeTagsBySlug($slugs);
     }
 
     /**
@@ -146,10 +448,24 @@ final class CourseService
         return $platformAdministrator || $this->courses->enrolment($userId, (int) ($media['course_id'] ?? 0)) !== null;
     }
 
-    /** @return list<array<string,mixed>> */
-    public function categories(bool $activeOnly = false): array
+    /**
+     * The taxonomy, in tree order, with course counts scoped to the reader's universe.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function categories(DataUniverse $universe, bool $activeOnly = false): array
     {
-        return $this->courses->categories($activeOnly);
+        return $this->courses->categories($universe, $activeOnly);
+    }
+
+    /**
+     * The categories a category may be filed under.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function categoryParentOptions(int $excludeId = 0): array
+    {
+        return $this->courses->categoryParentOptions($excludeId);
     }
 
     /** @return array<string,mixed> */
@@ -166,13 +482,19 @@ final class CourseService
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    public function createCategory(array $input, int $userId, ?string $seedToken = null): array
+    public function createCategory(array $input, int $userId): array
     {
         $data = $this->validateCategoryInput($input);
-        $data['position'] = $this->courses->nextCategoryPosition();
-        // A category is a root row with no parent, so the universe comes from the caller.
-        $categoryId = $this->courses->createCategory($data, $seedToken);
-        $this->audit->record($userId, 'course_category.created', ['category_id' => $categoryId, 'name' => $data['name'], 'slug' => $data['slug']]);
+        // A category is a universe-free label, so there is no universe for the caller to state.
+        // Positions are per branch, so adding a sub-category never renumbers the top level.
+        $data['position'] = $this->courses->nextCategoryPosition((int) $data['parent_id']);
+        $categoryId = $this->courses->createCategory($data);
+        $this->audit->record($userId, 'course_category.created', [
+            'category_id' => $categoryId,
+            'name' => $data['name'],
+            'slug' => $data['slug'],
+            'parent_id' => $data['parent_id'],
+        ]);
         return $this->category($categoryId);
     }
 
@@ -188,7 +510,6 @@ final class CourseService
             'category_id' => $categoryId,
             'name' => $data['name'],
             'slug' => $data['slug'],
-            'is_active' => $data['is_active'],
             'previous_name' => (string) $existing['name'],
         ]);
     }
@@ -198,7 +519,15 @@ final class CourseService
         if (!in_array($direction, ['up', 'down'], true)) {
             throw new InvalidArgumentException('Choose whether to move the category up or down.');
         }
-        $categories = $this->courses->categories();
+        // Moving is within a branch: the ordering below is already tree order, and swapping two
+        // rows that sit under different parents would move a category sideways rather than up.
+        // The parent is resolved once, outside the filter - asking per row would be one query per
+        // category to answer the same question.
+        $parentId = $this->parentOf($categoryId);
+        $categories = array_values(array_filter(
+            $this->courses->categories(DataUniverse::All),
+            static fn(array $row): bool => (int) ($row['parent_id'] ?? 0) === $parentId
+        ));
         $index = null;
         foreach ($categories as $position => $category) {
             if ((int) $category['id'] === $categoryId) {
@@ -223,6 +552,17 @@ final class CourseService
         $courseCount = (int) ($category['course_count'] ?? 0);
         if ($replacementCategoryId === $categoryId) {
             throw new InvalidArgumentException('Choose a different replacement category.');
+        }
+        // A branch is never deleted wholesale. The database refuses it too - the parent reference
+        // is ON DELETE RESTRICT - but a foreign key violation is not a sentence anybody can act on,
+        // and removing three levels of taxonomy plus every course filed under them is not something
+        // one button should be able to do.
+        $childCount = $this->courses->categoryChildCount($categoryId);
+        if ($childCount > 0) {
+            throw new InvalidArgumentException(
+                'This category has ' . $childCount . ' sub-categor' . ($childCount === 1 ? 'y' : 'ies')
+                . ' beneath it. Move or delete those first.'
+            );
         }
         if ($courseCount > 0 && ($replacementCategoryId === null || $replacementCategoryId < 1)) {
             throw new InvalidArgumentException('This category is still used by courses. Choose a replacement category or deactivate it instead.');
@@ -1356,8 +1696,10 @@ final class CourseService
         if (preg_match('/^\d+(?:\.\d{1,2})?$/', $priceText) !== 1) {
             throw new InvalidArgumentException('Enter the price as an amount with no more than two decimal places.');
         }
-        [$whole, $fraction] = array_pad(explode('.', $priceText, 2), 2, '');
-        $minorUnits = ((int) $whole * 100) + (int) str_pad($fraction, 2, '0');
+        // Parsed by Money, so there is one conversion from a typed amount to cents on the platform.
+        // The validation above is deliberately stricter than Money is: a price with three decimal
+        // places is a typo on this form, and rounding it silently is not a kindness.
+        $minorUnits = Money::ofMajorUnits($priceText)->minorUnits;
         $currency = strtoupper(trim((string) ($input['currency_code'] ?? 'ZAR')));
         if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
             throw new InvalidArgumentException('Currency must be a three-letter ISO code such as ZAR.');
@@ -1440,10 +1782,16 @@ final class CourseService
         return $value . ' ' . ($value === 1 ? $singular : $unit);
     }
 
+    /**
+     * One price, formatted for this installation.
+     *
+     * Delegated to Money rather than assembled here. This used to test the code against 'ZAR' and
+     * prefix an R, which is right for one country and wrong for the next: it puts the symbol on the
+     * wrong side for several currencies and uses the wrong thousands separator for most of Europe.
+     */
     private function formatPrice(int $minorUnits, string $currency): string
     {
-        $amount = number_format(max(0, $minorUnits) / 100, 2, '.', ',');
-        return strtoupper($currency) === 'ZAR' ? 'R' . $amount : strtoupper($currency) . ' ' . $amount;
+        return Money::ofMinorUnits($minorUnits, $currency)->format();
     }
 
     /**
@@ -1462,14 +1810,69 @@ final class CourseService
         if ($duplicate !== null && (int) $duplicate['id'] !== (int) $existingCategoryId) {
             throw new InvalidArgumentException('Another course category already uses the slug "' . $slug . '".');
         }
+        // Names are unique across the whole taxonomy, so the clash is caught here with a sentence
+        // rather than reaching the reader as a constraint violation.
+        $sameName = $this->courses->categoryByName($name);
+        if ($sameName !== null && (int) $sameName['id'] !== (int) $existingCategoryId) {
+            throw new InvalidArgumentException('Another course category is already called "' . $name . '".');
+        }
+
+        // A category may sit under one parent, and the depth cap is three. Rejected here with an
+        // explanation; the database refuses it as well, but a constraint violation is not a
+        // sentence anybody can act on.
+        $parentId = max(0, (int) ($input['parent_id'] ?? 0));
+        if ($parentId > 0) {
+            if ($parentId === (int) $existingCategoryId) {
+                throw new InvalidArgumentException('A course category cannot be filed under itself.');
+            }
+            $parent = $this->courses->categoryById($parentId);
+            if ($parent === null) {
+                throw new InvalidArgumentException('Choose a parent category that exists.');
+            }
+            if ((int) $parent['level'] >= 3) {
+                throw new InvalidArgumentException(
+                    'Course categories go three levels deep, so "' . (string) $parent['name'] . '" cannot hold sub-categories.'
+                );
+            }
+            if ($existingCategoryId !== null && $this->categoryIsDescendantOf($parentId, $existingCategoryId)) {
+                throw new InvalidArgumentException('A course category cannot be filed under one of its own sub-categories.');
+            }
+        }
+
         return [
             'name' => $name,
             'slug' => $slug,
+            'parent_id' => $parentId,
             'description' => trim((string) ($input['description'] ?? $input['category_description'] ?? '')),
-            'is_active' => $existingCategoryId === null
-                ? (!array_key_exists('is_active', $input) || $this->boolValue($input['is_active']))
-                : $this->boolValue($input['is_active'] ?? false),
         ];
+    }
+
+    /** The parent of one category, or 0 when it is a top-level one. */
+    private function parentOf(int $categoryId): int
+    {
+        $category = $this->courses->categoryById($categoryId);
+
+        return (int) ($category['parent_id'] ?? 0);
+    }
+
+    /**
+     * Whether one category sits anywhere beneath another.
+     *
+     * The depth trigger only compares a row against its immediate parent, so it cannot see a cycle
+     * being created by re-parenting a category under its own grandchild. Three levels means the
+     * walk is bounded by construction.
+     */
+    private function categoryIsDescendantOf(int $candidateId, int $ancestorId): bool
+    {
+        $walk = $candidateId;
+        for ($depth = 0; $depth < 3 && $walk > 0; $depth++) {
+            if ($walk === $ancestorId) {
+                return true;
+            }
+            $walk = $this->parentOf($walk);
+        }
+
+        return false;
     }
 
     /**

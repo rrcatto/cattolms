@@ -28,10 +28,38 @@ Changelog:
     pagination but no search.
   - Added the required metadata header and reindented with tabs.
 -->
+<check if="{{ @can_manage_enrolments }}">
+	<div class="card section">
+		<div class="section-head">
+			<div>
+				<h2>Assign a course</h2>
+				<p>Put a staff member on a course now. A course this company owns costs nothing; any other course uses one credit seat.</p>
+			</div>
+		</div>
+		<form class="form-grid" action="/company/enrolments/assign" method="post">
+			<input type="hidden" name="csrf" value="{{ @csrf }}">
+			<include href="partials/entity-lookup.html" with="lk_base='/company/lookup',lk_name='user_id',lk_type='people',lk_label='Staff member',lk_selected=0,lk_required=1,lk_empty='Nobody selected'" />
+			<include href="partials/entity-lookup.html" with="lk_base='/company/lookup',lk_name='course_id',lk_type='assignable_courses',lk_label='Course',lk_selected=0,lk_required=1,lk_empty='No course selected'" />
+			<div class="field">
+				<label for="assign-access-days">Access period (days)</label>
+				<input id="assign-access-days" name="access_days" type="number" min="1" max="3650" value="365" required>
+				<div class="help">The period starts now, not when they first open the course.</div>
+			</div>
+			<div class="field full">
+				<button class="btn btn-primary" type="submit">Assign course</button>
+			</div>
+		</form>
+	</div>
+</check>
+
 <include href="partials/dataset-search.html" with="ds_name='enrolments',ds_label='Search enrolments',ds_value=@enrolments_search,ds_action='/company/enrolments'" />
 
 <div id="enrolments-region" data-server-search-target>
 <div id="enrolments-results">
+
+	<check if="{{ @enrolments_pagination }}">
+		<include href="partials/pagination.html" with="pg=@enrolments_pagination" />
+	</check>
 
 	<div class="section-head">
 		<div>
@@ -43,7 +71,7 @@ Changelog:
 	<div class="table-wrap">
 		<table>
 			<thead>
-				<tr><th>Learner</th><th>Course</th><th>Status</th><th>Progress</th><th></th></tr>
+				<tr><repeat group="{{ @enrolments_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@enrolments_region,sort_results=@enrolments_results" /></repeat></tr>
 			</thead>
 			<tbody>
 				<repeat group="{{ @enrolments }}" value="{{ @enrolment }}">
@@ -52,18 +80,18 @@ Changelog:
 						<td>{{ @enrolment.course_title }}</td>
 						<td>{{ @enrolment.status }}</td>
 						<td>{{ @enrolment.progress_percentage }}%</td>
-						<td>
+						<td class="cell-actions">
 							<check if="{{ @enrolment.status=='cancelled' }}">
 								<true>
 									<form action="/company/enrolments/{{ @enrolment.id }}/restore" method="post">
 										<input type="hidden" name="csrf" value="{{ @csrf }}">
-										<button class="btn btn-soft btn-sm">Restore</button>
+										<button class="btn btn-soft btn-sm" title="Restore this learner's course access">Restore</button>
 									</form>
 								</true>
 								<false>
 									<form action="/company/enrolments/{{ @enrolment.id }}/remove" method="post">
 										<input type="hidden" name="csrf" value="{{ @csrf }}">
-										<button class="btn btn-danger btn-sm">Remove access</button>
+										<button class="btn btn-danger btn-sm" title="Remove this learner's course access" data-confirm="Remove this learner’s course access?">Remove</button>
 									</form>
 								</false>
 							</check>

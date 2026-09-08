@@ -36,6 +36,7 @@ use CattoLearning\Support\GeoIpLocator;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Mail\SeedAwareMailer;
 use CattoLearning\Seed\SeedMailRouter;
+use CattoLearning\Seed\SeedNamePools;
 use CattoLearning\Infrastructure\Mail\SymfonyMailerAdapter;
 use CattoLearning\Infrastructure\Persistence\ConnectionFactory;
 use CattoLearning\View\ThemeManager;
@@ -114,6 +115,13 @@ final class ContainerFactory
             CoursePortabilityService::class => autowire()
                 ->constructorParameter('storageRoot', $instanceRoot . '/storage')
                 ->constructorParameter('bundledImportRoot', $codeRoot . '/resources/course-imports'),
+
+            // The seed name lists follow the same rule as bundled course imports and themes: a copy
+            // ships in the release, the installer publishes it to the instance, and the instance
+            // copy is the one that is read - so an operator's edits survive every upgrade.
+            SeedNamePools::class => autowire()
+                ->constructorParameter('instanceRoot', $instanceRoot . '/storage/seeds')
+                ->constructorParameter('bundledRoot', $codeRoot . '/resources/seeds'),
         ]);
 
         /** @var Container $container */

@@ -11,6 +11,8 @@ Description:
 Provides shared support functionality for uuid used across Catto Learning.
 
 Changelog:
+2026/09/06 18:30 SAST
+- Added isValid(), so a malformed token from a URL is "no such record" rather than a PostgreSQL cast error shown to the reader.
 2026/08/23 04:19 SAST
 - Added time-ordered UUIDv7 for Seed Database set tokens, and shared the formatting between v4 and v7.
 2026/08/12 23:56 SAST
@@ -62,6 +64,21 @@ final class Uuid
             substr($hex, 16, 4),
             substr($hex, 20, 12)
         );
+    }
+
+    /**
+     * Whether a string is a UUID at all.
+     *
+     * A token reaches the application from a route parameter, so it can be anything. PostgreSQL
+     * casts a UUID column comparison rather than comparing text, and a malformed value makes that
+     * cast fail with an SQLSTATE the reader then sees. Checking the shape first turns a hand-typed
+     * URL into "no such record", which is what it actually is.
+     */
+    public static function isValid(string $candidate): bool
+    {
+        // Anchored with \z rather than $, because $ also matches immediately before a trailing
+        // newline, which would let "<uuid>\n" through to the cast this check exists to avoid.
+        return preg_match('/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i', $candidate) === 1;
     }
 
     public static function v4(): string

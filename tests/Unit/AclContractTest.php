@@ -51,7 +51,11 @@ final class AclContractTest extends TestCase
 
         self::assertSame($keys, array_values(array_unique($keys)));
         self::assertCount(10, array_values(array_filter($keys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.'))));
-        self::assertCount(70, $catalog->businessKeys());
+        // 71 since v0.6: COURSE.TAG.MANAGE joined COURSE.CATEGORY.MANAGE when tags gained an
+        // administration surface. Tags and categories are separate keys because they are separate
+        // decisions - a tag is cross-cutting classification and a category is the catalogue's
+        // structure - and an installation may well want one delegated and not the other.
+        self::assertCount(71, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {

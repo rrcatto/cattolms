@@ -31,6 +31,10 @@ Changelog:
 <div id="credits-region" data-server-search-target>
 <div id="credits-results">
 
+	<check if="{{ @credits_pagination }}">
+		<include href="partials/pagination.html" with="pg=@credits_pagination" />
+	</check>
+
 	<div class="notice">
 		<span>ⓘ</span>
 		<div>Credits are tied to a course and access period and are consumed when the learner starts the course.</div>
@@ -39,7 +43,7 @@ Changelog:
 	<div class="table-wrap section">
 		<table>
 			<thead>
-				<tr><th>Course</th><th>Period</th><th>Total</th><th>Available</th><th>Assigned</th><th>Consumed</th></tr>
+				<tr><repeat group="{{ @credits_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@credits_region,sort_results=@credits_results" /></repeat></tr>
 			</thead>
 			<tbody>
 				<repeat group="{{ @credits }}" value="{{ @credit }}">

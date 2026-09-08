@@ -161,7 +161,7 @@ final class SeedGenerationIntegrationTest extends TestCase
 
         foreach ([
             'companies', 'users', 'user_emails', 'user_roles', 'company_users',
-            'course_categories', 'courses', 'course_modules', 'course_assessments',
+            'courses', 'course_modules', 'course_assessments',
             'assessment_questions', 'assessment_options', 'course_enrolments',
             'course_requests', 'course_credits',
         ] as $table) {
@@ -172,15 +172,22 @@ final class SeedGenerationIntegrationTest extends TestCase
             );
         }
 
+        // Since v0.6 a set builds out a planned minority of its courses and lists the rest. A
+        // course with modules must be complete; a course without them is a catalogue entry, which
+        // is both affordable and closer to a real catalogue, where most of what exists is not what
+        // anyone opens. So the contract is no longer "every course has modules" but "every course
+        // that has modules has assessments and questions too" - a half-built course is the
+        // incoherence worth catching.
         self::assertSame(
             0,
             $this->rowCount(
                 'SELECT COUNT(*)::int AS total FROM courses c
                  WHERE c.seed_token = :token::uuid
-                   AND NOT EXISTS (SELECT 1 FROM course_modules m WHERE m.course_id = c.id)',
+                   AND EXISTS (SELECT 1 FROM course_modules m WHERE m.course_id = c.id)
+                   AND NOT EXISTS (SELECT 1 FROM course_assessments a WHERE a.course_id = c.id)',
                 $bind
             ),
-            'Every generated course must have modules.'
+            'A generated course with modules must have its assessments too.'
         );
         self::assertSame(
             0,
@@ -425,7 +432,8 @@ final class SeedGenerationIntegrationTest extends TestCase
      * The regression for the defect that stopped the first VPS run. The per-set uniqueness key
      * used to be the first eight characters of the set token; a UUIDv7 opens with a millisecond
      * timestamp, so those characters are shared by every set generated within about a minute of
-     * each other. The second generation collided on `course_categories_slug_key` and the whole
+     * each other. The second generation collided on `course_categories_slug_key` - a table that
+     * has since left the seed universe entirely - and the whole
      * run stopped there - which also meant the collisions waiting behind it in `courses.slug`,
      * `companies.domain`, `user_emails.email` and `certificates.certificate_number` were never
      * reached, and so never seen.
@@ -450,7 +458,6 @@ final class SeedGenerationIntegrationTest extends TestCase
         // constraints are scoped to a parent row the generator creates itself, so two sets cannot
         // reach each other through them; these five are platform-wide.
         $uniqueColumns = [
-            'course_categories' => 'slug',
             'courses' => 'slug',
             'companies' => 'domain',
             'user_emails' => 'email',
@@ -460,7 +467,7 @@ final class SeedGenerationIntegrationTest extends TestCase
         // Minimum volume always produces these four. Certificates depend on a learner reaching a
         // pass, which the smallest plan does not guarantee, so it is checked for collision but not
         // required to be populated.
-        $alwaysPopulated = ['course_categories', 'courses', 'companies', 'user_emails'];
+        $alwaysPopulated = ['courses', 'companies', 'user_emails'];
 
         foreach ($uniqueColumns as $table => $column) {
             $first = $this->uniqueValues($table, $column, $this->token());
@@ -505,5 +512,33 @@ final class SeedGenerationIntegrationTest extends TestCase
         }
 
         return $values;
+    }
+
+    /**
+     * Generated courses actually carry tags.
+     *
+     * They did not. `tagCourses()` built its rows and then ended on a comment explaining why they
+     * were not counted, without ever writing them, so four seed sets and eight hundred generated
+     * courses left `course_tags` completely empty. Nothing noticed, because the tag surfaces did not
+     * exist yet and the association carries no seed token to be audited by.
+     */
+    public function testGeneratedCoursesCarryTags(): void
+    {
+        $tagged = (int) $this->fixture->scalar(
+            'SELECT COUNT(DISTINCT ct.course_id)::int FROM course_tags ct
+               JOIN courses c ON c.id = ct.course_id
+              WHERE c.seed_token = :token::uuid',
+            [':token' => $this->token()]
+        );
+        $courses = (int) $this->fixture->scalar(
+            'SELECT COUNT(*)::int FROM courses WHERE seed_token = :token::uuid',
+            [':token' => $this->token()]
+        );
+
+        self::assertGreaterThan(0, $courses, 'The fixture must have generated courses to tag.');
+        self::assertSame($courses, $tagged, 'Every generated course carries at least one tag.');
+
+        // And the associations are not part of the manifest, because the tag was never the set's.
+        self::assertArrayNotHasKey('course_tags', $this->result['tables']);
     }
 }

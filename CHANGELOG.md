@@ -1,7 +1,136 @@
 # Changelog
 
-**LMS version:** 0.5.8.3  
-**Date time:** 2026/09/03 05:10 SAST  
+**LMS version:** 0.6  
+**Date time:** 2026/09/08 03:30 SAST  
+
+## 2026-09-08 03:30 SAST — v0.6 catalogue, scale, and one canonical baseline
+
+Local gates green: 674 tests, PHPStan level 6 over `src/` and `tests/`, architecture, runtime hazard,
+UI contract and release validation. Every route returns its expected status; owner browser acceptance
+is outstanding. **This release cannot be upgraded into** — see the schema note below.
+
+### Schema rebased onto one baseline
+
+- `database/migrations/` holds a single migration describing all 41 tables, plus one additive
+  migration after it. The 0.5.8 baseline and the five migrations that followed it are gone.
+- There is no upgrade path from 0.5.8.3. Installing 0.6 is `composer smoke:install` and a discarded
+  database, which is acceptable only while the database is disposable TEST/DEV state.
+- `release:validate` now enforces the shape: exactly one baseline, any number of additive migrations,
+  and a non-baseline migration that drops or recreates a table fails the build. Judged by which table
+  is named, so adding a new table stays possible — a blanket ban had made it impossible.
+
+### The taxonomy became a real one
+
+- `course_categories`, `tags` and `course_tags` no longer carry `seed_token`. They classify a course
+  rather than describing a person, a company or a transaction, and they are shared vocabulary exactly
+  as roles and permissions already were. 30 tables are seed-aware; these are not among them.
+- The reason it was wrong: a generated course could only be filed in a generated category, so seed
+  data never exercised the real taxonomy, and generated category names carried a set suffix to avoid
+  colliding with genuine ones. `SeedTableCatalog` records the amendment to owner decision D3.
+- Anything *counted* under a label still takes an explicit `DataUniverse`. Per-category counts, browse
+  listings, tag weights and the administration charts are all filtered by the reader's universe.
+- Category browsing three levels deep, with counts for the whole branch behind each child; a tag
+  index; tag pages; faceted search narrowing by category and tag together; distribution charts.
+- `is_active` removed from categories and tags, and `description` removed from tags. A category
+  exists or it does not, and a tag is a name. Both were on screen and neither could be explained.
+- The taxonomy screens gained the universe control they had been missing, which is why every tag had
+  been reporting zero courses: they counted REAL only, with no way to say otherwise.
+
+### Generated data
+
+- Ten editable word lists in `storage/seeds/`, published from `resources/seeds/` on install and never
+  overwritten once edited. `SeedNameFactory` combines three per name, remembers every combination and
+  redraws on a repeat, primed with the names already in the database.
+- Nothing is appended to a name to make it unique — no digits, no set key. Uniqueness comes from the
+  size of the combination space. Slugs, domains, email addresses and certificate numbers are the
+  exception, because an identifier is not a name.
+- Randomness comes from a seeded `Random\Randomizer`. The generator it replaced returned the low bits
+  of an LCG modulo the pool size, and those bits alternate with a period of two, so half of every
+  even-sized list was unreachable.
+- Courses are named after the category they are filed under and tagged from the same taxonomy — the
+  discipline, the area, the subject, a delivery mode and a purpose. Previously the title came from one
+  word list and the category from another, so "Abattoir Hygiene" could be filed under Cloud
+  Infrastructure and tagged by arithmetic on its row number.
+- `tagCourses()` had been building its rows and never writing them, so every generated course came out
+  untagged. It writes through `SeedRepository::attachCourseTags()` now.
+- A seed set opens onto a per-table breakdown of what it wrote and what remains of it. The data had
+  always been recorded and had never been reachable.
+
+### Pagination, ordering and cost
+
+- Every paginated read is a deferred join through `PageQuery::deferred()`: the page's identifiers are
+  selected first with the same WHERE, ORDER BY, LIMIT and OFFSET, and only then does the query join
+  outwards. A page cannot hold the right rows in the wrong sequence.
+- Every ordering ends in a unique column. `PaginationOrderingContractTest` proves it by reading the
+  ordering constants, because a test that pages a fixture cannot prove an ordering is total —
+  PostgreSQL may break a tie either way, and on one plan it reliably picks the same one. Removing the
+  tiebreakers was tried against exactly such a test and it passed.
+- Sorting on every paginated list, through a whitelist per dataset. The request supplies a key, never
+  a column: an ORDER BY takes an expression and no parameter binding can make a supplied column safe.
+- A paging or search request builds only the table being swapped — the section body rather than the
+  whole page, one dataset rather than both on the two-table screens, and no universe recount.
+- `tools/seed-benchmark-dataset.php` and `tools/benchmark-pagination.php` ship for measurement, run by
+  hand and never part of the gate.
+- The Companies list had joined three independent one-to-many relationships and de-duplicated with
+  COUNT(DISTINCT), building their cartesian product to arrive at three integers. Scalar sub-selects
+  now cost the sum rather than the product; the first page had not completed in ten minutes at
+  benchmark volume.
+
+### One row is one line
+
+- `table-layout: fixed` with a percentage width declared per column in the header model, which is the
+  only layout in which a table cannot outgrow its box. Numeric columns take what four digits need and
+  the name column takes the rest.
+- A cell with two or more actions is a menu, not a row of buttons. Anything truncated carries its full
+  text as a tooltip, applied to the rendered table because whether a cell overflows depends on the
+  column width and the viewport, which no template knows.
+- Four contract tests: widths must total 100, no column may be nameless, no cell may carry a row of
+  buttons, and no action in a table may be styled as bare text.
+- `PopoutClippingContractTest` computes selector specificity across every installed theme and fails if
+  a theme's `overflow` on the table wrapper beats core's. The row menu was invisible under Gilded
+  Noir because `.gn-main .table-wrap{overflow:auto}` outranked an unmarked core rule, and the
+  navigation flyout was invisible under the default theme because a sidebar that scrolls vertically
+  cannot let an absolutely positioned child overflow it sideways. Inside a sidebar the third level
+  nests instead.
+- One page header partial on every screen except the front page, and in a compact form in the course
+  player, where the course carries its own.
+
+### Screens split, because each half carried the other's empty columns
+
+- Companies into **Course Consumers** and **Course Creators**. The split is on what a company does, so
+  one that both sells and buys appears on both. A company owning no courses counts as a consumer, so
+  no company is unreachable.
+- Reports into **Course Performance** and **Company Enrolments**.
+- Enrolments and Requests into routes of their own. Neither could previously be linked to, bookmarked
+  or reloaded, and the browser's back button could not return to the one the reader had been on.
+- The Company workspace gained Courses Bought, Favourites and Performance, and a three-level menu.
+  Course Performance is available to a company administrator scoped to their own staff — every figure
+  counts only enrolments held by an active member, including the sort expressions, because sorting by
+  a platform-wide count while displaying a company one orders rows by numbers that are not on screen.
+
+### Commerce foundations, not commerce
+
+- `Money` stores minor units with an ISO 4217 code and formats through `intl`, so the symbol,
+  its placement and the separators come from the locale rather than a symbol table.
+  `ofMajorUnits()` parses strings as digits, because 9.995 rounds to 999 cents as a float.
+- Prices are per course and access period. Trading currency, country and VAT rate are `.env` settings;
+  VAT is not charged until a rate is set, and prices are stored excluding it.
+- Credits are held by a company and by nothing else. The individual holder branch never described
+  anything real: a credit is a seat a company buys so that its staff can be put on a course, and the
+  decision to spend one is a company administrator's.
+- The section is named Credits, not "Credits & Orders". No order, invoice, payment or refund table
+  exists, and naming it after both claimed a history the platform does not keep.
+
+### Removed
+
+- The enrolment progress reset. It deleted issued certificates along with the results, sessions,
+  attempts and module progress behind them, irreversibly, and nothing in the interface reached it.
+  Route, controller action, service method and repository method are gone.
+
+### Repository hygiene
+
+- `.gitattributes` normalises line endings on commit. Without it, working copies drifted to CRLF and a
+  diff showed 2,608 changed lines with no real change among them.
 
 ## 2026-09-03 05:10 SAST — v0.5.8.3 Stage C and D, company administration, and one control per job
 

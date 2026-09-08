@@ -63,7 +63,14 @@ final class CompanyRequestCreditRegressionTest extends TestCase
                 "INSERT INTO company_users (company_id,user_id,company_role,status) VALUES (:company_id,:user_id,'staff','active')",
                 [':company_id' => $companyId, ':user_id' => $learnerId]
             );
-            $courseId = $fixture->createCourse($adminId, $companyId, 'qa-request-' . $suffix, 'QA Requested Course ' . $suffix, 'published');
+            // The course belongs to somebody else. That is the whole premise of a credit: a company
+            // buys access to a course it does not own. This fixture used to make the learner's own
+            // company the owner, which since the 2026/09/07 ownership rule means the approval is
+            // free and immediate and no credit is consulted at all - so the test would have passed
+            // while proving nothing about credit matching.
+            $providerAdminId = $fixture->createUser('QA provider admin ' . $suffix, 'qa-provider-' . $suffix . '@example.test');
+            $providerId = $fixture->createCompany($providerAdminId, 'QA Provider ' . $suffix, 'qa-provider-' . $suffix . '.example.test');
+            $courseId = $fixture->createCourse($providerAdminId, $providerId, 'qa-request-' . $suffix, 'QA Requested Course ' . $suffix, 'published');
 
             $wrongPeriodCredit = $administration->addCredit($companyId, null, $courseId, 31536000, 1, 'qa', 'wrong period', $adminId);
             $fixture->rememberCredit($wrongPeriodCredit);
@@ -136,5 +143,65 @@ final class CompanyRequestCreditRegressionTest extends TestCase
             $container->get(EntityLookupRepository::class),
             $container->get(AuthSessionRepository::class)
         );
+    }
+
+    /**
+     * A company training its own staff on its own course pays nothing and waits for nothing.
+     *
+     * Ownership is the entitlement - owner decision, ROADMAP section 2c. Before this rule, approval
+     * ran one query whatever the course was: find a matching credit. For a company's own course
+     * there is none, so the request was marked "approved" and nobody was enrolled. Nothing errored
+     * and nothing on the screen distinguished that from a failure.
+     *
+     * The credit left lying about is deliberate. A stray credit must not be consumed for a course
+     * the company already owns, or a company would pay twice for something it made.
+     */
+    public function testACompanyTrainsItsOwnStaffOnItsOwnCourseWithoutACredit(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var SQL $db */
+        $db = $container->get(SQL::class);
+        /** @var AdministrationRepository $administration */
+        $administration = $container->get(AdministrationRepository::class);
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        $mailer = new FakeMailer();
+
+        try {
+            $adminId = $fixture->createUser('QA owner admin ' . $suffix, 'qa-owner-' . $suffix . '@example.test');
+            $learnerEmail = 'qa-own-learner-' . $suffix . '@example.test';
+            $learnerId = $fixture->createUser('QA owner learner ' . $suffix, $learnerEmail);
+            $companyId = $fixture->createCompany($adminId, 'QA Owner Co ' . $suffix, 'qa-owner-' . $suffix . '.example.test');
+            $db->exec(
+                "INSERT INTO company_users (company_id,user_id,company_role,status) VALUES (:company_id,:user_id,'staff','active')",
+                [':company_id' => $companyId, ':user_id' => $learnerId]
+            );
+
+            // Owned by this company, and a matching credit exists anyway.
+            $courseId = $fixture->createCourse($adminId, $companyId, 'qa-owned-' . $suffix, 'QA Owned Course ' . $suffix, 'published');
+            $credit = $administration->addCredit($companyId, null, $courseId, 2592000, 1, 'qa', 'should not be touched', $adminId);
+            $fixture->rememberCredit($credit);
+
+            $requestId = $administration->createRequest($learnerId, $companyId, $courseId, 2592000, 'Our own course please');
+            $fixture->rememberRequest($requestId);
+
+            $this->service($container, $mailer)->decideRequest($requestId, true, 'Approved', $adminId, $companyId);
+
+            $request = $db->exec('SELECT status,enrolment_id FROM course_requests WHERE id=:id', [':id' => $requestId])[0];
+            self::assertSame('fulfilled', (string) $request['status'], 'An owned course enrols immediately.');
+            self::assertNotSame('', trim((string) ($request['enrolment_id'] ?? '')), 'The learner is actually on the course.');
+
+            $used = $db->exec('SELECT COUNT(*)::int AS total FROM course_credit_allocations WHERE credit_id=:id', [':id' => $credit]);
+            self::assertSame(0, (int) $used[0]['total'], 'A company must not spend a credit on a course it owns.');
+
+            $notices = array_values(array_filter(
+                $mailer->messages,
+                static fn(array $message): bool => $message['type'] === 'course_enrolment_notice'
+            ));
+            self::assertCount(1, $notices, 'Every enrolment tells the learner where to start.');
+            self::assertSame($learnerEmail, $notices[0]['email']);
+        } finally {
+            $fixture->cleanup();
+        }
     }
 }

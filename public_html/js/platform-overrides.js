@@ -61,9 +61,17 @@
     }));
 
     const dropdownSelector = 'details.account-menu,details.rl-account-menu,details[data-cl-dropdown]';
-    const dropdowns = [...document.querySelectorAll(dropdownSelector)];
-    const closeDropdowns = except => dropdowns.forEach(menu => { if (menu !== except) menu.open = false; });
-    dropdowns.forEach(menu => menu.addEventListener('toggle', () => { if (menu.open) closeDropdowns(menu); }));
+    /* Queried at the moment it is needed rather than snapshotted at load. A row's actions menu
+       arrives with the rows, and every page turn replaces them, so a list captured once holds
+       elements that are no longer in the document and misses every one that is. */
+    const closeDropdowns = except => document.querySelectorAll(dropdownSelector)
+      .forEach(menu => { if (menu !== except) menu.open = false; });
+    /* Delegated from document, for the same reason: `toggle` bubbles from a details element, so one
+       listener covers the menus that exist now and the ones swapped in later. */
+    document.addEventListener('toggle', event => {
+      const menu = event.target instanceof Element ? event.target.closest(dropdownSelector) : null;
+      if (menu && menu.open) closeDropdowns(menu);
+    }, true);
     document.addEventListener('click', event => { const target = event.target instanceof Element ? event.target : null; if (!target || !target.closest(dropdownSelector)) closeDropdowns(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDropdowns(); document.querySelectorAll('.modal-backdrop.open').forEach(closeModal); } });
 
@@ -104,8 +112,31 @@
       create.addEventListener('click',async()=>{ const categoryName=name.value.trim(); if(!categoryName){if(error){error.textContent='Enter a category name.';error.classList.remove('d-none');}name.focus();return;} create.disabled=true; const form=new FormData(); form.append('csrf',panel.dataset.csrf||''); form.append('category_name',categoryName); form.append('category_description',description?description.value.trim():''); form.append('is_active','1'); try{const response=await fetch(panel.dataset.createUrl||'/admin/courses/categories/inline',{method:'POST',body:form,credentials:'same-origin',headers:{Accept:'application/json'}});const data=await response.json().catch(()=>({}));if(!response.ok||!data.category)throw new Error(data.error||'The category could not be created.');const option=document.createElement('option');option.value=String(data.category.id);option.textContent=String(data.category.name);option.selected=true;select.append(option);name.value='';if(description)description.value='';setOpen(false);}catch(exception){if(error){error.textContent=exception instanceof Error?exception.message:'The category could not be created.';error.classList.remove('d-none');}}finally{create.disabled=false;} });
     });
 
-    const activityTable=document.querySelector('[data-activity-table]'), activityFeed=activityTable?.querySelector('[data-activity-feed]');
-    if(activityTable&&activityFeed){const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char])); const poll=async()=>{if(document.hidden)return;const url=new URL('/admin/activity/feed',location.origin),current=new URL(location.href);['from','to','family','actor_id','course_id','company_id','q'].forEach(key=>{const value=current.searchParams.get(key);if(value)url.searchParams.set(key,value);});url.searchParams.set('after_id',activityTable.dataset.lastEventId||'0');try{const response=await fetch(url,{headers:{Accept:'application/json'},credentials:'same-origin'});if(!response.ok)return;const data=await response.json();const events=Array.isArray(data.events)?data.events:[];events.slice().reverse().forEach(event=>activityFeed.insertAdjacentHTML('afterbegin',`<tr data-activity-id="${Number(event.id)||0}"><td class="small">${escapeHtml(event.created_at)}</td><td>${escapeHtml(event.actor_name)}</td><td>${escapeHtml(event.company_name||'—')}</td><td><strong>${escapeHtml(event.event_label)}</strong><div class="small muted">${escapeHtml(event.family_label)}</div></td><td>${escapeHtml(event.subject)}</td><td>${escapeHtml(event.result)}</td><td class="small">${escapeHtml(event.ip_address||'—')}</td><td class="small">${escapeHtml(event.geo_location||'—')}</td><td><span class="badge info">${escapeHtml(event.source_label)}</span></td><td><a class="btn btn-ghost btn-sm" href="/admin/activity/${Number(event.id)||0}">Details</a></td></tr>`));if(events.length){activityTable.dataset.lastEventId=String(Math.max(...events.map(event=>Number(event.id)||0),Number(activityTable.dataset.lastEventId)||0));activityTable.querySelector('[data-activity-empty]')?.setAttribute('hidden','hidden');}}catch(_){}};setInterval(poll,15000);}
+    /* Activity live feed.
+
+       The table is looked up on every tick rather than captured once. Activity is a paginated
+       list, and a page swap replaces the table element, so a reference captured at load goes on
+       appending rows to a node that is no longer in the document - nothing on screen changes,
+       which is the worst kind of broken.
+
+       It also polls only while the reader is looking at the first page. New events belong at the
+       top of the newest page; prepending them onto page four would be inventing rows that do not
+       belong there and would push that page's real last row out of view. */
+    {
+      const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+      const poll=async()=>{
+        if(document.hidden)return;
+        const activityTable=document.querySelector('[data-activity-table]');
+        const activityFeed=activityTable?.querySelector('[data-activity-feed]');
+        if(!activityTable||!activityFeed)return;
+        if((activityTable.dataset.activityPage||'1')!=='1')return;
+        const url=new URL('/admin/activity/feed',location.origin),current=new URL(location.href);
+        ['from','to','family','actor_id','course_id','company_id','q'].forEach(key=>{const value=current.searchParams.get(key);if(value)url.searchParams.set(key,value);});
+        url.searchParams.set('after_id',activityTable.dataset.lastEventId||'0');
+        try{const response=await fetch(url,{headers:{Accept:'application/json'},credentials:'same-origin'});if(!response.ok)return;const data=await response.json();const events=Array.isArray(data.events)?data.events:[];events.slice().reverse().forEach(event=>activityFeed.insertAdjacentHTML('afterbegin',`<tr data-activity-id="${Number(event.id)||0}"><td class="small">${escapeHtml(event.created_at)}</td><td>${escapeHtml(event.actor_name)}</td><td>${escapeHtml(event.company_name||'—')}</td><td><strong>${escapeHtml(event.event_label)}</strong><div class="small muted">${escapeHtml(event.family_label)}</div></td><td>${escapeHtml(event.subject)}</td><td>${escapeHtml(event.result)}</td><td class="small">${escapeHtml(event.ip_address||'—')}</td><td class="small">${escapeHtml(event.geo_location||'—')}</td><td><span class="badge info">${escapeHtml(event.source_label)}</span></td><td><a class="btn btn-ghost btn-sm" href="/admin/activity/${Number(event.id)||0}">Details</a></td></tr>`));if(events.length){activityTable.dataset.lastEventId=String(Math.max(...events.map(event=>Number(event.id)||0),Number(activityTable.dataset.lastEventId)||0));activityTable.querySelector('[data-activity-empty]')?.setAttribute('hidden','hidden');}}catch(_){}
+      };
+      setInterval(poll,15000);
+    }
 
     const passwordInput=document.querySelector('form[action="/admin/settings/mail"] input[name="smtp_password"]');
     if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const control=document.createElement('div');control.className='cl-password-control';passwordInput.parentNode.insertBefore(control,passwordInput);control.appendChild(passwordInput);const toggle=document.createElement('button');toggle.type='button';toggle.className='btn btn-ghost cl-password-toggle';toggle.disabled=true;toggle.textContent='Show';control.appendChild(toggle);toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
@@ -136,6 +167,48 @@
         if (value instanceof HTMLInputElement) value.value = '';
         if (selected) selected.innerHTML = '<span class="muted">Nothing selected</span>';
       }
+    });
+
+    /* Truncated table cells carry their full text as a tooltip.
+
+       One row is one line, so anything wider than its column is cut off with an ellipsis. That is
+       the right visual answer and the wrong informational one on its own: the reader can see that
+       something was shortened and has no way to read it. A tooltip is the whole of the recovery.
+
+       It is applied here rather than written into every template because it is a property of the
+       rendered result, not of the markup: whether a cell overflows depends on the column width, the
+       viewport and the content, and no template can know. Cells that fit get no tooltip, so
+       hovering never produces a box repeating what is already on screen.
+
+       A cell that already carries a title keeps it. Several tables set one deliberately - a person
+       row shows the email address behind the name - and a deliberate tooltip always outranks this.
+
+       Runs again after every htmx swap, because a page turn replaces the rows. */
+    const applyCellTooltips = root => {
+      const scope = root instanceof Element ? root : document;
+      scope.querySelectorAll('.table-wrap td, .table-wrap th').forEach(cell => {
+        if (cell.hasAttribute('title')) {
+          if (cell.dataset.clAutoTitle !== '1') return;
+        }
+        const text = (cell.textContent || '').replace(/\s+/g, ' ').trim();
+        /* One pixel of slack: sub-pixel layout rounding reports a one-pixel overflow on cells that
+           are not actually truncated, which would put a tooltip on most of the table. */
+        if (text !== '' && cell.scrollWidth > cell.clientWidth + 1) {
+          cell.setAttribute('title', text);
+          cell.dataset.clAutoTitle = '1';
+        } else if (cell.dataset.clAutoTitle === '1') {
+          cell.removeAttribute('title');
+          delete cell.dataset.clAutoTitle;
+        }
+      });
+    };
+    applyCellTooltips(document);
+    document.body.addEventListener('htmx:afterSwap', event => applyCellTooltips(event.target));
+    /* And when the viewport changes, because a column that fitted at one width may not at another. */
+    let tooltipResize = 0;
+    window.addEventListener('resize', () => {
+      clearTimeout(tooltipResize);
+      tooltipResize = setTimeout(() => applyCellTooltips(document), 200);
     });
 
     const preview = new URL(location.href).searchParams.get('theme_preview');

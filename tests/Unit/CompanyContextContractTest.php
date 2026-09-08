@@ -128,30 +128,47 @@ final class CompanyContextContractTest extends TestCase
     // --- the company-courses rule --------------------------------------------------------------
 
     /**
-     * The Company Courses rows and count share one WHERE clause.
+     * A company's two relationships to a course are stated separately, and each shares one rule
+     * between its rows and its count.
      *
-     * They described different populations before Stage D - `publishedCourses()` for the rows
-     * against a published count - which is how a list gets a total that does not belong to it.
+     * They were one predicate - owned OR credited - behind one screen called "Courses". Those are
+     * opposites: one is stock the company sells, the other stock it consumes, and a list holding
+     * both answers neither question. Since v0.6 they are two constants, and the resolver picks one;
+     * recombining them into a single predicate is the regression this guards.
+     *
+     * The rows and the count still share whichever one is chosen, which is the older half of this
+     * contract: before Stage D the rows ran `publishedCourses()` against a published count, so the
+     * list had a total that did not belong to it.
      */
-    public function testCompanyCoursesRowsAndCountShareOneRule(): void
+    public function testACompanysTwoCourseRelationshipsAreStatedSeparately(): void
     {
         $source = self::source('src/Course/CourseRepository.php');
 
-        self::assertStringContainsString('COMPANY_COURSES_WHERE', $source);
-        self::assertSame(
-            2,
-            substr_count($source, 'self::COMPANY_COURSES_WHERE'),
-            'The rule is used exactly twice: once by the rows and once by the count.'
-        );
-        self::assertStringContainsString(
-            'owner_company_id = :company_id',
+        // The constant, not the word: the file's own changelog records that the combined rule once
+        // existed, and that record is the point of a changelog.
+        self::assertStringNotContainsString(
+            'self::COMPANY_COURSES_WHERE',
             $source,
-            'Company-owned courses are the first half of the rule.'
+            'The combined owned-or-credited rule must not come back.'
+        );
+        self::assertStringContainsString('COMPANY_OWNED_WHERE', $source);
+        self::assertStringContainsString('COMPANY_TRAINING_WHERE', $source);
+        self::assertStringContainsString(
+            "const COMPANY_OWNED_WHERE = 'c.owner_company_id = :company_id'",
+            $source,
+            'Owned is the provider relationship: the company made the course.'
         );
         self::assertStringContainsString(
             'course_credits cr',
             $source,
-            'Company-available courses - the ones it holds credits for - are the second half.'
+            'Training is the entitlement relationship: the company bought seats.'
+        );
+
+        // One resolver, used by the rows and by the count, so the two cannot pick differently.
+        self::assertSame(
+            2,
+            substr_count($source, 'self::companyCourseWhere('),
+            'The resolver is used exactly twice: once by the rows and once by the count.'
         );
     }
 

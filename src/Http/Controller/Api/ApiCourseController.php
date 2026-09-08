@@ -31,6 +31,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller\Api;
 
+use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseService;
 
 use CattoLearning\Api\AuthorizationService;
@@ -66,9 +67,9 @@ final class ApiCourseController extends BaseApiController
     {
         $this->execute(function (): void {
             $this->identity(ApiScope::COURSES_READ, 'CATALOGUE.VIEW');
-            $pagination = Pagination::create($_GET['page'] ?? null, $_GET['page_size'] ?? null, $this->courses->catalogueCount(DataUniverse::Real));
+            $pagination = Pagination::create($_GET['page'] ?? null, $_GET['page_size'] ?? null, $this->courses->catalogueCount(DataUniverse::Real, CatalogueFilter::none()));
             $this->respond([
-                'data' => $this->courses->catalogue(DataUniverse::Real, $pagination->pageSize, $pagination->offset),
+                'data' => $this->courses->catalogue(DataUniverse::Real, CatalogueFilter::none(), $pagination->pageSize, $pagination->offset),
                 'meta' => $pagination->toArray(),
             ]);
         });

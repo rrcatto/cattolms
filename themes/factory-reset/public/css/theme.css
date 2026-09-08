@@ -488,3 +488,13 @@ body[data-cl-palette-managed="1"] .card,body[data-cl-palette-managed="1"] .stat-
 /* Icon sizing, v1.0.3. Both dimensions, because the icon is now an SVG rather than a glyph span:
    a width-only rule leaves the height to default, and an SVG with no height renders 150px tall. */
 .nav-icon{width:18px;height:18px;flex:0 0 auto;vertical-align:-.15em;text-align:initial}
+
+/* Third navigation level, v1.0.4. Core positions the flyout and decides when it opens; this gives
+   it the sidebar's own surface rather than the light page surface core defaults to. The sidebar
+   forces its links to the on-colour ink with !important, so a white panel would print light text
+   on white. */
+.sidebar .nav-subpanel{background:var(--primary);border-color:color-mix(in srgb,var(--on-primary,#fff) 20%,transparent);color:var(--on-primary,#fff);box-shadow:14px 0 36px rgba(9,28,42,.28)}
+.sidebar .nav-group+.nav-group{border-top-color:color-mix(in srgb,var(--on-primary,#fff) 18%,transparent)}
+body[data-cl-palette-managed="1"] .sidebar .nav-subpanel{background:var(--cl-darkest)!important;border-color:var(--cl-dark)!important;color:var(--cl-on-color-1)!important}
+body[data-cl-palette-managed="1"] .sidebar .nav-group-label{color:var(--cl-on-color-1)!important}
+body[data-cl-palette-managed="1"] .sidebar .nav-group+.nav-group{border-top-color:var(--cl-dark)!important}

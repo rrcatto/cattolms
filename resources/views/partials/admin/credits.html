@@ -44,10 +44,9 @@ Changelog:
 				<p>Every adjustment is recorded in the audit log.</p>
 			</div>
 		</div>
-		<form action="/admin/credits" method="post" class="form-grid">
+		<form action="/admin/course/credits" method="post" class="form-grid">
 			<input type="hidden" name="csrf" value="{{ @csrf }}">
-			<include href="partials/entity-lookup.html" with="lk_name='company_id',lk_type='companies',lk_label='Company holder',lk_empty='None — grant to one person',lk_selected=0,lk_required=0" />
-			<include href="partials/entity-lookup.html" with="lk_name='user_id',lk_type='people',lk_label='Individual holder',lk_empty='None — grant to a company',lk_selected=0,lk_required=0" />
+			<include href="partials/entity-lookup.html" with="lk_name='company_id',lk_type='companies',lk_label='Company holding the credit',lk_empty='Search for the company',lk_selected=0,lk_required=1" />
 			<include href="partials/entity-lookup.html" with="lk_name='course_id',lk_type='courses',lk_label='Course',lk_required=1,lk_empty='Search for the course',lk_selected=0" />
 			<div class="field">
 				<label>Access period</label><select name="access_period_seconds"><option value="15552000">6 months</option><option value="31536000" selected>12 months</option></select>
@@ -71,12 +70,12 @@ Changelog:
 			<div><h2>How credits work</h2></div>
 		</div>
 		<div class="notice">
-			<div>A credit is specific to a course and access period. It is assigned before commencement and consumed permanently when the learner clicks <strong>Start course</strong>.</div>
+			<div><strong>A credit is specific to a course and access period.</strong> It is assigned before commencement and consumed permanently when the learner starts the course.</div>
 		</div>
 	</div>
 </div>
 
-<include href="partials/dataset-search.html" with="ds_name='credits',ds_label='Search credits',ds_value=@credits_search,ds_action='/admin/credits'" />
+<include href="partials/dataset-search.html" with="ds_name='credits',ds_label='Search credits',ds_value=@credits_search,ds_action='/admin/course/credits'" />
 
 <check if="{{ @universe_switch }}">
 	<include href="partials/universe-switch.html" with="us=@universe_switch,ct=@credits_universe_counts" />
@@ -85,10 +84,14 @@ Changelog:
 <div id="credits-region" data-server-search-target>
 <div id="credits-results">
 
+	<check if="{{ @credits_pagination }}">
+		<include href="partials/pagination.html" with="pg=@credits_pagination" />
+	</check>
+
 	<div class="table-wrap section">
 		<table>
 			<thead>
-				<tr><th>Holder</th><th>Course</th><th>Period</th><th>Available</th><th>Assigned</th><th>Consumed</th></tr>
+				<tr><repeat group="{{ @credits_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@credits_region,sort_results=@credits_results" /></repeat></tr>
 			</thead>
 			<tbody>
 				<repeat group="{{ @credits }}" value="{{ @credit }}">

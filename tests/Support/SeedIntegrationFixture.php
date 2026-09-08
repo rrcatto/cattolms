@@ -188,12 +188,27 @@ final class SeedIntegrationFixture
         return $companyId;
     }
 
-    public function createCategory(string $name, string $slug, ?string $token = null): int
+    /**
+     * One course category.
+     *
+     * Categories carry no universe since v0.6 - they are labels shared by both - so the token
+     * argument is accepted and ignored rather than removed, which keeps the two set builders below
+     * reading the same way as every other fixture they call. The row is still tracked and removed
+     * on teardown, because a fixture that leaves taxonomy behind pollutes the catalogue for every
+     * later test.
+     */
+    public function createCategory(string $name, string $slug, ?string $token = null, int $parentId = 0): int
     {
+        // The level is derived from the parent rather than passed in, exactly as the repository
+        // derives it, so a fixture cannot build a tree the database would have refused.
+        $level = $parentId === 0
+            ? 1
+            : (int) $this->db->exec('SELECT level FROM course_categories WHERE id = :id', [':id' => $parentId])[0]['level'] + 1;
+
         $id = (int) $this->db->exec(
-            'INSERT INTO course_categories (name,slug,position,seed_token)
-             VALUES (:name,:slug,1,:token::uuid) RETURNING id',
-            [':name' => $name, ':slug' => $slug, ':token' => $token]
+            'INSERT INTO course_categories (name,slug,position,level,parent_id)
+             VALUES (:name,:slug,1,:level,:parent) RETURNING id',
+            [':name' => $name, ':slug' => $slug, ':level' => $level, ':parent' => $parentId ?: null]
         )[0]['id'];
         $this->categories[] = $id;
 

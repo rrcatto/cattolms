@@ -45,6 +45,10 @@ Changelog:
 <div id="people-region" data-server-search-target>
 <div id="people-results">
 
+	<check if="{{ @people_pagination }}">
+		<include href="partials/pagination.html" with="pg=@people_pagination" />
+	</check>
+
 	<div class="notice">
 		<span>ⓘ</span>
 		<div><strong>One complete profile:</strong> open any person to edit personal particulars, primary and secondary email addresses, company, roles, account status, sessions and learning information from the same screen.</div>
@@ -53,7 +57,7 @@ Changelog:
 	<div class="table-wrap section">
 		<table>
 			<thead>
-				<tr><th>Person</th><th>Company</th><th>Roles</th><th>Courses</th><th>Created</th><th>Last login</th><th></th></tr>
+				<tr><repeat group="{{ @people_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@people_region,sort_results=@people_results" /></repeat></tr>
 			</thead>
 			<tbody>
 				<repeat group="{{ @people }}" value="{{ @person }}">
@@ -62,8 +66,8 @@ Changelog:
 							<div class="person">
 								<div class="avatar">U</div>
 								<div>
-									<strong>{{ @person.name }}</strong>
-									<div class="muted small">{{ @person.email }}</div>
+									<strong title="{{ @person.name }}">{{ @person.name }}</strong>
+									<div class="muted small" title="{{ @person.email }}">{{ @person.email }}</div>
 								</div>
 							</div>
 						</td>

@@ -11,6 +11,10 @@ Description:
 Provides mail infrastructure for mailer interface, supporting Catto Learning email delivery.
 
 Changelog:
+
+2026/09/07 12:00 SAST
+
+- sendCourseEnrolmentNotice(): every enrolment tells the learner where to start.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -36,6 +40,15 @@ interface MailerInterface
     public function sendCourseRequestNotice(string $email, string $staffLabel, string $courseTitle): void;
 
     public function sendCourseRequestDecision(string $email, string $courseTitle, bool $approved): void;
+
+    /**
+     * Tells a learner they are on a course and where to start it.
+     *
+     * Sent for every enrolment, whether it came from an approved request or from an administrator
+     * assigning it directly. An operator may well tell their staff in person as well; the platform
+     * does not rely on that having happened - owner decision, ROADMAP section 2c.
+     */
+    public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void;
 
     public function sendContactMessage(string $name, string $email, string $subject, string $message): void;
 

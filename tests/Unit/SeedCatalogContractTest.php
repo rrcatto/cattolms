@@ -64,13 +64,21 @@ final class SeedCatalogContractTest extends TestCase
         return $bodies;
     }
 
-    /** Decision D3 froze this list at 31 tables. */
+    /** Decision D3 froze this list, amended to 30 tables in v0.6. */
+    /**
+     * The frozen inventory, thirty tables since v0.6.
+     *
+     * `course_categories` left it, and `tags` and `course_tags` were never in it: a category and a
+     * tag classify a course rather than describing a person, a company or a transaction, so they
+     * are labels shared by both universes exactly as roles and permissions already are. The full
+     * reasoning, and the amendment to owner decision D3, is recorded in SeedTableCatalog.
+     */
     public function testSeedAwareTableListIsFrozen(): void
     {
         self::assertSame([
             'users', 'user_emails', 'user_roles', 'auth_sessions',
             'companies', 'company_users',
-            'course_categories', 'courses', 'course_price_variants', 'course_modules',
+            'courses', 'course_price_variants', 'course_modules',
             'course_content_blocks', 'course_assessments', 'assessment_questions',
             'assessment_options', 'course_grade_bands', 'course_media', 'course_editors',
             'course_enrolments', 'module_progress', 'assessment_attempts', 'assessment_responses',
@@ -79,7 +87,7 @@ final class SeedCatalogContractTest extends TestCase
             'course_edit_history', 'audit_log',
         ], SeedTableCatalog::seedAwareTables());
 
-        self::assertCount(31, SeedTableCatalog::seedAwareTables());
+        self::assertCount(30, SeedTableCatalog::seedAwareTables());
     }
 
     /** The two changes decision D3 made to the original proposal, asserted individually. */

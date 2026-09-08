@@ -29,17 +29,19 @@ Changelog:
 <div id="courses-region" data-server-search-target>
 <div id="courses-results">
 
-	<div class="section-head">
-		<div>
-			<h2>Courses</h2>
-			<p>Courses owned by or currently available to this company context.</p>
-		</div>
+	<check if="{{ @courses_pagination }}">
+		<include href="partials/pagination.html" with="pg=@courses_pagination" />
+	</check>
+
+	<div class="notice">
+		<span>ⓘ</span>
+		<div><strong>Courses this company owns.</strong> Training its own staff on them costs nothing and needs no credits. Courses bought for staff are under <a href="/company/training">Courses Bought</a>.</div>
 	</div>
 
 	<div class="table-wrap">
 		<table>
 			<thead>
-				<tr><th>Course</th><th>Status</th><th>Category</th></tr>
+				<tr><repeat group="{{ @courses_sort_headers }}" value="{{ @sh }}"><include href="partials/sortable-header.html" with="sh=@sh,sort_region=@courses_region,sort_results=@courses_results" /></repeat></tr>
 			</thead>
 			<tbody>
 				<repeat group="{{ @courses }}" value="{{ @course }}">

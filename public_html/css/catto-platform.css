@@ -4,6 +4,18 @@
    The file is minified and validate-ui-contracts.php asserts literal byte substrings inside its
    lines, so a new control is appended as its own block rather than edited into an existing one.
    Changelog:
+2026/09/07 13:00 SAST
+- Table rows never wrap: row actions, cells and the table itself.
+2026/09/08 11:00 SAST
+- Tables use a compact scale: half the cell padding and a smaller type step. On an eleven-column table the padding alone was costing about 350px, which is more than the words. Truncation stays as the last resort rather than the first.
+2026/09/08 09:00 SAST
+- One row is one line, and it fits. The previous version was overridden on every screen by the themes, which each set flex-wrap:wrap at a higher specificity and load afterwards. Long values now truncate with an ellipsis rather than wrapping or scrolling, secondary lines sit inline, and in-row buttons are compact.
+2026/09/06 21:30 SAST
+- The third-level flyout opens to the right by default. A group in a panel anchored near the window edge carries nav-flyout-edge and flips left only on a desktop too narrow to hold it.
+2026/09/06 20:10 SAST
+- The third navigation level became a hover/focus flyout: the group heading and its separator stay in the parent panel and the members open to the side. No JavaScript; the heading is a button so keyboard focus opens it, and narrow viewports fall back to the indented list.
+2026/09/04 20:49 SAST
+- Pagination 2.0: appended the numbered-page, ellipsis, jump-to-page and htmx busy-state block.
 2026/08/31 19:05 SAST
 - Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
 
@@ -19,7 +31,7 @@
 .cl-palette-switcher{position:fixed;right:18px;bottom:18px;z-index:1100;width:min(310px,calc(100vw - 36px));padding:12px;border:1px solid var(--cl-border,#dfe4ea);border-radius:14px;background:#fff;color:#18212b;box-shadow:0 18px 48px rgba(15,23,42,.20)}.cl-palette-switcher[hidden]{display:none!important}.cl-palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.cl-palette-head strong{font-size:.84rem}.cl-palette-hide,.cl-palette-show{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:6px 9px;font:inherit;font-weight:700}.cl-palette-show{position:fixed;right:18px;bottom:18px;z-index:1100;box-shadow:0 8px 24px rgba(15,23,42,.14)}.cl-palette-show[hidden]{display:none!important}.cl-palette-options{display:grid;gap:6px;max-height:min(52vh,430px);overflow:auto;padding-right:2px}.cl-palette-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;border:1px solid #dbe2ea;border-radius:9px;padding:8px 9px;background:#fff;color:#18212b;text-align:left;font:inherit}.cl-palette-option.active{border-color:var(--cl-accent,#64748b);box-shadow:inset 3px 0 var(--cl-accent,#64748b)}.cl-palette-name{font-size:.78rem;font-weight:800}.cl-palette-swatches{display:flex}.cl-palette-swatch{width:17px;height:17px;border:1px solid rgba(0,0,0,.13)}.cl-palette-swatch:first-child{border-radius:5px 0 0 5px}.cl-palette-swatch:last-child{border-radius:0 5px 5px 0}
 
 /* v0.5.7.5.1 scalable administration/account workspace layout primitives. */
-.activity-filters{width:100%;max-width:none!important}.activity-filters .form-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));width:100%}.pagination-row{display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap}.acl-groups{display:grid;gap:.75rem}.acl-group{min-width:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);overflow:hidden}.acl-group-summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;cursor:pointer;list-style:none;font-weight:800}.acl-group-summary::-webkit-details-marker{display:none}.acl-group-summary::after{content:"⌄";font-size:1rem;line-height:1;transition:transform .15s ease}.acl-group[open]>.acl-group-summary::after{transform:rotate(180deg)}.acl-group-content{padding:0 1rem 1rem;border-top:1px solid var(--cl-border,#dfe4ea)}.acl-table-wrap{margin-top:1rem}.acl-permission-table{width:100%;min-width:760px}.acl-permission-table th,.acl-permission-table td{vertical-align:top}.acl-permission-table .acl-permission-check{width:5rem;text-align:center}.acl-permission-table input[type="checkbox"]{width:1rem;height:1rem;margin:.15rem 0 0}.acl-permission-table code{white-space:nowrap}.cl-account-workspace,.cl-company-workspace{display:grid;gap:1rem}.table-wrap{overflow-x:auto}.table-wrap table{min-width:720px}
+.activity-filters{width:100%;max-width:none!important}.activity-filters .form-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));width:100%}.pagination-row{display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap}.acl-groups{display:grid;gap:.75rem}.acl-group{min-width:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);overflow:hidden}.acl-group-summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;cursor:pointer;list-style:none;font-weight:800}.acl-group-summary::-webkit-details-marker{display:none}.acl-group-summary::after{content:"⌄";font-size:1rem;line-height:1;transition:transform .15s ease}.acl-group[open]>.acl-group-summary::after{transform:rotate(180deg)}.acl-group-content{padding:0 1rem 1rem;border-top:1px solid var(--cl-border,#dfe4ea)}.acl-table-wrap{margin-top:1rem}.acl-permission-table{width:100%;min-width:760px}.acl-permission-table th,.acl-permission-table td{vertical-align:top}.acl-permission-table .acl-permission-check{width:5rem;text-align:center}.acl-permission-table input[type="checkbox"]{width:1rem;height:1rem;margin:.15rem 0 0}.acl-permission-table code{white-space:nowrap}.cl-account-workspace,.cl-company-workspace{display:grid;gap:1rem}/* The v0.5.7.6 scroll-and-min-width pair is gone. It is what the fixed-layout table system below replaced, and leaving it here meant two contradictory descriptions of the same box. */
 
 
 /* Contact anti-bot honeypot is core-owned functional markup. It must remain
@@ -52,6 +64,11 @@
    Appended as its own block: this file is minified and validate-ui-contracts.php matches literal
    byte substrings inside lines, so an existing line must not be re-wrapped to add a rule. */
 .company-context-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-left:auto}
+/* The banner carried the section-head class and therefore every theme's page-heading treatment,
+   which is how one banner rendered dark on a standalone section and light on the workspace. It
+   is core-owned now in full, so its own typography lives here rather than being inherited. */
+.company-context h2{font-size:1.02rem;line-height:1.3;margin:0}
+.company-context p{margin:.15rem 0 0;font-size:.82rem;opacity:.75}
 .company-context-current{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
 .modal-card-wide{max-width:60rem;width:100%}
 .company-picker-results{margin-top:.75rem}
@@ -86,3 +103,223 @@
    defines a five-column grid, so a fixed grid-N class would have broken every skin. Auto-fit lets
    any count lay out sensibly. Card styling stays the theme's. */
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px}
+/* v0.6 Pagination 2.0. Core owns the numbered control because it is functional navigation, not
+   decoration: the page a reader is on must be distinguishable under a theme that has never heard
+   of this control, and an ellipsis must never be mistaken for a page that can be clicked. Themes
+   still supply colour and typography through the ordinary platform button classes.
+   The numbered pages are a list so assistive technology announces how many there are; the marker
+   is removed because the numbers are the content. Tabular figures keep the row from reflowing as
+   the reader pages from 9 to 10 to 100. */
+.pagination-controls{flex-wrap:wrap;justify-content:center}
+.pagination-pages-list{display:flex;align-items:center;gap:.25rem;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.pagination-pages-list>li{display:flex;margin:0;padding:0}
+.pagination-page{min-width:2.35rem;justify-content:center;text-align:center;font-variant-numeric:tabular-nums}
+.pagination-page.is-current{pointer-events:none;font-weight:700}
+.pagination-gap{display:inline-flex;align-items:center;justify-content:center;min-width:1.5rem;padding:0 .15rem;opacity:.6;user-select:none}
+.pagination-jump{display:flex;align-items:center;gap:.5rem;margin:0}
+.pagination-jump label{margin:0;font-size:.9rem;white-space:nowrap}
+.pagination-jump input[type="number"]{width:5.5rem;min-width:0;text-align:center;font-variant-numeric:tabular-nums}
+.pagination-jump .help{margin:0;font-size:.85rem;white-space:nowrap;opacity:.75}
+/* htmx busy state. The control stays in place and dims rather than being replaced by a spinner,
+   because the rows underneath it are still the previous page and removing the control would move
+   the page under the pointer mid-request. */
+.pagination-row.htmx-request{opacity:.6;pointer-events:none}
+@media (max-width:640px){.pagination-jump{justify-content:space-between}.pagination-edge{display:none}}
+/* v0.6 course taxonomy. Depth is shown by indentation and a guide line, because a three-level tree
+   rendered flat is unreadable and the level is the one thing an administrator must see before
+   choosing a parent. Core owns it: the hierarchy is functional structure, not decoration a theme
+   may drop, and a theme that ignored it would leave 369 categories looking like one flat list.
+   The guide is a border rather than a character so it lines up whatever the row height. */
+.cl-category-depth{display:block;position:relative}
+.cl-category-depth-1{font-weight:700}
+.cl-category-depth-2{margin-left:1.5rem;padding-left:.85rem;border-left:2px solid var(--cl-border,#dfe4ea)}
+.cl-category-depth-3{margin-left:3rem;padding-left:.85rem;border-left:2px solid var(--cl-border,#dfe4ea);opacity:.9}
+.cl-category-depth-2::before,.cl-category-depth-3::before{content:"";position:absolute;left:0;top:.7em;width:.6rem;height:2px;background:var(--cl-border,#dfe4ea)}
+.cl-category-level{display:inline-block;min-width:1.5rem;margin-right:.4rem;font-size:.75rem;font-weight:700;opacity:.5;font-variant-numeric:tabular-nums}
+/* v0.6 in-page group navigation. Courses, Course Categories and Enrolments belong together and the
+   main menu cannot say so without a third level, which would be a Theme API change. */
+.cl-group-nav{display:flex;flex-wrap:wrap;gap:.25rem;margin:0 0 1.25rem;border-bottom:1px solid var(--cl-border,#dfe4ea)}
+.cl-group-tab{display:inline-flex;align-items:center;padding:.55rem .9rem;margin-bottom:-1px;border:1px solid transparent;border-bottom-color:var(--cl-border,#dfe4ea);border-radius:8px 8px 0 0;color:inherit;text-decoration:none;font-size:.88rem;font-weight:600;opacity:.7;white-space:nowrap}
+.cl-group-tab:hover{opacity:1;background:color-mix(in srgb,currentColor 6%,transparent)}
+.cl-group-tab.is-current{opacity:1;font-weight:800;background:var(--cl-page-surface,#fff);border-color:var(--cl-border,#dfe4ea);border-bottom-color:transparent}
+/* v0.6 third navigation level. Administration is grouped rather than flat, so a menu child may
+   itself hold children. Core draws the grouping because it is functional structure: a theme that
+   ignored it would render twelve sections as one undifferentiated list, which is the problem the
+   grouping exists to solve. Themes still own colour and typography.
+   The group heading stays visible with its separator rule and the members fly out to the side on
+   hover, so a long menu costs one panel of height rather than twelve.
+   The heading is a button rather than a span so the flyout is reachable from the keyboard: the
+   members are display:none until the group is hovered or holds focus, and something inside the
+   group has to be focusable first or Tab can never get to them. There is no JavaScript here at
+   all - :hover and :focus-within do the whole job, so the control behaves identically with
+   scripting off.
+   The panel carries its own background and text colour rather than inheriting, because it is
+   positioned over page content and a theme's dark menu panel would otherwise hand it the light
+   page's ink and render the heading invisible against itself. */
+.nav-group{position:relative;display:grid;gap:2px}
+.nav-group+.nav-group{margin-top:5px;padding-top:6px;border-top:1px solid var(--cl-border,rgba(127,127,127,.26))}
+.nav-group-label{display:flex;align-items:center;gap:.5rem;width:100%;margin:0;padding:.4rem .6rem;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.04em;line-height:1.35;text-transform:uppercase;text-align:left;opacity:.62;cursor:default}
+.nav-group-caret{margin-left:auto;flex:0 0 auto;font-size:1.1em;line-height:1;opacity:.75;transition:transform .15s ease}
+.nav-subpanel{display:none;position:absolute;top:-7px;left:100%;z-index:1070;min-width:13.5rem;padding:7px;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)}
+.nav-group:hover>.nav-subpanel,.nav-group:focus-within>.nav-subpanel{display:grid;gap:2px}
+.nav-group:hover>.nav-group-label,.nav-group:focus-within>.nav-group-label{opacity:1}
+.nav-group:hover>.nav-group-label .nav-group-caret,.nav-group:focus-within>.nav-group-label .nav-group-caret{transform:translateX(3px)}
+.nav-flyout-left>.nav-subpanel{left:auto;right:100%}
+/* A group inside a panel that is anchored near the window edge. It still opens to the right, which
+   is the direction a reader expects, but a top-bar menu sits close to the right edge and on a
+   narrower desktop there is simply not enough room out there: the flyout would be clipped by the
+   window with no way to scroll to it. Below the width where it fits, the group opens to the left
+   instead - the same thing a native menu does when it runs out of room. */
+@media(min-width:1081px) and (max-width:1600px){.nav-flyout-edge>.nav-subpanel{left:auto;right:100%}}
+.nav-sublink{display:flex;align-items:center;gap:.5rem;white-space:nowrap}
+/* Narrow viewports have nowhere to fly out to, and a hover target is not a thing a finger has, so
+   the members return to the indented list the group replaced. */
+@media(max-width:1080px){.nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}.nav-group-caret{display:none}.nav-group-label{opacity:.62}}
+/* Inside a scrolling sidebar the third level nests rather than flying out.
+
+   A flyout is `position:absolute; left:100%`, so it is drawn outside its parent - and a sidebar
+   that scrolls cannot let it. `overflow-y:auto` forces the other axis to compute as `auto` too:
+   there is no such thing as a box that scrolls vertically and overflows visibly sideways. Factory
+   Reset's sidebar is `position:fixed` with `overflow-y:auto`, so its flyouts were being clipped
+   away entirely and the group opened onto nothing.
+
+   Nesting is the answer rather than a fight: an indented sub-list is what sidebar navigation does,
+   it needs no JavaScript, and it cannot be clipped because it takes part in the flow. Themes whose
+   navigation is a top bar - Gilded Noir, Light Default - are unaffected and keep the flyout. */
+.sidebar .nav-group>.nav-subpanel,.side-nav .nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}
+.sidebar .nav-group-caret,.side-nav .nav-group-caret{transform:rotate(90deg)}
+.sidebar .nav-group>.nav-group-label,.side-nav .nav-group>.nav-group-label{opacity:.62}
+/* v0.6 category browsing. Core owns the breadcrumb and the narrowing rail because both are
+   navigation: a reader who has browsed three levels down needs a way back up that does not depend
+   on which theme is installed, and a branch offering a count has to show that count legibly. */
+.cl-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0 0 .75rem;font-size:.85rem}
+.cl-breadcrumb a{color:inherit;text-decoration:none;opacity:.72}
+.cl-breadcrumb a:hover{text-decoration:underline;opacity:1}
+.cl-breadcrumb a[aria-current="page"]{font-weight:800;opacity:1;text-decoration:none;cursor:default}
+.cl-breadcrumb-sep{opacity:.4}
+.cl-category-rail{display:flex;flex-wrap:wrap;gap:.5rem}
+.cl-category-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .7rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;color:inherit;text-decoration:none;font-size:.85rem;font-weight:600}
+.cl-category-chip:hover{border-color:currentColor}
+.cl-category-count{font-size:.75rem;font-weight:700;opacity:.55}
+/* v0.6 tags. A tag is a link into the catalogue wherever it appears, so it looks and behaves the
+   same on a card, on a rail and beside a course. The administration row is a form per tag: an edit
+   surface with one field is not worth a second screen. */
+.cl-tag-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .6rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;color:inherit;text-decoration:none;font-size:.78rem;font-weight:600}
+.cl-tag-chip:hover{border-color:currentColor}
+.cl-tag-chip.is-selected{border-color:currentColor;font-weight:800;box-shadow:inset 0 0 0 1px currentColor}
+.cl-tag-chip.is-selected .cl-category-count{opacity:.85}
+.cl-facet{display:grid;gap:.5rem}
+.cl-facet-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.cl-facet-label{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
+.cl-tag-cloud{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem}
+.cl-tag-weight-0{font-size:.78rem;opacity:.45}
+.cl-tag-weight-1{font-size:.85rem}
+.cl-tag-weight-2{font-size:.95rem}
+.cl-tag-weight-3{font-size:1.1rem}
+.cl-tag-weight-4{font-size:1.3rem}
+.cl-tag-weight-5{font-size:1.55rem;font-weight:800}
+.cl-course-tags{display:flex;flex-wrap:wrap;gap:.35rem;margin:.5rem 0 0}
+.cl-active-facet{display:flex;align-items:center;gap:.6rem}
+.cl-tag-row-wrap{display:flex;align-items:center;gap:.4rem;width:100%;flex-wrap:nowrap}
+.cl-tag-row{display:flex;align-items:center;gap:.5rem;flex:1 1 auto;min-width:0;flex-wrap:nowrap}
+.cl-tag-name{flex:0 1 12rem;min-width:0}
+.cl-tag-description{flex:1 1 auto;min-width:0}
+.cl-tag-active{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;font-size:.78rem}
+.cl-tag-active input{width:auto}
+/* v0.6 distribution chart. Core owns it because it is a reading of platform data rather than
+   decoration, and because a chart nobody can read under a theme that has never heard of it is worse
+   than a table. No library: a bar is a div with a width, the figures are text beside it, and the
+   whole thing renders server-side with no script. */
+.cl-chart{display:grid;gap:.4rem}
+.cl-chart-row{display:grid;grid-template-columns:minmax(7rem,14rem) minmax(4rem,1fr) auto;align-items:center;gap:.75rem}
+.cl-chart-label{font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-chart-track{display:block;height:.7rem;border-radius:999px;background:color-mix(in srgb,currentColor 10%,transparent)}
+.cl-chart-bar{display:block;height:100%;min-width:2px;border-radius:999px;background:currentColor;opacity:.55}
+.cl-chart-value{font-size:.82rem;font-weight:800;font-variant-numeric:tabular-nums;min-width:3ch;text-align:right}
+@media(max-width:700px){.cl-chart-row{grid-template-columns:minmax(5rem,1fr) auto;}.cl-chart-track{grid-column:1 / -1;order:3}}
+/* v0.6 the table system. One row is one line, the table is exactly as wide as its container, and
+   each column gets the share of that width its content actually needs.
+
+   The mechanism is `table-layout: fixed` plus a percentage width declared per column. That is the
+   only layout in which a table cannot be wider than its box: the browser stops measuring content and
+   uses the widths it is given, so nothing can push a row sideways and nothing needs to scroll. The
+   previous attempt put `max-width:0` on every cell instead, which tells the browser every column may
+   shrink to nothing - so it distributed space badly and a short column like Roles kept as much room
+   as Person. That was the "did you make all the columns the same size" problem, and it was real.
+
+   Widths are declared once per table in the header model the service builds, so the proportions sit
+   beside the column labels rather than in nine CSS rules kept in step with them by hand.
+
+   `.table-wrap` no longer hides its overflow. It did, to stop horizontal scrolling - and it also
+   clipped anything a row opened, which is why the row actions menu appeared to do nothing at all.
+   Fixed layout is what prevents scrolling now, so the wrapper can let a menu out again.
+
+   These are stated with !important because themes load after core and each redeclares table padding,
+   row-action wrapping and cell sizing at a higher specificity. Functional layout belongs to the LMS.
+*/
+:root{--cl-table-pad-y:6px;--cl-table-pad-x:9px;--cl-table-font:.78rem;--cl-table-head-font:.66rem;--cl-table-btn-font:.7rem}
+/* !important, and the reason matters. Gilded Noir declares `.gn-main .table-wrap{overflow:auto}`
+   at specificity (0,2,0) and loads after core, so a bare `.table-wrap` rule loses to it. The
+   wrapper then clips, and the row menu - which is absolutely positioned and has to escape the cell
+   - is drawn outside it and never appears. That is why the actions menu did nothing in Gilded Noir
+   and worked in the default theme, and it is the same cascade failure the row-action rules below
+   were already marked for. Nothing overflows horizontally any more: `table-layout: fixed` is what
+   keeps the table inside its box, so the scroll affordance this replaces has nothing to scroll. */
+.table-wrap{width:100%;overflow:visible!important}
+.table-wrap table,.table-wrap .table{width:100%!important;min-width:0!important;table-layout:fixed!important;font-size:var(--cl-table-font)!important}
+.table-wrap th,.table-wrap td,.table-wrap tbody td,.table-wrap thead th{padding:var(--cl-table-pad-y) var(--cl-table-pad-x)!important;font-size:var(--cl-table-font)!important;line-height:1.35!important;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis}
+.table-wrap th,.table-wrap thead th{font-size:var(--cl-table-head-font)!important;letter-spacing:.03em}
+/* Compact controls, because a row is a row and not a toolbar. */
+.table-wrap td .btn{padding:.2rem .45rem!important;font-size:var(--cl-table-btn-font)!important;line-height:1.25!important;border-radius:6px;white-space:nowrap}
+.table-wrap td .badge{padding:.12rem .4rem!important;font-size:.68rem!important;white-space:nowrap}
+.table-wrap td .avatar{width:22px!important;height:22px!important;font-size:.6rem!important;flex:0 0 auto}
+.table-wrap td .small,.table-wrap td .muted{font-size:.72rem!important}
+.table-wrap td input,.table-wrap td select{padding:.2rem .4rem!important;font-size:var(--cl-table-btn-font)!important;min-height:0!important}
+/* Nothing inside a row stacks: not the actions, not a secondary line, not a hand-written flex box. */
+.row-actions,.table-wrap .row-actions,.table-wrap td .row-actions{display:inline-flex!important;flex-wrap:nowrap!important;align-items:center;gap:.3rem;white-space:nowrap}
+.row-actions form,.table-wrap td form{display:inline-flex!important;margin:0!important}
+.table-wrap td .d-flex{flex-wrap:nowrap!important}
+.table-wrap td>div,.table-wrap td>p,.table-wrap td>span.muted,.table-wrap td>.small{display:inline!important;margin:0}
+.table-wrap td>div.muted::before,.table-wrap td>.small.muted::before{content:"·";margin:0 .4rem;opacity:.5}
+.table-wrap td .person{display:inline-flex!important;align-items:center;gap:.4rem;max-width:100%;overflow:hidden}
+.table-wrap td .person>div{display:inline!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table-wrap td .role-list{display:inline-flex!important;flex-wrap:nowrap!important;gap:.25rem;overflow:hidden}
+/* Two or more actions in a row is a menu, not a row of buttons.
+
+   A row of buttons in a table cell is a promise the column cannot keep: five actions need about
+   400px, and a column carrying them takes that space away from the course title next to it, which
+   is the thing the reader is actually looking for. The menu is one control of a fixed width, so the
+   actions column costs about 80px whatever it holds, and every remaining pixel goes to content.
+
+   The cell itself must not clip, or the panel is drawn outside the cell and simply is not shown -
+   which is what made the first attempt at this look like a button that did nothing. */
+.table-wrap td.cell-actions,.table-wrap th.cell-actions{overflow:visible!important}
+/* The menu is core-owned and must not depend on a theme knowing what it is. Themes style `details`
+   as a bordered accordion panel - Gilded Noir gives every one a border, a paper background, 18px of
+   padding on its body and `overflow:hidden` - and all of that is wrong for a control that is one
+   button and a floating panel. Restated here rather than fought selector by selector in five
+   themes. */
+.row-menu,.table-wrap .row-menu{position:relative!important;display:inline-block!important;overflow:visible!important;border:0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:0!important}
+.row-menu>summary.row-menu-trigger{display:inline-flex!important;align-items:center;gap:.25rem;list-style:none;cursor:pointer}
+.row-menu>summary.row-menu-trigger::-webkit-details-marker{display:none}
+.row-menu>summary.row-menu-trigger::marker{content:""}
+.row-menu>summary.row-menu-trigger::after{content:none!important}
+.row-menu[open]>summary.row-menu-trigger{outline:1px solid var(--cl-border,#dfe4ea)}
+.row-menu>.row-menu-panel{padding:6px!important;margin:0!important}
+.row-menu-panel .btn,.row-menu-panel form{width:100%;display:block}
+.row-menu-panel form .btn{width:100%}
+/* A row menu can open again now the wrapper does not clip. */
+.row-menu>summary{list-style:none;cursor:pointer}
+.row-menu>summary::-webkit-details-marker{display:none}
+.row-menu-panel,.table-wrap .row-menu-panel{position:absolute!important;right:0;top:calc(100% + 4px);z-index:1050;display:grid!important;gap:2px;min-width:11rem;width:max-content;padding:6px!important;border:1px solid var(--cl-border,#dfe4ea)!important;border-radius:10px!important;background:var(--cl-page-surface,#fff)!important;color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)!important;text-align:left;white-space:nowrap}
+.row-menu-panel .btn,.row-menu-panel form{width:100%}
+.row-menu-panel .btn{justify-content:flex-start;text-align:left}
+
+/* v0.6 sortable column headings. Core owns them because sorting is functional navigation: the
+   direction indicator has to be legible under a theme that has never heard of this control, and a
+   heading that does not look clickable is one nobody clicks. */
+.sortable-header a{display:inline-flex;align-items:center;gap:.35rem;color:inherit;text-decoration:none;white-space:nowrap}
+.sortable-header a:hover{text-decoration:underline}
+.sortable-header.is-sorted{font-weight:800}
+.sortable-indicator{font-size:.7em;opacity:.4}
+.sortable-header.is-sorted .sortable-indicator{opacity:1}

@@ -17,3 +17,4 @@ Thumbs.db
 /generated-themes/
 *.rej
 *.orig
+*.orig.*

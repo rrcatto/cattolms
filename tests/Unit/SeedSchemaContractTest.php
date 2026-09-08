@@ -127,7 +127,7 @@ final class SeedSchemaContractTest extends TestCase
             $declared,
             'The cleanup planner names rows from this list, so it must cover exactly the seed-aware tables.'
         );
-        self::assertCount(31, $declared);
+        self::assertCount(30, $declared);
     }
 
     /** Each declared identity is exactly the primary key the baseline declares. */
@@ -231,7 +231,9 @@ final class SeedSchemaContractTest extends TestCase
         self::assertSame([], $missing, "Unclassified inter-seed foreign keys:\n  " . implode("\n  ", $missing));
         self::assertSame([], $wrongAction, "Misclassified foreign keys:\n  " . implode("\n  ", $wrongAction));
         self::assertSame([], array_keys($declared), 'These references are declared but do not exist in the baseline.');
-        self::assertSame(66, $found, 'The inter-seed foreign-key count changed; reconcile the catalogue.');
+        // Sixty-five since v0.6: courses.category_id stopped being a guarded cross-universe
+        // reference when categories became universe-free labels.
+        self::assertSame(65, $found, 'The inter-seed foreign-key count changed; reconcile the catalogue.');
     }
 
     /**
@@ -355,6 +357,9 @@ final class SeedSchemaContractTest extends TestCase
      * it is invisible until the first is fixed - which is exactly what happened: the run stopped at
      * `course_categories_slug_key` and said nothing about the four columns behind it.
      *
+     * `course_categories.slug` left this list in v0.6 along with the table: a universe-free label
+     * is not generated per set, so it has nothing to namespace and nothing to collide with.
+     *
      * Reading the list out of the baseline rather than trusting a written note means a sixth
      * column cannot be added without this failing and someone deciding, deliberately, whether it
      * needs the key too.
@@ -370,7 +375,6 @@ final class SeedSchemaContractTest extends TestCase
         $namespaced = [
             'certificates.certificate_number',
             'companies.domain',
-            'course_categories.slug',
             'courses.slug',
             'user_emails.email',
         ];

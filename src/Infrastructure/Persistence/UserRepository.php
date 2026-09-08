@@ -128,7 +128,7 @@ final class UserRepository
         }
 
         foreach ([
-            'first_name', 'last_name', 'identification_number', 'gender',
+            'first_name', 'middle_names', 'last_name', 'identification_number', 'gender',
             'mobile_number', 'display_name', 'certificate_name'
         ] as $field) {
             if (array_key_exists($field, $data)) {

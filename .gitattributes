@@ -1,0 +1,20 @@
+# Normalise line endings on commit.
+#
+# Without this file the repository stores whatever the working copy happened to have, and a tree
+# edited on Windows or through a WSL mount drifts to CRLF. That drift is invisible until it reaches
+# a diff: eight files in v0.5.8.3 showed as modified with 2,608 changed lines and not one real
+# change among them, which makes review impossible and buries genuine edits.
+#
+# `text=auto` lets git decide what is text; `eol=lf` fixes what is written into a commit. Working
+# copies may keep whatever endings the editor prefers - only the committed form is normalised.
+* text=auto eol=lf
+
+# Files that must never be line-ending converted, because doing so corrupts them.
+*.zip  binary
+*.png  binary
+*.ico  binary
+*.mmdb binary
+
+# Generated or vendored files, excluded from language statistics and diff noise.
+composer.lock  -diff linguist-generated
+SHA256SUMS.txt -diff linguist-generated

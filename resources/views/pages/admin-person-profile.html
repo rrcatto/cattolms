@@ -1,5 +1,7 @@
+<set ph_back_href="/admin/people" ph_back_label="People" ph_kicker="Platform administration" ph_title="Person profile" ph_lead="Particulars, company, roles, access and sessions." />
+<include href="partials/page-head.html" />
 <div class="section-head admin-person-head">
-  <div><a class="back-link" href="/admin/people">← People</a><div class="eyebrow" style="margin-top:10px">Platform administration</div><h2 style="font-size:1.75rem;margin:7px 0 0">{{ @profile.first_name }} {{ @profile.last_name }}</h2><p>Complete profile, company, roles, learning access and sessions in one place.</p></div>
+  <div><a class="back-link" href="/admin/people">← People</a><div class="eyebrow" style="margin-top:10px">Platform administration</div><h2 style="font-size:1.75rem;margin:7px 0 0">{{ @profile.full_name }}</h2><p>Complete profile, company, roles, learning access and sessions in one place.</p></div>
   <span class="badge {{ @profile.status=='active' ? 'good' : 'danger' }}">{{ @profile.status }}</span>
 </div>
 
@@ -7,7 +9,7 @@
   <div class="profile-head">
     <div class="avatar">U</div>
     <div class="profile-meta">
-      <h2>{{ @profile.first_name }} {{ @profile.last_name }}</h2>
+      <h2>{{ @profile.full_name }}</h2>
       <p>{{ @primary_email }}<check if="{{ @company }}"> · {{ @company.name }}</check></p>
       <div class="chip-row" style="margin-top:10px"><repeat group="{{ @roles }}" value="{{ @role }}"><span class="badge info">{{ @role }}</span></repeat></div>
     </div>
@@ -20,6 +22,7 @@
     <form action="/admin/people/{{ @target_user_id }}" method="post" class="form-grid">
       <input type="hidden" name="csrf" value="{{ @csrf }}">
       <div class="field"><label>First name</label><input name="first_name" maxlength="120" value="{{ @profile.first_name }}"></div>
+      <div class="field"><label>Middle names</label><input name="middle_names" maxlength="160" value="{{ @profile.middle_names }}" placeholder="Any names between the first name and the surname"></div>
       <div class="field"><label>Last name</label><input name="last_name" maxlength="120" value="{{ @profile.last_name }}"></div>
       <div class="field"><label>Identification number</label><input name="identification_number" maxlength="120" value="{{ @profile.identification_number }}"></div>
       <div class="field"><label>Birthdate</label><input type="date" name="birthdate" value="{{ @profile.birthdate }}"></div>
@@ -48,7 +51,7 @@
 </div>
 
 <div class="grid grid-3 section admin-person-records">
-  <div class="card"><div class="section-head"><div><h2>Courses in library</h2><p>Current learner access.</p></div></div><check if="{{ @library_courses }}"><true><div class="list"><repeat group="{{ @library_courses }}" value="{{ @course }}"><div class="list-item"><div><strong>{{ @course.title }}</strong><p>{{ @course.status }} · {{ @course.progress_percentage }}% progress</p></div><a class="btn btn-soft btn-sm" href="/admin/enrolments">Manage</a></div></repeat></div></true><false><div class="empty">No courses in this library.</div></false></check></div>
+  <div class="card"><div class="section-head"><div><h2>Courses in library</h2><p>Current learner access.</p></div></div><check if="{{ @library_courses }}"><true><div class="list"><repeat group="{{ @library_courses }}" value="{{ @course }}"><div class="list-item"><div><strong>{{ @course.title }}</strong><p>{{ @course.status }} · {{ @course.progress_percentage }}% progress</p></div><a class="btn btn-soft btn-sm" href="/admin/course/enrolments">Manage</a></div></repeat></div></true><false><div class="empty">No courses in this library.</div></false></check></div>
   <div class="card"><div class="section-head"><div><h2>Favourites</h2><p>Courses saved for later.</p></div></div><check if="{{ @favourites }}"><true><div class="list"><repeat group="{{ @favourites }}" value="{{ @course }}"><div class="list-item"><div><strong>{{ @course.title }}</strong></div></div></repeat></div></true><false><div class="empty">No favourites.</div></false></check></div>
   <div class="card"><div class="section-head"><div><h2>Course requests</h2><p>Current and previous requests.</p></div></div><check if="{{ @requests }}"><true><div class="list"><repeat group="{{ @requests }}" value="{{ @request }}"><div class="list-item"><div><strong>{{ @request.course_title }}</strong><p>{{ @request.status }}</p></div></div></repeat></div></true><false><div class="empty">No course requests.</div></false></check></div>
 </div>

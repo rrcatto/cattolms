@@ -1,10 +1,5 @@
-<section class="cl-page-head">
-  <div class="container-fluid cl-container-wide py-5">
-    <a class="cl-back-link" href="/admin/courses/{{ @course.id }}">← Course editor</a>
-    <span class="cl-kicker d-block mt-3">Certificate settings</span>
-    <h1 class="display-5 fw-bold">{{ @course.title }}</h1>
-  </div>
-</section>
+<set ph_back_href="{{ '/admin/courses/'.(@course.id) }}" ph_back_label="Course editor" ph_kicker="Certificate settings" ph_title="{{ @course.title }}" />
+<include href="partials/page-head.html" />
 <section class="container-fluid cl-container-wide py-5">
   <div class="row g-4">
     <div class="col-xl-6">
@@ -66,9 +61,9 @@
         <div class="card-body p-4">
           <h2 class="h4">Certificate placeholders</h2>
           <p class="text-body-secondary">Issued certificates snapshot the rendered certificate and its important course/result data so later course edits do not rewrite an existing certificate.</p>
-          <div class="table-responsive">
+          <div class="table-wrap">
             <table class="table align-middle small">
-              <thead><tr><th>Placeholder</th><th>Meaning and control</th></tr></thead>
+              <thead><tr><th style="width:32%">Placeholder</th><th style="width:68%">Meaning and control</th></tr></thead>
               <tbody>
                 <tr><td><code>&#123;&#123;student_name&#125;&#125;</code></td><td>Learner certificate name from Profile; falls back to display name, then primary email.</td></tr>
                 <tr><td><code>&#123;&#123;course_title&#125;&#125;</code></td><td>The course title controlled in the course editor.</td></tr>

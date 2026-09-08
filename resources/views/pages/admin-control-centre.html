@@ -1,10 +1,6 @@
-<section class="section-head cl-admin-workspace-head">
-  <div>
-    <div class="eyebrow">Administration</div>
-    <h1>Platform administration</h1>
-    <p>Every top-level Administration area is available in one workspace. Open only the sections you need, or use the standalone section links for a dedicated page.</p>
-  </div>
-</section>
+<set ph_kicker="Administration" ph_title="Platform administration" ph_lead="Every top-level Administration area is available in one workspace. Open only the sections you need." />
+<include href="partials/page-head.html" />
+
 
 <section class="cl-admin-workspace section" data-admin-workspace>
   <repeat group="{{ @admin_sections }}" value="{{ @section }}">
