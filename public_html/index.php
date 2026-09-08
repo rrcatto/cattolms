@@ -27,8 +27,9 @@ declare(strict_types=1);
 
 use CattoLearning\Application\App;
 
-$codeRoot = '/usr/local/lib/php/catto-learning/current';
 $instanceRoot = dirname(__DIR__);
+$env = parse_ini_file($instanceRoot . '/.env', false, INI_SCANNER_RAW);
+$codeRoot = $env['APP_CODEBASE_PATH'] ?? '';
 $publicRoot = __DIR__;
 $autoload = $codeRoot . '/vendor/autoload.php';
 
