@@ -15,3 +15,10 @@ when@prod:
     framework:
         router:
             strict_requirements: null
+
+# Tests boot the kernel as 'test'. The test service container is what lets an integration test look
+# at a private service - the two database connections, for one - without any of them being made
+# public for the running site.
+when@test:
+    framework:
+        test: true

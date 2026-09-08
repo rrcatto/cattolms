@@ -21,4 +21,28 @@ services:
         autowire: true
         autoconfigure: true
 
-    # Nothing yet. The first entry arrives with the first ported route.
+    # The controllers the Symfony kernel routes to. Registered as a namespace rather than one at a
+    # time because a controller that is not a service is a 500 with no route name in it, and that
+    # is a poor way to find out you forgot a line.
+    CattoLearning\Http\Symfony\:
+        resource: '../src/Http/Symfony/'
+        exclude: '../src/Http/Symfony/Listener/'
+        tags: ['controller.service_arguments']
+
+    CattoLearning\Http\Symfony\Listener\:
+        resource: '../src/Http/Symfony/Listener/'
+
+    # Repositories depend on Database, not on Doctrine's Connection, because Database infers each
+    # bound parameter's PDO type from the PHP value. Same reason as in the PHP-DI container.
+    CattoLearning\Infrastructure\Persistence\Database: '@CattoLearning\Infrastructure\Persistence\DbalDatabase'
+    CattoLearning\Infrastructure\Persistence\DbalDatabase: ~
+    CattoLearning\Infrastructure\Persistence\OptionRepository: ~
+
+    CattoLearning\Configuration\SecretCipher: ~
+    CattoLearning\Configuration\RuntimeSettings: ~
+
+    # Applied to DoctrineBundle's connection. The platform's own ConnectionFactory registers the
+    # same middleware, so both connections agree about the session timezone.
+    CattoLearning\Infrastructure\Persistence\SessionTimeZoneMiddleware:
+        arguments: ['%env(APP_TIMEZONE)%']
+        tags: ['doctrine.middleware']
