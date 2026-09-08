@@ -330,6 +330,18 @@ final class ThemeManager
         return (string) $this->theme($key)['root'];
     }
 
+    /**
+     * The deployed code root.
+     *
+     * Exposed so the renderer can name the codebase that served the request. It is the directory
+     * `code/current` resolves to, which is the only thing that can answer "which tree is this"
+     * without being told.
+     */
+    public function codeRoot(): string
+    {
+        return rtrim($this->codeRoot, '/');
+    }
+
     public function platformViewsRoot(): string
     {
         return rtrim($this->codeRoot, '/') . '/resources/views';

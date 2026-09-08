@@ -114,6 +114,9 @@ abstract class BaseController
      */
     protected function renderFragment(string $template, array $data = [], int $status = 200): void
     {
+        // The same identity and capability flags the page render supplies. A fragment includes the
+        // same partials, and those partials hide controls on the same can_* flags.
+        $data = $this->viewIdentity($data);
         http_response_code($status);
         header('Content-Type: text/html; charset=utf-8');
         // A lookup response reflects one operator's resource scope, so it must never be reused
@@ -245,8 +248,21 @@ abstract class BaseController
         return $this->universe($user) === DataUniverse::Seed ? SeedTableCatalog::INFRASTRUCTURE_TOKEN : null;
     }
 
-    /** @param array<string,mixed> $data */
-    protected function render(string $page, array $data = [], int $status = 200): void
+    /**
+     * The identity and capability values every platform template may read.
+     *
+     * Shared by the page render and the fragment render, and that is the point. A fragment is a
+     * piece of a page: it includes the same partials, and those partials guard controls on the same
+     * can_* flags. The fragment path used to supply four scalars - csrf, app_name, app_url and
+     * current_uri - so every htmx swap of an Administration list died on "Undefined variable
+     * $can_manage_people", returned a 500, and htmx swapped the error page into the results region.
+     * Paging and searching by keyboard worked, because those are ordinary GET requests; only the
+     * swap was broken, which is why it survived every route smoke test.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    protected function viewIdentity(array $data): array
     {
         $currentUser = $this->currentUser();
 
@@ -304,12 +320,21 @@ abstract class BaseController
         foreach ($systemCapabilities as $flag => $permission) {
             $data[$flag] = $currentUser?->hasPermission($permission) ?? false;
         }
-        $data['active_nav'] = $data['active_nav'] ?? $this->activeNavigation();
         // Which link the Courses group sub-navigation shows as current. Defaulted for every render
         // because the partial is included by three screens and an unset variable is a 500 in F3,
         // not a blank - the same trap the dataset-search universe key fell into.
         $data['course_group'] = $data['course_group'] ?? '';
         $data['company_group'] = $data['company_group'] ?? '';
+
+        return $data;
+    }
+
+    /** @param array<string,mixed> $data */
+    protected function render(string $page, array $data = [], int $status = 200): void
+    {
+        $data = $this->viewIdentity($data);
+        // Navigation state belongs to a page, not to a fragment swapped into one.
+        $data['active_nav'] = $data['active_nav'] ?? $this->activeNavigation();
         $data['page_title'] = $data['page_title'] ?? ($data['title'] ?? '');
         $data['page_kicker'] = $data['page_kicker'] ?? '';
         $data['flash_messages'] = $this->consumeFlash();

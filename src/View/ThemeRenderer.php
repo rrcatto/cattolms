@@ -140,6 +140,38 @@ final class ThemeRenderer
      * This is deliberately not a minifier. It removes comments and nothing else, so a rendering
      * difference can never be blamed on it.
      */
+    /**
+     * Stamps the generated page with the codebase that produced it.
+     *
+     * Core-owned and injected after rendering, deliberately. The `head` element belongs to the
+     * theme, and there are five of them plus whatever an external author writes; putting the tag in
+     * each one means five edits, a Theme SDK change, and a new theme that silently omits it. Done
+     * here, no theme can leave it out and none has to know it exists.
+     *
+     * The version is read from the code root's own directory name rather than from a constant, so
+     * it cannot disagree with reality. `code/current` is a symlink and the served version is
+     * whatever it resolves to; a constant would keep saying 0.7 after the link moved, which is
+     * exactly the question this tag exists to answer. Copying the tree to make v0.8 makes it say
+     * v0.8 with nothing to remember.
+     *
+     * Inserted after the opening head tag, so it is present before any stylesheet or script and a
+     * truncated response still carries it.
+     */
+    private function stampGenerator(string $html): string
+    {
+        $directory = basename($this->themes->codeRoot());
+        // "cattolms-v0.7" -> "0.7". A directory that does not follow the convention falls back to
+        // its own name, which is still the honest answer to which tree served the request.
+        $version = preg_match('/-v([0-9][0-9.]*)$/', $directory, $m) === 1 ? $m[1] : $directory;
+        $tag = '<meta name="generator" content="CattoLMS v' . htmlspecialchars($version, ENT_QUOTES) . '">';
+
+        $stamped = preg_replace('/(<head\b[^>]*>)/i', '$1' . $tag, $html, 1);
+
+        // A page with no head element, or a failed match, is served unstamped rather than not at
+        // all. The tag is diagnostic; losing it is not worth an outage.
+        return $stamped ?? $html;
+    }
+
     private static function stripHtmlComments(string $html): string
     {
         $stripped = preg_replace_callback(
@@ -284,7 +316,7 @@ final class ThemeRenderer
         if (!headers_sent() && $this->f3->get('ERROR') === null) {
             http_response_code($status);
         }
-        return self::stripHtmlComments(Template::instance()->render('base.html'));
+        return $this->stampGenerator(self::stripHtmlComments(Template::instance()->render('base.html')));
     }
 
     /**
