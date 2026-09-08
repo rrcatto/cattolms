@@ -133,7 +133,7 @@ Changelog:
             	<details class="row-menu" data-cl-dropdown>
             		<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
             		<div class="row-menu-panel">
-            			<a class="btn btn-sm btn-soft" href="/admin/seed/{{ @seed_set.seed_token }}">Breakdown</a>
+            			<a class="btn btn-sm btn-soft" href="/admin/seed/{{ @seed_set.seed_token }}" title="What this set wrote to each table">Records</a>
             			<check if="{{ @can_manage_seed && !@seed_set.is_cleaned }}">
             				<a class="btn btn-sm btn-outline-danger" href="/admin/seed/{{ @seed_set.seed_token }}/cleanup">Clean up</a>
             			</check>

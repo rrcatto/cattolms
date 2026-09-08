@@ -165,7 +165,10 @@ final class ThemeRenderer
         $version = preg_match('/-v([0-9][0-9.]*)$/', $directory, $m) === 1 ? $m[1] : $directory;
         $tag = '<meta name="generator" content="CattoLMS v' . htmlspecialchars($version, ENT_QUOTES) . '">';
 
-        $stamped = preg_replace('/(<head\b[^>]*>)/i', '$1' . $tag, $html, 1);
+        // On its own line, indented one step inside head. Injected markup is still markup somebody
+        // has to read; running it onto the head tag is exactly the kind of thing this codebase is
+        // supposed to be careful about.
+        $stamped = preg_replace('/(<head\b[^>]*>)/i', "$1\n\t" . $tag, $html, 1);
 
         // A page with no head element, or a failed match, is served unstamped rather than not at
         // all. The tag is diagnostic; losing it is not worth an outage.
