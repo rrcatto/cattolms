@@ -50,7 +50,6 @@ namespace CattoLearning\Infrastructure\Persistence;
 use CattoLearning\Seed\SeedTableCatalog;
 use CattoLearning\Support\Slug;
 use CattoLearning\Support\Uuid;
-use DB\SQL;
 use RuntimeException;
 
 final class SeedRepository
@@ -71,7 +70,7 @@ final class SeedRepository
         'ip_address' => 'inet',
     ];
 
-    public function __construct(private readonly SQL $db)
+    public function __construct(private readonly Database $db)
     {
     }
 
@@ -98,11 +97,11 @@ final class SeedRepository
             $params = [];
             foreach ($chunk as $index => $pair) {
                 $placeholders[] = '(:c' . $index . ',:t' . $index . ')';
-                $params[':c' . $index] = (int) $pair[0];
-                $params[':t' . $index] = (int) $pair[1];
+                $params['c' . $index] = (int) $pair[0];
+                $params['t' . $index] = (int) $pair[1];
             }
 
-            $this->db->exec(
+            $this->db->executeStatement(
                 'INSERT INTO course_tags (course_id, tag_id) VALUES ' . implode(',', $placeholders)
                     . ' ON CONFLICT DO NOTHING',
                 $params
@@ -137,10 +136,13 @@ final class SeedRepository
             foreach ($chunk as $rowIndex => $row) {
                 $slots = [];
                 foreach ($columns as $columnIndex => $column) {
-                    $key = ':v' . $rowIndex . '_' . $columnIndex;
+                    // The name and the placeholder are no longer the same string: DBAL binds by
+                    // bare name and the colon belongs only in the SQL.
+                    $name = 'v' . $rowIndex . '_' . $columnIndex;
+                    $slot = ':' . $name;
                     $cast = self::COLUMN_CASTS[$column] ?? null;
-                    $slots[] = $cast === null ? $key : $key . '::' . $cast;
-                    $params[$key] = $row[$columnIndex] ?? null;
+                    $slots[] = $cast === null ? $slot : $slot . '::' . $cast;
+                    $params[$name] = $row[$columnIndex] ?? null;
                 }
                 $placeholders[] = '(' . implode(',', $slots) . ')';
             }
@@ -149,7 +151,11 @@ final class SeedRepository
                 . implode(',', $placeholders)
                 . ($returnIds ? ' RETURNING id' : '');
 
-            $result = $this->db->exec($sql, $params);
+            // The statement carries RETURNING only when ids were asked for, so which DBAL call
+            // is correct depends on a runtime flag rather than on the SQL as written.
+            $result = $returnIds
+                ? $this->db->fetchAllAssociative($sql, $params)
+                : $this->db->executeStatement($sql, $params);
             if ($returnIds && is_array($result)) {
                 foreach ($result as $returned) {
                     $ids[] = (int) ($returned['id'] ?? 0);
@@ -168,7 +174,7 @@ final class SeedRepository
     public function roleIdsByKey(): array
     {
         $map = [];
-        foreach ($this->db->exec('SELECT id, role_key FROM roles') as $row) {
+        foreach ($this->db->fetchAllAssociative('SELECT id, role_key FROM roles') as $row) {
             $map[(string) $row['role_key']] = (int) $row['id'];
         }
 
@@ -178,9 +184,9 @@ final class SeedRepository
     /** The shared SEED System Company created by the baseline (decision D1). */
     public function seedSystemCompanyId(): int
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT id FROM companies WHERE is_system = TRUE AND seed_token = :token LIMIT 1',
-            [':token' => SeedTableCatalog::INFRASTRUCTURE_TOKEN]
+            ['token' => SeedTableCatalog::INFRASTRUCTURE_TOKEN]
         );
 
         $id = (int) ($rows[0]['id'] ?? 0);
@@ -202,17 +208,17 @@ final class SeedRepository
         float $generationSeconds,
         ?int $actorUserId
     ): int {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'INSERT INTO seed_data (seed_token, description, requested_volume, initial_record_count, generation_seconds, created_by_user_id)
              VALUES (:token::uuid, :description, :volume, :records, :seconds, :actor)
              RETURNING id',
             [
-                ':token' => $token,
-                ':description' => $description,
-                ':volume' => $requestedVolume,
-                ':records' => $initialRecordCount,
-                ':seconds' => round($generationSeconds, 3),
-                ':actor' => $actorUserId,
+                'token' => $token,
+                'description' => $description,
+                'volume' => $requestedVolume,
+                'records' => $initialRecordCount,
+                'seconds' => round($generationSeconds, 3),
+                'actor' => $actorUserId,
             ]
         );
 
@@ -236,12 +242,12 @@ final class SeedRepository
         $params = [];
         foreach ($rows as $index => $row) {
             $placeholders[] = '(:s' . $index . ', :t' . $index . ', :c' . $index . ')';
-            $params[':s' . $index] = $row[0];
-            $params[':t' . $index] = $row[1];
-            $params[':c' . $index] = $row[2];
+            $params['s' . $index] = $row[0];
+            $params['t' . $index] = $row[1];
+            $params['c' . $index] = $row[2];
         }
 
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO seed_data_tables (seed_data_id, table_name, initial_record_count) VALUES '
             . implode(',', $placeholders),
             $params
@@ -258,7 +264,7 @@ final class SeedRepository
      */
     public function sets(): array
     {
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             "SELECT s.id, s.seed_token, s.description, s.requested_volume, s.initial_record_count,
                     s.generation_seconds, s.created_at, s.cleaned_at, s.cleanup_metadata,
                     COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, ue.email, 'System') AS created_by_name
@@ -278,9 +284,9 @@ final class SeedRepository
             return null;
         }
 
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT * FROM seed_data WHERE seed_token = :token::uuid LIMIT 1',
-            [':token' => $token]
+            ['token' => $token]
         );
 
         return $rows[0] ?? null;
@@ -304,7 +310,7 @@ final class SeedRepository
         }
 
         $counts = [];
-        foreach ($this->db->exec(implode(' UNION ALL ', $branches), [':token' => $token]) as $row) {
+        foreach ($this->db->fetchAllAssociative(implode(' UNION ALL ', $branches), ['token' => $token]) as $row) {
             $counts[(string) $row['table_name']] = (int) $row['total'];
         }
 
@@ -343,8 +349,8 @@ final class SeedRepository
      */
     private function buildCleanupPlan(string $token): void
     {
-        $this->db->exec('DROP TABLE IF EXISTS seed_cleanup_plan');
-        $this->db->exec(
+        $this->db->executeStatement('DROP TABLE IF EXISTS seed_cleanup_plan');
+        $this->db->executeStatement(
             'CREATE TEMPORARY TABLE seed_cleanup_plan (
                  table_name  TEXT    NOT NULL,
                  row_key     JSONB   NOT NULL,
@@ -355,13 +361,13 @@ final class SeedRepository
         );
 
         foreach (SeedTableCatalog::seedAwareTables() as $table) {
-            $this->db->exec(
+            $this->db->executeStatement(
                 'INSERT INTO seed_cleanup_plan (table_name, row_key, owner_token, is_target)
                  SELECT :table::text, ' . self::rowKeyExpression($table, 't') . ', t.seed_token, TRUE
                  FROM ' . $table . ' t
                  WHERE t.seed_token = :token::uuid
                  ON CONFLICT (table_name, row_key) DO NOTHING',
-                [':table' => $table, ':token' => $token]
+                ['table' => $table, 'token' => $token]
             );
         }
 
@@ -371,7 +377,7 @@ final class SeedRepository
         do {
             $added = 0;
             foreach (SeedTableCatalog::collateralReferences() as $reference) {
-                $rows = $this->db->exec(
+                $rows = $this->db->fetchAllAssociative(
                     'INSERT INTO seed_cleanup_plan (table_name, row_key, owner_token, is_target)
                      SELECT :child::text, ' . self::rowKeyExpression($reference['child'], 'c') . ', c.seed_token, FALSE
                      FROM ' . $reference['child'] . ' c
@@ -382,9 +388,9 @@ final class SeedRepository
                        AND c.' . $reference['column'] . ' IS NOT NULL
                      ON CONFLICT (table_name, row_key) DO NOTHING
                      RETURNING 1 AS planned',
-                    [':child' => $reference['child'], ':parent' => $reference['parent']]
+                    ['child' => $reference['child'], 'parent' => $reference['parent']]
                 );
-                $added += is_array($rows) ? count($rows) : 0;
+                $added += count($rows);
             }
         } while ($added > 0);
 
@@ -393,7 +399,7 @@ final class SeedRepository
         // plan chosen from a guess about a table holding a million rows is not the plan those
         // deletes need. One ANALYZE costs milliseconds and is the difference between a nested loop
         // and a hash join.
-        $this->db->exec('ANALYZE seed_cleanup_plan');
+        $this->db->executeStatement('ANALYZE seed_cleanup_plan');
     }
 
     /**
@@ -414,7 +420,7 @@ final class SeedRepository
 
     private function discardCleanupPlan(): void
     {
-        $this->db->exec('DROP TABLE IF EXISTS seed_cleanup_plan');
+        $this->db->executeStatement('DROP TABLE IF EXISTS seed_cleanup_plan');
     }
 
     /**
@@ -469,12 +475,12 @@ final class SeedRepository
         $summary = $this->summariseCleanupPlan();
 
         foreach (SeedTableCatalog::cleanupOrder() as $table) {
-            $this->db->exec(
+            $this->db->executeStatement(
                 'DELETE FROM ' . $table . ' t
                  USING seed_cleanup_plan p
                  WHERE p.table_name = :table::text
                    AND p.row_key = ' . self::rowKeyExpression($table, 't'),
-                [':table' => $table]
+                ['table' => $table]
             );
         }
 
@@ -491,21 +497,21 @@ final class SeedRepository
     private function summariseCleanupPlan(): array
     {
         $tables = [];
-        foreach ($this->db->exec(
+        foreach ($this->db->fetchAllAssociative(
             'SELECT table_name, COUNT(*)::int AS total FROM seed_cleanup_plan GROUP BY table_name'
         ) as $row) {
             $tables[(string) $row['table_name']] = (int) $row['total'];
         }
 
         $collateral = [];
-        foreach ($this->db->exec(
+        foreach ($this->db->fetchAllAssociative(
             'SELECT owner_token::text AS other_token, COUNT(*)::int AS total
              FROM seed_cleanup_plan WHERE is_target = FALSE GROUP BY owner_token'
         ) as $row) {
             $collateral[(string) $row['other_token']] = (int) $row['total'];
         }
 
-        $target = (int) ($this->db->exec(
+        $target = (int) ($this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total FROM seed_cleanup_plan WHERE is_target = TRUE'
         )[0]['total'] ?? 0);
 
@@ -545,12 +551,12 @@ final class SeedRepository
                 continue;
             }
 
-            $rows = $this->db->exec(
+            $rows = $this->db->fetchAllAssociative(
                 'DELETE FROM ' . $table . ' c
                  WHERE c.seed_token IS NOT NULL AND (' . implode(' OR ', $conditions) . ')
                  RETURNING 1 AS deleted'
             );
-            $count = is_array($rows) ? count($rows) : 0;
+            $count = count($rows);
             if ($count > 0) {
                 $removed[$table] = $count;
             }
@@ -578,7 +584,7 @@ final class SeedRepository
      */
     public function invalidateLoginTokensForSet(string $token): int
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'DELETE FROM auth_login_tokens t
              WHERE EXISTS (
                      SELECT 1 FROM users u
@@ -590,18 +596,18 @@ final class SeedRepository
                      WHERE ue.email = t.email AND u.seed_token = :token::uuid
                  )
              RETURNING 1 AS deleted',
-            [':token' => $token]
+            ['token' => $token]
         );
 
-        return is_array($rows) ? count($rows) : 0;
+        return count($rows);
     }
 
     /** @param array<string,mixed> $metadata */
     public function markCleaned(string $token, array $metadata): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'UPDATE seed_data SET cleaned_at = NOW(), cleanup_metadata = :metadata::jsonb WHERE seed_token = :token::uuid',
-            [':token' => $token, ':metadata' => json_encode($metadata, JSON_THROW_ON_ERROR)]
+            ['token' => $token, 'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR)]
         );
     }
 
@@ -625,11 +631,11 @@ final class SeedRepository
         }
 
         $initial = [];
-        foreach ($this->db->exec(
+        foreach ($this->db->fetchAllAssociative(
             'SELECT t.table_name, t.initial_record_count FROM seed_data_tables t
              JOIN seed_data d ON d.id = t.seed_data_id
              WHERE d.seed_token = :token::uuid',
-            [':token' => $token]
+            ['token' => $token]
         ) as $row) {
             $initial[(string) $row['table_name']] = (int) $row['initial_record_count'];
         }
@@ -666,7 +672,7 @@ final class SeedRepository
     public function activeCategoryIds(): array
     {
         $ids = [];
-        foreach ($this->db->exec('SELECT id FROM course_categories ORDER BY level, position, name') as $row) {
+        foreach ($this->db->fetchAllAssociative('SELECT id FROM course_categories ORDER BY level, position, name') as $row) {
             $ids[] = (int) $row['id'];
         }
 
@@ -688,7 +694,7 @@ final class SeedRepository
      */
     public function categoryTaxonomy(): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT c.id, c.name, c.level,
                     COALESCE(r.name, p.name, c.name) AS root,
                     COALESCE(p.name, c.name) AS branch
@@ -728,21 +734,21 @@ final class SeedRepository
         $params = [];
         foreach ($names as $index => $name) {
             $placeholders[] = '(:n' . $index . ',:s' . $index . ')';
-            $params[':n' . $index] = mb_substr($name, 0, 80);
-            $params[':s' . $index] = mb_substr(Slug::from($name), 0, 80);
+            $params['n' . $index] = mb_substr($name, 0, 80);
+            $params['s' . $index] = mb_substr(Slug::from($name), 0, 80);
         }
 
         // ON CONFLICT on the slug, because that is the unique column; the name is not unique in the
         // schema and two labels that slug identically are the same label.
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO tags (name, slug) VALUES ' . implode(',', $placeholders) . ' ON CONFLICT (slug) DO NOTHING',
             $params
         );
 
         $lookup = [];
-        foreach ($this->db->exec(
+        foreach ($this->db->fetchAllAssociative(
             'SELECT id, name FROM tags WHERE slug IN (' . implode(',', array_map(static fn(int $i): string => ':s' . $i, array_keys($names))) . ')',
-            array_filter($params, static fn(string $key): bool => str_starts_with($key, ':s'), ARRAY_FILTER_USE_KEY)
+            array_filter($params, static fn(string $key): bool => str_starts_with($key, 's'), ARRAY_FILTER_USE_KEY)
         ) as $row) {
             $lookup[(string) $row['name']] = (int) $row['id'];
         }
@@ -766,10 +772,10 @@ final class SeedRepository
             $params = [];
             foreach ($chunk as $index => [$courseId, $tagId]) {
                 $placeholders[] = '(:c' . $index . ', :t' . $index . ')';
-                $params[':c' . $index] = $courseId;
-                $params[':t' . $index] = $tagId;
+                $params['c' . $index] = $courseId;
+                $params['t' . $index] = $tagId;
             }
-            $this->db->exec(
+            $this->db->executeStatement(
                 'INSERT INTO course_tags (course_id, tag_id) VALUES ' . implode(',', $placeholders)
                 . ' ON CONFLICT DO NOTHING',
                 $params
@@ -811,7 +817,7 @@ final class SeedRepository
     private function column(string $sql): array
     {
         $values = [];
-        foreach ($this->db->exec($sql) as $row) {
+        foreach ($this->db->fetchAllAssociative($sql) as $row) {
             $value = trim((string) (array_values($row)[0] ?? ''));
             if ($value !== '') {
                 $values[] = $value;
@@ -828,7 +834,7 @@ final class SeedRepository
             $branches[] = 'SELECT COUNT(*)::int AS total FROM ' . $table . ' WHERE seed_token IS NOT NULL';
         }
 
-        $rows = $this->db->exec('SELECT SUM(total)::int AS grand_total FROM (' . implode(' UNION ALL ', $branches) . ') counts');
+        $rows = $this->db->fetchAllAssociative('SELECT SUM(total)::int AS grand_total FROM (' . implode(' UNION ALL ', $branches) . ') counts');
 
         return (int) ($rows[0]['grand_total'] ?? 0);
     }

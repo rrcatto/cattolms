@@ -27,11 +27,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use Doctrine\DBAL\Connection;
 
 final class OptionRepository
 {
-    public function __construct(private readonly Connection $db)
+    public function __construct(private readonly Database $db)
     {
     }
 

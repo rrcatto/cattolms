@@ -23,7 +23,6 @@ namespace CattoLearning\Infrastructure\Persistence;
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Auth\RoleFamily;
-use DB\SQL;
 use RuntimeException;
 use Throwable;
 
@@ -31,7 +30,7 @@ use Throwable;
 final class RoleRepository
 {
     public function __construct(
-        private readonly SQL $db,
+        private readonly Database $db,
         private readonly SeedProvenance $provenance
     ) {
     }
@@ -69,26 +68,26 @@ final class RoleRepository
     /** @return list<string> */
     public function roles(int $userId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT r.role_key FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=:user_id ORDER BY r.role_key',
-            [':user_id' => $userId]
+            ['user_id' => $userId]
         );
-        return array_values(array_map(static fn(array $row): string => (string) $row['role_key'], $rows));
+        return array_map(static fn(array $row): string => (string) $row['role_key'], $rows);
     }
 
     /** @return list<string> */
     public function permissionsForUser(int $userId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT DISTINCT p.permission_key
              FROM user_roles ur
              JOIN role_permissions rp ON rp.role_id=ur.role_id
              JOIN permissions p ON p.id=rp.permission_id
              WHERE ur.user_id=:user_id
              ORDER BY p.permission_key',
-            [':user_id' => $userId]
+            ['user_id' => $userId]
         );
-        return array_values(array_map(static fn(array $row): string => (string) $row['permission_key'], $rows));
+        return array_map(static fn(array $row): string => (string) $row['permission_key'], $rows);
     }
 
     public function bootstrapAdministrator(int $userId, string $email, string $configuredAdminEmail): bool
@@ -104,7 +103,7 @@ final class RoleRepository
     /** Recreates the protected ADMIN row when only that row has been lost. */
     public function ensureAdminRole(): int
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "INSERT INTO roles (role_key,role_name,role_description)
              VALUES ('ADMIN','Administrator','System Administrator')
              ON CONFLICT (role_key) DO UPDATE SET role_name=EXCLUDED.role_name, role_description=EXCLUDED.role_description
@@ -123,28 +122,28 @@ final class RoleRepository
         if ($row === null) {
             throw new RuntimeException('Unknown role: ' . $role);
         }
-        $this->db->exec(
+        $this->db->executeStatement(
             'DELETE FROM user_roles WHERE user_id=:user_id AND role_id=:role_id',
-            [':user_id' => $userId, ':role_id' => (int) $row['id']]
+            ['user_id' => $userId, 'role_id' => (int) $row['id']]
         );
     }
 
     public function countUsersWithRole(string $role): int
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE r.role_key=:role',
-            [':role' => strtoupper(trim($role))]
+            ['role' => strtoupper(trim($role))]
         );
         return (int) ($rows[0]['total'] ?? 0);
     }
 
     public function countActiveUsersWithRole(string $role): int
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total
              FROM user_roles ur JOIN roles r ON r.id=ur.role_id JOIN users u ON u.id=ur.user_id
              WHERE r.role_key=:role AND u.status='active'",
-            [':role' => strtoupper(trim($role))]
+            ['role' => strtoupper(trim($role))]
         );
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -152,7 +151,7 @@ final class RoleRepository
     /** @return list<array<string,mixed>> */
     public function all(): array
     {
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             "SELECT id,role_key,role_name,role_description FROM roles
              ORDER BY CASE
                WHEN role_key='ADMIN' THEN 0
@@ -165,7 +164,7 @@ final class RoleRepository
     /** @return list<array<string,mixed>> */
     public function allWithPermissionCounts(): array
     {
-        return $this->db->exec(
+        return $this->db->fetchAllAssociative(
             "SELECT r.id,r.role_key,r.role_name,r.role_description,
                     COUNT(DISTINCT ur.user_id)::int AS user_count,
                     COUNT(DISTINCT rp.permission_id)::int AS permission_count
@@ -184,12 +183,12 @@ final class RoleRepository
     /** @return array<string,mixed>|null */
     public function findById(int $roleId): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             "SELECT r.id,r.role_key,r.role_name,r.role_description,
                     COUNT(DISTINCT ur.user_id)::int AS user_count
              FROM roles r LEFT JOIN user_roles ur ON ur.role_id=r.id
              WHERE r.id=:id GROUP BY r.id LIMIT 1",
-            [':id' => $roleId]
+            ['id' => $roleId]
         );
         return $rows[0] ?? null;
     }
@@ -206,9 +205,9 @@ final class RoleRepository
             throw new RuntimeException('Custom role keys must use uppercase snake notation and must not reuse a built-in key.');
         }
         try {
-            $rows = $this->db->exec(
+            $rows = $this->db->fetchAllAssociative(
                 'INSERT INTO roles (role_key,role_name,role_description) VALUES (:key,:name,:description) RETURNING id',
-                [':key' => $key, ':name' => $name, ':description' => $description]
+                ['key' => $key, 'name' => $name, 'description' => $description]
             );
         } catch (Throwable $e) {
             throw new RuntimeException('Unable to create the role. The role key may already exist.', 0, $e);
@@ -229,9 +228,9 @@ final class RoleRepository
         if (RoleCatalog::isSeedRole($currentKey) !== RoleCatalog::isSeedRole($key)) {
             throw new RuntimeException('A custom role cannot change between the normal and SEED role families.');
         }
-        $this->db->exec(
+        $this->db->executeStatement(
             'UPDATE roles SET role_key=:key,role_name=:name,role_description=:description WHERE id=:id',
-            [':key' => $key, ':name' => $name, ':description' => $description, ':id' => $roleId]
+            ['key' => $key, 'name' => $name, 'description' => $description, 'id' => $roleId]
         );
     }
 
@@ -244,17 +243,17 @@ final class RoleRepository
         if (RoleCatalog::isBuiltIn((string) $role['role_key'])) {
             throw new RuntimeException('Built-in roles cannot be deleted.');
         }
-        $this->db->exec('DELETE FROM roles WHERE id=:id', [':id' => $roleId]);
+        $this->db->executeStatement('DELETE FROM roles WHERE id=:id', ['id' => $roleId]);
     }
 
     /** @return list<string> */
     public function permissionKeysForRole(int $roleId): array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT p.permission_key FROM role_permissions rp JOIN permissions p ON p.id=rp.permission_id WHERE rp.role_id=:role_id ORDER BY p.permission_key',
-            [':role_id' => $roleId]
+            ['role_id' => $roleId]
         );
-        return array_values(array_map(static fn(array $row): string => (string) $row['permission_key'], $rows));
+        return array_map(static fn(array $row): string => (string) $row['permission_key'], $rows);
     }
 
     /** @param list<string> $permissionKeys */
@@ -274,20 +273,20 @@ final class RoleRepository
             }
         }
 
-        $this->db->begin();
+        $this->db->beginTransaction();
         try {
-            $this->db->exec('DELETE FROM role_permissions WHERE role_id=:role_id', [':role_id' => $roleId]);
+            $this->db->executeStatement('DELETE FROM role_permissions WHERE role_id=:role_id', ['role_id' => $roleId]);
             foreach ($permissionKeys as $key) {
-                $this->db->exec(
+                $this->db->executeStatement(
                     'INSERT INTO role_permissions (role_id,permission_id)
                      SELECT :role_id,p.id FROM permissions p WHERE p.permission_key=:permission_key
                      ON CONFLICT (role_id,permission_id) DO NOTHING',
-                    [':role_id' => $roleId, ':permission_key' => $key]
+                    ['role_id' => $roleId, 'permission_key' => $key]
                 );
             }
             $this->db->commit();
         } catch (Throwable $e) {
-            $this->db->rollback();
+            $this->db->rollBack();
             throw $e;
         }
     }
@@ -328,9 +327,9 @@ final class RoleRepository
         if (in_array($opposite, $this->roles($userId), true)) {
             $row = $this->roleByKey($opposite);
             if ($row !== null) {
-                $this->db->exec(
+                $this->db->executeStatement(
                     'DELETE FROM user_roles WHERE user_id=:user_id AND role_id=:role_id',
-                    [':user_id' => $userId, ':role_id' => (int) $row['id']]
+                    ['user_id' => $userId, 'role_id' => (int) $row['id']]
                 );
             }
         }
@@ -339,19 +338,19 @@ final class RoleRepository
     /** @return array<string,mixed>|null */
     private function roleByKey(string $role): ?array
     {
-        $rows = $this->db->exec(
+        $rows = $this->db->fetchAllAssociative(
             'SELECT id,role_key,role_name,role_description FROM roles WHERE role_key=:role LIMIT 1',
-            [':role' => $role]
+            ['role' => $role]
         );
         return $rows[0] ?? null;
     }
 
     private function insertUserRole(int $userId, int $roleId): void
     {
-        $this->db->exec(
+        $this->db->executeStatement(
             'INSERT INTO user_roles (user_id,role_id,created_at,seed_token)
              VALUES (:user_id,:role_id,NOW(),:seed_token::uuid) ON CONFLICT (user_id,role_id) DO NOTHING',
-            [':user_id' => $userId, ':role_id' => $roleId, ':seed_token' => $this->provenance->fromUser($userId)]
+            ['user_id' => $userId, 'role_id' => $roleId, 'seed_token' => $this->provenance->fromUser($userId)]
         );
     }
 }
