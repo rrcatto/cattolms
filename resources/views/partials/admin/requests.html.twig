@@ -37,7 +37,7 @@ Changelog:
 {% if requests_status_filters %}
 	<nav class="cl-filter-chips" aria-label="Filter by status">
 		{% for chip in requests_status_filters %}
-			<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {{ chip.active ? 'aria-current="true"' : '' }}>{{ chip.label }}</a>
+			<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {% if chip.active %}aria-current="true"{% endif %}>{{ chip.label }}</a>
 		{% endfor %}
 	</nav>
 {% endif %}

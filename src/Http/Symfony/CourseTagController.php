@@ -114,6 +114,10 @@ final class CourseTagController
             'title' => $tag !== null ? 'Courses tagged ' . (string) $tag['name'] : 'Browse by tag',
             'page_kicker' => 'Every label in the catalogue',
             'tag_index' => $this->weighted($this->courses->tagIndex()),
+            // The sphere animates the heaviest tags only. All 378 spinning at once is a ball of
+            // overlapping words nobody can read or click; the full list stays below it as the
+            // fallback, so nothing is hidden - only the animation is bounded.
+            'cloud_limit' => 80,
             'selected_tag' => $tag ?? [],
             'showing_courses' => $showing,
             'courses' => $courses,

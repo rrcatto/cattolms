@@ -42,7 +42,7 @@ Changelog:
 				<a href="/courses">All courses</a>
 				{% for crumb in browse_trail %}
 					<span class="cl-breadcrumb-sep" aria-hidden="true">/</span>
-					<a href="/courses/category/{{ crumb.slug }}" {{ crumb.slug == browse_category.slug ? 'aria-current="page"' : '' }}>{{ crumb.name }}</a>
+					<a href="/courses/category/{{ crumb.slug }}" {% if crumb.slug == browse_category.slug %}aria-current="page"{% endif %}>{{ crumb.name }}</a>
 				{% endfor %}
 			</nav>
 		{% endif %}

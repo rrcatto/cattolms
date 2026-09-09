@@ -24,7 +24,10 @@ export default class extends Controller {
 
     static values = {
         radius: { type: Number, default: 260 },
-        speed: { type: Number, default: 0.6 },
+        // The sphere animates this many words at most. Every tag stays in the list beneath it;
+        // what is bounded is the animation, because 378 words on one sphere overlap into a ball
+        // nobody can read or click.
+        limit: { type: Number, default: 80 },
     };
 
     connect() {
@@ -34,8 +37,9 @@ export default class extends Controller {
             return;
         }
 
-        this.hrefs = links.map((link) => link.getAttribute('href'));
-        const words = links.map((link) => link.dataset.tagLabel || link.textContent.trim());
+        const shown = links.slice(0, this.limitValue);
+        this.hrefs = shown.map((link) => link.getAttribute('href'));
+        const words = shown.map((link) => link.dataset.tagLabel || link.textContent.trim());
 
         // The radius is capped to the container so the sphere never overflows the page on a narrow
         // screen, which is the one way this control can make a page worse than the list it replaces.
@@ -50,7 +54,9 @@ export default class extends Controller {
         });
 
         this.canvasTarget.addEventListener('click', this.onClick);
-        this.sourceTarget.hidden = true;
+        // The list is kept when it holds more than the sphere shows, so nothing becomes
+        // unreachable just because it did not fit on the ball.
+        this.sourceTarget.hidden = links.length <= shown.length;
         this.element.classList.add('is-animated');
     }
 

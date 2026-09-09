@@ -43,13 +43,20 @@ Changelog:
 			sit on the details element itself, which is the element that fires the toggle event: an
 			earlier version put them on the inner placeholder and listened through a from selector,
 			and the request never fired at all, so every section sat on Loading forever.
+
+			The attributes are literal markup with only the route interpolated. Built as a string -
+			'hx-get="' ~ route ~ '"' - Twig autoescapes the quotes and the browser receives
+			hx-get=&quot;...&quot; as text, so the request never fired for a second reason on top
+			of the first. Never assemble an attribute as an expression.
 		#}
-			<details class="cl-admin-section" data-company-section="{{ section.key }}" {{ section.key=='dashboard' ? 'open' : '' }}
-		         {{ section.key=='dashboard' ? '' : 'hx-get="' ~ section.route ~ '"' }}
-		         {{ section.key=='dashboard' ? '' : 'hx-trigger="toggle once"' }}
-		         {{ section.key=='dashboard' ? '' : 'hx-target="find .cl-admin-section-lazy"' }}
-		         {{ section.key=='dashboard' ? '' : 'hx-select=".cl-section-body"' }}
-		         {{ section.key=='dashboard' ? '' : 'hx-swap="innerHTML"' }}>
+			<details class="cl-admin-section" data-company-section="{{ section.key }}" {{ section.key == 'dashboard' ? 'open' : '' }}
+				{% if section.key != 'dashboard' %}
+					hx-get="{{ section.route }}"
+					hx-trigger="toggle once"
+					hx-target="find .cl-admin-section-lazy"
+					hx-select=".cl-section-body"
+					hx-swap="innerHTML"
+				{% endif %}>
 				<summary class="cl-admin-section-summary">
 					<span class="cl-admin-section-title">{{ section.label }}</span>
 					<span class="cl-admin-section-description">{{ section.description }}</span>
