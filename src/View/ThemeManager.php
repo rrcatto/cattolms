@@ -10,6 +10,9 @@ Description:
 Manages filesystem-authoritative Catto Learning Theme Package 3.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
 
 Changelog:
+2026/09/09 07:30 SAST
+- The generated palette no longer paints the links inside a dropdown panel with the navigation
+  bar's own text colour. Every theme's menus were white on white.
 2026/09/09 02:10 SAST
 - hasPageOverride() looks for the Twig wrapper.
 2026/09/09 01:20 SAST
@@ -768,6 +771,27 @@ body[data-cl-palette-managed="1"] .btn-primary,body[data-cl-palette-managed="1"]
 body[data-cl-palette-managed="1"] .btn-primary:hover,body[data-cl-palette-managed="1"] button.btn-primary:hover{background:var(--cl-dark)!important;color:var(--cl-on-color-2)!important}
 body[data-cl-palette-managed="1"] .hero,body[data-cl-palette-managed="1"] .cl-feature-band,body[data-cl-palette-managed="1"] [data-theme-block="dark"]{background-color:var(--cl-large-block-bg)!important;color:var(--cl-on-color-1)!important}
 body[data-cl-palette-managed="1"] .card,body[data-cl-palette-managed="1"] .stat-card,body[data-cl-palette-managed="1"] .modal-card{border-color:var(--cl-border)}
+/* A dropdown panel is inside the navigation element but is not part of it.
+
+   The rule above paints every link inside [data-theme-nav] with the colour that reads on the
+   navigation bar, which for every shipped palette is white. A menu panel is a light surface drawn
+   over the page, so its links were white on white and the menus could not be read at all. This
+   was true in every theme, because every theme's panel is a descendant of the element the rule
+   targets.
+
+   The panel marks itself with cl-nav-panel and is given the palette's darkest colour, which reads
+   on the light surface every floating panel uses; its links then inherit that rather than the bar's
+   colour. Stating it on the panel is necessary rather than tidy: three of the five themes set a
+   white panel background and no colour at all, so `inherit` alone walked straight back up to the
+   navigation bar and stayed white on white.
+
+   Only a floating light panel carries the marker. A nested list drawn inside a dark sidebar is not
+   one - it is part of the bar and its light-on-dark colours are correct - which is why the marker
+   is opted into rather than applied to every panel class.
+
+   No !important, so a theme that wants a dark panel says so at this selector's weight. */
+body[data-cl-palette-managed="1"] .cl-nav-panel{color:var(--cl-darkest)}
+body[data-cl-palette-managed="1"] .cl-nav-panel a,body[data-cl-palette-managed="1"] .cl-nav-panel button{color:inherit}
 CSS;
         if (file_put_contents($target, $css) === false) {
             throw new RuntimeException('Unable to write generated theme palette stylesheet: ' . $target);

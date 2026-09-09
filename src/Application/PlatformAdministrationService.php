@@ -539,6 +539,24 @@ final class PlatformAdministrationService
     }
 
     /**
+     * The page and page-size request keys a dataset reads.
+     *
+     * These are the same names paginationPayload() defaults to, stated once so a caller reading the
+     * request and the builder writing the links cannot disagree. Writing either out by hand is what
+     * DatasetSearchWiringTest forbids, and for good reason: the Courses search shipped reading a key
+     * nothing emitted, so the box filtered nothing while every layer beneath it was correct.
+     */
+    public static function pageParam(string $dataset): string
+    {
+        return $dataset . '_page';
+    }
+
+    public static function sizeParam(string $dataset): string
+    {
+        return $dataset . '_page_size';
+    }
+
+    /**
      * Adds a search term to the filter set pagination links re-emit.
      *
      * Without this, paging a searched list silently drops the search and page 2 shows the

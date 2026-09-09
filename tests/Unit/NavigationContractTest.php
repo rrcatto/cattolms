@@ -228,7 +228,10 @@ final class NavigationContractTest extends TestCase
         self::assertStringContainsString('child.children|length > 0', $nav, 'A menu child may hold children and the theme must render them.');
         self::assertStringContainsString('grandchild.href', $nav);
         self::assertStringContainsString('class="nav-group"', $nav);
-        self::assertStringContainsString('class="nav-subpanel"', $nav);
+        // The panel may carry more than one class - it also marks itself as a navigation surface so
+        // the generated palette leaves its text colour alone - so the class is asserted, not the
+        // whole attribute.
+        self::assertMatchesRegularExpression('/class="[^"]*\bnav-subpanel\b[^"]*"/', $nav);
         self::assertMatchesRegularExpression(
             '/<button class="nav-group-label" type="button"/',
             $nav,
