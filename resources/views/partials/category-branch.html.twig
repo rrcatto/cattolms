@@ -37,18 +37,29 @@ Changelog:
 	</summary>
 
 	<div class="cl-category-body">
-		{% if node.courses %}
-			<div id="category-{{ node.slug }}-region" data-server-search-target>
-				<div id="category-{{ node.slug }}-results">
-					{% include '@platform/partials/pagination.html.twig' with {pg: node.pagination} %}
-					<div class="cl-course-cards">
-						{% for course in node.courses %}
-							{% include '@platform/partials/course-card.html.twig' with {course: course} %}
-						{% endfor %}
-					</div>
-					{% include '@platform/partials/pagination.html.twig' with {pg: node.pagination} %}
+		{% if node.course_count > 0 %}
+			{% if node.is_open %}
+				{% include '@platform/partials/category-courses.html.twig' with {slug: node.slug, courses: node.courses, pagination: node.pagination} %}
+			{% else %}
+				{#
+					A closed accordion carries the address of its own contents rather than the
+					contents. Rendering every category's courses eagerly produced three megabytes of
+					inline cover artwork for a page whose reader opens two of them.
+
+					`once` so re-opening does not re-fetch, and the link is what a reader without
+					JavaScript gets: the category's own page, which is a real destination that has
+					always existed.
+				#}
+				<div class="cl-category-lazy"
+				     hx-get="/courses/categories/{{ node.slug }}/courses"
+				     hx-trigger="toggle once from:closest details"
+				     hx-swap="outerHTML">
+					<noscript>
+						<a class="btn btn-soft btn-sm" href="/courses/category/{{ node.slug }}">Open {{ node.name }}</a>
+					</noscript>
+					<p class="text-body-secondary mb-0">Loading {{ node.course_count }} courses…</p>
 				</div>
-			</div>
+			{% endif %}
 		{% endif %}
 
 		{% for child in node.children %}

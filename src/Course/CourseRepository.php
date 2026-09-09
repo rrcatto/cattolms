@@ -777,8 +777,32 @@ final class CourseRepository
         ));
     }
 
+    /**
+     * Every category's published-course total, in one query.
+     *
+     * The browser renders a few hundred categories at once. Asked one at a time that is a few
+     * hundred round trips for a page that shows one screen, and the grouped count is the same work
+     * PostgreSQL would do anyway - once, rather than once per category.
+     *
+     * @return array<int,int> category id => courses filed directly in it
+     */
+    public function categoryCourseTotals(DataUniverse $universe): array
+    {
+        $totals = [];
+        foreach ($this->db->fetchAllAssociative(
+            "SELECT c.category_id, COUNT(*)::int AS total
+               FROM courses c
+              WHERE c.status = 'published' AND c.category_id IS NOT NULL" . self::andScope($universe, 'c') . "
+              GROUP BY c.category_id"
+        ) as $row) {
+            $totals[(int) $row['category_id']] = (int) $row['total'];
+        }
+
+        return $totals;
+    }
+
     /** The total behind {@see categoryCourses()}, under the identical membership rule. */
-    public function categoryCoursesCount(int $categoryId, DataUniverse $universe): int
+    public function categoryCourseTotal(int $categoryId, DataUniverse $universe): int
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM courses c

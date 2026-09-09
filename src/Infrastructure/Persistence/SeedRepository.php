@@ -49,6 +49,7 @@ namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Seed\SeedTableCatalog;
 use CattoLearning\Support\Slug;
+use CattoLearning\View\Artwork\ArtworkGenerator;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 
@@ -70,8 +71,10 @@ final class SeedRepository
         'ip_address' => 'inet',
     ];
 
-    public function __construct(private readonly Database $db)
-    {
+    public function __construct(
+        private readonly Database $db,
+        private readonly ArtworkGenerator $artwork
+    ) {
     }
 
     /**
@@ -733,15 +736,21 @@ final class SeedRepository
         $placeholders = [];
         $params = [];
         foreach ($names as $index => $name) {
-            $placeholders[] = '(:n' . $index . ',:s' . $index . ')';
-            $params['n' . $index] = mb_substr($name, 0, 80);
-            $params['s' . $index] = mb_substr(Slug::from($name), 0, 80);
+            $placeholders[] = '(:n' . $index . ',:s' . $index . ',:i' . $index . ')';
+            $label = mb_substr($name, 0, 80);
+            $slug = mb_substr(Slug::from($name), 0, 80);
+            $params['n' . $index] = $label;
+            $params['s' . $index] = $slug;
+            // A tag created here is a tag like any other and gets its icon in the same statement,
+            // for the same reason the administration form does: a chip with no icon beside chips
+            // that have one reads as a rendering failure rather than as a tag.
+            $params['i' . $index] = $this->artwork->tagIcon($slug, $label);
         }
 
         // ON CONFLICT on the slug, because that is the unique column; the name is not unique in the
         // schema and two labels that slug identically are the same label.
         $this->db->executeStatement(
-            'INSERT INTO tags (name, slug) VALUES ' . implode(',', $placeholders) . ' ON CONFLICT (slug) DO NOTHING',
+            'INSERT INTO tags (name, slug, icon_svg) VALUES ' . implode(',', $placeholders) . ' ON CONFLICT (slug) DO NOTHING',
             $params
         );
 

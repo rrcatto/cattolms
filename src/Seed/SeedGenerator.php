@@ -53,6 +53,7 @@ use CattoLearning\Support\Slug;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use CattoLearning\Support\Uuid;
+use CattoLearning\View\Artwork\ArtworkGenerator;
 use RuntimeException;
 
 final class SeedGenerator
@@ -102,7 +103,8 @@ final class SeedGenerator
 
     public function __construct(
         private readonly SeedRepository $repository,
-        private readonly SeedNamePools $pools
+        private readonly SeedNamePools $pools,
+        private readonly ArtworkGenerator $artwork
     ) {
     }
 
@@ -390,6 +392,10 @@ final class SeedGenerator
     ): array {
         $courseRows = [];
         $titles = [];
+        // Artwork is generated here rather than backfilled afterwards, for the same reason a real
+        // course gets its cover in the same statement that creates it: a course without one is a
+        // grey rectangle, and a catalogue of them is indistinguishable from a broken image.
+        $publicIds = [];
         // The category each course belongs to, kept so the tags can be drawn from the same place
         // the title was. Before this the two were unrelated: a course called "Abattoir Hygiene"
         // could be filed under Cloud Infrastructure and tagged by arithmetic on its row number.
@@ -407,8 +413,10 @@ final class SeedGenerator
             $status = $i % 3 === 2 ? 'draft' : 'published';
 
             $titles[] = $title;
+            $publicId = Uuid::v4();
+            $publicIds[] = $publicId;
             $courseRows[] = [
-                Uuid::v4(),
+                $publicId,
                 $category === null ? null : $category['id'],
                 Slug::from($title) . '-' . $i . '-' . $suffix,
                 $title,
@@ -429,6 +437,7 @@ final class SeedGenerator
                 $owner,
                 $status === 'published' ? gmdate('Y-m-d H:i:sP') : null,
                 $token,
+                $this->artwork->courseCover($publicId, $title),
             ];
         }
 
@@ -439,7 +448,7 @@ final class SeedGenerator
                 'status', 'default_access_period_seconds', 'module_weight', 'final_weight',
                 'certificate_enabled', 'certificate_template', 'owner_user_id', 'owner_company_id',
                 'revision_number', 'publication_approval_status', 'created_by_user_id',
-                'updated_by_user_id', 'published_at', 'seed_token',
+                'updated_by_user_id', 'published_at', 'seed_token', 'cover_svg',
             ],
             $courseRows,
             true

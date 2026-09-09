@@ -62,6 +62,8 @@ use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Support\Pagination;
+use CattoLearning\Auth\DataUniverse;
+use CattoLearning\Support\Slug;
 
 use Base;
 
@@ -205,26 +207,17 @@ final class CourseController extends BaseController
     {
         $universe = $this->universe();
         $tree = $this->courses->categoryBrowser($universe);
-
         $openSlug = trim((string) ($_GET['open'] ?? ''));
-        $page = $_GET['page'] ?? null;
 
-        $decorate = function (array $node) use (&$decorate, $universe, $openSlug, $page): array {
-            // Only the category being paged reads the page number. Every other accordion opens at
-            // its first page, because one page parameter cannot mean two things at once.
-            $isPaged = $openSlug !== '' && $openSlug === (string) $node['slug'];
-            $node['is_open'] = $isPaged;
-            if ((int) $node['course_count'] > 0) {
-                $node += $this->courses->categoryCoursePage(
-                    (int) $node['id'],
-                    (string) $node['slug'],
-                    $universe,
-                    $isPaged ? $page : 1,
-                    $_GET['page_size'] ?? null
-                );
-            } else {
-                $node['courses'] = [];
-                $node['pagination'] = [];
+        $decorate = function (array $node) use (&$decorate, $universe, $openSlug): array {
+            // Only the category named by `open` is rendered with its courses. Every other accordion
+            // carries the address of its own contents and fetches them when it is opened, which is
+            // what keeps this page a few tens of kilobytes: the seed catalogue's whole taxonomy
+            // rendered eagerly came to three megabytes of inline cover artwork, most of it for
+            // categories the reader never opened.
+            $node['is_open'] = $openSlug !== '' && $openSlug === (string) $node['slug'];
+            if ($node['is_open']) {
+                $node += $this->categoryCourses((string) $node['slug'], (int) $node['id'], $universe);
             }
             $node['children'] = array_map($decorate, (array) $node['children']);
 
@@ -236,6 +229,47 @@ final class CourseController extends BaseController
             'page_kicker' => 'Every part of the catalogue that holds a course',
             'category_tree' => array_map($decorate, $tree),
         ]);
+    }
+
+    /**
+     * One category's courses, as the fragment its accordion swaps in.
+     *
+     * The same markup the browser renders for an open category, so opening one and arriving with
+     * it already open produce the same thing. Without JavaScript the accordion offers the
+     * category's own page instead, which is a real destination that has always existed.
+     */
+    public function categoryCoursesFragment(): void
+    {
+        $slug = Slug::validate((string) $this->f3->get('PARAMS.slug'));
+        $category = $this->courses->categoryBySlug($slug);
+        if ($category === null) {
+            $this->f3->error(404, 'The category could not be found.');
+
+            return;
+        }
+
+        $node = ['slug' => $slug, 'name' => (string) $category['name']]
+            + $this->categoryCourses($slug, (int) $category['id'], $this->universe());
+
+        $this->renderFragment('partials/category-courses', $node);
+    }
+
+    /**
+     * @return array{courses:list<array<string,mixed>>,pagination:array<string,mixed>}
+     */
+    private function categoryCourses(string $slug, int $categoryId, DataUniverse $universe): array
+    {
+        $pagination = $this->courses->categoryPagination(
+            $slug,
+            $this->courses->categoryCourseTotal($categoryId, $universe),
+            $_GET['page'] ?? null,
+            $_GET['page_size'] ?? null
+        );
+
+        return [
+            'courses' => $this->courses->categoryCoursePage($categoryId, $universe, $pagination),
+            'pagination' => $pagination,
+        ];
     }
 
     public function tagIndex(): void

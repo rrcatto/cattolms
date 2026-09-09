@@ -22,11 +22,13 @@ quarter of a million covers cost nothing to the queries that never ask for one.
 
 Changelog:
 2026/09/09 05:00 SAST
-- Created for generated course, category and tag artwork.
+- Created for generated course, category and tag artwork, and fills it for the rows the baseline
+  already seeded so a clean install arrives complete.
 */
 
 declare(strict_types=1);
 
+use CattoLearning\View\Artwork\ArtworkGenerator;
 use Phinx\Migration\AbstractMigration;
 
 final class AddGeneratedArtwork extends AbstractMigration
@@ -43,6 +45,59 @@ COMMENT ON COLUMN courses.cover_svg IS
 COMMENT ON COLUMN course_categories.icon_svg IS 'Generated title-bar icon.';
 COMMENT ON COLUMN tags.icon_svg IS 'Generated chip icon.';
 SQL);
+
+        $this->backfill();
+    }
+
+    /**
+     * Fills the artwork for the rows that already exist.
+     *
+     * The baseline seeds the taxonomy, so a clean install arrives here with several hundred
+     * categories and tags and no artwork - and a column that is only ever filled on insert would
+     * leave every one of them blank on the first install and only the first. Generating them here
+     * means the migration produces a complete database rather than one that needs a script run
+     * after it.
+     *
+     * It is the same generator the application uses, so a row created by this migration and a row
+     * created by a controller are indistinguishable. Courses are done in batches because this also
+     * runs against a database that already holds a volume set.
+     */
+    private function backfill(): void
+    {
+        $artwork = new ArtworkGenerator();
+
+        foreach ($this->fetchAll("SELECT id, slug, name FROM course_categories WHERE icon_svg = ''") as $row) {
+            $this->execute(
+                'UPDATE course_categories SET icon_svg = ' . $this->quote($artwork->categoryIcon((string) $row['slug'], (string) $row['name']))
+                . ' WHERE id = ' . (int) $row['id']
+            );
+        }
+
+        foreach ($this->fetchAll("SELECT id, slug, name FROM tags WHERE icon_svg = ''") as $row) {
+            $this->execute(
+                'UPDATE tags SET icon_svg = ' . $this->quote($artwork->tagIcon((string) $row['slug'], (string) $row['name']))
+                . ' WHERE id = ' . (int) $row['id']
+            );
+        }
+
+        while (true) {
+            $rows = $this->fetchAll("SELECT id, public_id, title FROM courses WHERE cover_svg = '' ORDER BY id LIMIT 1000");
+            if ($rows === []) {
+                break;
+            }
+            foreach ($rows as $row) {
+                $this->execute(
+                    'UPDATE courses SET cover_svg = ' . $this->quote($artwork->courseCover((string) $row['public_id'], (string) $row['title']))
+                    . ' WHERE id = ' . (int) $row['id']
+                );
+            }
+        }
+    }
+
+    /** Phinx has no binding API on execute(), so the one generated value is quoted here. */
+    private function quote(string $value): string
+    {
+        return "'" . str_replace("'", "''", $value) . "'";
     }
 
     public function down(): void
