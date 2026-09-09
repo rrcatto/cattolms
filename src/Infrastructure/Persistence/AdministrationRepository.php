@@ -1644,7 +1644,10 @@ SQL;
             [
                 'user_id' => $userId,
                 'course_id' => $courseId,
-                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
+                // The row's universe comes from the course, which is the resource it is about;
+                // the identity holding it may be a genuine ADMIN from the other universe, which is
+                // the D4 amendment of 2026/09/09 recorded in SeedTableCatalog.
+                'seed_token' => $this->provenance->fromCourse($courseId),
             ]
         );
         return true;

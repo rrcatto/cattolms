@@ -857,6 +857,17 @@ Ordinary writes inherit provenance from the resource they belong to, never from 
 identity: a genuine `ADMIN` operating on a generated aggregate writes a SEED business row and
 stays the recorded actor on it (decision D4). Course portability is REAL-only (decision D5).
 
+**D4 amendment, owner's instruction 2026/09/09.** A genuine immutable `ADMIN` straddles both
+universes and works with generated data without restriction. `course_favourites.user_id` joins the
+actor allowlist so an administrator can bookmark a generated course: the catalogue exists to be
+reviewed, and one that cannot be bookmarked cannot be. The exception is that column alone. A
+favourite grants no access, carries no entitlement, and the row still takes its universe from the
+course, so it is removed with the seed set that owns it and leaves nothing behind. An enrolment, a
+company membership or a course ownership would outlive the generated data or confer something on
+the identity holding it, so those remain forbidden exactly as D4 approved them.
+`20260909180000_admin_may_favourite_seed_courses` narrows that table's constraint trigger to the
+course reference; `SeedTableCatalog` carries the full record.
+
 ## 5. Verification state
 
 The authoritative acceptance gate remains the VPS with Composer/PostgreSQL:

@@ -183,7 +183,7 @@ final class SeedTableCatalog
         ],
         'course_results' => ['enrolment_id' => 'course_enrolments'],
         'certificates' => ['enrolment_id' => 'course_enrolments'],
-        'course_favourites' => ['user_id' => 'users', 'course_id' => 'courses'],
+        'course_favourites' => ['course_id' => 'courses'],
         'course_requests' => [
             'user_id' => 'users',
             'company_id' => 'companies',
@@ -229,6 +229,16 @@ final class SeedTableCatalog
         'course_requests' => ['decided_by_user_id'],
         'course_credits' => ['created_by_user_id'],
         'course_credit_allocations' => ['assigned_by_user_id'],
+        // Amendment, owner's instruction 2026/09/09. D4 as approved on 2026/08/22 named
+        // course_enrolments.user_id as the shape that must never qualify, and this column has that
+        // shape - it says whose favourite it is, not who performed an action. The owner's ruling is
+        // that a genuine immutable ADMIN straddles both universes and must be able to work with
+        // generated data without restriction, and a catalogue nobody can bookmark cannot be
+        // reviewed. The exception is deliberately this column only: a favourite is a bookmark,
+        // carries no entitlement, grants no access and cascades away with the seed set, so a real
+        // administrator holding one on generated data creates no obligation that can outlive it.
+        // An enrolment or a company membership would, and those stay forbidden.
+        'course_favourites' => ['user_id'],
     ];
 
     /**
