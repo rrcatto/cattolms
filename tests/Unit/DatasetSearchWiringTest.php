@@ -248,10 +248,15 @@ final class DatasetSearchWiringTest extends TestCase
     public function testTheFragmentRendererSuppliesTheFormEssentials(): void
     {
         $renderer = (string) file_get_contents(dirname(__DIR__, 2) . '/src/View/ThemeRenderer.php');
-        $fragment = substr($renderer, strpos($renderer, 'public function renderFragment') ?: 0, 1600);
+        $scalars = substr($renderer, strpos($renderer, 'private function platformScalars') ?: 0, 600);
 
-        self::assertStringContainsString("'csrf' => Csrf::token()", $fragment, 'A fragment containing a form needs a token.');
-        self::assertStringContainsString("'app_name'", $fragment);
+        self::assertStringContainsString("'csrf' => Csrf::token()", $scalars, 'A fragment containing a form needs a token.');
+        self::assertStringContainsString("'app_name'", $scalars);
+
+        // Both fragment paths take the same set: the htmx swap, and a workspace section rendered
+        // into a page. A section is a fragment too, and it was the section path that went without.
+        self::assertStringContainsString('$scalars = $this->platformScalars();', $renderer);
+        self::assertStringContainsString('array_merge($this->platformScalars(), $data)', $renderer);
     }
 
     /**
@@ -262,10 +267,10 @@ final class DatasetSearchWiringTest extends TestCase
      */
     public function testTheSearchSwapTargetsAWrapperItDoesNotReplace(): void
     {
-        $control = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/dataset-search.html');
+        $control = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/dataset-search.html.twig');
 
-        self::assertStringContainsString('hx-target="#{{ @ds_name }}-region"', $control);
-        self::assertStringContainsString('hx-select="#{{ @ds_name }}-results"', $control);
+        self::assertStringContainsString('hx-target="#{{ ds_name }}-region"', $control);
+        self::assertStringContainsString('hx-select="#{{ ds_name }}-results"', $control);
         self::assertStringContainsString('hx-swap="innerHTML"', $control, 'outerHTML on the target is what destroyed it.');
     }
 }

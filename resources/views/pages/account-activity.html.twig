@@ -1,0 +1,11 @@
+{% extends layout %}
+
+{% block page_body %}
+{% set ph_back_href = '/account' %}
+{% set ph_back_label = 'Account' %}
+{% set ph_kicker = 'Account' %}
+{% set ph_title = 'My activity' %}
+{% set ph_lead = 'Everything recorded against your account.' %}
+{% include '@platform/partials/page-head.html.twig' %}
+{% include '@platform/partials/account/activity.html.twig' %}
+{% endblock %}

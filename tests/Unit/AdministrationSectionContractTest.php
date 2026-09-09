@@ -75,9 +75,9 @@ final class AdministrationSectionContractTest extends TestCase
 
     public function testConsolidatedWorkspaceRendersAllReusableSectionsWithoutTabRouting(): void
     {
-        $workspace = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/admin-control-centre.html');
-        self::assertStringContainsString('@admin_sections', $workspace);
-        self::assertStringContainsString('@section.content', $workspace);
+        $workspace = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/admin-control-centre.html.twig');
+        self::assertStringContainsString('admin_sections', $workspace);
+        self::assertStringContainsString('section.content', $workspace);
         self::assertStringContainsString('data-admin-workspace', $workspace);
         self::assertStringNotContainsString('data-admin-tab', $workspace);
         self::assertStringNotContainsString('?tab=', $workspace);
@@ -87,18 +87,18 @@ final class AdministrationSectionContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $controller = (string) file_get_contents($root . '/src/Http/Controller/AdminController.php');
-        $partial = (string) file_get_contents($root . '/resources/views/partials/admin/roles.html');
+        $partial = (string) file_get_contents($root . '/resources/views/partials/admin/roles.html.twig');
 
         self::assertStringContainsString("\$data['roles_acl'] = \$this->roleAdministration->roles();", $controller);
-        self::assertStringContainsString('@roles_acl', $partial);
-        self::assertStringNotContainsString('<repeat group="{{ @roles }}" value="{{ @role }}">', $partial);
+        self::assertStringContainsString('roles_acl', $partial);
+        self::assertStringNotContainsString('{% for role in roles %}', $partial);
     }
 
     public function testRolePermissionEditorUsesCategoryAccordionsWithTables(): void
     {
-        $roleEdit = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/admin-role-edit.html');
+        $roleEdit = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/admin-role-edit.html.twig');
 
-        self::assertStringContainsString('@role_acl.permission_groups', $roleEdit);
+        self::assertStringContainsString('role_acl.permission_groups', $roleEdit);
         self::assertStringContainsString('<details class="acl-group">', $roleEdit);
         self::assertStringContainsString('class="acl-group-summary"', $roleEdit);
         self::assertStringContainsString('class="acl-permission-table"', $roleEdit);
@@ -116,7 +116,7 @@ final class AdministrationSectionContractTest extends TestCase
     public function testThemeRendererExposesRenderedAdministrationSectionApi(): void
     {
         $renderer = (string) file_get_contents(dirname(__DIR__, 2) . '/src/View/ThemeRenderer.php');
-        foreach (['materialiseAdministrationSections', "admin['sections']", "admin['section']", '@admin.sections'] as $token) {
+        foreach (['materialiseAdministrationSections', "admin['sections']", "admin['section']", 'admin.sections'] as $token) {
             self::assertStringContainsString($token, $renderer);
         }
     }

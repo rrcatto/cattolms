@@ -65,17 +65,17 @@ final class BundledThemePackageContractTest extends TestCase
         $zip = new \ZipArchive();
         self::assertTrue($zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true);
         $manifest = [
-            'format'=>'catto-learning-theme','schema_version'=>'3.0','template_api'=>'1.0',
+            'format'=>'catto-learning-theme','schema_version'=>'4.0','template_api'=>'2.0',
             'theme'=>['name'=>'Broken Scripts','slug'=>'broken-scripts','version'=>'1.0.0','author'=>'QA','description'=>'Broken base contract','created_at'=>'2026-08-17T04:00:00+02:00'],
             'parent'=>null,'styles'=>[],'scripts'=>[],'external'=>['styles'=>[],'scripts'=>[]],
         ];
         $zip->addFromString('theme.json', json_encode($manifest, JSON_THROW_ON_ERROR));
-        $zip->addFromString('base.html', '<html><head><repeat group="{{ @platform.styles }}" value="{{ @url }}"></repeat></head><body>{{ @content | raw }}</body></html>');
+        $zip->addFromString('base.html.twig', '<html><head>{% for url in platform.styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}</head><body>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}</body></html>');
         $zip->addFromString('public/css/theme.css', 'body{margin:0}');
         $zip->close();
         try {
             $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('@platform.scripts');
+            $this->expectExceptionMessage('platform.scripts');
             (new ThemePackageValidator())->inspect($path);
         } finally {
             @unlink($path);

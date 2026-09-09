@@ -27,7 +27,7 @@ final class PeopleTimestampUiContractTest extends TestCase
 {
     public function testPeopleListShowsCreationAndLastLoginSeparately(): void
     {
-        $template = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/people.html');
+        $template = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/people.html.twig');
         $service = (string) file_get_contents(__DIR__ . '/../../src/Application/PlatformAdministrationService.php');
 
         // The two headings are entries in the header model the service builds, not literal markup:
@@ -39,15 +39,15 @@ final class PeopleTimestampUiContractTest extends TestCase
         // the label rather than on the whole entry.
         self::assertStringContainsString("'created' => 'Created|", $service);
         self::assertStringContainsString("'last_login' => 'Last login|", $service);
-        self::assertStringContainsString('@people_sort_headers', $template);
-        self::assertStringContainsString('{{ @person.created_at }}', $template);
-        self::assertStringContainsString("{{ @person.last_login_at ?: 'Never' }}", $template);
+        self::assertStringContainsString('people_sort_headers', $template);
+        self::assertStringContainsString('{{ person.created_at }}', $template);
+        self::assertStringContainsString("{{ person.last_login_at ?: 'Never' }}", $template);
     }
 
     public function testFullProfileShowsCreationAndLastLoginSeparately(): void
     {
-        $template = (string) file_get_contents(__DIR__ . '/../../resources/views/pages/admin-person-profile.html');
-        self::assertStringContainsString('Created {{ @profile.created_at }}', $template);
-        self::assertStringContainsString("Last login {{ @profile.last_login_at ?: 'Never' }}", $template);
+        $template = (string) file_get_contents(__DIR__ . '/../../resources/views/pages/admin-person-profile.html.twig');
+        self::assertStringContainsString('Created {{ profile.created_at }}', $template);
+        self::assertStringContainsString("Last login {{ profile.last_login_at ?: 'Never' }}", $template);
     }
 }

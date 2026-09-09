@@ -41,6 +41,7 @@ use CattoLearning\Application\AdministrationSectionRegistry;
 use CattoLearning\Seed\SeedGenerationPlan;
 use CattoLearning\Seed\SeedGenerator;
 use CattoLearning\Seed\SeedTableCatalog;
+use CattoLearning\Tests\Support\RenderHarness;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
@@ -161,7 +162,7 @@ final class SeedDatabaseContractTest extends TestCase
 
         $seed = $sections[array_search('seed', $keys, true)];
         self::assertSame('/admin/seed', $seed['route']);
-        self::assertSame('partials/admin/seed.html', $seed['template']);
+        self::assertSame('partials/admin/seed.html.twig', $seed['template']);
         self::assertFileExists(self::root() . '/resources/views/' . $seed['template']);
     }
 
@@ -238,21 +239,21 @@ final class SeedDatabaseContractTest extends TestCase
      */
     public function testASeedSetOpensItsPerTableBreakdown(): void
     {
-        $list = self::read('resources/views/partials/admin/seed.html');
+        $list = self::read('resources/views/partials/admin/seed.html.twig');
         self::assertStringContainsString(
-            'href="/admin/seed/{{ @seed_set.seed_token }}"',
+            'href="/admin/seed/{{ seed_set.seed_token }}"',
             $list,
             'The token in the history list must open the set it names.'
         );
 
-        self::assertFileExists(self::root() . '/resources/views/pages/admin-seed-set.html');
+        self::assertFileExists(self::root() . '/resources/views/pages/admin-seed-set.html.twig');
         self::assertStringContainsString(
             'public function setTableBreakdown(',
             self::read('src/Infrastructure/Persistence/SeedRepository.php')
         );
 
-        $page = self::read('resources/views/pages/admin-seed-set.html');
-        foreach (['@seed_row.table', '@seed_row.initial', '@seed_row.current', '@seed_row.removed'] as $token) {
+        $page = self::read('resources/views/pages/admin-seed-set.html.twig');
+        foreach (['seed_row.table', 'seed_row.initial', 'seed_row.current', 'seed_row.removed'] as $token) {
             self::assertStringContainsString($token, $page, 'The breakdown must show ' . $token . '.');
         }
     }
@@ -283,7 +284,7 @@ final class SeedDatabaseContractTest extends TestCase
             'cleaned set' => $base + ['seed_set' => ['cleaned_at' => '2026-09-06 04:00:00'] + $set],
             'set with no description' => $base + ['seed_set' => ['description' => ''] + $set],
         ] as $name => $hive) {
-            self::assertNull(self::renderError('pages/admin-seed-set.html', $hive), $name . ' failed to render.');
+            self::assertNull(self::renderError('pages/admin-seed-set.html.twig', $hive), $name . ' failed to render.');
         }
     }
 
@@ -307,7 +308,7 @@ final class SeedDatabaseContractTest extends TestCase
     public function testSeedSectionRendersInEveryState(): void
     {
         foreach (self::renderScenarios() as $name => $hive) {
-            self::assertNull(self::renderError('partials/admin/seed.html', $hive), $name . ' failed to render.');
+            self::assertNull(self::renderError('partials/admin/seed.html.twig', $hive), $name . ' failed to render.');
         }
     }
 
@@ -349,47 +350,16 @@ final class SeedDatabaseContractTest extends TestCase
         return ['empty state' => $base, 'with sets' => $withSets, 'cleanup preview' => $preview];
     }
 
-    /** @param array<string,mixed> $hive */
+    /**
+     * @param array<string,mixed> $hive
+     *
+     * The harness owns this: it had its own copy pointed at a shared, guessable temporary
+     * directory, which is exactly the collision RenderHarness::compileDirectory() was written to
+     * avoid, and it duly collided.
+     */
     private static function renderError(string $template, array $hive): ?string
     {
-        $f3 = Base::instance();
-        $temp = sys_get_temp_dir() . '/catto-seed-render/';
-        if (!is_dir($temp)) {
-            mkdir($temp, 0775, true);
-        }
-
-        $f3->set('UI', self::root() . '/resources/views/');
-        $f3->set('TEMP', $temp);
-        $f3->set('HALT', false);
-        $f3->set('ONERROR', static function (): void {
-        });
-        $f3->clear('ERROR');
-
-        foreach ($hive as $key => $value) {
-            $f3->set($key, $value);
-        }
-
-        $captured = null;
-        set_error_handler(static function (int $severity, string $message) use (&$captured): bool {
-            $captured ??= $message;
-
-            return true;
-        });
-
-        try {
-            Template::instance()->render($template);
-        } catch (\Throwable $exception) {
-            $captured ??= $exception->getMessage();
-        } finally {
-            restore_error_handler();
-        }
-
-        $error = $f3->get('ERROR');
-        if ($captured === null && is_array($error)) {
-            $captured = (string) ($error['text'] ?? 'unknown template error');
-        }
-
-        return $captured;
+        return RenderHarness::renderError($template, $hive);
     }
     /**
      * Cleanup invalidates a set's login tokens before it removes the identities they name.

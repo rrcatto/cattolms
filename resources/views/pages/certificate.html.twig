@@ -1,0 +1,10 @@
+{% extends layout %}
+
+{% block page_body %}
+{% set ph_compact = 1 %}
+{% set ph_back_href = '/account/library' %}
+{% set ph_back_label = 'My learning' %}
+{% set ph_title = 'Certificate' %}
+{% include '@platform/partials/page-head.html.twig' %}
+<section class="container py-5">{% if certificate.rendered_html %}<div class="cl-certificate-preview-frame">{{ certificate.rendered_html|raw }}</div>{% else %}<div class="cl-certificate"><h1>{{ certificate.certificate_title }}</h1><h2>{{ certificate.learner_name }}</h2><p>{{ certificate.certificate_body_text }}</p><h3>{{ certificate.course_title }}</h3><p>{{ certificate.grade_code }} · {{ certificate.overall_percentage }}%</p><p>{{ certificate.certificate_number }}</p></div>{% endif %}<p class="text-center text-body-secondary mt-3">This public page verifies the certificate record held by {{ app_name }}.</p></section>
+{% endblock %}

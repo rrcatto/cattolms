@@ -806,7 +806,7 @@ CREATE TABLE app_options (
     updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
 );
 INSERT INTO app_options (option_key, option_value) VALUES
-    ('active_theme', 'factory-reset-v1.0.4'),
+    ('active_theme', 'factory-reset-v2.0.0'),
     ('system_company_name', 'System Company'),
     ('acl_revision', '1');
 

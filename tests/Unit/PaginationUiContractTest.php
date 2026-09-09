@@ -57,13 +57,13 @@ final class PaginationUiContractTest extends TestCase
 
     public function testSharedPaginationControlStatesTheFullContract(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('Showing {{ @pg.from }}-{{ @pg.to }} of {{ @pg.total }}', $markup);
-        self::assertStringContainsString('Page {{ @pg.page }} of {{ @pg.total_pages }}', $markup);
+        self::assertStringContainsString('Showing {{ pg.from }}-{{ pg.to }} of {{ pg.total }}', $markup);
+        self::assertStringContainsString('Page {{ pg.page }} of {{ pg.total_pages }}', $markup);
         self::assertStringContainsString('>Previous<', $markup);
         self::assertStringContainsString('>Next<', $markup);
-        self::assertStringContainsString('name="{{ @pg.size_param }}"', $markup);
+        self::assertStringContainsString('name="{{ pg.size_param }}"', $markup);
         self::assertStringContainsString('pagination-page-size', $markup);
     }
 
@@ -74,15 +74,15 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testSharedControlOffersBothEndsTheNumberedWindowAndAJump(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('{{ @pg.first_href }}', $markup, 'First page must be reachable in one action.');
-        self::assertStringContainsString('{{ @pg.last_href }}', $markup, 'Last page must be reachable in one action.');
-        self::assertStringContainsString('group="{{ @pg.pages }}"', $markup, 'The numbered pages come from the Pagination window.');
-        self::assertStringContainsString('{{ @pg_item.is_gap }}', $markup, 'An elided range must render as a gap, never as a page.');
+        self::assertStringContainsString('{{ pg.first_href }}', $markup, 'First page must be reachable in one action.');
+        self::assertStringContainsString('{{ pg.last_href }}', $markup, 'Last page must be reachable in one action.');
+        self::assertStringContainsString('for pg_item in pg.pages', $markup, 'The numbered pages come from the Pagination window.');
+        self::assertStringContainsString('{% if pg_item.is_gap %}', $markup, 'An elided range must render as a gap, never as a page.');
         self::assertStringContainsString('aria-current="page"', $markup, 'The current page must be announced as the current page.');
         self::assertStringContainsString('pagination-jump', $markup);
-        self::assertStringContainsString('name="{{ @pg.page_param }}" type="number"', $markup, 'Jump to page is a number input, not a whole-dataset select.');
+        self::assertStringContainsString('name="{{ pg.page_param }}" type="number"', $markup, 'Jump to page is a number input, not a whole-dataset select.');
     }
 
     /**
@@ -91,20 +91,20 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testTheControlHidesWhenThereIsNowhereToGoAndAppearsAtBothEnds(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('{{ @pg.has_pages }}', $markup, 'A single page must not render dead controls.');
+        self::assertStringContainsString('{% if pg.has_pages %}', $markup, 'A single page must not render dead controls.');
         // The summary sits outside that guard: how many records exist is worth stating either way.
         self::assertLessThan(
-            strpos($markup, '{{ @pg.has_pages }}'),
-            (int) strpos($markup, 'Showing {{ @pg.from }}'),
+            strpos($markup, '{% if pg.has_pages %}'),
+            (int) strpos($markup, 'Showing {{ pg.from }}'),
             'The row count must render whether or not there is more than one page.'
         );
 
         foreach (self::paginatedPartials() as [$partial, $dataset]) {
             self::assertSame(
                 2,
-                substr_count(self::read($partial), 'with="pg=@' . $dataset . '_pagination"'),
+                substr_count(self::read($partial), 'with {pg: ' . $dataset . '_pagination}'),
                 $partial . ' must carry the control above and below its table.'
             );
         }
@@ -116,9 +116,9 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testPaginationNeverReintroducesAWholeDatasetSelect(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringNotContainsString('name="{{ @pg.page_param }}"><', $markup);
+        self::assertStringNotContainsString('name="{{ pg.page_param }}"><', $markup);
         self::assertDoesNotMatchRegularExpression(
             '/<select[^>]*name="\{\{ @pg\.page_param \}\}"/',
             $markup,
@@ -133,20 +133,20 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testPaginationIsHtmxEnhancedAndStillWorksAsPlainGet(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('hx-target="#{{ @pg.region }}"', $markup);
-        self::assertStringContainsString('hx-select="#{{ @pg.results }}"', $markup);
+        self::assertStringContainsString('hx-target="#{{ pg.region }}"', $markup);
+        self::assertStringContainsString('hx-select="#{{ pg.results }}"', $markup);
         self::assertStringContainsString('hx-swap="innerHTML"', $markup);
         self::assertStringContainsString('hx-push-url="true"', $markup, 'A reload or a back button must land on the page the reader was on.');
 
         // Progressive enhancement: the links carry a real href and the forms a real method and
         // action, so the whole control works with no JavaScript at all.
-        self::assertStringContainsString('href="{{ @pg.first_href }}"', $markup);
-        self::assertStringContainsString('href="{{ @pg_item.href }}"', $markup);
+        self::assertStringContainsString('href="{{ pg.first_href }}"', $markup);
+        self::assertStringContainsString('href="{{ pg_item.href }}"', $markup);
         self::assertSame(
             2,
-            substr_count($markup, 'method="get" action="{{ @pg.base }}"'),
+            substr_count($markup, 'method="get" action="{{ pg.base }}"'),
             'Jump to page and rows per page must both remain ordinary GET forms.'
         );
     }
@@ -158,10 +158,10 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testEveryPagingTargetComesFromTheOneUrlBuilder(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
         $service = self::read('src/Application/PlatformAdministrationService.php');
 
-        self::assertStringNotContainsString('{{ @pg.query }}', $markup, 'A link must not rebuild its own URL from a query fragment.');
+        self::assertStringNotContainsString('{{ pg.query }}', $markup, 'A link must not rebuild its own URL from a query fragment.');
         self::assertStringContainsString('private static function pageHref(', $service);
         self::assertStringContainsString("'first_href' =>", $service);
         self::assertStringContainsString("'last_href' =>", $service);
@@ -176,15 +176,15 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testPagingPreservesSearchFiltersAndUniverse(): void
     {
-        $markup = self::read('resources/views/partials/pagination.html');
+        $markup = self::read('resources/views/partials/pagination.html.twig');
 
         self::assertSame(
             2,
-            substr_count($markup, 'group="{{ @pg.filters }}"'),
+            substr_count($markup, '{% for filter_key, filter_value in pg.filters %}'),
             'Both the jump form and the page-size form must re-emit the current filters.'
         );
         self::assertStringContainsString(
-            'name="{{ @pg.size_param }}" value="{{ @pg.page_size }}"',
+            'name="{{ pg.size_param }}" value="{{ pg.page_size }}"',
             $markup,
             'Jumping to a page must keep the chosen rows-per-page.'
         );
@@ -195,14 +195,14 @@ final class PaginationUiContractTest extends TestCase
         // The selector renders from the array the service supplies, so the contract is that
         // the constant itself is the approved set rather than a hard-coded list in markup.
         self::assertSame([25, 50, 100, 150, 250], Pagination::PAGE_SIZES);
-        self::assertStringContainsString('group="{{ @pg.page_sizes }}"', self::read('resources/views/partials/pagination.html'));
+        self::assertStringContainsString('for size in pg.page_sizes', self::read('resources/views/partials/pagination.html.twig'));
     }
 
     public function testChangingPageSizeReturnsToPageOne(): void
     {
         self::assertStringContainsString(
-            'name="{{ @pg.page_param }}" value="1"',
-            self::read('resources/views/partials/pagination.html'),
+            'name="{{ pg.page_param }}" value="1"',
+            self::read('resources/views/partials/pagination.html.twig'),
             'Changing rows-per-page must reset to page 1 rather than clamping to an arbitrary page.'
         );
     }
@@ -211,16 +211,16 @@ final class PaginationUiContractTest extends TestCase
     public static function paginatedPartials(): array
     {
         return [
-            ['resources/views/partials/admin/people.html', 'people'],
-            ['resources/views/partials/admin/companies.html', 'companies'],
-            ['resources/views/partials/admin/courses.html', 'courses'],
-            ['resources/views/partials/admin/credits.html', 'credits'],
-            ['resources/views/partials/admin/activity.html', 'activity'],
-            ['resources/views/partials/company/people.html', 'people'],
-            ['resources/views/partials/company/requests.html', 'requests'],
-            ['resources/views/partials/company/enrolments.html', 'enrolments'],
-            ['resources/views/partials/company/credits.html', 'credits'],
-            ['resources/views/partials/company/courses.html', 'courses'],
+            ['resources/views/partials/admin/people.html.twig', 'people'],
+            ['resources/views/partials/admin/companies.html.twig', 'companies'],
+            ['resources/views/partials/admin/courses.html.twig', 'courses'],
+            ['resources/views/partials/admin/credits.html.twig', 'credits'],
+            ['resources/views/partials/admin/activity.html.twig', 'activity'],
+            ['resources/views/partials/company/people.html.twig', 'people'],
+            ['resources/views/partials/company/requests.html.twig', 'requests'],
+            ['resources/views/partials/company/enrolments.html.twig', 'enrolments'],
+            ['resources/views/partials/company/credits.html.twig', 'credits'],
+            ['resources/views/partials/company/courses.html.twig', 'courses'],
         ];
     }
 
@@ -228,7 +228,7 @@ final class PaginationUiContractTest extends TestCase
     public function testEveryListPartialIncludesTheSharedControl(string $partial, string $dataset): void
     {
         self::assertStringContainsString(
-            'with="pg=@' . $dataset . '_pagination"',
+            'with {pg: ' . $dataset . '_pagination}',
             self::read($partial),
             $partial . ' must reuse the one shared pagination control.'
         );
@@ -256,10 +256,10 @@ final class PaginationUiContractTest extends TestCase
 
         $directory = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($views));
         foreach ($directory as $file) {
-            if ($file->isDir() || $file->getExtension() !== 'html') continue;
+            if ($file->isDir() || $file->getExtension() !== 'twig') continue;
             $contents = (string) file_get_contents($file->getPathname());
             $markup .= $contents;
-            if (preg_match_all('/with="pg=@([a-z_]+)_pagination"/', $contents, $matches) > 0) {
+            if (preg_match_all('/with \{pg: ([a-z_]+)_pagination\}/', $contents, $matches) > 0) {
                 foreach ($matches[1] as $dataset) $datasets[$dataset] = true;
             }
         }
@@ -291,23 +291,23 @@ final class PaginationUiContractTest extends TestCase
     public function testEnrolmentsAndRequestsPaginateIndependently(): void
     {
         self::assertStringContainsString(
-            'with="pg=@enrolments_pagination"',
-            self::read('resources/views/partials/admin/enrolments.html')
+            'with {pg: enrolments_pagination}',
+            self::read('resources/views/partials/admin/enrolments.html.twig')
         );
         self::assertStringContainsString(
-            'with="pg=@requests_pagination"',
-            self::read('resources/views/partials/admin/requests.html')
+            'with {pg: requests_pagination}',
+            self::read('resources/views/partials/admin/requests.html.twig')
         );
         self::assertStringNotContainsString(
-            '@requests_pagination',
-            self::read('resources/views/partials/admin/enrolments.html'),
+            'requests_pagination',
+            self::read('resources/views/partials/admin/enrolments.html.twig'),
             'The two screens are separate; neither renders the other\'s pager.'
         );
     }
 
     public function testAdministrationCoursesUsesTheCoreResponsiveWrapper(): void
     {
-        $markup = self::read('resources/views/partials/admin/courses.html');
+        $markup = self::read('resources/views/partials/admin/courses.html.twig');
 
         self::assertStringContainsString('class="table-wrap"', $markup);
         // Only .table-wrap is defined in core CSS. Gilded Noir happens to style the Bootstrap
@@ -339,7 +339,7 @@ final class PaginationUiContractTest extends TestCase
     {
         // The consolidated preview must link out to the standalone route rather than trying to
         // deep-page every section inside one enormous /admin URL.
-        foreach (['admin/people.html', 'admin/courses.html', 'admin/credits.html'] as $partial) {
+        foreach (['admin/people.html.twig', 'admin/courses.html.twig', 'admin/credits.html.twig'] as $partial) {
             $markup = self::read('resources/views/partials/' . $partial);
             self::assertStringContainsString('_preview_has_more', $markup, $partial . ' must offer a View all link when truncated.');
             self::assertStringContainsString('View all', $markup);
@@ -348,9 +348,9 @@ final class PaginationUiContractTest extends TestCase
 
     public function testLargeSelectorsWereReplacedByBoundedLookups(): void
     {
-        foreach (['admin/activity.html', 'admin/credits.html'] as $partial) {
+        foreach (['admin/activity.html.twig', 'admin/credits.html.twig'] as $partial) {
             $markup = self::read('resources/views/partials/' . $partial);
-            self::assertStringContainsString('entity-lookup.html', $markup);
+            self::assertStringContainsString('entity-lookup.html.twig', $markup);
             self::assertDoesNotMatchRegularExpression(
                 '/<select name="(company_id|user_id|course_id|actor_id)"/',
                 $markup,
@@ -361,27 +361,27 @@ final class PaginationUiContractTest extends TestCase
 
     public function testEntityLookupDeclaresTheHtmxContractAndDegrades(): void
     {
-        $markup = self::read('resources/views/partials/entity-lookup.html');
+        $markup = self::read('resources/views/partials/entity-lookup.html.twig');
 
         // The endpoint is a parameter with the Administration one as its default. The Company
         // workspace has its own, because the Administration lookup is guarded by platform
         // permissions a company administrator does not hold and must not be given: with them they
         // could search every person and course on the platform rather than their own company's.
         self::assertStringContainsString("'/admin/lookup'", $markup, 'Administration remains the default endpoint.');
-        self::assertStringContainsString('/{{ @lk_type }}"', $markup);
+        self::assertStringContainsString('/{{ lk_type }}"', $markup);
         self::assertStringContainsString('hx-trigger="keyup changed delay:250ms, search"', $markup);
-        self::assertStringContainsString('hx-target="#{{ @lk_name }}-results"', $markup);
+        self::assertStringContainsString('hx-target="#{{ lk_name }}-results"', $markup);
         // Progressive enhancement: the value the form submits lives in a plain hidden input, so
         // an already-selected entity survives even when htmx never loads.
         self::assertStringContainsString('type="hidden"', $markup);
-        self::assertStringContainsString('name="{{ @lk_name }}"', $markup);
+        self::assertStringContainsString('name="{{ lk_name }}"', $markup);
     }
 
     public function testLookupResultsStateTheirOwnCapRatherThanTruncatingSilently(): void
     {
         self::assertStringContainsString(
-            'Showing the first {{ @lookup_max_results }} matches',
-            self::read('resources/views/partials/entity-lookup-results.html')
+            'Showing the first {{ lookup_max_results }} matches',
+            self::read('resources/views/partials/entity-lookup-results.html.twig')
         );
     }
 
@@ -501,7 +501,7 @@ final class PaginationUiContractTest extends TestCase
             substr_count($service, '$this->normaliseCompanies($this->administration->companies($universe, self::PREVIEW_PAGE_SIZE, 0))'),
             'Both the consolidated Company workspace and its standalone dashboard must populate the platform-wide company table.'
         );
-        self::assertStringContainsString('@company_platform_wide', self::read('resources/views/partials/company/dashboard.html'));
+        self::assertStringContainsString('company_platform_wide', self::read('resources/views/partials/company/dashboard.html.twig'));
     }
 
     /**
@@ -524,7 +524,7 @@ final class PaginationUiContractTest extends TestCase
             $markup = (string) file_get_contents($path);
 
             // The dataset a partial pages on, taken from its own pagination include.
-            preg_match_all('/pg=@([a-z_]+)_pagination/', $markup, $matches);
+            preg_match_all('/pg: ([a-z_]+)_pagination/', $markup, $matches);
             foreach (array_unique($matches[1]) as $dataset) {
                 if (!str_contains($markup, '@' . $dataset . '_sort_headers')) {
                     $missing[] = basename($path) . ' pages ' . $dataset . ' but draws no sortable headings';
@@ -580,7 +580,7 @@ final class PaginationUiContractTest extends TestCase
 
         return array_values(array_filter(
             $paths,
-            static fn(string $path): bool => str_contains((string) file_get_contents($path), 'partials/pagination.html')
+            static fn(string $path): bool => str_contains((string) file_get_contents($path), 'partials/pagination.html.twig')
         ));
     }
 }

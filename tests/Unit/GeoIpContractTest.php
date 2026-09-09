@@ -36,13 +36,13 @@ final class GeoIpContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $audit = (string) file_get_contents($root . '/src/Infrastructure/Persistence/AuditRepository.php');
-        $activity = (string) file_get_contents($root . '/resources/views/partials/admin/activity.html');
+        $activity = (string) file_get_contents($root . '/resources/views/partials/admin/activity.html.twig');
         $composer = (string) file_get_contents($root . '/composer.json');
 
         self::assertStringContainsString('ClientFingerprint::ipAddress()', $audit);
         self::assertStringNotContainsString('ip_hash', $audit);
-        self::assertStringContainsString('@event.ip_address', $activity);
-        self::assertStringContainsString('@event.geo_location', $activity);
+        self::assertStringContainsString('event.ip_address', $activity);
+        self::assertStringContainsString('event.geo_location', $activity);
         self::assertStringContainsString('geocoder-php/geoip2-provider', $composer);
     }
 }

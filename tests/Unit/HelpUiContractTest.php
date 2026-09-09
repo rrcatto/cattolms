@@ -21,7 +21,7 @@ final class HelpUiContractTest extends TestCase
 {
     public function testHelpUsesNativeAccordionStructure(): void
     {
-        $html = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/help.html');
+        $html = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/help.html.twig');
         self::assertStringContainsString('data-help-accordion', $html);
         self::assertGreaterThanOrEqual(5, substr_count($html, '<details class="cl-help-item"'));
         self::assertStringContainsString('<summary>Theme Manager and Theme SDK</summary>', $html);

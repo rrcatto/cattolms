@@ -37,18 +37,18 @@ use PHPUnit\Framework\TestCase;
 
 final class ThemeUiContractTest extends TestCase
 {
-    public function testFactoryResetCompliesWithThemePackage3(): void
+    public function testFactoryResetCompliesWithThemePackage4(): void
     {
         $root = __DIR__ . '/../../themes/factory-reset';
         $manifest = json_decode((string) file_get_contents($root . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('catto-learning-theme', $manifest['format'] ?? null);
-        self::assertSame('3.0', $manifest['schema_version'] ?? null);
-        self::assertSame('1.0', $manifest['template_api'] ?? null);
+        self::assertSame('4.0', $manifest['schema_version'] ?? null);
+        self::assertSame('2.0', $manifest['template_api'] ?? null);
         self::assertSame('Factory Reset', $manifest['theme']['name'] ?? null);
         self::assertNull($manifest['parent'] ?? null);
-        self::assertFileExists($root . '/base.html');
+        self::assertFileExists($root . '/base.html.twig');
         self::assertNotSame('', trim((string) file_get_contents($root . '/public/css/theme.css')));
-        self::assertStringContainsString('@content', (string) file_get_contents($root . '/base.html'));
+        self::assertStringContainsString('page_body', (string) file_get_contents($root . '/base.html.twig'));
     }
 
     public function testFactoryResetOptsIntoCorePaletteManagement(): void
@@ -57,7 +57,7 @@ final class ThemeUiContractTest extends TestCase
         $manifest = json_decode((string) file_get_contents($root . '/theme.json'), true, 512, JSON_THROW_ON_ERROR);
         self::assertGreaterThanOrEqual(1, count($manifest['palettes'] ?? []));
         foreach ($manifest['palettes'] as $palette) self::assertCount(5, $palette['colors'] ?? []);
-        self::assertFileDoesNotExist($root . '/partials/palette-switcher.html');
+        self::assertFileDoesNotExist($root . '/partials/palette-switcher.html.twig');
         self::assertFileDoesNotExist($root . '/public/js/palette-switcher.js');
 
         $platformJs = (string) file_get_contents(__DIR__ . '/../../public_html/js/platform-overrides.js');
@@ -69,17 +69,20 @@ final class ThemeUiContractTest extends TestCase
     public function testFunctionalPagesBelongToPlatformNotFactoryReset(): void
     {
         self::assertDirectoryExists(__DIR__ . '/../../resources/views/pages');
-        self::assertFileExists(__DIR__ . '/../../resources/views/pages/courses.html');
+        self::assertFileExists(__DIR__ . '/../../resources/views/pages/courses.html.twig');
         self::assertDirectoryDoesNotExist(__DIR__ . '/../../themes/factory-reset/pages');
         $renderer = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeRenderer.php');
-        self::assertStringContainsString('platformViewsRoot()', $renderer);
-        self::assertStringContainsString("render('pages/' . \$page . '.html')", $renderer);
+        // The page comes from the platform namespace; a theme cannot shadow one, because @platform
+        // is a single fixed path while @theme is the one that moves.
+        self::assertStringContainsString('pageTemplate($page)', $renderer);
+        $templates = (string) file_get_contents(__DIR__ . '/../../src/View/Twig/ThemeTemplates.php');
+        self::assertStringContainsString("PLATFORM_NAMESPACE . '/pages/'", $templates);
         self::assertStringNotContainsString('factoryResetRoot', $renderer);
     }
 
     public function testPlatformModalsAreClosedByMarkupAndUseVersionedCoreAssets(): void
     {
-        $admin = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/people.html');
+        $admin = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/people.html.twig');
         self::assertStringContainsString('id="quickAddPersonModal"', $admin);
         self::assertMatchesRegularExpression('/id="quickAddPersonModal"[^>]*aria-hidden="true"[^>]*hidden/', $admin);
 
@@ -117,7 +120,7 @@ final class ThemeUiContractTest extends TestCase
 
     public function testThemeManagerUiOffersImportActivatePreviewAndUninstallOnly(): void
     {
-        $admin = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/themes.html');
+        $admin = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/themes.html.twig');
         foreach (['Theme Manager', 'Import theme ZIP', 'Preview', 'Activate', 'Uninstall'] as $token) self::assertStringContainsString($token, $admin);
         self::assertStringNotContainsString('Export ZIP', $admin);
         self::assertStringNotContainsString('Theme Studio', $admin);
@@ -125,7 +128,7 @@ final class ThemeUiContractTest extends TestCase
     public function testContactHoneypotIsHiddenByPlatformCssForEveryTheme(): void
     {
         $root = dirname(__DIR__, 2);
-        $contact = (string) file_get_contents($root . '/resources/views/pages/contact.html');
+        $contact = (string) file_get_contents($root . '/resources/views/pages/contact.html.twig');
         $platformCss = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
         self::assertStringContainsString('class="cl-honeypot"', $contact);
         self::assertStringContainsString('.cl-honeypot{', $platformCss);
@@ -135,7 +138,7 @@ final class ThemeUiContractTest extends TestCase
     public function testEquivalentWorkspaceAccordionsShareOneCoreContract(): void
     {
         $root = dirname(__DIR__, 2);
-        foreach (['admin-control-centre.html','account-control-centre.html','company-control-centre.html'] as $file) {
+        foreach (['admin-control-centre.html.twig','account-control-centre.html.twig','company-control-centre.html.twig'] as $file) {
             $markup = (string) file_get_contents($root . '/resources/views/pages/' . $file);
             foreach (['cl-admin-section-summary','cl-admin-section-title','cl-admin-section-description','cl-admin-section-toggle','cl-admin-section-content'] as $token) {
                 self::assertStringContainsString($token, $markup);

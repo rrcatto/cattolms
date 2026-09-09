@@ -137,21 +137,21 @@ final class NavigationIconContractTest extends TestCase
     {
         foreach (glob(self::root() . '/themes/*', GLOB_ONLYDIR) ?: [] as $theme) {
             $markup = '';
-            foreach (glob($theme . '/*.html') ?: [] as $file) {
+            foreach (glob($theme . '/*.html.twig') ?: [] as $file) {
                 $markup .= (string) file_get_contents($file);
             }
-            foreach (glob($theme . '/partials/*.html') ?: [] as $file) {
+            foreach (glob($theme . '/partials/*.html.twig') ?: [] as $file) {
                 $markup .= (string) file_get_contents($file);
             }
 
             $name = basename($theme);
             self::assertStringContainsString(
-                '@platform.icon_sprite',
+                'platform.icon_sprite',
                 $markup,
                 $name . ' does not reference the platform icon sprite, so its icons will drift from every other theme.'
             );
             self::assertStringContainsString(
-                '@navigation',
+                'navigation',
                 $markup,
                 $name . ' does not render the core navigation array, so a menu item added in the LMS will not appear in it.'
             );

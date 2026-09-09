@@ -178,7 +178,7 @@ final class ThemeLifecycleRegressionTest extends TestCase
                 $manager->stageImport($brokenZip);
                 self::fail('A theme missing @platform.scripts must be rejected during inspection.');
             } catch (\RuntimeException $e) {
-                self::assertStringContainsString('@platform.scripts', $e->getMessage());
+                self::assertStringContainsString('platform.scripts', $e->getMessage());
             }
         } finally {
             $options->set('active_theme', $originalActive, $actorId);
@@ -195,8 +195,8 @@ final class ThemeLifecycleRegressionTest extends TestCase
     {
         $manifest = [
             'format' => 'catto-learning-theme',
-            'schema_version' => '3.0',
-            'template_api' => '1.0',
+            'schema_version' => '4.0',
+            'template_api' => '2.0',
             'theme' => [
                 'name' => $name,
                 'slug' => $slug,
@@ -215,7 +215,7 @@ final class ThemeLifecycleRegressionTest extends TestCase
         self::assertTrue($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true);
         $zip->addFromString('theme.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         if ($withBase) {
-            $zip->addFromString('base.html', '<!doctype html><html><head><repeat group="{{ @platform.styles }}" value="{{ @style }}"><link rel="stylesheet" href="{{ @style }}"></repeat></head><body>{{ @content | raw }}<repeat group="{{ @platform.scripts }}" value="{{ @script }}"><script src="{{ @script }}"></script></repeat></body></html>');
+            $zip->addFromString('base.html.twig', '<!doctype html><html><head>{% for style in platform.styles %}<link rel="stylesheet" href="{{ style }}">{% endfor %}</head><body>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}{% for script in platform.scripts %}<script src="{{ script }}"></script>{% endfor %}</body></html>');
         }
         $zip->addFromString('public/css/theme.css', $css);
         $zip->close();
@@ -225,14 +225,14 @@ final class ThemeLifecycleRegressionTest extends TestCase
     private function writeBrokenThemeZip(string $path, string $name, string $slug): void
     {
         $manifest = [
-            'format'=>'catto-learning-theme','schema_version'=>'3.0','template_api'=>'1.0',
+            'format'=>'catto-learning-theme','schema_version'=>'4.0','template_api'=>'2.0',
             'theme'=>['name'=>$name,'slug'=>$slug,'version'=>'1.0.0','author'=>'QA','description'=>'Broken lifecycle fixture.','created_at'=>'2026-08-17T04:00:00+02:00'],
             'parent'=>null,'styles'=>[],'scripts'=>[],'external'=>['styles'=>[],'scripts'=>[]],
         ];
         $zip = new ZipArchive();
         self::assertTrue($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true);
         $zip->addFromString('theme.json', json_encode($manifest, JSON_THROW_ON_ERROR));
-        $zip->addFromString('base.html', '<html><head><repeat group="{{ @platform.styles }}" value="{{ @style }}"></repeat></head><body>{{ @content | raw }}</body></html>');
+        $zip->addFromString('base.html.twig', '<html><head>{% for style in platform.styles %}<link rel="stylesheet" href="{{ style }}">{% endfor %}</head><body>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}</body></html>');
         $zip->addFromString('public/css/theme.css', 'body{margin:0}');
         $zip->close();
     }

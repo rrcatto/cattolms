@@ -31,7 +31,7 @@ final class ThemePackageValidatorTest extends TestCase
         $this->requireZip();
         $path = $this->makePackage([
             'theme.json' => $this->manifest(),
-            'base.html' => $this->baseTemplate(),
+            'base.html.twig' => $this->baseTemplate(),
             'public/css/theme.css' => 'body{margin:0}',
         ]);
         try {
@@ -83,7 +83,7 @@ final class ThemePackageValidatorTest extends TestCase
         ]);
         try {
             $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('standalone theme must contain base.html');
+            $this->expectExceptionMessage('standalone theme must contain base.html.twig');
             (new ThemePackageValidator())->inspect($path);
         } finally { @unlink($path); }
     }
@@ -93,13 +93,13 @@ final class ThemePackageValidatorTest extends TestCase
         $this->requireZip();
         $path = $this->makePackage([
             'theme.json' => $this->manifest(),
-            'base.html' => $this->baseTemplate(),
-            'pages/catalogue.html' => '<section>Catalogue</section>',
+            'base.html.twig' => $this->baseTemplate(),
+            'pages/catalogue.html.twig' => '<section>Catalogue</section>',
             'public/css/theme.css' => 'body{}',
         ]);
         try {
             $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('must render the raw platform content slot');
+            $this->expectExceptionMessage("must extend '@theme/base.html.twig'");
             (new ThemePackageValidator())->inspect($path);
         } finally { @unlink($path); }
     }
@@ -109,7 +109,7 @@ final class ThemePackageValidatorTest extends TestCase
         $this->requireZip();
         $path = $this->makePackage([
             'theme.json' => $this->manifest(),
-            'base.html' => $this->baseTemplate(),
+            'base.html.twig' => $this->baseTemplate(),
             'public/css/theme.css' => 'body{}',
             'evil.php' => '<?php echo getenv("APP_KEY");',
         ]);
@@ -129,7 +129,7 @@ final class ThemePackageValidatorTest extends TestCase
         ];
         $path = $this->makePackage([
             'theme.json' => json_encode($manifest, JSON_THROW_ON_ERROR),
-            'base.html' => $this->baseTemplate(),
+            'base.html.twig' => $this->baseTemplate(),
             'public/css/theme.css' => 'body{}',
         ]);
         try {
@@ -151,7 +151,7 @@ final class ThemePackageValidatorTest extends TestCase
         }
         $path = $this->makePackage([
             'theme.json' => json_encode($manifest, JSON_THROW_ON_ERROR),
-            'base.html' => $this->baseTemplate(),
+            'base.html.twig' => $this->baseTemplate(),
             'public/css/theme.css' => 'body{}',
         ]);
         try {
@@ -170,7 +170,7 @@ final class ThemePackageValidatorTest extends TestCase
         ];
         $path = $this->makePackage([
             'theme.json' => json_encode($manifest, JSON_THROW_ON_ERROR),
-            'base.html' => $this->baseTemplate() . '<div class="palette-switcher">Legacy picker</div>',
+            'base.html.twig' => $this->baseTemplate() . '<div class="palette-switcher">Legacy picker</div>',
             'public/css/theme.css' => 'body{}',
         ]);
         try {
@@ -197,8 +197,8 @@ final class ThemePackageValidatorTest extends TestCase
     {
         return json_encode([
             'format' => 'catto-learning-theme',
-            'schema_version' => '3.0',
-            'template_api' => '1.0',
+            'schema_version' => '4.0',
+            'template_api' => '2.0',
             'theme' => [
                 'name' => 'Test Theme', 'slug' => 'test-theme', 'version' => '1.0.0',
                 'author' => 'Test', 'created_at' => '2026-08-15T12:32:00+02:00',
@@ -213,19 +213,19 @@ final class ThemePackageValidatorTest extends TestCase
         $this->requireZip();
         $path = $this->makePackage([
             'theme.json' => $this->manifest(),
-            'base.html' => '<html><body>{{ @content | raw }}</body></html>',
+            'base.html.twig' => '<html><body>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}</body></html>',
             'public/css/theme.css' => 'body{}',
         ]);
         try {
             $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessage('@platform.styles');
+            $this->expectExceptionMessage('platform.styles');
             (new ThemePackageValidator())->inspect($path);
         } finally { @unlink($path); }
     }
 
     private function baseTemplate(): string
     {
-        return '<!doctype html><html><head><repeat group="{{ @platform.styles }}" value="{{ @url }}"><link rel="stylesheet" href="{{ @url }}"></repeat></head><body>{{ @content | raw }}<repeat group="{{ @platform.scripts }}" value="{{ @url }}"><script src="{{ @url }}"></script></repeat></body></html>';
+        return '<!doctype html><html><head>{% for url in platform.styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}</head><body>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}{% for url in platform.scripts %}<script src="{{ url }}"></script>{% endfor %}</body></html>';
     }
 
     private function requireZip(): void

@@ -50,9 +50,9 @@ final class TableRowContractTest extends TestCase
     private static function views(): array
     {
         $paths = array_merge(
-            glob(self::root() . '/resources/views/partials/**/*.html') ?: [],
-            glob(self::root() . '/resources/views/partials/*.html') ?: [],
-            glob(self::root() . '/resources/views/pages/*.html') ?: []
+            glob(self::root() . '/resources/views/partials/**/*.html.twig') ?: [],
+            glob(self::root() . '/resources/views/partials/*.html.twig') ?: [],
+            glob(self::root() . '/resources/views/pages/*.html.twig') ?: []
         );
         self::assertNotSame([], $paths, 'No templates were found, so these tests prove nothing.');
 

@@ -33,13 +33,15 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Support;
 
-use Base;
 use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\View\Twig\ThemeTemplates;
+use CattoLearning\View\Twig\TwigFactory;
 use CattoLearning\Support\Pagination;
 use ReflectionClass;
 use ReflectionMethod;
 use RuntimeException;
-use Template;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 
 final class RenderHarness
 {
@@ -49,6 +51,10 @@ final class RenderHarness
     /** This process's private compiled-template directory, created on first use. */
     private static ?string $compileDirectory = null;
 
+    private static ?Environment $twig = null;
+
+    private static ?FilesystemLoader $loader = null;
+
     public static function root(): string
     {
         return dirname(__DIR__, 2);
@@ -57,107 +63,59 @@ final class RenderHarness
     /**
      * Renders one platform template and returns the first error it produced, or null.
      *
-     * The capture is this harness's own error handler rather than F3's ERROR hive alone.
-     * Relying on the hive meant relying on F3's global handler still being installed, which is
-     * exactly what PHPUnit removes after flagging a risky test: from the second data set onward
-     * a template reading an undefined variable produced a PHPUnit warning instead of a failure,
-     * and the assertion passed. The handler here is pushed and popped around the render, so the
-     * stack is left exactly as it was found and the result does not depend on what else has run
-     * first. F3 itself is constructed in tests/bootstrap.php, before any test runs, so its own
-     * one-time handler installation is never charged to a test and never stripped.
-     *
-     * HALT is disabled and ONERROR silenced so a broken template reports itself instead of
-     * terminating the whole test run, which is what F3 does by default.
+     * Twig with strict_variables raises on an undefined variable rather than rendering a blank,
+     * which is the whole reason a render harness is worth having: a template that reads a variable
+     * its controller never supplies fails here instead of on the page. Every Twig error carries the
+     * template and line, so the message is returned as-is.
      *
      * @param array<string,mixed> $hive
      */
     public static function renderError(string $template, array $hive): ?string
     {
-        self::prepare($hive);
-
-        // F3's sandbox() does ob_start(), require(), ob_get_clean(). When the require fails - a
-        // missing compiled template, a fatal inside one - ob_get_clean() is skipped and the buffer
-        // is left open. PHPUnit then reports the test as risky, which buries the assertion under a
-        // second, unrelated-looking complaint. Recording the depth here and unwinding to it below
-        // means a genuine template error reports itself as a template error.
-        $bufferDepth = ob_get_level();
-
-        $captured = null;
-        set_error_handler(static function (int $severity, string $message) use (&$captured): bool {
-            $captured ??= $message;
-
-            return true;
-        });
-
         try {
-            Template::instance()->render($template);
+            RenderHarness::render($template, $hive);
         } catch (\Throwable $exception) {
-            $captured ??= $exception->getMessage();
-        } finally {
-            restore_error_handler();
-            self::unwindOutputBuffers($bufferDepth);
+            return $exception->getMessage();
         }
 
-        // F3's own handler still wins while it is installed, in which case the message lands in
-        // the hive instead. Both paths are read so the result is the same either way.
-        $error = Base::instance()->get('ERROR');
-        if ($captured === null && is_array($error)) {
-            $captured = (string) ($error['text'] ?? 'unknown template error');
-        }
-
-        return $captured;
+        return null;
     }
 
     /**
      * The rendered markup, for assertions about what actually reached the page.
      *
-     * Callers that care about correctness of output should call renderError() first: this
-     * returns whatever F3 managed to produce, which for a broken template is a partial page.
-     *
      * @param array<string,mixed> $hive
      */
     public static function render(string $template, array $hive): string
     {
-        self::prepare($hive);
-        $bufferDepth = ob_get_level();
+        $name = str_ends_with($template, '.twig') ? $template : $template . '.twig';
+        $name = str_ends_with($name, '.html.twig') ? $name : substr($name, 0, -5) . '.html.twig';
 
-        try {
-            return Template::instance()->render($template);
-        } finally {
-            self::unwindOutputBuffers($bufferDepth);
-        }
+        // A page template extends the theme's layout, and no theme is installed in a unit test.
+        // The fixture theme stands in: it declares the two blocks and nothing else, so what the
+        // assertion sees is the page's own markup rather than a theme's chrome around it.
+        (new ThemeTemplates(self::loader()))->use([__DIR__ . '/fixtures/themes/parent-theme']);
+
+        return self::twig()->render(
+            '@' . ThemeTemplates::PLATFORM_NAMESPACE . '/' . $name,
+            ['layout' => '@theme/base.html.twig'] + $hive
+        );
     }
 
-    /**
-     * Closes any output buffer the render left open, back to the depth it started at.
-     *
-     * Never closes a buffer the harness did not cause: the depth is captured immediately before
-     * the render, so PHPUnit's own buffering is untouched.
-     */
-    private static function unwindOutputBuffers(int $depth): void
+    /** One environment per process, configured exactly as the application configures its own. */
+    private static function twig(): Environment
     {
-        while (ob_get_level() > $depth) {
-            if (!@ob_end_clean()) {
-                // An unremovable buffer would loop forever; stop rather than hang the suite.
-                break;
-            }
+        if (self::$twig === null) {
+            $root = self::root();
+            self::$twig = TwigFactory::create(self::loader(), $root, self::compileDirectory(), true);
         }
+
+        return self::$twig;
     }
 
-    /** @param array<string,mixed> $hive */
-    private static function prepare(array $hive): void
+    private static function loader(): FilesystemLoader
     {
-        $f3 = Base::instance();
-
-        $f3->set('UI', self::root() . '/resources/views/');
-        $f3->set('TEMP', self::compileDirectory());
-        $f3->set('HALT', false);
-        $f3->set('ONERROR', static function (): void {
-            // Swallow F3's default error page; the captured message is the assertion subject.
-        });
-        $f3->clear('ERROR');
-
-        foreach ($hive as $key => $value) $f3->set($key, $value);
+        return self::$loader ??= TwigFactory::loader(self::root());
     }
 
     /**
