@@ -366,3 +366,39 @@
 .sortable-header.is-sorted{font-weight:800}
 .sortable-indicator{font-size:.7em;opacity:.4}
 .sortable-header.is-sorted .sortable-indicator{opacity:1}
+
+/* v0.7 Help Centre accordions. Core owns the structure for the same reason it owns the sortable
+   headings: a disclosure control that does not look like one is a control nobody opens, and a theme
+   that has never heard of this page must still render it usably. Themes tint it through the
+   --cl-* palette; nothing here fixes a colour a theme cannot change. */
+.cl-help-accordion{display:grid;gap:.75rem}
+.cl-help-group{border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}
+.cl-help-group>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem 1rem;padding:1rem 1.15rem;cursor:pointer;list-style:none;font-weight:800}
+.cl-help-group>summary::-webkit-details-marker{display:none}
+.cl-help-group>summary::after{content:"⌄";margin-left:auto;font-size:1.1rem;line-height:1;transition:transform .15s ease}
+.cl-help-group[open]>summary::after{transform:rotate(180deg)}
+.cl-help-group>summary:hover{background:var(--cl-page-muted,rgba(127,127,127,.07))}
+.cl-help-group>summary:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+.cl-help-group-title{font-size:1.05rem}
+.cl-help-group-hint{font-size:.875rem;font-weight:400;opacity:.72}
+.cl-help-group-body{padding:.35rem 1.15rem 1.1rem;border-top:1px solid var(--cl-border,#dfe4ea)}
+
+/* The nested level is deliberately quieter: a rule down the left rather than a second box, so the
+   eye reads one group containing topics instead of two kinds of card. */
+.cl-help-item{padding-left:.9rem;border-left:2px solid var(--cl-border,#dfe4ea)}
+.cl-help-item+.cl-help-item{margin-top:.15rem}
+.cl-help-item>summary{padding:.6rem 0;cursor:pointer;list-style:none;font-weight:600}
+.cl-help-item>summary::-webkit-details-marker{display:none}
+.cl-help-item>summary::before{content:"›";display:inline-block;width:1rem;opacity:.55;transition:transform .15s ease}
+.cl-help-item[open]>summary::before{transform:rotate(90deg)}
+.cl-help-item>summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.cl-help-item[open]{border-left-color:currentColor}
+.cl-help-body{padding:0 0 .85rem 1rem;max-width:68ch}
+.cl-help-body p{margin:0 0 .6rem}
+.cl-help-body p:last-child{margin-bottom:0}
+
+/* v0.7 form actions. A submit button hard against the last field reads as part of the field, and
+   under Factory Reset the contact form's button was touching the textarea. Core owns the spacing
+   because it is the same mistake on every form, not a matter of taste per theme. */
+.cl-form-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.5rem}
+.form-grid .field-wide{grid-column:1/-1}

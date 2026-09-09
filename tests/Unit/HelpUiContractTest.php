@@ -19,11 +19,39 @@ use PHPUnit\Framework\TestCase;
 
 final class HelpUiContractTest extends TestCase
 {
-    public function testHelpUsesNativeAccordionStructure(): void
+    /**
+     * Two levels of native disclosure, and no third.
+     *
+     * details and summary rather than a scripted widget: the page then works with no JavaScript, the
+     * browser handles the keyboard, and the browser's own find still reaches an open topic. The
+     * depth limit is the point of the test - a third level would be a table of contents pretending
+     * to be a page, and the answers here are short enough that finding one should take two clicks.
+     */
+    public function testHelpUsesNativeAccordionsTwoLevelsDeep(): void
     {
         $html = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/help.html.twig');
+
         self::assertStringContainsString('data-help-accordion', $html);
-        self::assertGreaterThanOrEqual(5, substr_count($html, '<details class="cl-help-item"'));
-        self::assertStringContainsString('<summary>Theme Manager and Theme SDK</summary>', $html);
+        self::assertGreaterThanOrEqual(3, substr_count($html, '<details class="cl-help-group"'), 'The topics are grouped.');
+        self::assertGreaterThanOrEqual(8, substr_count($html, '<details class="cl-help-item"'), 'Each group holds topics.');
+        self::assertSame(0, substr_count($html, 'cl-help-subitem'), 'Two levels is the limit.');
+
+        // An unbalanced accordion swallows the rest of the page into the last open element, so
+        // every details element opened is closed exactly once.
+        self::assertSame(
+            substr_count($html, '<details '),
+            substr_count($html, '</details>'),
+            'Every details element is closed exactly once.'
+        );
+    }
+
+    /** The theme topics describe the package format the platform actually installs. */
+    public function testTheThemeTopicsAreCurrent(): void
+    {
+        $html = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/help.html.twig');
+
+        self::assertStringContainsString('Theme Package 4.0', $html);
+        self::assertStringContainsString('base.html.twig', $html);
+        self::assertStringNotContainsString('Theme Package 3.0', $html);
     }
 }
