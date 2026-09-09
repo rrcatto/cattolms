@@ -1,9 +1,35 @@
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_kicker = 'POPIA principle' %}
-{% set ph_title = 'Privacy' %}
-{% set ph_lead = 'What we record, why, and for how long.' %}
-{% include '@platform/partials/page-head.html.twig' %}
-<section class="container cl-medium py-5"><p>Catto Learning is designed to collect only information needed to provide accounts, learning access, transactions, support and explicitly authorised research or marketing.</p><h2 class="h4 mt-4">Core commitments</h2><ul><li>Personal information is not sold.</li><li>Marketing consent is separate from service administration.</li><li>Backup email addresses must be verified.</li><li>Users can inspect and revoke their active sessions.</li><li>Operational disclosures to payment, mail and hosting providers will be described accurately in the production privacy notice.</li></ul><div class="alert alert-warning">This Stage 1 page is a product-design statement, not the final legal privacy notice.</div></section>
+	{% set ph_kicker = 'POPIA principle' %}
+	{% set ph_title = 'Privacy' %}
+	{% set ph_lead = 'What we record, why, and for how long.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="container cl-medium py-5">
+		<p>
+			Catto Learning is designed to collect only information needed to provide accounts, learning access, transactions, support and explicitly authorised research or marketing.
+		</p>
+		<h2 class="h4 mt-4">
+			Core commitments
+		</h2>
+		<ul>
+			<li>
+				Personal information is not sold.
+			</li>
+			<li>
+				Marketing consent is separate from service administration.
+			</li>
+			<li>
+				Backup email addresses must be verified.
+			</li>
+			<li>
+				Users can inspect and revoke their active sessions.
+			</li>
+			<li>
+				Operational disclosures to payment, mail and hosting providers will be described accurately in the production privacy notice.
+			</li>
+		</ul>
+		<div class="alert alert-warning">
+			This Stage 1 page is a product-design statement, not the final legal privacy notice.
+		</div>
+	</section>
 {% endblock %}

@@ -1,1 +1,137 @@
-<div class="row g-3 mb-4"><div class="col-md-8"><label class="form-label">Assessment title</label><input class="form-control" name="assessment_title" value="{{ assessment.title }}" required></div><div class="col-md-4"><label class="form-label">Pass mark</label><div class="input-group"><input class="form-control" type="number" min="0" max="100" step="0.01" name="pass_mark" value="{{ assessment.pass_mark ?: 50 }}"><span class="input-group-text">%</span></div></div><div class="col-12"><label class="form-label">Instructions</label><textarea class="form-control cl-rich-editor" name="instructions_html" rows="4">{{ assessment.instructions_html }}</textarea></div></div><div class="card bg-body-tertiary border-0 mb-4"><div class="card-body"><h3 class="h5">Attempt and question-selection rules</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Graded questions drawn</label><input class="form-control" type="number" min="1" name="graded_question_count" value="{{ assessment.graded_question_count ?: editor_question_count }}"></div><div class="col-md-3"><label class="form-label">Maximum graded attempts</label><input class="form-control" type="number" min="1" name="maximum_attempts" value="{{ assessment.maximum_attempts }}" placeholder="Unlimited"></div><div class="col-md-3"><label class="form-label">Time limit (seconds)</label><input class="form-control" type="number" min="1" name="time_limit_seconds" value="{{ assessment.time_limit_seconds ?: 1800 }}"></div><div class="col-md-3"><label class="form-label">Recorded result</label><select class="form-select" name="score_policy"><option value="highest" {{ assessment.score_policy == 'highest' ? 'selected' : '' }}>Highest score</option><option value="average" {{ assessment.score_policy == 'average' ? 'selected' : '' }}>Average score</option><option value="latest" {{ assessment.score_policy == 'latest' ? 'selected' : '' }}>Latest score</option></select></div><div class="col-md-4"><label class="form-label">Introductory questions</label><input class="form-control" type="number" min="0" name="difficulty_introductory" value="{{ assessment.difficulty_introductory ?: 0 }}"></div><div class="col-md-4"><label class="form-label">Standard questions</label><input class="form-control" type="number" min="0" name="difficulty_standard" value="{{ assessment.difficulty_standard ?: 0 }}"></div><div class="col-md-4"><label class="form-label">Advanced questions</label><input class="form-control" type="number" min="0" name="difficulty_advanced" value="{{ assessment.difficulty_advanced ?: 0 }}"></div><div class="col-12 d-flex flex-wrap gap-4"><label class="form-check"><input class="form-check-input" type="checkbox" name="randomise_questions" value="1" {{ assessment.randomise_questions ? 'checked' : '' }}> <span class="form-check-label">Randomise questions</span></label><label class="form-check"><input class="form-check-input" type="checkbox" name="randomise_options" value="1" {{ assessment.randomise_options ? 'checked' : '' }}> <span class="form-check-label">Randomise answers</span></label><label class="form-check"><input class="form-check-input" type="checkbox" name="negative_marking" value="1" {{ assessment.negative_marking ? 'checked' : '' }}> <span class="form-check-label">Use negative marking</span></label></div></div></div></div><div class="card bg-body-tertiary border-0 mb-4"><div class="card-body"><h3 class="h5">Practice assessment</h3><div class="row g-3"><div class="col-md-3"><div class="form-check mt-4"><input class="form-check-input" id="practice-enabled" type="checkbox" name="practice_enabled" value="1" {{ assessment.practice_enabled ? 'checked' : '' }}><label class="form-check-label" for="practice-enabled">Enable unlimited practice</label></div></div><div class="col-md-3"><label class="form-label">Practice questions drawn</label><input class="form-control" type="number" min="1" name="practice_question_count" value="{{ assessment.practice_question_count ?: 5 }}"></div><div class="col-md-6"><label class="form-label">Practice pool</label><select class="form-select" name="practice_pool_mode"><option value="separate" {{ assessment.practice_pool_mode == 'separate' ? 'selected' : '' }}>Separate practice-only questions</option><option value="graded" {{ assessment.practice_pool_mode == 'graded' ? 'selected' : '' }}>Reuse graded questions</option><option value="both" {{ assessment.practice_pool_mode == 'both' ? 'selected' : '' }}>Both practice and graded eligible questions</option></select></div></div></div></div><div id="question-editor">{% for qi, question in editor_questions %}<div class="cl-question-editor" data-question><div class="d-flex justify-content-between align-items-center gap-3"><h3 class="h5 mb-0">Question <span data-question-number>{{ qi + 1 }}</span></h3><button class="btn btn-sm btn-outline-danger" type="button" data-remove-question>Remove</button></div><label class="form-label mt-3">Question</label><textarea class="form-control mb-3" name="question_html[{{ qi }}]" required>{{ question.question_html }}</textarea><div class="row g-3"><div class="col-md-2"><label class="form-label">Points</label><input class="form-control" type="number" min="1" name="question_points[{{ qi }}]" value="{{ question.points ?: 1 }}"></div><div class="col-md-3"><label class="form-label">Difficulty</label><select class="form-select" name="question_difficulty[{{ qi }}]"><option value="introductory" {{ question.difficulty == 'introductory' ? 'selected' : '' }}>Introductory</option><option value="standard" {{ question.difficulty == 'standard' ? 'selected' : '' }}>Standard</option><option value="advanced" {{ question.difficulty == 'advanced' ? 'selected' : '' }}>Advanced</option></select></div><div class="col-md-2"><label class="form-label">Wrong points</label><input class="form-control" type="number" max="0" step="0.25" name="incorrect_points[{{ qi }}]" value="{{ question.incorrect_points ?: 0 }}"></div><div class="col-md-5"><label class="form-label">Explanation</label><textarea class="form-control" name="question_explanation[{{ qi }}]">{{ question.explanation_html }}</textarea></div><div class="col-12 d-flex gap-4"><label class="form-check"><input class="form-check-input" type="checkbox" name="practice_eligible[{{ qi }}]" value="1" {{ question.practice_eligible ? 'checked' : '' }}> <span class="form-check-label">Practice eligible</span></label><label class="form-check"><input class="form-check-input" type="checkbox" name="graded_eligible[{{ qi }}]" value="1" {{ question.graded_eligible ? 'checked' : '' }}> <span class="form-check-label">Graded eligible</span></label></div></div><div class="cl-option-editor mt-3" data-options>{% for oi, option in question.options %}<div class="input-group mb-2" data-option><span class="input-group-text"><input type="radio" name="correct_option[{{ qi }}]" value="{{ oi }}" {{ option.is_correct ? 'checked' : '' }} aria-label="Correct option"></span><input class="form-control" name="option_html[{{ qi }}][{{ oi }}]" value="{{ option.option_html }}" required><button class="btn btn-outline-danger" type="button" data-remove-option aria-label="Remove option">×</button></div>{% endfor %}</div><button class="btn btn-sm btn-outline-secondary" type="button" data-add-option>Add option</button></div>{% endfor %}</div><div class="d-flex flex-wrap gap-2 mt-4"><button class="btn btn-outline-primary" type="button" id="add-question">Add question</button><button class="btn btn-primary" type="submit">Save assessment</button></div>
+<div class="row g-3 mb-4">
+	<div class="col-md-8">
+		<label class="form-label">Assessment title</label>
+		<input class="form-control" name="assessment_title" value="{{ assessment.title }}" required>
+	</div>
+	<div class="col-md-4">
+		<label class="form-label">Pass mark</label>
+		<div class="input-group">
+			<input class="form-control" type="number" min="0" max="100" step="0.01" name="pass_mark" value="{{ assessment.pass_mark ?: 50 }}">
+			<span class="input-group-text">%</span>
+		</div>
+	</div>
+	<div class="col-12">
+		<label class="form-label">Instructions</label>
+		<textarea class="form-control cl-rich-editor" name="instructions_html" rows="4">{{ assessment.instructions_html }}</textarea>
+	</div>
+</div>
+<div class="card bg-body-tertiary border-0 mb-4">
+	<div class="card-body">
+		<h3 class="h5">
+			Attempt and question-selection rules
+		</h3>
+		<div class="row g-3">
+			<div class="col-md-3">
+				<label class="form-label">Graded questions drawn</label>
+				<input class="form-control" type="number" min="1" name="graded_question_count" value="{{ assessment.graded_question_count ?: editor_question_count }}">
+			</div>
+			<div class="col-md-3">
+				<label class="form-label">Maximum graded attempts</label>
+				<input class="form-control" type="number" min="1" name="maximum_attempts" value="{{ assessment.maximum_attempts }}" placeholder="Unlimited">
+			</div>
+			<div class="col-md-3">
+				<label class="form-label">Time limit (seconds)</label>
+				<input class="form-control" type="number" min="1" name="time_limit_seconds" value="{{ assessment.time_limit_seconds ?: 1800 }}">
+			</div>
+			<div class="col-md-3">
+				<label class="form-label">Recorded result</label><select class="form-select" name="score_policy"><option value="highest" {{ assessment.score_policy == 'highest' ? 'selected' : '' }}>Highest score</option><option value="average" {{ assessment.score_policy == 'average' ? 'selected' : '' }}>Average score</option><option value="latest" {{ assessment.score_policy == 'latest' ? 'selected' : '' }}>Latest score</option></select>
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Introductory questions</label>
+				<input class="form-control" type="number" min="0" name="difficulty_introductory" value="{{ assessment.difficulty_introductory ?: 0 }}">
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Standard questions</label>
+				<input class="form-control" type="number" min="0" name="difficulty_standard" value="{{ assessment.difficulty_standard ?: 0 }}">
+			</div>
+			<div class="col-md-4">
+				<label class="form-label">Advanced questions</label>
+				<input class="form-control" type="number" min="0" name="difficulty_advanced" value="{{ assessment.difficulty_advanced ?: 0 }}">
+			</div>
+			<div class="col-12 d-flex flex-wrap gap-4">
+				<label class="form-check">
+				<input class="form-check-input" type="checkbox" name="randomise_questions" value="1" {{ assessment.randomise_questions ? 'checked' : '' }}>
+				<span class="form-check-label">Randomise questions</span></label><label class="form-check">
+				<input class="form-check-input" type="checkbox" name="randomise_options" value="1" {{ assessment.randomise_options ? 'checked' : '' }}>
+				<span class="form-check-label">Randomise answers</span></label><label class="form-check">
+				<input class="form-check-input" type="checkbox" name="negative_marking" value="1" {{ assessment.negative_marking ? 'checked' : '' }}>
+				<span class="form-check-label">Use negative marking</span></label>
+			</div>
+		</div>
+	</div>
+</div>
+<div class="card bg-body-tertiary border-0 mb-4">
+	<div class="card-body">
+		<h3 class="h5">
+			Practice assessment
+		</h3>
+		<div class="row g-3">
+			<div class="col-md-3">
+				<div class="form-check mt-4">
+					<input class="form-check-input" id="practice-enabled" type="checkbox" name="practice_enabled" value="1" {{ assessment.practice_enabled ? 'checked' : '' }}>
+					<label class="form-check-label" for="practice-enabled">Enable unlimited practice</label>
+				</div>
+			</div>
+			<div class="col-md-3">
+				<label class="form-label">Practice questions drawn</label>
+				<input class="form-control" type="number" min="1" name="practice_question_count" value="{{ assessment.practice_question_count ?: 5 }}">
+			</div>
+			<div class="col-md-6">
+				<label class="form-label">Practice pool</label><select class="form-select" name="practice_pool_mode"><option value="separate" {{ assessment.practice_pool_mode == 'separate' ? 'selected' : '' }}>Separate practice-only questions</option><option value="graded" {{ assessment.practice_pool_mode == 'graded' ? 'selected' : '' }}>Reuse graded questions</option><option value="both" {{ assessment.practice_pool_mode == 'both' ? 'selected' : '' }}>Both practice and graded eligible questions</option></select>
+			</div>
+		</div>
+	</div>
+</div>
+<div id="question-editor">
+	{% for qi, question in editor_questions %}
+		<div class="cl-question-editor" data-question>
+			<div class="d-flex justify-content-between align-items-center gap-3">
+				<h3 class="h5 mb-0">
+					Question <span data-question-number>{{ qi + 1 }}</span>
+				</h3>
+				<button class="btn btn-sm btn-outline-danger" type="button" data-remove-question>Remove</button>
+			</div>
+			<label class="form-label mt-3">Question</label>
+			<textarea class="form-control mb-3" name="question_html[{{ qi }}]" required>{{ question.question_html }}</textarea>
+			<div class="row g-3">
+				<div class="col-md-2">
+					<label class="form-label">Points</label>
+					<input class="form-control" type="number" min="1" name="question_points[{{ qi }}]" value="{{ question.points ?: 1 }}">
+				</div>
+				<div class="col-md-3">
+					<label class="form-label">Difficulty</label><select class="form-select" name="question_difficulty[{{ qi }}]"><option value="introductory" {{ question.difficulty == 'introductory' ? 'selected' : '' }}>Introductory</option><option value="standard" {{ question.difficulty == 'standard' ? 'selected' : '' }}>Standard</option><option value="advanced" {{ question.difficulty == 'advanced' ? 'selected' : '' }}>Advanced</option></select>
+				</div>
+				<div class="col-md-2">
+					<label class="form-label">Wrong points</label>
+					<input class="form-control" type="number" max="0" step="0.25" name="incorrect_points[{{ qi }}]" value="{{ question.incorrect_points ?: 0 }}">
+				</div>
+				<div class="col-md-5">
+					<label class="form-label">Explanation</label>
+					<textarea class="form-control" name="question_explanation[{{ qi }}]">{{ question.explanation_html }}</textarea>
+				</div>
+				<div class="col-12 d-flex gap-4">
+					<label class="form-check">
+					<input class="form-check-input" type="checkbox" name="practice_eligible[{{ qi }}]" value="1" {{ question.practice_eligible ? 'checked' : '' }}>
+					<span class="form-check-label">Practice eligible</span></label><label class="form-check">
+					<input class="form-check-input" type="checkbox" name="graded_eligible[{{ qi }}]" value="1" {{ question.graded_eligible ? 'checked' : '' }}>
+					<span class="form-check-label">Graded eligible</span></label>
+				</div>
+			</div>
+			<div class="cl-option-editor mt-3" data-options>
+				{% for oi, option in question.options %}
+					<div class="input-group mb-2" data-option>
+						<span class="input-group-text">
+						<input type="radio" name="correct_option[{{ qi }}]" value="{{ oi }}" {{ option.is_correct ? 'checked' : '' }} aria-label="Correct option">
+						</span>
+						<input class="form-control" name="option_html[{{ qi }}][{{ oi }}]" value="{{ option.option_html }}" required>
+						<button class="btn btn-outline-danger" type="button" data-remove-option aria-label="Remove option">×</button>
+					</div>
+				{% endfor %}
+			</div>
+			<button class="btn btn-sm btn-outline-secondary" type="button" data-add-option>Add option</button>
+		</div>
+	{% endfor %}
+</div>
+<div class="d-flex flex-wrap gap-2 mt-4">
+	<button class="btn btn-outline-primary" type="button" id="add-question">Add question</button><button class="btn btn-primary" type="submit">Save assessment</button>
+</div>

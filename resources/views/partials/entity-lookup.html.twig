@@ -33,27 +33,25 @@ Changelog:
   - Created for the v0.5.7.6 pagination and large-data UI foundations release.
 #}
 <div class="field full entity-lookup" data-entity-lookup="{{ lk_name }}">
-
-  <label for="{{ lk_name }}-search">{{ lk_label }}</label>
-
-  {# Keep this note outside the tag below. A comment opened inside a start tag is not treated
+	<label for="{{ lk_name }}-search">{{ lk_label }}</label>
+{# Keep this note outside the tag below. A comment opened inside a start tag is not treated
        as a comment: the browser reads it as attribute text and ends the element early, which
        silently drops every attribute written after it. The value expression below guards the
        selection before reading its id, because the "nothing selected" default is a falsy
        scalar and cannot be dereferenced. #}
-  <input type="hidden"
+	<input type="hidden"
          id="{{ lk_name }}-value"
          name="{{ lk_name }}"
          value="{{ lk_selected ? lk_selected.id : '' }}"
          {{ lk_required ? 'required' : '' }}>
-
-  <p class="lookup-selected" id="{{ lk_name }}-selected" aria-live="polite">
-    {% if lk_selected %}
-      <strong>{{ lk_selected.label }}</strong> <span class="muted">{{ lk_selected.detail }}</span>{% else %}<span class="muted">{{ lk_empty ?: 'Nothing selected' }}</span>
-    {% endif %}
-  </p>
-
-  <input type="search"
+	<p class="lookup-selected" id="{{ lk_name }}-selected" aria-live="polite">
+		{% if lk_selected %}
+			<strong>{{ lk_selected.label }}</strong> <span class="muted">{{ lk_selected.detail }}</span>
+		{% else %}
+			<span class="muted">{{ lk_empty ?: 'Nothing selected' }}</span>
+		{% endif %}
+	</p>
+	<input type="search"
          id="{{ lk_name }}-search"
          class="lookup-search"
          placeholder="Search {{ lk_type }}…"
@@ -65,13 +63,12 @@ Changelog:
          hx-target="#{{ lk_name }}-results"
          hx-vals='{"target": "{{ lk_name }}"}'
          name="q">
-
-  <div class="lookup-results-panel" id="{{ lk_name }}-results" role="region" aria-live="polite">
-    <p class="help lookup-hint">Type at least 2 characters to search.</p>
-  </div>
-
-  {% if lk_selected %}
-    <button type="button" class="btn btn-ghost btn-sm lookup-clear" data-lookup-clear="{{ lk_name }}">Clear selection</button>
-  {% endif %}
-
+	<div class="lookup-results-panel" id="{{ lk_name }}-results" role="region" aria-live="polite">
+		<p class="help lookup-hint">
+			Type at least 2 characters to search.
+		</p>
+	</div>
+	{% if lk_selected %}
+		<button type="button" class="btn btn-ghost btn-sm lookup-clear" data-lookup-clear="{{ lk_name }}">Clear selection</button>
+	{% endif %}
 </div>

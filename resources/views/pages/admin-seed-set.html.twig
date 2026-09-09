@@ -28,59 +28,129 @@ Changelog:
   - Created so a seed set in the history list can be opened for its per-table record breakdown.
 #}
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_back_href = '/admin/seed' %}
-{% set ph_back_label = 'Seed Database' %}
-{% set ph_kicker = 'Platform administration' %}
-{% set ph_title = seed_set.description ?: 'Seed set' %}
-{% set ph_lead = seed_set.seed_token %}
-{% include '@platform/partials/page-head.html.twig' %}
-
-<section class="container-fluid cl-container-wide py-5">
-
-  <div class="card mb-4">
-    <div class="card-header bg-white p-4"><h2 class="h4 mb-0">Set summary</h2></div>
-    <div class="card-body p-4">
-      <div class="row g-4">
-        <div class="col-md-4"><strong>Requested</strong><div>{{ seed_set.requested_volume }}</div></div>
-        <div class="col-md-4"><strong>Written</strong><div>{{ seed_totals.initial }}</div></div>
-        <div class="col-md-4"><strong>Remaining</strong><div>{{ seed_totals.current }}</div></div>
-        <div class="col-md-4"><strong>Generated in</strong><div>{{ seed_set.generation_seconds }}s</div></div>
-        <div class="col-md-4"><strong>Created</strong><div>{{ seed_set.created_at }}</div></div>
-        <div class="col-md-4"><strong>Cleaned up</strong><div>{{ seed_set.cleaned_at ?: 'No' }}</div></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-header bg-white p-4">
-      <h2 class="h4 mb-1">Records per table</h2>
-      <p class="text-body-secondary mb-0">What generation wrote, beside what physically remains. The two agree until something removes rows: a cleanup, a cascade from another set, or a deletion made by hand.</p>
-    </div>
-    <div class="table-wrap">
-      <table class="table table-sm align-middle mb-0">
-        <thead><tr><th style="width:58%">Table</th><th style="width:14%">Written</th><th style="width:14%">Remaining</th><th style="width:14%">Removed</th></tr></thead>
-        <tbody>
-          {% for seed_row in seed_breakdown %}
-            <tr>
-              <td class="mono small">{{ seed_row.table }}</td>
-              <td>{{ seed_row.initial }}</td>
-              <td>{{ seed_row.current }}</td>
-              <td>{{ seed_row.removed ?: '—' }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-        <tfoot><tr><th>Total</th><th>{{ seed_totals.initial }}</th><th>{{ seed_totals.current }}</th><th>{{ seed_totals.initial - seed_totals.current }}</th></tr></tfoot>
-      </table>
-    </div>
-  </div>
-
-  {% if can_manage_seed and not seed_set.cleaned_at %}
-    <div class="d-flex gap-2 mt-4">
-      <a class="btn btn-outline-danger" href="/admin/seed/{{ seed_set.seed_token }}/cleanup">Clean up this set</a>
-    </div>
-  {% endif %}
-
-</section>
+	{% set ph_back_href = '/admin/seed' %}
+	{% set ph_back_label = 'Seed Database' %}
+	{% set ph_kicker = 'Platform administration' %}
+	{% set ph_title = seed_set.description ?: 'Seed set' %}
+	{% set ph_lead = seed_set.seed_token %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="container-fluid cl-container-wide py-5">
+		<div class="card mb-4">
+			<div class="card-header bg-white p-4">
+				<h2 class="h4 mb-0">
+					Set summary
+				</h2>
+			</div>
+			<div class="card-body p-4">
+				<div class="row g-4">
+					<div class="col-md-4">
+						<strong>Requested</strong>
+						<div>
+							{{ seed_set.requested_volume }}
+						</div>
+					</div>
+					<div class="col-md-4">
+						<strong>Written</strong>
+						<div>
+							{{ seed_totals.initial }}
+						</div>
+					</div>
+					<div class="col-md-4">
+						<strong>Remaining</strong>
+						<div>
+							{{ seed_totals.current }}
+						</div>
+					</div>
+					<div class="col-md-4">
+						<strong>Generated in</strong>
+						<div>
+							{{ seed_set.generation_seconds }}s
+						</div>
+					</div>
+					<div class="col-md-4">
+						<strong>Created</strong>
+						<div>
+							{{ seed_set.created_at }}
+						</div>
+					</div>
+					<div class="col-md-4">
+						<strong>Cleaned up</strong>
+						<div>
+							{{ seed_set.cleaned_at ?: 'No' }}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="card">
+			<div class="card-header bg-white p-4">
+				<h2 class="h4 mb-1">
+					Records per table
+				</h2>
+				<p class="text-body-secondary mb-0">
+					What generation wrote, beside what physically remains. The two agree until something removes rows: a cleanup, a cascade from another set, or a deletion made by hand.
+				</p>
+			</div>
+			<div class="table-wrap">
+				<table class="table table-sm align-middle mb-0">
+					<thead>
+						<tr>
+							<th style="width:58%">
+								Table
+							</th>
+							<th style="width:14%">
+								Written
+							</th>
+							<th style="width:14%">
+								Remaining
+							</th>
+							<th style="width:14%">
+								Removed
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						{% for seed_row in seed_breakdown %}
+							<tr>
+								<td class="mono small">
+									{{ seed_row.table }}
+								</td>
+								<td>
+									{{ seed_row.initial }}
+								</td>
+								<td>
+									{{ seed_row.current }}
+								</td>
+								<td>
+									{{ seed_row.removed ?: '—' }}
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+					<tfoot>
+						<tr>
+							<th>
+								Total
+							</th>
+							<th>
+								{{ seed_totals.initial }}
+							</th>
+							<th>
+								{{ seed_totals.current }}
+							</th>
+							<th>
+								{{ seed_totals.initial - seed_totals.current }}
+							</th>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		</div>
+		{% if can_manage_seed and not seed_set.cleaned_at %}
+			<div class="d-flex gap-2 mt-4">
+				<a class="btn btn-outline-danger" href="/admin/seed/{{ seed_set.seed_token }}/cleanup">Clean up this set</a>
+			</div>
+		{% endif %}
+	</section>
 {% endblock %}

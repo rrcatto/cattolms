@@ -1,8 +1,99 @@
 {% extends layout %}
-
 {% block page_body %}
-{% if is_preview %}<div class="cl-preview-bar"><div class="container-fluid cl-container-wide d-flex flex-wrap align-items-center justify-content-between gap-2"><strong>Student-view preview</strong><span>Use the course exactly as a learner would.</span><div class="d-flex gap-2"><a class="btn btn-sm btn-light" href="/admin/courses/{{ course.id }}">Exit preview</a><form action="/admin/courses/{{ course.id }}/preview/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-outline-light" type="submit">Reset preview</button></form></div></div></div>{% endif %}
-{% if course.presentation_css %}<style data-course-presentation>{{ course.presentation_css|raw }}</style>{% endif %}
-<section class="cl-course-toolbar"><div class="container-fluid cl-container-course"><div><a href="/learn/{{ course.slug }}{{ preview_query }}">← Course overview</a><span>{{ course.title }}</span></div><div>{{ course.progress.assessed_count }} / {{ course.progress.module_count }} assessments</div></div></section>
-<section class="container-fluid cl-container-course py-4 py-lg-5"><div class="row g-4"><aside class="col-xl-3"><div class="cl-course-nav"><span class="cl-kicker text-primary">Modules</span><nav>{% for nav_module in course.modules %}<a class="{{ nav_module.position == module.position ? 'active' : '' }}" href="/learn/{{ course.slug }}/module/{{ nav_module.position }}{{ preview_query }}"><span>{{ nav_module.position }}</span>{{ nav_module.title }}</a>{% endfor %}</nav></div></aside><article class="col-xl-9"><header class="cl-module-header"><span class="cl-kicker text-primary">Module {{ module.position }}</span><h1 class="display-5 fw-bold">{{ module.title }}</h1>{% if module.subtitle %}<p class="lead">{{ module.subtitle }}</p>{% endif %}</header><div class="cl-course-presentation">{% if module.learning_outcomes_html %}<section class="cl-outcomes outcomes"><span class="cl-kicker text-primary eyebrow">Learning outcomes</span>{{ module.learning_outcomes_html|raw }}</section>{% endif %}<div class="cl-course-content"><div class="module-body">{{ module.rendered_content_html|raw }}</div></div></div>{% if module.assessment %}<section class="card cl-assessment-cta mt-5"><div class="card-body p-4 p-lg-5 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3"><div><span class="cl-kicker text-primary">Self assessment</span><h2 class="h3">{{ module.assessment.title }}</h2><p class="mb-0">Practice first, or begin a graded attempt when ready. The assessment opens on its own page.</p>{% if module.assessment.best_attempt %}<p class="mt-2 mb-0">Recorded result: <strong>{{ module.assessment.best_attempt.percentage }}% · {{ module.assessment.best_attempt.grade_code }}</strong></p>{% endif %}</div><a class="btn btn-primary btn-lg" href="/learn/{{ course.slug }}/module/{{ module.position }}/assessment{{ preview_query }}">Open self assessment</a></div></section>{% endif %}<div class="cl-module-actions">{% if module.previous_position %}<a class="btn btn-outline-primary" href="/learn/{{ course.slug }}/module/{{ module.previous_position }}{{ preview_query }}">← Previous</a>{% endif %}<a class="btn btn-outline-secondary" href="/learn/{{ course.slug }}{{ preview_query }}">Course overview</a>{% if module.next_position %}<a class="btn btn-primary ms-auto" href="/learn/{{ course.slug }}/module/{{ module.next_position }}{{ preview_query }}">Next module →</a>{% endif %}</div></article></div></section>
+	{% if is_preview %}
+		<div class="cl-preview-bar">
+			<div class="container-fluid cl-container-wide d-flex flex-wrap align-items-center justify-content-between gap-2">
+				<strong>Student-view preview</strong><span>Use the course exactly as a learner would.</span>
+				<div class="d-flex gap-2">
+					<a class="btn btn-sm btn-light" href="/admin/courses/{{ course.id }}">Exit preview</a>
+					<form action="/admin/courses/{{ course.id }}/preview/reset" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<button class="btn btn-sm btn-outline-light" type="submit">Reset preview</button>
+					</form>
+				</div>
+			</div>
+		</div>
+	{% endif %}
+	{% if course.presentation_css %}
+		<style data-course-presentation>{{ course.presentation_css|raw }}</style>
+	{% endif %}
+	<section class="cl-course-toolbar">
+		<div class="container-fluid cl-container-course">
+			<div>
+				<a href="/learn/{{ course.slug }}{{ preview_query }}">← Course overview</a><span>{{ course.title }}</span>
+			</div>
+			<div>
+				{{ course.progress.assessed_count }} / {{ course.progress.module_count }} assessments
+			</div>
+		</div>
+	</section>
+	<section class="container-fluid cl-container-course py-4 py-lg-5">
+		<div class="row g-4">
+			<aside class="col-xl-3">
+				<div class="cl-course-nav">
+					<span class="cl-kicker text-primary">Modules</span>
+					<nav>
+						{% for nav_module in course.modules %}
+							<a class="{{ nav_module.position == module.position ? 'active' : '' }}" href="/learn/{{ course.slug }}/module/{{ nav_module.position }}{{ preview_query }}"><span>{{ nav_module.position }}</span>{{ nav_module.title }}</a>
+						{% endfor %}
+					</nav>
+				</div>
+			</aside>
+			<article class="col-xl-9">
+				<header class="cl-module-header">
+					<span class="cl-kicker text-primary">Module {{ module.position }}</span>
+					<h1 class="display-5 fw-bold">
+						{{ module.title }}
+					</h1>
+					{% if module.subtitle %}
+						<p class="lead">
+							{{ module.subtitle }}
+						</p>
+					{% endif %}
+				</header>
+				<div class="cl-course-presentation">
+					{% if module.learning_outcomes_html %}
+						<section class="cl-outcomes outcomes">
+							<span class="cl-kicker text-primary eyebrow">Learning outcomes</span>{{ module.learning_outcomes_html|raw }}
+						</section>
+					{% endif %}
+					<div class="cl-course-content">
+						<div class="module-body">
+							{{ module.rendered_content_html|raw }}
+						</div>
+					</div>
+				</div>
+				{% if module.assessment %}
+					<section class="card cl-assessment-cta mt-5">
+						<div class="card-body p-4 p-lg-5 d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+							<div>
+								<span class="cl-kicker text-primary">Self assessment</span>
+								<h2 class="h3">
+									{{ module.assessment.title }}
+								</h2>
+								<p class="mb-0">
+									Practice first, or begin a graded attempt when ready. The assessment opens on its own page.
+								</p>
+								{% if module.assessment.best_attempt %}
+									<p class="mt-2 mb-0">
+										Recorded result: <strong>{{ module.assessment.best_attempt.percentage }}% · {{ module.assessment.best_attempt.grade_code }}</strong>
+									</p>
+								{% endif %}
+							</div>
+							<a class="btn btn-primary btn-lg" href="/learn/{{ course.slug }}/module/{{ module.position }}/assessment{{ preview_query }}">Open self assessment</a>
+						</div>
+					</section>
+				{% endif %}
+				<div class="cl-module-actions">
+					{% if module.previous_position %}
+						<a class="btn btn-outline-primary" href="/learn/{{ course.slug }}/module/{{ module.previous_position }}{{ preview_query }}">← Previous</a>
+					{% endif %}
+					<a class="btn btn-outline-secondary" href="/learn/{{ course.slug }}{{ preview_query }}">Course overview</a>
+					{% if module.next_position %}
+						<a class="btn btn-primary ms-auto" href="/learn/{{ course.slug }}/module/{{ module.next_position }}{{ preview_query }}">Next module →</a>
+					{% endif %}
+				</div>
+			</article>
+		</div>
+	</section>
 {% endblock %}

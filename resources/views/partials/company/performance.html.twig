@@ -21,41 +21,62 @@ Changelog:
 	2026/09/07 19:20 SAST
 	- Created so a company administrator can see course performance for their own staff.
 #}
-<div class="notice"><span>ⓘ</span><div>Every figure below counts your own staff only. A course appears once at least one of your people is enrolled in it.</div></div>
-
+<div class="notice">
+	<span>ⓘ</span>
+	<div>
+		Every figure below counts your own staff only. A course appears once at least one of your people is enrolled in it.
+	</div>
+</div>
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'company_performance', ds_label: 'Search courses', ds_value: company_performance_search, ds_action: '/company/performance'} %}
-
 <div id="company_performance-region" data-server-search-target>
-<div id="company_performance-results">
-
-	{% if company_performance_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: company_performance_pagination} %}
-	{% endif %}
-
-	{% if company_performance %}
-		<div class="table-wrap section">
+	<div id="company_performance-results">
+		{% if company_performance_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: company_performance_pagination} %}
+		{% endif %}
+		{% if company_performance %}
+			<div class="table-wrap section">
 				<table>
 					<thead>
-						<tr>{% for sh in company_performance_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_performance_region, sort_results: company_performance_results} %}{% endfor %}</tr>
+						<tr>
+							{% for sh in company_performance_sort_headers %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_performance_region, sort_results: company_performance_results} %}
+							{% endfor %}
+						</tr>
 					</thead>
 					<tbody>
 						{% for row in company_performance %}
 							<tr>
-								<td title="{{ row.title }}"><strong>{{ row.title }}</strong></td>
-								<td><span class="badge info">{{ row.status }}</span></td>
-								<td>{{ row.enrolments }}</td>
-								<td>{{ row.started }}</td>
-								<td>{{ row.completed }}</td>
-								<td>{{ row.completion_rate }}%</td>
-								<td>{{ row.average_result }}%</td>
+								<td title="{{ row.title }}">
+									<strong>{{ row.title }}</strong>
+								</td>
+								<td>
+									<span class="badge info">{{ row.status }}</span>
+								</td>
+								<td>
+									{{ row.enrolments }}
+								</td>
+								<td>
+									{{ row.started }}
+								</td>
+								<td>
+									{{ row.completed }}
+								</td>
+								<td>
+									{{ row.completion_rate }}%
+								</td>
+								<td>
+									{{ row.average_result }}%
+								</td>
 							</tr>
 						{% endfor %}
 					</tbody>
 				</table>
 			</div>
-
-			{% include '@platform/partials/pagination.html.twig' with {pg: company_performance_pagination} %}{% else %}<div class="empty">No courses match this search.</div>
-	{% endif %}
-
-</div>
+			{% include '@platform/partials/pagination.html.twig' with {pg: company_performance_pagination} %}
+		{% else %}
+			<div class="empty">
+				No courses match this search.
+			</div>
+		{% endif %}
+	</div>
 </div>

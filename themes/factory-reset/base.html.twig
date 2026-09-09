@@ -1,41 +1,79 @@
 <!doctype html>
 <html lang="en-GB">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title }} · {{ app_name }}</title>
-  <meta name="description" content="Structured self-study courses, progress tracking and assessments.">
-  {% for resourceUrl in platform.styles %}<link href="{{ resourceUrl }}" rel="stylesheet">{% endfor %}
-  {% for resourceUrl in theme.external_styles %}<link href="{{ resourceUrl }}" rel="stylesheet">{% endfor %}
-  {% for resourceUrl in theme.styles %}<link href="{{ resourceUrl }}" rel="stylesheet">{% endfor %}
-</head>
-<body class="{{ body_class }} {{ course_content_mode ? 'cl-course-page' : '' }}">
-{% if is_authenticated %}
-  <div class="app-shell">
-      {% include '@theme/partials/navigation.html.twig' %}
-      <main class="main">
-        <header class="topbar" data-theme-breadcrumb>
-          <div class="topbar-left">
-            <button class="icon-btn mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
-            <div><div class="page-kicker">{{ page_kicker }}</div><div class="page-title">{{ page_title ?: title }}</div></div>
-          </div>
-          <div class="top-actions"><span class="small muted">{{ user_name ?: user_email }}</span></div>
-        </header>
-        <div class="content">
-          {% include '@theme/partials/flash.html.twig' %}
-          {% block page_content %}{% block page_body %}{% endblock %}{% endblock %}
-          {% include '@theme/partials/footer.html.twig' %}
-        </div>
-      </main>
-    </div>{% else %}
-    <div class="public-shell">
-      <nav class="public-nav" data-theme-nav><div class="public-nav-inner"><a class="brand" href="/"><span class="brand-mark">CL</span><span><strong>{{ app_name }}</strong><small>Learning platform</small></span></a><div class="public-links">{% for nav in navigation %}{% if nav.method != 'POST' %}<a class="btn {{ nav.key=='signin' ? 'btn-primary' : 'btn-ghost' }}" href="{{ nav.href }}" data-nav-item="{{ nav.key }}">{{ nav.label }}</a>{% endif %}{% endfor %}</div></div></nav>
-      <main class="public-main">{% include '@theme/partials/flash.html.twig' %}{{ block('page_content') }}</main>
-      {% include '@theme/partials/footer.html.twig' %}
-    </div>
-{% endif %}
-{% for resourceUrl in platform.scripts %}<script src="{{ resourceUrl }}"></script>{% endfor %}
-{% for resourceUrl in theme.external_scripts %}<script src="{{ resourceUrl }}"></script>{% endfor %}
-{% for resourceUrl in theme.scripts %}<script src="{{ resourceUrl }}"></script>{% endfor %}
-</body>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>{{ title }} · {{ app_name }}</title>
+		<meta name="description" content="Structured self-study courses, progress tracking and assessments.">
+		{% for resourceUrl in platform.styles %}
+			<link href="{{ resourceUrl }}" rel="stylesheet">
+		{% endfor %}
+		{% for resourceUrl in theme.external_styles %}
+			<link href="{{ resourceUrl }}" rel="stylesheet">
+		{% endfor %}
+		{% for resourceUrl in theme.styles %}
+			<link href="{{ resourceUrl }}" rel="stylesheet">
+		{% endfor %}
+	</head>
+	<body class="{{ body_class }} {{ course_content_mode ? 'cl-course-page' : '' }}">
+		{% if is_authenticated %}
+			<div class="app-shell">
+				{% include '@theme/partials/navigation.html.twig' %}
+				<main class="main">
+					<header class="topbar" data-theme-breadcrumb>
+						<div class="topbar-left">
+							<button class="icon-btn mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
+							<div>
+								<div class="page-kicker">
+									{{ page_kicker }}
+								</div>
+								<div class="page-title">
+									{{ page_title ?: title }}
+								</div>
+							</div>
+						</div>
+						<div class="top-actions">
+							<span class="small muted">{{ user_name ?: user_email }}</span>
+						</div>
+					</header>
+					<div class="content">
+						{% include '@theme/partials/flash.html.twig' %}
+						{% block page_content %}
+							{% block page_body %}
+							{% endblock %}
+						{% endblock %}
+						{% include '@theme/partials/footer.html.twig' %}
+					</div>
+				</main>
+			</div>
+		{% else %}
+			<div class="public-shell">
+				<nav class="public-nav" data-theme-nav>
+					<div class="public-nav-inner">
+						<a class="brand" href="/"><span class="brand-mark">CL</span><span><strong>{{ app_name }}</strong><small>Learning platform</small></span></a>
+						<div class="public-links">
+							{% for nav in navigation %}
+								{% if nav.method != 'POST' %}
+									<a class="btn {{ nav.key=='signin' ? 'btn-primary' : 'btn-ghost' }}" href="{{ nav.href }}" data-nav-item="{{ nav.key }}">{{ nav.label }}</a>
+								{% endif %}
+							{% endfor %}
+						</div>
+					</div>
+				</nav>
+				<main class="public-main">
+					{% include '@theme/partials/flash.html.twig' %}{{ block('page_content') }}
+				</main>
+				{% include '@theme/partials/footer.html.twig' %}
+			</div>
+		{% endif %}
+		{% for resourceUrl in platform.scripts %}
+			<script src="{{ resourceUrl }}"></script>
+		{% endfor %}
+		{% for resourceUrl in theme.external_scripts %}
+			<script src="{{ resourceUrl }}"></script>
+		{% endfor %}
+		{% for resourceUrl in theme.scripts %}
+			<script src="{{ resourceUrl }}"></script>
+		{% endfor %}
+	</body>
 </html>

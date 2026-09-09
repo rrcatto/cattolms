@@ -1,24 +1,37 @@
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_kicker = 'Account' %}
-{% set ph_title = 'My account' %}
-{% set ph_lead = 'Every part of your account in one place.' %}
-{% include '@platform/partials/page-head.html.twig' %}
-<div class="section-head"><div><div class="eyebrow">Account</div><h2>Your account</h2><p>Dashboard, profile, learning, login sessions and account activity in one place.</p></div></div>
-<div class="cl-account-workspace section" data-account-workspace>
-  {% for section in account_sections %}
-    <details class="cl-admin-section" data-account-section="{{ section.key }}" {{ section.key=='dashboard' ? 'open' : '' }}>
-      <summary class="cl-admin-section-summary">
-        <span class="cl-admin-section-title">{{ section.label }}</span>
-        <span class="cl-admin-section-description">{{ section.description }}</span>
-        <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-      </summary>
-      <div class="cl-admin-section-content">
-        <div class="cl-admin-section-actions"><a class="cl-admin-section-link" href="{{ section.route }}">Open as standalone page</a></div>
-        {{ section.content|raw }}
-      </div>
-    </details>
-  {% endfor %}
-</div>
+	{% set ph_kicker = 'Account' %}
+	{% set ph_title = 'My account' %}
+	{% set ph_lead = 'Every part of your account in one place.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<div class="section-head">
+		<div>
+			<div class="eyebrow">
+				Account
+			</div>
+			<h2>
+				Your account
+			</h2>
+			<p>
+				Dashboard, profile, learning, login sessions and account activity in one place.
+			</p>
+		</div>
+	</div>
+	<div class="cl-account-workspace section" data-account-workspace>
+		{% for section in account_sections %}
+			<details class="cl-admin-section" data-account-section="{{ section.key }}" {{ section.key=='dashboard' ? 'open' : '' }}>
+				<summary class="cl-admin-section-summary">
+					<span class="cl-admin-section-title">{{ section.label }}</span>
+					<span class="cl-admin-section-description">{{ section.description }}</span>
+					<span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
+				</summary>
+				<div class="cl-admin-section-content">
+					<div class="cl-admin-section-actions">
+						<a class="cl-admin-section-link" href="{{ section.route }}">Open as standalone page</a>
+					</div>
+					{{ section.content|raw }}
+				</div>
+			</details>
+		{% endfor %}
+	</div>
 {% endblock %}

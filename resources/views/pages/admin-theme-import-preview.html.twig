@@ -1,15 +1,81 @@
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_back_href = '/admin/themes' %}
-{% set ph_back_label = 'Themes' %}
-{% set ph_kicker = 'Administration · Themes' %}
-{% set ph_title = 'Inspect theme package' %}
-{% set ph_lead = 'The Theme Package 3.0 ZIP has been validated but has not yet been installed.' %}
-{% include '@platform/partials/page-head.html.twig' %}
-
-<div class="notice"><span>✓</span><div><strong>{{ inspection.summary.name }}</strong> · version {{ inspection.summary.version }}<br>{{ inspection.summary.description }}{% if inspection.summary.child %}<br><span class="small muted">Child of {{ inspection.summary.parent_name }} {{ inspection.summary.parent_version }}</span>{% endif %}</div></div>
-<section class="card section"><div class="form-grid"><div><strong>Install identity</strong><div class="mono">{{ inspection.install_key }}</div></div><div><strong>Author</strong><div>{{ inspection.summary.author }}</div></div><div><strong>Package files</strong><div>{{ inspection.summary.files }}</div></div><div><strong>Additional stylesheets</strong><div>{{ inspection.summary.additional_styles }}</div></div><div><strong>Scripts</strong><div>{{ inspection.summary.scripts }}</div></div><div><strong>Colour palettes</strong><div>{{ inspection.summary.palettes }}{% if inspection.summary.palettes > 5 %} · <span class="badge warn">High palette count</span>{% endif %}</div></div><div><strong>Package contract</strong><div>Theme Package 3.0 · Template API 1.0</div></div></div></section>
-<div class="notice section"><span>i</span><div>The installed theme is immutable to the LMS. A future version installs alongside this release rather than replacing it.</div></div>
-<form action="/admin/themes/import/confirm" method="post" class="section"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="token" value="{{ inspection.token }}"><button class="btn btn-primary">Install theme package</button></form>
+	{% set ph_back_href = '/admin/themes' %}
+	{% set ph_back_label = 'Themes' %}
+	{% set ph_kicker = 'Administration · Themes' %}
+	{% set ph_title = 'Inspect theme package' %}
+	{% set ph_lead = 'The Theme Package 3.0 ZIP has been validated but has not yet been installed.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<div class="notice">
+		<span>✓</span>
+		<div>
+			<strong>{{ inspection.summary.name }}</strong> · version {{ inspection.summary.version }}
+			<br>
+			{{ inspection.summary.description }}
+			{% if inspection.summary.child %}
+				<br>
+				<span class="small muted">Child of {{ inspection.summary.parent_name }} {{ inspection.summary.parent_version }}</span>
+			{% endif %}
+		</div>
+	</div>
+	<section class="card section">
+		<div class="form-grid">
+			<div>
+				<strong>Install identity</strong>
+				<div class="mono">
+					{{ inspection.install_key }}
+				</div>
+			</div>
+			<div>
+				<strong>Author</strong>
+				<div>
+					{{ inspection.summary.author }}
+				</div>
+			</div>
+			<div>
+				<strong>Package files</strong>
+				<div>
+					{{ inspection.summary.files }}
+				</div>
+			</div>
+			<div>
+				<strong>Additional stylesheets</strong>
+				<div>
+					{{ inspection.summary.additional_styles }}
+				</div>
+			</div>
+			<div>
+				<strong>Scripts</strong>
+				<div>
+					{{ inspection.summary.scripts }}
+				</div>
+			</div>
+			<div>
+				<strong>Colour palettes</strong>
+				<div>
+					{{ inspection.summary.palettes }}
+					{% if inspection.summary.palettes > 5 %}
+						· <span class="badge warn">High palette count</span>
+					{% endif %}
+				</div>
+			</div>
+			<div>
+				<strong>Package contract</strong>
+				<div>
+					Theme Package 3.0 · Template API 1.0
+				</div>
+			</div>
+		</div>
+	</section>
+	<div class="notice section">
+		<span>i</span>
+		<div>
+			The installed theme is immutable to the LMS. A future version installs alongside this release rather than replacing it.
+		</div>
+	</div>
+	<form action="/admin/themes/import/confirm" method="post" class="section">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		<input type="hidden" name="token" value="{{ inspection.token }}">
+		<button class="btn btn-primary">Install theme package</button>
+	</form>
 {% endblock %}

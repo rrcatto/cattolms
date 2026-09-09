@@ -1,6 +1,10 @@
 <footer style="max-width:1320px;margin:20px auto;padding:24px;color:var(--muted);font-size:.82rem;border-top:1px solid var(--line)">
-  <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center">
-    <span>© 2026 Richard Catto</span>
-    <nav aria-label="Footer navigation" style="display:flex;gap:14px;flex-wrap:wrap">{% for footer_link in footer_navigation %}<a href="{{ footer_link.href }}">{{ footer_link.label }}</a>{% endfor %}</nav>
-  </div>
+	<div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center">
+		<span>© 2026 Richard Catto</span>
+		<nav aria-label="Footer navigation" style="display:flex;gap:14px;flex-wrap:wrap">
+			{% for footer_link in footer_navigation %}
+				<a href="{{ footer_link.href }}">{{ footer_link.label }}</a>
+			{% endfor %}
+		</nav>
+	</div>
 </footer>

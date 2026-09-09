@@ -24,39 +24,57 @@ Changelog:
   - Created with the company favourites table.
 #}
 <div id="company_favourites-region" data-server-search-target>
-<div id="company_favourites-results">
-
-	{% if company_favourites_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: company_favourites_pagination} %}
-	{% endif %}
-
-	<div class="notice">
-		<span>ⓘ</span>
-		<div>Courses this company is interested in for its staff. Adding one here buys nothing and enrols nobody. What individual staff favourite for themselves is their own list and never changes this one.</div>
-	</div>
-
-	{% if company_favourites %}
-		<div class="table-wrap">
+	<div id="company_favourites-results">
+		{% if company_favourites_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: company_favourites_pagination} %}
+		{% endif %}
+		<div class="notice">
+			<span>ⓘ</span>
+			<div>
+				Courses this company is interested in for its staff. Adding one here buys nothing and enrols nobody. What individual staff favourite for themselves is their own list and never changes this one.
+			</div>
+		</div>
+		{% if company_favourites %}
+			<div class="table-wrap">
 				<table>
-					<thead><tr>{% for sh in company_favourites_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_favourites_region, sort_results: company_favourites_results} %}{% endfor %}</tr></thead>
+					<thead>
+						<tr>
+							{% for sh in company_favourites_sort_headers %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: company_favourites_region, sort_results: company_favourites_results} %}
+							{% endfor %}
+						</tr>
+					</thead>
 					<tbody>
 						{% for favourite in company_favourites %}
 							<tr>
-								<td><strong>{{ favourite.title }}</strong></td>
-								<td>{{ favourite.owner_company_name ?: 'Platform course' }}</td>
-								<td>{{ favourite.category_name ?: '—' }}</td>
+								<td>
+									<strong>{{ favourite.title }}</strong>
+								</td>
+								<td>
+									{{ favourite.owner_company_name ?: 'Platform course' }}
+								</td>
+								<td>
+									{{ favourite.category_name ?: '—' }}
+								</td>
 								<td>
 									{% if favourite.is_company_owned %}
-										<span class="badge good">Owned — free for staff</span>{% else %}
-											{% if favourite.has_company_credits %}
-												<span class="badge info">Credits held</span>{% else %}<span class="badge">Not bought</span>
-											{% endif %}
+										<span class="badge good">Owned — free for staff</span>
+									{% else %}
+										{% if favourite.has_company_credits %}
+											<span class="badge info">Credits held</span>
+										{% else %}
+											<span class="badge">Not bought</span>
+										{% endif %}
 									{% endif %}
 								</td>
-								<td class="small">{{ favourite.created_at }}</td>
+								<td class="small">
+									{{ favourite.created_at }}
+								</td>
 								<td class="cell-actions">
 									<details class="row-menu" data-cl-dropdown>
-										<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+										<summary class="btn btn-soft btn-sm row-menu-trigger">
+											Actions ▾
+										</summary>
 										<div class="row-menu-panel">
 											<a class="btn btn-soft btn-sm" href="/courses/{{ favourite.slug }}">View</a>
 											{% if can_manage_company_favourites %}
@@ -72,16 +90,19 @@ Changelog:
 						{% endfor %}
 					</tbody>
 				</table>
-			</div>{% else %}
-			<div class="empty">
-				<h3>No favourites yet</h3>
-				<p>Mark a course as a favourite from the catalogue to keep it here for later.</p>
 			</div>
-	{% endif %}
-
-	{% if company_favourites_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: company_favourites_pagination} %}
-	{% endif %}
-
-</div>
+		{% else %}
+			<div class="empty">
+				<h3>
+					No favourites yet
+				</h3>
+				<p>
+					Mark a course as a favourite from the catalogue to keep it here for later.
+				</p>
+			</div>
+		{% endif %}
+		{% if company_favourites_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: company_favourites_pagination} %}
+		{% endif %}
+	</div>
 </div>

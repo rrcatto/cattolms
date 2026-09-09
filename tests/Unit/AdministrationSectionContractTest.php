@@ -104,8 +104,9 @@ final class AdministrationSectionContractTest extends TestCase
         self::assertStringContainsString('class="acl-permission-table"', $roleEdit);
         // The four columns, each now declaring its share of the width: the description is the only
         // one carrying prose and was being given a quarter of the table like the checkbox beside it.
-        foreach (['>Assign</th>', '>Permission</th>', '>Internal key</th>', '>Description</th>'] as $column) {
-            self::assertStringContainsString($column, $roleEdit);
+        // Column headings, whatever whitespace the template puts around them.
+        foreach (['Assign', 'Permission', 'Internal key', 'Description'] as $column) {
+            self::assertMatchesRegularExpression('/<th[^>]*>\s*' . preg_quote($column, '/') . '\s*<\/th>/', $roleEdit);
         }
         self::assertStringContainsString('name="permissions[]"', $roleEdit);
         self::assertStringNotContainsString('class="acl-grid"', $roleEdit);

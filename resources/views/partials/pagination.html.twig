@@ -78,88 +78,83 @@ Changelog:
   - Created for the v0.5.7.6 pagination and large-data UI foundations release.
 #}
 <nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}">
-
 	<div class="pagination-summary" aria-live="polite">
 		<span>Showing {{ pg.from }}-{{ pg.to }} of {{ pg.total }}</span>
 		<span class="pagination-pages">Page {{ pg.page }} of {{ pg.total_pages }}</span>
 	</div>
-
 	{% if pg.has_pages %}
-
-	<div class="pagination-controls">
-
-		{% if pg.has_previous %}
-			<a class="btn btn-soft btn-sm pagination-edge" href="{{ pg.first_href }}" aria-label="First page"
+		<div class="pagination-controls">
+			{% if pg.has_previous %}
+				<a class="btn btn-soft btn-sm pagination-edge" href="{{ pg.first_href }}" aria-label="First page"
 				   hx-get="{{ pg.first_href }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
 				   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">&laquo; First</a>
 				<a class="btn btn-soft btn-sm" rel="prev" href="{{ pg.previous_href }}" aria-label="Previous page"
 				   hx-get="{{ pg.previous_href }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
-				   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">Previous</a>{% else %}
+				   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">Previous</a>
+			{% else %}
 				<span class="btn btn-soft btn-sm pagination-edge is-disabled" aria-disabled="true">&laquo; First</span>
 				<span class="btn btn-soft btn-sm is-disabled" aria-disabled="true">Previous</span>
-		{% endif %}
-
-		<ol class="pagination-pages-list">
-			{% for pg_item in pg.pages %}
-				<li>
-					{% if pg_item.is_gap %}
-						<span class="pagination-gap" aria-hidden="true">&hellip;</span>{% else %}
+			{% endif %}
+			<ol class="pagination-pages-list">
+				{% for pg_item in pg.pages %}
+					<li>
+						{% if pg_item.is_gap %}
+							<span class="pagination-gap" aria-hidden="true">&hellip;</span>
+						{% else %}
 							{% if pg_item.is_current %}
-								<span class="btn btn-primary btn-sm pagination-page is-current" aria-current="page">{{ pg_item.page }}</span>{% else %}
-									<a class="btn btn-soft btn-sm pagination-page" href="{{ pg_item.href }}"
+								<span class="btn btn-primary btn-sm pagination-page is-current" aria-current="page">{{ pg_item.page }}</span>
+							{% else %}
+								<a class="btn btn-soft btn-sm pagination-page" href="{{ pg_item.href }}"
 									   aria-label="Page {{ pg_item.page }}"
 									   hx-get="{{ pg_item.href }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
 									   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">{{ pg_item.page }}</a>
 							{% endif %}
-					{% endif %}
-				</li>
-			{% endfor %}
-		</ol>
-
-		{% if pg.has_next %}
-			<a class="btn btn-soft btn-sm" rel="next" href="{{ pg.next_href }}" aria-label="Next page"
+						{% endif %}
+					</li>
+				{% endfor %}
+			</ol>
+			{% if pg.has_next %}
+				<a class="btn btn-soft btn-sm" rel="next" href="{{ pg.next_href }}" aria-label="Next page"
 				   hx-get="{{ pg.next_href }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
 				   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">Next</a>
 				<a class="btn btn-soft btn-sm pagination-edge" href="{{ pg.last_href }}" aria-label="Last page"
 				   hx-get="{{ pg.last_href }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
-				   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">Last &raquo;</a>{% else %}
+				   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">Last &raquo;</a>
+			{% else %}
 				<span class="btn btn-soft btn-sm is-disabled" aria-disabled="true">Next</span>
 				<span class="btn btn-soft btn-sm pagination-edge is-disabled" aria-disabled="true">Last &raquo;</span>
-		{% endif %}
-
-	</div>
-
-	<form class="pagination-jump" method="get" action="{{ pg.base }}"
+			{% endif %}
+		</div>
+		<form class="pagination-jump" method="get" action="{{ pg.base }}"
 	      hx-get="{{ pg.base }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
 	      hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">
-		{% for filter_key, filter_value in pg.filters %}
-			<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
-		{% endfor %}
-		<input type="hidden" name="{{ pg.size_param }}" value="{{ pg.page_size }}">
-		<label for="{{ pg.prefix }}-jump-page">Jump to page</label>
-		<input id="{{ pg.prefix }}-jump-page" name="{{ pg.page_param }}" type="number" inputmode="numeric"
+			{% for filter_key, filter_value in pg.filters %}
+				<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
+			{% endfor %}
+			<input type="hidden" name="{{ pg.size_param }}" value="{{ pg.page_size }}">
+			<label for="{{ pg.prefix }}-jump-page">Jump to page</label>
+			<input id="{{ pg.prefix }}-jump-page" name="{{ pg.page_param }}" type="number" inputmode="numeric"
 		       min="1" max="{{ pg.total_pages }}" step="1" value="{{ pg.page }}"
 		       aria-describedby="{{ pg.prefix }}-jump-help">
-		<button class="btn btn-soft btn-sm" type="submit">Go</button>
-		<span class="help" id="{{ pg.prefix }}-jump-help">of {{ pg.total_pages }}</span>
-	</form>
-
-	<form class="pagination-page-size" method="get" action="{{ pg.base }}"
+			<button class="btn btn-soft btn-sm" type="submit">Go</button>
+			<span class="help" id="{{ pg.prefix }}-jump-help">of {{ pg.total_pages }}</span>
+		</form>
+		<form class="pagination-page-size" method="get" action="{{ pg.base }}"
 	      hx-get="{{ pg.base }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
 	      hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">
-		<input type="hidden" name="{{ pg.page_param }}" value="1">
-		{% for filter_key, filter_value in pg.filters %}
-			<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
-		{% endfor %}
-		<label for="{{ pg.prefix }}-page-size">Rows per page</label>
-		<select id="{{ pg.prefix }}-page-size" name="{{ pg.size_param }}" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
+			<input type="hidden" name="{{ pg.page_param }}" value="1">
+			{% for filter_key, filter_value in pg.filters %}
+				<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
+			{% endfor %}
+			<label for="{{ pg.prefix }}-page-size">Rows per page</label>
+			<select id="{{ pg.prefix }}-page-size" name="{{ pg.size_param }}" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
 			{% for size in pg.page_sizes %}
 				<option value="{{ size }}" {{ pg.page_size == size ? 'selected' : '' }}>{{ size }}</option>
 			{% endfor %}
-		</select>
-		<noscript><button class="btn btn-soft btn-sm" type="submit">Apply</button></noscript>
-	</form>
-
+			</select>
+			<noscript>
+				<button class="btn btn-soft btn-sm" type="submit">Apply</button>
+			</noscript>
+		</form>
 	{% endif %}
-
 </nav>

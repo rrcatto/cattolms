@@ -28,38 +28,52 @@ Changelog:
   - Added the shared live search control and its result region.
 #}
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'requests', ds_label: 'Search requests', ds_value: requests_search, ds_action: '/company/requests'} %}
-
 <div id="requests-region" data-server-search-target>
-<div id="requests-results">
-
-	{% if requests_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: requests_pagination} %}
-	{% endif %}
-
-	<div class="section-head">
-		<div>
-			<h2>Course requests</h2>
-			<p>Approval uses an exact matching credit where available.</p>
+	<div id="requests-results">
+		{% if requests_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: requests_pagination} %}
+		{% endif %}
+		<div class="section-head">
+			<div>
+				<h2>
+					Course requests
+				</h2>
+				<p>
+					Approval uses an exact matching credit where available.
+				</p>
+			</div>
 		</div>
-	</div>
-
-	{% if requests %}
-		<div class="table-wrap">
+		{% if requests %}
+			<div class="table-wrap">
 				<table>
 					<thead>
-						<tr>{% for sh in requests_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: requests_region, sort_results: requests_results} %}{% endfor %}</tr>
+						<tr>
+							{% for sh in requests_sort_headers %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: requests_region, sort_results: requests_results} %}
+							{% endfor %}
+						</tr>
 					</thead>
 					<tbody>
 						{% for request in requests %}
 							<tr>
-								<td><strong>{{ request.learner_name }}</strong></td>
-								<td>{{ request.course_title }}</td>
-								<td class="small">{{ request.requested_at }}</td>
-								<td><span class="badge {{ request.status_tone }}">{{ request.status_label }}</span></td>
+								<td>
+									<strong>{{ request.learner_name }}</strong>
+								</td>
+								<td>
+									{{ request.course_title }}
+								</td>
+								<td class="small">
+									{{ request.requested_at }}
+								</td>
+								<td>
+									<span class="badge {{ request.status_tone }}">{{ request.status_label }}</span>
+								</td>
 								<td class="cell-actions">
 									{% if request.status=='pending' %}
 										<details class="row-menu" data-cl-dropdown>
-											<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+											<summary class="btn btn-soft btn-sm row-menu-trigger">
+												Actions ▾
+											</summary>
 											<div class="row-menu-panel">
 												<form action="/company/requests/{{ request.id }}/decision" method="post">
 													<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -74,19 +88,21 @@ Changelog:
 						{% endfor %}
 					</tbody>
 				</table>
-			</div>{% else %}
-			<div class="empty">There are no course requests.</div>
-	{% endif %}
-
-	{% if requests_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: requests_pagination} %}{% else %}
+			</div>
+		{% else %}
+			<div class="empty">
+				There are no course requests.
+			</div>
+		{% endif %}
+		{% if requests_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: requests_pagination} %}
+		{% else %}
 			{% if requests_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} requests.</span>
 					<a class="btn btn-soft btn-sm" href="/company/requests">View all requests</a>
 				</div>
 			{% endif %}
-	{% endif %}
-
-</div>
+		{% endif %}
+	</div>
 </div>

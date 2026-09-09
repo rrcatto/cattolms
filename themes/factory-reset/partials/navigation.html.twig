@@ -1,28 +1,61 @@
 <aside class="sidebar" id="sidebar" data-theme-nav>
-  <a class="brand" href="/" aria-label="Home"><div class="brand-mark">CL</div><div><strong>{{ app_name }}</strong><span>Learning platform</span></div></a>
-  <div class="side-label">Workspace</div>
-  <nav class="side-nav" aria-label="Primary navigation">
-    {% for nav in navigation %}
-      {% if nav.children|length > 0 %}
-        <details class="account-menu" data-cl-dropdown {{ nav.active ? 'open' : '' }}>
-          <summary class="nav-link {{ nav.active ? 'active' : '' }}" data-nav-item="{{ nav.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ nav.icon_id }}"></use></svg>{{ nav.label }}</summary>
-          <div class="account-menu-panel">
-            {% for child in nav.children %}
-              {% if child.children|length > 0 %}
-                <div class="nav-group" data-nav-item="{{ child.key }}">
-                    <button class="nav-group-label" type="button" aria-haspopup="true"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}<span class="nav-group-caret" aria-hidden="true">&rsaquo;</span></button>
-                    <div class="nav-subpanel">
-                      {% for grandchild in child.children %}<a class="nav-link nav-sublink" href="{{ grandchild.href }}" data-nav-item="{{ grandchild.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ grandchild.icon_id }}"></use></svg>{{ grandchild.label }}</a>{% endfor %}
-                    </div>
-                  </div>{% else %}<a class="nav-link" href="{{ child.href }}" data-nav-item="{{ child.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}</a>
-              {% endif %}
-            {% endfor %}
-          </div>
-        </details>
-      {% endif %}
-      {% if nav.children|length == 0 and nav.method != 'POST' %}<a class="nav-link {{ nav.active ? 'active' : '' }}" href="{{ nav.href }}" data-nav-item="{{ nav.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ nav.icon_id }}"></use></svg>{{ nav.label }}</a>{% endif %}
-      {% if nav.method == 'POST' %}<form action="{{ nav.href }}" method="post" data-nav-item="{{ nav.key }}"><input type="hidden" name="csrf" value="{{ nav.csrf }}"><button class="nav-link" type="submit"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ nav.icon_id }}"></use></svg>{{ nav.label }}</button></form>{% endif %}
-    {% endfor %}
-  </nav>
-  {% if is_authenticated %}<div class="sidebar-bottom"><div class="user-mini"><div class="avatar">CL</div><div><strong>{{ user_email }}</strong><span>{{ user_name ?: 'Signed in' }}</span></div></div></div>{% endif %}
+	<a class="brand" href="/" aria-label="Home">
+	<div class="brand-mark">
+		CL
+	</div>
+	<div>
+		<strong>{{ app_name }}</strong><span>Learning platform</span>
+	</div>
+	</a>
+	<div class="side-label">
+		Workspace
+	</div>
+	<nav class="side-nav" aria-label="Primary navigation">
+		{% for nav in navigation %}
+			{% if nav.children|length > 0 %}
+				<details class="account-menu" data-cl-dropdown {{ nav.active ? 'open' : '' }}>
+					<summary class="nav-link {{ nav.active ? 'active' : '' }}" data-nav-item="{{ nav.key }}">
+						<svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ nav.icon_id }}"></use></svg>{{ nav.label }}
+					</summary>
+					<div class="account-menu-panel">
+						{% for child in nav.children %}
+							{% if child.children|length > 0 %}
+								<div class="nav-group" data-nav-item="{{ child.key }}">
+									<button class="nav-group-label" type="button" aria-haspopup="true"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}<span class="nav-group-caret" aria-hidden="true">&rsaquo;</span></button>
+									<div class="nav-subpanel">
+										{% for grandchild in child.children %}
+											<a class="nav-link nav-sublink" href="{{ grandchild.href }}" data-nav-item="{{ grandchild.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ grandchild.icon_id }}"></use></svg>{{ grandchild.label }}</a>
+										{% endfor %}
+									</div>
+								</div>
+							{% else %}
+								<a class="nav-link" href="{{ child.href }}" data-nav-item="{{ child.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}</a>
+							{% endif %}
+						{% endfor %}
+					</div>
+				</details>
+			{% endif %}
+			{% if nav.children|length == 0 and nav.method != 'POST' %}
+				<a class="nav-link {{ nav.active ? 'active' : '' }}" href="{{ nav.href }}" data-nav-item="{{ nav.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ nav.icon_id }}"></use></svg>{{ nav.label }}</a>
+			{% endif %}
+			{% if nav.method == 'POST' %}
+				<form action="{{ nav.href }}" method="post" data-nav-item="{{ nav.key }}">
+					<input type="hidden" name="csrf" value="{{ nav.csrf }}">
+					<button class="nav-link" type="submit"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ nav.icon_id }}"></use></svg>{{ nav.label }}</button>
+				</form>
+			{% endif %}
+		{% endfor %}
+	</nav>
+	{% if is_authenticated %}
+		<div class="sidebar-bottom">
+			<div class="user-mini">
+				<div class="avatar">
+					CL
+				</div>
+				<div>
+					<strong>{{ user_email }}</strong><span>{{ user_name ?: 'Signed in' }}</span>
+				</div>
+			</div>
+		</div>
+	{% endif %}
 </aside>

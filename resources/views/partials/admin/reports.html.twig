@@ -29,64 +29,125 @@ Changelog:
 #}
 <div class="section-head">
 	<div>
-		<h2>Reports</h2>
-		<p>Operational and learning results summarised into useful figures. Detailed event history belongs in Activity.</p>
+		<h2>
+			Reports
+		</h2>
+		<p>
+			Operational and learning results summarised into useful figures. Detailed event history belongs in Activity.
+		</p>
 	</div>
 </div>
-
 {% if universe_switch %}
 	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: 0} %}
 {% endif %}
-
 <div class="admin-reports-grid">
-	<div class="stat-card"><div class="stat-value">{{ report_summary.enrolments }}</div><div class="stat-label">Total enrolments</div><div class="stat-note">{{ report_summary.active }} active · {{ report_summary.completed }} completed</div></div>
-	<div class="stat-card"><div class="stat-value">{{ report_summary.graded_assessments }}</div><div class="stat-label">Graded assessments</div><div class="stat-note">Completed learner attempts</div></div>
-	<div class="stat-card"><div class="stat-value">{{ report_summary.assessment_pass_rate }}%</div><div class="stat-label">Assessment pass rate</div><div class="stat-note">Average score {{ report_summary.assessment_average }}%</div></div>
-	<div class="stat-card"><div class="stat-value">{{ report_summary.certificates }}</div><div class="stat-label">Certificates</div><div class="stat-note">Currently valid certificates</div></div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ report_summary.enrolments }}
+		</div>
+		<div class="stat-label">
+			Total enrolments
+		</div>
+		<div class="stat-note">
+			{{ report_summary.active }} active · {{ report_summary.completed }} completed
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ report_summary.graded_assessments }}
+		</div>
+		<div class="stat-label">
+			Graded assessments
+		</div>
+		<div class="stat-note">
+			Completed learner attempts
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ report_summary.assessment_pass_rate }}%
+		</div>
+		<div class="stat-label">
+			Assessment pass rate
+		</div>
+		<div class="stat-note">
+			Average score {{ report_summary.assessment_average }}%
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ report_summary.certificates }}
+		</div>
+		<div class="stat-label">
+			Certificates
+		</div>
+		<div class="stat-note">
+			Currently valid certificates
+		</div>
+	</div>
 </div>
-
 <div class="card section admin-wide-card">
 	<div class="section-head">
 		<div>
-			<h2>Course performance</h2>
-			<p>Enrolment, completion and result figures by course.</p>
+			<h2>
+				Course performance
+			</h2>
+			<p>
+				Enrolment, completion and result figures by course.
+			</p>
 		</div>
 	</div>
-
 	{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'course_report', ds_label: 'Search course performance', ds_value: course_report_search, ds_action: '/admin/reports'} %}
-
 	<div id="course_report-region" data-server-search-target>
-	<div id="course_report-results">
-
-	{% if course_report_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: course_report_pagination} %}
-	{% endif %}
-
-		{% if course_report %}
-			<div class="table-wrap">
+		<div id="course_report-results">
+			{% if course_report_pagination %}
+				{% include '@platform/partials/pagination.html.twig' with {pg: course_report_pagination} %}
+			{% endif %}
+			{% if course_report %}
+				<div class="table-wrap">
 					<table>
 						<thead>
-							<tr>{% for sh in course_report_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: course_report_region, sort_results: course_report_results} %}{% endfor %}</tr>
+							<tr>
+								{% for sh in course_report_sort_headers %}
+									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: course_report_region, sort_results: course_report_results} %}
+								{% endfor %}
+							</tr>
 						</thead>
 						<tbody>
 							{% for row in course_report %}
 								<tr>
-									<td><strong>{{ row.title }}</strong></td>
-									<td><span class="badge info">{{ row.status }}</span></td>
-									<td>{{ row.enrolments }}</td>
-									<td>{{ row.started }}</td>
-									<td>{{ row.completed }}</td>
-									<td>{{ row.completion_rate }}%</td>
-									<td>{{ row.average_result }}%</td>
+									<td>
+										<strong>{{ row.title }}</strong>
+									</td>
+									<td>
+										<span class="badge info">{{ row.status }}</span>
+									</td>
+									<td>
+										{{ row.enrolments }}
+									</td>
+									<td>
+										{{ row.started }}
+									</td>
+									<td>
+										{{ row.completed }}
+									</td>
+									<td>
+										{{ row.completion_rate }}%
+									</td>
+									<td>
+										{{ row.average_result }}%
+									</td>
 								</tr>
 							{% endfor %}
 						</tbody>
 					</table>
 				</div>
-
-				{% include '@platform/partials/pagination.html.twig' with {pg: course_report_pagination} %}{% else %}<div class="empty">No courses match this search.</div>
-		{% endif %}
-
-	</div>
+				{% include '@platform/partials/pagination.html.twig' with {pg: course_report_pagination} %}
+			{% else %}
+				<div class="empty">
+					No courses match this search.
+				</div>
+			{% endif %}
+		</div>
 	</div>
 </div>

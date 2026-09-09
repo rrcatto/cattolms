@@ -107,7 +107,9 @@ final class CompanyWorkspaceContractTest extends TestCase
         $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
         $js = (string) file_get_contents($root . '/public_html/js/platform-overrides.js');
         self::assertStringContainsString('data-open-modal="company-add"', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
-        self::assertStringContainsString('id="company-add-title">Add Company</h3>', $modals);
+        // The heading is named by the dialog's aria-labelledby, so the id and the label both have
+        // to be there. Which line each sits on is formatting, not contract.
+        self::assertMatchesRegularExpression('/id="company-add-title"\s*>\s*Add Company\s*<\/h3>/', $modals);
         self::assertStringContainsString('Create Company</button>', $modals);
         self::assertStringContainsString('data-open-modal="company-edit-', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
         self::assertStringContainsString('id="company-edit-', $modals);

@@ -1,49 +1,151 @@
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_back_href = '/admin/courses' %}
-{% set ph_back_label = 'Course administration' %}
-{% set ph_kicker = 'Course metadata' %}
-{% set ph_title = 'Course categories' %}
-{% set ph_lead = 'Create and maintain the catalogue taxonomy used by courses.' %}
-{% set ph_action_href = '/admin/courses' %}
-{% set ph_action_label = 'Courses' %}
-{% include '@platform/partials/page-head.html.twig' %}
-<div class="container-fluid cl-container-wide pt-4">
-  {% include '@platform/partials/admin/course-group-nav.html.twig' %}
-</div>
-<section class="container-fluid cl-container-wide py-5">
-  <div class="row g-4">
-    <div class="col-12"><div class="card"><div class="toolbar p-3">
-	<div></div>
-	<button class="btn btn-primary" type="button" data-open-modal="createCategoryModal">＋ Create category</button>
-</div>
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: 0} %}
-{% endif %}
-<div class="table-wrap"><table class="table table-hover align-middle mb-0"><thead><tr><th style="width:52%">Category</th><th style="width:8%">Courses</th><th style="width:14%">With sub-categories</th><th style="width:12%">Order</th><th class="cell-actions" style="width:14%">Actions</th></tr></thead><tbody>{% for category_index, category in categories %}<tr data-category-row><td><span class="cl-category-depth cl-category-depth-{{ category.level }}"><span class="cl-category-level" title="Level {{ category.level }}">L{{ category.level }}</span>{{ category.name }}</span>{% if category.parent_name %}<div class="small text-body-secondary cl-category-depth cl-category-depth-{{ category.level }}" style="border:0">in {{ category.grandparent_name ? category.grandparent_name ~ ' › ' : '' }}{{ category.parent_name }}</div>{% endif %}{% if category.description %}<div class="small text-body-secondary mt-1">{{ category.description }}</div>{% endif %}</td><td>{{ category.course_count }}</td><td>{{ category.descendant_course_count }}{% if category.child_count %}<div class="small text-body-secondary">{{ category.child_count }} sub</div>{% endif %}</td><td class="cell-actions"><div class="row-actions"><form action="/admin/courses/categories/{{ category.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up"><button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index==0 ? 'disabled' : '' }}>↑</button></form><form action="/admin/courses/categories/{{ category.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down"><button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index+1==categories|length ? 'disabled' : '' }}>↓</button></form></div></td><td class="cell-actions"><a class="btn btn-sm btn-primary" href="/admin/courses/categories/{{ category.id }}">Manage</a></td></tr>{% endfor %}</tbody></table></div></div></div>
-  </div>
-</section>
-
-<div class="modal-backdrop" id="createCategoryModal" role="dialog" aria-modal="true" aria-labelledby="createCategoryTitle" aria-hidden="true" hidden>
-  <div class="modal-card">
-    <div class="modal-head">
-      <div>
-        <div class="eyebrow">Course metadata</div>
-        <h3 id="createCategoryTitle">Create category</h3>
-      </div>
-      <button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
-    </div>
-    <form action="/admin/courses/categories" method="post">
-      <div class="modal-body">
-        <p class="text-body-secondary">The slug is generated from the name unless you supply one.</p>
-        <div class="vstack gap-3"><input type="hidden" name="csrf" value="{{ csrf }}"><div><label class="form-label">Name</label><input class="form-control" name="name" maxlength="120" required></div><div><label class="form-label">Parent category</label><select class="form-select" name="parent_id"><option value="0">None — a top-level category</option>{% for parent_option in parent_options %}<option value="{{ parent_option.id }}">{{ parent_option.parent_name ? parent_option.parent_name ~ ' › ' : '' }}{{ parent_option.name }}</option>{% endfor %}</select><div class="form-text">Categories go three levels deep, so a sub-sub-category cannot hold children of its own.</div></div><div><label class="form-label">Slug <small class="text-body-secondary">optional</small></label><input class="form-control" name="slug" placeholder="generated-from-name"></div><div><label class="form-label">Description</label><textarea class="form-control" name="description" rows="4"></textarea></div></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn btn-ghost" type="button" data-close-modal>Cancel</button>
-        <button class="btn btn-primary" type="submit">Create category</button>
-      </div>
-    </form>
-  </div>
-</div>
+	{% set ph_back_href = '/admin/courses' %}
+	{% set ph_back_label = 'Course administration' %}
+	{% set ph_kicker = 'Course metadata' %}
+	{% set ph_title = 'Course categories' %}
+	{% set ph_lead = 'Create and maintain the catalogue taxonomy used by courses.' %}
+	{% set ph_action_href = '/admin/courses' %}
+	{% set ph_action_label = 'Courses' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<div class="container-fluid cl-container-wide pt-4">
+		{% include '@platform/partials/admin/course-group-nav.html.twig' %}
+	</div>
+	<section class="container-fluid cl-container-wide py-5">
+		<div class="row g-4">
+			<div class="col-12">
+				<div class="card">
+					<div class="toolbar p-3">
+						<div>
+						</div>
+						<button class="btn btn-primary" type="button" data-open-modal="createCategoryModal">＋ Create category</button>
+					</div>
+					{% if universe_switch %}
+						{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: 0} %}
+					{% endif %}
+					<div class="table-wrap">
+						<table class="table table-hover align-middle mb-0">
+							<thead>
+								<tr>
+									<th style="width:52%">
+										Category
+									</th>
+									<th style="width:8%">
+										Courses
+									</th>
+									<th style="width:14%">
+										With sub-categories
+									</th>
+									<th style="width:12%">
+										Order
+									</th>
+									<th class="cell-actions" style="width:14%">
+										Actions
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{% for category_index, category in categories %}
+									<tr data-category-row>
+										<td>
+											<span class="cl-category-depth cl-category-depth-{{ category.level }}"><span class="cl-category-level" title="Level {{ category.level }}">L{{ category.level }}</span>{{ category.name }}</span>
+											{% if category.parent_name %}
+												<div class="small text-body-secondary cl-category-depth cl-category-depth-{{ category.level }}" style="border:0">
+													in {{ category.grandparent_name ? category.grandparent_name ~ ' › ' : '' }}{{ category.parent_name }}
+												</div>
+											{% endif %}
+											{% if category.description %}
+												<div class="small text-body-secondary mt-1">
+													{{ category.description }}
+												</div>
+											{% endif %}
+										</td>
+										<td>
+											{{ category.course_count }}
+										</td>
+										<td>
+											{{ category.descendant_course_count }}
+											{% if category.child_count %}
+												<div class="small text-body-secondary">
+													{{ category.child_count }} sub
+												</div>
+											{% endif %}
+										</td>
+										<td class="cell-actions">
+											<div class="row-actions">
+												<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
+													<input type="hidden" name="csrf" value="{{ csrf }}">
+													<input type="hidden" name="direction" value="up">
+													<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index==0 ? 'disabled' : '' }}>↑</button>
+												</form>
+												<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
+													<input type="hidden" name="csrf" value="{{ csrf }}">
+													<input type="hidden" name="direction" value="down">
+													<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index+1==categories|length ? 'disabled' : '' }}>↓</button>
+												</form>
+											</div>
+										</td>
+										<td class="cell-actions">
+											<a class="btn btn-sm btn-primary" href="/admin/courses/categories/{{ category.id }}">Manage</a>
+										</td>
+									</tr>
+								{% endfor %}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+	<div class="modal-backdrop" id="createCategoryModal" role="dialog" aria-modal="true" aria-labelledby="createCategoryTitle" aria-hidden="true" hidden>
+		<div class="modal-card">
+			<div class="modal-head">
+				<div>
+					<div class="eyebrow">
+						Course metadata
+					</div>
+					<h3 id="createCategoryTitle">
+						Create category
+					</h3>
+				</div>
+				<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
+			</div>
+			<form action="/admin/courses/categories" method="post">
+				<div class="modal-body">
+					<p class="text-body-secondary">
+						The slug is generated from the name unless you supply one.
+					</p>
+					<div class="vstack gap-3">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<div>
+							<label class="form-label">Name</label>
+							<input class="form-control" name="name" maxlength="120" required>
+						</div>
+						<div>
+							<label class="form-label">Parent category</label><select class="form-select" name="parent_id"><option value="0">None — a top-level category</option>
+							{% for parent_option in parent_options %}
+								<option value="{{ parent_option.id }}">{{ parent_option.parent_name ? parent_option.parent_name ~ ' › ' : '' }}{{ parent_option.name }}</option>
+							{% endfor %}
+							</select>
+							<div class="form-text">
+								Categories go three levels deep, so a sub-sub-category cannot hold children of its own.
+							</div>
+						</div>
+						<div>
+							<label class="form-label">Slug <small class="text-body-secondary">optional</small></label>
+							<input class="form-control" name="slug" placeholder="generated-from-name">
+						</div>
+						<div>
+							<label class="form-label">Description</label>
+							<textarea class="form-control" name="description" rows="4"></textarea>
+						</div>
+					</div>
+				</div>
+				<div class="modal-foot">
+					<button class="btn btn-ghost" type="button" data-close-modal>Cancel</button>
+					<button class="btn btn-primary" type="submit">Create category</button>
+				</div>
+			</form>
+		</div>
+	</div>
 {% endblock %}

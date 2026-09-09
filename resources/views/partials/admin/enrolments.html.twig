@@ -24,56 +24,62 @@ Changelog:
   - Course requests moved to their own screen and route; this one is enrolments alone.
 #}
 {% include '@platform/partials/admin/course-group-nav.html.twig' %}
-
 <div class="section-head">
 	<div>
-		<h2>Enrolments</h2>
-		<p>Learner access to courses, and how far each has got.</p>
+		<h2>
+			Enrolments
+		</h2>
+		<p>
+			Learner access to courses, and how far each has got.
+		</p>
 	</div>
 </div>
-
-
-
-	{% if universe_switch %}
-		{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: enrolments_universe_counts} %}
-	{% endif %}
-
-	{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'enrolments', ds_label: 'Search enrolments', ds_value: enrolments_search, ds_action: '/admin/course/enrolments'} %}
-
-	<div id="enrolments-region" data-server-search-target>
+{% if universe_switch %}
+	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: enrolments_universe_counts} %}
+{% endif %}
+{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'enrolments', ds_label: 'Search enrolments', ds_value: enrolments_search, ds_action: '/admin/course/enrolments'} %}
+<div id="enrolments-region" data-server-search-target>
 	<div id="enrolments-results">
-
-	{% if enrolments_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: enrolments_pagination} %}
-	{% endif %}
-
+		{% if enrolments_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: enrolments_pagination} %}
+		{% endif %}
 		<div class="table-wrap">
 			<table>
 				<thead>
-					<tr>{% for sh in enrolments_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: enrolments_region, sort_results: enrolments_results} %}{% endfor %}</tr>
+					<tr>
+						{% for sh in enrolments_sort_headers %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: enrolments_region, sort_results: enrolments_results} %}
+						{% endfor %}
+					</tr>
 				</thead>
 				<tbody>
 					{% for enrolment in enrolments %}
 						<tr>
 							<td title="{{ enrolment.learner_name }} · {{ enrolment.email }}">
 								{{ enrolment.learner_name }}
-								
 							</td>
-							<td title="{{ enrolment.course_title }}">{{ enrolment.course_title }}</td>
-							<td><span class="badge {{ enrolment.status=='cancelled' ? 'danger' : 'info' }}">{{ enrolment.status }}</span></td>
-							<td>{{ enrolment.progress_percentage }}%</td>
+							<td title="{{ enrolment.course_title }}">
+								{{ enrolment.course_title }}
+							</td>
+							<td>
+								<span class="badge {{ enrolment.status=='cancelled' ? 'danger' : 'info' }}">{{ enrolment.status }}</span>
+							</td>
+							<td>
+								{{ enrolment.progress_percentage }}%
+							</td>
 							<td class="cell-actions">
 								<div class="row-actions">
 									{% if enrolment.status=='cancelled' %}
 										<form action="/admin/course/enrolments/{{ enrolment.id }}/restore" method="post">
-												<input type="hidden" name="csrf" value="{{ csrf }}">
-												<button class="btn btn-soft btn-sm" title="Restore this learner's course access">Restore</button>
-											</form>{% else %}
-											<form action="/admin/course/enrolments/{{ enrolment.id }}/remove" method="post">
-												<input type="hidden" name="csrf" value="{{ csrf }}">
-												<input type="hidden" name="reason" value="Removed by platform administrator">
-												<button class="btn btn-danger btn-sm" title="Remove this learner's course access" data-confirm="Remove this learner’s course access?">Remove</button>
-											</form>
+											<input type="hidden" name="csrf" value="{{ csrf }}">
+											<button class="btn btn-soft btn-sm" title="Restore this learner's course access">Restore</button>
+										</form>
+									{% else %}
+										<form action="/admin/course/enrolments/{{ enrolment.id }}/remove" method="post">
+											<input type="hidden" name="csrf" value="{{ csrf }}">
+											<input type="hidden" name="reason" value="Removed by platform administrator">
+											<button class="btn btn-danger btn-sm" title="Remove this learner's course access" data-confirm="Remove this learner’s course access?">Remove</button>
+										</form>
 									{% endif %}
 								</div>
 							</td>
@@ -82,16 +88,15 @@ Changelog:
 				</tbody>
 			</table>
 		</div>
-
 		{% if enrolments_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: enrolments_pagination} %}{% else %}
-				{% if enrolments_preview_has_more %}
-					<div class="pagination-row">
-						<span class="pagination-summary">Showing the first {{ preview_page_size }} enrolments.</span>
-						<a class="btn btn-soft btn-sm" href="/admin/enrolments{{ universe_query }}">View all enrolments</a>
-					</div>
-				{% endif %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: enrolments_pagination} %}
+		{% else %}
+			{% if enrolments_preview_has_more %}
+				<div class="pagination-row">
+					<span class="pagination-summary">Showing the first {{ preview_page_size }} enrolments.</span>
+					<a class="btn btn-soft btn-sm" href="/admin/enrolments{{ universe_query }}">View all enrolments</a>
+				</div>
+			{% endif %}
 		{% endif %}
-
 	</div>
-	</div>
+</div>

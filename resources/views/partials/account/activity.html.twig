@@ -1,2 +1,62 @@
-<div class="section-head"><div><h2>Account activity</h2><p>Recent actions recorded for this account. Login sessions are managed separately under Sessions.</p></div></div>
-<div class="table-wrap"><table><thead><tr><th style="width:13%">Time</th><th style="width:31%">Activity</th><th style="width:30%">Subject</th><th style="width:13%">IP</th><th style="width:13%">Location</th></tr></thead><tbody>{% for event in account_activity %}<tr><td class="small">{{ event.created_at }}</td><td title="{{ event.event_label }}"><strong>{{ event.event_label }}</strong><div class="small muted">{{ event.family_label }}</div></td><td title="{{ event.subject }}">{{ event.subject }}</td><td>{{ event.ip_address ?: '—' }}</td><td>{{ event.geo_location }}</td></tr>{% endfor %}</tbody></table>{% if not account_activity %}<div class="empty">No account activity has been recorded yet.</div>{% endif %}</div>
+<div class="section-head">
+	<div>
+		<h2>
+			Account activity
+		</h2>
+		<p>
+			Recent actions recorded for this account. Login sessions are managed separately under Sessions.
+		</p>
+	</div>
+</div>
+<div class="table-wrap">
+	<table>
+		<thead>
+			<tr>
+				<th style="width:13%">
+					Time
+				</th>
+				<th style="width:31%">
+					Activity
+				</th>
+				<th style="width:30%">
+					Subject
+				</th>
+				<th style="width:13%">
+					IP
+				</th>
+				<th style="width:13%">
+					Location
+				</th>
+			</tr>
+		</thead>
+		<tbody>
+			{% for event in account_activity %}
+				<tr>
+					<td class="small">
+						{{ event.created_at }}
+					</td>
+					<td title="{{ event.event_label }}">
+						<strong>{{ event.event_label }}</strong>
+						<div class="small muted">
+							{{ event.family_label }}
+						</div>
+					</td>
+					<td title="{{ event.subject }}">
+						{{ event.subject }}
+					</td>
+					<td>
+						{{ event.ip_address ?: '—' }}
+					</td>
+					<td>
+						{{ event.geo_location }}
+					</td>
+				</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+	{% if not account_activity %}
+		<div class="empty">
+			No account activity has been recorded yet.
+		</div>
+	{% endif %}
+</div>

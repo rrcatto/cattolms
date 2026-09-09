@@ -13,14 +13,12 @@ Changelog:
   - Uses the shared page header rather than a heading block of its own.
 #}
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_kicker = 'Account' %}
-{% set ph_title = account_section.label %}
-{% set ph_lead = account_section.description %}
-{% set ph_action_href = '/account' %}
-{% set ph_action_label = 'All account sections' %}
-{% include '@platform/partials/page-head.html.twig' %}
-
-{{ account_section.content|raw }}
+	{% set ph_kicker = 'Account' %}
+	{% set ph_title = account_section.label %}
+	{% set ph_lead = account_section.description %}
+	{% set ph_action_href = '/account' %}
+	{% set ph_action_label = 'All account sections' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{{ account_section.content|raw }}
 {% endblock %}

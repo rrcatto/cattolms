@@ -25,45 +25,52 @@ Changelog:
   - Added the shared live search control and its result region.
 #}
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'courses', ds_label: 'Search courses', ds_value: courses_search, ds_action: '/company/courses'} %}
-
 <div id="courses-region" data-server-search-target>
-<div id="courses-results">
-
-	{% if courses_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}
-	{% endif %}
-
-	<div class="notice">
-		<span>ⓘ</span>
-		<div><strong>Courses this company owns.</strong> Training its own staff on them costs nothing and needs no credits. Courses bought for staff are under <a href="/company/training">Courses Bought</a>.</div>
-	</div>
-
-	<div class="table-wrap">
-		<table>
-			<thead>
-				<tr>{% for sh in courses_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: courses_region, sort_results: courses_results} %}{% endfor %}</tr>
-			</thead>
-			<tbody>
-				{% for course in courses %}
+	<div id="courses-results">
+		{% if courses_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}
+		{% endif %}
+		<div class="notice">
+			<span>ⓘ</span>
+			<div>
+				<strong>Courses this company owns.</strong> Training its own staff on them costs nothing and needs no credits. Courses bought for staff are under <a href="/company/training">Courses Bought</a>.
+			</div>
+		</div>
+		<div class="table-wrap">
+			<table>
+				<thead>
 					<tr>
-						<td><strong>{{ course.title }}</strong></td>
-						<td>{{ course.status }}</td>
-						<td>{{ course.category_name ?: '—' }}</td>
+						{% for sh in courses_sort_headers %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: courses_region, sort_results: courses_results} %}
+						{% endfor %}
 					</tr>
-				{% endfor %}
-			</tbody>
-		</table>
-	</div>
-
-	{% if courses_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}{% else %}
+				</thead>
+				<tbody>
+					{% for course in courses %}
+						<tr>
+							<td>
+								<strong>{{ course.title }}</strong>
+							</td>
+							<td>
+								{{ course.status }}
+							</td>
+							<td>
+								{{ course.category_name ?: '—' }}
+							</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+		{% if courses_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}
+		{% else %}
 			{% if courses_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} courses.</span>
 					<a class="btn btn-soft btn-sm" href="/company/courses">View all courses</a>
 				</div>
 			{% endif %}
-	{% endif %}
-
-</div>
+		{% endif %}
+	</div>
 </div>

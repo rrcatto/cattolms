@@ -34,33 +34,48 @@ Changelog:
 #}
 <div class="section-head">
 	<div>
-		<h2>Platform settings</h2>
-		<p>Administrator overrides are stored in PostgreSQL. Where an override is absent, the LMS falls back to the corresponding value in <span class="mono">.env</span>.</p>
+		<h2>
+			Platform settings
+		</h2>
+		<p>
+			Administrator overrides are stored in PostgreSQL. Where an override is absent, the LMS falls back to the corresponding value in <span class="mono">.env</span>.
+		</p>
 	</div>
 </div>
-
 <div class="admin-settings-layout">
-
 	<div class="card">
 		<div class="section-head">
 			<div>
-				<h2>Platform identity</h2>
-				<p>Safe runtime settings may override their deployment defaults without editing <span class="mono">.env</span>.</p>
+				<h2>
+					Platform identity
+				</h2>
+				<p>
+					Safe runtime settings may override their deployment defaults without editing <span class="mono">.env</span>.
+				</p>
 			</div>
 		</div>
 		<form action="/admin/settings" method="post" class="form-grid">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			<div class="field full">
-				<label>Platform name <span class="badge info">{{ platform_name_source=='database' ? 'Database override' : '.env default' }}</span></label><input name="platform_name" value="{{ platform_name }}">
-				<div class="help">Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.</div>
+				<label>Platform name <span class="badge info">{{ platform_name_source=='database' ? 'Database override' : '.env default' }}</span></label>
+				<input name="platform_name" value="{{ platform_name }}">
+				<div class="help">
+					Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
+				</div>
 			</div>
 			<div class="field full">
-				<label>System Company name</label><input name="system_company_name" value="{{ system_company_name }}">
-				<div class="help">The permanent host organisation. It cannot be deleted, but its name is yours to control.</div>
+				<label>System Company name</label>
+				<input name="system_company_name" value="{{ system_company_name }}">
+				<div class="help">
+					The permanent host organisation. It cannot be deleted, but its name is yours to control.
+				</div>
 			</div>
 			<div class="field full">
-				<label>System Company domain</label><input name="system_company_domain" value="{{ system_company_domain }}" required>
-				<div class="help">Initially defaults from <span class="mono">APP_DOMAIN</span>. Enter only the domain, for example <span class="mono">prettythings.capetown</span>.</div>
+				<label>System Company domain</label>
+				<input name="system_company_domain" value="{{ system_company_domain }}" required>
+				<div class="help">
+					Initially defaults from <span class="mono">APP_DOMAIN</span>. Enter only the domain, for example <span class="mono">prettythings.capetown</span>.
+				</div>
 			</div>
 			<div class="field full">
 				<button class="btn btn-primary">Save platform settings</button>
@@ -73,38 +88,51 @@ Changelog:
 			</form>
 		{% endif %}
 	</div>
-
 	{% if can_manage_seed %}
 		<div class="card">
 			<div class="section-head">
 				<div>
-					<h2>SEED System Company</h2>
-					<p>The shared host organisation for generated data. Its domain is also the address every seed message is delivered to.</p>
+					<h2>
+						SEED System Company
+					</h2>
+					<p>
+						The shared host organisation for generated data. Its domain is also the address every seed message is delivered to.
+					</p>
 				</div>
 				<span class="badge info">{{ seed_system_company_domain_source=='database' ? 'Database override' : '.env default' }}</span>
 			</div>
-
 			{% if not seed_system_company_present %}
-				<div class="alert alert-warning"><strong>The shared SEED System Company is missing.</strong> This database predates the v0.5.8 baseline, so there is no row to edit. A destructive reset and migrate creates it.</div>
+				<div class="alert alert-warning">
+					<strong>The shared SEED System Company is missing.</strong> This database predates the v0.5.8 baseline, so there is no row to edit. A destructive reset and migrate creates it.
+				</div>
 			{% endif %}
-
 			{% if seed_system_company_present %}
 				<form action="/admin/settings/seed-company" method="post" class="form-grid">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<div class="field full">
-						<label>SEED System Company name</label><input name="seed_system_company_name" value="{{ seed_system_company_name }}" required>
-						<div class="help">Overrides <span class="mono">SEED_SYSTEM_COMPANY_NAME</span>. Generated companies are separate organisations; this is the one that owns seed infrastructure.</div>
+						<label>SEED System Company name</label>
+						<input name="seed_system_company_name" value="{{ seed_system_company_name }}" required>
+						<div class="help">
+							Overrides <span class="mono">SEED_SYSTEM_COMPANY_NAME</span>. Generated companies are separate organisations; this is the one that owns seed infrastructure.
+						</div>
 					</div>
 					<div class="field full">
-						<label>SEED System Company domain</label><input name="seed_system_company_domain" value="{{ seed_system_company_domain }}">
-						<div class="help">Overrides <span class="mono">SEED_SYSTEM_COMPANY_DOMAIN</span>, and must differ from <span class="mono">APP_DOMAIN</span>. Generated addresses keep their own reserved domains on screen but are delivered here, so use a domain you genuinely receive mail for. Leave it empty to disable the rewrite entirely.</div>
+						<label>SEED System Company domain</label>
+						<input name="seed_system_company_domain" value="{{ seed_system_company_domain }}">
+						<div class="help">
+							Overrides <span class="mono">SEED_SYSTEM_COMPANY_DOMAIN</span>, and must differ from <span class="mono">APP_DOMAIN</span>. Generated addresses keep their own reserved domains on screen but are delivered here, so use a domain you genuinely receive mail for. Leave it empty to disable the rewrite entirely.
+						</div>
 					</div>
 					<div class="field full">
 						{% if seed_mail_rewrite_active %}
-							<p class="help"><strong>Seed mail is delivered to {{ seed_system_company_domain }}.</strong> One real inbox receives every generated identity's messages.</p>
+							<p class="help">
+								<strong>Seed mail is delivered to {{ seed_system_company_domain }}.</strong> One real inbox receives every generated identity's messages.
+							</p>
 						{% endif %}
 						{% if not seed_mail_rewrite_active %}
-							<p class="help"><strong>Seed mail is not delivered.</strong> With no domain set, generated addresses stay on their reserved domains and bounce, which is safe if you never sign in as a generated identity.</p>
+							<p class="help">
+								<strong>Seed mail is not delivered.</strong> With no domain set, generated addresses stay on their reserved domains and bounce, which is safe if you never sign in as a generated identity.
+							</p>
 						{% endif %}
 					</div>
 					<div class="field full">
@@ -120,58 +148,79 @@ Changelog:
 			{% endif %}
 		</div>
 	{% endif %}
-
 	<div class="card">
 		<div class="section-head">
 			<div>
-				<h2>SMTP / outgoing email</h2>
-				<p>Database values override <span class="mono">MAILER_DSN</span>, <span class="mono">MAIL_FROM_ADDRESS</span>, <span class="mono">MAIL_FROM_NAME</span> and <span class="mono">MAIL_REPLY_TO</span>.</p>
+				<h2>
+					SMTP / outgoing email
+				</h2>
+				<p>
+					Database values override <span class="mono">MAILER_DSN</span>, <span class="mono">MAIL_FROM_ADDRESS</span>, <span class="mono">MAIL_FROM_NAME</span> and <span class="mono">MAIL_REPLY_TO</span>.
+				</p>
 			</div>
 			<span class="badge info">{{ mail_settings.mail_override_active ? 'Database override' : '.env defaults' }}</span>
 		</div>
-
 		{% if mail_settings.mail_configuration_error %}
-			<div class="alert alert-warning"><strong>Mail configuration needs attention.</strong> {{ mail_settings.mail_configuration_error }}</div>
+			<div class="alert alert-warning">
+				<strong>Mail configuration needs attention.</strong> {{ mail_settings.mail_configuration_error }}
+			</div>
 		{% endif %}
-
 		<form action="/admin/settings/mail" method="post" class="form-grid">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			<div class="field">
 				<label>Connection type</label><select name="smtp_scheme"><option value="smtp" {{ mail_settings.smtp_scheme=='smtp' ? 'selected' : '' }}>SMTP / STARTTLS</option><option value="smtps" {{ mail_settings.smtp_scheme=='smtps' ? 'selected' : '' }}>SMTP over TLS</option></select>
 			</div>
 			<div class="field">
-				<label>SMTP port</label><input type="number" min="1" max="65535" name="smtp_port" value="{{ mail_settings.smtp_port }}" required>
+				<label>SMTP port</label>
+				<input type="number" min="1" max="65535" name="smtp_port" value="{{ mail_settings.smtp_port }}" required>
 			</div>
 			<div class="field full">
-				<label>SMTP server</label><input name="smtp_host" value="{{ mail_settings.smtp_host }}" placeholder="smtp.example.com" required>
+				<label>SMTP server</label>
+				<input name="smtp_host" value="{{ mail_settings.smtp_host }}" placeholder="smtp.example.com" required>
 			</div>
 			<div class="field full">
-				<label>SMTP username</label><input name="smtp_username" value="{{ mail_settings.smtp_username }}" autocomplete="off">
+				<label>SMTP username</label>
+				<input name="smtp_username" value="{{ mail_settings.smtp_username }}" autocomplete="off">
 			</div>
 			<div class="field full">
-				<label>SMTP password</label><input type="password" name="smtp_password" value="" autocomplete="new-password">
-				<div class="help">{{ mail_settings.smtp_password_configured ? 'A password is configured. Leave this blank to keep it.' : 'No SMTP password is currently configured.' }} Passwords saved here are encrypted using <span class="mono">APP_KEY</span>.</div>
+				<label>SMTP password</label>
+				<input type="password" name="smtp_password" value="" autocomplete="new-password">
+				<div class="help">
+					{{ mail_settings.smtp_password_configured ? 'A password is configured. Leave this blank to keep it.' : 'No SMTP password is currently configured.' }} Passwords saved here are encrypted using <span class="mono">APP_KEY</span>.
+				</div>
 			</div>
 			<div class="field full">
-				<label>From address</label><input type="email" name="mail_from_address" value="{{ mail_settings.mail_from_address }}" required>
+				<label>From address</label>
+				<input type="email" name="mail_from_address" value="{{ mail_settings.mail_from_address }}" required>
 			</div>
 			<div class="field full">
-				<label>From name</label><input name="mail_from_name" value="{{ mail_settings.mail_from_name }}">
-				<div class="help">Leave blank to use the effective Platform name.</div>
+				<label>From name</label>
+				<input name="mail_from_name" value="{{ mail_settings.mail_from_name }}">
+				<div class="help">
+					Leave blank to use the effective Platform name.
+				</div>
 			</div>
 			<div class="field full">
-				<label>Reply-to address</label><input type="email" name="mail_reply_to" value="{{ mail_settings.mail_reply_to }}">
-				<div class="help">Optional. Leave blank to receive replies at the From address.</div>
+				<label>Reply-to address</label>
+				<input type="email" name="mail_reply_to" value="{{ mail_settings.mail_reply_to }}">
+				<div class="help">
+					Optional. Leave blank to receive replies at the From address.
+				</div>
 			</div>
 			<details class="field full">
-				<summary><strong>Advanced SMTP DSN options</strong></summary><label style="margin-top:10px">Query options</label><input name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true">
-				<div class="help">Normally leave this unchanged. This preserves optional Symfony Mailer DSN query parameters.</div>
+				<summary>
+					<strong>Advanced SMTP DSN options</strong>
+				</summary>
+				<label style="margin-top:10px">Query options</label>
+				<input name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true">
+				<div class="help">
+					Normally leave this unchanged. This preserves optional Symfony Mailer DSN query parameters.
+				</div>
 			</details>
 			<div class="field full">
 				<button class="btn btn-primary">Save SMTP override</button>
 			</div>
 		</form>
-
 		<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
 			<form action="/admin/mail/test" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -185,56 +234,72 @@ Changelog:
 			{% endif %}
 		</div>
 	</div>
-
 	<div class="card">
 		<div class="section-head">
 			<div>
-				<h2>Configuration model</h2>
-				<p>The LMS deliberately separates deployment secrets from administrator-managed runtime settings.</p>
+				<h2>
+					Configuration model
+				</h2>
+				<p>
+					The LMS deliberately separates deployment secrets from administrator-managed runtime settings.
+				</p>
 			</div>
 		</div>
 		<div class="list">
 			<div class="list-item">
 				<div>
 					<strong>Database-over-.env settings</strong>
-					<p>Platform name and outgoing mail may be changed here. Removing an override returns that setting to its <span class="mono">.env</span> default.</p>
+					<p>
+						Platform name and outgoing mail may be changed here. Removing an override returns that setting to its <span class="mono">.env</span> default.
+					</p>
 				</div>
 			</div>
 			<div class="list-item">
 				<div>
 					<strong>Infrastructure remains in .env</strong>
-					<p>Database credentials, <span class="mono">APP_KEY</span>, application URL/domain, cookie/security settings and filesystem/deployment configuration are not exposed in the web UI.</p>
+					<p>
+						Database credentials, <span class="mono">APP_KEY</span>, application URL/domain, cookie/security settings and filesystem/deployment configuration are not exposed in the web UI.
+					</p>
 				</div>
 			</div>
 		</div>
 	</div>
-
 	<div class="card">
 		<div class="section-head">
 			<div>
-				<h2>Maintenance</h2>
-				<p>Expired means the record can no longer be used to authenticate anyone. These controls remove only obsolete authentication/session records.</p>
+				<h2>
+					Maintenance
+				</h2>
+				<p>
+					Expired means the record can no longer be used to authenticate anyone. These controls remove only obsolete authentication/session records.
+				</p>
 			</div>
 		</div>
 		<div class="list">
 			<div class="list-item">
 				<div>
 					<strong>Expired login links</strong>
-					<p>{{ maintenance.login_tokens }} passwordless login links are past their validity period.</p>
+					<p>
+						{{ maintenance.login_tokens }} passwordless login links are past their validity period.
+					</p>
 				</div>
 				<span class="badge info">{{ maintenance.login_tokens }}</span>
 			</div>
 			<div class="list-item">
 				<div>
 					<strong>Expired authentication sessions</strong>
-					<p>{{ maintenance.auth_sessions }} authentication sessions can no longer be used.</p>
+					<p>
+						{{ maintenance.auth_sessions }} authentication sessions can no longer be used.
+					</p>
 				</div>
 				<span class="badge info">{{ maintenance.auth_sessions }}</span>
 			</div>
 			<div class="list-item">
 				<div>
 					<strong>Expired web sessions</strong>
-					<p>{{ maintenance.web_sessions }} browser sessions have expired.</p>
+					<p>
+						{{ maintenance.web_sessions }} browser sessions have expired.
+					</p>
 				</div>
 				<span class="badge info">{{ maintenance.web_sessions }}</span>
 			</div>
@@ -244,5 +309,4 @@ Changelog:
 			<button class="btn btn-danger" data-confirm="Remove the expired login and session records listed above?">Clean expired records</button>
 		</form>
 	</div>
-
 </div>

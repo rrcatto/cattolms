@@ -61,8 +61,7 @@ Changelog:
   - Created as the one live search control for every paginated dataset.
 #}
 <form class="dataset-search" method="get" action="{{ ds_action }}" data-server-search>
-
-	{#
+{#
 		The data scope the screen is showing travels with the search. Without it the request arrives
 		with no scope at all, the server falls back to its default, and the scope control resets the
 		moment anybody types - which is what happened when the inline Administration form was
@@ -78,10 +77,12 @@ Changelog:
 		should still supply the key; this makes forgetting it a missing hidden field rather than a
 		broken page.
 	#}
-	{% if universe is defined and universe %}<input type="hidden" name="universe" value="{{ universe }}">{% endif %}
-
+	{% if universe is defined and universe %}
+		<input type="hidden" name="universe" value="{{ universe }}">
+	{% endif %}
 	<div class="field">
-		<label for="{{ ds_name }}-search">{{ ds_label }}</label><input type="search" id="{{ ds_name }}-search" name="{{ ds_name }}_q" value="{{ ds_value }}" placeholder="Type to search" autocomplete="off" maxlength="120"
+		<label for="{{ ds_name }}-search">{{ ds_label }}</label>
+		<input type="search" id="{{ ds_name }}-search" name="{{ ds_name }}_q" value="{{ ds_value }}" placeholder="Type to search" autocomplete="off" maxlength="120"
 		       hx-get="{{ ds_action }}"
 		       hx-trigger="input changed delay:300ms, search"
 		       hx-target="#{{ ds_name }}-region"
@@ -91,15 +92,16 @@ Changelog:
 		       hx-sync="this:replace"
 		       hx-indicator="closest .dataset-search">
 	</div>
-
 	<div class="dataset-search-actions">
 		<span class="dataset-search-status" aria-live="polite" role="status">Searching…</span>
-		<noscript><button class="btn btn-soft btn-sm dataset-search-submit" type="submit">Search</button></noscript>
+		<noscript>
+			<button class="btn btn-soft btn-sm dataset-search-submit" type="submit">Search</button>
+		</noscript>
 		{% if ds_value %}
 			<a class="btn btn-ghost btn-sm" href="{{ ds_action }}">Clear</a>
 		{% endif %}
 	</div>
-
-	<p class="help">Searches every matching record, not only the rows on this page.</p>
-
+	<p class="help">
+		Searches every matching record, not only the rows on this page.
+	</p>
 </form>

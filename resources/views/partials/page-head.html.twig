@@ -46,15 +46,21 @@ Changelog:
   - Created so every screen carries the same header in the same place.
 #}
 {% if ph_compact is defined and ph_compact %}
-	<section class="cl-page-head cl-page-head-compact"><div class="container-fluid cl-container-wide py-3">
+	<section class="cl-page-head cl-page-head-compact">
+		<div class="container-fluid cl-container-wide py-3">
 			<div class="cl-page-head-row">
 				{% if ph_back_href is defined and ph_back_href %}
 					<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label is defined and ph_back_label ? ph_back_label : 'Back' }}</a>
 				{% endif %}
-				<h1 class="h5 mb-0">{{ ph_title }}</h1>
+				<h1 class="h5 mb-0">
+					{{ ph_title }}
+				</h1>
 			</div>
-		</div></section>{% else %}
-		<section class="cl-page-head"><div class="container-fluid cl-container-wide py-5">
+		</div>
+	</section>
+{% else %}
+	<section class="cl-page-head">
+		<div class="container-fluid cl-container-wide py-5">
 			<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
 				<div>
 					{% if ph_back_href is defined and ph_back_href %}
@@ -63,14 +69,19 @@ Changelog:
 					{% if ph_kicker is defined and ph_kicker %}
 						<span class="cl-kicker d-block {{ ph_back_href is defined and ph_back_href ? 'mt-3' : '' }}">{{ ph_kicker }}</span>
 					{% endif %}
-					<h1 class="display-5 fw-bold">{{ ph_title }}</h1>
+					<h1 class="display-5 fw-bold">
+						{{ ph_title }}
+					</h1>
 					{% if ph_lead is defined and ph_lead %}
-						<p class="lead mb-0">{{ ph_lead }}</p>
+						<p class="lead mb-0">
+							{{ ph_lead }}
+						</p>
 					{% endif %}
 				</div>
 				{% if ph_action_href is defined and ph_action_href %}
 					<a class="btn btn-light" href="{{ ph_action_href }}">{{ ph_action_label is defined and ph_action_label ? ph_action_label : 'Back' }}</a>
 				{% endif %}
 			</div>
-		</div></section>
+		</div>
+	</section>
 {% endif %}
