@@ -25,6 +25,6 @@ Changelog:
   - Created with the Companies split.
 #}
 <nav class="cl-group-nav" aria-label="Company administration">
-	<a class="cl-group-tab {{ company_group == 'consumers' ? 'is-current' : '' }}" href="/admin/companies" {{ company_group == 'consumers' ? 'aria-current="page"' : '' }}>Course Consumers</a>
-	<a class="cl-group-tab {{ company_group == 'creators' ? 'is-current' : '' }}" href="/admin/companies/creators" {{ company_group == 'creators' ? 'aria-current="page"' : '' }}>Course Creators</a>
+	<a class="cl-group-tab {{ company_group == 'consumers' ? 'is-current' : '' }}" href="/admin/companies" {% if company_group == 'consumers' %}aria-current="page"{% endif %}>Course Consumers</a>
+	<a class="cl-group-tab {{ company_group == 'creators' ? 'is-current' : '' }}" href="/admin/companies/creators" {% if company_group == 'creators' %}aria-current="page"{% endif %}>Course Creators</a>
 </nav>

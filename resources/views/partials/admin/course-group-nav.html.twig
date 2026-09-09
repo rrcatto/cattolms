@@ -35,17 +35,17 @@ Changelog:
   - Created so Courses, Course Categories and Enrolments and Requests reach each other directly.
 #}
 <nav class="cl-group-nav" aria-label="Course administration">
-	<a class="cl-group-tab {{ course_group == 'courses' ? 'is-current' : '' }}" href="/admin/courses" {{ course_group == 'courses' ? 'aria-current="page"' : '' }}>Courses</a>
+	<a class="cl-group-tab {{ course_group == 'courses' ? 'is-current' : '' }}" href="/admin/courses" {% if course_group == 'courses' %}aria-current="page"{% endif %}>Courses</a>
 	{% if can_manage_course_categories %}
-		<a class="cl-group-tab {{ course_group == 'categories' ? 'is-current' : '' }}" href="/admin/courses/categories" {{ course_group == 'categories' ? 'aria-current="page"' : '' }}>Course Categories</a>
+		<a class="cl-group-tab {{ course_group == 'categories' ? 'is-current' : '' }}" href="/admin/courses/categories" {% if course_group == 'categories' %}aria-current="page"{% endif %}>Course Categories</a>
 	{% endif %}
 	{% if can_manage_course_tags %}
-		<a class="cl-group-tab {{ course_group == 'tags' ? 'is-current' : '' }}" href="/admin/courses/tags" {{ course_group == 'tags' ? 'aria-current="page"' : '' }}>Course Tags</a>
+		<a class="cl-group-tab {{ course_group == 'tags' ? 'is-current' : '' }}" href="/admin/courses/tags" {% if course_group == 'tags' %}aria-current="page"{% endif %}>Course Tags</a>
 	{% endif %}
 	{% if can_view_requests %}
-		<a class="cl-group-tab {{ course_group == 'requests' ? 'is-current' : '' }}" href="/admin/course/requests" {{ course_group == 'requests' ? 'aria-current="page"' : '' }}>Course Requests</a>
+		<a class="cl-group-tab {{ course_group == 'requests' ? 'is-current' : '' }}" href="/admin/course/requests" {% if course_group == 'requests' %}aria-current="page"{% endif %}>Course Requests</a>
 	{% endif %}
 	{% if can_view_enrolments %}
-		<a class="cl-group-tab {{ course_group == 'enrolments' ? 'is-current' : '' }}" href="/admin/course/enrolments" {{ course_group == 'enrolments' ? 'aria-current="page"' : '' }}>Enrolments</a>
+		<a class="cl-group-tab {{ course_group == 'enrolments' ? 'is-current' : '' }}" href="/admin/course/enrolments" {% if course_group == 'enrolments' %}aria-current="page"{% endif %}>Enrolments</a>
 	{% endif %}
 </nav>
