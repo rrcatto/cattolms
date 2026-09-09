@@ -401,7 +401,6 @@
    under Factory Reset the contact form's button was touching the textarea. Core owns the spacing
    because it is the same mistake on every form, not a matter of taste per theme. */
 .cl-form-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.5rem}
-.form-grid .field-wide{grid-column:1/-1}
 
 /* v0.7 the small handful of layout utilities the page bodies actually used inline.
    Twenty-two inline style attributes said one of eight things, and an inline style is the one
@@ -447,3 +446,18 @@
 .cl-course-cover-generated{display:block;line-height:0}
 .cl-course-cover-generated svg{display:block;width:100%;height:auto}
 .cl-tag-chip svg,.cl-tag-icon svg{display:inline-block;width:18px;height:18px;vertical-align:-3px;margin-right:.35rem}
+
+/* v0.7 the form grid, which core markup uses everywhere and only some themes styled.
+
+   Light Default and Factory Reset Sidebar defined no gap at all, so every form built from this
+   grid had its fields touching - the contact page was simply where it was noticed. A theme is
+   free to restyle it: every theme rule is written as a descendant of its own root and so outranks
+   these. What core must not do is leave the layout of its own markup to chance. */
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;min-width:0}
+.form-grid .field{display:grid;gap:.4rem;min-width:0}
+.form-grid .field-wide{grid-column:1/-1}
+@media(max-width:720px){.form-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Bootstrap's card-body padding is 1rem, which is thin for a page whose whole content is one form.
+   A theme that states its own padding is more specific than this and keeps it. */
+.contact-card>.card-body{padding:clamp(1.25rem,2.5vw,2rem)}
