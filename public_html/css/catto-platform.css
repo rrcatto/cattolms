@@ -4,6 +4,8 @@
    The file is minified and validate-ui-contracts.php asserts literal byte substrings inside its
    lines, so a new control is appended as its own block rather than edited into an existing one.
    Changelog:
+2026/09/09 14:01 SAST
+- Defined the rest of core's own cl- namespace. Core emitted .cl-narrow, .cl-medium, .cl-page-head-row, .cl-filter-chip(s), .cl-question-editor and .cl-option-editor from core-owned page bodies without defining any of them, so each rendered only as well as the active theme happened to cover it: three themes gave the auth and content pages no width at all, and no theme styled the page-head row or the status filter.
 2026/09/07 13:00 SAST
 - Table rows never wrap: row actions, cells and the table itself.
 2026/09/08 11:00 SAST
@@ -461,3 +463,42 @@
 /* Bootstrap's card-body padding is 1rem, which is thin for a page whose whole content is one form.
    A theme that states its own padding is more specific than this and keeps it. */
 .contact-card>.card-body{padding:clamp(1.25rem,2.5vw,2rem)}
+
+/* v0.7 the rest of core's own cl- namespace that core never defined.
+
+   Core emits these classes from core-owned page bodies, so a theme is free to restyle them but
+   must not be required to define them. Every rule here is a single class, and core loads before
+   any theme sheet, so an existing theme rule - all of which are written as a descendant of the
+   theme's own root - still wins. What changes is only the case where a theme said nothing.
+
+   Measured across the five installed themes before writing this:
+   - .cl-narrow / .cl-medium had a width only in Gilded Noir and Light Default. Under the other
+     three, /login, /contact, /privacy, /help, /error, /company/register and six admin forms
+     inherited Bootstrap's .container and rendered a sign-in form 1320px wide.
+   - .cl-page-head-row had no rule in any theme, so the compact page header's back-link and title
+     stacked instead of forming the row the markup is built as.
+   - .cl-filter-chip had no rule in any theme, so the Requests status filter drew as bare running
+     links and the selected filter was distinguishable only by aria-current.
+   - .cl-question-editor / .cl-option-editor were carded in four themes and bare in Light Default,
+     where every question and answer option in the assessment editor ran together. */
+/* Compounded with .container deliberately. Every use of these sits on a Bootstrap container, and
+   Factory Reset and Radiant Learning each redeclare a bare `.container{max-width:1320px}` in their
+   own sheet - same specificity as a bare `.cl-narrow`, loaded afterwards, so the width constraint
+   lost and the form stayed full width. The compound outranks it while staying below the
+   `.theme-main .cl-narrow` form both Gilded Noir and Light Default already use, so those two keep
+   the widths they were accepted with. The bare rules stay for any future use off a container. */
+.cl-narrow{max-width:38rem;margin-inline:auto}
+.cl-medium{max-width:54rem;margin-inline:auto}
+.container.cl-narrow{max-width:38rem}
+.container.cl-medium{max-width:54rem}
+.cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+.cl-filter-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
+.cl-filter-chip{display:inline-flex;align-items:center;padding:.3rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.8rem;line-height:1.4;text-decoration:none;color:inherit}
+/* The selected state keeps the inherited text colour and tints the ground with a share of it, so
+   it cannot fail contrast in a theme core knows nothing about - a filled chip in a fixed brand
+   colour would, on whichever theme sets that colour light. */
+.cl-filter-chip.is-current{font-weight:600;border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
+.cl-question-editor{padding:1.25rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:1rem;margin-bottom:1.25rem}
+.cl-question-editor+.cl-question-editor{margin-top:1.25rem}
+.cl-option-editor{padding:.8rem;border:1px dashed var(--cl-border,#dfe4ea);border-radius:.7rem}
+.cl-option-editor+.cl-option-editor{margin-top:.6rem}
