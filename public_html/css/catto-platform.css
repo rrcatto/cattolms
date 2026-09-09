@@ -4,6 +4,8 @@
    The file is minified and validate-ui-contracts.php asserts literal byte substrings inside its
    lines, so a new control is appended as its own block rather than edited into an existing one.
    Changelog:
+2026/09/09 16:05 SAST
+- Form spacing is now core's guarantee rather than the active theme's. A .card with no .card-body had no padding in Gilded Noir or Light Default and 28 core templates use that shape; a .field had no gap in Gilded Noir and gap:0 in Light Default, so a label, its control and its help text touched in every form built without the two-column grid.
 2026/09/09 14:01 SAST
 - Defined the rest of core's own cl- namespace. Core emitted .cl-narrow, .cl-medium, .cl-page-head-row, .cl-filter-chip(s), .cl-question-editor and .cl-option-editor from core-owned page bodies without defining any of them, so each rendered only as well as the active theme happened to cover it: three themes gave the auth and content pages no width at all, and no theme styled the page-head row or the status filter.
 2026/09/07 13:00 SAST
@@ -502,3 +504,39 @@
 .cl-question-editor+.cl-question-editor{margin-top:1.25rem}
 .cl-option-editor{padding:.8rem;border:1px dashed var(--cl-border,#dfe4ea);border-radius:.7rem}
 .cl-option-editor+.cl-option-editor{margin-top:.6rem}
+
+/* v0.7 form spacing, made a property of the platform rather than of whichever theme is active.
+
+   Every form on the LMS is built from the same few pieces, and the spacing of those pieces was
+   left to the themes. Resolved against all five installed themes, the vocabulary came out like
+   this - the accepted contact page was correct only because it happens to use the one shape two
+   themes had covered:
+
+     .card with no .card-body      no padding at all in Gilded Noir and Light Default. 28 core
+                                   templates use this shape, which is why the Account profile's
+                                   email card had its input flush against the border.
+     .field in a plain form        no gap in Gilded Noir, and gap:0 in Light Default, so the
+                                   label, the control and the help text touched.
+     .field inside .form-grid      gap:0 in Light Default even after core defined the grid.
+
+   Two rules, and both are written to disturb as little as possible.
+
+   The card rule is wrapped in :where() so it carries the specificity of a bare .card and nothing
+   more: a theme that states its own .card padding - Factory Reset at 18px, Radiant at 20px - loads
+   afterwards and still wins. It only reaches the cards nobody had padded. The :has() guard is what
+   keeps a card that does wrap its content in a .card-body from being padded twice. */
+.card:where(:not(:has(> .card-body))){padding:clamp(1rem,2vw,1.4rem)}
+
+/* The field rule needs !important, for the same reason the table-wrap block above does: Light
+   Default states gap:0 at .ld-main .field, which outranks any bare .field core can write and loads
+   after it. The gap between a label and its control is not a matter of taste a theme should be
+   able to set to nothing, so core states it and means it. Only the gap is forced - a theme keeps
+   full control of the field's display, margins, type and colour, and Light Default's own
+   flex-direction:column continues to apply. If that theme drops gap:0 when it is next versioned,
+   the !important here can go with it. */
+.field{display:grid;gap:.4rem!important;min-width:0}
+/* Air between one field and the next, and before whatever ends the form. Light Default is the only
+   theme that spaced consecutive fields, and it did it with a margin on every field including the
+   last one inside a grid cell. */
+.field+.field{margin-top:1rem}
+.field+.btn,.field+button,.field+.cl-form-actions{margin-top:1rem}

@@ -785,10 +785,14 @@ final class PlatformAdministrationService
      * formatter of its own, and a six-figure seed set is exactly where an unseparated digit run
      * stops being readable.
      *
+     * Public because the catalogue counts a dataset of its own, outside the administration
+     * sections universeView() serves, and a second counter would be free to disagree with this one
+     * about what "real" means.
+     *
      * @param callable(DataUniverse):int $count
      * @return array{label:string,total:int,real:int,seed:int,total_display:string,real_display:string,seed_display:string}
      */
-    private function universeCounts(string $dataset, callable $count): array
+    public function universeCounts(string $dataset, callable $count): array
     {
         $total = $count(DataUniverse::All);
         $seed = $count(DataUniverse::Seed);
@@ -854,7 +858,16 @@ final class PlatformAdministrationService
      * @param array<string,mixed> $preserved
      * @return array{selected:string,label:string,options:list<array{value:string,label:string,short_label:string,href:string,active:bool}>}
      */
-    private function universeSwitch(DataUniverse $selected, string $base, array $preserved): array
+    /**
+     * The All / Real / Seed selector model.
+     *
+     * Public because the catalogue is not an administration section and so cannot reach it through
+     * universeView(), and building a second one there would be a second control for one job.
+     *
+     * @param array<string,mixed> $preserved
+     * @return array<string,mixed>
+     */
+    public function universeSwitch(DataUniverse $selected, string $base, array $preserved): array
     {
         $options = [];
         foreach ([DataUniverse::All, DataUniverse::Real, DataUniverse::Seed] as $universe) {

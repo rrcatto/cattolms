@@ -541,14 +541,18 @@ final class CourseService
      *
      * @return array<string,mixed>
      */
-    public function categoryPagination(string $slug, string $base, string $dataset, int $total, mixed $page, mixed $pageSize): array
+    /**
+     * @param array<string,mixed> $preserved query state the page's other links also carry
+     * @return array<string,mixed>
+     */
+    public function categoryPagination(string $slug, string $base, string $dataset, int $total, mixed $page, mixed $pageSize, array $preserved = []): array
     {
         return PlatformAdministrationService::paginationPayload(
             'category-' . $slug,
             Pagination::create($page, $pageSize, $total),
             $base,
             'Courses in this category',
-            ['open' => $slug],
+            ['open' => $slug] + $preserved,
             PlatformAdministrationService::pageParam($dataset),
             PlatformAdministrationService::sizeParam($dataset)
         );
