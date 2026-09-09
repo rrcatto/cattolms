@@ -68,6 +68,7 @@ use CattoLearning\Support\Slug;
 use Base;
 
 use InvalidArgumentException;
+use RuntimeException;
 
 final class CourseController extends BaseController
 {
@@ -168,8 +169,16 @@ final class CourseController extends BaseController
         // reader to the query form, which is the only form that can express a combination anyway.
         $facetBase = $category === null ? '/courses' : '/courses/category/' . (string) $category['slug'];
 
-        $pagination = Pagination::create($_GET['page'] ?? null, $_GET['page_size'] ?? null, $this->courses->catalogueCount($universe, $filter));
-        $courses = $this->courses->catalogue($universe, $filter, $pagination->pageSize, $pagination->offset);
+        // The list is built only for a search. Without this the categories page paid for a page of
+        // cards it does not draw on every single request.
+        $pagination = Pagination::create(
+            $_GET['page'] ?? null,
+            $_GET['page_size'] ?? null,
+            $filter->search === '' ? 0 : $this->courses->catalogueCount($universe, $filter)
+        );
+        $courses = $filter->search === ''
+            ? []
+            : $this->courses->catalogue($universe, $filter, $pagination->pageSize, $pagination->offset);
         $favouriteIds = [];
         $requestStatus = [];
         if ($user !== null) {
@@ -188,7 +197,7 @@ final class CourseController extends BaseController
         $this->render('courses', [
             'title' => $this->catalogueTitle($category, $tag),
             'page_kicker' => 'Discover what to learn next',
-            'category_tree' => $this->categoryTree('/courses', $universe, $universeFilter),
+            'category_tree' => $filter->search === '' ? $this->categoryTree('/courses', $universe, $universeFilter) : [],
             'universe_query' => $universeQuery,
             'courses' => $courses,
             'browse_category' => $category ?? [],
@@ -221,7 +230,13 @@ final class CourseController extends BaseController
             // The whole taxonomy, weighted, rather than the twenty-four-tag rail beside it. The
             // rail narrows what is already on screen; this is how a reader finds a subject at all,
             // and it is the same control the dedicated tag page draws.
-            'tag_cloud' => $this->catalogueTagCloud($this->courses->tagIndex($universe), 60),
+            // A search is the one time this page lists courses. The catalogue is the taxonomy, not
+            // a wall of every course under it; but a reader who types a title has asked for
+            // courses and nothing else answers that.
+            'searching' => $filter->search !== '',
+            'can_favourite' => $user !== null,
+            'favourite_return' => $base . ($canSelectUniverse ? '?universe=' . $universe->value : ''),
+            'universe_amp' => $canSelectUniverse ? '&universe=' . $universe->value : '',
             // Built by the one shared payload builder, not by hand. This screen used to assemble
             // its own array, so every control added to the shared pagination control rendered
             // everywhere except here - which is how a surface quietly ends up with a different
@@ -293,6 +308,17 @@ final class CourseController extends BaseController
             }
             $node['children'] = array_map($decorate, (array) $node['children']);
 
+            // Every ancestor of the opened category is opened with it. A link to a category three
+            // levels down otherwise arrived with its own accordion open inside two closed ones, so
+            // the reader saw no change at all and the link looked broken.
+            $node['has_open_descendant'] = false;
+            foreach ($node['children'] as $child) {
+                if ($child['is_open'] === true || $child['has_open_descendant'] === true) {
+                    $node['has_open_descendant'] = true;
+                    break;
+                }
+            }
+
             return $node;
         };
 
@@ -361,52 +387,93 @@ final class CourseController extends BaseController
         ];
     }
 
+    /**
+     * The tag page: the cloud, and the courses of whichever tag is chosen.
+     *
+     * Serves /courses/tags and /courses/tag/<slug>. Landing on it shows the vocabulary and nothing
+     * else - a reader has not asked for any courses yet, and every course in the catalogue is not
+     * an answer to a question nobody asked. Choosing a tag, or searching, is the question.
+     */
     public function tagIndex(): void
     {
-        // The same default as the catalogue that links here, so following the link does not change
-        // which universe the reader is looking at.
-        $canSelectUniverse = $this->canSelectUniverse();
-        $universe = $this->requestedUniverse($canSelectUniverse ? DataUniverse::All : DataUniverse::Real);
+        $user = $this->currentUser();
+
+        // The same default as the categories page that links here, so following the link does not
+        // change which universe the reader is looking at.
+        $canSelectUniverse = $this->canSelectUniverse($user);
+        $universe = $this->requestedUniverse($canSelectUniverse ? DataUniverse::All : DataUniverse::Real, $user);
+        $universeFilter = $canSelectUniverse ? ['universe' => $universe->value] : [];
+        $universeQuery = $canSelectUniverse ? '?universe=' . $universe->value : '';
+
+        $selectedTags = $this->courses->activeTagsBySlug($this->requestedTagSlugs());
+        $search = trim((string) ($_GET[PlatformAdministrationService::searchParam(self::DATASET)] ?? ''));
+        $filter = new CatalogueFilter(
+            null,
+            array_map(static fn(array $tag): int => (int) $tag['id'], $selectedTags),
+            $search
+        );
+
+        $tag = count($selectedTags) === 1 ? $selectedTags[0] : null;
+        $base = $tag !== null ? '/courses/tag/' . (string) $tag['slug'] : '/courses/tags';
+        $tagFilters = count($selectedTags) !== 1
+            ? [self::TAGS_PARAM => implode(',', array_column($selectedTags, 'slug'))]
+            : [];
+
+        $showing = $selectedTags !== [] || $search !== '';
+        $pagination = Pagination::create(
+            $_GET['page'] ?? null,
+            $_GET['page_size'] ?? null,
+            $showing ? $this->courses->catalogueCount($universe, $filter) : 0
+        );
+        $courses = $showing
+            ? $this->courses->catalogue($universe, $filter, $pagination->pageSize, $pagination->offset)
+            : [];
+
+        if ($user !== null && $courses !== []) {
+            $favouriteIds = [];
+            foreach ($this->platformAdministration->favourites($user->id, $universe) as $item) {
+                $favouriteIds[(int) $item['id']] = true;
+            }
+            foreach ($courses as &$course) {
+                $course['is_favourite'] = isset($favouriteIds[(int) $course['id']]);
+            }
+            unset($course);
+        }
 
         $this->render('course-tags', [
-            'title' => 'Browse by tag',
+            'title' => $tag !== null ? 'Courses tagged ' . (string) $tag['name'] : 'Browse by tag',
             'page_kicker' => 'Every label in the catalogue',
+            // The whole vocabulary here, not the catalogue page's shortened cloud: this is the page
+            // whose subject is the vocabulary.
             'tag_index' => $this->weightedTags($this->courses->tagIndex($universe)),
+            'selected_tag' => $tag ?? [],
+            'selected_tags' => $selectedTags,
+            'showing_courses' => $showing,
+            'courses' => $courses,
+            'can_favourite' => $user !== null,
+            'favourite_return' => $base . ($canSelectUniverse ? '?universe=' . $universe->value : ''),
+            'catalogue_search' => $search,
+            'universe_query' => $universeQuery,
+            'universe_amp' => $canSelectUniverse ? '&universe=' . $universe->value : '',
             'universe_switch' => $canSelectUniverse
-                ? $this->platformAdministration->universeSwitch($universe, '/courses/tags', [])
+                ? $this->platformAdministration->universeSwitch($universe, $base, $tagFilters)
                 : null,
-        ]);
-    }
-
-    /**
-     * The heaviest tags in the catalogue, presented alphabetically.
-     *
-     * Two orderings, deliberately. Which tags appear is a question about weight - the sixty worth
-     * showing are the sixty holding the most - but how they are read is alphabetical, because a
-     * cloud is scanned for a word and the size already carries the weight. Slicing the repository's
-     * own name order instead took the first sixty letters of the alphabet and called them popular.
-     *
-     * A tag holding nothing is dropped rather than greyed, matching the rail on the same screen:
-     * on this page a tag is an invitation to click, and one that leads nowhere is not one. The
-     * dedicated tag page still lists everything, because there the absence is the information.
-     *
-     * @param list<array<string,mixed>> $tags
-     * @return list<array<string,mixed>>
-     */
-    private function catalogueTagCloud(array $tags, int $limit): array
-    {
-        // Weighted before filtering, so a tag's size still means its share of the whole catalogue
-        // rather than its share of whatever survived the cut.
-        $held = array_values(array_filter(
-            $this->weightedTags($tags),
-            static fn(array $tag): bool => (int) $tag['course_count'] > 0
-        ));
-        usort($held, static fn(array $a, array $b): int
-            => [(int) $b['course_count'], (string) $a['name']] <=> [(int) $a['course_count'], (string) $b['name']]);
-        $held = array_slice($held, 0, $limit);
-        usort($held, static fn(array $a, array $b): int => (string) $a['name'] <=> (string) $b['name']);
-
-        return $held;
+            'universe_counts' => $canSelectUniverse
+                ? $this->platformAdministration->universeCounts(
+                    'courses',
+                    fn(DataUniverse $scope): int => $this->courses->catalogueCount($scope, $filter)
+                )
+                : null,
+            'catalogue_pagination' => PlatformAdministrationService::paginationPayload(
+                'catalogue',
+                $pagination,
+                $base,
+                'Courses',
+                [PlatformAdministrationService::searchParam(self::DATASET) => $search] + $tagFilters + $universeFilter,
+                'page',
+                'page_size'
+            ),
+        ] + $pagination->toArray());
     }
 
     /**
@@ -520,8 +587,17 @@ final class CourseController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('CATALOGUE.COURSE.FAVOURITE');
         $courseId = max(1, (int) ($_POST['course_id'] ?? 0));
-        $added = $this->platformAdministration->toggleFavourite($user->id, $courseId);
-        $this->flash('success', $added ? 'The course was added to your favourites.' : 'The course was removed from your favourites.');
+
+        // A favourite is a personal relationship between an identity and a course, so the two must
+        // be in the same data universe - the database enforces it as well. Reaching this with a
+        // generated course therefore has a legitimate answer, and it is not a 500: the reader gets
+        // told why, on the page they were on.
+        try {
+            $added = $this->platformAdministration->toggleFavourite($user->id, $courseId);
+            $this->flash('success', $added ? 'The course was added to your favourites.' : 'The course was removed from your favourites.');
+        } catch (RuntimeException) {
+            $this->flash('error', 'A generated course cannot be added to a real account\'s favourites. Favourites belong to one data universe, so this would leave your list pointing at rows that vanish when the seed set is cleaned up.');
+        }
         $return = (string) ($_POST['return'] ?? '/courses');
         $this->redirect(str_starts_with($return, '/') ? $return : '/courses');
     }
