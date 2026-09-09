@@ -28,13 +28,15 @@ Changelog:
   - Added the shared genuine-ADMIN data-universe control above the list.
 #}
 {% include '@platform/partials/admin/course-group-nav.html.twig' %}
-
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'courses', ds_label: 'Search courses', ds_value: courses_search, ds_action: '/admin/courses'} %}
-
 <div class="section-head">
 	<div>
-		<h2>Courses</h2>
-		<p>One canonical list for creating, importing, reviewing and maintaining courses.</p>
+		<h2>
+			Courses
+		</h2>
+		<p>
+			One canonical list for creating, importing, reviewing and maintaining courses.
+		</p>
 	</div>
 	<div class="row-actions">
 		<a class="btn btn-soft btn-sm" href="/admin/courses/categories">Categories</a>
@@ -42,20 +44,16 @@ Changelog:
 		<a class="btn btn-primary btn-sm" href="/admin/courses/new">Create course</a>
 	</div>
 </div>
-
 {% if universe_switch %}
 	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: courses_universe_counts} %}
 {% endif %}
-
 <div id="courses-region" data-server-search-target>
-<div id="courses-results">
-
-	{% if courses_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}
-	{% endif %}
-
-	{% if courses %}
-		{#
+	<div id="courses-results">
+		{% if courses_pagination %}
+			{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}
+		{% endif %}
+		{% if courses %}
+{#
 				table-wrap is the core responsive wrapper and the only one core CSS defines. This
 				table previously used a Bootstrap-style wrapper class that core never styles, so it
 				had no horizontal scroll except under themes that happen to define that class.
@@ -64,24 +62,43 @@ Changelog:
 				<div class="table-wrap">
 					<table class="table table-hover align-middle mb-0">
 						<thead>
-							<tr>{% for sh in courses_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: courses_region, sort_results: courses_results} %}{% endfor %}</tr>
+							<tr>
+								{% for sh in courses_sort_headers %}
+									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: courses_region, sort_results: courses_results} %}
+								{% endfor %}
+							</tr>
 						</thead>
 						<tbody>
 							{% for course in courses %}
 								<tr>
-									<td><strong title="{{ course.title }}">{{ course.title }}</strong></td>
-									<td><span class="badge text-bg-light border">{{ course.category_name ?: 'Uncategorised' }}</span></td>
-									<td><span class="badge cl-status-{{ course.status }}">{{ course.status|ucfirst }}</span></td>
-									
-									<td title="{{ course.owner_company_name }}"><strong>{{ course.owner_company_name ?: '—' }}</strong><br><small class="text-body-secondary">{{ course.owner_person_name ?: '—' }}</small></td>
-									
-									<td>{{ course.learner_count }}</td>
-									<td>{{ course.started_count }}</td>
-									
-									<td>{{ course.updated_at }}</td>
+									<td>
+										<strong title="{{ course.title }}">{{ course.title }}</strong>
+									</td>
+									<td>
+										<span class="badge text-bg-light border">{{ course.category_name ?: 'Uncategorised' }}</span>
+									</td>
+									<td>
+										<span class="badge cl-status-{{ course.status }}">{{ course.status|ucfirst }}</span>
+									</td>
+									<td title="{{ course.owner_company_name }}">
+										<strong>{{ course.owner_company_name ?: '—' }}</strong>
+										<br>
+										<small class="text-body-secondary">{{ course.owner_person_name ?: '—' }}</small>
+									</td>
+									<td>
+										{{ course.learner_count }}
+									</td>
+									<td>
+										{{ course.started_count }}
+									</td>
+									<td>
+										{{ course.updated_at }}
+									</td>
 									<td class="cell-actions">
 										<details class="row-menu" data-cl-dropdown>
-											<summary class="btn btn-soft btn-sm row-menu-trigger">Actions ▾</summary>
+											<summary class="btn btn-soft btn-sm row-menu-trigger">
+												Actions ▾
+											</summary>
 											<div class="row-menu-panel">
 												<a class="btn btn-sm btn-primary" href="/admin/courses/{{ course.id }}">Manage</a>
 												<a class="btn btn-sm btn-outline-primary" href="/admin/courses/{{ course.id }}/preview">Preview</a>
@@ -105,29 +122,33 @@ Changelog:
 					</table>
 				</div>
 			</div>
-
 			{% if courses_pagination %}
-				{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}{% else %}
-					{#
+				{% include '@platform/partials/pagination.html.twig' with {pg: courses_pagination} %}
+			{% else %}
+{#
 						Consolidated workspace preview: bounded rows plus a link to the deep-paging
 						route, and no COUNT query merely to render a dashboard panel.
 					#}
-					{% if courses_preview_has_more %}
-						<div class="pagination-row">
-							<span class="pagination-summary">Showing the first {{ preview_page_size }} courses.</span>
-							<a class="btn btn-soft btn-sm" href="/admin/courses{{ universe_query }}">View all courses</a>
-						</div>
-					{% endif %}
-			{% endif %}{% else %}
+				{% if courses_preview_has_more %}
+					<div class="pagination-row">
+						<span class="pagination-summary">Showing the first {{ preview_page_size }} courses.</span>
+						<a class="btn btn-soft btn-sm" href="/admin/courses{{ universe_query }}">View all courses</a>
+					</div>
+				{% endif %}
+			{% endif %}
+		{% else %}
 			<div class="cl-empty-state">
-				<h2>No courses exist yet</h2>
-				<p>Import one of the existing self-study HTML files or create a course manually.</p>
+				<h2>
+					No courses exist yet
+				</h2>
+				<p>
+					Import one of the existing self-study HTML files or create a course manually.
+				</p>
 				<div class="d-flex justify-content-center gap-2">
 					<a class="btn btn-primary" href="/admin/courses/import">Import HTML</a>
 					<a class="btn btn-outline-primary" href="/admin/courses/new">Create manually</a>
 				</div>
 			</div>
-	{% endif %}
-
-</div>
+		{% endif %}
+	</div>
 </div>

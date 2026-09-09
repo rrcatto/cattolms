@@ -1,16 +1,136 @@
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_back_href = '/admin/roles' %}
-{% set ph_back_label = 'Roles and ACL' %}
-{% set ph_kicker = 'Platform administration' %}
-{% set ph_title = role_acl.role_name %}
-{% set ph_lead = role_acl.role_description %}
-{% include '@platform/partials/page-head.html.twig' %}
-<section class="container py-4">
-<div class="grid grid-2 section"><div class="card"><h2>Role details</h2><form action="/admin/roles/{{ role_acl.id }}" method="post" class="form-grid"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="field"><label>Role key</label><input name="role_key" value="{{ role_acl.role_key }}" {{ role_acl.is_builtin_role ? 'readonly' : '' }}><div class="help">{{ role_acl.is_builtin_role ? 'Built-in role keys are permanent.' : 'Use uppercase snake notation. Prefix SEED_ only for a seed-only role.' }}</div></div><div class="field"><label>Role name</label><input name="role_name" value="{{ role_acl.role_name }}" pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example CompanyManager"><div class="help">CamelCase, for example CompanyManager.</div></div><div class="field full"><label>Description</label><textarea name="role_description" rows="4">{{ role_acl.role_description }}</textarea></div><div class="field full"><button class="btn btn-primary" {{ not can_manage_roles ? 'disabled' : '' }}>Save role</button></div></form>{% if can_manage_roles and not role_acl.is_builtin_role and role_acl.user_count==0 %}<form class="section" action="/admin/roles/{{ role_acl.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger" data-confirm="Delete this role?">Delete role</button></form>{% endif %}</div>
-<div class="card"><h2>Assignment summary</h2><p><strong>{{ role_acl.user_count }}</strong> users currently have this role.</p><p><strong>Role family:</strong> {{ role_acl.role_family }}</p><p class="muted">Role family controls which identities may receive the role. It does not select a separate permission namespace.</p>{% if role_acl.is_admin_role %}<div class="notice"><span>i</span><div>ADMIN always receives every business and SYSTEM permission. Its permission checkboxes are read-only and cannot be reduced.</div></div>{% endif %}</div></div>
-<form action="/admin/roles/{{ role_acl.id }}/permissions" method="post" class="section"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="section-head"><div><h2>Permissions</h2><p>Check the capabilities this role should receive, then save once. Normal and SEED_* roles share these business permission keys; data visibility is enforced separately.</p></div><button class="btn btn-primary" type="submit" {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>Save permissions</button></div>
-<div class="acl-groups">{% for groupName, groupPermissions in role_acl.permission_groups %}<details class="acl-group"><summary class="acl-group-summary">{{ groupName }}</summary><div class="acl-group-content"><div class="table-wrap acl-table-wrap"><table class="acl-permission-table"><thead><tr><th style="width:7%">Assign</th><th style="width:24%">Permission</th><th style="width:27%">Internal key</th><th style="width:42%">Description</th></tr></thead><tbody>{% for permission in groupPermissions %}<tr><td class="acl-permission-check"><input type="checkbox" name="permissions[]" value="{{ permission.key }}" aria-label="Assign {{ permission.name }}" {{ permission.key in role_acl.permission_keys ? 'checked' : '' }} {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}></td><td><strong>{{ permission.name }}</strong></td><td><code>{{ permission.key }}</code></td><td>{{ permission.description }}</td></tr>{% endfor %}</tbody></table></div></div></details>{% endfor %}</div>
-<div class="toolbar section"><span class="muted">Changes take effect on the next request after Save.</span><button class="btn btn-primary" type="submit" {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>Save permissions</button></div></form></section>
+	{% set ph_back_href = '/admin/roles' %}
+	{% set ph_back_label = 'Roles and ACL' %}
+	{% set ph_kicker = 'Platform administration' %}
+	{% set ph_title = role_acl.role_name %}
+	{% set ph_lead = role_acl.role_description %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="container py-4">
+		<div class="grid grid-2 section">
+			<div class="card">
+				<h2>
+					Role details
+				</h2>
+				<form action="/admin/roles/{{ role_acl.id }}" method="post" class="form-grid">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					<div class="field">
+						<label>Role key</label>
+						<input name="role_key" value="{{ role_acl.role_key }}" {{ role_acl.is_builtin_role ? 'readonly' : '' }}>
+						<div class="help">
+							{{ role_acl.is_builtin_role ? 'Built-in role keys are permanent.' : 'Use uppercase snake notation. Prefix SEED_ only for a seed-only role.' }}
+						</div>
+					</div>
+					<div class="field">
+						<label>Role name</label>
+						<input name="role_name" value="{{ role_acl.role_name }}" pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example CompanyManager">
+						<div class="help">
+							CamelCase, for example CompanyManager.
+						</div>
+					</div>
+					<div class="field full">
+						<label>Description</label>
+						<textarea name="role_description" rows="4">{{ role_acl.role_description }}</textarea>
+					</div>
+					<div class="field full">
+						<button class="btn btn-primary" {{ not can_manage_roles ? 'disabled' : '' }}>Save role</button>
+					</div>
+				</form>
+				{% if can_manage_roles and not role_acl.is_builtin_role and role_acl.user_count==0 %}
+					<form class="section" action="/admin/roles/{{ role_acl.id }}/delete" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<button class="btn btn-danger" data-confirm="Delete this role?">Delete role</button>
+					</form>
+				{% endif %}
+			</div>
+			<div class="card">
+				<h2>
+					Assignment summary
+				</h2>
+				<p>
+					<strong>{{ role_acl.user_count }}</strong> users currently have this role.
+				</p>
+				<p>
+					<strong>Role family:</strong> {{ role_acl.role_family }}
+				</p>
+				<p class="muted">
+					Role family controls which identities may receive the role. It does not select a separate permission namespace.
+				</p>
+				{% if role_acl.is_admin_role %}
+					<div class="notice">
+						<span>i</span>
+						<div>
+							ADMIN always receives every business and SYSTEM permission. Its permission checkboxes are read-only and cannot be reduced.
+						</div>
+					</div>
+				{% endif %}
+			</div>
+		</div>
+		<form action="/admin/roles/{{ role_acl.id }}/permissions" method="post" class="section">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<div class="section-head">
+				<div>
+					<h2>
+						Permissions
+					</h2>
+					<p>
+						Check the capabilities this role should receive, then save once. Normal and SEED_* roles share these business permission keys; data visibility is enforced separately.
+					</p>
+				</div>
+				<button class="btn btn-primary" type="submit" {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>Save permissions</button>
+			</div>
+			<div class="acl-groups">
+				{% for groupName, groupPermissions in role_acl.permission_groups %}
+					<details class="acl-group">
+						<summary class="acl-group-summary">
+							{{ groupName }}
+						</summary>
+						<div class="acl-group-content">
+							<div class="table-wrap acl-table-wrap">
+								<table class="acl-permission-table">
+									<thead>
+										<tr>
+											<th style="width:7%">
+												Assign
+											</th>
+											<th style="width:24%">
+												Permission
+											</th>
+											<th style="width:27%">
+												Internal key
+											</th>
+											<th style="width:42%">
+												Description
+											</th>
+										</tr>
+									</thead>
+									<tbody>
+										{% for permission in groupPermissions %}
+											<tr>
+												<td class="acl-permission-check">
+													<input type="checkbox" name="permissions[]" value="{{ permission.key }}" aria-label="Assign {{ permission.name }}" {{ permission.key in role_acl.permission_keys ? 'checked' : '' }} {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>
+												</td>
+												<td>
+													<strong>{{ permission.name }}</strong>
+												</td>
+												<td>
+													<code>{{ permission.key }}</code>
+												</td>
+												<td>
+													{{ permission.description }}
+												</td>
+											</tr>
+										{% endfor %}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</details>
+				{% endfor %}
+			</div>
+			<div class="toolbar section">
+				<span class="muted">Changes take effect on the next request after Save.</span><button class="btn btn-primary" type="submit" {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>Save permissions</button>
+			</div>
+		</form>
+	</section>
 {% endblock %}

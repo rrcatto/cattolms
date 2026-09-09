@@ -31,22 +31,19 @@ Changelog:
   - Created for the visible genuine-ADMIN All, Real and Seed Administration control.
 #}
 <div class="universe-switch" data-universe="{{ us.selected }}">
-
-  {% if ct %}
-    <p class="universe-switch-summary">
-      <span class="universe-switch-noun">{{ ct.label }}</span>
-      <strong>{{ ct.total_display }}</strong> total
+	{% if ct %}
+		<p class="universe-switch-summary">
+			<span class="universe-switch-noun">{{ ct.label }}</span>
+			<strong>{{ ct.total_display }}</strong> total
       <span class="universe-switch-split">{{ ct.real_display }} real · {{ ct.seed_display }} seed</span>
-    </p>
-  {% endif %}
-
-  <div class="universe-switch-links" role="group" aria-label="Show which data">
-    <span class="universe-switch-legend" aria-hidden="true">View</span>
-    {% for universe_option in us.options %}
-      <a class="universe-switch-link {{ universe_option.active ? 'active' : '' }}"
+		</p>
+	{% endif %}
+	<div class="universe-switch-links" role="group" aria-label="Show which data">
+		<span class="universe-switch-legend" aria-hidden="true">View</span>
+		{% for universe_option in us.options %}
+			<a class="universe-switch-link {{ universe_option.active ? 'active' : '' }}"
          href="{{ universe_option.href }}"
          aria-current="{{ universe_option.active ? 'true' : 'false' }}">{{ universe_option.short_label }}</a>
-    {% endfor %}
-  </div>
-
+		{% endfor %}
+	</div>
 </div>

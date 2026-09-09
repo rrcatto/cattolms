@@ -1,12 +1,17 @@
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_kicker = 'Sign in' %}
-{% set ph_title = 'Check your email' %}
-{% set ph_lead = 'The sign-in link is on its way.' %}
-{% include '@platform/partials/page-head.html.twig' %}
-<section class="container cl-narrow py-5"><div class="card shadow-sm border-0"><div class="card-body p-4 p-lg-5 text-center">
-  <p>If the address can receive email, a secure one-time link has been sent. Opening that link completes registration or signs you in.</p>
-  <a class="btn btn-outline-primary" href="/login">Send another link</a>
-</div></div></section>
+	{% set ph_kicker = 'Sign in' %}
+	{% set ph_title = 'Check your email' %}
+	{% set ph_lead = 'The sign-in link is on its way.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="container cl-narrow py-5">
+		<div class="card shadow-sm border-0">
+			<div class="card-body p-4 p-lg-5 text-center">
+				<p>
+					If the address can receive email, a secure one-time link has been sent. Opening that link completes registration or signs you in.
+				</p>
+				<a class="btn btn-outline-primary" href="/login">Send another link</a>
+			</div>
+		</div>
+	</section>
 {% endblock %}

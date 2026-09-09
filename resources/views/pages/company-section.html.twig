@@ -31,25 +31,22 @@ Changelog:
     from a standalone section page.
 #}
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_kicker = 'Company' %}
-{% set ph_title = company_section.label %}
-{% set ph_lead = company_section.description %}
-{% set ph_action_href = '/company' %}
-{% set ph_action_label = 'All company sections' %}
-{% include '@platform/partials/page-head.html.twig' %}
-
-<section class="cl-company-section">
-	{% include '@platform/partials/company-context.html.twig' %}
-
-	{#
+	{% set ph_kicker = 'Company' %}
+	{% set ph_title = company_section.label %}
+	{% set ph_lead = company_section.description %}
+	{% set ph_action_href = '/company' %}
+	{% set ph_action_label = 'All company sections' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-company-section">
+		{% include '@platform/partials/company-context.html.twig' %}
+{#
 		The body is wrapped so the consolidated workspace can pull exactly this part of the page
 		into an accordion section when the reader opens it, without also pulling the heading and
 		the company banner it already shows.
 	#}
-	<div class="cl-section-body">
-		{{ company_section.content|raw }}
-	</div>
-</section>
+		<div class="cl-section-body">
+			{{ company_section.content|raw }}
+		</div>
+	</section>
 {% endblock %}

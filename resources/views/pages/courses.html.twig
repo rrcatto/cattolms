@@ -24,83 +24,131 @@ Changelog:
   - Category breadcrumb, category heading and the narrowing rail of child categories with their branch counts.
 #}
 {% extends layout %}
-
 {% block page_body %}
-{% set ph_kicker = 'Course catalogue' %}
-{% set ph_title = browse_category ? browse_category.name : (browse_tag ? 'Courses tagged '~browse_tag.name : 'Find your next course') %}
-{% set ph_lead = browse_category ? (browse_category.description ?: 'Every course in this part of the catalogue, including the levels beneath it.') : 'Browse published self-study courses and compare their access options.' %}
-{% set ph_action_href = '/courses/tags' %}
-{% set ph_action_label = 'Browse by tag' %}
-{% include '@platform/partials/page-head.html.twig' %}
-
-{% if browse_trail %}
-	<nav class="cl-breadcrumb" aria-label="Category">
-		<a href="/courses">All courses</a>
-		{% for crumb in browse_trail %}
-			<span class="cl-breadcrumb-sep" aria-hidden="true">/</span>
-			<a href="/courses/category/{{ crumb.slug }}" {{ crumb.slug == browse_category.slug ? 'aria-current="page"' : '' }}>{{ crumb.name }}</a>
-		{% endfor %}
-	</nav>
-{% endif %}
-
-
-
-{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base} %}
-
+	{% set ph_kicker = 'Course catalogue' %}
+	{% set ph_title = browse_category ? browse_category.name : (browse_tag ? 'Courses tagged '~browse_tag.name : 'Find your next course') %}
+	{% set ph_lead = browse_category ? (browse_category.description ?: 'Every course in this part of the catalogue, including the levels beneath it.') : 'Browse published self-study courses and compare their access options.' %}
+	{% set ph_action_href = '/courses/tags' %}
+	{% set ph_action_label = 'Browse by tag' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% if browse_trail %}
+		<nav class="cl-breadcrumb" aria-label="Category">
+			<a href="/courses">All courses</a>
+			{% for crumb in browse_trail %}
+				<span class="cl-breadcrumb-sep" aria-hidden="true">/</span>
+				<a href="/courses/category/{{ crumb.slug }}" {{ crumb.slug == browse_category.slug ? 'aria-current="page"' : '' }}>{{ crumb.name }}</a>
+			{% endfor %}
+		</nav>
+	{% endif %}
+	{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base} %}
 {#
 	A tag is offered only where choosing it would return something, or where it is already chosen -
 	so the facet has to be built before it is headed. Guarding the heading on browse_tags and the
 	chips on their own counts printed a Tags heading above an empty rail whenever every tag in the
 	branch held nothing, which is the state a new catalogue starts in.
 #}
-{% set rail_tags = browse_tags|filter(rail_tag => rail_tag.course_count > 0 or rail_tag.is_selected) %}
-{% if rail_tags is not empty %}
-	<div class="cl-facet section">
-		<div class="cl-facet-head">
-			<span class="cl-facet-label">Tags</span>
-			{% if browse_selected_tags %}
-				<a class="btn btn-soft btn-sm" href="{{ browse_clear_href }}">Clear tags</a>
-			{% endif %}
-		</div>
-		<div class="cl-category-rail" aria-label="Narrow by tag">
-			{% for rail_tag in rail_tags %}
-				<a class="cl-tag-chip {{ rail_tag.is_selected ? 'is-selected' : '' }}" href="{{ rail_tag.href }}"
+	{% set rail_tags = browse_tags|filter(rail_tag => rail_tag.course_count > 0 or rail_tag.is_selected) %}
+	{% if rail_tags is not empty %}
+		<div class="cl-facet section">
+			<div class="cl-facet-head">
+				<span class="cl-facet-label">Tags</span>
+				{% if browse_selected_tags %}
+					<a class="btn btn-soft btn-sm" href="{{ browse_clear_href }}">Clear tags</a>
+				{% endif %}
+			</div>
+			<div class="cl-category-rail" aria-label="Narrow by tag">
+				{% for rail_tag in rail_tags %}
+					<a class="cl-tag-chip {{ rail_tag.is_selected ? 'is-selected' : '' }}" href="{{ rail_tag.href }}"
 				   aria-pressed="{{ rail_tag.is_selected ? 'true' : 'false' }}">
 					<span>{{ rail_tag.name }}</span>
 					<span class="cl-category-count">{{ rail_tag.course_count }}</span>
-				</a>
-			{% endfor %}
+					</a>
+				{% endfor %}
+			</div>
 		</div>
-	</div>
-{% endif %}
-
-{% if browse_children %}
-	<div class="cl-facet section">
-		<div class="cl-facet-head"><span class="cl-facet-label">Categories</span></div>
-		<div class="cl-category-rail" aria-label="Narrow by category">
-			{% for branch in browse_children %}
-				<a class="cl-category-chip" href="/courses/category/{{ branch.slug }}">
+	{% endif %}
+	{% if browse_children %}
+		<div class="cl-facet section">
+			<div class="cl-facet-head">
+				<span class="cl-facet-label">Categories</span>
+			</div>
+			<div class="cl-category-rail" aria-label="Narrow by category">
+				{% for branch in browse_children %}
+					<a class="cl-category-chip" href="/courses/category/{{ branch.slug }}">
 					<span>{{ branch.name }}</span>
 					<span class="cl-category-count">{{ branch.course_count }}</span>
-				</a>
-			{% endfor %}
+					</a>
+				{% endfor %}
+			</div>
 		</div>
-	</div>
-{% endif %}
-<div id="catalogue-region" data-server-search-target>
-<div id="catalogue-results">
-
-	{% if catalogue_pagination %}
-		{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination} %}
 	{% endif %}
-{% if courses %}<div class="grid grid-3 section">{% for course in courses %}<article class="course-card card" data-course-card><div class="course-cover"><span class="course-level">{{ course.category_name ?: 'COURSE' }}</span></div><div class="course-body"><div style="display:flex;justify-content:space-between;gap:12px"><div class="course-title">{{ course.title }}</div>{% if is_authenticated %}<form action="/courses/favourite" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="course_id" value="{{ course.id }}"><input type="hidden" name="return" value="/courses"><button class="btn btn-sm btn-ghost favourite" type="submit" title="Favourite">{{ course.is_favourite ? '★' : '☆' }}</button></form>{% endif %}</div><div class="course-meta">{{ course.level ?: 'Self-study' }} · {{ course.module_count }} modules</div><p class="muted small">{{ course.summary }}</p>{% if course.tags %}<div class="cl-course-tags">{% for course_tag in course.tags %}<a class="cl-tag-chip" href="/courses/tag/{{ course_tag.slug }}">{{ course_tag.name }}</a>{% endfor %}</div>{% endif %}{% if course.has_price %}<div class="course-price"><strong>{{ course.default_price_label }}</strong><span class="muted small"> · {{ course.default_access_label }}</span>{% if course.has_alternative_prices %}<span class="badge info">More options</span>{% endif %}</div>{% endif %}<div class="course-footer"><a class="btn btn-primary btn-sm" href="/courses/{{ course.slug }}">View course</a></div></div></article>{% endfor %}</div>{% else %}<div class="empty section"><h3>No courses are published yet</h3></div>{% endif %}
-<div class="container">
-  {# The public catalogue is the only paginated surface using bare page and page size query
+	<div id="catalogue-region" data-server-search-target>
+		<div id="catalogue-results">
+			{% if catalogue_pagination %}
+				{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination} %}
+			{% endif %}
+			{% if courses %}
+				<div class="grid grid-3 section">
+					{% for course in courses %}
+						<article class="course-card card" data-course-card>
+							<div class="course-cover">
+								<span class="course-level">{{ course.category_name ?: 'COURSE' }}</span>
+							</div>
+							<div class="course-body">
+								<div style="display:flex;justify-content:space-between;gap:12px">
+									<div class="course-title">
+										{{ course.title }}
+									</div>
+									{% if is_authenticated %}
+										<form action="/courses/favourite" method="post">
+											<input type="hidden" name="csrf" value="{{ csrf }}">
+											<input type="hidden" name="course_id" value="{{ course.id }}">
+											<input type="hidden" name="return" value="/courses">
+											<button class="btn btn-sm btn-ghost favourite" type="submit" title="Favourite">{{ course.is_favourite ? '★' : '☆' }}</button>
+										</form>
+									{% endif %}
+								</div>
+								<div class="course-meta">
+									{{ course.level ?: 'Self-study' }} · {{ course.module_count }} modules
+								</div>
+								<p class="muted small">
+									{{ course.summary }}
+								</p>
+								{% if course.tags %}
+									<div class="cl-course-tags">
+										{% for course_tag in course.tags %}
+											<a class="cl-tag-chip" href="/courses/tag/{{ course_tag.slug }}">{{ course_tag.name }}</a>
+										{% endfor %}
+									</div>
+								{% endif %}
+								{% if course.has_price %}
+									<div class="course-price">
+										<strong>{{ course.default_price_label }}</strong><span class="muted small"> · {{ course.default_access_label }}</span>
+										{% if course.has_alternative_prices %}
+											<span class="badge info">More options</span>
+										{% endif %}
+									</div>
+								{% endif %}
+								<div class="course-footer">
+									<a class="btn btn-primary btn-sm" href="/courses/{{ course.slug }}">View course</a>
+								</div>
+							</div>
+						</article>
+					{% endfor %}
+				</div>
+			{% else %}
+				<div class="empty section">
+					<h3>
+						No courses are published yet
+					</h3>
+				</div>
+			{% endif %}
+			<div class="container">
+{# The public catalogue is the only paginated surface using bare page and page size query
        names, because it carries a single principal dataset and those names are public URLs.
        The control itself is the shared one, built by the shared payload builder. #}
-  {% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination} %}
-</div>
-
-</div>
-</div>
+				{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination} %}
+			</div>
+		</div>
+	</div>
 {% endblock %}

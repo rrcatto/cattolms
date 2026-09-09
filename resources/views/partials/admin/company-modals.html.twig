@@ -27,37 +27,63 @@ Changelog:
 		<div class="modal-card">
 			<form action="/admin/companies" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				<div class="modal-head"><h3 id="company-add-title">Add Company</h3><button class="close-btn" type="button" data-close-modal aria-label="Close">×</button></div>
-				<div class="modal-body"><div class="form-grid">
-					<div class="field full"><label>Company name</label><input name="name" required></div>
-					<div class="field full"><label>Registered email domain</label><input name="domain" placeholder="example.co.za" required></div>
-					<div class="field full"><label>Company type</label><select name="company_type"><option value="client">Client company</option><option value="course_provider">Course provider</option></select></div>
-				</div></div>
-				<div class="modal-foot"><button class="btn btn-soft" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Create Company</button></div>
+				<div class="modal-head">
+					<h3 id="company-add-title">
+						Add Company
+					</h3>
+					<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-grid">
+						<div class="field full">
+							<label>Company name</label>
+							<input name="name" required>
+						</div>
+						<div class="field full">
+							<label>Registered email domain</label>
+							<input name="domain" placeholder="example.co.za" required>
+						</div>
+						<div class="field full">
+							<label>Company type</label><select name="company_type"><option value="client">Client company</option><option value="course_provider">Course provider</option></select>
+						</div>
+					</div>
+				</div>
+				<div class="modal-foot">
+					<button class="btn btn-soft" type="button" data-close-modal>Cancel</button><button class="btn btn-primary" type="submit">Create Company</button>
+				</div>
 			</form>
 		</div>
 	</div>
-
 	{% for company in cm_rows %}
 		<div class="modal-backdrop" id="company-edit-{{ company.id }}" role="dialog" aria-modal="true" aria-labelledby="company-edit-title-{{ company.id }}" aria-hidden="true" hidden>
 			<div class="modal-card">
 				<form action="/admin/companies/{{ company.id }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<div class="modal-head">
-						<h3 id="company-edit-title-{{ company.id }}">Edit {{ company.name }}</h3>
+						<h3 id="company-edit-title-{{ company.id }}">
+							Edit {{ company.name }}
+						</h3>
 						<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
 					</div>
 					<div class="modal-body">
 						<div class="form-grid">
-							<div class="field full"><label>Company name</label><input name="name" value="{{ company.name }}" required></div>
-							<div class="field full"><label>Domain</label><input name="domain" value="{{ company.domain }}" required></div>
+							<div class="field full">
+								<label>Company name</label>
+								<input name="name" value="{{ company.name }}" required>
+							</div>
+							<div class="field full">
+								<label>Domain</label>
+								<input name="domain" value="{{ company.domain }}" required>
+							</div>
 							<div class="field full">
 								<label>Company type</label><select name="company_type" {{ company.is_system ? 'disabled' : '' }}>
-									<option value="client" {{ company.company_type=='client' ? 'selected' : '' }}>Client company</option>
-									<option value="course_provider" {{ company.company_type=='course_provider' ? 'selected' : '' }}>Course provider</option>
-									<option value="system" {{ company.company_type=='system' ? 'selected' : '' }}>System Company</option>
+								<option value="client" {{ company.company_type=='client' ? 'selected' : '' }}>Client company</option>
+								<option value="course_provider" {{ company.company_type=='course_provider' ? 'selected' : '' }}>Course provider</option>
+								<option value="system" {{ company.company_type=='system' ? 'selected' : '' }}>System Company</option>
 								</select>
-								{% if company.is_system %}<input type="hidden" name="company_type" value="system">{% endif %}
+								{% if company.is_system %}
+									<input type="hidden" name="company_type" value="system">
+								{% endif %}
 							</div>
 						</div>
 					</div>

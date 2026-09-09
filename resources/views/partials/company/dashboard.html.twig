@@ -21,41 +21,108 @@ Changelog:
 #}
 <div class="section-head">
 	<div>
-		<h2>{{ company.name }}</h2>
-		<p>{{ company_platform_wide ? 'Platform-wide company overview for ADMIN.' : 'Company enrolments and account overview.' }}</p>
+		<h2>
+			{{ company.name }}
+		</h2>
+		<p>
+			{{ company_platform_wide ? 'Platform-wide company overview for ADMIN.' : 'Company enrolments and account overview.' }}
+		</p>
 	</div>
 	<span class="badge info">{{ company.domain }}</span>
 </div>
-
 <div class="stat-grid">
-	<div class="stat-card"><div class="stat-value">{{ people_count }}</div><div class="stat-label">People</div></div>
-	<div class="stat-card"><div class="stat-value">{{ courses_count }}</div><div class="stat-label">Courses</div></div>
-	<div class="stat-card"><div class="stat-value">{{ requests_count }}</div><div class="stat-label">Requests</div></div>
-	<div class="stat-card"><div class="stat-value">{{ enrolments_count }}</div><div class="stat-label">Enrolments</div></div>
-	<div class="stat-card"><div class="stat-value">{{ credits_count }}</div><div class="stat-label">Credit pools</div></div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ people_count }}
+		</div>
+		<div class="stat-label">
+			People
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ courses_count }}
+		</div>
+		<div class="stat-label">
+			Courses
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ requests_count }}
+		</div>
+		<div class="stat-label">
+			Requests
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ enrolments_count }}
+		</div>
+		<div class="stat-label">
+			Enrolments
+		</div>
+	</div>
+	<div class="stat-card">
+		<div class="stat-value">
+			{{ credits_count }}
+		</div>
+		<div class="stat-label">
+			Credit pools
+		</div>
+	</div>
 </div>
-
 {% if company_platform_wide %}
 	<div class="card section">
-		<h3>All companies</h3>
+		<h3>
+			All companies
+		</h3>
 		<div class="table-wrap">
 			<table>
 				<thead>
-					<tr><th style="width:52%">Company</th><th style="width:24%">Domain</th><th style="width:8%">People</th><th style="width:8%">Courses</th><th style="width:8%">Enrolments</th></tr>
+					<tr>
+						<th style="width:52%">
+							Company
+						</th>
+						<th style="width:24%">
+							Domain
+						</th>
+						<th style="width:8%">
+							People
+						</th>
+						<th style="width:8%">
+							Courses
+						</th>
+						<th style="width:8%">
+							Enrolments
+						</th>
+					</tr>
 				</thead>
 				<tbody>
 					{% for co in companies %}
 						<tr>
-							<td>{{ co.name }}</td>
-							<td>{{ co.domain }}</td>
-							<td>{{ co.people_count }}</td>
-							<td>{{ co.owned_course_count }}</td>
-							<td>{{ co.enrolment_count }}</td>
+							<td>
+								{{ co.name }}
+							</td>
+							<td>
+								{{ co.domain }}
+							</td>
+							<td>
+								{{ co.people_count }}
+							</td>
+							<td>
+								{{ co.owned_course_count }}
+							</td>
+							<td>
+								{{ co.enrolment_count }}
+							</td>
 						</tr>
 					{% endfor %}
 				</tbody>
 			</table>
 		</div>
-		<p><a class="btn btn-soft btn-sm" href="/admin/companies">Manage company records</a></p>
+		<p>
+			<a class="btn btn-soft btn-sm" href="/admin/companies">Manage company records</a>
+		</p>
 	</div>
 {% endif %}

@@ -31,10 +31,14 @@ Changelog:
 #}
 {% if sh.sortable %}
 	<th class="sortable-header {{ sh.active ? 'is-sorted' : '' }}" {{ sh.width ? 'style="width:' ~ sh.width ~ '%"' : '' }} {{ sh.active ? 'aria-sort="' ~ (sh.direction == 'desc' ? 'descending' : 'ascending') ~ '"' : '' }}>
-			<a href="{{ sh.href }}"
+		<a href="{{ sh.href }}"
 			   hx-get="{{ sh.href }}" hx-target="#{{ sort_region }}" hx-select="#{{ sort_results }}"
 			   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .table-wrap">
-				{{ sh.label }}<span class="sortable-indicator" aria-hidden="true">{{ sh.active ? (sh.direction == 'desc' ? '▼' : '▲') : '↕' }}</span>
-			</a>
-		</th>{% else %}<th {{ sh.width ? 'style="width:' ~ sh.width ~ '%"' : '' }}>{{ sh.label }}</th>
+		{{ sh.label }}<span class="sortable-indicator" aria-hidden="true">{{ sh.active ? (sh.direction == 'desc' ? '▼' : '▲') : '↕' }}</span>
+		</a>
+	</th>
+{% else %}
+	<th {{ sh.width ? 'style="width:' ~ sh.width ~ '%"' : '' }}>
+		{{ sh.label }}
+	</th>
 {% endif %}
