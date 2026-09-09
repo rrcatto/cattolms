@@ -172,6 +172,7 @@ final class App
 
         $routes->add('GET /', HomeController::class, 'index');
         $routes->add('GET /privacy', HomeController::class, 'privacy');
+        $routes->add('GET /about', HomeController::class, 'about');
         $routes->add('GET /help', HelpController::class, 'index');
         $routes->add('GET /contact', ContactController::class, 'index');
         $routes->add('POST /contact', ContactController::class, 'submit');

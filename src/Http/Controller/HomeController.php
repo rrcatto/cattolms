@@ -69,4 +69,9 @@ final class HomeController extends BaseController
     {
         $this->render('privacy', ['title' => 'Privacy']);
     }
+
+    public function about(): void
+    {
+        $this->render('about', ['title' => 'About']);
+    }
 }

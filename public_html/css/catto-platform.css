@@ -635,3 +635,15 @@
 	.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:none}
 	.cl-tag-cloud-shell.is-animated [data-tag-cloud-target="source"]{display:block!important}
 }
+
+/* v0.7 the navigation sprite is drawn, not filled.
+
+   Every symbol in public_html/img/nav-icons.svg is an outline: open paths, no fill attribute and no
+   stroke attribute. The sprite's own header says they are drawn with stroke:currentColor, but
+   nothing ever set it, so SVG's default applied instead - fill:black, stroke:none. On a light bar
+   that reads as a smudge; on Factory Reset Sidebar's dark rail it is black on near-black and the
+   icons simply are not there.
+
+   Core owns the sprite, so core states how it is drawn. A theme still sets the colour, because
+   currentColor is whatever the theme painted the text. */
+.nav-icon{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
