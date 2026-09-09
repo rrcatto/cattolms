@@ -59,27 +59,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
-use Base;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Http\Controller\AdminController;
-use CattoLearning\Http\Controller\AdminSeedController;
-use CattoLearning\Http\Controller\AssessmentController;
-use CattoLearning\Http\Controller\AuthController;
-use CattoLearning\Http\Controller\CompanyController;
-use CattoLearning\Http\Controller\CourseController;
-use CattoLearning\Http\Controller\ContactController;
-use CattoLearning\Http\Controller\AdminCourseController;
-use CattoLearning\Http\Controller\AdminLookupController;
-use CattoLearning\Http\Controller\AdminCourseCategoryController;
-use CattoLearning\Http\Controller\AdminCourseTagController;
-use CattoLearning\Http\Controller\LearningController;
-use CattoLearning\Http\Controller\AccountController;
-use CattoLearning\Http\Controller\HomeController;
-use CattoLearning\Http\Controller\HelpController;
-use CattoLearning\Http\Controller\ThemeController;
 use CattoLearning\Event\EventDispatcher;
-use CattoLearning\Http\Routing\RouteRegistrar;
 use CattoLearning\Infrastructure\Persistence\ConnectionFactory;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\DatabaseSessionHandler;
@@ -92,10 +74,6 @@ use CattoLearning\Support\Env;
 use Dotenv\Dotenv;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Routing\Exception\MethodNotAllowedException;
-use Symfony\Component\Routing\Exception\ResourceNotFoundException;
-use Symfony\Component\Routing\Matcher\RequestMatcherInterface;
-use Symfony\Component\Routing\RouterInterface;
 use Throwable;
 
 final class App
@@ -131,314 +109,10 @@ final class App
         ini_set('error_log', $logRoot . '/application.log');
         self::logRequest();
 
-        $f3 = Base::instance();
-        $f3->set('DEBUG', Env::bool('APP_DEBUG', false) ? 2 : 0);
-        $f3->set('CACHE', $cacheRoot . '/');
-        $f3->set('TEMP', $cacheRoot . '/');
-        $f3->set('ESCAPE', true);
-        $f3->set('AUTOLOAD', $codeRoot . '/src/');
-
         self::startSession(new DbalDatabase(ConnectionFactory::create()));
 
-        // The Symfony kernel is offered the request first and answers only what it has a route
-        // for. Everything else falls through untouched, so a route moves by being declared on the
-        // Symfony side and deleted from the registration below - never by both owning it at once.
-        if (self::handledBySymfony($instanceRoot)) {
-            return;
-        }
-
-        $container = ContainerFactory::build(
-            $codeRoot,
-            $instanceRoot,
-            $publicRoot,
-            $f3
-        );
-        // F3 3.9 natively accepts a PSR-11 container. Route callbacks in
-        // Class->method form are therefore resolved lazily by PHP-DI only
-        // when F3 dispatches the matching route.
-        $f3->set('CONTAINER', $container);
-
-        /** @var list<class-string<\CattoLearning\Plugin\PluginInterface>> $pluginClasses */
-        $pluginClasses = require $codeRoot . '/config/plugins.php';
-        $pluginManager = new PluginManager($container, $pluginClasses);
-        /** @var EventDispatcher $events */
-        $events = $container->get(EventDispatcher::class);
-        $pluginManager->boot(new PluginContext($f3, $events));
-        $f3->set('plugin_inventory', $pluginManager->inventory());
-
-        $routes = new RouteRegistrar($f3);
-
-        // The whole of /api/v1 is served by the Symfony kernel now; see src/Http/Symfony/.
-
-        $routes->add('GET /', HomeController::class, 'index');
-        $routes->add('GET /privacy', HomeController::class, 'privacy');
-        $routes->add('GET /about', HomeController::class, 'about');
-        $routes->add('GET /help', HelpController::class, 'index');
-        $routes->add('GET /contact', ContactController::class, 'index');
-        $routes->add('POST /contact', ContactController::class, 'submit');
-        $routes->add('GET /theme/palette', ThemeController::class, 'palette');
-        $routes->add('GET /courses', CourseController::class, 'catalogue');
-        $routes->add('GET /courses/category/@slug', CourseController::class, 'catalogue');
-        $routes->add('GET /courses/categories', CourseController::class, 'categoryBrowser');
-        $routes->add('GET /courses/categories/@slug/courses', CourseController::class, 'categoryCoursesFragment');
-        $routes->add('GET /courses/@slug', CourseController::class, 'detail');
-        $routes->add('POST /courses/favourite', CourseController::class, 'toggleFavourite');
-        $routes->add('POST /courses/request', CourseController::class, 'requestCourse');
-        $routes->add('GET /course-media/@public_id', CourseController::class, 'media');
-        $routes->add('GET /certificates/@public_id', CourseController::class, 'certificate');
-
-        $routes->add('GET /login', AuthController::class, 'loginForm');
-        $routes->add('POST /login', AuthController::class, 'requestLink');
-        $routes->add('GET /login/sent', AuthController::class, 'sent');
-        $routes->add('HEAD /auth/consume', AuthController::class, 'consumeHead');
-        $routes->add('GET /auth/consume', AuthController::class, 'consume');
-        $routes->add('POST /logout', AuthController::class, 'logout');
-
-        $routes->add('GET /account/library', AccountController::class, 'learning');
-        $routes->add('POST /account/library/enrolments/@id/remove', LearningController::class, 'removeOwnAccess');
-        $routes->add('GET /learn/@slug', LearningController::class, 'course');
-        $routes->add('POST /learn/@slug/start', LearningController::class, 'start');
-        $routes->add('GET /learn/@slug/module/@position', LearningController::class, 'module');
-        $routes->add('GET /learn/@slug/diagnostic/@key', AssessmentController::class, 'diagnosticOverview');
-        $routes->add('POST /learn/@slug/diagnostic/@key/start', AssessmentController::class, 'startDiagnostic');
-        $routes->add('GET /learn/@slug/module/@position/assessment', AssessmentController::class, 'moduleOverview');
-        $routes->add('POST /learn/@slug/module/@position/assessment/start', AssessmentController::class, 'startModule');
-        $routes->add('GET /learn/@slug/final/assessment', AssessmentController::class, 'finalOverview');
-        $routes->add('POST /learn/@slug/final/assessment/start', AssessmentController::class, 'startFinal');
-        $routes->add('GET /learn/@slug/assessment/session/@session', AssessmentController::class, 'session');
-        $routes->add('POST /learn/@slug/assessment/session/@session/respond', AssessmentController::class, 'respond');
-        $routes->add('POST /learn/@slug/assessment/session/@session/finish', AssessmentController::class, 'finish');
-        $routes->add('GET /learn/@slug/assessment/session/@session/result', AssessmentController::class, 'result');
-        $routes->add('GET /account', AccountController::class, 'index');
-        $routes->add('GET /account/dashboard', AccountController::class, 'dashboard');
-        $routes->add('GET /account/activity', AccountController::class, 'activity');
-        $routes->add('GET /account/profile', AccountController::class, 'profile');
-        $routes->add('POST /account/profile', AccountController::class, 'updateProfile');
-        $routes->add('GET /account/sessions', AccountController::class, 'sessions');
-        $routes->add('POST /account/sessions/revoke', AccountController::class, 'revokeSession');
-        $routes->add('POST /account/email/secondary', AccountController::class, 'requestSecondaryEmail');
-        $routes->add('GET /account/email/verify', AccountController::class, 'verifySecondaryEmail');
-        $routes->add('POST /account/email/remove', AccountController::class, 'removeSecondaryEmail');
-
-        $routes->add('GET /company/register', CompanyController::class, 'registerForm');
-        $routes->add('POST /company/register', CompanyController::class, 'register');
-        $routes->add('GET /company', CompanyController::class, 'index');
-        $routes->add('GET /company/dashboard', CompanyController::class, 'dashboard');
-        $routes->add('GET /company/people', CompanyController::class, 'people');
-        $routes->add('GET /company/requests', CompanyController::class, 'requests');
-        $routes->add('GET /company/enrolments', CompanyController::class, 'enrolments');
-        $routes->add('GET /company/credits', CompanyController::class, 'credits');
-        $routes->add('GET /company/courses', CompanyController::class, 'courses');
-        $routes->add('GET /company/training', CompanyController::class, 'training');
-        $routes->add('GET /company/favourites', CompanyController::class, 'favourites');
-        $routes->add('GET /company/performance', CompanyController::class, 'performance');
-        $routes->add('GET /company/lookup/@type', CompanyController::class, 'lookup');
-        $routes->add('POST /company/enrolments/assign', CompanyController::class, 'assignCourse');
-        $routes->add('POST /company/favourites/@id/toggle', CompanyController::class, 'toggleFavourite');
-        $routes->add('POST /company/people', CompanyController::class, 'createPerson');
-        $routes->add('POST /company/people/@id/remove', CompanyController::class, 'removePerson');
-        $routes->add('POST /company/requests/@id/decision', CompanyController::class, 'decideRequest');
-        $routes->add('POST /company/enrolments/@id/remove', CompanyController::class, 'removeEnrolment');
-        $routes->add('POST /company/enrolments/@id/restore', CompanyController::class, 'restoreEnrolment');
-        // Selecting the administered company is a POST on purpose: it is an authorisation
-        // boundary, so it may not be reachable by a GET parameter.
-        $routes->add('POST /company/context', CompanyController::class, 'selectCompany');
-        $routes->add('GET /company/picker', CompanyController::class, 'picker');
-        $routes->add('POST /company/people/@id', CompanyController::class, 'updatePerson');
-        $routes->add('POST /company/people/@id/status', CompanyController::class, 'setPersonStatus');
-
-        $routes->add('GET /admin', AdminController::class, 'index');
-        $routes->add('GET /admin/dashboard', AdminController::class, 'dashboard');
-        $routes->add('GET /admin/people', AdminController::class, 'people');
-        $routes->add('GET /admin/companies', AdminController::class, 'companies');
-        $routes->add('GET /admin/companies/creators', AdminController::class, 'companyCreators');
-        $routes->add('GET /admin/course/enrolments', AdminController::class, 'enrolments');
-        $routes->add('GET /admin/course/requests', AdminController::class, 'requests');
-        $routes->add('GET /admin/course/credits', AdminController::class, 'credits');
-        $routes->add('GET /admin/activity', AdminController::class, 'activity');
-        $routes->add('GET /admin/reports', AdminController::class, 'reports');
-        $routes->add('GET /admin/reports/companies', AdminController::class, 'companyReport');
-        $routes->add('GET /admin/themes', AdminController::class, 'themes');
-        $routes->add('GET /admin/seed', AdminSeedController::class, 'index');
-        $routes->add('POST /admin/seed/generate', AdminSeedController::class, 'generate');
-        $routes->add('GET /admin/settings', AdminController::class, 'settings');
-
-
-
-
-        $routes->add('GET /admin/roles', AdminController::class, 'roles');
-        $routes->add('GET /admin/roles/@id', AdminController::class, 'role');
-        $routes->add('POST /admin/roles', AdminController::class, 'createRole');
-        $routes->add('POST /admin/roles/@id', AdminController::class, 'updateRole');
-        $routes->add('POST /admin/roles/@id/permissions', AdminController::class, 'saveRolePermissions');
-        $routes->add('POST /admin/roles/@id/delete', AdminController::class, 'deleteRole');
-        // Read-only bounded entity search backing the Administration/Company pickers that
-        // replaced the whole-table <select> controls. GET and side-effect free, so no CSRF.
-        $routes->add('GET /admin/lookup/@type', AdminLookupController::class, 'search');
-        $routes->add('GET /admin/activity/feed', AdminController::class, 'activityFeed');
-        $routes->add('GET /admin/activity/@id', AdminController::class, 'activityEvent');
-        $routes->add('GET /admin/people/@id', AdminController::class, 'person');
-        $routes->add('POST /admin/people', AdminController::class, 'createPerson');
-        $routes->add('POST /admin/people/@id', AdminController::class, 'updatePerson');
-        $routes->add('POST /admin/people/@id/status', AdminController::class, 'changePersonStatus');
-        $routes->add('POST /admin/people/@id/sessions/revoke', AdminController::class, 'revokePersonSession');
-        $routes->add('POST /admin/companies', AdminController::class, 'createCompany');
-        $routes->add('POST /admin/companies/@id', AdminController::class, 'updateCompany');
-        $routes->add('POST /admin/companies/@id/status', AdminController::class, 'changeCompanyStatus');
-        $routes->add('POST /admin/course/enrolments/@id/remove', AdminController::class, 'removeEnrolment');
-        $routes->add('POST /admin/course/enrolments/@id/restore', AdminController::class, 'restoreEnrolment');
-        $routes->add('POST /admin/course/credits', AdminController::class, 'addCredit');
-        $routes->add('POST /admin/course/requests/@id/decision', AdminController::class, 'decideRequest');
-        $routes->add('POST /admin/themes/import', AdminController::class, 'importTheme');
-        $routes->add('POST /admin/themes/import/confirm', AdminController::class, 'confirmThemeImport');
-        $routes->add('POST /admin/themes/@slug/delete', AdminController::class, 'deleteTheme');
-        $routes->add('POST /admin/settings', AdminController::class, 'saveSettings');
-        $routes->add('POST /admin/settings/platform-name/reset', AdminController::class, 'resetPlatformName');
-        $routes->add('POST /admin/settings/mail/password', AdminController::class, 'mailPassword');
-        $routes->add('POST /admin/settings/mail', AdminController::class, 'saveMailSettings');
-        $routes->add('POST /admin/settings/mail/reset', AdminController::class, 'resetMailSettings');
-
-        $routes->add('POST /admin/themes/activate', AdminController::class, 'activateTheme');
-        $routes->add('POST /admin/themes/resync', AdminController::class, 'resyncThemes');
-        $routes->add('POST /admin/database/prune', AdminController::class, 'pruneDatabase');
-        $routes->add('POST /admin/mail/test', AdminController::class, 'testMail');
-
-        $routes->add('GET /admin/courses', AdminController::class, 'courses');
-        $routes->add('GET /admin/courses/tags', AdminCourseTagController::class, 'index');
-        $routes->add('POST /admin/courses/tags', AdminCourseTagController::class, 'create');
-        $routes->add('POST /admin/courses/tags/@id', AdminCourseTagController::class, 'update');
-        $routes->add('POST /admin/courses/tags/@id/delete', AdminCourseTagController::class, 'delete');
-        $routes->add('GET /admin/courses/categories', AdminCourseCategoryController::class, 'index');
-        $routes->add('POST /admin/courses/categories', AdminCourseCategoryController::class, 'create');
-        $routes->add('POST /admin/courses/categories/inline', AdminCourseCategoryController::class, 'inlineCreate');
-        $routes->add('GET /admin/courses/categories/@id', AdminCourseCategoryController::class, 'edit');
-        $routes->add('POST /admin/courses/categories/@id', AdminCourseCategoryController::class, 'update');
-        $routes->add('POST /admin/courses/categories/@id/move', AdminCourseCategoryController::class, 'move');
-        $routes->add('POST /admin/courses/categories/@id/delete', AdminCourseCategoryController::class, 'delete');
-        $routes->add('GET /admin/courses/new', AdminCourseController::class, 'createForm');
-        $routes->add('POST /admin/courses', AdminCourseController::class, 'create');
-        $routes->add('GET /admin/courses/import', AdminCourseController::class, 'importForm');
-        $routes->add('POST /admin/courses/import', AdminCourseController::class, 'stageImport');
-        $routes->add('GET /admin/courses/import/preview', AdminCourseController::class, 'previewImport');
-        $routes->add('POST /admin/courses/import/commit', AdminCourseController::class, 'commitImport');
-        $routes->add('GET /admin/courses/@id', AdminCourseController::class, 'edit');
-        $routes->add('POST /admin/courses/@id', AdminCourseController::class, 'update');
-        $routes->add('POST /admin/courses/@id/people', AdminCourseController::class, 'updatePeople');
-        $routes->add('POST /admin/courses/@id/pricing', AdminCourseController::class, 'createPriceVariant');
-        $routes->add('POST /admin/courses/@id/pricing/@price_variant_id', AdminCourseController::class, 'updatePriceVariant');
-        $routes->add('POST /admin/courses/@id/pricing/@price_variant_id/default', AdminCourseController::class, 'setDefaultPriceVariant');
-        $routes->add('POST /admin/courses/@id/pricing/@price_variant_id/move', AdminCourseController::class, 'movePriceVariant');
-        $routes->add('POST /admin/courses/@id/pricing/@price_variant_id/delete', AdminCourseController::class, 'deletePriceVariant');
-        $routes->add('GET /admin/courses/@id/preview', AdminCourseController::class, 'preview');
-        $routes->add('POST /admin/courses/@id/preview/reset', AdminCourseController::class, 'resetPreview');
-        $routes->add('GET /admin/courses/@id/export', AdminCourseController::class, 'export');
-        $routes->add('POST /admin/courses/@id/reset', AdminCourseController::class, 'resetCourse');
-        $routes->add('POST /admin/courses/@id/delete', AdminCourseController::class, 'deleteCourse');
-        $routes->add('POST /admin/courses/@id/revision', AdminCourseController::class, 'cloneRevision');
-        $routes->add('GET /admin/courses/@id/preview/modules/@module_id', AdminCourseController::class, 'previewModule');
-        $routes->add('GET /admin/courses/@id/certificate', AdminCourseController::class, 'certificate');
-        $routes->add('POST /admin/courses/@id/certificate', AdminCourseController::class, 'updateCertificate');
-        $routes->add('POST /admin/courses/@id/status', AdminCourseController::class, 'status');
-        $routes->add('POST /admin/courses/@id/submit-for-approval', AdminCourseController::class, 'submitForApproval');
-        $routes->add('GET /admin/courses/@id/modules/new', AdminCourseController::class, 'createModuleForm');
-        $routes->add('POST /admin/courses/@id/modules', AdminCourseController::class, 'createModule');
-        $routes->add('GET /admin/courses/@id/modules/@module_id', AdminCourseController::class, 'editModule');
-        $routes->add('POST /admin/courses/@id/modules/@module_id', AdminCourseController::class, 'updateModule');
-        $routes->add('POST /admin/courses/@id/modules/@module_id/assessment', AdminCourseController::class, 'updateAssessment');
-        $routes->add('POST /admin/courses/@id/modules/@module_id/delete', AdminCourseController::class, 'deleteModule');
-        $routes->add('GET /admin/courses/@id/diagnostics/new', AdminCourseController::class, 'createDiagnosticForm');
-        $routes->add('POST /admin/courses/@id/diagnostics', AdminCourseController::class, 'createDiagnostic');
-        $routes->add('GET /admin/courses/@id/diagnostics/@diagnostic_id', AdminCourseController::class, 'editDiagnostic');
-        $routes->add('POST /admin/courses/@id/diagnostics/@diagnostic_id', AdminCourseController::class, 'updateDiagnostic');
-        $routes->add('POST /admin/courses/@id/diagnostics/@diagnostic_id/delete', AdminCourseController::class, 'deleteDiagnostic');
-        $routes->add('POST /admin/courses/@id/diagnostics/@diagnostic_id/move', AdminCourseController::class, 'moveDiagnostic');
-        $routes->add('GET /admin/courses/@id/final-assessment', AdminCourseController::class, 'editFinalAssessment');
-        $routes->add('POST /admin/courses/@id/final-assessment', AdminCourseController::class, 'updateFinalAssessment');
-        $routes->add('POST /admin/courses/@id/grade-bands', AdminCourseController::class, 'updateGradeBands');
-        $routes->add('POST /admin/courses/@id/grant-self', AdminCourseController::class, 'grantSelf');
-        $routes->add('POST /admin/courses/@id/grant', AdminCourseController::class, 'grant');
-        $routes->add('POST /admin/courses/@id/media', AdminCourseController::class, 'uploadMedia');
-        $routes->add('POST /admin/courses/@id/presentation', AdminCourseController::class, 'importPresentation');
-
-        $f3->set('ONERROR', static function (Base $f3) use ($container): void {
-            static $handling = false;
-            $error = (array) $f3->get('ERROR');
-            $status = max(400, (int) ($error['code'] ?? 500));
-            $message = $status >= 500 && !Env::bool('APP_DEBUG', false)
-                ? 'An unexpected error occurred.'
-                : (string) ($error['text'] ?? 'Request failed.');
-
-            if ($status >= 500) {
-                error_log((string) ($error['trace'] ?? $message));
-            }
-            while (ob_get_level() > 0) {
-                @ob_end_clean();
-            }
-            $uri = (string) ($_SERVER['REQUEST_URI'] ?? '');
-            if (str_starts_with($uri, '/api/')) {
-                if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
-                header('Cache-Control: no-store');
-                echo json_encode(['error' => ['status' => $status, 'code' => 'request_failed', 'message' => $message]], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-                return;
-            }
-            if ($handling) {
-                if (!headers_sent()) header('Content-Type: text/html; charset=utf-8');
-                echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Error</title><body style="font-family:system-ui;padding:3rem"><h1>'
-                    . htmlspecialchars((string) $status, ENT_QUOTES, 'UTF-8') . '</h1><p>'
-                    . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p></body></html>';
-                return;
-            }
-            $handling = true;
-            try {
-                /** @var ThemeRenderer $view */
-                $view = $container->get(ThemeRenderer::class);
-
-                // Error pages remain inside the current authenticated session.
-                // Authentication lookup is deliberately best-effort here: if the
-                // underlying failure is database/auth related, error rendering must
-                // still fall back safely rather than recurse into another exception.
-                $currentUser = null;
-                try {
-                    /** @var AuthService $auth */
-                    $auth = $container->get(AuthService::class);
-                    $currentUser = $auth->currentUser();
-                } catch (Throwable) {
-                    $currentUser = null;
-                }
-
-                echo $view->render('error', [
-                    'title' => 'Request failed',
-                    'page_kicker' => 'Error ' . $status,
-                    'status' => $status,
-                    'message' => $message,
-                    'is_authenticated' => $currentUser !== null,
-                    'is_platform_admin' => $currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false,
-                    'is_company_admin' => $currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false,
-                    'is_course_owner' => $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_OWNER),
-                    'is_course_editor' => $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_EDITOR),
-                    'permissions' => $currentUser !== null ? $currentUser->permissions : [],
-                    'role_keys' => $currentUser !== null ? $currentUser->roles : [],
-                    'user_email' => $currentUser !== null ? $currentUser->primaryEmail : '',
-                    'user_name' => $currentUser !== null ? $currentUser->displayName : '',
-                    'flash_messages' => [],
-                    'load_assessment_timer' => false,
-                ], $status);
-            } catch (Throwable $renderError) {
-                error_log($renderError->__toString());
-                if (!headers_sent()) header('Content-Type: text/html; charset=utf-8');
-                echo '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Error</title><body style="font-family:system-ui;padding:3rem"><h1>Request failed</h1><p>'
-                    . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p></body></html>';
-            } finally {
-                $handling = false;
-            }
-        });
-
-        try {
-            $f3->run();
-        } catch (Throwable $e) {
-            error_log($e->__toString());
-            $f3->error(500, Env::bool('APP_DEBUG', false) ? $e->getMessage() : 'Application error.');
-        }
+        // Symfony owns every route, the container and the error page. Fat-Free is gone.
+        self::handleWithSymfony($instanceRoot);
     }
 
     /**
@@ -478,7 +152,7 @@ final class App
      * The kernel is discarded again when it does not match, so a Fat-Free request pays for one
      * compiled-matcher lookup and nothing else - no application service is constructed.
      */
-    private static function handledBySymfony(string $instanceRoot): bool
+    private static function handleWithSymfony(string $instanceRoot): void
     {
         $kernel = new Kernel(
             Env::string('APP_ENV', 'production'),
@@ -488,26 +162,9 @@ final class App
         $kernel->boot();
 
         $request = Request::createFromGlobals();
-        // The router matches a Request rather than a path so that host, scheme and any condition
-        // expression are part of the decision. matchRequest() is declared on RequestMatcherInterface,
-        // which the concrete router implements alongside RouterInterface.
-        /** @var RouterInterface&RequestMatcherInterface $router */
-        $router = $kernel->getContainer()->get('router');
-        $router->getContext()->fromRequest($request);
-
-        try {
-            $router->matchRequest($request);
-        } catch (ResourceNotFoundException | MethodNotAllowedException) {
-            $kernel->shutdown();
-
-            return false;
-        }
-
         $response = $kernel->handle($request);
         $response->send();
         $kernel->terminate($request, $response);
-
-        return true;
     }
 
     private static function startSession(Database $db): void

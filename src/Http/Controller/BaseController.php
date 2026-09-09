@@ -49,21 +49,49 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use Base;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\RoleCatalog;
+use CattoLearning\Http\HttpRedirect;
 use CattoLearning\Support\Csrf;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 abstract class BaseController
 {
     public function __construct(
-        protected readonly Base $f3,
         protected readonly AuthService $auth,
-        protected readonly ThemeRenderer $view
+        protected readonly ThemeRenderer $view,
+        protected readonly RequestStack $requests
     ) {
+    }
+
+    /** The current request, which every helper below reads rather than touching a superglobal. */
+    protected function request(): Request
+    {
+        return $this->requests->getCurrentRequest() ?? Request::createFromGlobals();
+    }
+
+    /**
+     * One route parameter.
+     *
+     * Replaces Fat-Free's PARAMS hive. Returns a string always, because every caller either
+     * validates it or casts it, and a null here would only move the check outward.
+     */
+    protected function param(string $name, string $default = ''): string
+    {
+        return (string) ($this->request()->attributes->get($name) ?? $default);
+    }
+
+    /** One posted field. */
+    protected function posted(string $name, string $default = ''): string
+    {
+        return (string) ($this->request()->request->get($name) ?? $default);
     }
 
     protected function currentUser(): ?CurrentUser
@@ -76,7 +104,7 @@ abstract class BaseController
         $user = $this->currentUser();
         if ($user === null) {
             $this->flash('warning', 'Sign in to continue.');
-            $this->redirect('/login?return=' . rawurlencode((string) ($_SERVER['REQUEST_URI'] ?? '/account/library')));
+            $this->redirect('/login?return=' . rawurlencode($this->request()->getRequestUri()));
         }
         return $user;
     }
@@ -85,7 +113,7 @@ abstract class BaseController
     {
         $user = $this->requireUser();
         if (!$user->hasPermission($permission)) {
-            $this->f3->error(403, 'You do not have permission to access this function.');
+            throw new AccessDeniedHttpException('You do not have permission to access this function.');
         }
         return $user;
     }
@@ -110,18 +138,18 @@ abstract class BaseController
      *
      * @param array<string,mixed> $data
      */
-    protected function renderFragment(string $template, array $data = [], int $status = 200): void
+    protected function renderFragment(string $template, array $data = [], int $status = 200): Response
     {
         // The same identity and capability flags the page render supplies. A fragment includes the
         // same partials, and those partials hide controls on the same can_* flags.
         $data = $this->viewIdentity($data);
-        http_response_code($status);
+
         header('Content-Type: text/html; charset=utf-8');
         // A lookup response reflects one operator's resource scope, so it must never be reused
         // for another request by a shared cache.
         header('Cache-Control: no-store');
 
-        echo $this->view->renderFragment($template, $data);
+        return new Response($this->view->renderFragment($template, $data), $status);
     }
 
     /**
@@ -245,7 +273,7 @@ abstract class BaseController
     }
 
     /** @param array<string,mixed> $data */
-    protected function render(string $page, array $data = [], int $status = 200): void
+    protected function render(string $page, array $data = [], int $status = 200): Response
     {
         $data = $this->viewIdentity($data);
         // Navigation state belongs to a page, not to a fragment swapped into one.
@@ -254,13 +282,24 @@ abstract class BaseController
         $data['page_kicker'] = $data['page_kicker'] ?? '';
         $data['flash_messages'] = $this->consumeFlash();
 
-        echo $this->view->render($page, $data, $status);
+        return new Response($this->view->render($page, $data, $status), $status);
     }
 
+    /**
+     * Stops the controller and sends the reader somewhere else.
+     *
+     * Thrown rather than returned so a guard can redirect from the middle of a method without
+     * every caller forwarding a response it did not ask for. See HttpRedirect for why.
+     */
     protected function redirect(string $path): never
     {
-        header('Location: ' . $path, true, 303);
-        exit;
+        throw new HttpRedirect($path);
+    }
+
+    /** The response for a resource that is not there. */
+    protected function notFound(string $message): NotFoundHttpException
+    {
+        return new NotFoundHttpException($message);
     }
 
     protected function flash(string $type, string $message): void
@@ -278,14 +317,24 @@ abstract class BaseController
         ));
     }
 
-    protected function handle(callable $callback, string $fallbackPath): void
+    /**
+     * Runs a write and turns a domain failure into a message on the page it came from.
+     *
+     * A redirect is not a failure: HttpRedirect extends Exception rather than RuntimeException
+     * precisely so a successful write's own redirect passes straight through this.
+     */
+    protected function handle(callable $callback, string $fallbackPath): Response
     {
         try {
-            $callback();
+            $result = $callback();
         } catch (RuntimeException|\InvalidArgumentException $e) {
             $this->flash('danger', $e->getMessage());
             $this->redirect($fallbackPath);
         }
+
+        // A callback that produced a response is showing the reader something; one that produced
+        // nothing has performed a write, and the reader goes back where they came from.
+        return $result instanceof Response ? $result : $this->redirect($fallbackPath);
     }
     private function activeNavigation(): string
     {

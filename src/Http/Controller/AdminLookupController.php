@@ -32,13 +32,16 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use Base;
 use CattoLearning\Application\PlatformAdministrationService;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\EntityLookupRepository;
 use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class AdminLookupController extends BaseController
 {
@@ -58,13 +61,13 @@ final class AdminLookupController extends BaseController
     ];
 
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanyRepository $companies
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /**
@@ -74,14 +77,13 @@ final class AdminLookupController extends BaseController
      * htmx swaps error responses by default and a silent empty list would look like "no
      * matches" instead of "you asked for something that does not exist".
      *
-     * @param array<string,mixed> $params
      */
-    public function search(Base $f3, array $params = []): void
+    #[Route('/admin/lookup/{type}', name: 'admin_lookup_search', requirements: ['type' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function search(): Response
     {
-        $type = strtolower(trim((string) ($params['type'] ?? '')));
+        $type = strtolower(trim($this->param('type')));
         if (!EntityLookupRepository::isSupportedType($type)) {
-            $this->f3->error(400, 'Unknown lookup type.');
-            return;
+            throw new BadRequestHttpException('Unknown lookup type.');
         }
 
         $user = $this->requirePermission(self::TYPE_PERMISSIONS[$type]);
@@ -90,7 +92,7 @@ final class AdminLookupController extends BaseController
 
         $results = $this->platformAdministration->lookupEntities($type, $query, $this->scopeCompanyId($user));
 
-        $this->renderFragment('partials/entity-lookup-results', [
+        return $this->renderFragment('partials/entity-lookup-results', [
             'lookup_type' => $type,
             'lookup_target' => $target,
             'lookup_query' => trim($query),

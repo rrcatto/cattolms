@@ -61,7 +61,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\View;
 
-use Base;
 use CattoLearning\Application\AdministrationSectionRegistry;
 use CattoLearning\Application\AccountSectionRegistry;
 use CattoLearning\Application\CompanySectionRegistry;
@@ -76,7 +75,6 @@ final class ThemeRenderer
 {
     private const PLATFORM_ASSET_VERSION = '0.6';
     public function __construct(
-        private readonly Base $f3,
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
         private readonly ThemeManager $themes,
@@ -339,10 +337,6 @@ final class ThemeRenderer
         // The layout a page extends: the theme's optional wrapper for this family, or its base.
         // Resolved here so no platform page template has to know which themes ship wrappers.
         $context['layout'] = $this->templates->layoutFor($family);
-
-        if (!headers_sent() && $this->f3->get('ERROR') === null) {
-            http_response_code($status);
-        }
 
         return $this->stampGenerator(
             $this->twig->render($this->templates->pageTemplate($page), $context)
@@ -839,11 +833,9 @@ final class ThemeRenderer
                 if (is_array($section)) $sections[] = $render($section);
             }
             $data['admin_sections'] = $sections;
-            $this->f3->set('admin_sections', $sections);
         }
         if (isset($data['admin_section']) && is_array($data['admin_section'])) {
             $data['admin_section'] = $render($data['admin_section']);
-            $this->f3->set('admin_section', $data['admin_section']);
         }
         return $data;
     }
@@ -877,11 +869,9 @@ final class ThemeRenderer
             $sections = [];
             foreach ($data[$plural] as $section) if (is_array($section)) $sections[] = $render($section);
             $data[$plural] = $sections;
-            $this->f3->set($plural, $sections);
         }
         if (isset($data[$singular]) && is_array($data[$singular])) {
             $data[$singular] = $render($data[$singular]);
-            $this->f3->set($singular, $data[$singular]);
         }
         return $data;
     }

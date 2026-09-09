@@ -26,90 +26,105 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use Base;
 use CattoLearning\Application\AccountSectionRegistry;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class AccountController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanyService $companies,
         private readonly AccountSectionRegistry $sections
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /** Renders every Account section in one presentation-neutral workspace. */
-    public function index(): void
+    #[Route('/account', name: 'account_index', methods: ['GET'])]
+    public function index(): Response
     {
         $user = $this->requirePermission('ACCOUNT.VIEW');
         $sections = $this->allowedSections($user);
         $data = $this->workspaceData($user, $sections);
         $data['account_sections'] = $sections;
         $data['account_layout'] = 'workspace';
-        $this->render('account-control-centre', $data + [
+        return $this->render('account-control-centre', $data + [
             'title' => 'Account',
             'page_kicker' => 'Dashboard, profile, learning, sessions and activity',
             'active_nav' => 'account',
         ]);
     }
 
-    public function dashboard(): void
+
+    #[Route('/account/dashboard', name: 'account_dashboard', methods: ['GET'])]
+    public function dashboard(): Response
     {
         $user = $this->requirePermission('ACCOUNT.VIEW');
-        $this->renderAccountSection('dashboard', $this->dashboardData($user->id));
+        return $this->renderAccountSection('dashboard', $this->dashboardData($user->id));
     }
 
-    public function learning(): void
+
+    #[Route('/account/library', name: 'account_learning', methods: ['GET'])]
+    public function learning(): Response
     {
         $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
-        $this->renderAccountSection('learning', $this->learningData($user->id, $this->libraryRequest()));
+        return $this->renderAccountSection('learning', $this->learningData($user->id, $this->libraryRequest()));
     }
 
-    public function profile(): void
+    #[Route('/account/profile', name: 'account_profile', methods: ['GET'])]
+    public function profile(): Response
     {
         $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
-        $this->renderAccountSection('profile', $this->profileData($user->id));
+        return $this->renderAccountSection('profile', $this->profileData($user->id));
     }
 
-    public function updateProfile(): void
+
+    #[Route('/account/profile', name: 'account_update_profile', methods: ['POST'])]
+    public function updateProfile(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->auth->updateProfile($user->id, $_POST);
             $this->flash('success', 'Your profile was updated.');
             $this->redirect('/account/profile');
         }, '/account/profile');
     }
 
-    public function sessions(): void
+
+    #[Route('/account/sessions', name: 'account_sessions', methods: ['GET'])]
+    public function sessions(): Response
     {
         $user = $this->requirePermission('ACCOUNT.SESSION.VIEW');
-        $this->renderAccountSection('sessions', [
+        return $this->renderAccountSection('sessions', [
             'sessions' => $this->auth->activeSessions($user->id),
         ]);
     }
 
-    public function activity(): void
+
+    #[Route('/account/activity', name: 'account_activity', methods: ['GET'])]
+    public function activity(): Response
     {
         $user = $this->requirePermission('ACCOUNT.ACTIVITY.VIEW');
-        $this->renderAccountSection('activity', [
+        return $this->renderAccountSection('activity', [
             'account_activity' => $this->platformAdministration->activityEvents(['actor_id' => $user->id], 100),
         ]);
     }
 
-    public function revokeSession(): void
+    #[Route('/account/sessions/revoke', name: 'account_revoke_session', methods: ['POST'])]
+    public function revokeSession(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('ACCOUNT.SESSION.MANAGE');
@@ -120,28 +135,34 @@ final class AccountController extends BaseController
         $this->redirect($isCurrent ? '/' : '/account/sessions');
     }
 
-    public function requestSecondaryEmail(): void
+
+    #[Route('/account/email/secondary', name: 'account_request_secondary_email', methods: ['POST'])]
+    public function requestSecondaryEmail(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('ACCOUNT.EMAIL.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->auth->requestSecondaryEmail($user->id, (string) ($_POST['email'] ?? ''));
             $this->flash('success', 'A verification link has been sent to the secondary email address.');
             $this->redirect('/account/profile#emails');
         }, '/account/profile#emails');
     }
 
-    public function verifySecondaryEmail(): void
+
+    #[Route('/account/email/verify', name: 'account_verify_secondary_email', methods: ['GET'])]
+    public function verifySecondaryEmail(): Response
     {
         $token = (string) ($_GET['token'] ?? '');
-        $this->handle(function () use ($token): void {
+        return $this->handle(function () use ($token): void {
             $this->auth->verifySecondaryEmail($token);
             $this->flash('success', 'The secondary email address has been verified.');
             $this->redirect('/account/profile#emails');
         }, '/login');
     }
 
-    public function removeSecondaryEmail(): void
+
+    #[Route('/account/email/remove', name: 'account_remove_secondary_email', methods: ['POST'])]
+    public function removeSecondaryEmail(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('ACCOUNT.EMAIL.MANAGE');
@@ -267,7 +288,7 @@ final class AccountController extends BaseController
     }
 
     /** @param array<string,mixed> $data */
-    private function renderAccountSection(string $key, array $data): void
+    private function renderAccountSection(string $key, array $data): Response
     {
         $user = $this->requireUser();
         // See workspaceData(): every Account section renders through here, so the scope key is
@@ -276,7 +297,7 @@ final class AccountController extends BaseController
         $definition = $this->sections->get($key);
         $data['account_section'] = $definition;
         $data['account_layout'] = 'section';
-        $this->render('account-section', $data + [
+        return $this->render('account-section', $data + [
             'title' => $definition['label'] . ' · Account',
             'page_title' => $definition['label'],
             'page_kicker' => 'Account',

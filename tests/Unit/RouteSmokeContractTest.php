@@ -23,39 +23,32 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
+use CattoLearning\Tests\Support\RouteTable;
 use PHPUnit\Framework\TestCase;
 
 final class RouteSmokeContractTest extends TestCase
 {
     public function testEveryDeclaredRouteTargetsARealControllerMethodAndIsUnique(): void
     {
-        $source = (string) file_get_contents(__DIR__ . '/../../src/Application/App.php');
-        preg_match_all('/use\s+([^;]+);/', $source, $useMatches);
-        $imports = [];
-        foreach ($useMatches[1] as $fqcn) {
-            $fqcn = trim((string) $fqcn);
-            $imports[basename(str_replace('\\', '/', $fqcn))] = $fqcn;
-        }
-
-        preg_match_all(
-            "/\\\$routes->add\\('([^']+)',\\s*([A-Za-z0-9_]+)::class,\\s*'([^']+)'\\);/",
-            $source,
-            $matches,
-            PREG_SET_ORDER
-        );
-        self::assertGreaterThanOrEqual(139, count($matches), 'The application route table unexpectedly shrank.');
+        // Read from the attributes that declare the routes. There is no route table any more: a
+        // list in one file and sixteen controllers could drift apart, and an attribute cannot drift
+        // from the method it sits on.
+        $routes = RouteTable::all();
+        self::assertGreaterThanOrEqual(170, count($routes), 'The declared routes unexpectedly shrank.');
 
         $signatures = [];
-        foreach ($matches as $match) {
-            $route = (string) $match[1];
-            $shortClass = (string) $match[2];
-            $method = (string) $match[3];
-            self::assertArrayHasKey($shortClass, $imports, 'Controller import missing for ' . $shortClass . '.');
-            $class = $imports[$shortClass];
-            self::assertTrue(class_exists($class), 'Controller class does not autoload: ' . $class);
-            self::assertTrue(method_exists($class, $method), $route . ' targets missing method ' . $class . '::' . $method . '().');
-            self::assertArrayNotHasKey($route, $signatures, 'Duplicate HTTP route signature: ' . $route);
-            $signatures[$route] = $class . '::' . $method;
+        $names = [];
+        foreach ($routes as $route) {
+            $signature = $route['method'] . ' ' . $route['path'];
+            self::assertTrue(class_exists($route['class']), 'Controller class does not autoload: ' . $route['class']);
+            self::assertTrue(
+                method_exists($route['class'], $route['action']),
+                $signature . ' targets missing method ' . $route['class'] . '::' . $route['action'] . '().'
+            );
+            self::assertArrayNotHasKey($signature, $signatures, 'Duplicate HTTP route signature: ' . $signature);
+            self::assertArrayNotHasKey($route['name'], $names, 'Duplicate route name: ' . $route['name']);
+            $signatures[$signature] = self::shortName($route['class']) . '::' . $route['action'];
+            $names[$route['name']] = true;
         }
 
         foreach ([
@@ -84,5 +77,12 @@ final class RouteSmokeContractTest extends TestCase
             self::assertArrayHasKey($route, $signatures);
             self::assertStringEndsWith($expectedTarget, str_replace('CattoLearning\\Http\\Controller\\', '', $signatures[$route]));
         }
+    }
+
+    private static function shortName(string $class): string
+    {
+        $parts = explode('\\', $class);
+
+        return end($parts);
     }
 }

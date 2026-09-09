@@ -21,35 +21,40 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Infrastructure\Mail\MailerInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 
-use Base;
 
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 
 final class ContactController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly MailerInterface $mailer
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
-    public function index(): void
+
+    #[Route('/contact', name: 'contact_index', methods: ['GET'])]
+    public function index(): Response
     {
-        $this->render('contact', [
+        return $this->render('contact', [
             'title' => 'Contact',
             'page_kicker' => 'Get in touch',
         ]);
     }
 
-    public function submit(): void
+    #[Route('/contact', name: 'contact_submit', methods: ['POST'])]
+    public function submit(): Response
     {
         $this->requireCsrf();
 

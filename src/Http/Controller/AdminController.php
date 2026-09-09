@@ -71,7 +71,9 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Seed\SeedGenerationPlan;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
+use Symfony\Component\Routing\Attribute\Route;
 
 
 use CattoLearning\Course\LearningService;
@@ -90,9 +92,11 @@ use CattoLearning\View\ThemeRenderer;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 
-use Base;
 
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class AdminController extends BaseController
 {
@@ -104,9 +108,9 @@ final class AdminController extends BaseController
     private const PAGINATED_DATASETS = ['people', 'companies', 'company_creators', 'courses', 'enrolments', 'requests', 'credits', 'activity', 'course_report', 'company_report'];
 
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly AdministrationSectionRegistry $adminSections,
         private readonly ThemeManager $themes,
@@ -116,7 +120,7 @@ final class AdminController extends BaseController
         private readonly RoleAdministrationService $roleAdministration,
         private readonly SelectedCompanyContext $companyContext
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /**
@@ -124,7 +128,8 @@ final class AdminController extends BaseController
      * are loaded together and exposed through the presentation-neutral
      * @admin.sections Theme API; no tab/query parameter selects a section.
      */
-    public function index(): void
+    #[Route('/admin', name: 'admin_index', methods: ['GET'])]
+    public function index(): Response
     {
         $user = $this->requireUser();
         $sections = array_values(array_filter(
@@ -132,8 +137,7 @@ final class AdminController extends BaseController
             fn(array $section): bool => $this->canAccessAdministrationSection($user, (string) $section['key'])
         ));
         if ($sections === []) {
-            $this->f3->error(403, 'You do not have permission to access Administration.');
-            return;
+            throw new AccessDeniedHttpException('You do not have permission to access Administration.');
         }
         // The consolidated workspace loads a bounded preview of each section rather than a full
         // paginated page. Before v0.5.7.6 this ran every section's complete dataset in one
@@ -151,7 +155,7 @@ final class AdminController extends BaseController
             // nothing to give it. Its bounds are constants, so the consolidated workspace can state
             // them without reaching for the service.
             + ['seed_volume' => SeedGenerationPlan::bounds()];
-        $this->render('admin-control-centre', $this->withAdministrationPresentation($data, true, null, $sections) + [
+        return $this->render('admin-control-centre', $this->withAdministrationPresentation($data, true, null, $sections) + [
             'title' => 'Administration',
             'page_kicker' => 'Complete permitted platform administration workspace',
             'load_ckeditor' => false,
@@ -159,9 +163,10 @@ final class AdminController extends BaseController
     }
 
     /** Renders the standalone Dashboard Administration section. */
-    public function dashboard(): void
+    #[Route('/admin/dashboard', name: 'admin_dashboard', methods: ['GET'])]
+    public function dashboard(): Response
     {
-        $this->renderAdministrationSection('dashboard');
+        return $this->renderAdministrationSection('dashboard');
     }
 
     /** Renders the standalone People Administration section. */
@@ -177,14 +182,17 @@ final class AdminController extends BaseController
      * AdminCourseController keeps every other course route: creating, importing, editing, pricing,
      * preview and export. Only the list moved.
      */
-    public function courses(): void
+    #[Route('/admin/courses', name: 'admin_courses', methods: ['GET'])]
+    public function courses(): Response
     {
-        $this->renderAdministrationSection('courses');
+        return $this->renderAdministrationSection('courses');
     }
 
-    public function people(): void
+
+    #[Route('/admin/people', name: 'admin_people', methods: ['GET'])]
+    public function people(): Response
     {
-        $this->renderAdministrationSection('people');
+        return $this->renderAdministrationSection('people');
     }
 
     /**
@@ -198,21 +206,24 @@ final class AdminController extends BaseController
      * The split is on what a company actually does rather than on its type field, so a company that
      * both sells and buys appears on both screens.
      */
-    public function companies(): void
+    #[Route('/admin/companies', name: 'admin_companies', methods: ['GET'])]
+    public function companies(): Response
     {
-        $this->renderAdministrationSection('companies');
+        return $this->renderAdministrationSection('companies');
     }
 
     /** Renders the Course Creators half of Companies. */
-    public function companyCreators(): void
+    #[Route('/admin/companies/creators', name: 'admin_company_creators', methods: ['GET'])]
+    public function companyCreators(): Response
     {
-        $this->renderAdministrationSection('company_creators');
+        return $this->renderAdministrationSection('company_creators');
     }
 
     /** Renders the standalone Enrolments Administration section. */
-    public function enrolments(): void
+    #[Route('/admin/course/enrolments', name: 'admin_enrolments', methods: ['GET'])]
+    public function enrolments(): Response
     {
-        $this->renderAdministrationSection('enrolments');
+        return $this->renderAdministrationSection('enrolments');
     }
 
     /**
@@ -221,9 +232,10 @@ final class AdminController extends BaseController
      * It shared a page with Course performance, which asks a different question about a different
      * subject, and two disparate reports on one page make each harder to read.
      */
-    public function companyReport(): void
+    #[Route('/admin/reports/companies', name: 'admin_company_report', methods: ['GET'])]
+    public function companyReport(): Response
     {
-        $this->renderAdministrationSection('company_report');
+        return $this->renderAdministrationSection('company_report');
     }
 
     /**
@@ -232,54 +244,62 @@ final class AdminController extends BaseController
      * Its own route since v0.6. Requests and enrolments had shared /admin/course/enrolments and were
      * switched by in-page tab buttons, so neither could be linked to or reloaded on its own.
      */
-    public function requests(): void
+    #[Route('/admin/course/requests', name: 'admin_requests', methods: ['GET'])]
+    public function requests(): Response
     {
-        $this->renderAdministrationSection('requests');
+        return $this->renderAdministrationSection('requests');
     }
 
     /** Renders the standalone Credits Administration section. */
-    public function credits(): void
+    #[Route('/admin/course/credits', name: 'admin_credits', methods: ['GET'])]
+    public function credits(): Response
     {
-        $this->renderAdministrationSection('credits');
+        return $this->renderAdministrationSection('credits');
     }
 
     /** Renders the standalone Activity Administration section. */
-    public function activity(): void
+    #[Route('/admin/activity', name: 'admin_activity', methods: ['GET'])]
+    public function activity(): Response
     {
-        $this->renderAdministrationSection('activity');
+        return $this->renderAdministrationSection('activity');
     }
 
     /** Renders the standalone Reports Administration section. */
-    public function reports(): void
+    #[Route('/admin/reports', name: 'admin_reports', methods: ['GET'])]
+    public function reports(): Response
     {
-        $this->renderAdministrationSection('reports');
+        return $this->renderAdministrationSection('reports');
     }
 
     /** Renders the standalone Themes Administration section. */
-    public function themes(): void
+    #[Route('/admin/themes', name: 'admin_themes', methods: ['GET'])]
+    public function themes(): Response
     {
-        $this->renderAdministrationSection('themes');
+        return $this->renderAdministrationSection('themes');
     }
 
     /** Renders the standalone Settings Administration section. */
-    public function settings(): void
+    #[Route('/admin/settings', name: 'admin_settings', methods: ['GET'])]
+    public function settings(): Response
     {
-        $this->renderAdministrationSection('settings');
+        return $this->renderAdministrationSection('settings');
     }
 
     /** Renders the standalone Roles & ACL Administration section. */
-    public function roles(): void
+    #[Route('/admin/roles', name: 'admin_roles', methods: ['GET'])]
+    public function roles(): Response
     {
-        $this->renderAdministrationSection('roles');
+        return $this->renderAdministrationSection('roles');
     }
 
-    public function role(): void
+    #[Route('/admin/roles/{id}', name: 'admin_role', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function role(): Response
     {
         $this->requirePermission('SYSTEM.ROLE.VIEW');
-        $roleId = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($roleId): void {
+        $roleId = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($roleId): Response {
             $role = $this->roleAdministration->role($roleId);
-            $this->render('admin-role-edit', [
+            return $this->render('admin-role-edit', [
                 'title' => 'Role · ' . (string) $role['role_name'],
                 'page_kicker' => 'Administration · Roles & ACL',
                 'role_acl' => $role,
@@ -288,55 +308,65 @@ final class AdminController extends BaseController
         }, '/admin/roles');
     }
 
-    public function createRole(): void
+
+    #[Route('/admin/roles', name: 'admin_create_role', methods: ['POST'])]
+    public function createRole(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $roleId = $this->roleAdministration->create($_POST, $user->id);
             $this->flash('success', 'The role was created. Assign its permissions before using it.');
             $this->redirect('/admin/roles/' . $roleId);
         }, '/admin/roles');
     }
 
-    public function updateRole(): void
+
+    #[Route('/admin/roles/{id}', name: 'admin_update_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updateRole(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $roleId = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $roleId): void {
+        $roleId = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $roleId): void {
             $this->roleAdministration->update($roleId, $_POST, $user->id);
             $this->flash('success', 'The role details were saved.');
             $this->redirect('/admin/roles/' . $roleId);
         }, '/admin/roles/' . $roleId);
     }
 
-    public function saveRolePermissions(): void
+
+    #[Route('/admin/roles/{id}/permissions', name: 'admin_save_role_permissions', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function saveRolePermissions(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $roleId = max(1, (int) $this->f3->get('PARAMS.id'));
+        $roleId = max(1, (int) $this->param('id'));
         $permissions = array_values(array_filter((array) ($_POST['permissions'] ?? []), 'is_string'));
-        $this->handle(function () use ($user, $roleId, $permissions): void {
+        return $this->handle(function () use ($user, $roleId, $permissions): void {
             $this->roleAdministration->savePermissions($roleId, $permissions, $user->id);
             $this->flash('success', 'The role permissions were saved.');
             $this->redirect('/admin/roles/' . $roleId);
         }, '/admin/roles/' . $roleId);
     }
 
-    public function deleteRole(): void
+
+    #[Route('/admin/roles/{id}/delete', name: 'admin_delete_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function deleteRole(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.ROLE.MANAGE');
-        $roleId = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $roleId): void {
+        $roleId = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $roleId): void {
             $this->roleAdministration->delete($roleId, $user->id);
             $this->flash('success', 'The role was deleted.');
             $this->redirect('/admin/roles');
         }, '/admin/roles');
     }
 
-    public function activityFeed(): void
+
+    #[Route('/admin/activity/feed', name: 'admin_activity_feed', methods: ['GET'])]
+    public function activityFeed(): Response
     {
         $this->requirePermission('PLATFORM.ACTIVITY.VIEW');
         $filters = [
@@ -357,32 +387,35 @@ final class AdminController extends BaseController
         exit;
     }
 
-    public function activityEvent(): void
+
+    #[Route('/admin/activity/{id}', name: 'admin_activity_event', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function activityEvent(): Response
     {
         $this->requirePermission('PLATFORM.ACTIVITY.VIEW');
-        $eventId = max(1, (int) $this->f3->get('PARAMS.id'));
+        $eventId = max(1, (int) $this->param('id'));
         $event = $this->platformAdministration->activityEvent($eventId);
         if ($event === null) {
-            $this->f3->error(404, 'The activity event could not be found.');
-            return;
+            throw new NotFoundHttpException('The activity event could not be found.');
         }
-        $this->render('admin-activity-event', [
+        return $this->render('admin-activity-event', [
             'title' => 'Activity event #' . $eventId,
             'page_kicker' => 'Administration · Activity',
             'event' => $event,
         ]);
     }
 
-    public function person(): void
+
+    #[Route('/admin/people/{id}', name: 'admin_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function person(): Response
     {
         $this->requirePermission('PLATFORM.PERSON.VIEW');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
+        $target = max(1, (int) $this->param('id'));
         $data = $this->platformAdministration->personForAdministration($target);
         $library = $this->learning->library($target);
         $favourites = $this->platformAdministration->favourites($target);
         $requests = $this->platformAdministration->userRequests($target);
         $sessions = $this->auth->activeSessions($target);
-        $this->render('admin-person-profile', $data + [
+        return $this->render('admin-person-profile', $data + [
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
             'target_user_id' => $target,
@@ -394,49 +427,57 @@ final class AdminController extends BaseController
         ]);
     }
 
-    public function createPerson(): void
+
+    #[Route('/admin/people', name: 'admin_create_person', methods: ['POST'])]
+    public function createPerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->platformAdministration->createPerson($_POST, $user->id);
             $this->flash('success', 'The person was created.');
             $this->redirect('/admin/people');
         }, '/admin/people');
     }
 
-    public function updatePerson(): void
+
+    #[Route('/admin/people/{id}', name: 'admin_update_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updatePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $target): void {
+        $target = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $target): void {
             $this->platformAdministration->updatePerson($target, $_POST, $user->id);
             $this->flash('success', 'The person was updated.');
             $this->redirect('/admin/people/' . $target);
         }, '/admin/people/' . $target);
     }
 
-    public function changePersonStatus(): void
+
+    #[Route('/admin/people/{id}/status', name: 'admin_change_person_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function changePersonStatus(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
+        $target = max(1, (int) $this->param('id'));
         $status = trim((string) ($_POST['status'] ?? 'disabled'));
-        $this->handle(function () use ($user, $target, $status): void {
+        return $this->handle(function () use ($user, $target, $status): void {
             $this->platformAdministration->setPersonStatus($target, $status, $user->id);
             $this->flash('success', 'The account status was updated.');
             $this->redirect('/admin/people/' . $target);
         }, '/admin/people/' . $target);
     }
 
-    public function revokePersonSession(): void
+
+    #[Route('/admin/people/{id}/sessions/revoke', name: 'admin_revoke_person_session', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function revokePersonSession(): Response
     {
         $this->requireCsrf();
         $actor = $this->requirePermission('PLATFORM.PERSON.MANAGE');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
+        $target = max(1, (int) $this->param('id'));
         $sessionId = trim((string) ($_POST['session_id'] ?? ''));
-        $this->handle(function () use ($actor, $target, $sessionId): void {
+        return $this->handle(function () use ($actor, $target, $sessionId): void {
             if ($sessionId === '') {
                 throw new RuntimeException('Select a session to revoke.');
             }
@@ -447,87 +488,104 @@ final class AdminController extends BaseController
         }, '/admin/people/' . $target);
     }
 
-    public function createCompany(): void
+
+    #[Route('/admin/companies', name: 'admin_create_company', methods: ['POST'])]
+    public function createCompany(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->platformAdministration->createCompany($_POST, $user->id);
             $this->flash('success', 'The company was created.');
             $this->redirect('/admin/companies');
         }, '/admin/companies');
     }
 
-    public function updateCompany(): void
+
+    #[Route('/admin/companies/{id}', name: 'admin_update_company', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updateCompany(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $id): void {
+        $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->updateCompany($id, $_POST, $user->id);
             $this->flash('success', 'The company was updated.');
             $this->redirect('/admin/companies');
         }, '/admin/companies');
     }
 
-    public function changeCompanyStatus(): void
+
+    #[Route('/admin/companies/{id}/status', name: 'admin_change_company_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function changeCompanyStatus(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.COMPANY.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $id): void {
+        $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->setCompanyStatus($id, (string) ($_POST['status'] ?? 'disabled'), $user->id);
             $this->flash('success', 'The company status was updated.');
             $this->redirect('/admin/companies');
         }, '/admin/companies');
     }
 
-    public function removeEnrolment(): void
+
+    #[Route('/admin/course/enrolments/{id}/remove', name: 'admin_remove_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function removeEnrolment(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
+        $id = max(1, (int) $this->param('id'));
         $this->platformAdministration->removeEnrolment($id, $user->id, (string) ($_POST['reason'] ?? 'Removed by platform administrator'));
         $this->flash('success', 'Course access was removed. Progress and results were retained.');
         $this->redirect('/admin/course/enrolments');
     }
 
-    public function restoreEnrolment(): void
+
+    #[Route('/admin/course/enrolments/{id}/restore', name: 'admin_restore_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function restoreEnrolment(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
+        $id = max(1, (int) $this->param('id'));
         $this->platformAdministration->restoreEnrolment($id, $user->id);
         $this->flash('success', 'Course access was restored.');
         $this->redirect('/admin/course/enrolments');
     }
 
 
-    public function addCredit(): void
+
+
+    #[Route('/admin/course/credits', name: 'admin_add_credit', methods: ['POST'])]
+    public function addCredit(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.CREDIT.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->platformAdministration->addCredit($_POST, $user->id);
             $this->flash('success', 'The course credit was added and audited.');
             $this->redirect('/admin/course/credits');
         }, '/admin/course/credits');
     }
 
-    public function decideRequest(): void
+
+    #[Route('/admin/course/requests/{id}/decision', name: 'admin_decide_request', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function decideRequest(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.REQUEST.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
+        $id = max(1, (int) $this->param('id'));
         $approve = (string) ($_POST['decision'] ?? '') === 'approve';
-        $this->handle(function () use ($user, $id, $approve): void {
+        return $this->handle(function () use ($user, $id, $approve): void {
             $this->platformAdministration->decideRequest($id, $approve, (string) ($_POST['note'] ?? ''), $user->id, null);
             $this->flash('success', $approve ? 'The request was approved.' : 'The request was rejected.');
             $this->redirect('/admin/course/enrolments');
         }, '/admin/course/enrolments');
     }
 
-    public function resyncThemes(): void
+
+    #[Route('/admin/themes/resync', name: 'admin_resync_themes', methods: ['POST'])]
+    public function resyncThemes(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.THEME.MANAGE');
@@ -536,7 +594,9 @@ final class AdminController extends BaseController
         $this->redirect('/admin/themes');
     }
 
-    public function activateTheme(): void
+
+    #[Route('/admin/themes/activate', name: 'admin_activate_theme', methods: ['POST'])]
+    public function activateTheme(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.THEME.MANAGE');
@@ -546,35 +606,43 @@ final class AdminController extends BaseController
         $this->redirect('/admin/themes');
     }
 
-    public function deleteTheme(): void
+
+    #[Route('/admin/themes/{slug}/delete', name: 'admin_delete_theme', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['POST'])]
+    public function deleteTheme(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('SYSTEM.THEME.MANAGE'); $slug = (string) $this->f3->get('PARAMS.slug');
+        $this->requireCsrf(); $user = $this->requirePermission('SYSTEM.THEME.MANAGE'); $slug = (string) $this->param('slug');
         $this->themes->delete($slug, $user->id);
         $this->flash('success', 'The theme was uninstalled.');
         $this->redirect('/admin/themes');
     }
 
-    public function importTheme(): void
+
+    #[Route('/admin/themes/import', name: 'admin_import_theme', methods: ['POST'])]
+    public function importTheme(): Response
     {
         $this->requireCsrf(); $this->requirePermission('SYSTEM.THEME.MANAGE');
-        $this->handle(function (): void {
+        return $this->handle(function (): Response {
             $file = $_FILES['theme_file']['tmp_name'] ?? ''; if (!is_string($file) || !is_uploaded_file($file)) throw new RuntimeException('Choose a Catto Learning theme ZIP file.');
             $inspection = $this->themes->stageImport($file);
-            $this->render('admin-theme-import-preview', ['title' => 'Inspect theme package', 'page_kicker' => 'Administration · Themes · Import', 'inspection' => $inspection]);
+            return $this->render('admin-theme-import-preview', ['title' => 'Inspect theme package', 'page_kicker' => 'Administration · Themes · Import', 'inspection' => $inspection]);
         }, '/admin/themes');
     }
 
-    public function confirmThemeImport(): void
+
+    #[Route('/admin/themes/import/confirm', name: 'admin_confirm_theme_import', methods: ['POST'])]
+    public function confirmThemeImport(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('SYSTEM.THEME.MANAGE'); $token = (string) ($_POST['token'] ?? '');
-        $this->handle(function () use ($user, $token): void {
+        return $this->handle(function () use ($user, $token): void {
             $key = $this->themes->importStaged($token, $user->id);
             $this->flash('success', 'Theme ' . $key . ' was installed successfully.');
             $this->redirect('/admin/themes');
         }, '/admin/themes');
     }
 
-    public function saveSettings(): void
+
+    #[Route('/admin/settings', name: 'admin_save_settings', methods: ['POST'])]
+    public function saveSettings(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
@@ -583,7 +651,9 @@ final class AdminController extends BaseController
         $this->redirect('/admin/settings');
     }
 
-    public function resetPlatformName(): void
+
+    #[Route('/admin/settings/platform-name/reset', name: 'admin_reset_platform_name', methods: ['POST'])]
+    public function resetPlatformName(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
@@ -594,7 +664,11 @@ final class AdminController extends BaseController
 
 
 
-    public function mailPassword(): void
+
+
+
+    #[Route('/admin/settings/mail/password', name: 'admin_mail_password', methods: ['POST'])]
+    public function mailPassword(): Response
     {
         $this->requireCsrf();
         $this->requirePermission('SYSTEM.SETTING.VIEW');
@@ -606,18 +680,22 @@ final class AdminController extends BaseController
         exit;
     }
 
-    public function saveMailSettings(): void
+
+    #[Route('/admin/settings/mail', name: 'admin_save_mail_settings', methods: ['POST'])]
+    public function saveMailSettings(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->platformAdministration->saveMailSettings($_POST, $user->id);
             $this->flash('success', 'SMTP settings were saved as database overrides.');
             $this->redirect('/admin/settings');
         }, '/admin/settings');
     }
 
-    public function resetMailSettings(): void
+
+    #[Route('/admin/settings/mail/reset', name: 'admin_reset_mail_settings', methods: ['POST'])]
+    public function resetMailSettings(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
@@ -626,7 +704,9 @@ final class AdminController extends BaseController
         $this->redirect('/admin/settings');
     }
 
-    public function pruneDatabase(): void
+
+    #[Route('/admin/database/prune', name: 'admin_prune_database', methods: ['POST'])]
+    public function pruneDatabase(): Response
     {
         $this->requireCsrf();
         $this->requirePermission('SYSTEM.DATABASE.PRUNE');
@@ -638,11 +718,13 @@ final class AdminController extends BaseController
         $this->redirect('/admin/settings');
     }
 
-    public function testMail(): void
+
+    #[Route('/admin/mail/test', name: 'admin_test_mail', methods: ['POST'])]
+    public function testMail(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.MAIL.TEST');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->mailer->sendTestMessage($user->primaryEmail);
             $this->flash('success', 'A test email was sent to ' . $user->primaryEmail . '.');
             $this->redirect('/admin/settings');
@@ -654,12 +736,11 @@ final class AdminController extends BaseController
      * Renders one Administration section through the same section definition
      * and business-data source used by the consolidated workspace.
      */
-    private function renderAdministrationSection(string $key): void
+    private function renderAdministrationSection(string $key): Response
     {
         $user = $this->requireUser();
         if (!$this->canAccessAdministrationSection($user, $key)) {
-            $this->f3->error(403, 'You do not have permission to access this Administration section.');
-            return;
+            throw new AccessDeniedHttpException('You do not have permission to access this Administration section.');
         }
         $definition = $this->adminSections->get($key);
         $filters = $this->sectionRequest($key);
@@ -698,12 +779,10 @@ final class AdminController extends BaseController
             // preg_replace, not rtrim. rtrim takes a set of characters rather than a suffix, so
             // rtrim('...form.html', '.html') strips the trailing "m" of "form" as well and asks for
             // a template that does not exist. The registry template always ends in .html.
-            $this->renderFragment((string) preg_replace('/\.html\.twig$/', '', $definition['template']), $data);
-
-            return;
+            return $this->renderFragment((string) preg_replace('/\.html\.twig$/', '', $definition['template']), $data);
         }
 
-        $this->render('admin-section', $data + [
+        return $this->render('admin-section', $data + [
             'title' => $definition['label'] . ' · Administration',
             'page_title' => $definition['label'],
             'page_kicker' => $this->sectionKicker($user, $key),

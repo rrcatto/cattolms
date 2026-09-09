@@ -34,21 +34,23 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
-use Base;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class AdminCourseTagController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CourseService $courses
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /**
@@ -59,7 +61,9 @@ final class AdminCourseTagController extends BaseController
      */
     private const DATASET = 'tags';
 
-    public function index(): void
+
+    #[Route('/admin/courses/tags', name: 'admin_course_tag_index', methods: ['GET'])]
+    public function index(): Response
     {
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
         $search = trim((string) ($_GET[PlatformAdministrationService::searchParam(self::DATASET)] ?? ''));
@@ -73,7 +77,7 @@ final class AdminCourseTagController extends BaseController
         // records, so the count depends on which universe the reader is in - and until this was
         // here there was no way to be in any universe but REAL.
 
-        $this->render('admin-course-tags', [
+        return $this->render('admin-course-tags', [
             'title' => 'Course tags',
             'course_group' => 'tags',
             // Counted in the reader's universe. A tag is a shared label; the courses carrying it
@@ -90,35 +94,41 @@ final class AdminCourseTagController extends BaseController
         ]);
     }
 
-    public function create(): void
+
+    #[Route('/admin/courses/tags', name: 'admin_course_tag_create', methods: ['POST'])]
+    public function create(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $tag = $this->courses->createTag($_POST, $user->id);
             $this->flash('success', 'The tag “' . (string) $tag['name'] . '” was created.');
             $this->redirect('/admin/courses/tags');
         }, '/admin/courses/tags');
     }
 
-    public function update(): void
+
+    #[Route('/admin/courses/tags/{id}', name: 'admin_course_tag_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function update(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
-        $tagId = (int) $this->f3->get('PARAMS.id');
-        $this->handle(function () use ($user, $tagId): void {
+        $tagId = (int) $this->param('id');
+        return $this->handle(function () use ($user, $tagId): void {
             $this->courses->updateTag($tagId, $_POST, $user->id);
             $this->flash('success', 'The tag was updated.');
             $this->redirect('/admin/courses/tags');
         }, '/admin/courses/tags');
     }
 
-    public function delete(): void
+
+    #[Route('/admin/courses/tags/{id}/delete', name: 'admin_course_tag_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function delete(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
-        $tagId = (int) $this->f3->get('PARAMS.id');
-        $this->handle(function () use ($user, $tagId): void {
+        $tagId = (int) $this->param('id');
+        return $this->handle(function () use ($user, $tagId): void {
             $this->courses->deleteTag($tagId, $user->id);
             $this->flash('success', 'The tag was deleted and detached from every course that carried it.');
             $this->redirect('/admin/courses/tags');

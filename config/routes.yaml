@@ -1,7 +1,16 @@
-# Routes move here one at a time. Fat-Free still owns every route it owned before; this file grows
-# as they are ported, and the front controller switches over once enough of them have.
+# Every route the platform serves, from the attributes on the actions themselves.
+#
+# The Fat-Free route table in App.php was one list that had to agree with sixteen controllers; a
+# route and the method it named could drift apart with nothing to notice. An attribute cannot drift
+# from the method it sits on.
 controllers:
     resource:
         path: ../src/Http/Symfony/
         namespace: CattoLearning\Http\Symfony
+    type: attribute
+
+web:
+    resource:
+        path: ../src/Http/Controller/
+        namespace: CattoLearning\Http\Controller
     type: attribute

@@ -34,6 +34,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Application\AdministrationSectionRegistry;
+use CattoLearning\Tests\Support\RouteTable;
 use CattoLearning\View\ThemeRenderer;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -64,7 +65,7 @@ final class AdministrationSectionContractTest extends TestCase
     public function testRegistryRoutesAreRegisteredAndDriveAdministrationNavigation(): void
     {
         $root = dirname(__DIR__, 2);
-        $app = (string) file_get_contents($root . '/src/Application/App.php');
+        $app = RouteTable::signatures();
         $renderer = (string) file_get_contents($root . '/src/View/ThemeRenderer.php');
         foreach ((new AdministrationSectionRegistry())->all() as $section) {
             self::assertStringContainsString($section['route'], $app, 'Missing standalone route for ' . $section['key']);

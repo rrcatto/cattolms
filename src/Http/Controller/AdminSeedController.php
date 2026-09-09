@@ -27,30 +27,33 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use Base;
 use CattoLearning\Application\AdministrationSectionRegistry;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Seed\SeedDatabaseService;
 use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class AdminSeedController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly SeedDatabaseService $seeds,
         private readonly AdministrationSectionRegistry $adminSections
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /** The standalone Seed Database section. */
-    public function index(): void
+    #[Route('/admin/seed', name: 'admin_seed_index', methods: ['GET'])]
+    public function index(): Response
     {
         $this->requirePermission('SYSTEM.SEED.VIEW');
 
-        $this->render('admin-section', $this->sectionData() + [
+        return $this->render('admin-section', $this->sectionData() + [
             'title' => 'Seed Database · Administration',
             'page_title' => 'Seed Database',
             'page_kicker' => 'Platform administration',
@@ -66,12 +69,13 @@ final class AdminSeedController extends BaseController
      * is a deliberate ADMIN-only maintenance action on a disposable database rather than something
      * an ordinary request path can reach.
      */
-    public function generate(): void
+    #[Route('/admin/seed/generate', name: 'admin_seed_generate', methods: ['POST'])]
+    public function generate(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SEED.MANAGE');
 
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             set_time_limit(0);
             $result = $this->seeds->generate(
                 $_POST['volume'] ?? null,

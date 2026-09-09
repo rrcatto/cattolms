@@ -50,7 +50,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
-use DI\Container;
+use Psr\Container\ContainerInterface;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -61,7 +61,7 @@ final class CompanyContextIntegrationTest extends TestCase
     /** Every Company section a selected company must describe. */
     private const SECTIONS = ['dashboard', 'people', 'requests', 'enrolments', 'credits', 'courses'];
 
-    private Container $container;
+    private ContainerInterface $container;
     private Database $db;
     private IntegrationDataFixture $fixture;
     private SelectedCompanyContext $context;

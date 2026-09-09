@@ -18,6 +18,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Auth\PermissionCatalog;
+use CattoLearning\Tests\Support\RouteTable;
 use CattoLearning\Auth\RoleCatalog;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -128,14 +129,14 @@ final class AclContractTest extends TestCase
         $root = dirname(__DIR__, 2);
         $edit = (string) file_get_contents($root . '/resources/views/pages/admin-role-edit.html.twig');
         $service = (string) file_get_contents($root . '/src/Application/RoleAdministrationService.php');
-        $app = (string) file_get_contents($root . '/src/Application/App.php');
+        $app = RouteTable::signatures();
         self::assertStringContainsString('name="permissions[]"', $edit);
         self::assertStringContainsString('Save permissions', $edit);
         self::assertStringNotContainsString('autosave', strtolower($edit));
         self::assertStringContainsString("'changes' => \$changes", $service);
         self::assertStringContainsString('acl.role_permissions_updated', $service);
         self::assertStringContainsString('groupedForRole', $service);
-        foreach (['GET /admin/roles','POST /admin/roles/@id/permissions'] as $route) {
+        foreach (['GET /admin/roles','POST /admin/roles/{id}/permissions'] as $route) {
             self::assertStringContainsString($route, $app);
         }
     }

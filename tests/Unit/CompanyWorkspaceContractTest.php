@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Application\CompanySectionRegistry;
+use CattoLearning\Tests\Support\RouteTable;
 use PHPUnit\Framework\TestCase;
 
 final class CompanyWorkspaceContractTest extends TestCase
@@ -38,7 +39,7 @@ final class CompanyWorkspaceContractTest extends TestCase
     public function testCompanyRoutesAndThemeApiArePresentationNeutral(): void
     {
         $root = dirname(__DIR__, 2);
-        $app = (string) file_get_contents($root . '/src/Application/App.php');
+        $app = RouteTable::signatures();
         $renderer = (string) file_get_contents($root . '/src/View/ThemeRenderer.php');
         foreach (['GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses'] as $route) self::assertStringContainsString($route, $app);
         self::assertStringNotContainsString('/company?tab=', $app);

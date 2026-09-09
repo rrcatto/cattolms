@@ -30,23 +30,25 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Course\CatalogueFilter;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Course\CourseService;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 
-use Base;
+use Symfony\Component\HttpFoundation\Response;
 
 final class HomeController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CourseService $courses
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /**
@@ -56,22 +58,26 @@ final class HomeController extends BaseController
      * page previously built the entire published catalogue in order to display six cards and a
      * count, so its cost grew with every course published while its output never changed.
      */
-    public function index(): void
+    #[Route('/', name: 'home_index', methods: ['GET'])]
+    public function index(): Response
     {
-        $this->render('home', [
+        return $this->render('home', [
             'title' => 'Practical self-study courses',
             'featured_courses' => $this->courses->featuredCourses(6),
             'published_course_count' => $this->courses->catalogueCount(CatalogueFilter::none()),
         ]);
     }
 
-    public function privacy(): void
+    #[Route('/privacy', name: 'home_privacy', methods: ['GET'])]
+    public function privacy(): Response
     {
-        $this->render('privacy', ['title' => 'Privacy']);
+        return $this->render('privacy', ['title' => 'Privacy']);
     }
 
-    public function about(): void
+
+    #[Route('/about', name: 'home_about', methods: ['GET'])]
+    public function about(): Response
     {
-        $this->render('about', ['title' => 'About']);
+        return $this->render('about', ['title' => 'About']);
     }
 }

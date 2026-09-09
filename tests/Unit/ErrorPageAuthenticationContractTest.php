@@ -16,17 +16,26 @@ final class ErrorPageAuthenticationContractTest extends TestCase
 {
     public function testHtmlErrorRendererUsesCurrentAuthenticationWhenAvailable(): void
     {
-        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/App.php');
+        // The error page goes through the ordinary theme renderer rather than a second, plainer
+        // path - which is what keeps a failed request looking like the same site.
+        $listener = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Symfony/Listener/ErrorPageListener.php');
+        self::assertStringContainsString('ThemeRenderer $view', $listener);
+        self::assertStringContainsString("view->render('error'", $listener);
 
-        self::assertStringContainsString('container->get(AuthService::class)', $source);
-        self::assertStringContainsString("'is_authenticated' => \$currentUser !== null", $source);
-        self::assertStringContainsString("'is_platform_admin' => \$currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false", $source);
-        self::assertStringContainsString("'is_company_admin' => \$currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false", $source);
-        self::assertStringContainsString("'permissions' => \$currentUser !== null ? \$currentUser->permissions : []", $source);
-        self::assertStringContainsString("'role_keys' => \$currentUser !== null ? \$currentUser->roles : []", $source);
-        self::assertStringContainsString("'user_email' => \$currentUser !== null ? \$currentUser->primaryEmail : ''", $source);
-        self::assertStringContainsString("'user_name' => \$currentUser !== null ? \$currentUser->displayName : ''", $source);
-        self::assertStringNotContainsString('acl_universe', $source);
-        self::assertStringNotContainsString('businessRealm()', $source);
+        // Every flag the chrome reads is derived from the identity of the request that failed, so
+        // an error page shows the navigation the reader actually has rather than the public one.
+        $identity = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/BaseController.php');
+        foreach ([
+            "\$data['is_authenticated'] = \$currentUser !== null;",
+            "\$data['is_platform_admin'] = \$currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false;",
+            "\$data['is_company_admin'] = \$currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false;",
+        ] as $line) {
+            self::assertStringContainsString($line, $identity, 'The chrome reads this flag: ' . $line);
+        }
+
+        // Neither the removed data universe nor the removed realm helper may come back.
+        $renderer = (string) file_get_contents(dirname(__DIR__, 2) . '/src/View/ThemeRenderer.php');
+        self::assertStringNotContainsString('acl_universe', $renderer);
+        self::assertStringNotContainsString('businessRealm()', $renderer);
     }
 }

@@ -52,6 +52,8 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Course\LearningService;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Application\PlatformAdministrationService;
 
@@ -64,22 +66,24 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\Slug;
 
-use Base;
 
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class CourseController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CourseService $courses,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly LearningService $learning
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /**
@@ -101,7 +105,11 @@ final class CourseController extends BaseController
      */
     private const CATEGORY_DATASET = 'cat';
 
-    public function catalogue(): void
+
+
+    #[Route('/courses', name: 'course_catalogue_1', methods: ['GET'])]
+    #[Route('/courses/category/{slug}', name: 'course_catalogue_2', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function catalogue(): Response
     {
         $user = $this->currentUser();
 
@@ -120,7 +128,7 @@ final class CourseController extends BaseController
         // a destination people link to and search engines index, not a filter state. An unknown or
         // deactivated slug browses the whole catalogue instead of erroring: a stale link should show
         // a reader courses, not a 404.
-        $slug = trim((string) $this->f3->get('PARAMS.slug'));
+        $slug = trim((string) $this->param('slug'));
         $category = $this->courses->browsableCategory($slug);
 
         // Tags arrive two ways and mean the same thing. A single tag has its own path because a tag
@@ -189,7 +197,7 @@ final class CourseController extends BaseController
             $course['request_status'] = $requestStatus[(int) $course['id']] ?? '';
         }
         unset($course);
-        $this->render('courses', [
+        return $this->render('courses', [
             'title' => $this->catalogueTitle($category, $tag),
             'page_kicker' => 'Discover what to learn next',
             'category_tree' => $filter->search === '' ? $this->categoryTree('/courses', []) : [],
@@ -255,9 +263,10 @@ final class CourseController extends BaseController
      * page is being turned is named in the query string, so paging one accordion cannot move
      * another, and every link works as an ordinary GET whether or not htmx is present.
      */
-    public function categoryBrowser(): void
+    #[Route('/courses/categories', name: 'course_category_browser', methods: ['GET'])]
+    public function categoryBrowser(): Response
     {
-        $this->f3->reroute('/courses', true);
+        $this->redirect('/courses');
     }
 
     /**
@@ -315,14 +324,13 @@ final class CourseController extends BaseController
      * it already open produce the same thing. Without JavaScript the accordion offers the
      * category's own page instead, which is a real destination that has always existed.
      */
-    public function categoryCoursesFragment(): void
+    #[Route('/courses/categories/{slug}/courses', name: 'course_category_courses_fragment', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function categoryCoursesFragment(): Response
     {
-        $slug = Slug::validate((string) $this->f3->get('PARAMS.slug'));
+        $slug = Slug::validate((string) $this->param('slug'));
         $category = $this->courses->categoryBySlug($slug);
         if ($category === null) {
-            $this->f3->error(404, 'The category could not be found.');
-
-            return;
+            throw new NotFoundHttpException('The category could not be found.');
         }
 
         // Resolved the same way the page that linked here resolved it, or opening an accordion
@@ -336,7 +344,7 @@ final class CourseController extends BaseController
                 []
             );
 
-        $this->renderFragment('partials/category-courses', $node);
+        return $this->renderFragment('partials/category-courses', $node);
     }
 
     /**
@@ -372,7 +380,7 @@ final class CourseController extends BaseController
      * else - a reader has not asked for any courses yet, and every course in the catalogue is not
      * an answer to a question nobody asked. Choosing a tag, or searching, is the question.
      */
-    public function tagIndex(): void
+    public function tagIndex(): Response
     {
         $user = $this->currentUser();
 
@@ -414,7 +422,7 @@ final class CourseController extends BaseController
             unset($course);
         }
 
-        $this->render('course-tags', [
+        return $this->render('course-tags', [
             'title' => $tag !== null ? 'Courses tagged ' . (string) $tag['name'] : 'Browse by tag',
             'page_kicker' => 'Every label in the catalogue',
             // The whole vocabulary here, not the catalogue page's shortened cloud: this is the page
@@ -478,7 +486,7 @@ final class CourseController extends BaseController
      */
     private function requestedTagSlugs(): array
     {
-        $slugs = [trim((string) $this->f3->get('PARAMS.tag'))];
+        $slugs = [trim((string) $this->param('tag'))];
         foreach (explode(',', (string) ($_GET[self::TAGS_PARAM] ?? '')) as $slug) {
             $slugs[] = trim($slug);
         }
@@ -547,7 +555,9 @@ final class CourseController extends BaseController
         return $tag === null ? 'Course catalogue' : 'Courses tagged ' . (string) $tag['name'];
     }
 
-    public function toggleFavourite(): void
+
+    #[Route('/courses/favourite', name: 'course_toggle_favourite', methods: ['POST'])]
+    public function toggleFavourite(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('CATALOGUE.COURSE.FAVOURITE');
@@ -567,22 +577,26 @@ final class CourseController extends BaseController
         $this->redirect(str_starts_with($return, '/') ? $return : '/courses');
     }
 
-    public function requestCourse(): void
+
+    #[Route('/courses/request', name: 'course_request_course', methods: ['POST'])]
+    public function requestCourse(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('CATALOGUE.COURSE.REQUEST');
         $courseId = max(1, (int) ($_POST['course_id'] ?? 0));
         $period = max(86400, (int) ($_POST['access_period_seconds'] ?? 31536000));
-        $this->handle(function () use ($user, $courseId, $period): void {
+        return $this->handle(function () use ($user, $courseId, $period): void {
             $this->platformAdministration->requestCourse($user->id, $courseId, $period, (string) ($_POST['note'] ?? ''));
             $this->flash('success', 'Your course request was sent to your company administrator.');
             $this->redirect('/account/library?tab=requests');
         }, '/courses');
     }
 
-    public function detail(): void
+
+    #[Route('/courses/{slug}', name: 'course_detail', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function detail(): Response
     {
-        $slug = (string) $this->f3->get('PARAMS.slug');
+        $slug = (string) $this->param('slug');
         // A course opened from the catalogue is resolved in the catalogue's universe. Reading the
         // detail page in the reader's own universe instead made every course in the generated
         // catalogue a 404 the moment it was clicked, which looks like a broken link rather than
@@ -593,13 +607,13 @@ final class CourseController extends BaseController
             $course = null;
         }
         if ($course === null) {
-            $this->f3->error(404, 'The course could not be found.');
+            throw new NotFoundHttpException('The course could not be found.');
         }
         $user = $this->currentUser();
         $enrolment = $user !== null
             ? $this->courses->enrolmentForUser($user->id, (int) $course['id'])
             : null;
-        $this->render('course-detail', [
+        return $this->render('course-detail', [
             'title' => (string) $course['title'],
             'course' => $course,
             'has_access' => $enrolment !== null,
@@ -608,12 +622,14 @@ final class CourseController extends BaseController
         ]);
     }
 
-    public function media(): void
+
+    #[Route('/course-media/{public_id}', name: 'course_media', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]
+    public function media(): Response
     {
-        $publicId = (string) $this->f3->get('PARAMS.public_id');
+        $publicId = (string) $this->param('public_id');
         $media = $this->courses->media($publicId);
         if ($media === null) {
-            $this->f3->error(404, 'The course media file could not be found.');
+            throw new NotFoundHttpException('The course media file could not be found.');
         }
 
         $allowed = (bool) $media['is_public'] && (string) $media['course_status'] === 'published';
@@ -622,7 +638,7 @@ final class CourseController extends BaseController
             $allowed = $this->courses->userCanAccessMedia($user->id, $media, $user->hasPermission('PLATFORM.DASHBOARD.VIEW'));
         }
         if (!$allowed) {
-            $this->f3->error(403, 'You do not have access to this course media.');
+            throw new AccessDeniedHttpException('You do not have access to this course media.');
         }
 
         $filename = str_replace(["\r", "\n", '"'], '', (string) $media['original_filename']);
@@ -634,14 +650,16 @@ final class CourseController extends BaseController
         exit;
     }
 
-    public function certificate(): void
+
+    #[Route('/certificates/{public_id}', name: 'course_certificate', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]
+    public function certificate(): Response
     {
-        $publicId = (string) $this->f3->get('PARAMS.public_id');
+        $publicId = (string) $this->param('public_id');
         $certificate = $this->learning->certificate($publicId);
         if ($certificate === null) {
-            $this->f3->error(404, 'The certificate could not be found.');
+            throw new NotFoundHttpException('The certificate could not be found.');
         }
-        $this->render('certificate', [
+        return $this->render('certificate', [
             'title' => 'Certificate verification',
             'certificate' => $certificate,
         ]);

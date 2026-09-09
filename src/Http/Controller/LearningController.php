@@ -32,7 +32,9 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Application\AccountSectionRegistry;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Course\LearningService;
 use CattoLearning\Course\CourseRepository;
@@ -41,7 +43,8 @@ use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 
-use Base;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * The learner-facing course surfaces: the Course Library, opening a course, working through its
@@ -55,14 +58,14 @@ use Base;
 final class LearningController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly AccountSectionRegistry $accountSections
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
     /**
@@ -74,7 +77,7 @@ final class LearningController extends BaseController
      * in PHP, which is the pattern that makes a list quietly lie about its size once the data
      * grows.
      */
-    public function library(): void
+    public function library(): Response
     {
         $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
         $request = $this->libraryRequest();
@@ -109,7 +112,7 @@ final class LearningController extends BaseController
             )
         );
 
-        $this->render('library', $data);
+        return $this->render('library', $data);
     }
 
     /**
@@ -133,29 +136,32 @@ final class LearningController extends BaseController
         return $request;
     }
 
-    public function removeOwnAccess(): void
+
+    #[Route('/account/library/enrolments/{id}/remove', name: 'learning_remove_own_access', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function removeOwnAccess(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
-        $enrolmentId = max(1, (int) $this->f3->get('PARAMS.id'));
+        $enrolmentId = max(1, (int) $this->param('id'));
         $enrolment = $this->learning->enrolmentForUser($enrolmentId, $user->id);
         if ($enrolment === null) {
-            $this->f3->error(404, 'The course enrolment was not found.');
-            return;
+            throw new NotFoundHttpException('The course enrolment was not found.');
         }
         $this->platformAdministration->removeEnrolment($enrolmentId, $user->id, 'Removed from the platform administrator’s own test library.');
         $this->flash('success', 'The course was removed from your library. The consumed credit was not returned.');
         $this->redirect('/account/library');
     }
 
-    public function course(): void
+
+    #[Route('/learn/{slug}', name: 'learning_course', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function course(): Response
     {
         $user = $this->requirePermission('LEARNING.COURSE.VIEW');
-        $slug = (string) $this->f3->get('PARAMS.slug');
+        $slug = (string) $this->param('slug');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $preview): void {
+        return $this->handle(function () use ($user, $slug, $preview): Response {
             $course = $this->learning->courseHome($user->id, $slug, $preview);
-            $this->render('learn-course', [
+            return $this->render('learn-course', [
                 'title' => (string) $course['title'],
                 'course' => $course,
                 'is_preview' => $preview,
@@ -165,28 +171,32 @@ final class LearningController extends BaseController
         }, '/account/library');
     }
 
-    public function start(): void
+
+    #[Route('/learn/{slug}/start', name: 'learning_start', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['POST'])]
+    public function start(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.COURSE.START');
-        $slug = (string) $this->f3->get('PARAMS.slug');
+        $slug = (string) $this->param('slug');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $preview): void {
+        return $this->handle(function () use ($user, $slug, $preview): void {
             $this->learning->start($user->id, $slug, $preview);
             $this->flash('success', 'The course has started. Your access period begins now.');
             $this->redirect('/learn/' . rawurlencode($slug) . ($preview ? '?preview=1' : ''));
         }, '/learn/' . rawurlencode($slug));
     }
 
-    public function module(): void
+
+    #[Route('/learn/{slug}/module/{position}', name: 'learning_module', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'position' => '\\d+'], methods: ['GET'])]
+    public function module(): Response
     {
         $user = $this->requirePermission('LEARNING.COURSE.VIEW');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $position = (int) $this->f3->get('PARAMS.position');
+        $slug = (string) $this->param('slug');
+        $position = (int) $this->param('position');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $position, $preview): void {
+        return $this->handle(function () use ($user, $slug, $position, $preview): Response {
             $course = $this->learning->module($user->id, $slug, $position, $preview);
-            $this->render('learn-module', [
+            return $this->render('learn-module', [
                 'title' => (string) $course['module']['title'],
                 'course' => $course,
                 'module' => $course['module'],
