@@ -474,30 +474,22 @@ final class CourseService
      */
     public function categoryBrowser(DataUniverse $universe): array
     {
-        $rows = [];
+        // Two queries for the whole browser, whatever the taxonomy holds: the categories and every
+        // category's total. The courses themselves are not fetched here - see the note on the
+        // browser page about why an accordion loads its own contents.
+        $totals = $this->courses->categoryCourseTotals($universe);
+
+        $index = [];
         foreach ($this->courses->categories($universe) as $row) {
             if ((int) ($row['descendant_course_count'] ?? 0) < 1) {
                 continue;
             }
-            $row['children'] = [];
-            $rows[(int) $row['id']] = $row;
-        }
-
-        $roots = [];
-        foreach ($rows as $id => $row) {
-            $parentId = (int) ($row['parent_id'] ?? 0);
-            if ($parentId > 0 && isset($rows[$parentId])) {
-                continue;
-            }
-            $roots[] = $id;
-        }
-
-        // Built by reference so a three-level tree needs one pass rather than one per level.
-        $tree = [];
-        $index = [];
-        foreach ($rows as $id => $row) {
+            $id = (int) $row['id'];
+            $row['course_count'] = $totals[$id] ?? 0;
             $index[$id] = $row;
         }
+
+        $tree = [];
         foreach (array_keys($index) as $id) {
             $parentId = (int) ($index[$id]['parent_id'] ?? 0);
             if ($parentId > 0 && isset($index[$parentId])) {
@@ -527,39 +519,61 @@ final class CourseService
         return $node;
     }
 
-    /**
-     * One page of the courses filed directly in a category, with the shared pagination payload.
-     *
-     * The payload is built here rather than in the controller because this is where the Pagination
-     * object is, and because every paginated surface on the platform composes its URLs through the
-     * one builder. Paging is on the public `page` / `page_size` names the catalogue already uses,
-     * with the category carried as a filter so every link says which accordion it belongs to.
-     *
-     * @return array{courses:list<array<string,mixed>>,pagination:array<string,mixed>}
-     */
-    public function categoryCoursePage(
-        int $categoryId,
-        string $slug,
-        DataUniverse $universe,
-        mixed $page,
-        mixed $pageSize
-    ): array {
-        $pagination = Pagination::create($page, $pageSize, $this->courses->categoryCoursesCount($categoryId, $universe));
+    /** One category's published-course total. */
+    public function categoryCourseTotal(int $categoryId, DataUniverse $universe): int
+    {
+        return $this->courses->categoryCourseTotal($categoryId, $universe);
+    }
 
-        return [
-            'courses' => $this->decorateCatalogue(
-                $this->courses->categoryCourses($categoryId, $universe, $pagination->pageSize, $pagination->offset)
-            ),
-            'pagination' => PlatformAdministrationService::paginationPayload(
-                'category-' . $slug,
-                $pagination,
-                '/courses/categories',
-                'Courses in this category',
-                ['open' => $slug],
-                'page',
-                'page_size'
-            ),
-        ];
+    /** @return array<string,mixed>|null */
+    public function categoryBySlug(string $slug): ?array
+    {
+        return $this->courses->categoryBySlug($slug);
+    }
+
+    /**
+     * The shared pagination payload for one category's accordion.
+     *
+     * Built for every category, paged or not: an accordion showing its first page still has to say
+     * how many pages there are, or a reader cannot tell a complete list from a truncated one.
+     * Paging is on the public `page` / `page_size` names the catalogue already uses, with the
+     * category carried as a filter so every link says which accordion it belongs to.
+     *
+     * @return array<string,mixed>
+     */
+    public function categoryPagination(string $slug, int $total, mixed $page, mixed $pageSize): array
+    {
+        return PlatformAdministrationService::paginationPayload(
+            'category-' . $slug,
+            Pagination::create($page, $pageSize, $total),
+            '/courses/categories',
+            'Courses in this category',
+            ['open' => $slug],
+            'page',
+            'page_size'
+        );
+    }
+
+    /**
+     * One page of the courses filed directly in a category.
+     *
+     * Only the accordion being paged calls this. Every other one already holds its first page from
+     * the browser's single windowed read, which is what keeps a page of a few hundred categories to
+     * three queries and one more.
+     *
+     * @param array<string,mixed> $pagination
+     * @return list<array<string,mixed>>
+     */
+    public function categoryCoursePage(int $categoryId, DataUniverse $universe, array $pagination): array
+    {
+        // The payload carries page and page size; the offset is derived rather than stored, so it
+        // is derived the same way here as Pagination derives it.
+        $pageSize = (int) $pagination['page_size'];
+        $offset = max(0, ((int) $pagination['page'] - 1) * $pageSize);
+
+        return $this->decorateCatalogue(
+            $this->courses->categoryCourses($categoryId, $universe, $pageSize, $offset)
+        );
     }
 
     /** @return list<array<string,mixed>> */
