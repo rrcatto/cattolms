@@ -92,6 +92,15 @@ final class CourseController extends BaseController
     /** The dataset name every catalogue request key is composed from. */
     private const DATASET = 'catalogue';
 
+    /**
+     * The category accordions are their own paginated dataset.
+     *
+     * They share a screen with the catalogue grid, which already pages on `page`, so they need
+     * their own keys - one page number cannot mean two lists at once - and `open` names which
+     * accordion the number belongs to.
+     */
+    private const CATEGORY_DATASET = 'cat';
+
     public function catalogue(): void
     {
         $user = $this->currentUser();
@@ -158,6 +167,7 @@ final class CourseController extends BaseController
         $this->render('courses', [
             'title' => $this->catalogueTitle($category, $tag),
             'page_kicker' => 'Discover what to learn next',
+            'category_tree' => $this->categoryTree('/courses'),
             'courses' => $courses,
             'browse_category' => $category ?? [],
             'browse_tag' => $tag ?? [],
@@ -205,11 +215,25 @@ final class CourseController extends BaseController
      */
     public function categoryBrowser(): void
     {
+        $this->f3->reroute('/courses', true);
+    }
+
+    /**
+     * The catalogue's category accordions: every branch that holds a course, nested.
+     *
+     * They page on their own dataset's parameters, because the catalogue's own
+     * grid is already paging on page and page_size on the same screen, and one page number cannot
+     * mean two lists at once.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function categoryTree(string $base): array
+    {
         $universe = $this->universe();
         $tree = $this->courses->categoryBrowser($universe);
         $openSlug = trim((string) ($_GET['open'] ?? ''));
 
-        $decorate = function (array $node) use (&$decorate, $universe, $openSlug): array {
+        $decorate = function (array $node) use (&$decorate, $universe, $openSlug, $base): array {
             // Only the category named by `open` is rendered with its courses. Every other accordion
             // carries the address of its own contents and fetches them when it is opened, which is
             // what keeps this page a few tens of kilobytes: the seed catalogue's whole taxonomy
@@ -217,19 +241,16 @@ final class CourseController extends BaseController
             // categories the reader never opened.
             $node['is_open'] = $openSlug !== '' && $openSlug === (string) $node['slug'];
             if ($node['is_open']) {
-                $node += $this->categoryCourses((string) $node['slug'], (int) $node['id'], $universe);
+                $node += $this->categoryCourses((string) $node['slug'], (int) $node['id'], $universe, $base);
             }
             $node['children'] = array_map($decorate, (array) $node['children']);
 
             return $node;
         };
 
-        $this->render('course-categories', [
-            'title' => 'Browse by category',
-            'page_kicker' => 'Every part of the catalogue that holds a course',
-            'category_tree' => array_map($decorate, $tree),
-        ]);
+        return array_map($decorate, $tree);
     }
+
 
     /**
      * One category's courses, as the fragment its accordion swaps in.
@@ -249,7 +270,7 @@ final class CourseController extends BaseController
         }
 
         $node = ['slug' => $slug, 'name' => (string) $category['name']]
-            + $this->categoryCourses($slug, (int) $category['id'], $this->universe());
+            + $this->categoryCourses($slug, (int) $category['id'], $this->universe(), '/courses');
 
         $this->renderFragment('partials/category-courses', $node);
     }
@@ -257,13 +278,15 @@ final class CourseController extends BaseController
     /**
      * @return array{courses:list<array<string,mixed>>,pagination:array<string,mixed>}
      */
-    private function categoryCourses(string $slug, int $categoryId, DataUniverse $universe): array
+    private function categoryCourses(string $slug, int $categoryId, DataUniverse $universe, string $base): array
     {
         $pagination = $this->courses->categoryPagination(
             $slug,
+            $base,
+            self::CATEGORY_DATASET,
             $this->courses->categoryCourseTotal($categoryId, $universe),
-            $_GET['page'] ?? null,
-            $_GET['page_size'] ?? null
+            $_GET[PlatformAdministrationService::pageParam(self::CATEGORY_DATASET)] ?? null,
+            $_GET[PlatformAdministrationService::sizeParam(self::CATEGORY_DATASET)] ?? null
         );
 
         return [

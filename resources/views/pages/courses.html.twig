@@ -67,18 +67,25 @@ Changelog:
 			</div>
 		</div>
 	{% endif %}
-	{% if browse_children %}
+	{#
+		Categories are accordions, not a rail of chips.
+
+		A chip rail can only offer one level, so a three-level taxonomy arrived as a flat row that
+		said nothing about what contained what. The accordions carry the shape: a category holds the
+		courses filed directly in it, and its sub-categories are accordions inside it.
+
+		Only a branch that holds a course is here. An empty category, however many sub-categories it
+		has, is still empty - only a course makes one worth opening - and keeping a category because
+		its branch is non-empty also keeps every ancestor of every non-empty one.
+	#}
+	{% if category_tree %}
 		<div class="cl-facet section">
 			<div class="cl-facet-head">
 				<span class="cl-facet-label">Categories</span>
-				<a class="btn btn-soft btn-sm" href="/courses/categories">Browse the whole taxonomy</a>
 			</div>
-			<div class="cl-category-rail" aria-label="Narrow by category">
-				{% for branch in browse_children %}
-					<a class="cl-category-chip" href="/courses/category/{{ branch.slug }}">
-					<span>{{ branch.name }}</span>
-					<span class="cl-category-count">{{ branch.course_count }}</span>
-					</a>
+			<div class="cl-category-tree">
+				{% for node in category_tree %}
+					{% include '@platform/partials/category-branch.html.twig' with {node: node, depth: 0} %}
 				{% endfor %}
 			</div>
 		</div>

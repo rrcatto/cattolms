@@ -541,16 +541,16 @@ final class CourseService
      *
      * @return array<string,mixed>
      */
-    public function categoryPagination(string $slug, int $total, mixed $page, mixed $pageSize): array
+    public function categoryPagination(string $slug, string $base, string $dataset, int $total, mixed $page, mixed $pageSize): array
     {
         return PlatformAdministrationService::paginationPayload(
             'category-' . $slug,
             Pagination::create($page, $pageSize, $total),
-            '/courses/categories',
+            $base,
             'Courses in this category',
             ['open' => $slug],
-            'page',
-            'page_size'
+            PlatformAdministrationService::pageParam($dataset),
+            PlatformAdministrationService::sizeParam($dataset)
         );
     }
 
