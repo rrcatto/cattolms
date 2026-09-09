@@ -51,11 +51,11 @@ Changelog:
 					always existed.
 				#}
 				<div class="cl-category-lazy"
-				     hx-get="/courses/categories/{{ node.slug }}/courses"
+				     hx-get="/courses/categories/{{ node.slug }}/courses{{ universe_query|default('') }}"
 				     hx-trigger="toggle once from:closest details"
 				     hx-swap="outerHTML">
 					<noscript>
-						<a class="btn btn-soft btn-sm" href="/courses/category/{{ node.slug }}">Open {{ node.name }}</a>
+						<a class="btn btn-soft btn-sm" href="/courses/category/{{ node.slug }}{{ universe_query|default('') }}">Open {{ node.name }}</a>
 					</noscript>
 					<p class="text-body-secondary mb-0">Loading {{ node.course_count }} courses…</p>
 				</div>
@@ -63,7 +63,7 @@ Changelog:
 		{% endif %}
 
 		{% for child in node.children %}
-			{% include '@platform/partials/category-branch.html.twig' with {node: child, depth: depth + 1} %}
+			{% include '@platform/partials/category-branch.html.twig' with {node: child, depth: depth + 1, universe_query: universe_query|default('')} %}
 		{% endfor %}
 	</div>
 </details>

@@ -40,7 +40,24 @@ Changelog:
 			{% endfor %}
 		</nav>
 	{% endif %}
+	{% if universe_switch %}
+		{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: universe_counts} %}
+	{% endif %}
 	{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base} %}
+{#
+	The cloud is the whole taxonomy weighted, and the rail below it is the tags of the branch the
+	reader is standing in. They answer different questions - find a subject, and narrow this list -
+	so both are shown, and the cloud is capped because the full set is a page of its own.
+#}
+	{% if tag_cloud %}
+		<div class="cl-facet section">
+			<div class="cl-facet-head">
+				<span class="cl-facet-label">Explore by tag</span>
+				<a class="btn btn-soft btn-sm" href="/courses/tags{{ universe_query }}">All tags</a>
+			</div>
+			{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_cloud} %}
+		</div>
+	{% endif %}
 {#
 	A tag is offered only where choosing it would return something, or where it is already chosen -
 	so the facet has to be built before it is headed. Guarding the heading on browse_tags and the
@@ -85,7 +102,7 @@ Changelog:
 			</div>
 			<div class="cl-category-tree">
 				{% for node in category_tree %}
-					{% include '@platform/partials/category-branch.html.twig' with {node: node, depth: 0} %}
+					{% include '@platform/partials/category-branch.html.twig' with {node: node, depth: 0, universe_query: universe_query} %}
 				{% endfor %}
 			</div>
 		</div>

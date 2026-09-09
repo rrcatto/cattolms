@@ -33,15 +33,11 @@ Changelog:
 	{% set ph_lead = 'Every label in the catalogue. The larger a tag, the more courses carry it.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-5">
+		{% if universe_switch %}
+			{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: null} %}
+		{% endif %}
 		{% if tag_index %}
-			<div class="cl-tag-cloud">
-				{% for cloud_tag in tag_index %}
-					<a class="cl-tag-chip cl-tag-weight-{{ cloud_tag.weight }}" href="/courses/tag/{{ cloud_tag.slug }}"
-					   title="{{ cloud_tag.name }}">{% if cloud_tag.icon_svg is defined and cloud_tag.icon_svg %}<span class="cl-tag-icon" aria-hidden="true">{{ cloud_tag.icon_svg|raw }}</span>{% endif %}<span>{{ cloud_tag.name }}</span>
-					<span class="cl-category-count">{{ cloud_tag.course_count }}</span>
-					</a>
-				{% endfor %}
-			</div>
+			{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_index} %}
 		{% else %}
 			<div class="empty section">
 				<h3>
