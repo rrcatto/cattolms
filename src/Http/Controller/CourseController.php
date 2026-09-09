@@ -588,15 +588,15 @@ final class CourseController extends BaseController
         $user = $this->requirePermission('CATALOGUE.COURSE.FAVOURITE');
         $courseId = max(1, (int) ($_POST['course_id'] ?? 0));
 
-        // A favourite is a personal relationship between an identity and a course, so the two must
-        // be in the same data universe - the database enforces it as well. Reaching this with a
-        // generated course therefore has a legitimate answer, and it is not a 500: the reader gets
-        // told why, on the page they were on.
+        // A genuine ADMIN may favourite a generated course - the D4 amendment of 2026/09/09 - so
+        // the ordinary path no longer refuses one. Provenance can still refuse a write the reader
+        // is not entitled to make, and when it does the answer is a message on the page they were
+        // on rather than an exception reaching the browser as a 500.
         try {
             $added = $this->platformAdministration->toggleFavourite($user->id, $courseId);
             $this->flash('success', $added ? 'The course was added to your favourites.' : 'The course was removed from your favourites.');
         } catch (RuntimeException) {
-            $this->flash('error', 'A generated course cannot be added to a real account\'s favourites. Favourites belong to one data universe, so this would leave your list pointing at rows that vanish when the seed set is cleaned up.');
+            $this->flash('error', 'That course could not be added to your favourites.');
         }
         $return = (string) ($_POST['return'] ?? '/courses');
         $this->redirect(str_starts_with($return, '/') ? $return : '/courses');
