@@ -20,7 +20,7 @@ Changelog:
 	<div class="cl-tag-cloud">
 		{% for cloud_tag in shown %}
 			<a class="cl-tag-chip cl-tag-weight-{{ cloud_tag.weight }}" href="/courses/tag/{{ cloud_tag.slug }}"
-			   title="{{ cloud_tag.name }}">{% if cloud_tag.icon_svg is defined and cloud_tag.icon_svg %}<span class="cl-tag-icon" aria-hidden="true">{{ cloud_tag.icon_svg|raw }}</span>{% endif %}<span>{{ cloud_tag.name }}</span>
+			   title="{{ cloud_tag.name }}" data-tag-label="{{ cloud_tag.name }}">{% if cloud_tag.icon_svg is defined and cloud_tag.icon_svg %}<span class="cl-tag-icon" aria-hidden="true">{{ cloud_tag.icon_svg|raw }}</span>{% endif %}<span>{{ cloud_tag.name }}</span>
 			<span class="cl-category-count">{{ cloud_tag.course_count }}</span>
 			</a>
 		{% endfor %}

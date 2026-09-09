@@ -54,6 +54,13 @@ final class PermissionVoter extends Voter
     {
         $user = $token->getUser();
 
-        return $user instanceof ApiUser && $user->identity->hasPermission($attribute);
+        // Both identities answer the same question the same way. The API and the browser differ in
+        // how they are authenticated, not in what an account is allowed to do, and a second rule
+        // here would be exactly the divergence the shared permission catalogue exists to prevent.
+        return match (true) {
+            $user instanceof ApiUser => $user->identity->hasPermission($attribute),
+            $user instanceof WebUser => $user->identity->hasPermission($attribute),
+            default => false,
+        };
     }
 }

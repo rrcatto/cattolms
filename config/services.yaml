@@ -52,7 +52,7 @@ services:
 
     CattoLearning\Auth\:
         resource: '../src/Auth/'
-        exclude: '../src/Auth/{CurrentUser.php,DataUniverse.php,RoleCatalog.php,RoleFamily.php}'
+        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,Security/WebUser.php}'
 
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
@@ -74,6 +74,13 @@ services:
 
     # The view model is shared with the Fat-Free renderer, which is what keeps one set of
     # navigation and breadcrumb rules while both engines are in use.
+    # Fat-Free's Base, for as long as ThemeRenderer still asks it for the error state and the
+    # response code. It is a singleton either way, so handing Symfony the same instance is what
+    # keeps one renderer serving both routers. This definition goes when Fat-Free does.
+    Base:
+        class: Base
+        factory: ['Base', 'instance']
+
     CattoLearning\View\ThemeRenderer: ~
     CattoLearning\View\ThemeManager:
         arguments:
@@ -87,11 +94,42 @@ services:
 
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'
-        exclude: '../src/Infrastructure/Persistence/{ConnectionFactory.php,PageQuery.php,SeedTableCatalog.php,SessionTimeZoneDriver.php}'
+        exclude: '../src/Infrastructure/Persistence/{ConnectionFactory.php,PageQuery.php,SessionTimeZoneDriver.php}'
 
     # Repositories depend on Database, not on Doctrine's Connection, because Database infers each
     # bound parameter's PDO type from the PHP value. Same reason as in the PHP-DI container.
     CattoLearning\Infrastructure\Persistence\Database: '@CattoLearning\Infrastructure\Persistence\DbalDatabase'
+
+    # The mail graph. The router's delivery domain is APP_DOMAIN: every domain the platform invents
+    # ends in .invalid, so mail to one is rewritten here rather than bouncing off a name that was
+    # never meant to resolve.
+    CattoLearning\Infrastructure\Mail\:
+        resource: '../src/Infrastructure/Mail/'
+    CattoLearning\Infrastructure\Mail\GeneratedDomainRouter:
+        arguments:
+            $deliveryDomain: '%env(APP_DOMAIN)%'
+    CattoLearning\Infrastructure\Mail\MailerInterface: '@CattoLearning\Infrastructure\Mail\GeneratedDomainMailer'
+
+    # Data generation, so the Seed Database screen can move across with the rest.
+    CattoLearning\Seed\:
+        resource: '../src/Seed/'
+        exclude: '../src/Seed/{SeedGenerationPlan.php}'
+
+    # The application services a ported route reaches.
+    CattoLearning\Application\:
+        resource: '../src/Application/'
+        exclude: '../src/Application/{App.php,CliBootstrap.php,ContainerFactory.php,Kernel.php,RouteRegistrar.php}'
+
+    CattoLearning\Company\:
+        resource: '../src/Company/'
+
+    # Support/ is value objects with private constructors and static factories, which is why it is
+    # not registered wholesale - doing so makes the container refuse to compile. GeoIpLocator is the
+    # exception: it is a service that happens to live among them.
+    CattoLearning\Support\GeoIpLocator: ~
+
+    CattoLearning\Event\:
+        resource: '../src/Event/'
 
     # Applied to DoctrineBundle's connection. The platform's own ConnectionFactory registers the
     # same middleware, so both connections agree about the session timezone.

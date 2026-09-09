@@ -180,8 +180,6 @@ final class App
         $routes->add('GET /courses/category/@slug', CourseController::class, 'catalogue');
         $routes->add('GET /courses/categories', CourseController::class, 'categoryBrowser');
         $routes->add('GET /courses/categories/@slug/courses', CourseController::class, 'categoryCoursesFragment');
-        $routes->add('GET /courses/tags', CourseController::class, 'tagIndex');
-        $routes->add('GET /courses/tag/@tag', CourseController::class, 'tagIndex');
         $routes->add('GET /courses/@slug', CourseController::class, 'detail');
         $routes->add('POST /courses/favourite', CourseController::class, 'toggleFavourite');
         $routes->add('POST /courses/request', CourseController::class, 'requestCourse');

@@ -607,6 +607,30 @@ filtered to the reader's universe, which is the same trap categories already car
 
 ---
 
+## 3h. Symfony UX trial run — owner decision, 2026/09/09
+
+The owner wants one page styled with Symfony UX before deciding whether it earns a place in the
+platform. `/courses/tags` is the trial: an animated tag cloud driven by a Stimulus controller over
+TagCloud.js, with a chosen tag listing its courses beneath it as cards, five across and up to five
+rows to a page.
+
+The page is deliberately chosen. It is public, it is not on any critical path, and it has a real
+interaction to judge - if UX cannot make a tag cloud pleasant it will not earn the rest of the LMS.
+
+What the trial has to answer:
+
+- does a Stimulus controller stay inside the platform's rules? The page must still render
+  server-side first and still work with JavaScript off, because that is not negotiable for a public
+  catalogue page and it is what tells us whether UX fits this codebase or fights it;
+- what does it cost to ship? AssetMapper carries no npm toolchain, which is the whole reason it is
+  the chosen path - a build step would be a second thing to keep working on the VPS;
+- can a theme still restyle it? A Stimulus controller that hard-codes its own appearance would take
+  the page out of the theme layer, and no amount of interactivity is worth that.
+
+If the answer is yes on all three, the candidates after it are the course player, the assessment
+screens and the administration tables - the three places where the current htmx enhancement is
+doing the most work.
+
 ## 4. Course/media portability
 
 - canonical `.clcourse` import/export package;

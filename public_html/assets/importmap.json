@@ -1,0 +1,26 @@
+{
+    "app": {
+        "path": "\/assets\/app-JMughI-.js",
+        "type": "js"
+    },
+    "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-j-V9kmg.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/tag_cloud_controller.js": {
+        "path": "\/assets\/controllers\/tag_cloud_controller-PF4i0BO.js",
+        "type": "js"
+    },
+    "@hotwired\/stimulus": {
+        "path": "\/assets\/vendor\/@hotwired\/stimulus\/stimulus.index-ryewcoo.js",
+        "type": "js"
+    },
+    "@symfony\/stimulus-bundle": {
+        "path": "\/assets\/@symfony\/stimulus-bundle\/loader-IOzBDLu.js",
+        "type": "js"
+    },
+    "TagCloud": {
+        "path": "\/assets\/vendor\/TagCloud\/TagCloud.index-r_BOY6F.js",
+        "type": "js"
+    }
+}

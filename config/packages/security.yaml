@@ -1,8 +1,8 @@
 # The API firewall.
 #
 # Stateless on purpose: an API request carries a Bearer token and nothing else, so there is no
-# session to read and no cookie to trust. The web interface is not behind a firewall at all yet -
-# Fat-Free still owns those routes, and `security: false` says so rather than leaving it implied.
+# session to read and no cookie to trust. The web firewall below reads the session the platform
+# already keeps rather than managing one of its own, so routes can move across a few at a time.
 #
 # There is no role hierarchy and no access_control matching on roles. Authorization here is two
 # orthogonal questions - does the token carry the transport scope, and does the account hold the
@@ -13,6 +13,11 @@ security:
         # Never consulted: ApiTokenAuthenticator resolves the identity itself and hands back a
         # SelfValidatingPassport. Symfony requires the key to exist, so it exists and is empty.
         api_tokens:
+            memory: ~
+
+        # Never consulted either: SessionAuthenticator resolves the identity from the session and
+        # hands back a SelfValidatingPassport.
+        web_session:
             memory: ~
 
     firewalls:
@@ -31,5 +36,18 @@ security:
                 - CattoLearning\Api\Security\ApiTokenAuthenticator
             entry_point: CattoLearning\Api\Security\ApiTokenAuthenticator
 
+        # The web firewall. It authenticates every request from the session the platform already
+        # keeps and refuses none: an anonymous visitor is not an error on a platform whose catalogue
+        # is public. Routes that need an identity say so themselves with #[IsGranted].
+        #
+        # Not stateless, but not session-managing either: App::run() opens the PostgreSQL-backed
+        # session before either router sees the request, and AuthService owns it. Symfony reads that
+        # identity rather than keeping one of its own, so a Symfony route and a Fat-Free route
+        # cannot disagree about who is signed in while the two coexist.
         web:
-            security: false
+            pattern: ^/
+            stateless: true
+            provider: web_session
+            custom_authenticators:
+                - CattoLearning\Auth\Security\SessionAuthenticator
+            entry_point: CattoLearning\Auth\Security\SessionAuthenticator

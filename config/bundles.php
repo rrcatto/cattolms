@@ -12,6 +12,9 @@ rather than installing the standard edition and pruning afterwards. DoctrineBund
 DBAL only - the ORM is not installed, and config/packages/doctrine.yaml records why.
 
 Changelog:
+2026/09/09 23:55 SAST
+- StimulusBundle and AssetMapper, for the Symfony UX trial on /courses/tags. AssetMapper rather than
+  Encore so there is no npm toolchain to keep working on the VPS.
 2026/09/08 22:15 SAST
 - SecurityBundle, for the stateless API firewall. The web routes are still Fat-Free's and are
   excluded by config/packages/security.yaml rather than by this list.
@@ -26,4 +29,5 @@ return [
     Symfony\Bundle\TwigBundle\TwigBundle::class => ['all' => true],
     Doctrine\Bundle\DoctrineBundle\DoctrineBundle::class => ['all' => true],
     Symfony\Bundle\SecurityBundle\SecurityBundle::class => ['all' => true],
+    Symfony\UX\StimulusBundle\StimulusBundle::class => ['all' => true],
 ];
