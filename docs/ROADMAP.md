@@ -574,6 +574,39 @@ Planning only.
 
 ---
 
+## 3g. Industry types for companies — owner decision, 2026/09/09
+
+Not started. Requested so that a company can be classified by what it does, which is the missing
+axis in every question anyone will eventually ask of the platform: which industries buy which
+courses, which industries a course sells into, and which industries are under-served by the
+catalogue.
+
+**Shape.** A company carries an industry. One, not many - a company that genuinely spans two is
+rare enough to be a data-entry decision rather than a schema one, and a many-to-many here would
+make every report ambiguous about what it is counting.
+
+**The list is curated, not free text.** A free-text field produces "Mining", "mining" and "Mining
+& Quarrying" as three industries inside a month, and no report can recover from that. It is a
+lookup table the platform ships and an administrator maintains, in the same way course categories
+are.
+
+**Open, and for the owner to decide when this is scheduled:**
+
+- whether the list follows a published standard - ISIC, NACE, SIC, or South Africa's own SIC 7 -
+  or is written for this platform. A standard is defensible and immediately comparable with
+  outside data; a hand-written list is shorter and reads better in a form. The choice constrains
+  the reporting later, so it is worth making deliberately rather than by default.
+- whether an industry is required on a company or optional. Required is better data and worse
+  onboarding; optional produces a reporting bucket called "unspecified" that never empties.
+- whether it is one level or two - Mining, then Coal, Gold, Platinum - which matters more for
+  reporting than for the form.
+
+**Not a data universe.** An industry classifies a company the way a category classifies a course:
+it is shared vocabulary, so it carries no seed token. What is *counted* under an industry is still
+filtered to the reader's universe, which is the same trap categories already carry.
+
+---
+
 ## 4. Course/media portability
 
 - canonical `.clcourse` import/export package;

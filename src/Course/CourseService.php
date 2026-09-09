@@ -58,6 +58,8 @@ use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\Support\Pagination;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Env;
@@ -453,6 +455,114 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
+    /**
+     * The catalogue's category browser: the branches that actually hold something, nested.
+     *
+     * A category is worth showing when a course exists somewhere beneath it. Only a course can do
+     * that - an empty branch, however many sub-categories it contains, is still empty - and the
+     * branch count already answers exactly that question, so the rule is one comparison rather than
+     * a recursive walk. Keeping a category because its branch is non-empty also keeps every
+     * ancestor of every non-empty category, because an ancestor's branch contains its descendants'
+     * courses by definition. That is the whole of "render it, and all its parent categories".
+     *
+     * Each node carries the number of courses filed directly in it, which is what its own table
+     * will hold, and the branch total, which is what its heading reports. They differ wherever a
+     * parent holds nothing itself, and showing only the branch total would promise a table that
+     * turns out to be empty.
+     *
+     * @return list<array<string,mixed>> Roots, each with a `children` list of the same shape.
+     */
+    public function categoryBrowser(DataUniverse $universe): array
+    {
+        $rows = [];
+        foreach ($this->courses->categories($universe) as $row) {
+            if ((int) ($row['descendant_course_count'] ?? 0) < 1) {
+                continue;
+            }
+            $row['children'] = [];
+            $rows[(int) $row['id']] = $row;
+        }
+
+        $roots = [];
+        foreach ($rows as $id => $row) {
+            $parentId = (int) ($row['parent_id'] ?? 0);
+            if ($parentId > 0 && isset($rows[$parentId])) {
+                continue;
+            }
+            $roots[] = $id;
+        }
+
+        // Built by reference so a three-level tree needs one pass rather than one per level.
+        $tree = [];
+        $index = [];
+        foreach ($rows as $id => $row) {
+            $index[$id] = $row;
+        }
+        foreach (array_keys($index) as $id) {
+            $parentId = (int) ($index[$id]['parent_id'] ?? 0);
+            if ($parentId > 0 && isset($index[$parentId])) {
+                continue;
+            }
+            $tree[] = $this->categoryBranch($id, $index);
+        }
+
+        return $tree;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $index
+     * @return array<string,mixed>
+     */
+    private function categoryBranch(int $id, array $index): array
+    {
+        $node = $index[$id];
+        $children = [];
+        foreach ($index as $childId => $child) {
+            if ((int) ($child['parent_id'] ?? 0) === $id) {
+                $children[] = $this->categoryBranch($childId, $index);
+            }
+        }
+        $node['children'] = $children;
+
+        return $node;
+    }
+
+    /**
+     * One page of the courses filed directly in a category, with the shared pagination payload.
+     *
+     * The payload is built here rather than in the controller because this is where the Pagination
+     * object is, and because every paginated surface on the platform composes its URLs through the
+     * one builder. Paging is on the public `page` / `page_size` names the catalogue already uses,
+     * with the category carried as a filter so every link says which accordion it belongs to.
+     *
+     * @return array{courses:list<array<string,mixed>>,pagination:array<string,mixed>}
+     */
+    public function categoryCoursePage(
+        int $categoryId,
+        string $slug,
+        DataUniverse $universe,
+        mixed $page,
+        mixed $pageSize
+    ): array {
+        $pagination = Pagination::create($page, $pageSize, $this->courses->categoryCoursesCount($categoryId, $universe));
+
+        return [
+            'courses' => $this->decorateCatalogue(
+                $this->courses->categoryCourses($categoryId, $universe, $pagination->pageSize, $pagination->offset)
+            ),
+            'pagination' => PlatformAdministrationService::paginationPayload(
+                'category-' . $slug,
+                $pagination,
+                '/courses/categories',
+                'Courses in this category',
+                ['open' => $slug],
+                'page',
+                'page_size'
+            ),
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
     public function categories(DataUniverse $universe, bool $activeOnly = false): array
     {
         return $this->courses->categories($universe, $activeOnly);

@@ -80,6 +80,7 @@ use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Uuid;
+use CattoLearning\View\Artwork\ArtworkGenerator;
 use CattoLearning\Infrastructure\Persistence\PageQuery;
 use CattoLearning\Infrastructure\Persistence\SeedProvenance;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -91,7 +92,8 @@ final class CourseRepository
     public function __construct(
         private readonly Database $db,
         private readonly RuntimeSettings $settings,
-        private readonly SeedProvenance $provenance
+        private readonly SeedProvenance $provenance,
+        private readonly ArtworkGenerator $artwork
     ) {
     }
 
@@ -734,6 +736,60 @@ final class CourseRepository
     }
 
     /**
+     * One page of the courses filed directly in one category, for the catalogue's category browser.
+     *
+     * Directly, not the branch. Each category in the browser is its own accordion and its
+     * sub-categories are accordions inside it, so counting a child's courses here would show every
+     * course twice - once under the child and once under its parent.
+     *
+     * The cover comes back with the row because the browser draws a card per course. It is the one
+     * list projection that selects cover_svg, which is why the column can sit on the table without
+     * costing every other list anything.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function categoryCourses(int $categoryId, DataUniverse $universe, int $limit, int $offset): array
+    {
+        $keys = "SELECT c.id FROM courses c
+                  WHERE c.status = 'published' AND c.category_id = :category_id"
+            . self::andScope($universe, 'c');
+
+        $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
+                          c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
+                          c.cover_svg,
+                          cover.public_id AS cover_media_public_id,
+                          (SELECT COUNT(*)::int FROM course_modules cm WHERE cm.course_id = c.id) AS module_count,
+                          (SELECT cpv.price_minor_units FROM course_price_variants cpv
+                            WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
+                          (SELECT cpv.currency_code FROM course_price_variants cpv
+                            WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code
+                   FROM page
+                   JOIN courses c ON c.id = page.id
+                   LEFT JOIN LATERAL (
+                       SELECT public_id FROM course_media
+                       WHERE course_id = c.id AND media_role = 'cover'
+                       ORDER BY created_at DESC LIMIT 1
+                   ) cover ON TRUE";
+
+        return $this->normaliseRows($this->db->fetchAllAssociative(
+            PageQuery::deferred($keys, $detail, self::CATALOGUE_ORDER, $limit, $offset),
+            ['category_id' => $categoryId]
+        ));
+    }
+
+    /** The total behind {@see categoryCourses()}, under the identical membership rule. */
+    public function categoryCoursesCount(int $categoryId, DataUniverse $universe): int
+    {
+        $rows = $this->db->fetchAllAssociative(
+            "SELECT COUNT(*)::int AS total FROM courses c
+              WHERE c.status = 'published' AND c.category_id = :category_id" . self::andScope($universe, 'c'),
+            ['category_id' => $categoryId]
+        );
+
+        return (int) ($rows[0]['total'] ?? 0);
+    }
+
+    /**
      * The categories a category may be filed under: every active category above the deepest level.
      *
      * A category being edited cannot become its own parent, nor the child of one of its own
@@ -1241,7 +1297,7 @@ final class CourseRepository
         $scope = self::andScope($universe, 'c');
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT t.id, t.name, t.slug,
+            "SELECT t.id, t.name, t.slug, t.icon_svg,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
                       WHERE ct.tag_id = t.id AND c.status = 'published'{$scope}) AS course_count
@@ -1253,11 +1309,16 @@ final class CourseRepository
     /** @param array<string,mixed> $data */
     public function createTag(array $data): int
     {
+        $name = (string) $data['name'];
+        $slug = (string) $data['slug'];
         $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO tags (name, slug) VALUES (:name, :slug) RETURNING id',
+            'INSERT INTO tags (name, slug, icon_svg) VALUES (:name, :slug, :icon_svg) RETURNING id',
             [
-                'name' => (string) $data['name'],
-                'slug' => (string) $data['slug'],
+                'name' => $name,
+                'slug' => $slug,
+                // Seeded on the slug, which is unique and stable: renaming a tag keeps the icon a
+                // reader who recognises it by colour already knows.
+                'icon_svg' => $this->artwork->tagIcon($slug, $name),
             ]
         );
 
@@ -1322,8 +1383,8 @@ final class CourseRepository
     {
         $parentId = (int) ($data['parent_id'] ?? 0);
         $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO course_categories (parent_id,level,name,slug,description,position)
-             VALUES (:parent_id,:level,:name,:slug,:description,:position) RETURNING id',
+            'INSERT INTO course_categories (parent_id,level,name,slug,description,position,icon_svg)
+             VALUES (:parent_id,:level,:name,:slug,:description,:position,:icon_svg) RETURNING id',
             [
                 'parent_id' => $parentId > 0 ? $parentId : null,
                 'level' => $this->categoryLevelFor($parentId),
@@ -1331,6 +1392,7 @@ final class CourseRepository
                 'slug' => (string) $data['slug'],
                 'description' => (string) $data['description'],
                 'position' => (int) $data['position'],
+                'icon_svg' => $this->artwork->categoryIcon((string) $data['slug'], (string) $data['name']),
             ]
         );
 
@@ -1906,6 +1968,7 @@ final class CourseRepository
         }
 
         $now = gmdate('Y-m-d H:i:sP');
+        $publicId = Uuid::v4();
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO courses
                  (public_id,seed_token,category_id,slug,title,subtitle,summary,description_html,level,
@@ -1915,7 +1978,7 @@ final class CourseRepository
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
                   parent_course_id,revision_number,publication_approval_status,certificate_template_html,
                   certificate_template_css,interchange_schema_version,created_by_user_id,updated_by_user_id,
-                  created_at,updated_at)
+                  created_at,updated_at,cover_svg)
              VALUES (:public_id,:seed_token,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
                      :estimated_minutes,:status,:default_access_period_seconds,:module_weight,:final_weight,
                      :certificate_enabled,:certificate_title,:certificate_template,:certificate_body_text,
@@ -1923,10 +1986,10 @@ final class CourseRepository
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
                      :parent_course_id,:revision_number,:publication_approval_status,:certificate_template_html,
                      :certificate_template_css,:interchange_schema_version,:created_by,:updated_by,
-                     :created_at,:updated_at)
+                     :created_at,:updated_at,:cover_svg)
              RETURNING id',
             [
-                'public_id' => Uuid::v4(),
+                'public_id' => $publicId,
                 'seed_token' => $seedToken ?? $this->provenance->fromCompany($ownerCompanyId),
                 'category_id' => $data['category_id'] ?: null,
                 'slug' => (string) $data['slug'],
@@ -1962,6 +2025,9 @@ final class CourseRepository
                 'updated_by' => $userId,
                 'created_at' => $now,
                 'updated_at' => $now,
+                // Seeded on the public id rather than the title: two courses may share a name, and
+                // a renamed course keeps the cover its learners already recognise.
+                'cover_svg' => $this->artwork->courseCover($publicId, (string) $data['title']),
             ]
         );
 
