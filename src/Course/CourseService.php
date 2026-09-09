@@ -69,6 +69,16 @@ use RuntimeException;
 
 final class CourseService
 {
+    /**
+     * The taxonomy, per universe, for the life of one request.
+     *
+     * A page of cards asks for the ancestors of every course's category. The categories are one
+     * small table, so it is read once instead of per card or per row.
+     *
+     * @var array<string,array<int,array<string,mixed>>>
+     */
+    private array $categoryIndex = [];
+
     public function __construct(
         private readonly TransactionManager $transactions,
         private readonly CourseRepository $courses,
@@ -91,13 +101,7 @@ final class CourseService
     {
         $courses = $this->decorateCatalogue($this->courses->publishedCourses($universe, $filter, $limit, $offset));
 
-        // One statement for the whole page rather than one per card.
-        $tags = $this->courses->tagsForCourses(array_map(static fn(array $row): int => (int) $row['id'], $courses));
-        foreach ($courses as &$course) {
-            $course['tags'] = $tags[(int) $course['id']] ?? [];
-        }
-
-        return $courses;
+        return $this->decorateCards($courses, $universe);
     }
 
     /** Total published courses in the same scope the rows use, for "Showing X-Y of Z". */
@@ -568,6 +572,68 @@ final class CourseService
      * @param array<string,mixed> $pagination
      * @return list<array<string,mixed>>
      */
+    /**
+     * The ancestors of a category, outermost first, including the category itself.
+     *
+     * Built from the category list rather than a recursive query, and memoised per universe: a
+     * page of cards asks for the path of every course's category, and the taxonomy is one small
+     * table that is already being read.
+     *
+     * @return list<array{name:string,slug:string}>
+     */
+    public function categoryPath(int $categoryId, DataUniverse $universe): array
+    {
+        $key = $universe->value;
+        if (!isset($this->categoryIndex[$key])) {
+            $index = [];
+            foreach ($this->courses->categories($universe) as $row) {
+                $index[(int) $row['id']] = $row;
+            }
+            $this->categoryIndex[$key] = $index;
+        }
+        $index = $this->categoryIndex[$key];
+
+        $path = [];
+        $id = $categoryId;
+        // A malformed parent chain must not hang a page render, so the walk is bounded by the
+        // number of categories that exist.
+        for ($step = 0, $limit = count($index) + 1; $id > 0 && isset($index[$id]) && $step < $limit; $step++) {
+            $path[] = ['name' => (string) $index[$id]['name'], 'slug' => (string) $index[$id]['slug']];
+            $id = (int) ($index[$id]['parent_id'] ?? 0);
+        }
+
+        return array_reverse($path);
+    }
+
+    /**
+     * Everything a course card shows beyond the course row itself.
+     *
+     * One statement for the whole page's tags rather than one per card, and the category path from
+     * the memoised taxonomy. Used by every surface that draws cards, so a card cannot show more on
+     * one page than another.
+     *
+     * @param list<array<string,mixed>> $courses
+     * @return list<array<string,mixed>>
+     */
+    public function decorateCards(array $courses, DataUniverse $universe): array
+    {
+        if ($courses === []) {
+            return $courses;
+        }
+        $tags = $this->courses->tagsForCourses(array_map(static fn(array $row): int => (int) $row['id'], $courses));
+        foreach ($courses as &$course) {
+            $course['tags'] = $tags[(int) $course['id']] ?? [];
+            $course['category_path'] = $this->categoryPath((int) ($course['category_id'] ?? 0), $universe);
+        }
+        unset($course);
+
+        return $courses;
+    }
+
+    /**
+     * @param array<string,mixed> $pagination
+     * @return list<array<string,mixed>>
+     */
     public function categoryCoursePage(int $categoryId, DataUniverse $universe, array $pagination): array
     {
         // The payload carries page and page size; the offset is derived rather than stored, so it
@@ -575,8 +641,9 @@ final class CourseService
         $pageSize = (int) $pagination['page_size'];
         $offset = max(0, ((int) $pagination['page'] - 1) * $pageSize);
 
-        return $this->decorateCatalogue(
-            $this->courses->categoryCourses($categoryId, $universe, $pageSize, $offset)
+        return $this->decorateCards(
+            $this->decorateCatalogue($this->courses->categoryCourses($categoryId, $universe, $pageSize, $offset)),
+            $universe
         );
     }
 

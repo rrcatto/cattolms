@@ -225,7 +225,7 @@ final class CourseRepository
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
                     c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
-                    c.course_style_key, cc.name AS category_name, cc.slug AS category_slug,
+                    c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
                     cover.public_id AS cover_media_public_id,
                     (SELECT COUNT(*)::int FROM course_modules cm WHERE cm.course_id = c.id) AS module_count,
                     (SELECT COUNT(*)::int FROM assessment_questions aq
@@ -356,7 +356,7 @@ final class CourseRepository
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level, c.status,
                     c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
-                    c.course_style_key, cc.name AS category_name, cc.slug AS category_slug,
+                    c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
                     c.owner_company_id, oc.name AS owner_company_name,
                     (c.owner_company_id = :company_id) AS is_company_owned,
                     EXISTS (
@@ -756,7 +756,8 @@ final class CourseRepository
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
                           c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
-                          c.cover_svg,
+                          c.cover_svg, c.category_id,
+                          cat.name AS category_name, cat.slug AS category_slug,
                           cover.public_id AS cover_media_public_id,
                           (SELECT COUNT(*)::int FROM course_modules cm WHERE cm.course_id = c.id) AS module_count,
                           (SELECT cpv.price_minor_units FROM course_price_variants cpv
@@ -765,6 +766,7 @@ final class CourseRepository
                             WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code
                    FROM page
                    JOIN courses c ON c.id = page.id
+                   LEFT JOIN course_categories cat ON cat.id = c.category_id
                    LEFT JOIN LATERAL (
                        SELECT public_id FROM course_media
                        WHERE course_id = c.id AND media_role = 'cover'

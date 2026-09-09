@@ -540,3 +540,78 @@
    last one inside a grid cell. */
 .field+.field{margin-top:1rem}
 .field+.btn,.field+button,.field+.cl-form-actions{margin-top:1rem}
+
+/* v0.7 the two Help accordion levels are laid out the same way.
+
+   The group summary was a flex row with its disclosure marker hidden; the item summary underneath
+   it was left as a default list-item, so it still drew a marker, sat on a different left edge and
+   did not share the group's baseline. Both are now the same control at two sizes, both explicitly
+   left aligned, so no theme's own text-align can reach them. */
+.cl-help-item>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem 1rem}
+.cl-help-group>summary,.cl-help-item>summary{text-align:left;justify-content:flex-start}
+.cl-help-item>summary::-webkit-details-marker{display:none}
+.cl-help-item>summary::after{content:"⌄";margin-left:auto;font-size:1rem;line-height:1;opacity:.6;transition:transform .15s ease}
+.cl-help-item[open]>summary::after{transform:rotate(180deg)}
+
+/* v0.7 row action menus stack, which is what a menu is.
+
+   The panel and its forms were already told to be a grid, and the actions still drew side by side.
+   The reason is a rule from the one-row-per-table-row work: `.table-wrap td form` sets
+   display:inline-flex!important so a form sitting directly in a cell keeps its buttons on the row.
+   That selector is (0,1,2) and `.row-menu-panel form` is (0,1,1), so the cell rule won on
+   specificity and no amount of source order would have changed it - two !important declarations
+   are still decided by specificity first.
+
+   Both intents are real, so both are kept and the more specific one names the case it means: a
+   form loose in a cell stays inline, a form inside an action menu stacks. */
+.table-wrap td .row-menu-panel form,.row-menu-panel form{display:grid!important;gap:.35rem;width:100%!important;margin:0!important}
+.table-wrap td .row-menu-panel .btn,.row-menu-panel .btn{display:flex!important;width:100%!important;justify-content:flex-start;text-align:left;white-space:nowrap}
+/* Every action carries a visible edge and changes on hover. brightness() rather than a stated
+   colour, because core does not know what any theme painted the button and must not overwrite it -
+   a palette-driven theme keeps its own colour and still gets the feedback. */
+.row-menu-panel .btn{border:1px solid rgba(0,0,0,.18)}
+.row-menu-panel .btn:hover{filter:brightness(.93)}
+.row-menu-panel .btn-danger,.row-menu-panel .btn-danger:hover{border-color:rgba(0,0,0,.28)}
+
+/* v0.7 the course card, to the owner's specification, and five to a row.
+
+   Five columns is stated rather than derived: auto-fill with a minimum width gave a different
+   number of cards per row on every screen, and the request was five. It steps down at narrower
+   widths because five 20%-wide cards below about 1400px are too narrow to read, and a card that
+   cannot be read is not a card. */
+.cl-course-cards{display:grid;gap:1rem;grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1500px){.cl-course-cards{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1200px){.cl-course-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.cl-course-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.cl-course-cards{grid-template-columns:minmax(0,1fr)}}
+
+/* The body is a column so the foot can be pushed to the bottom of every card in the row: cards in
+   a grid row are the same height, and without this the action sits directly under the text and no
+   two cards in a row agree where it is. */
+.cl-course-card-body{display:flex;flex-direction:column;gap:.6rem;padding:clamp(.85rem,1.2vw,1.1rem);min-width:0}
+.cl-course-card-title{font-size:1rem;line-height:1.3;margin:0}
+.cl-course-card-title a{color:inherit;text-decoration:none}
+.cl-course-card-title a:hover{text-decoration:underline}
+/* The description is clamped rather than left to run: five cards to a row means a long summary
+   would set the height of the whole row. */
+.cl-course-card-summary{margin:0;font-size:.82rem;line-height:1.45;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cl-course-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .3rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;opacity:.7;min-width:0}
+.cl-course-crumbs a{color:inherit;text-decoration:none}
+.cl-course-crumbs a:hover{text-decoration:underline}
+.cl-course-crumb-sep{opacity:.5}
+.cl-course-card-tags{display:flex;flex-wrap:wrap;gap:.3rem}
+.cl-course-card-tags .cl-tag-chip{font-size:.7rem;padding:.12rem .45rem}
+/* The facts are a definition list so the label is readable to a screen reader as a label, and a
+   grid so Level, Modules and Price line up across every card in the row. */
+.cl-course-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(4rem,1fr));gap:.35rem;margin:0;font-size:.72rem}
+.cl-course-facts>div{display:grid;gap:.05rem;min-width:0}
+.cl-course-facts dt{text-transform:uppercase;letter-spacing:.04em;opacity:.6;font-size:.62rem}
+.cl-course-facts dd{margin:0;font-weight:700}
+.cl-course-card-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-top:auto;padding-top:.6rem;border-top:1px solid var(--cl-border,#dfe4ea)}
+.cl-course-card-foot form{margin:0}
+/* The star is a control, so it gets a hit area and a focus ring rather than being bare text. */
+.cl-favourite{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;font-size:1.1rem;line-height:1;color:inherit;background:transparent;border:1px solid var(--cl-border,#dfe4ea);border-radius:8px;cursor:pointer}
+.cl-favourite:hover{filter:brightness(.93)}
+.cl-favourite:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+.cl-favourite.is-on{color:#c8971b;border-color:currentColor}
+.cl-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
