@@ -56,8 +56,8 @@ Changelog:
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'actor_id', lk_type: 'people', lk_label: 'Person / actor', lk_selected: activity_selected_actor, lk_empty: 'All people', lk_required: 0} %}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'course_id', lk_type: 'courses', lk_label: 'Course', lk_selected: activity_selected_course, lk_empty: 'All courses', lk_required: 0} %}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: activity_selected_company, lk_empty: 'All companies', lk_required: 0} %}
 		<div class="field full">
 			<label>Search</label>
-			<div style="display:flex;gap:8px;align-items:center">
-				<input name="q" value="{{ activity_filters.q }}" placeholder="Event, person, ID or metadata" style="flex:1">
+			<div class="cl-row-inline">
+				<input name="q" value="{{ activity_filters.q }}" placeholder="Event, person, ID or metadata" class="cl-flex-fill">
 				<button class="btn btn-primary" type="submit">Filter</button><a class="btn btn-soft" href="/admin/activity">Clear</a>
 			</div>
 		</div>

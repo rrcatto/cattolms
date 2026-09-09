@@ -82,7 +82,7 @@ Changelog:
 			</div>
 		</form>
 		{% if platform_name_source=='database' %}
-			<form action="/admin/settings/platform-name/reset" method="post" style="margin-top:10px">
+			<form action="/admin/settings/platform-name/reset" method="post" class="cl-mt-2">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				<button class="btn btn-ghost btn-sm" type="submit">Use APP_NAME from .env</button>
 			</form>
@@ -140,7 +140,7 @@ Changelog:
 					</div>
 				</form>
 				{% if seed_system_company_override %}
-					<form action="/admin/settings/seed-company/reset" method="post" style="margin-top:10px">
+					<form action="/admin/settings/seed-company/reset" method="post" class="cl-mt-2">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						<button class="btn btn-ghost btn-sm" type="submit">Use the .env values</button>
 					</form>
@@ -211,7 +211,7 @@ Changelog:
 				<summary>
 					<strong>Advanced SMTP DSN options</strong>
 				</summary>
-				<label style="margin-top:10px">Query options</label>
+				<label class="cl-mt-2">Query options</label>
 				<input name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true">
 				<div class="help">
 					Normally leave this unchanged. This preserves optional Symfony Mailer DSN query parameters.
@@ -221,7 +221,7 @@ Changelog:
 				<button class="btn btn-primary">Save SMTP override</button>
 			</div>
 		</form>
-		<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+		<div class="cl-row-wrap cl-mt-2">
 			<form action="/admin/mail/test" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				<button class="btn btn-ghost btn-sm">Send test email</button>
@@ -304,7 +304,7 @@ Changelog:
 				<span class="badge info">{{ maintenance.web_sessions }}</span>
 			</div>
 		</div>
-		<form action="/admin/database/prune" method="post" style="margin-top:14px">
+		<form action="/admin/database/prune" method="post" class="cl-mt-3">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			<button class="btn btn-danger" data-confirm="Remove the expired login and session records listed above?">Clean expired records</button>
 		</form>
