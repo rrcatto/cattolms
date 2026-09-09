@@ -394,15 +394,24 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testEveryAdministrationSectionRenderTakesItsPayloadFromTheSectionLoader(): void
     {
+        $checked = 0;
         foreach (glob(self::root() . '/src/Http/Controller/*.php') ?: [] as $controller) {
             $source = (string) file_get_contents($controller);
-            if (!str_contains($source, "'admin_section' =>") && !str_contains($source, "'admin_sections' =>")) continue;
+            // The payload is assigned, not written as an array literal. Matching the literal form
+            // made this guard examine no controller at all and pass on nothing, which is the one
+            // way a source-scanning check can be worse than absent.
+            if (!str_contains($source, "\$data['admin_section']") && !str_contains($source, "\$data['admin_sections']")) {
+                continue;
+            }
+            $checked++;
 
             self::assertTrue(
                 str_contains($source, 'sectionData(') || str_contains($source, 'workspacePreview('),
                 basename($controller) . ' renders an Administration section, so it must take its data from the section loader.'
             );
         }
+
+        self::assertGreaterThan(0, $checked, 'No controller was examined; the scan is looking for the wrong thing.');
     }
 
     /**
@@ -466,8 +475,8 @@ final class PaginationUiContractTest extends TestCase
 
         // The signatures are matched up to the bounding parameters rather than in full, so adding
         // an optional filter does not fail a test whose subject is the membership rule.
-        self::assertStringContainsString('public function manageableCourses(int $userId, DataUniverse $universe, int $limit, int $offset', $repository);
-        self::assertStringContainsString('public function manageableCoursesCount(int $userId, DataUniverse $universe', $repository);
+        self::assertStringContainsString('public function manageableCourses(int $userId, int $limit, int $offset', $repository);
+        self::assertStringContainsString('public function manageableCoursesCount(int $userId', $repository);
         self::assertSame(
             2,
             substr_count($repository, 'self::MANAGEABLE_COURSES_WHERE'),
@@ -487,7 +496,7 @@ final class PaginationUiContractTest extends TestCase
         self::assertStringContainsString('private function sectionPreviewValues(', $service);
 
         $controller = self::read('src/Http/Controller/AdminController.php');
-        self::assertStringContainsString('workspacePreview($keys, $user->id, $this->universe($user), $capabilities)', $controller);
+        self::assertStringContainsString('workspacePreview($keys, $user->id, $capabilities)', $controller);
         self::assertStringNotContainsString('array_replace($data,', $controller);
     }
 
@@ -498,7 +507,7 @@ final class PaginationUiContractTest extends TestCase
 
         self::assertSame(
             2,
-            substr_count($service, '$this->normaliseCompanies($this->administration->companies($universe, self::PREVIEW_PAGE_SIZE, 0))'),
+            substr_count($service, '$this->normaliseCompanies($this->administration->companies(self::PREVIEW_PAGE_SIZE, 0))'),
             'Both the consolidated Company workspace and its standalone dashboard must populate the platform-wide company table.'
         );
         self::assertStringContainsString('company_platform_wide', self::read('resources/views/partials/company/dashboard.html.twig'));

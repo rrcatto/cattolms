@@ -151,33 +151,26 @@ foreach ([
     $need(in_array($commercePermission, $permissionKeys, true), 'Reserved Commerce permission missing: ' . $commercePermission);
 }
 $roleCatalog = $read($root . '/src/Auth/RoleCatalog.php');
-foreach (['ADMIN','STUDENT','COMPANY_ADMIN','COURSE_EDITOR','COURSE_OWNER','SEED_STUDENT','SEED_COMPANY_ADMIN','SEED_COURSE_EDITOR','SEED_COURSE_OWNER','SEED_ADMIN'] as $roleKey) {
+foreach (['ADMIN','STUDENT','COMPANY_ADMIN','COURSE_EDITOR','COURSE_OWNER'] as $roleKey) {
     $need(str_contains($roleCatalog, "'" . $roleKey . "'"), 'RoleCatalog missing built-in role ' . $roleKey . '.');
     $need(str_contains($baseline, "('" . $roleKey . "'"), 'Baseline missing built-in role ' . $roleKey . '.');
 }
-$need(is_file($root . '/src/Auth/RoleFamily.php'), 'Role-family compatibility helper is missing.');
-$need(!is_file($root . '/src/Auth/AclRealm.php') && !is_file($root . '/src/Auth/RoleUniverse.php'), 'Obsolete permission/data-universe switching helpers must not remain.');
+$need(!is_file($root . '/src/Auth/AclRealm.php') && !is_file($root . '/src/Auth/DataUniverse.php'), 'Obsolete permission/data-universe helpers must not remain.');
 $need(str_contains($baseline, 'role_permissions_boundary_guard'), 'Baseline must keep SYSTEM.* restricted to ADMIN.');
-$need(str_contains($baseline, 'user_roles_family_guard'), 'Baseline must prevent normal/SEED role-family mixing.');
-// v0.5.8 implements the Seed Database. The baseline must build its schema from the frozen
-// catalogue rather than a hand-written copy, so the columns, guards and tests cannot drift.
-$need(str_contains($baseline, 'SeedSchema::upSql()'), 'The v0.5.8 baseline must build the Seed Database schema from SeedSchema.');
-$need(str_contains($baseline, 'SeedSchema::downSql()'), 'The v0.5.8 baseline must reverse the Seed Database schema from SeedSchema.');
-$need(str_contains($baseline, 'SeedTableCatalog::INFRASTRUCTURE_TOKEN'), 'The v0.5.8 baseline must create the shared SEED System Company.');
-// Thirty since v0.6. `course_categories` left the catalogue because a category is a label rather
-// than a business record - the reasoning is recorded on decision D3 in SeedTableCatalog - and
-// `tags` and `course_tags` were never in it for the same reason. The count is pinned so that
-// removing a table stays a deliberate act with a written justification.
-$need(count(CattoLearning\Seed\SeedTableCatalog::seedAwareTables()) === 30, 'The frozen seed-aware table catalogue must hold 30 tables.');
-$need(!in_array('course_categories', CattoLearning\Seed\SeedTableCatalog::seedAwareTables(), true), 'Course categories are universe-free labels and must not carry seed provenance.');
+// There is one kind of data. The baseline must not reintroduce a second: no per-row provenance
+// column, no cross-universe guard, and no role family to keep apart from another.
+// Comments are stripped first: this file's own changelog records the removal by name, and scanning
+// the raw text would report the record of the fix as the fault.
+$baselineSql = (string) preg_replace(['#/\*.*?\*/#s', '#^\s*--.*$#m'], '', $baseline);
+foreach (['seed_token', 'enforce_same_data_universe', 'SEED_'] as $token) {
+    $need(!str_contains($baselineSql, $token), 'The baseline must not reintroduce the REAL/SEED split: ' . $token);
+}
 foreach (['CREATE TABLE tags', 'CREATE TABLE course_tags', 'course_categories_depth', 'enforce_category_depth'] as $token) {
     $need(str_contains($baseline, $token), 'Baseline schema missing the v0.6 taxonomy: ' . $token);
 }
 // The depth cap is what keeps the descendant query bounded and the breadcrumb honest, so it is
 // enforced by the database rather than only by whoever remembers it.
 $need(str_contains($baseline, 'CHECK (level BETWEEN 1 AND 3)'), 'Course categories must be capped at three levels.');
-$need(!CattoLearning\Seed\SeedTableCatalog::isSeedAware('web_sessions'), 'web_sessions must not be seed-aware (decision D3).');
-$need(CattoLearning\Seed\SeedTableCatalog::isSeedAware('course_media'), 'course_media must be seed-aware (decision D3).');
 $acl = $read($root . '/src/Auth/AclService.php');
 $roles = $read($root . '/src/Infrastructure/Persistence/RoleRepository.php');
 foreach (["in_array(RoleCatalog::ADMIN, \$roleKeys, true)",'return $this->catalog->keys();','acl_revision'] as $token) $need(str_contains($acl, $token), 'ACL service missing protected ADMIN/session-cache contract: ' . $token);

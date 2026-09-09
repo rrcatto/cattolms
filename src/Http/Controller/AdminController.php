@@ -70,6 +70,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Seed\SeedGenerationPlan;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 
 
@@ -145,7 +146,11 @@ final class AdminController extends BaseController
         $capabilities = [];
         foreach ($keys as $key) $capabilities[$key] = $this->sectionCapabilities($user, $key);
 
-        $data = $this->platformAdministration->workspacePreview($keys, $user->id, $capabilities);
+        $data = $this->platformAdministration->workspacePreview($keys, $user->id, $capabilities)
+            // The Seed Database section is a form rather than a dataset, so the section loader has
+            // nothing to give it. Its bounds are constants, so the consolidated workspace can state
+            // them without reaching for the service.
+            + ['seed_volume' => SeedGenerationPlan::bounds()];
         $this->render('admin-control-centre', $this->withAdministrationPresentation($data, true, null, $sections) + [
             'title' => 'Administration',
             'page_kicker' => 'Complete permitted platform administration workspace',
@@ -751,9 +756,8 @@ final class AdminController extends BaseController
             $data['permission_total'] = $this->roleAdministration->permissionTotal();
         }
         if (in_array('seed', $sectionKeys, true)) {
-            $data['seed_sets'] = $this->seeds->sets();
-            $data['seed_total_records'] = $this->seeds->totalSeedRecords();
-            $data['seed_volume'] = $this->seeds->volumeBounds();
+
+
             $data['seed_cleanup_preview'] = null;
         }
 

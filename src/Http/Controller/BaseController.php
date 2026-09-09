@@ -189,8 +189,8 @@ abstract class BaseController
         $data['is_authenticated'] = $currentUser !== null;
         $data['is_platform_admin'] = $currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false;
         $data['is_company_admin'] = $currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false;
-        $data['is_course_owner'] = $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_OWNER) || $currentUser->hasRole(RoleCatalog::COURSE_OWNER));
-        $data['is_course_editor'] = $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_EDITOR) || $currentUser->hasRole(RoleCatalog::COURSE_EDITOR));
+        $data['is_course_owner'] = $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_OWNER);
+        $data['is_course_editor'] = $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_EDITOR);
         $data['user_email'] = $currentUser === null ? '' : $currentUser->primaryEmail;
         $data['user_name'] = $currentUser === null ? '' : $currentUser->displayName;
         $data['permissions'] = $currentUser === null ? [] : $currentUser->permissions;
@@ -228,6 +228,8 @@ abstract class BaseController
         $systemCapabilities = [
             'can_manage_themes' => 'SYSTEM.THEME.MANAGE',
             'can_manage_settings' => 'SYSTEM.SETTING.MANAGE',
+            'can_view_seed' => 'SYSTEM.SEED.VIEW',
+            'can_manage_seed' => 'SYSTEM.SEED.MANAGE',
             'can_manage_roles' => 'SYSTEM.ROLE.MANAGE',
         ];
         foreach ($systemCapabilities as $flag => $permission) {

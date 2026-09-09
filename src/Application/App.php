@@ -63,6 +63,7 @@ use Base;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Http\Controller\AdminController;
+use CattoLearning\Http\Controller\AdminSeedController;
 use CattoLearning\Http\Controller\AssessmentController;
 use CattoLearning\Http\Controller\AuthController;
 use CattoLearning\Http\Controller\CompanyController;
@@ -259,6 +260,8 @@ final class App
         $routes->add('GET /admin/reports', AdminController::class, 'reports');
         $routes->add('GET /admin/reports/companies', AdminController::class, 'companyReport');
         $routes->add('GET /admin/themes', AdminController::class, 'themes');
+        $routes->add('GET /admin/seed', AdminSeedController::class, 'index');
+        $routes->add('POST /admin/seed/generate', AdminSeedController::class, 'generate');
         $routes->add('GET /admin/settings', AdminController::class, 'settings');
 
 

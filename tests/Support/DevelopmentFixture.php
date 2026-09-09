@@ -73,7 +73,7 @@ final class DevelopmentFixture
         return $id;
     }
 
-    public function rememberTokenEmail(string $email): void
+    public function rememberEmail(string $email): void
     {
         $this->tokenEmails[] = strtolower($email);
     }

@@ -44,7 +44,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\IntegrationContainer;
-use CattoLearning\Tests\Support\SeedIntegrationFixture;
+use CattoLearning\Tests\Support\IntegrationDataFixture;
 use DI\Container;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -53,7 +53,7 @@ final class CompanySuspensionIntegrationTest extends TestCase
 {
     private Container $container;
     private Database $db;
-    private SeedIntegrationFixture $fixture;
+    private IntegrationDataFixture $fixture;
     private PlatformAdministrationService $administration;
     private AuthSessionRepository $sessions;
     private UserRepository $users;
@@ -71,7 +71,7 @@ final class CompanySuspensionIntegrationTest extends TestCase
     {
         $this->container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
-        $this->fixture = new SeedIntegrationFixture($this->db);
+        $this->fixture = new IntegrationDataFixture($this->db);
 
         /** @var PlatformAdministrationService $administration */
         $administration = $this->container->get(PlatformAdministrationService::class);
@@ -98,14 +98,14 @@ final class CompanySuspensionIntegrationTest extends TestCase
         $this->fixture->addCompanyMember($this->companyId, $this->learnerId);
 
         $this->companyAdminId = $this->fixture->createUser('Company administrator', 'coadmin-' . $this->suffix . '@susp-' . $this->suffix . '.test');
-        $this->fixture->addCompanyMember($this->companyId, $this->companyAdminId, null, 'administrator');
+        $this->fixture->addCompanyMember($this->companyId, $this->companyAdminId, 'administrator');
 
         $this->otherLearnerId = $this->fixture->createUser('Other learner', 'other-' . $this->suffix . '@untouched-' . $this->suffix . '.test');
         $this->fixture->addCompanyMember($this->otherCompanyId, $this->otherLearnerId);
 
         // The platform administrator is a member of the suspendable company on purpose: the
         // exemption has to hold for somebody actually inside it, not merely for an outsider.
-        $this->fixture->addCompanyMember($this->companyId, $this->adminUserId, null, 'administrator');
+        $this->fixture->addCompanyMember($this->companyId, $this->adminUserId, 'administrator');
         $this->fixture->grantRole($this->adminUserId, 'ADMIN');
     }
 
@@ -285,7 +285,7 @@ final class CompanySuspensionIntegrationTest extends TestCase
     /** The System Company cannot be suspended, and the refusal is at repository level. */
     public function testTheSystemCompanyCannotBeSuspended(): void
     {
-        $system = $this->companies->systemCompany(\CattoLearning\Auth\DataUniverse::Real);
+        $system = $this->companies->systemCompany();
         self::assertNotNull($system, 'The REAL System Company must exist.');
 
         $this->expectException(RuntimeException::class);

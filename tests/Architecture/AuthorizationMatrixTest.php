@@ -162,7 +162,7 @@ final class AuthorizationMatrixTest extends TestCase
         self::assertStringContainsString("requirePermission('COURSE.EDIT')", $this->methodSource(BaseController::class, 'requireCourseAuthor'));
     }
 
-    public function testControllersDoNotSwitchPermissionsByDataUniverseOrOrdinaryBusinessRole(): void
+    public function testControllersDoNotSwitchPermissionsByOrdinaryBusinessRole(): void
     {
         $base = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/BaseController.php');
         self::assertStringNotContainsString('function requireRole(', $base);

@@ -35,6 +35,8 @@ final class PermissionCatalog
         return [
             $this->p('SYSTEM.THEME.VIEW', 'ViewThemes', 'System · Themes', 'View installed themes and registry state.'),
             $this->p('SYSTEM.THEME.MANAGE', 'ManageThemes', 'System · Themes', 'Import, activate, remove and re-synchronise themes.'),
+            $this->p('SYSTEM.SEED.VIEW', 'ViewSeedData', 'System · Seed', 'Open the Seed Database screen.'),
+            $this->p('SYSTEM.SEED.MANAGE', 'ManageSeedData', 'System · Seed', 'Generate a set of data.'),
             $this->p('SYSTEM.SETTING.VIEW', 'ViewSettings', 'System · Settings', 'View platform and runtime settings.'),
             $this->p('SYSTEM.SETTING.MANAGE', 'ManageSettings', 'System · Settings', 'Change platform, runtime and mail settings.'),
             $this->p('SYSTEM.ROLE.VIEW', 'ViewRoles', 'System · ACL', 'View roles and their effective permissions.'),

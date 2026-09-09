@@ -247,6 +247,8 @@ CREATE TABLE permissions (
 INSERT INTO permissions (permission_key,permission_name,permission_group,permission_description) VALUES
     ('SYSTEM.THEME.VIEW','ViewThemes','System · Themes','View installed themes and registry state.'),
     ('SYSTEM.THEME.MANAGE','ManageThemes','System · Themes','Import, activate, remove and re-synchronise themes.'),
+    ('SYSTEM.SEED.VIEW','ViewSeedData','System · Seed','Open the Seed Database screen.'),
+    ('SYSTEM.SEED.MANAGE','ManageSeedData','System · Seed','Generate a set of data.'),
     ('SYSTEM.SETTING.VIEW','ViewSettings','System · Settings','View platform and runtime settings.'),
     ('SYSTEM.SETTING.MANAGE','ManageSettings','System · Settings','Change platform, runtime and mail settings.'),
     ('SYSTEM.ROLE.VIEW','ViewRoles','System · ACL','View roles and their effective permissions.'),
@@ -338,7 +340,30 @@ CREATE TABLE user_roles (
     PRIMARY KEY (user_id, role_id)
 );
 
--- SYSTEM.* is platform-infrastructure authority.
+-- SYSTEM.* is platform-infrastructure authority and is ADMIN's alone. Enforced in the database as
+-- well as in PermissionCatalog, because a grant made by any route - a migration, a console command,
+-- a hand-written UPDATE - must not be able to hand platform infrastructure to an ordinary role.
+CREATE OR REPLACE FUNCTION enforce_role_permission_boundary()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    v_role_key VARCHAR(64);
+    v_permission_key VARCHAR(128);
+BEGIN
+    SELECT role_key INTO v_role_key FROM roles WHERE id = NEW.role_id;
+    SELECT permission_key INTO v_permission_key FROM permissions WHERE id = NEW.permission_id;
+
+    IF v_permission_key LIKE 'SYSTEM.%' AND v_role_key <> 'ADMIN' THEN
+        RAISE EXCEPTION 'SYSTEM permissions are reserved for ADMIN: % cannot hold %', v_role_key, v_permission_key
+            USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+CREATE TRIGGER role_permissions_boundary_guard
+BEFORE INSERT OR UPDATE ON role_permissions
+FOR EACH ROW EXECUTE FUNCTION enforce_role_permission_boundary();
+
 
 -- ADMIN remains an immutable super-role in application code; these rows make
 -- its effective ACL transparent in the database and Administration UI.

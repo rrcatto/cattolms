@@ -235,7 +235,6 @@ final class CompanyManagementContractTest extends TestCase
         ]);
 
         self::assertStringContainsString('Table Bay Logistics', $html);
-        self::assertStringContainsString('SEED', $html, 'The universe must be visible before choosing, not after.');
         self::assertStringContainsString('action="/company/context"', $html);
         self::assertStringContainsString('name="csrf"', $html);
     }

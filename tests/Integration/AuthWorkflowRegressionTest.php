@@ -53,7 +53,7 @@ final class AuthWorkflowRegressionTest extends TestCase
         $db = $container->get(Database::class);
         $fixture = new DevelopmentFixture($db);
         $email = 'qa-auth-fail-' . $fixture->suffix() . '@example.test';
-        $fixture->rememberTokenEmail($email);
+        $fixture->rememberEmail($email);
 
         try {
             $auth = $this->authService($container, new FakeMailer(true));
@@ -114,7 +114,7 @@ final class AuthWorkflowRegressionTest extends TestCase
         $fixture = new DevelopmentFixture($db);
         $suffix = $fixture->suffix();
         $email = 'qa-auth-' . $suffix . '@example.test';
-        $fixture->rememberTokenEmail($email);
+        $fixture->rememberEmail($email);
         $mailer = new FakeMailer();
 
         try {
@@ -169,7 +169,7 @@ final class AuthWorkflowRegressionTest extends TestCase
         $db = $container->get(Database::class);
         $fixture = new DevelopmentFixture($db);
         $email = 'qa-auth-retry-' . $fixture->suffix() . '@example.test';
-        $fixture->rememberTokenEmail($email);
+        $fixture->rememberEmail($email);
 
         try {
             $failedAuth = $this->authService($container, new FakeMailer(true));

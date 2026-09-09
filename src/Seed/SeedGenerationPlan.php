@@ -211,6 +211,20 @@ final class SeedGenerationPlan
         ];
     }
 
+    /**
+     * The volumes a request may ask for.
+     *
+     * @return array{minimum:int,maximum:int,default:int}
+     */
+    public static function bounds(): array
+    {
+        return [
+            'minimum' => self::MINIMUM_VOLUME,
+            'maximum' => self::MAXIMUM_VOLUME,
+            'default' => self::DEFAULT_VOLUME,
+        ];
+    }
+
     public static function forVolume(mixed $requestedVolume): self
     {
         return new self(self::normaliseVolume($requestedVolume));

@@ -386,28 +386,6 @@ final class PlatformAdministrationService
         'course_tags' => '/admin/courses/tags',
     ];
 
-    /**
-     * The datasets each Administration section counts per universe.
-     *
-     * Reports is present in ADMIN_SECTION_ROUTES but absent here on purpose: it has no row list
-     * to count, and its figures are already recomputed for the selected universe, so a "records"
-     * strip above it would be counting something the page does not show.
-     *
-     * @var array<string,list<string>>
-     */
-    private const UNIVERSE_COUNTED_DATASETS = [
-        'people' => ['people'],
-        'companies' => ['companies'],
-        'company_creators' => ['company_creators'],
-        'courses' => ['courses'],
-        // Two sections since v0.6, so each counts its own dataset. Requests had no entry at all,
-        // which is why it rendered no universe control: the switch is built only for a section
-        // listed here, and a screen without one silently shows REAL with no way to say so.
-        'requests' => ['requests'],
-        'enrolments' => ['enrolments'],
-        'credits' => ['credits'],
-        'activity' => ['activity'],
-    ];
 
     /**
      * The noun each counts strip uses, so the reader is told what is being counted rather than
@@ -695,44 +673,6 @@ final class PlatformAdministrationService
      * @return array{selected:string,label:string,options:list<array{value:string,label:string,short_label:string,href:string,active:bool}>}
      */
 
-    /**
-     * Request state a universe switch should carry forward: filters and page size, never a page.
-     *
-     * @param array<string,mixed> $request
-     * @return array<string,mixed>
-     */
-    private function preservedState(string $section, array $request): array
-    {
-        $preserved = [];
-        foreach (self::UNIVERSE_COUNTED_DATASETS[$section] ?? [] as $dataset) {
-            $size = $request[$dataset . '_page_size'] ?? null;
-            if ($size !== null && $size !== '') {
-                $preserved[$dataset . '_page_size'] = (string) $size;
-            }
-        }
-        if ($section === 'activity') {
-            foreach ($this->activityFilterValues($request) as $key => $value) {
-                if ($value !== '' && $value !== 0 && $value !== null) {
-                    $preserved[$key] = $value;
-                }
-            }
-        }
-
-        // A universe switch keeps the reader's search. Switching between real and seed while
-        // looking for "Acme" is still looking for "Acme"; only the page number is reset, because
-        // page 4 of one population means nothing in the other.
-        //
-        // Every searchable dataset, read from the declaration - registering them by hand is how
-        // Companies came to be the only one that survived a universe switch.
-        foreach (array_keys(self::SEARCHABLE_DATASETS) as $dataset) {
-            $search = self::searchTerm($dataset, $request);
-            if ($search !== '') {
-                $preserved[self::searchParam($dataset)] = $search;
-            }
-        }
-
-        return $preserved;
-    }
 
     /**
      * Pagination state for one dataset, from the raw request and the true total.
@@ -1542,7 +1482,7 @@ final class PlatformAdministrationService
      * did so across every company, not one. Sections are now capped at PREVIEW_PAGE_SIZE rows,
      * and the counts are real SQL counts rather than count() over a capped array.
      *
-     * @param array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool,universe:DataUniverse} $context
+     * @param array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool} $context
      * @return array<string,mixed>
      */
     public function companyControlCentre(int $actorUserId, array $context): array
@@ -1597,7 +1537,7 @@ final class PlatformAdministrationService
      * asked for a single section.
      *
      * @param array<string,mixed> $request
-     * @param array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool,universe:DataUniverse} $context
+     * @param array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool} $context
      * @return array<string,mixed>
      */
     public function companySectionData(string $section, int $actorUserId, array $context, array $request = []): array
@@ -2578,7 +2518,7 @@ final class PlatformAdministrationService
      */
     private function roleOptionsForUser(array $currentRoles): array
     {
-        return array_values($this->roles->all());
+        return $this->roles->all();
     }
 
 
