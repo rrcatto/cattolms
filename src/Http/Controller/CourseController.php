@@ -192,6 +192,52 @@ final class CourseController extends BaseController
      * page is being told what the vocabulary is, and a term nobody has used is exactly the thing
      * worth seeing.
      */
+    /**
+     * The catalogue's category browser: every branch that holds a course, nested, each with its own
+     * paginated list of the courses filed directly in it.
+     *
+     * One page renders the whole tree because a taxonomy three levels deep is small - it is the
+     * courses inside a branch that are unbounded, and each branch pages its own. The category whose
+     * page is being turned is named in the query string, so paging one accordion cannot move
+     * another, and every link works as an ordinary GET whether or not htmx is present.
+     */
+    public function categoryBrowser(): void
+    {
+        $universe = $this->universe();
+        $tree = $this->courses->categoryBrowser($universe);
+
+        $openSlug = trim((string) ($_GET['open'] ?? ''));
+        $page = $_GET['page'] ?? null;
+
+        $decorate = function (array $node) use (&$decorate, $universe, $openSlug, $page): array {
+            // Only the category being paged reads the page number. Every other accordion opens at
+            // its first page, because one page parameter cannot mean two things at once.
+            $isPaged = $openSlug !== '' && $openSlug === (string) $node['slug'];
+            $node['is_open'] = $isPaged;
+            if ((int) $node['course_count'] > 0) {
+                $node += $this->courses->categoryCoursePage(
+                    (int) $node['id'],
+                    (string) $node['slug'],
+                    $universe,
+                    $isPaged ? $page : 1,
+                    $_GET['page_size'] ?? null
+                );
+            } else {
+                $node['courses'] = [];
+                $node['pagination'] = [];
+            }
+            $node['children'] = array_map($decorate, (array) $node['children']);
+
+            return $node;
+        };
+
+        $this->render('course-categories', [
+            'title' => 'Browse by category',
+            'page_kicker' => 'Every part of the catalogue that holds a course',
+            'category_tree' => array_map($decorate, $tree),
+        ]);
+    }
+
     public function tagIndex(): void
     {
         $tags = $this->courses->tagIndex($this->universe());

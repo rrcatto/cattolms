@@ -57,6 +57,11 @@ services:
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
 
+    # Generated artwork: a course cover, a category icon, a tag icon. Presentation, so it lives
+    # beside the theme layer rather than in the persistence graph that calls it.
+    CattoLearning\View\Artwork\:
+        resource: '../src/View/Artwork/'
+
     # The Twig theme layer.
     CattoLearning\View\Twig\:
         resource: '../src/View/Twig/'

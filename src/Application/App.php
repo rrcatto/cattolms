@@ -178,6 +178,7 @@ final class App
         $routes->add('GET /theme/palette', ThemeController::class, 'palette');
         $routes->add('GET /courses', CourseController::class, 'catalogue');
         $routes->add('GET /courses/category/@slug', CourseController::class, 'catalogue');
+        $routes->add('GET /courses/categories', CourseController::class, 'categoryBrowser');
         $routes->add('GET /courses/tags', CourseController::class, 'tagIndex');
         $routes->add('GET /courses/tag/@tag', CourseController::class, 'catalogue');
         $routes->add('GET /courses/@slug', CourseController::class, 'detail');
