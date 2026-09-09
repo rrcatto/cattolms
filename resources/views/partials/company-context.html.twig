@@ -55,7 +55,6 @@ Changelog:
 			</p>
 		</div>
 		<span class="badge info">{{ company_context_domain }}</span>
-		<span class="badge {{ company_context_universe=='seed' ? 'warn' : 'info' }}">{{ company_context_universe=='seed' ? 'SEED' : 'REAL' }}</span>
 		<div class="company-context-actions">
 			<button class="btn btn-soft btn-sm" type="button" data-open-modal="company-switch">Switch company</button>
 			<noscript>
@@ -72,10 +71,7 @@ Changelog:
 				<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
 			</div>
 			<div class="modal-body">
-				{% if company_switcher.universe_switch is defined and company_switcher.universe_switch %}
-					{% include '@platform/partials/universe-switch.html.twig' with {us: company_switcher.universe_switch, ct: company_switcher.universe_counts|default(0)} %}
-				{% endif %}
-				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'picker', ds_label: 'Search companies', ds_value: company_switcher.picker_search, ds_action: '/company/picker', universe: company_switcher.universe|default('')} %}
+				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'picker', ds_label: 'Search companies', ds_value: company_switcher.picker_search, ds_action: '/company/picker'} %}
 				<div id="picker-region" data-server-search-target>
 					{% include '@platform/partials/company-picker-results.html.twig' with {picker_companies: company_switcher.picker_companies, picker_pagination: company_switcher.picker_pagination, picker_search: company_switcher.picker_search} %}
 				</div>

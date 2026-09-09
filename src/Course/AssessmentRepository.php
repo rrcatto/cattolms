@@ -28,15 +28,13 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Support\Uuid;
-use CattoLearning\Infrastructure\Persistence\SeedProvenance;
 use CattoLearning\Infrastructure\Persistence\Database;
 use RuntimeException;
 
 final class AssessmentRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
@@ -94,17 +92,16 @@ final class AssessmentRepository
         $sessionPublicId = Uuid::v4();
         $sessionRows = $this->db->fetchAllAssociative(
             'INSERT INTO assessment_sessions
-                (public_id, seed_token, enrolment_id, assessment_id, attempt_mode, attempt_number,
+                (public_id, enrolment_id, assessment_id, attempt_mode, attempt_number,
                  status, selected_question_count, current_sequence, earned_points, maximum_points,
                  started_at, deadline_at, created_at)
              VALUES
-                (:public_id, :seed_token, :enrolment_id, :assessment_id, :attempt_mode, :attempt_number,
+                (:public_id, :enrolment_id, :assessment_id, :attempt_mode, :attempt_number,
                  :status, :selected_question_count, :current_sequence, :earned_points, :maximum_points,
                  :started_at, :deadline_at, :created_at)
              RETURNING id',
             [
                 'public_id' => $sessionPublicId,
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
                 'enrolment_id' => $enrolmentId,
                 'assessment_id' => (int) $assessment['id'],
                 'attempt_mode' => $mode,
@@ -130,11 +127,10 @@ final class AssessmentRepository
             }
             $this->db->executeStatement(
                 "INSERT INTO assessment_session_questions
-                 (session_id,question_id,sequence,answer_order,response_status,points_awarded,seed_token)
-                 VALUES (:session_id,:question_id,:sequence,:answer_order,'pending',0,:seed_token::uuid)
+                 (session_id,question_id,sequence,answer_order,response_status,points_awarded)
+                 VALUES (:session_id,:question_id,:sequence,:answer_order,'pending',0)
                  ON CONFLICT (session_id,question_id) DO NOTHING",
                 [
-                    'seed_token' => $this->provenance->fromSession($sessionId),
                     'session_id' => $sessionId,
                     'question_id' => (int) $question['id'],
                     'sequence' => $sequence + 1,

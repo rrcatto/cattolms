@@ -33,10 +33,8 @@ namespace CattoLearning\Course;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\Infrastructure\Persistence\SeedProvenance;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\Env;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Slug;
 use InvalidArgumentException;
 use RuntimeException;
@@ -53,7 +51,6 @@ final class CoursePortabilityService
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
         private readonly OptionRepository $options,
-        private readonly SeedProvenance $provenance,
         private readonly string $storageRoot,
         private readonly string $bundledImportRoot
     ) {
@@ -408,7 +405,7 @@ final class CoursePortabilityService
         // Decision D5: portability is REAL-only, so slug collisions are checked against the
         // genuine universe. A SEED course with the same slug is irrelevant here and must not
         // block a genuine import, nor be discoverable through one.
-        if ($replaceCourseId === null && $this->courses->findBySlug((string) $data['slug'], DataUniverse::Real) !== null) {
+        if ($replaceCourseId === null && $this->courses->findBySlug((string) $data['slug']) !== null) {
             throw new InvalidArgumentException('A course with the slug ' . $data['slug'] . ' already exists.');
         }
         if ($replaceCourseId !== null) {
@@ -418,7 +415,7 @@ final class CoursePortabilityService
             if ($this->portability->hasStartedLearners($replaceCourseId)) {
                 throw new InvalidArgumentException('A started course cannot be reset or replaced. Create a new revision.');
             }
-            if ($data['slug'] !== $existing['slug'] && $this->courses->findBySlug((string) $data['slug'], DataUniverse::Real) !== null) {
+            if ($data['slug'] !== $existing['slug'] && $this->courses->findBySlug((string) $data['slug']) !== null) {
                 throw new InvalidArgumentException('A course with the imported slug already exists.');
             }
         }
@@ -535,10 +532,9 @@ final class CoursePortabilityService
         // company here is always the genuine System Company. There is deliberately no seed
         // branch: a seed identity never reaches this code, and if one ever did, importing into
         // the REAL universe is exactly what must not happen silently.
-        $systemCompany = $this->companies->systemCompany(DataUniverse::Real)
+        $systemCompany = $this->companies->systemCompany()
             ?? $this->companies->ensureSystemCompany(
                 $userId,
-                DataUniverse::Real,
                 $this->options->get('system_company_name', 'System Company'),
                 Env::string('APP_DOMAIN', 'local')
             );
@@ -718,9 +714,6 @@ final class CoursePortabilityService
      */
     private function refuseSeedImporter(int $userId): void
     {
-        if ($this->provenance->fromUser($userId) !== null) {
-            throw new InvalidArgumentException('A seed identity cannot import a course.');
-        }
     }
 
     /** @return array<string,mixed> */

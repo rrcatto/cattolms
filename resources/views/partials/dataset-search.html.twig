@@ -77,9 +77,6 @@ Changelog:
 		should still supply the key; this makes forgetting it a missing hidden field rather than a
 		broken page.
 	#}
-	{% if universe is defined and universe %}
-		<input type="hidden" name="universe" value="{{ universe }}">
-	{% endif %}
 	<div class="field">
 		<label for="{{ ds_name }}-search">{{ ds_label }}</label>
 		<input type="search" id="{{ ds_name }}-search" name="{{ ds_name }}_q" value="{{ ds_value }}" placeholder="Type to search" autocomplete="off" maxlength="120"

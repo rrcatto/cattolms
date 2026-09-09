@@ -28,15 +28,13 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Support\Uuid;
-use CattoLearning\Infrastructure\Persistence\SeedProvenance;
 use CattoLearning\Infrastructure\Persistence\Database;
 use RuntimeException;
 
 final class CoursePortabilityRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
@@ -182,10 +180,10 @@ final class CoursePortabilityRepository
         // at once could both find it absent and both insert.
         $this->db->executeStatement(
             'INSERT INTO course_enrolments
-                (public_id, seed_token, user_id, course_id, source_type, source_reference, status,
+                (public_id, user_id, course_id, source_type, source_reference, status,
                  access_period_seconds, assigned_at, started_at, expires_at, assigned_by_user_id,
                  is_preview, created_at, updated_at)
-             SELECT :public_id, :seed_token, :user_id, :course_id, :source_type, :source_reference,
+             SELECT :public_id, :user_id, :course_id, :source_type, :source_reference,
                     :status, :access_period_seconds, :assigned_at, NULL, NULL, :assigned_by_user_id,
                     TRUE, :created_at, :updated_at
               WHERE NOT EXISTS (
@@ -195,7 +193,6 @@ final class CoursePortabilityRepository
                 'public_id' => Uuid::v4(),
                 // A preview enrolment is still an enrolment: the previewer and the course must be
                 // in the same universe, so an ADMIN previewing a SEED course gets a SEED row.
-                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
                 'user_id' => $userId,
                 'course_id' => $courseId,
                 'source_type' => 'preview',
@@ -245,15 +242,14 @@ final class CoursePortabilityRepository
         foreach ($blocks as $position => $block) {
             $rows = $this->db->fetchAllAssociative(
                 'INSERT INTO course_content_blocks
-                    (public_id, seed_token, module_id, parent_block_id, position, block_type,
+                    (public_id, module_id, parent_block_id, position, block_type,
                      title, content_html, settings, created_at, updated_at)
                  VALUES
-                    (:public_id, :seed_token, :module_id, :parent_block_id, :position, :block_type,
+                    (:public_id, :module_id, :parent_block_id, :position, :block_type,
                      :title, :content_html, :settings, :created_at, :updated_at)
                  RETURNING id',
                 [
                     'public_id' => Uuid::v4(),
-                    'seed_token' => $this->provenance->fromModule($moduleId),
                     'module_id' => $moduleId,
                     'parent_block_id' => $parentId,
                     'position' => $position + 1,

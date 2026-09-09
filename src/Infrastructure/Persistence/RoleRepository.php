@@ -22,7 +22,6 @@ namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Auth\RoleFamily;
 use RuntimeException;
 use Throwable;
 
@@ -30,8 +29,7 @@ use Throwable;
 final class RoleRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
@@ -52,7 +50,6 @@ final class RoleRepository
 
         $current = $this->roles($userId);
         $candidate = array_values(array_unique([...$current, $role]));
-        RoleFamily::assertCompatible($candidate);
 
         $baseline = RoleCatalog::baselineForRole($role);
         if ($role !== $baseline && !in_array($baseline, $candidate, true)) {
@@ -115,7 +112,7 @@ final class RoleRepository
     public function revoke(int $userId, string $role): void
     {
         $role = strtoupper(trim($role));
-        if (in_array($role, [RoleCatalog::STUDENT, RoleCatalog::SEED_STUDENT], true)) {
+        if (in_array($role, [RoleCatalog::STUDENT, RoleCatalog::STUDENT], true)) {
             throw new RuntimeException('The baseline learner role cannot be removed directly.');
         }
         $row = $this->roleByKey($role);
@@ -225,10 +222,7 @@ final class RoleRepository
         if (RoleCatalog::isBuiltIn($currentKey) && $key !== $currentKey) {
             throw new RuntimeException('Built-in role keys cannot be changed.');
         }
-        if (RoleCatalog::isSeedRole($currentKey) !== RoleCatalog::isSeedRole($key)) {
-            throw new RuntimeException('A custom role cannot change between the normal and SEED role families.');
-        }
-        $this->db->executeStatement(
+                $this->db->executeStatement(
             'UPDATE roles SET role_key=:key,role_name=:name,role_description=:description WHERE id=:id',
             ['key' => $key, 'name' => $name, 'description' => $description, 'id' => $roleId]
         );
@@ -302,20 +296,15 @@ final class RoleRepository
         if ($roles === []) {
             throw new RuntimeException('Every user must retain at least one role.');
         }
-        RoleFamily::assertCompatible($roles);
-        $family = RoleFamily::forRoleSet($roles);
-        $baseline = $family === RoleFamily::SEED ? RoleCatalog::SEED_STUDENT : RoleCatalog::STUDENT;
-        if (!in_array($baseline, $roles, true)) {
-            $roles[] = $baseline;
+        // Every identity keeps the baseline role, so revoking the last specialised role cannot
+        // leave an account with no way to sign in and see anything.
+        if (!in_array(RoleCatalog::STUDENT, $roles, true)) {
+            $roles[] = RoleCatalog::STUDENT;
         }
-        RoleFamily::assertCompatible($roles);
 
         $current = $this->roles($userId);
         foreach ($current as $role) {
-            if (!in_array($role, $roles, true)) {
-                if (in_array($role, [RoleCatalog::STUDENT, RoleCatalog::SEED_STUDENT], true)) {
-                    continue;
-                }
+            if (!in_array($role, $roles, true) && $role !== RoleCatalog::STUDENT) {
                 $this->revoke($userId, $role);
             }
         }
@@ -323,16 +312,6 @@ final class RoleRepository
             $this->assign($userId, $role);
         }
 
-        $opposite = $family === RoleFamily::SEED ? RoleCatalog::STUDENT : RoleCatalog::SEED_STUDENT;
-        if (in_array($opposite, $this->roles($userId), true)) {
-            $row = $this->roleByKey($opposite);
-            if ($row !== null) {
-                $this->db->executeStatement(
-                    'DELETE FROM user_roles WHERE user_id=:user_id AND role_id=:role_id',
-                    ['user_id' => $userId, 'role_id' => (int) $row['id']]
-                );
-            }
-        }
     }
 
     /** @return array<string,mixed>|null */
@@ -348,9 +327,9 @@ final class RoleRepository
     private function insertUserRole(int $userId, int $roleId): void
     {
         $this->db->executeStatement(
-            'INSERT INTO user_roles (user_id,role_id,created_at,seed_token)
-             VALUES (:user_id,:role_id,NOW(),:seed_token::uuid) ON CONFLICT (user_id,role_id) DO NOTHING',
-            ['user_id' => $userId, 'role_id' => $roleId, 'seed_token' => $this->provenance->fromUser($userId)]
+            'INSERT INTO user_roles (user_id,role_id,created_at)
+             VALUES (:user_id,:role_id,NOW()) ON CONFLICT (user_id,role_id) DO NOTHING',
+            ['user_id' => $userId, 'role_id' => $roleId]
         );
     }
 }

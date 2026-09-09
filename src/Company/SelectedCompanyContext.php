@@ -68,7 +68,6 @@ namespace CattoLearning\Company;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use InvalidArgumentException;
 use RuntimeException;
@@ -100,7 +99,7 @@ final class SelectedCompanyContext
      */
     public function canSelect(CurrentUser $user): bool
     {
-        return !$user->isSeedIdentity() && $user->hasPermission(self::SELECTOR_PERMISSION);
+        return $user->hasPermission(self::SELECTOR_PERMISSION);
     }
 
     /**
@@ -111,7 +110,7 @@ final class SelectedCompanyContext
      *
      * @return array<string,mixed> the company now being administered
      */
-    public function select(CurrentUser $user, int $companyId, DataUniverse $universe): array
+    public function select(CurrentUser $user, int $companyId): array
     {
         if (!$this->canSelect($user)) {
             throw new RuntimeException('Your account administers a single company and cannot select another.');
@@ -156,9 +155,9 @@ final class SelectedCompanyContext
      * changed underneath it - drops back to the All-companies overview, which is a narrowing to a
      * read-only view they already had rather than a widening.
      *
-     * @return array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool,universe:DataUniverse}
+     * @return array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool}
      */
-    public function resolve(CurrentUser $user, DataUniverse $universe): array
+    public function resolve(CurrentUser $user): array
     {
         if (!$this->canSelect($user)) {
             $company = $this->companies->findForUser($user->id);
@@ -181,7 +180,6 @@ final class SelectedCompanyContext
                 'company' => $company,
                 'company_id' => (int) $company['id'],
                 'platform_wide' => false,
-                'universe' => self::universeOf($company),
             ];
         }
 
@@ -208,7 +206,7 @@ final class SelectedCompanyContext
         // than hard-coded, because there is one System Company per universe (decision D1) and the
         // genuine platform administrator is a REAL identity administering the REAL platform until
         // they say otherwise.
-        $system = $this->companies->systemCompany(DataUniverse::Real);
+        $system = $this->companies->systemCompany();
         if ($system === null) {
             throw new RuntimeException(
                 'The REAL System Company is missing, so there is no default company to administer. '
@@ -227,7 +225,7 @@ final class SelectedCompanyContext
      * and it answers by looking at the company.
      *
      * @param array<string,mixed> $company
-     * @return array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool,universe:DataUniverse}
+     * @return array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool}
      */
     private function selectedContext(array $company): array
     {
@@ -236,7 +234,6 @@ final class SelectedCompanyContext
             'company' => $company,
             'company_id' => (int) $company['id'],
             'platform_wide' => false,
-            'universe' => self::universeOf($company),
         ];
     }
 
@@ -250,23 +247,9 @@ final class SelectedCompanyContext
      * Selecting a company and then writing to a different one is the defect this method exists
      * to make impossible.
      */
-    public function contextCompanyId(CurrentUser $user, DataUniverse $universe): int
+    public function contextCompanyId(CurrentUser $user): int
     {
-        return (int) $this->resolve($user, $universe)['company_id'];
+        return (int) $this->resolve($user)['company_id'];
     }
 
-    /**
-     * Which universe a company row belongs to.
-     *
-     * `seed_token` is the only source of truth, exactly as it is for identities. A company's name,
-     * domain or type says nothing about which universe it is in.
-     *
-     * @param array<string,mixed> $company
-     */
-    public static function universeOf(array $company): DataUniverse
-    {
-        $token = $company['seed_token'] ?? null;
-
-        return $token === null || $token === '' ? DataUniverse::Real : DataUniverse::Seed;
-    }
 }

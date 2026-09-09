@@ -34,9 +34,6 @@ Changelog:
 		</p>
 	</div>
 </div>
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: requests_universe_counts} %}
-{% endif %}
 {% if requests_status_filters %}
 	<nav class="cl-filter-chips" aria-label="Filter by status">
 		{% for chip in requests_status_filters %}
@@ -110,7 +107,7 @@ Changelog:
 			{% if requests_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} requests.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/requests{{ universe_query }}">View all requests</a>
+					<a class="btn btn-soft btn-sm" href="/admin/requests">View all requests</a>
 				</div>
 			{% endif %}
 		{% endif %}

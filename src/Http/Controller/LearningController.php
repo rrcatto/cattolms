@@ -36,7 +36,6 @@ use CattoLearning\Application\AccountSectionRegistry;
 
 use CattoLearning\Course\LearningService;
 use CattoLearning\Course\CourseRepository;
-use CattoLearning\Auth\DataUniverse;
 
 use CattoLearning\View\ThemeRenderer;
 
@@ -78,7 +77,6 @@ final class LearningController extends BaseController
     public function library(): void
     {
         $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
-        $universe = $this->universe($user);
         $request = $this->libraryRequest();
 
         $data = [
@@ -96,12 +94,10 @@ final class LearningController extends BaseController
             // an absent key is an undefined variable, and F3 turns that into a 500 for the whole
             // page. That is exactly how /account and /account/library began returning
             // "Undefined variable $universe" the moment this page started using the shared control.
-            'universe' => $this->canSelectUniverse($user) ? $universe->value : '',
         ];
 
         $data += $this->learning->courseLibraryView(
             $user->id,
-            $universe,
             $request,
             fn(string $dataset, array $req, int $total) => $this->platformAdministration->paginationFor($dataset, $req, $total),
             fn(string $dataset, $pagination, string $label, string $search) => $this->platformAdministration->paginationView(
@@ -158,7 +154,7 @@ final class LearningController extends BaseController
         $slug = (string) $this->f3->get('PARAMS.slug');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $preview): void {
-            $course = $this->learning->courseHome($user->id, $this->universe($user), $slug, $preview);
+            $course = $this->learning->courseHome($user->id, $slug, $preview);
             $this->render('learn-course', [
                 'title' => (string) $course['title'],
                 'course' => $course,
@@ -176,7 +172,7 @@ final class LearningController extends BaseController
         $slug = (string) $this->f3->get('PARAMS.slug');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $preview): void {
-            $this->learning->start($user->id, $this->universe($user), $slug, $preview);
+            $this->learning->start($user->id, $slug, $preview);
             $this->flash('success', 'The course has started. Your access period begins now.');
             $this->redirect('/learn/' . rawurlencode($slug) . ($preview ? '?preview=1' : ''));
         }, '/learn/' . rawurlencode($slug));
@@ -189,7 +185,7 @@ final class LearningController extends BaseController
         $position = (int) $this->f3->get('PARAMS.position');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $position, $preview): void {
-            $course = $this->learning->module($user->id, $this->universe($user), $slug, $position, $preview);
+            $course = $this->learning->module($user->id, $slug, $position, $preview);
             $this->render('learn-module', [
                 'title' => (string) $course['module']['title'],
                 'course' => $course,

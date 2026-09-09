@@ -62,20 +62,14 @@ final class AdminCourseCategoryController extends BaseController
         // The All/Real/Seed control, for the same reason the tags screen has one: the label is
         // shared and the courses filed under it are not, so a screen with no selector counts REAL
         // only and reports zero against every category of a generated catalogue.
-        $universeView = $this->platformAdministration->universeView(
-            'course_categories',
-            $user->id,
-            $this->universe($user),
-            $this->canSelectUniverse($user)
-        );
 
-        $this->render('admin-course-categories', $universeView + [
+        $this->render('admin-course-categories', [
             'title' => 'Course categories',
             'course_group' => 'categories',
             // Counted in the reader's universe. The label is shared; what is filed under it is
             // not, so a genuine administrator viewing REAL must not be shown generated courses in
             // the tally beside a category name.
-            'categories' => $this->courses->categories($this->universe($user)),
+            'categories' => $this->courses->categories(),
             'parent_options' => $this->courses->categoryParentOptions(),
         ]);
     }
@@ -97,7 +91,7 @@ final class AdminCourseCategoryController extends BaseController
         $categoryId = $this->categoryId();
         $category = $this->courses->category($categoryId);
         $replacementCategories = array_values(array_filter(
-            $this->courses->categories($this->universe($user)),
+            $this->courses->categories(),
             static fn(array $candidate): bool => (int) $candidate['id'] !== $categoryId
         ));
         $this->render('admin-course-category-edit', [

@@ -25,7 +25,7 @@ Changelog:
 #}
 <details class="cl-category-branch cl-category-depth-{{ depth + 1 }}" {{ node.is_open or node.has_open_descendant ? 'open' : '' }} id="category-{{ node.slug }}"
 	{% if node.course_count > 0 and not node.is_open %}
-		hx-get="/courses/categories/{{ node.slug }}/courses{{ universe_query|default('') }}"
+		hx-get="/courses/categories/{{ node.slug }}/courses"
 		hx-trigger="toggle once"
 		hx-target="find .cl-category-lazy"
 		hx-swap="outerHTML"
@@ -55,7 +55,7 @@ Changelog:
 			{% else %}
 				<div class="cl-category-lazy">
 					<noscript>
-						<a class="btn btn-soft btn-sm" href="/courses?open={{ node.slug }}{{ universe_query|default('')|replace({'?': '&'}) }}">Open {{ node.name }}</a>
+						<a class="btn btn-soft btn-sm" href="/courses?open={{ node.slug }}">Open {{ node.name }}</a>
 					</noscript>
 					<p class="text-body-secondary mb-0">Loading {{ node.course_count }} courses…</p>
 				</div>
@@ -63,7 +63,7 @@ Changelog:
 		{% endif %}
 
 		{% for child in node.children %}
-			{% include '@platform/partials/category-branch.html.twig' with {node: child, depth: depth + 1, universe_query: universe_query|default('')} %}
+			{% include '@platform/partials/category-branch.html.twig' with {node: child, depth: depth + 1} %}
 		{% endfor %}
 	</div>
 </details>

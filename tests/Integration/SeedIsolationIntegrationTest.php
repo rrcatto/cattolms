@@ -153,7 +153,7 @@ final class SeedIsolationIntegrationTest extends TestCase
     /** A seed identity is pinned to SEED, including SEED_ADMIN. */
     public function testASeedIdentityCannotReachTheGenuineUniverse(): void
     {
-        foreach ([RoleCatalog::SEED_STUDENT, RoleCatalog::SEED_ADMIN] as $role) {
+        foreach ([RoleCatalog::STUDENT, RoleCatalog::ADMIN] as $role) {
             $identity = $this->identity($this->seed['learner'], [$role], $this->seed['token']);
 
             foreach ([null, 'all', 'real'] as $requested) {

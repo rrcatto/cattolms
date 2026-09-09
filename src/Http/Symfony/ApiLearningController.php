@@ -13,7 +13,7 @@ The caller's own course library, and starting a course in it.
 Architectural boundary: HTTP controller. It states what access each route requires and hands the
 work to LearningService; it holds no business rules and no SQL.
 
-Both routes are DataUniverse::Real, stated rather than defaulted, for the same reason as the course
+Both routes are stated rather than defaulted, for the same reason as the course
 routes: an API token is never issued to a generated identity, and the universe is still named at the
 call site so the next reader can see that it was decided.
 
@@ -28,7 +28,6 @@ namespace CattoLearning\Http\Symfony;
 
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Api\Security\ApiUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\LearningService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -46,7 +45,7 @@ final class ApiLearningController
     #[IsGranted('LEARNING.LIBRARY.VIEW')]
     public function library(#[CurrentUser] ApiUser $user): JsonResponse
     {
-        return ApiResponse::data($this->learning->library($user->identity->userId, DataUniverse::Real));
+        return ApiResponse::data($this->learning->library($user->identity->userId));
     }
 
     #[Route('/api/v1/courses/{slug}/start', name: 'api_learning_start', methods: ['POST'])]
@@ -54,10 +53,10 @@ final class ApiLearningController
     #[IsGranted('LEARNING.COURSE.START')]
     public function start(string $slug, #[CurrentUser] ApiUser $user): JsonResponse
     {
-        $this->learning->start($user->identity->userId, DataUniverse::Real, $slug);
+        $this->learning->start($user->identity->userId, $slug);
 
         return ApiResponse::data(
-            $this->learning->courseHome($user->identity->userId, DataUniverse::Real, $slug)
+            $this->learning->courseHome($user->identity->userId, $slug)
         );
     }
 }

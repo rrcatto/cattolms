@@ -16,7 +16,7 @@ to CourseService and returns what comes back; it holds no business rules and no 
 Three things about it are the platform's rules rather than Symfony's, and all three survive the port
 unchanged:
 
-  - Every read and write is DataUniverse::Real, stated at the call site rather than defaulted.
+  - Every read and write is stated at the call site rather than defaulted.
     Owner decision D3 forbids issuing an API token to a generated identity, so no request that
     reaches this class can belong to the SEED universe - but the universe is passed explicitly all
     the same, because a defaulted universe hides the decision from the next reader.
@@ -39,7 +39,6 @@ namespace CattoLearning\Http\Symfony;
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Api\AuthorizationException;
 use CattoLearning\Api\Security\ApiUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Support\Pagination;
@@ -64,12 +63,11 @@ final class ApiCourseController
         $pagination = Pagination::create(
             $request->query->get('page'),
             $request->query->get('page_size'),
-            $this->courses->catalogueCount(DataUniverse::Real, CatalogueFilter::none())
+            $this->courses->catalogueCount(CatalogueFilter::none())
         );
 
         return ApiResponse::page(
             $this->courses->catalogue(
-                DataUniverse::Real,
                 CatalogueFilter::none(),
                 $pagination->pageSize,
                 $pagination->offset
@@ -83,7 +81,7 @@ final class ApiCourseController
     #[IsGranted('CATALOGUE.VIEW')]
     public function show(string $slug): JsonResponse
     {
-        $course = $this->courses->publicCourse($slug, DataUniverse::Real);
+        $course = $this->courses->publicCourse($slug);
         if ($course === null) {
             throw new NotFoundHttpException('The course could not be found.');
         }
@@ -101,7 +99,7 @@ final class ApiCourseController
             $body['certificate_enabled'] = true;
         }
 
-        $courseId = $this->courses->createBlank($body, $user->identity->userId, DataUniverse::Real);
+        $courseId = $this->courses->createBlank($body, $user->identity->userId);
 
         return ApiResponse::data($this->courses->adminCourse($courseId), 201);
     }

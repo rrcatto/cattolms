@@ -53,7 +53,7 @@ final class AssessmentController extends BaseController
         $position = (int) $this->f3->get('PARAMS.position');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $position, $preview): void {
-            $data = $this->assessments->moduleOverview($user->id, $this->universe($user), $slug, $position, $preview);
+            $data = $this->assessments->moduleOverview($user->id, $slug, $position, $preview);
             $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
                 'title' => (string) $data['assessment']['title'],
                 'start_action' => '/learn/' . rawurlencode($slug) . '/module/' . $position . '/assessment/start' . $this->previewQuery($preview),
@@ -69,7 +69,7 @@ final class AssessmentController extends BaseController
         $key = (string) $this->f3->get('PARAMS.key');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $key, $preview): void {
-            $data = $this->assessments->diagnosticOverview($user->id, $this->universe($user), $slug, $key, $preview);
+            $data = $this->assessments->diagnosticOverview($user->id, $slug, $key, $preview);
             $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
                 'title' => (string) $data['assessment']['title'],
                 'start_action' => '/learn/' . rawurlencode($slug) . '/diagnostic/' . rawurlencode($key) . '/start' . $this->previewQuery($preview),
@@ -87,7 +87,7 @@ final class AssessmentController extends BaseController
         $key = (string) $this->f3->get('PARAMS.key');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $key, $preview): void {
-            $session = $this->assessments->startDiagnosticAttempt($user->id, $this->universe($user), $slug, $key, $preview);
+            $session = $this->assessments->startDiagnosticAttempt($user->id, $slug, $key, $preview);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/diagnostic/' . rawurlencode($key) . $this->previewQuery($preview));
     }
@@ -98,7 +98,7 @@ final class AssessmentController extends BaseController
         $slug = (string) $this->f3->get('PARAMS.slug');
         $preview = $this->previewMode();
         $this->handle(function () use ($user, $slug, $preview): void {
-            $data = $this->assessments->finalOverview($user->id, $this->universe($user), $slug, $preview);
+            $data = $this->assessments->finalOverview($user->id, $slug, $preview);
             $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
                 'title' => (string) $data['assessment']['title'],
                 'start_action' => '/learn/' . rawurlencode($slug) . '/final/assessment/start' . $this->previewQuery($preview),
@@ -116,7 +116,7 @@ final class AssessmentController extends BaseController
         $preview = $this->previewMode();
         $mode = (string) ($_POST['mode'] ?? 'graded');
         $this->handle(function () use ($user, $slug, $position, $preview, $mode): void {
-            $session = $this->assessments->startModuleAttempt($user->id, $this->universe($user), $slug, $position, $mode, $preview);
+            $session = $this->assessments->startModuleAttempt($user->id, $slug, $position, $mode, $preview);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/module/' . $position . '/assessment' . $this->previewQuery($preview));
     }
@@ -129,7 +129,7 @@ final class AssessmentController extends BaseController
         $preview = $this->previewMode();
         $mode = (string) ($_POST['mode'] ?? 'graded');
         $this->handle(function () use ($user, $slug, $preview, $mode): void {
-            $session = $this->assessments->startFinalAttempt($user->id, $this->universe($user), $slug, $mode, $preview);
+            $session = $this->assessments->startFinalAttempt($user->id, $slug, $mode, $preview);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/final/assessment' . $this->previewQuery($preview));
     }

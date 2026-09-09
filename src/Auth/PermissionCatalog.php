@@ -29,19 +29,6 @@ namespace CattoLearning\Auth;
 /** Canonical secure-action catalogue for role-based access control. */
 final class PermissionCatalog
 {
-    /**
-     * Business operations deliberately unavailable to seed-only roles.
-     *
-     * Course portability stays REAL-only (decision D5): a SEED course must not be exportable
-     * into a package that could be re-imported as genuine content, and a seed identity must not
-     * be able to import one. Media management was withheld for the same reason until the owner
-     * approved genuine test uploads against SEED courses, so it is no longer listed here.
-     */
-    private const SEED_ROLE_EXCLUDED = [
-        'COURSE.IMPORT',
-        'COURSE.EXPORT',
-    ];
-
     /** @return list<array{key:string,name:string,group:string,description:string}> */
     public function all(): array
     {
@@ -54,8 +41,7 @@ final class PermissionCatalog
             $this->p('SYSTEM.ROLE.MANAGE', 'ManageRoles', 'System · ACL', 'Create and edit compatible non-ADMIN roles and save ACL assignments.'),
             $this->p('SYSTEM.DATABASE.PRUNE', 'PruneDatabase', 'System · Maintenance', 'Run supported database cleanup operations.'),
             $this->p('SYSTEM.MAIL.TEST', 'TestMail', 'System · Maintenance', 'Send the platform test email.'),
-            $this->p('SYSTEM.SEED.VIEW', 'ViewSeedData', 'System · Seed', 'View seed-set metadata, counts and history when Seed Database is installed.'),
-            $this->p('SYSTEM.SEED.MANAGE', 'ManageSeedData', 'System · Seed', 'Create and clean seed sets when Seed Database is installed.'),
+
             $this->p('ACCOUNT.VIEW', 'ViewAccount', 'Account', 'Open the signed-in user Account workspace and dashboard.'),
             $this->p('ACCOUNT.PROFILE.VIEW', 'ViewAccountProfile', 'Account', 'View the signed-in user’s own profile and email details.'),
             $this->p('ACCOUNT.PROFILE.EDIT', 'EditAccountProfile', 'Account', 'Edit the signed-in user’s own profile information.'),
@@ -63,7 +49,7 @@ final class PermissionCatalog
             $this->p('ACCOUNT.SESSION.VIEW', 'ViewAccountSessions', 'Account', 'View the signed-in user’s authentication sessions.'),
             $this->p('ACCOUNT.SESSION.MANAGE', 'ManageAccountSessions', 'Account', 'Revoke the signed-in user’s authentication sessions.'),
             $this->p('ACCOUNT.ACTIVITY.VIEW', 'ViewAccountActivity', 'Account', 'View the signed-in user’s own audit activity.'),
-            $this->p('CATALOGUE.VIEW', 'ViewCatalogue', 'Catalogue', 'Browse published catalogue courses visible to the identity’s data universe.'),
+            $this->p('CATALOGUE.VIEW', 'ViewCatalogue', 'Catalogue', 'Browse published catalogue courses.'),
             $this->p('CATALOGUE.COURSE.FAVOURITE', 'FavouriteCourse', 'Catalogue', 'Add or remove a visible course favourite.'),
             $this->p('CATALOGUE.COURSE.REQUEST', 'RequestCourse', 'Catalogue', 'Request access to a visible course.'),
             $this->p('LEARNING.LIBRARY.VIEW', 'ViewLibrary', 'Learning', 'View assigned, active and completed learning visible to the identity.'),
@@ -84,19 +70,19 @@ final class PermissionCatalog
             $this->p('COMPANY.COURSE.VIEW', 'ViewCompanyCourses', 'Company', 'View courses owned by or exposed to the current company.'),
             $this->p('COMPANY.COURSE.MANAGE', 'ManageCompanyCourses', 'Company', 'Manage company-owned courses within current-company scope.'),
             $this->p('COMPANY.CATALOGUE.MANAGE', 'ManageCompanyCatalogue', 'Company', 'Choose permitted catalogue courses exposed to the current company.'),
-            $this->p('PLATFORM.DASHBOARD.VIEW', 'ViewPlatformDashboard', 'Platform', 'View the platform business dashboard within the identity’s data universe.'),
-            $this->p('PLATFORM.PERSON.VIEW', 'ViewPlatformPeople', 'Platform', 'View people platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.PERSON.MANAGE', 'ManagePlatformPeople', 'Platform', 'Create, edit, disable and session-manage people platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.COMPANY.VIEW', 'ViewPlatformCompanies', 'Platform', 'View companies platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.COMPANY.MANAGE', 'ManagePlatformCompanies', 'Platform', 'Create, edit and status-manage companies platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.REQUEST.VIEW', 'ViewPlatformRequests', 'Platform', 'View course requests platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.REQUEST.MANAGE', 'ManagePlatformRequests', 'Platform', 'Approve or reject course requests platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.ENROLMENT.VIEW', 'ViewPlatformEnrolments', 'Platform', 'View enrolments platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.ENROLMENT.MANAGE', 'ManagePlatformEnrolments', 'Platform', 'Grant, remove, restore or reset enrolments platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.CREDIT.VIEW', 'ViewPlatformCredits', 'Platform', 'View credits platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.CREDIT.MANAGE', 'ManagePlatformCredits', 'Platform', 'Create, allocate and manage credits platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.ACTIVITY.VIEW', 'ViewPlatformActivity', 'Platform', 'View audit activity platform-wide within the identity’s data universe.'),
-            $this->p('PLATFORM.REPORT.VIEW', 'ViewPlatformReports', 'Platform', 'View operational and learning reports platform-wide within the identity’s data universe.'),
+            $this->p('PLATFORM.DASHBOARD.VIEW', 'ViewPlatformDashboard', 'Platform', 'View the platform business dashboard.'),
+            $this->p('PLATFORM.PERSON.VIEW', 'ViewPlatformPeople', 'Platform', 'View people platform-wide.'),
+            $this->p('PLATFORM.PERSON.MANAGE', 'ManagePlatformPeople', 'Platform', 'Create, edit, disable and session-manage people platform-wide.'),
+            $this->p('PLATFORM.COMPANY.VIEW', 'ViewPlatformCompanies', 'Platform', 'View companies platform-wide.'),
+            $this->p('PLATFORM.COMPANY.MANAGE', 'ManagePlatformCompanies', 'Platform', 'Create, edit and status-manage companies platform-wide.'),
+            $this->p('PLATFORM.REQUEST.VIEW', 'ViewPlatformRequests', 'Platform', 'View course requests platform-wide.'),
+            $this->p('PLATFORM.REQUEST.MANAGE', 'ManagePlatformRequests', 'Platform', 'Approve or reject course requests platform-wide.'),
+            $this->p('PLATFORM.ENROLMENT.VIEW', 'ViewPlatformEnrolments', 'Platform', 'View enrolments platform-wide.'),
+            $this->p('PLATFORM.ENROLMENT.MANAGE', 'ManagePlatformEnrolments', 'Platform', 'Grant, remove, restore or reset enrolments platform-wide.'),
+            $this->p('PLATFORM.CREDIT.VIEW', 'ViewPlatformCredits', 'Platform', 'View credits platform-wide.'),
+            $this->p('PLATFORM.CREDIT.MANAGE', 'ManagePlatformCredits', 'Platform', 'Create, allocate and manage credits platform-wide.'),
+            $this->p('PLATFORM.ACTIVITY.VIEW', 'ViewPlatformActivity', 'Platform', 'View audit activity platform-wide.'),
+            $this->p('PLATFORM.REPORT.VIEW', 'ViewPlatformReports', 'Platform', 'View operational and learning reports platform-wide.'),
             $this->p('COURSE.MANAGEMENT.VIEW', 'ViewCourseManagement', 'Courses', 'Open course-authoring surfaces for courses within resource scope.'),
             $this->p('COURSE.CREATE', 'CreateCourse', 'Courses', 'Create course shells where resource scope permits.'),
             $this->p('COURSE.EDIT', 'EditCourse', 'Courses', 'Edit course metadata, modules and content within resource scope.'),
@@ -120,12 +106,12 @@ final class PermissionCatalog
             $this->p('COMMERCE.PAYMENT.VIEW', 'ViewOwnPayments', 'Commerce · Learner', 'View payment state for the signed-in user’s orders when Commerce is installed.'),
             $this->p('COMPANY.ORDER.VIEW', 'ViewCompanyOrders', 'Commerce · Company', 'View orders belonging to the current company when Commerce is installed.'),
             $this->p('COMPANY.PAYMENT.VIEW', 'ViewCompanyPayments', 'Commerce · Company', 'View payment state for the current company when Commerce is installed.'),
-            $this->p('PLATFORM.ORDER.VIEW', 'ViewPlatformOrders', 'Commerce · Platform', 'View orders platform-wide within the identity’s data universe when Commerce is installed.'),
+            $this->p('PLATFORM.ORDER.VIEW', 'ViewPlatformOrders', 'Commerce · Platform', 'View orders platform-wide when Commerce is installed.'),
             $this->p('PLATFORM.ORDER.MANAGE', 'ManagePlatformOrders', 'Commerce · Platform', 'Perform supported administrative order operations when Commerce is installed.'),
             $this->p('PLATFORM.PAYMENT.VIEW', 'ViewPlatformPayments', 'Commerce · Platform', 'View payment attempts and statuses platform-wide when Commerce is installed.'),
             $this->p('PLATFORM.PAYMENT.MANAGE', 'ManagePlatformPayments', 'Commerce · Platform', 'Perform supported administrative payment operations when Commerce is installed.'),
             $this->p('PLATFORM.PAYMENT.RECONCILE', 'ReconcilePlatformPayments', 'Commerce · Platform', 'Run supported payment reconciliation operations when Commerce is installed.'),
-            $this->p('PLATFORM.REFUND.VIEW', 'ViewPlatformRefunds', 'Commerce · Platform', 'View refunds platform-wide within the identity’s data universe when Commerce is installed.'),
+            $this->p('PLATFORM.REFUND.VIEW', 'ViewPlatformRefunds', 'Commerce · Platform', 'View refunds platform-wide when Commerce is installed.'),
             $this->p('PLATFORM.REFUND.MANAGE', 'ManagePlatformRefunds', 'Commerce · Platform', 'Create and manage supported refunds when Commerce is installed.'),
         ];
     }
@@ -179,7 +165,7 @@ final class PermissionCatalog
         if (str_starts_with($permissionKey, 'SYSTEM.')) {
             return false;
         }
-        return !RoleCatalog::isSeedRole($roleKey) || !in_array($permissionKey, self::SEED_ROLE_EXCLUDED, true);
+        return true;
     }
 
     /** @param list<array{key:string,name:string,group:string,description:string}> $permissions

@@ -27,7 +27,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Company;
 
-use CattoLearning\Auth\RoleFamily;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Event\EventDispatcher;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -53,11 +52,6 @@ final class CompanyService
     /** @return array<string,mixed> */
     public function register(int $userId, string $userPrimaryEmail, string $name, string $inputDomain): array
     {
-        $family = RoleFamily::forRoleSet($this->roles->roles($userId));
-        if ($family === RoleFamily::SEED) {
-            throw new InvalidArgumentException('Seed company creation is not available until Seed Database infrastructure is installed.');
-        }
-
         $name = trim($name);
         if ($name === '' || mb_strlen($name) > 160) {
             throw new InvalidArgumentException('Enter a company or organisation name.');

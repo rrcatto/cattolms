@@ -33,7 +33,6 @@ use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Application\PlatformAdministrationService;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Slug;
 use InvalidArgumentException;
 
@@ -72,7 +71,7 @@ final class LearningService
      * @param array<string,mixed> $request  page, page size and search term per dataset
      * @return array<string,mixed>
      */
-    public function courseLibraryView(int $userId, DataUniverse $universe, array $request, callable $paginate, callable $paginationView): array
+    public function courseLibraryView(int $userId, array $request, callable $paginate, callable $paginationView): array
     {
         $view = [];
 
@@ -81,18 +80,18 @@ final class LearningService
             $statuses = $definition['statuses'];
 
             $total = match ($dataset) {
-                'favourites' => $this->administration->favouritesCount($userId, $universe, $search),
-                'requests' => $this->administration->userRequestsCount($userId, $universe, $search),
-                default => $this->libraryCount($userId, $universe, (array) $statuses, $search),
+                'favourites' => $this->administration->favouritesCount($userId, $search),
+                'requests' => $this->administration->userRequestsCount($userId, $search),
+                default => $this->libraryCount($userId, (array) $statuses, $search),
             };
 
             /** @var Pagination $pagination */
             $pagination = $paginate($dataset, $request, $total);
 
             $rows = match ($dataset) {
-                'favourites' => $this->administration->favouritesPage($userId, $universe, $pagination->pageSize, $pagination->offset, $search),
-                'requests' => $this->administration->userRequestsPage($userId, $universe, $pagination->pageSize, $pagination->offset, $search),
-                default => $this->libraryPage($userId, $universe, (array) $statuses, $pagination->pageSize, $pagination->offset, $search),
+                'favourites' => $this->administration->favouritesPage($userId, $pagination->pageSize, $pagination->offset, $search),
+                'requests' => $this->administration->userRequestsPage($userId, $pagination->pageSize, $pagination->offset, $search),
+                default => $this->libraryPage($userId, (array) $statuses, $pagination->pageSize, $pagination->offset, $search),
             };
 
             $view += [$dataset => $rows, $dataset . '_search' => $search]
@@ -103,9 +102,9 @@ final class LearningService
     }
 
     /** @return list<array<string,mixed>> */
-    public function library(int $userId, DataUniverse $universe): array
+    public function library(int $userId): array
     {
-        return $this->decorateLibrary($this->courses->library($userId, $universe));
+        return $this->decorateLibrary($this->courses->library($userId));
     }
 
     /**
@@ -114,19 +113,19 @@ final class LearningService
      * @param list<string> $statuses
      * @return list<array<string,mixed>>
      */
-    public function libraryPage(int $userId, DataUniverse $universe, array $statuses, int $limit, int $offset, string $search = ''): array
+    public function libraryPage(int $userId, array $statuses, int $limit, int $offset, string $search = ''): array
     {
         return $this->decorateLibrary(
-            $this->courses->libraryPage($userId, $universe, $statuses, $limit, $offset, $search)
+            $this->courses->libraryPage($userId, $statuses, $limit, $offset, $search)
         );
     }
 
     /**
      * @param list<string> $statuses
      */
-    public function libraryCount(int $userId, DataUniverse $universe, array $statuses, string $search = ''): int
+    public function libraryCount(int $userId, array $statuses, string $search = ''): int
     {
-        return $this->courses->libraryCount($userId, $universe, $statuses, $search);
+        return $this->courses->libraryCount($userId, $statuses, $search);
     }
 
     /**
@@ -161,9 +160,9 @@ final class LearningService
     }
 
     /** @return array<string,mixed> */
-    public function courseHome(int $userId, DataUniverse $universe, string $slug, bool $preview = false): array
+    public function courseHome(int $userId, string $slug, bool $preview = false): array
     {
-        $course = $this->courses->findBySlug(Slug::validate($slug), $universe);
+        $course = $this->courses->findBySlug(Slug::validate($slug));
         if ($course === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
@@ -191,9 +190,9 @@ final class LearningService
         return $course;
     }
 
-    public function start(int $userId, DataUniverse $universe, string $slug, bool $preview = false): void
+    public function start(int $userId, string $slug, bool $preview = false): void
     {
-        $course = $this->courses->findBySlug(Slug::validate($slug), $universe);
+        $course = $this->courses->findBySlug(Slug::validate($slug));
         if ($course === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
@@ -211,9 +210,9 @@ final class LearningService
     }
 
     /** @return array<string,mixed> */
-    public function module(int $userId, DataUniverse $universe, string $slug, int $position, bool $preview = false): array
+    public function module(int $userId, string $slug, int $position, bool $preview = false): array
     {
-        $course = $this->courseHome($userId, $universe, $slug, $preview);
+        $course = $this->courseHome($userId, $slug, $preview);
         $enrolment = (array) $course['enrolment'];
         if (empty($enrolment['started_at'])) {
             throw new InvalidArgumentException('Click Start course before opening the modules.');

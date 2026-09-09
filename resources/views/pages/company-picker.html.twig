@@ -43,9 +43,6 @@ Changelog:
 			</div>
 			<a class="btn btn-soft btn-sm" href="/company">Back to Company</a>
 		</div>
-		{% if universe_switch %}
-			{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: universe_counts} %}
-		{% endif %}
 		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'picker', ds_label: 'Search companies', ds_value: picker_search, ds_action: '/company/picker'} %}
 		<div id="picker-region" data-server-search-target>
 			{% include '@platform/partials/company-picker-results.html.twig' %}

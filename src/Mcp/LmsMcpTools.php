@@ -39,7 +39,6 @@ use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Api\ApiIdentity;
 use CattoLearning\Api\ApiScope;
 use CattoLearning\Api\AuthorizationService;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -80,10 +79,10 @@ final class LmsMcpTools
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::COURSES_READ, 'CATALOGUE.VIEW');
 
-        $pagination = Pagination::create($page, $pageSize, $this->courses->catalogueCount(DataUniverse::Real, CatalogueFilter::none()));
+        $pagination = Pagination::create($page, $pageSize, $this->courses->catalogueCount(CatalogueFilter::none()));
 
         return [
-            'courses' => $this->courses->catalogue(DataUniverse::Real, CatalogueFilter::none(), $pagination->pageSize, $pagination->offset),
+            'courses' => $this->courses->catalogue(CatalogueFilter::none(), $pagination->pageSize, $pagination->offset),
             'meta' => $pagination->toArray(),
         ];
     }
@@ -92,7 +91,7 @@ final class LmsMcpTools
     public function getCourse(string $slug): array
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::COURSES_READ, 'CATALOGUE.VIEW');
-        $course = $this->courses->publicCourse($slug, DataUniverse::Real);
+        $course = $this->courses->publicCourse($slug);
         if ($course === null) {
             throw new InvalidArgumentException('The course could not be found.');
         }
@@ -105,21 +104,21 @@ final class LmsMcpTools
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::LIBRARY_READ, 'LEARNING.LIBRARY.VIEW');
 
-        return $this->learning->library($this->identity->userId, DataUniverse::Real);
+        return $this->learning->library($this->identity->userId);
     }
 
     /** @return array<string,mixed> */
     public function startCourse(string $slug): array
     {
         $this->authorization->requireBusinessAccess($this->identity, ApiScope::LEARNING_START, 'LEARNING.COURSE.START');
-        $this->learning->start($this->identity->userId, DataUniverse::Real, $slug);
+        $this->learning->start($this->identity->userId, $slug);
         $this->audit->record($this->identity->userId, 'mcp.course_started', [
             'tool' => 'start_course',
             'token_id' => $this->identity->tokenPublicId,
             'course_slug' => $slug,
         ]);
 
-        return $this->learning->courseHome($this->identity->userId, DataUniverse::Real, $slug);
+        return $this->learning->courseHome($this->identity->userId, $slug);
     }
 
     /** @return array<string,mixed> */
@@ -142,7 +141,7 @@ final class LmsMcpTools
             'description_html' => $descriptionHtml,
             'access_days' => max(1, $accessPeriodDays),
             'certificate_enabled' => true,
-        ], $this->identity->userId, DataUniverse::Real);
+        ], $this->identity->userId);
         $this->audit->record($this->identity->userId, 'mcp.course_created', [
             'tool' => 'create_course',
             'token_id' => $this->identity->tokenPublicId,

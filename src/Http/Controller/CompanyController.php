@@ -41,7 +41,6 @@ use CattoLearning\Application\CompanySectionRegistry;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\View\ThemeRenderer;
@@ -124,14 +123,14 @@ final class CompanyController extends BaseController
             return;
         }
 
-        $context = $this->companyContext->resolve($user, $this->universe($user));
+        $context = $this->companyContext->resolve($user);
         $companyId = (int) $context['company_id'];
         $target = preg_replace('/[^a-z0-9_-]/i', '', (string) ($_GET['target'] ?? '')) ?? '';
         $query = (string) ($_GET['q'] ?? '');
 
         // The company is taken from the context being administered and never from the request: the
         // query string says what to search for, and must not be able to say whose data to search.
-        $results = $this->platformAdministration->lookupEntities($type, $this->universe($user), $query, $companyId);
+        $results = $this->platformAdministration->lookupEntities($type, $query, $companyId);
 
         $this->renderFragment('partials/entity-lookup-results', [
             'lookup_type' => $type,
@@ -156,7 +155,7 @@ final class CompanyController extends BaseController
         $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
 
         $this->handle(function () use ($user): void {
-            $context = $this->companyContext->resolve($user, $this->universe($user));
+            $context = $this->companyContext->resolve($user);
             $companyId = (int) $context['company_id'];
             if ($companyId <= 0) {
                 throw new RuntimeException('Select a company before assigning a course.');
@@ -209,7 +208,7 @@ final class CompanyController extends BaseController
         $courseId = (int) $this->f3->get('PARAMS.id');
 
         $this->handle(function () use ($user, $courseId): void {
-            $context = $this->companyContext->resolve($user, $this->universe($user));
+            $context = $this->companyContext->resolve($user);
             $companyId = (int) $context['company_id'];
             if ($companyId <= 0) {
                 throw new RuntimeException('Select a company before changing its favourites.');
@@ -229,12 +228,11 @@ final class CompanyController extends BaseController
             // The old guard refused this outright for a platform administrator, because it asked
             // whether the *actor* belonged to a company. There is always a company in context now,
             // so the question to ask is which one, not whether there is one.
-            $context = $this->companyContext->resolve($user, $this->universe($user));
+            $context = $this->companyContext->resolve($user);
             $this->platformAdministration->createCompanyPerson(
                 $user->id,
                 (int) $context['company_id'],
-                $_POST,
-                $context['universe']
+                $_POST
             );
             $this->flash('success', 'The staff account was created.');
             $this->redirect('/company/people');
@@ -354,7 +352,7 @@ final class CompanyController extends BaseController
         // company this administrator may take on; the company they choose then decides which
         // universe the workspace operates in. Resolving it from the request meant the modal, which
         // sends no universe, always resolved REAL - so a SEED company could not be found at all.
-        $data = $this->platformAdministration->companyPicker($this->pickerUniverse(), $_GET)
+        $data = $this->platformAdministration->companyPicker($_GET)
             + ['company_context_id' => $this->contextCompanyId($user)];
 
         if ($this->isHtmxRequest()) {
@@ -367,22 +365,6 @@ final class CompanyController extends BaseController
         ]);
     }
 
-    /**
-     * Which universes the Switch Company picker lists.
-     *
-     * ALL unless the reader narrows it, and narrowed through the same universe query parameter
-     * every other list uses. It read a picker_universe parameter fed by a select element on this
-     * one screen, which gave the modal its own vocabulary for something the rest of the LMS says
-     * one way.
-     *
-     * ALL is the default rather than the reader's current scope because the picker's job is to
-     * show every company this administrator may take on; the company they choose is what then
-     * decides which universe the workspace operates in.
-     */
-    private function pickerUniverse(): DataUniverse
-    {
-        return $this->requestedUniverse(DataUniverse::All);
-    }
 
     /**
      * The company every Company workspace write acts on.
@@ -395,7 +377,7 @@ final class CompanyController extends BaseController
      */
     private function contextCompanyId(CurrentUser $user): int
     {
-        return $this->companyContext->contextCompanyId($user, $this->universe($user));
+        return $this->companyContext->contextCompanyId($user);
     }
 
     /**
@@ -417,8 +399,7 @@ final class CompanyController extends BaseController
             + $this->platformAdministration->companySectionData(
                 $key,
                 $user->id,
-                $this->universe($user),
-                $this->companyContext->resolve($user, $this->universe($user)),
+                $this->companyContext->resolve($user),
                 $this->sectionRequest()
             );
         $data['company_section'] = $definition;
@@ -463,8 +444,7 @@ final class CompanyController extends BaseController
         return $this->companySelectorView($user)
             + $this->platformAdministration->companyControlCentre(
                 $user->id,
-                $this->universe($user),
-                $this->companyContext->resolve($user, $this->universe($user))
+                $this->companyContext->resolve($user)
             );
     }
 
@@ -480,7 +460,7 @@ final class CompanyController extends BaseController
     private function companySelectorView(CurrentUser $user): array
     {
         $canSelect = $this->companyContext->canSelect($user);
-        $context = $this->companyContext->resolve($user, $this->universe($user));
+        $context = $this->companyContext->resolve($user);
 
         return [
             'can_select_company' => $canSelect,
@@ -488,11 +468,10 @@ final class CompanyController extends BaseController
             'company_context_name' => (string) ($context['company']['name'] ?? ''),
             'company_context_domain' => (string) ($context['company']['domain'] ?? ''),
             'company_context_id' => (int) $context['company_id'],
-            'company_context_universe' => $context['universe']->value,
             // The switcher renders its first page of companies server-side so it works with no
             // JavaScript at all; htmx only replaces the same region on search and paging.
             'company_switcher' => $canSelect
-                ? $this->platformAdministration->companyPicker($this->pickerUniverse(), [])
+                ? $this->platformAdministration->companyPicker([])
                 : null,
         ];
     }
@@ -518,7 +497,7 @@ final class CompanyController extends BaseController
                 $this->redirect('/company');
             }
 
-            $company = $this->companyContext->select($user, $companyId, $this->universe($user));
+            $company = $this->companyContext->select($user, $companyId);
             $this->platformAdministration->recordCompanyContextSelected($user->id, (int) $company['id']);
             $this->flash('success', 'Now administering ' . (string) $company['name'] . '.');
             $this->redirect('/company');

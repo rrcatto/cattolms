@@ -73,20 +73,13 @@ final class AdminCourseTagController extends BaseController
         // The All/Real/Seed control. A tag is a shared label and the courses under it are business
         // records, so the count depends on which universe the reader is in - and until this was
         // here there was no way to be in any universe but REAL.
-        $universeView = $this->platformAdministration->universeView(
-            'course_tags',
-            $user->id,
-            $this->universe($user),
-            $this->canSelectUniverse($user),
-            [PlatformAdministrationService::searchParam(self::DATASET) => $search]
-        );
 
-        $this->render('admin-course-tags', $universeView + [
+        $this->render('admin-course-tags', [
             'title' => 'Course tags',
             'course_group' => 'tags',
             // Counted in the reader's universe. A tag is a shared label; the courses carrying it
             // are business records, so an operator reading REAL is not shown a generated tally.
-            'tags' => $this->courses->tags($this->universe($user), $search, $pagination->pageSize, $pagination->offset),
+            'tags' => $this->courses->tags($search, $pagination->pageSize, $pagination->offset),
             'tags_search' => $search,
             'tags_pagination' => PlatformAdministrationService::paginationPayload(
                 self::DATASET,

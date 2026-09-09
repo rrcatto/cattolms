@@ -43,9 +43,6 @@ Changelog:
 	</div>
 </div>
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'companies', ds_label: 'Search course consumers', ds_value: companies_search, ds_action: '/admin/companies'} %}
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: companies_universe_counts} %}
-{% endif %}
 <div class="toolbar">
 	<div>
 	</div>
@@ -116,7 +113,7 @@ Changelog:
 			{% if companies_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} companies.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/companies{{ universe_query }}">View all course consumers</a>
+					<a class="btn btn-soft btn-sm" href="/admin/companies">View all course consumers</a>
 				</div>
 			{% endif %}
 		{% endif %}

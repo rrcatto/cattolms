@@ -88,7 +88,7 @@ final class AdminLookupController extends BaseController
         $query = (string) ($_GET['q'] ?? '');
         $target = preg_replace('/[^a-z0-9_-]/i', '', (string) ($_GET['target'] ?? '')) ?? '';
 
-        $results = $this->platformAdministration->lookupEntities($type, $this->universe(), $query, $this->scopeCompanyId($user));
+        $results = $this->platformAdministration->lookupEntities($type, $query, $this->scopeCompanyId($user));
 
         $this->renderFragment('partials/entity-lookup-results', [
             'lookup_type' => $type,

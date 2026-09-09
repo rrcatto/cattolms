@@ -7,12 +7,11 @@ Date time: 2026/08/20 04:20 SAST
 Version: 0.5.7.5.1
 
 Description:
-Defines permanent Catto Learning built-in roles. Normal business roles use established unprefixed keys; seed-only test identities use SEED_* counterparts while sharing the same business permission catalogue.
+Defines the permanent Catto Learning built-in roles.
 
 Changelog:
 2026/08/20 04:20 SAST
 - Restored normal role keys STUDENT, COMPANY_ADMIN, COURSE_EDITOR and COURSE_OWNER.
-- Retained SEED_* role counterparts without duplicating business permission keys.
 */
 
 declare(strict_types=1);
@@ -27,26 +26,16 @@ final class RoleCatalog
     public const COMPANY_ADMIN = 'COMPANY_ADMIN';
     public const COURSE_EDITOR = 'COURSE_EDITOR';
     public const COURSE_OWNER = 'COURSE_OWNER';
-    public const SEED_STUDENT = 'SEED_STUDENT';
-    public const SEED_COMPANY_ADMIN = 'SEED_COMPANY_ADMIN';
-    public const SEED_COURSE_EDITOR = 'SEED_COURSE_EDITOR';
-    public const SEED_COURSE_OWNER = 'SEED_COURSE_OWNER';
-    public const SEED_ADMIN = 'SEED_ADMIN';
 
-    /** @return list<array{key:string,name:string,description:string,family:string}> */
+    /** @return list<array{key:string,name:string,description:string}> */
     public static function all(): array
     {
         return [
-            self::r(self::ADMIN, 'Administrator', 'System Administrator', RoleFamily::ADMIN),
-            self::r(self::STUDENT, 'Student', 'Learner with access to the catalogue, assigned courses and own account.', RoleFamily::NORMAL),
-            self::r(self::COMPANY_ADMIN, 'CompanyAdministrator', 'Administrator scoped to their company, learners, requests, credits and courses.', RoleFamily::NORMAL),
-            self::r(self::COURSE_EDITOR, 'CourseEditor', 'Course editor permitted to edit courses explicitly assigned to them.', RoleFamily::NORMAL),
-            self::r(self::COURSE_OWNER, 'CourseOwner', 'Course owner permitted to manage courses they own.', RoleFamily::NORMAL),
-            self::r(self::SEED_STUDENT, 'SeedStudent', 'Test learner role reserved for future seeded identities.', RoleFamily::SEED),
-            self::r(self::SEED_COMPANY_ADMIN, 'SeedCompanyAdministrator', 'Test company administrator role reserved for seeded identities.', RoleFamily::SEED),
-            self::r(self::SEED_COURSE_EDITOR, 'SeedCourseEditor', 'Test course editor role reserved for seeded identities.', RoleFamily::SEED),
-            self::r(self::SEED_COURSE_OWNER, 'SeedCourseOwner', 'Test course owner role reserved for seeded identities.', RoleFamily::SEED),
-            self::r(self::SEED_ADMIN, 'SeedAdministrator', 'Platform-style business administrator for SEED data only; no SYSTEM authority.', RoleFamily::SEED),
+            self::r(self::ADMIN, 'Administrator', 'System Administrator'),
+            self::r(self::STUDENT, 'Student', 'Learner with access to the catalogue, assigned courses and own account.'),
+            self::r(self::COMPANY_ADMIN, 'CompanyAdministrator', 'Administrator scoped to their company, learners, requests, credits and courses.'),
+            self::r(self::COURSE_EDITOR, 'CourseEditor', 'Course editor permitted to edit courses explicitly assigned to them.'),
+            self::r(self::COURSE_OWNER, 'CourseOwner', 'Course owner permitted to manage courses they own.'),
         ];
     }
 
@@ -61,19 +50,14 @@ final class RoleCatalog
         return in_array(strtoupper(trim($roleKey)), self::keys(), true);
     }
 
-    public static function isSeedRole(string $roleKey): bool
-    {
-        return str_starts_with(strtoupper(trim($roleKey)), 'SEED_');
-    }
-
     public static function baselineForRole(string $roleKey): string
     {
-        return self::isSeedRole($roleKey) ? self::SEED_STUDENT : self::STUDENT;
+        return self::STUDENT;
     }
 
-    /** @return array{key:string,name:string,description:string,family:string} */
-    private static function r(string $key, string $name, string $description, string $family): array
+    /** @return array{key:string,name:string,description:string} */
+    private static function r(string $key, string $name, string $description): array
     {
-        return compact('key', 'name', 'description', 'family');
+        return compact('key', 'name', 'description');
     }
 }

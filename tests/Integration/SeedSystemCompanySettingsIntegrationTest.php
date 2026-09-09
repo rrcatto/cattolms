@@ -39,7 +39,7 @@ use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\Seed\SeedMailRouter;
+use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use CattoLearning\Support\Env;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\SeedIntegrationFixture;
@@ -197,8 +197,8 @@ final class SeedSystemCompanySettingsIntegrationTest extends TestCase
         self::assertSame($domain, $this->settings->seedSystemCompanyDomain());
         self::assertSame('database', $this->settings->seedSystemCompanyDomainSource());
 
-        $router = new SeedMailRouter($this->settings->seedSystemCompanyDomain());
-        $generated = 'thabo.7.abc123@highveld-0-abc123' . SeedMailRouter::GENERATED_DOMAIN_SUFFIX;
+        $router = new GeneratedDomainRouter($this->settings->seedSystemCompanyDomain());
+        $generated = 'thabo.7.abc123@highveld-0-abc123' . GeneratedDomainRouter::GENERATED_DOMAIN_SUFFIX;
 
         self::assertSame(
             'thabo.7.abc123@' . $domain,
@@ -248,7 +248,7 @@ final class SeedSystemCompanySettingsIntegrationTest extends TestCase
         ], $this->adminUserId);
 
         self::assertSame('', $this->settings->seedSystemCompanyDomain());
-        self::assertFalse((new SeedMailRouter($this->settings->seedSystemCompanyDomain()))->isConfigured());
+        self::assertFalse((new GeneratedDomainRouter($this->settings->seedSystemCompanyDomain()))->isConfigured());
         self::assertSame(
             $existingDomain,
             (string) $this->seedCompanyRow()['domain'],
@@ -339,10 +339,10 @@ final class SeedSystemCompanySettingsIntegrationTest extends TestCase
     {
         $message = $this->refusalFor([
             'seed_system_company_name' => 'Undeliverable Host',
-            'seed_system_company_domain' => 'anything' . SeedMailRouter::GENERATED_DOMAIN_SUFFIX,
+            'seed_system_company_domain' => 'anything' . GeneratedDomainRouter::GENERATED_DOMAIN_SUFFIX,
         ]);
 
-        self::assertStringContainsString(SeedMailRouter::GENERATED_DOMAIN_SUFFIX, $message);
+        self::assertStringContainsString(GeneratedDomainRouter::GENERATED_DOMAIN_SUFFIX, $message);
     }
 
     /** An address or a URL is not a domain. */

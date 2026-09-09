@@ -34,9 +34,6 @@ Changelog:
 		</p>
 	</div>
 </div>
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: enrolments_universe_counts} %}
-{% endif %}
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'enrolments', ds_label: 'Search enrolments', ds_value: enrolments_search, ds_action: '/admin/course/enrolments'} %}
 <div id="enrolments-region" data-server-search-target>
 	<div id="enrolments-results">
@@ -94,7 +91,7 @@ Changelog:
 			{% if enrolments_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} enrolments.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/enrolments{{ universe_query }}">View all enrolments</a>
+					<a class="btn btn-soft btn-sm" href="/admin/enrolments">View all enrolments</a>
 				</div>
 			{% endif %}
 		{% endif %}

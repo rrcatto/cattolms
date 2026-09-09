@@ -35,8 +35,7 @@ use RuntimeException;
 final class UserRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
@@ -76,19 +75,18 @@ final class UserRepository
     }
 
     /** @return array<string,mixed> */
-    public function createWithPrimaryEmail(string $email, ?string $seedToken = null): array
+    public function createWithPrimaryEmail(string $email): array
     {
         $now = gmdate('Y-m-d H:i:sP');
 
         // An identity is the root of its own universe: there is no parent row to inherit from,
         // so the caller states it. Everything else in this class derives the token from the user.
         $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO users (public_id, seed_token, status, created_at, updated_at, last_login_at)
-             VALUES (:public_id, :seed_token, :status, :created_at, :updated_at, NULL)
+            'INSERT INTO users (public_id, status, created_at, updated_at, last_login_at)
+             VALUES (:public_id, :status, :created_at, :updated_at, NULL)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $seedToken,
                 'status' => 'active',
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -101,14 +99,13 @@ final class UserRepository
         }
 
         $this->db->executeStatement(
-            'INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at, seed_token)
-             VALUES (:user_id, :email, TRUE, :verified_at, :created_at, :seed_token)',
+            'INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at)
+             VALUES (:user_id, :email, TRUE, :verified_at, :created_at)',
             [
                 'user_id' => $userId,
                 'email' => $email,
                 'verified_at' => $now,
                 'created_at' => $now,
-                'seed_token' => $seedToken,
             ]
         );
 
@@ -164,13 +161,13 @@ final class UserRepository
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
-    public function createManagedUser(string $email, array $data = [], ?string $seedToken = null): array
+    public function createManagedUser(string $email, array $data = []): array
     {
         $existing = $this->findByVerifiedEmail($email);
         if ($existing !== null) {
             return $existing;
         }
-        $user = $this->createWithPrimaryEmail($email, $seedToken);
+        $user = $this->createWithPrimaryEmail($email);
         $this->updateProfile((int) $user['id'], $data);
         return $this->findById((int) $user['id']) ?? $user;
     }
@@ -260,14 +257,13 @@ final class UserRepository
         }
 
         $this->db->executeStatement(
-            'INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at, seed_token)
-             VALUES (:user_id, :email, FALSE, :verified_at, :created_at, :seed_token)',
+            'INSERT INTO user_emails (user_id, email, is_primary, verified_at, created_at)
+             VALUES (:user_id, :email, FALSE, :verified_at, :created_at)',
             [
                 'user_id' => $userId,
                 'email' => $email,
                 'verified_at' => gmdate('Y-m-d H:i:sP'),
                 'created_at' => gmdate('Y-m-d H:i:sP'),
-                'seed_token' => $this->provenance->fromUser($userId),
             ]
         );
     }
@@ -302,9 +298,9 @@ final class UserRepository
             return;
         }
         $this->db->executeStatement(
-            'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at,seed_token)
-             VALUES (:user_id,:email,TRUE,NOW(),NOW(),:seed_token::uuid)',
-            ['user_id' => $userId, 'email' => $email, 'seed_token' => $this->provenance->fromUser($userId)]
+            'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at)
+             VALUES (:user_id,:email,TRUE,NOW(),NOW())',
+            ['user_id' => $userId, 'email' => $email]
         );
     }
 
@@ -330,10 +326,10 @@ final class UserRepository
             }
         }
         $this->db->executeStatement(
-            'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at,seed_token)
-             VALUES (:user_id,:email,FALSE,NOW(),NOW(),:seed_token::uuid)
+            'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at)
+             VALUES (:user_id,:email,FALSE,NOW(),NOW())
              ON CONFLICT (email) DO UPDATE SET verified_at=NOW()',
-            ['user_id' => $userId, 'email' => $email, 'seed_token' => $this->provenance->fromUser($userId)]
+            ['user_id' => $userId, 'email' => $email]
         );
     }
 

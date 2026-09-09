@@ -66,34 +66,31 @@ namespace CattoLearning\Infrastructure\Persistence;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Uuid;
-use CattoLearning\Auth\DataUniverse;
 
 use RuntimeException;
 
 final class AdministrationRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
     /** @return array<string,int|float> */
-    public function overview(DataUniverse $universe): array
+    public function overview(): array
     {
         // Every sub-select carries its own scope. These are the headline dashboard figures, and
         // an unscoped scalar reports REAL+SEED to anyone holding PLATFORM.DASHBOARD.VIEW without
         // any list being visibly wrong - the failure mode this release exists to prevent.
-        $scope = self::andScope($universe, '');
         $rows = $this->db->fetchAllAssociative(<<<SQL
 SELECT
- (SELECT COUNT(*) FROM users WHERE status='active'{$scope})::int AS people,
- (SELECT COUNT(*) FROM courses WHERE status='published'{$scope})::int AS published_courses,
- (SELECT COUNT(*) FROM courses WHERE status='draft'{$scope})::int AS draft_courses,
- (SELECT COUNT(*) FROM companies WHERE status='active'{$scope})::int AS companies,
- (SELECT COUNT(*) FROM course_requests WHERE status='pending'{$scope})::int AS pending_requests,
- (SELECT COUNT(*) FROM course_enrolments WHERE status IN ('assigned','active','completed') AND is_preview=FALSE{$scope})::int AS enrolments,
- (SELECT COUNT(*) FROM course_enrolments WHERE status='completed' AND is_preview=FALSE{$scope})::int AS completed
+ (SELECT COUNT(*) FROM users WHERE status='active')::int AS people,
+ (SELECT COUNT(*) FROM courses WHERE status='published')::int AS published_courses,
+ (SELECT COUNT(*) FROM courses WHERE status='draft')::int AS draft_courses,
+ (SELECT COUNT(*) FROM companies WHERE status='active')::int AS companies,
+ (SELECT COUNT(*) FROM course_requests WHERE status='pending')::int AS pending_requests,
+ (SELECT COUNT(*) FROM course_enrolments WHERE status IN ('assigned','active','completed') AND is_preview=FALSE)::int AS enrolments,
+ (SELECT COUNT(*) FROM course_enrolments WHERE status='completed' AND is_preview=FALSE)::int AS completed
 SQL);
         $row = $rows[0] ?? [];
         $enrolments = max(0, (int) ($row['enrolments'] ?? 0));
@@ -109,19 +106,6 @@ SQL);
         ];
     }
 
-    /**
-     * The universe predicate as an AND-fragment, or an empty string when unrestricted.
-     *
-     * Appended as text rather than bound as a parameter because `IS NULL` / `IS NOT NULL` is
-     * query structure, not a value. The fragment originates in DataUniverse and never in
-     * request input, so nothing untrusted reaches the SQL.
-     */
-    private static function andScope(DataUniverse $universe, string $alias): string
-    {
-        $predicate = $universe->predicate($alias);
-
-        return $predicate === null ? '' : ' AND ' . $predicate;
-    }
 
     /**
      * The WHERE clause a paginated dataset and its count query must both use.
@@ -142,15 +126,10 @@ SQL);
      * @param list<string> $columns SQL expressions to match against, e.g. 'c.name'
      * @return array{0:string,1:array<string,string>}
      */
-    private static function searchFilter(DataUniverse $universe, string $alias, string $search, array $columns): array
+    private static function searchFilter(string $alias, string $search, array $columns): array
     {
         $conditions = [];
         $bindings = [];
-
-        $predicate = $universe->predicate($alias);
-        if ($predicate !== null) {
-            $conditions[] = $predicate;
-        }
 
         $term = trim($search);
         if ($term !== '' && $columns !== []) {
@@ -331,7 +310,7 @@ SQL);
      *
      * @return list<array<string,mixed>>
      */
-    public function people(DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function people(int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = $sort === null
             ? self::PEOPLE_ORDER
@@ -370,7 +349,7 @@ LEFT JOIN course_enrolments ce ON ce.user_id = u.id AND ce.is_preview = FALSE
 GROUP BY u.id, ue.email, c.id, c.name
 SQL;
 
-        [$where, $bindings] = self::searchFilter($universe, 'u', $search, self::PEOPLE_SEARCH);
+        [$where, $bindings] = self::searchFilter('u', $search, self::PEOPLE_SEARCH);
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys . $where, $detail, $order, $limit, $offset),
@@ -384,9 +363,9 @@ SQL;
      * Membership must match {@see people()} exactly: the primary-email join is an INNER join
      * there, so a user without a primary email is absent from both the page and the total.
      */
-    public function peopleCount(DataUniverse $universe, string $search = ''): int
+    public function peopleCount(string $search = ''): int
     {
-        [$where, $bindings] = self::searchFilter($universe, 'u', $search, self::PEOPLE_SEARCH);
+        [$where, $bindings] = self::searchFilter('u', $search, self::PEOPLE_SEARCH);
         $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM users u
@@ -450,7 +429,7 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function companies(DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null, string $audience = ''): array
+    public function companies(int $limit, int $offset, string $search = '', ?SortOrder $sort = null, string $audience = ''): array
     {
         $order = self::orderFor($sort, self::COMPANY_SORTS, self::COMPANY_ORDER, 'c.id');
         $keys = 'SELECT c.id FROM companies c';
@@ -481,7 +460,7 @@ SELECT c.*,
 FROM page
 JOIN companies c ON c.id=page.id
 SQL;
-        [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COMPANY_SEARCH);
+        [$where, $bindings] = self::searchFilter('c', $search, self::COMPANY_SEARCH);
         $where = self::companyAudienceWhere($where, $audience);
 
         return $this->db->fetchAllAssociative(
@@ -490,10 +469,10 @@ SQL;
         );
     }
 
-    public function companyCount(DataUniverse $universe, string $search = '', string $audience = ''): int
+    public function companyCount(string $search = '', string $audience = ''): int
     {
         // The identical audience predicate the rows use.
-        [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COMPANY_SEARCH);
+        [$where, $bindings] = self::searchFilter('c', $search, self::COMPANY_SEARCH);
         $where = self::companyAudienceWhere($where, $audience);
         $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM companies c' . $where, $bindings);
 
@@ -671,7 +650,7 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function enrolments(DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function enrolments(int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::ENROLMENT_SORTS, self::ENROLMENT_ORDER, 'ce.id DESC');
         [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
@@ -685,7 +664,7 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match;
+             WHERE ce.is_preview=FALSE' . '' . $match;
 
         $detail = 'SELECT ce.id, ce.public_id, ce.status, ce.assigned_at, ce.started_at, ce.expires_at, ce.completed_at,
                     ce.access_removed_at, ce.access_removed_reason,
@@ -711,7 +690,7 @@ SQL;
      * because the primary-email join is an INNER join in {@see enrolments()} and therefore
      * affects membership, not just the projected columns.
      */
-    public function enrolmentsCount(DataUniverse $universe, string $search = ''): int
+    public function enrolmentsCount(string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
         $rows = $this->db->fetchAllAssociative(
@@ -720,7 +699,7 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match,
+             WHERE ce.is_preview=FALSE' . '' . $match,
             $bindings
         );
 
@@ -734,10 +713,10 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function requests(DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null, string $status = ''): array
+    public function requests(int $limit, int $offset, string $search = '', ?SortOrder $sort = null, string $status = ''): array
     {
         $order = self::orderFor($sort, self::REQUEST_SORTS, self::REQUEST_ORDER, 'cr.id DESC');
-        [$where, $bindings] = self::searchFilter($universe, 'cr', $search, self::REQUEST_SEARCH);
+        [$where, $bindings] = self::searchFilter('cr', $search, self::REQUEST_SEARCH);
         [$statusMatch, $statusBinding] = self::andRequestStatus($status);
         $where .= $statusMatch;
         $bindings += $statusBinding;
@@ -783,11 +762,11 @@ SQL;
             : ['', []];
     }
 
-    public function requestsCount(DataUniverse $universe, string $search = '', string $status = ''): int
+    public function requestsCount(string $search = '', string $status = ''): int
     {
         // The identical filter the rows use, status included. A count built from a different filter
         // set than its list is the defect this platform has already shipped twice.
-        [$where, $bindings] = self::searchFilter($universe, 'cr', $search, self::REQUEST_SEARCH);
+        [$where, $bindings] = self::searchFilter('cr', $search, self::REQUEST_SEARCH);
         [$statusMatch, $statusBinding] = self::andRequestStatus($status);
         $where .= $statusMatch;
         $bindings += $statusBinding;
@@ -810,10 +789,10 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function creditLedger(DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function creditLedger(int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::CREDIT_SORTS, self::CREDIT_ORDER, 'cc.id DESC');
-        [$where, $bindings] = self::searchFilter($universe, 'cc', $search, self::CREDIT_SEARCH);
+        [$where, $bindings] = self::searchFilter('cc', $search, self::CREDIT_SEARCH);
 
         // The holder joins are in the key query because the search matches on them; the allocation
         // join is not, because it fans a credit out into one row per allocation and contributes
@@ -854,13 +833,13 @@ SQL;
      * allocations it has. Counting `course_credits` with only the membership-affecting INNER
      * join to `courses` therefore yields the same population without the allocation fan-out.
      */
-    public function creditLedgerCount(DataUniverse $universe, string $search = ''): int
+    public function creditLedgerCount(string $search = ''): int
     {
         // The holder joins are repeated here because the search matches on them. They are LEFT
         // joins onto single-valued columns, so they add no rows and the population is unchanged
         // whether or not a term is supplied - which is what keeps this count describing exactly
         // the rows creditLedger() returns.
-        [$where, $bindings] = self::searchFilter($universe, 'cc', $search, self::CREDIT_SEARCH);
+        [$where, $bindings] = self::searchFilter('cc', $search, self::CREDIT_SEARCH);
         $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total
              FROM course_credits cc
@@ -876,7 +855,7 @@ SQL;
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyPeople(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function companyPeople(int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_PEOPLE_SORTS, self::PEOPLE_ORDER, 'u.id');
         [$match, $bindings] = self::andSearch($search, self::PEOPLE_SEARCH);
@@ -885,7 +864,7 @@ SQL;
              FROM company_users cu
              JOIN users u ON u.id=cu.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u') . $match;
+             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . '' . $match;
 
         // certificate_name and mobile_number are selected because the Company People editor
         // offers them. A template that reads a column the query never selected is an
@@ -917,7 +896,7 @@ SQL;
      * them afterwards, because that reintroduces exactly the unbounded query pagination exists
      * to remove.
      */
-    public function companyPeopleCount(DataUniverse $universe, int $companyId, string $search = ''): int
+    public function companyPeopleCount(int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::PEOPLE_SEARCH);
         $rows = $this->db->fetchAllAssociative(
@@ -925,7 +904,7 @@ SQL;
              FROM company_users cu
              JOIN users u ON u.id=cu.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . self::andScope($universe, 'u') . $match,
+             WHERE cu.company_id=:company_id AND cu.status=\'active\'' . '' . $match,
             ['company_id' => $companyId] + $bindings
         );
 
@@ -933,7 +912,7 @@ SQL;
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyRequests(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function companyRequests(int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_REQUEST_SORTS, self::REQUEST_ORDER, 'cr.id DESC');
         [$match, $bindings] = self::andSearch($search, self::REQUEST_SEARCH);
@@ -943,7 +922,7 @@ SQL;
              JOIN courses c ON c.id=cr.course_id
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr') . $match;
+             WHERE cr.company_id=:company_id' . '' . $match;
 
         $detail = 'SELECT cr.*,c.title AS course_title,c.slug,
                     COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
@@ -961,7 +940,7 @@ SQL;
     }
 
     /** Total course requests raised by one company. */
-    public function companyRequestsCount(DataUniverse $universe, int $companyId, string $search = ''): int
+    public function companyRequestsCount(int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::REQUEST_SEARCH);
         $rows = $this->db->fetchAllAssociative(
@@ -970,7 +949,7 @@ SQL;
              JOIN courses c ON c.id=cr.course_id
              JOIN users u ON u.id=cr.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cr.company_id=:company_id' . self::andScope($universe, 'cr') . $match,
+             WHERE cr.company_id=:company_id' . '' . $match,
             ['company_id' => $companyId] + $bindings
         );
 
@@ -978,7 +957,7 @@ SQL;
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyEnrolments(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function companyEnrolments(int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_ENROLMENT_SORTS, self::ENROLMENT_ORDER, 'ce.id DESC');
         [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
@@ -989,7 +968,7 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match;
+             WHERE ce.is_preview=FALSE' . '' . $match;
 
         $detail = 'SELECT ce.id,ce.public_id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,
                     ce.access_removed_at,ce.access_removed_reason,c.id AS course_id,c.title AS course_title,c.slug,
@@ -1015,7 +994,7 @@ SQL;
      * The `company_users` join is what scopes this to the company, so it must be repeated
      * verbatim in the count or the total would describe a different population from the page.
      */
-    public function companyEnrolmentsCount(DataUniverse $universe, int $companyId, string $search = ''): int
+    public function companyEnrolmentsCount(int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::ENROLMENT_SEARCH);
         $rows = $this->db->fetchAllAssociative(
@@ -1025,7 +1004,7 @@ SQL;
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.is_preview=FALSE' . self::andScope($universe, 'ce') . $match,
+             WHERE ce.is_preview=FALSE' . '' . $match,
             ['company_id' => $companyId] + $bindings
         );
 
@@ -1033,7 +1012,7 @@ SQL;
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyCredits(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function companyCredits(int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_CREDIT_SORTS, self::CREDIT_ORDER, 'cc.id DESC');
         [$match, $bindings] = self::andSearch($search, self::CREDIT_SEARCH);
@@ -1044,7 +1023,7 @@ SQL;
              LEFT JOIN companies co ON co.id=cc.company_id
              LEFT JOIN users u ON u.id=cc.user_id
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc') . $match;
+             WHERE cc.company_id=:company_id' . '' . $match;
 
         $detail = 'SELECT cc.id,cc.public_id,cc.company_id,cc.course_id,cc.access_period_seconds,cc.quantity,cc.source_type,cc.note,cc.created_at,
                     c.title AS course_title,
@@ -1064,7 +1043,7 @@ SQL;
     }
 
     /** Total credits held by one company. */
-    public function companyCreditsCount(DataUniverse $universe, int $companyId, string $search = ''): int
+    public function companyCreditsCount(int $companyId, string $search = ''): int
     {
         [$match, $bindings] = self::andSearch($search, self::CREDIT_SEARCH);
         $rows = $this->db->fetchAllAssociative(
@@ -1074,7 +1053,7 @@ SQL;
              LEFT JOIN companies co ON co.id=cc.company_id
              LEFT JOIN users u ON u.id=cc.user_id
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE cc.company_id=:company_id' . self::andScope($universe, 'cc') . $match,
+             WHERE cc.company_id=:company_id' . '' . $match,
             ['company_id' => $companyId] + $bindings
         );
 
@@ -1207,12 +1186,11 @@ SQL;
      * @param array<string,mixed> $filters
      * @return list<array<string,mixed>>
      */
-    public function activity(DataUniverse $universe, array $filters = [], int $limit = 250, int $offset = 0, ?SortOrder $sort = null): array
+    public function activity(array $filters = [], int $limit = 250, int $offset = 0, ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::ACTIVITY_SORTS, self::ACTIVITY_ORDER, 'al.id DESC');
         ['where' => $where, 'params' => $params, 'needs_actor' => $needsActor] = $this->activityConditions($filters);
-        $where = array_merge($where, $universe->conditions('al'));
-
+        
         // Deferred join. Every row of this list carries four COALESCE chains of correlated
         // sub-selects - up to fourteen lookups per row - to name the course, the company and the
         // subject a generic audit entry refers to. Evaluated across the whole filtered log in
@@ -1269,11 +1247,10 @@ SQL;
      *
      * @param array<string,mixed> $filters
      */
-    public function activityCount(DataUniverse $universe, array $filters = []): int
+    public function activityCount(array $filters = []): int
     {
         ['where' => $where, 'params' => $params, 'needs_actor' => $needsActor] = $this->activityConditions($filters);
-        $where = array_merge($where, $universe->conditions('al'));
-
+        
         $sql = 'SELECT COUNT(*)::int AS total FROM audit_log al'
             . ($needsActor ? self::ACTIVITY_ACTOR_JOINS : '');
         if ($where !== []) $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -1284,43 +1261,42 @@ SQL;
     }
 
     /** @return list<string> */
-    public function activityFamilies(DataUniverse $universe): array
+    public function activityFamilies(): array
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT DISTINCT split_part(event_key,'.',1) AS family FROM audit_log WHERE event_key<>''"
-            . self::andScope($universe, '') . ' ORDER BY family'
+            . '' . ' ORDER BY family'
         );
         return array_values(array_filter(array_map(static fn(array $row): string => (string) ($row['family'] ?? ''), $rows)));
     }
 
     /** @return array<string,int|float> */
-    public function reportSummary(DataUniverse $universe): array
+    public function reportSummary(): array
     {
         // Report scalars are scoped exactly like the tables they summarise. An unscoped average
         // is worse than an unscoped list: it silently blends generated results into a genuine
         // performance figure with nothing on screen to suggest it happened.
-        $scope = self::andScope($universe, '');
-        $enrolmentScope = self::andScope($universe, 'e');
+        $enrolmentScope = '';
         $rows = $this->db->fetchAllAssociative(<<<SQL
 SELECT
-  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE{$scope})::int AS enrolments,
-  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='assigned'{$scope})::int AS assigned,
-  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='active'{$scope})::int AS active,
-  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='completed'{$scope})::int AS completed,
-  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='cancelled'{$scope})::int AS cancelled,
+  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE)::int AS enrolments,
+  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='assigned')::int AS assigned,
+  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='active')::int AS active,
+  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='completed')::int AS completed,
+  (SELECT COUNT(*) FROM course_enrolments WHERE is_preview=FALSE AND status='cancelled')::int AS cancelled,
   (SELECT COUNT(*) FROM assessment_sessions s JOIN course_enrolments e ON e.id=s.enrolment_id WHERE e.is_preview=FALSE AND s.status='submitted' AND s.attempt_mode='graded'{$enrolmentScope})::int AS graded_assessments,
   COALESCE((SELECT ROUND(AVG(s.percentage),1) FROM assessment_sessions s JOIN course_enrolments e ON e.id=s.enrolment_id WHERE e.is_preview=FALSE AND s.status='submitted' AND s.attempt_mode='graded'{$enrolmentScope}),0)::float AS assessment_average,
   COALESCE((SELECT ROUND(100.0*AVG(CASE WHEN s.passed THEN 1 ELSE 0 END),1) FROM assessment_sessions s JOIN course_enrolments e ON e.id=s.enrolment_id WHERE e.is_preview=FALSE AND s.status='submitted' AND s.attempt_mode='graded'{$enrolmentScope}),0)::float AS assessment_pass_rate,
-  (SELECT COUNT(*) FROM certificates WHERE revoked_at IS NULL{$scope})::int AS certificates
+  (SELECT COUNT(*) FROM certificates WHERE revoked_at IS NULL)::int AS certificates
 SQL);
         return $rows[0] ?? [];
     }
 
     /** @return list<array<string,mixed>> */
-    public function courseReport(DataUniverse $universe, int $limit = 0, int $offset = 0, string $search = '', ?SortOrder $sort = null): array
+    public function courseReport(int $limit = 0, int $offset = 0, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COURSE_REPORT_SORTS, self::COURSE_REPORT_ORDER, 'c.id');
-        [$courseScope, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
+        [$courseScope, $bindings] = self::searchFilter('c', $search, self::COURSE_REPORT_SEARCH);
 
         $detail = <<<'SQL'
 SELECT c.id,c.title,c.status,
@@ -1371,10 +1347,10 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function companyCourseReport(DataUniverse $universe, int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function companyCourseReport(int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::companyCourseReportSorts(), self::COURSE_REPORT_ORDER, 'c.id');
-        [$courseScope, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
+        [$courseScope, $bindings] = self::searchFilter('c', $search, self::COURSE_REPORT_SEARCH);
         $bindings['report_company_id'] = $companyId;
         $where = $courseScope === ''
             ? ' WHERE ' . self::COMPANY_LEARNER_COURSE
@@ -1401,9 +1377,9 @@ SQL;
     }
 
     /** Total rows behind {@see companyCourseReport()} under the identical scope and filter. */
-    public function companyCourseReportCount(DataUniverse $universe, int $companyId, string $search = ''): int
+    public function companyCourseReportCount(int $companyId, string $search = ''): int
     {
-        [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
+        [$where, $bindings] = self::searchFilter('c', $search, self::COURSE_REPORT_SEARCH);
         $bindings['report_company_id'] = $companyId;
         $where = $where === ''
             ? ' WHERE ' . self::COMPANY_LEARNER_COURSE
@@ -1454,19 +1430,19 @@ SQL;
     }
 
     /** Total rows behind {@see courseReport()} under the identical scope and filter. */
-    public function courseReportCount(DataUniverse $universe, string $search = ''): int
+    public function courseReportCount(string $search = ''): int
     {
-        [$where, $bindings] = self::searchFilter($universe, 'c', $search, self::COURSE_REPORT_SEARCH);
+        [$where, $bindings] = self::searchFilter('c', $search, self::COURSE_REPORT_SEARCH);
         $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
     }
 
     /** @return list<array<string,mixed>> */
-    public function companyReport(DataUniverse $universe, int $limit = 0, int $offset = 0, string $search = '', ?SortOrder $sort = null): array
+    public function companyReport(int $limit = 0, int $offset = 0, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_REPORT_SORTS, self::COMPANY_REPORT_ORDER, 'co.id');
-        $companyScope = self::andScope($universe, 'co');
+        $companyScope = '';
         [$match, $bindings] = self::andSearch($search, self::COMPANY_REPORT_SEARCH);
         $companyScope .= $match;
 
@@ -1503,12 +1479,11 @@ SQL;
     }
 
     /** Total rows behind {@see companyReport()} under the identical scope and filter. */
-    public function companyReportCount(DataUniverse $universe, string $search = ''): int
+    public function companyReportCount(string $search = ''): int
     {
-        $scope = self::andScope($universe, 'co');
         [$match, $bindings] = self::andSearch($search, self::COMPANY_REPORT_SEARCH);
         $rows = $this->db->fetchAllAssociative(
-            "SELECT COUNT(*)::int AS total FROM companies co WHERE co.status='active'" . $scope . $match,
+            "SELECT COUNT(*)::int AS total FROM companies co WHERE co.status='active'" . $match,
             $bindings
         );
 
@@ -1525,9 +1500,9 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function favourites(int $userId, DataUniverse $universe, string $search = ''): array
+    public function favourites(int $userId, string $search = ''): array
     {
-        [$sql, $bindings] = self::favouritesQuery($userId, $universe, $search);
+        [$sql, $bindings] = self::favouritesQuery($userId, $search);
 
         return $this->db->fetchAllAssociative($sql . ' ORDER BY cf.created_at DESC', $bindings);
     }
@@ -1537,9 +1512,9 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function favouritesPage(int $userId, DataUniverse $universe, int $limit, int $offset, string $search = ''): array
+    public function favouritesPage(int $userId, int $limit, int $offset, string $search = ''): array
     {
-        [$sql, $bindings] = self::favouritesQuery($userId, $universe, $search);
+        [$sql, $bindings] = self::favouritesQuery($userId, $search);
 
         // `cf.course_id` completes the ordering: this table is keyed by the user and course pair
         // rather than by a surrogate id, and two favourites added in the same instant were free to
@@ -1551,9 +1526,9 @@ SQL;
     }
 
     /** Total favourites behind {@see favouritesPage()} under the identical scope and filter. */
-    public function favouritesCount(int $userId, DataUniverse $universe, string $search = ''): int
+    public function favouritesCount(int $userId, string $search = ''): int
     {
-        [$sql, $bindings] = self::favouritesQuery($userId, $universe, $search, 'COUNT(*)::int AS total');
+        [$sql, $bindings] = self::favouritesQuery($userId, $search, 'COUNT(*)::int AS total');
         $rows = $this->db->fetchAllAssociative($sql, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -1564,14 +1539,13 @@ SQL;
      *
      * @return array{0:string,1:array<string,mixed>}
      */
-    private static function favouritesQuery(int $userId, DataUniverse $universe, string $search, string $select = 'c.*'): array
+    private static function favouritesQuery(int $userId, string $search, string $select = 'c.*'): array
     {
         [$match, $bindings] = self::andSearch($search, self::COURSE_TITLE_SEARCH);
-        $scope = $universe->predicate('cf');
 
         return [
             'SELECT ' . $select . ' FROM course_favourites cf JOIN courses c ON c.id=cf.course_id
-             WHERE cf.user_id=:user_id' . ($scope === null ? '' : ' AND ' . $scope) . $match,
+             WHERE cf.user_id=:user_id' . $match,
             ['user_id' => $userId] + $bindings,
         ];
     }
@@ -1582,9 +1556,9 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function userRequests(int $userId, DataUniverse $universe, string $search = ''): array
+    public function userRequests(int $userId, string $search = ''): array
     {
-        [$sql, $bindings] = self::userRequestsQuery($userId, $universe, $search);
+        [$sql, $bindings] = self::userRequestsQuery($userId, $search);
 
         return $this->db->fetchAllAssociative($sql . ' ORDER BY cr.requested_at DESC', $bindings);
     }
@@ -1594,9 +1568,9 @@ SQL;
      *
      * @return list<array<string,mixed>>
      */
-    public function userRequestsPage(int $userId, DataUniverse $universe, int $limit, int $offset, string $search = ''): array
+    public function userRequestsPage(int $userId, int $limit, int $offset, string $search = ''): array
     {
-        [$sql, $bindings] = self::userRequestsQuery($userId, $universe, $search);
+        [$sql, $bindings] = self::userRequestsQuery($userId, $search);
 
         return $this->db->fetchAllAssociative(
             $sql . ' ORDER BY cr.requested_at DESC, cr.id DESC' . $this->limitOffset($limit, $offset),
@@ -1605,9 +1579,9 @@ SQL;
     }
 
     /** Total requests behind {@see userRequestsPage()} under the identical scope and filter. */
-    public function userRequestsCount(int $userId, DataUniverse $universe, string $search = ''): int
+    public function userRequestsCount(int $userId, string $search = ''): int
     {
-        [$sql, $bindings] = self::userRequestsQuery($userId, $universe, $search, 'COUNT(*)::int AS total');
+        [$sql, $bindings] = self::userRequestsQuery($userId, $search, 'COUNT(*)::int AS total');
         $rows = $this->db->fetchAllAssociative($sql, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -1616,15 +1590,14 @@ SQL;
     /**
      * @return array{0:string,1:array<string,mixed>}
      */
-    private static function userRequestsQuery(int $userId, DataUniverse $universe, string $search, string $select = 'cr.*, c.title AS course_title, c.slug'): array
+    private static function userRequestsQuery(int $userId, string $search, string $select = 'cr.*, c.title AS course_title, c.slug'): array
     {
         [$match, $bindings] = self::andSearch($search, self::COURSE_TITLE_SEARCH);
-        $scope = $universe->predicate('cr');
 
         return [
             'SELECT ' . $select . ' FROM course_requests cr
              JOIN courses c ON c.id=cr.course_id
-             WHERE cr.user_id=:user_id' . ($scope === null ? '' : ' AND ' . $scope) . $match,
+             WHERE cr.user_id=:user_id' . $match,
             ['user_id' => $userId] + $bindings,
         ];
     }
@@ -1639,15 +1612,14 @@ SQL;
             return false;
         }
         $this->db->executeStatement(
-            'INSERT INTO course_favourites (user_id,course_id,created_at,seed_token)
-             VALUES (:user_id,:course_id,NOW(),:seed_token::uuid) ON CONFLICT (user_id,course_id) DO NOTHING',
+            'INSERT INTO course_favourites (user_id,course_id,created_at)
+             VALUES (:user_id,:course_id,NOW()) ON CONFLICT (user_id,course_id) DO NOTHING',
             [
                 'user_id' => $userId,
                 'course_id' => $courseId,
                 // The row's universe comes from the course, which is the resource it is about;
                 // the identity holding it may be a genuine ADMIN from the other universe, which is
                 // the D4 amendment of 2026/09/09 recorded in SeedTableCatalog.
-                'seed_token' => $this->provenance->fromCourse($courseId),
             ]
         );
         return true;
@@ -1666,15 +1638,14 @@ SQL;
 
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_requests
-                (public_id, seed_token, user_id, company_id, course_id, access_period_seconds,
+                (public_id, user_id, company_id, course_id, access_period_seconds,
                  learner_note, decision_note, status, requested_at)
              VALUES
-                (:public_id, :seed_token, :user_id, :company_id, :course_id, :access_period_seconds,
+                (:public_id, :user_id, :company_id, :course_id, :access_period_seconds,
                  :learner_note, :decision_note, :status, :requested_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
                 'user_id' => $userId,
                 'company_id' => $companyId,
                 'course_id' => $courseId,
@@ -1821,11 +1792,10 @@ SQL;
     {
         $this->db->executeStatement(
             'INSERT INTO course_credit_allocations
-                (seed_token, credit_id, user_id, enrolment_id, status, assigned_by_user_id, assigned_at)
+                ( credit_id, user_id, enrolment_id, status, assigned_by_user_id, assigned_at)
              VALUES
-                (:seed_token, :credit_id, :user_id, :enrolment_id, :status, :assigned_by_user_id, :assigned_at)',
+                ( :credit_id, :user_id, :enrolment_id, :status, :assigned_by_user_id, :assigned_at)',
             [
-                'seed_token' => $this->provenance->fromCredit($creditId),
                 'credit_id' => $creditId,
                 'user_id' => $userId,
                 'enrolment_id' => $enrolmentId,
@@ -1840,17 +1810,14 @@ SQL;
     {
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_credits
-                (public_id, seed_token, company_id, user_id, course_id, access_period_seconds,
+                (public_id, company_id, user_id, course_id, access_period_seconds,
                  quantity, source_type, note, created_by_user_id, created_at)
              VALUES
-                (:public_id, :seed_token, :company_id, :user_id, :course_id, :access_period_seconds,
+                (:public_id, :company_id, :user_id, :course_id, :access_period_seconds,
                  :quantity, :source_type, :note, :created_by_user_id, :created_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $companyId !== null
-                    ? $this->provenance->forPair('companies', $companyId, 'courses', $courseId)
-                    : $this->provenance->forPair('users', $userId, 'courses', $courseId),
                 'company_id' => $companyId,
                 'user_id' => $userId,
                 'course_id' => $courseId,

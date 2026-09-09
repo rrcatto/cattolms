@@ -14,9 +14,6 @@ Description:
   Infrastructure values are deliberately absent. Database credentials, the application key, the
   application URL and domain, and the cookie and session settings are never exposed here.
 
-  The SEED System Company card is guarded twice: once on the permission that may manage seed
-  infrastructure, and once on whether the shared company row actually exists, because a database
-  older than the v0.5.8 baseline has no row to edit and must say so rather than fail on save.
 
   WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags
   inside comments, so a tag written out as a usage example becomes a real tag in the compiled
@@ -88,66 +85,6 @@ Changelog:
 			</form>
 		{% endif %}
 	</div>
-	{% if can_manage_seed %}
-		<div class="card">
-			<div class="section-head">
-				<div>
-					<h2>
-						SEED System Company
-					</h2>
-					<p>
-						The shared host organisation for generated data. Its domain is also the address every seed message is delivered to.
-					</p>
-				</div>
-				<span class="badge info">{{ seed_system_company_domain_source=='database' ? 'Database override' : '.env default' }}</span>
-			</div>
-			{% if not seed_system_company_present %}
-				<div class="alert alert-warning">
-					<strong>The shared SEED System Company is missing.</strong> This database predates the v0.5.8 baseline, so there is no row to edit. A destructive reset and migrate creates it.
-				</div>
-			{% endif %}
-			{% if seed_system_company_present %}
-				<form action="/admin/settings/seed-company" method="post" class="form-grid">
-					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div class="field full">
-						<label>SEED System Company name</label>
-						<input name="seed_system_company_name" value="{{ seed_system_company_name }}" required>
-						<div class="help">
-							Overrides <span class="mono">SEED_SYSTEM_COMPANY_NAME</span>. Generated companies are separate organisations; this is the one that owns seed infrastructure.
-						</div>
-					</div>
-					<div class="field full">
-						<label>SEED System Company domain</label>
-						<input name="seed_system_company_domain" value="{{ seed_system_company_domain }}">
-						<div class="help">
-							Overrides <span class="mono">SEED_SYSTEM_COMPANY_DOMAIN</span>, and must differ from <span class="mono">APP_DOMAIN</span>. Generated addresses keep their own reserved domains on screen but are delivered here, so use a domain you genuinely receive mail for. Leave it empty to disable the rewrite entirely.
-						</div>
-					</div>
-					<div class="field full">
-						{% if seed_mail_rewrite_active %}
-							<p class="help">
-								<strong>Seed mail is delivered to {{ seed_system_company_domain }}.</strong> One real inbox receives every generated identity's messages.
-							</p>
-						{% endif %}
-						{% if not seed_mail_rewrite_active %}
-							<p class="help">
-								<strong>Seed mail is not delivered.</strong> With no domain set, generated addresses stay on their reserved domains and bounce, which is safe if you never sign in as a generated identity.
-							</p>
-						{% endif %}
-					</div>
-					<div class="field full">
-						<button class="btn btn-primary">Save SEED System Company</button>
-					</div>
-				</form>
-				{% if seed_system_company_override %}
-					<form action="/admin/settings/seed-company/reset" method="post" class="cl-mt-2">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<button class="btn btn-ghost btn-sm" type="submit">Use the .env values</button>
-					</form>
-				{% endif %}
-			{% endif %}
-		</div>
-	{% endif %}
 	<div class="card">
 		<div class="section-head">
 			<div>

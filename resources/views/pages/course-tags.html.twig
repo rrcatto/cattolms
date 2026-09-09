@@ -24,22 +24,19 @@ Changelog:
 #}
 {% extends layout %}
 {% block page_body %}
-	{% set ph_back_href = '/courses' ~ universe_query %}
+	{% set ph_back_href = '/courses' %}
 	{% set ph_back_label = 'Browse by category' %}
 	{% set ph_kicker = 'Browse' %}
 	{% set ph_title = selected_tag ? 'Courses tagged ' ~ selected_tag.name : 'Browse by tag' %}
 	{% set ph_lead = selected_tag ? 'Choose another tag to move across the catalogue.' : 'Every label in the catalogue. The larger a tag, the more courses carry it. Choose one to see its courses.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-4">
-		{% if universe_switch %}
-			{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: universe_counts} %}
-		{% endif %}
 		{% if tag_index %}
 			<div class="cl-facet section">
 				<div class="cl-facet-head">
 					<span class="cl-facet-label">Tags</span>
 					{% if selected_tag %}
-						<a class="btn btn-soft btn-sm" href="/courses/tags{{ universe_query }}">Clear tag</a>
+						<a class="btn btn-soft btn-sm" href="/courses/tags">Clear tag</a>
 					{% endif %}
 				</div>
 				{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_index} %}

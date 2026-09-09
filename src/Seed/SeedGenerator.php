@@ -60,15 +60,15 @@ final class SeedGenerator
 {
     /** Seed roles a generated identity may hold. Never a normal role, never ADMIN. */
     private const SEED_ROLE_MIX = [
-        RoleCatalog::SEED_STUDENT,
-        RoleCatalog::SEED_STUDENT,
-        RoleCatalog::SEED_STUDENT,
-        RoleCatalog::SEED_STUDENT,
-        RoleCatalog::SEED_STUDENT,
-        RoleCatalog::SEED_STUDENT,
-        RoleCatalog::SEED_COMPANY_ADMIN,
-        RoleCatalog::SEED_COURSE_EDITOR,
-        RoleCatalog::SEED_COURSE_OWNER,
+        RoleCatalog::STUDENT,
+        RoleCatalog::STUDENT,
+        RoleCatalog::STUDENT,
+        RoleCatalog::STUDENT,
+        RoleCatalog::STUDENT,
+        RoleCatalog::STUDENT,
+        RoleCatalog::COMPANY_ADMIN,
+        RoleCatalog::COURSE_EDITOR,
+        RoleCatalog::COURSE_OWNER,
     ];
 
     private const GRADE_BANDS = [
@@ -102,7 +102,6 @@ final class SeedGenerator
     private array $counts = [];
 
     public function __construct(
-        private readonly SeedRepository $repository,
         private readonly SeedNamePools $pools,
         private readonly ArtworkGenerator $artwork
     ) {
@@ -233,14 +232,14 @@ final class SeedGenerator
             // the company index and the set suffix. The .seed.invalid suffix is reserved by
             // RFC 2606 and can never resolve, so an address here is undeliverable unless the
             // seed mail router rewrites it to the operator's real inbox.
-            $domain = SeedMailRouter::generatedDomain(Slug::from($name), $i, $suffix);
+            $domain = GeneratedDomainRouter::generatedDomain(Slug::from($name), $i, $suffix);
             $meta[] = ['name' => $name, 'domain' => $domain];
             $rows[] = [Uuid::v4(), $name, $domain, 'active', false, 'client', $token];
         }
 
         $ids = $this->write(
             'companies',
-            ['public_id', 'name', 'domain', 'status', 'is_system', 'company_type', 'seed_token'],
+            ['public_id', 'name', 'domain', 'status', 'is_system', 'company_type'],
             $rows,
             true
         );
@@ -292,7 +291,7 @@ final class SeedGenerator
 
         $userIds = $this->write(
             'users',
-            ['public_id', 'display_name', 'first_name', 'middle_names', 'last_name', 'status', 'seed_token'],
+            ['public_id', 'display_name', 'first_name', 'middle_names', 'last_name', 'status'],
             $userRows,
             true
         );
@@ -307,7 +306,7 @@ final class SeedGenerator
             // The local part must be unique on its own, not merely within its domain: the mail
             // router discards the generated domain, so two identities differing only by company
             // would otherwise collapse onto one real inbox.
-            $local = SeedMailRouter::generatedLocalPart(
+            $local = GeneratedDomainRouter::generatedLocalPart(
                 Slug::from($identity['first'] . '-' . $identity['last']),
                 $index,
                 $suffix
@@ -324,16 +323,16 @@ final class SeedGenerator
 
             $buckets['all'][] = $userId;
             $buckets[match ($identity['role']) {
-                RoleCatalog::SEED_COURSE_OWNER => 'owners',
-                RoleCatalog::SEED_COURSE_EDITOR => 'editors',
-                RoleCatalog::SEED_COMPANY_ADMIN => 'admins',
+                RoleCatalog::COURSE_OWNER => 'owners',
+                RoleCatalog::COURSE_EDITOR => 'editors',
+                RoleCatalog::COMPANY_ADMIN => 'admins',
                 default => 'students',
             }][] = $userId;
         }
 
-        $this->write('user_emails', ['user_id', 'email', 'is_primary', 'seed_token'], $emailRows);
-        $this->write('user_roles', ['user_id', 'role_id', 'seed_token'], $roleRows);
-        $this->write('company_users', ['company_id', 'user_id', 'company_role', 'status', 'seed_token'], $membershipRows);
+        $this->write('user_emails', ['user_id', 'email', 'is_primary'], $emailRows);
+        $this->write('user_roles', ['user_id', 'role_id'], $roleRows);
+        $this->write('company_users', ['company_id', 'user_id', 'company_role', 'status'], $membershipRows);
 
         if ($buckets['owners'] === []) {
             $buckets['owners'] = array_slice($buckets['all'], 0, 1);
@@ -348,8 +347,8 @@ final class SeedGenerator
     private function companyRoleFor(string $seedRole): string
     {
         return match ($seedRole) {
-            RoleCatalog::SEED_COMPANY_ADMIN => 'administrator',
-            RoleCatalog::SEED_COURSE_OWNER => 'course_owner',
+            RoleCatalog::COMPANY_ADMIN => 'administrator',
+            RoleCatalog::COURSE_OWNER => 'course_owner',
             default => 'student',
         };
     }
@@ -448,7 +447,7 @@ final class SeedGenerator
                 'status', 'default_access_period_seconds', 'module_weight', 'final_weight',
                 'certificate_enabled', 'certificate_template', 'owner_user_id', 'owner_company_id',
                 'revision_number', 'publication_approval_status', 'created_by_user_id',
-                'updated_by_user_id', 'published_at', 'seed_token', 'cover_svg',
+                'updated_by_user_id', 'published_at', 'cover_svg',
             ],
             $courseRows,
             true
@@ -500,7 +499,7 @@ final class SeedGenerator
 
         $this->write(
             'course_grade_bands',
-            ['course_id', 'position', 'grade_code', 'grade_label', 'minimum_percentage', 'is_passing', 'seed_token'],
+            ['course_id', 'position', 'grade_code', 'grade_label', 'minimum_percentage', 'is_passing'],
             $rows
         );
     }
@@ -524,7 +523,7 @@ final class SeedGenerator
             'course_price_variants',
             [
                 'public_id', 'course_id', 'access_period_seconds', 'price_minor_units', 'currency_code',
-                'label', 'position', 'is_active', 'is_default', 'created_by_user_id', 'updated_by_user_id', 'seed_token',
+                'label', 'position', 'is_active', 'is_default', 'created_by_user_id', 'updated_by_user_id',
             ],
             $rows
         );
@@ -542,7 +541,7 @@ final class SeedGenerator
             $rows[] = [$courseId, $editors[$index % count($editors)], $token];
         }
 
-        $this->write('course_editors', ['course_id', 'user_id', 'seed_token'], $rows);
+        $this->write('course_editors', ['course_id', 'user_id'], $rows);
     }
 
     /**
@@ -650,7 +649,7 @@ final class SeedGenerator
 
         $ids = $this->write(
             'course_modules',
-            ['public_id', 'course_id', 'module_key', 'position', 'title', 'content_html', 'seed_token'],
+            ['public_id', 'course_id', 'module_key', 'position', 'title', 'content_html'],
             $rows,
             true
         );
@@ -669,7 +668,7 @@ final class SeedGenerator
 
         $this->write(
             'course_content_blocks',
-            ['public_id', 'module_id', 'position', 'block_type', 'title', 'content_html', 'seed_token'],
+            ['public_id', 'module_id', 'position', 'block_type', 'title', 'content_html'],
             $blockRows
         );
 
@@ -709,7 +708,7 @@ final class SeedGenerator
             'course_assessments',
             [
                 'public_id', 'course_id', 'module_id', 'assessment_type', 'title', 'position',
-                'pass_mark', 'required', 'practice_question_count', 'time_limit_seconds', 'score_policy', 'seed_token',
+                'pass_mark', 'required', 'practice_question_count', 'time_limit_seconds', 'score_policy',
             ],
             $rows,
             true
@@ -744,7 +743,7 @@ final class SeedGenerator
 
         $ids = $this->write(
             'assessment_questions',
-            ['public_id', 'assessment_id', 'position', 'question_html', 'points', 'difficulty', 'seed_token'],
+            ['public_id', 'assessment_id', 'position', 'question_html', 'points', 'difficulty'],
             $rows,
             true
         );
@@ -770,7 +769,7 @@ final class SeedGenerator
         // response cannot be recorded without naming a real option.
         $optionIds = $this->write(
             'assessment_options',
-            ['public_id', 'question_id', 'position', 'option_html', 'is_correct', 'seed_token'],
+            ['public_id', 'question_id', 'position', 'option_html', 'is_correct'],
             $optionRows,
             true
         );
@@ -842,7 +841,7 @@ final class SeedGenerator
 
         $enrolmentIds = $this->write(
             'course_enrolments',
-            ['public_id', 'user_id', 'course_id', 'source_type', 'status', 'access_period_seconds', 'started_at', 'completed_at', 'seed_token'],
+            ['public_id', 'user_id', 'course_id', 'source_type', 'status', 'access_period_seconds', 'started_at', 'completed_at'],
             $enrolmentRows,
             true
         );
@@ -920,13 +919,13 @@ final class SeedGenerator
 
         $this->write(
             'module_progress',
-            ['enrolment_id', 'module_id', 'first_opened_at', 'last_viewed_at', 'completed_at', 'best_percentage', 'best_grade_code', 'seed_token'],
+            ['enrolment_id', 'module_id', 'first_opened_at', 'last_viewed_at', 'completed_at', 'best_percentage', 'best_grade_code'],
             $progressRows
         );
 
         $attemptIds = $this->write(
             'assessment_attempts',
-            ['public_id', 'enrolment_id', 'assessment_id', 'attempt_number', 'earned_points', 'maximum_points', 'percentage', 'grade_code', 'passed', 'submitted_at', 'seed_token'],
+            ['public_id', 'enrolment_id', 'assessment_id', 'attempt_number', 'earned_points', 'maximum_points', 'percentage', 'grade_code', 'passed', 'submitted_at'],
             $attemptRows,
             true
         );
@@ -948,11 +947,11 @@ final class SeedGenerator
                 ];
             }
         }
-        $this->write('assessment_responses', ['attempt_id', 'question_id', 'selected_option_id', 'is_correct', 'seed_token'], $responseRows);
+        $this->write('assessment_responses', ['attempt_id', 'question_id', 'selected_option_id', 'is_correct'], $responseRows);
 
         $sessionIds = $this->write(
             'assessment_sessions',
-            ['public_id', 'enrolment_id', 'assessment_id', 'attempt_mode', 'attempt_number', 'status', 'selected_question_count', 'current_sequence', 'started_at', 'deadline_at', 'completed_at', 'seed_token'],
+            ['public_id', 'enrolment_id', 'assessment_id', 'attempt_mode', 'attempt_number', 'status', 'selected_question_count', 'current_sequence', 'started_at', 'deadline_at', 'completed_at'],
             $sessionRows,
             true
         );
@@ -965,19 +964,19 @@ final class SeedGenerator
         }
         $this->write(
             'assessment_session_questions',
-            ['session_id', 'question_id', 'sequence', 'response_status', 'submitted_at', 'seed_token'],
+            ['session_id', 'question_id', 'sequence', 'response_status', 'submitted_at'],
             $sessionQuestionRows
         );
 
         $this->write(
             'course_results',
-            ['enrolment_id', 'module_percentage', 'final_percentage', 'overall_percentage', 'grade_code', 'passed', 'seed_token'],
+            ['enrolment_id', 'module_percentage', 'final_percentage', 'overall_percentage', 'grade_code', 'passed'],
             $resultRows
         );
 
         $this->write(
             'certificates',
-            ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'issued_at', 'seed_token'],
+            ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'issued_at'],
             $certificateRows
         );
     }
@@ -1024,7 +1023,7 @@ final class SeedGenerator
             $seen[$pair] = true;
             $favouriteRows[] = [$learner, $course['id'], $token];
         }
-        $this->write('course_favourites', ['user_id', 'course_id', 'seed_token'], $favouriteRows);
+        $this->write('course_favourites', ['user_id', 'course_id'], $favouriteRows);
 
         $requestRows = [];
         for ($i = 0; $i < $plan->requests; $i++) {
@@ -1037,7 +1036,7 @@ final class SeedGenerator
         }
         $this->write(
             'course_requests',
-            ['public_id', 'user_id', 'company_id', 'course_id', 'access_period_seconds', 'status', 'seed_token'],
+            ['public_id', 'user_id', 'company_id', 'course_id', 'access_period_seconds', 'status'],
             $requestRows
         );
 
@@ -1052,7 +1051,7 @@ final class SeedGenerator
         }
         $creditIds = $this->write(
             'course_credits',
-            ['public_id', 'company_id', 'user_id', 'course_id', 'access_period_seconds', 'quantity', 'source_type', 'seed_token'],
+            ['public_id', 'company_id', 'user_id', 'course_id', 'access_period_seconds', 'quantity', 'source_type'],
             $creditRows,
             true
         );
@@ -1063,7 +1062,7 @@ final class SeedGenerator
         }
         $this->write(
             'course_credit_allocations',
-            ['credit_id', 'user_id', 'enrolment_id', 'status', 'seed_token'],
+            ['credit_id', 'user_id', 'enrolment_id', 'status'],
             $allocationRows
         );
     }
@@ -1089,7 +1088,7 @@ final class SeedGenerator
         }
         $this->write(
             'course_edit_history',
-            ['course_id', 'user_id', 'event_key', 'entity_type', 'summary', 'seed_token'],
+            ['course_id', 'user_id', 'event_key', 'entity_type', 'summary'],
             $historyRows
         );
 
@@ -1103,6 +1102,6 @@ final class SeedGenerator
         for ($i = 0; $i < $plan->auditEntries; $i++) {
             $auditRows[] = [$actors[$i % count($actors)], $events[$i % count($events)], $token];
         }
-        $this->write('audit_log', ['user_id', 'event_key', 'seed_token'], $auditRows);
+        $this->write('audit_log', ['user_id', 'event_key'], $auditRows);
     }
 }

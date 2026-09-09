@@ -52,9 +52,7 @@ namespace CattoLearning\Http\Controller;
 use Base;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Seed\SeedTableCatalog;
 use CattoLearning\Support\Csrf;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
@@ -164,89 +162,6 @@ abstract class BaseController
         return preg_match('/^([a-z][a-z_]*)-region$/', $target, $match) === 1 ? $match[1] : null;
     }
 
-    /**
-     * The data universe this request may read.
-     *
-     * One resolution point for every controller, so the rule cannot be restated slightly
-     * differently on each surface:
-     *
-     *   anonymous            REAL, always. There is no request value that changes this.
-     *   ordinary identity    its own universe, whatever the query string asks for.
-     *   seed identity        SEED, whatever the query string asks for.
-     *   genuine ADMIN        whatever it explicitly selected, defaulting to REAL.
-     *
-     * The widening decision itself lives in CurrentUser::resolveUniverse(); this only supplies
-     * the request value and the anonymous default.
-     */
-    protected function universe(?CurrentUser $user = null): DataUniverse
-    {
-        $user ??= $this->currentUser();
-
-        return $user?->resolveUniverse($_GET['universe'] ?? null) ?? DataUniverse::Real;
-    }
-
-    /**
-     * The requested scope for a surface whose default is not the reader's own.
-     *
-     * The Switch Company picker is the only such surface: it lists every company an administrator
-     * may take on, so it starts at ALL rather than at whatever the current page is showing, and
-     * the company chosen is what then decides the workspace universe.
-     *
-     * It reads the same `universe` parameter as everything else, and it reads it here rather than
-     * in the controller, because the filter is deliberately read in exactly one place. The picker
-     * previously had a parameter of its own fed by a select element, which gave one screen its own
-     * vocabulary for something the rest of the LMS says one way.
-     */
-    protected function requestedUniverse(DataUniverse $default, ?CurrentUser $user = null): DataUniverse
-    {
-        $user ??= $this->currentUser();
-        $requested = trim((string) ($_GET['universe'] ?? ''));
-
-        if ($requested === '' || $user === null || !$user->canSelectUniverse()) {
-            return $default;
-        }
-
-        return $user->resolveUniverse($requested);
-    }
-
-    /**
-     * Whether this request may be offered the All / Real / Seed selector.
-     *
-     * Anonymous requests never may. Everyone else defers to the identity, so the control is
-     * shown exactly to those whose selection universe() would actually honour.
-     */
-    protected function canSelectUniverse(?CurrentUser $user = null): bool
-    {
-        $user ??= $this->currentUser();
-
-        return $user?->canSelectUniverse() ?? false;
-    }
-
-    /**
-     * The seed token a row created by this request should carry.
-     *
-     * Used only where the new row is a *root* with no parent to inherit from - an identity or a
-     * course category. Everything with a parent takes its token from that parent instead, which
-     * is why this method is rare.
-     *
-     *   seed identity          its own set's token, so the row is cleaned up with that set
-     *   genuine ADMIN in SEED  the shared infrastructure token, because no individual set owns a
-     *                          row an administrator created by hand, and it should survive the
-     *                          cleanup of any one set
-     *   everyone else          null, meaning REAL
-     */
-    protected function seedTokenForUniverse(?CurrentUser $user = null): ?string
-    {
-        $user ??= $this->currentUser();
-        if ($user === null) {
-            return null;
-        }
-        if ($user->isSeedIdentity()) {
-            return $user->seedToken;
-        }
-
-        return $this->universe($user) === DataUniverse::Seed ? SeedTableCatalog::INFRASTRUCTURE_TOKEN : null;
-    }
 
     /**
      * The identity and capability values every platform template may read.
@@ -274,8 +189,8 @@ abstract class BaseController
         $data['is_authenticated'] = $currentUser !== null;
         $data['is_platform_admin'] = $currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false;
         $data['is_company_admin'] = $currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false;
-        $data['is_course_owner'] = $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_OWNER) || $currentUser->hasRole(RoleCatalog::SEED_COURSE_OWNER));
-        $data['is_course_editor'] = $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_EDITOR) || $currentUser->hasRole(RoleCatalog::SEED_COURSE_EDITOR));
+        $data['is_course_owner'] = $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_OWNER) || $currentUser->hasRole(RoleCatalog::COURSE_OWNER));
+        $data['is_course_editor'] = $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_EDITOR) || $currentUser->hasRole(RoleCatalog::COURSE_EDITOR));
         $data['user_email'] = $currentUser === null ? '' : $currentUser->primaryEmail;
         $data['user_name'] = $currentUser === null ? '' : $currentUser->displayName;
         $data['permissions'] = $currentUser === null ? [] : $currentUser->permissions;
@@ -314,8 +229,6 @@ abstract class BaseController
             'can_manage_themes' => 'SYSTEM.THEME.MANAGE',
             'can_manage_settings' => 'SYSTEM.SETTING.MANAGE',
             'can_manage_roles' => 'SYSTEM.ROLE.MANAGE',
-            'can_view_seed' => 'SYSTEM.SEED.VIEW',
-            'can_manage_seed' => 'SYSTEM.SEED.MANAGE',
         ];
         foreach ($systemCapabilities as $flag => $permission) {
             $data[$flag] = $currentUser?->hasPermission($permission) ?? false;

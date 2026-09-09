@@ -30,7 +30,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Configuration\RuntimeSettings;
-use CattoLearning\Seed\SeedMailRouter;
+use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -40,19 +40,19 @@ final class SeedMailRoutingTest extends TestCase
 {
     private const DELIVERY = 'seed.prettythings.co.za';
 
-    private static function router(string $domain = self::DELIVERY): SeedMailRouter
+    private static function router(string $domain = self::DELIVERY): GeneratedDomainRouter
     {
-        return new SeedMailRouter($domain);
+        return new GeneratedDomainRouter($domain);
     }
 
     /** Generated domains use the reserved TLD, so they can never resolve. */
     public function testGeneratedDomainsUseTheReservedInvalidTld(): void
     {
-        $domain = SeedMailRouter::generatedDomain('highveld-mining', 0, '01a029f4');
+        $domain = GeneratedDomainRouter::generatedDomain('highveld-mining', 0, '01a029f4');
 
         self::assertSame('highveld-mining-0-01a029f4.seed.invalid', $domain);
         self::assertStringEndsWith('.invalid', $domain);
-        self::assertTrue(SeedMailRouter::isSeedAddress('someone@' . $domain));
+        self::assertTrue(GeneratedDomainRouter::isGeneratedAddress('someone@' . $domain));
     }
 
     /** A seed address is delivered to the configured inbox, keeping its local part. */
@@ -81,7 +81,7 @@ final class SeedMailRoutingTest extends TestCase
             'someone@notseed.invalid.co.za',
         ] as $address) {
             self::assertSame($address, $router->deliveryAddress($address), $address . ' must be delivered unchanged.');
-            self::assertFalse(SeedMailRouter::isSeedAddress($address));
+            self::assertFalse(GeneratedDomainRouter::isGeneratedAddress($address));
         }
     }
 
@@ -117,8 +117,8 @@ final class SeedMailRoutingTest extends TestCase
             for ($company = 0; $company < 5; $company++) {
                 for ($person = 0; $person < 20; $person++) {
                     $index = $company * 20 + $person;
-                    $address = SeedMailRouter::generatedLocalPart('thabo-nkosi', $index, $setSuffix)
-                        . '@' . SeedMailRouter::generatedDomain('acme', $company, $setSuffix);
+                    $address = GeneratedDomainRouter::generatedLocalPart('thabo-nkosi', $index, $setSuffix)
+                        . '@' . GeneratedDomainRouter::generatedDomain('acme', $company, $setSuffix);
 
                     $delivered[] = $router->deliveryAddress($address);
                 }
@@ -146,7 +146,7 @@ final class SeedMailRoutingTest extends TestCase
     /** Case does not change whether an address is recognised as generated. */
     public function testRecognitionIsCaseInsensitive(): void
     {
-        self::assertTrue(SeedMailRouter::isSeedAddress('Person@Acme-0-ABC.Seed.Invalid'));
+        self::assertTrue(GeneratedDomainRouter::isGeneratedAddress('Person@Acme-0-ABC.Seed.Invalid'));
     }
 
     /**
@@ -158,16 +158,16 @@ final class SeedMailRoutingTest extends TestCase
     public function testEveryMailerMethodIsDecorated(): void
     {
         $interface = new \ReflectionClass(\CattoLearning\Infrastructure\Mail\MailerInterface::class);
-        $decorator = new \ReflectionClass(\CattoLearning\Infrastructure\Mail\SeedAwareMailer::class);
+        $decorator = new \ReflectionClass(\CattoLearning\Infrastructure\Mail\GeneratedDomainMailer::class);
 
         foreach ($interface->getMethods() as $method) {
             self::assertTrue(
                 $decorator->hasMethod($method->getName()),
-                'SeedAwareMailer must implement ' . $method->getName() . '().'
+                'GeneratedDomainMailer must implement ' . $method->getName() . '().'
             );
         }
 
-        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Mail/SeedAwareMailer.php');
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Infrastructure/Mail/GeneratedDomainMailer.php');
         self::assertSame(
             // Every method redirects except sendContactMessage, whose address is the sender.
             count($interface->getMethods()) - 1,

@@ -34,60 +34,13 @@ final readonly class CurrentUser
         public string $displayName,
         public array $roles,
         public array $permissions,
-        public string $sessionPublicId,
-        /**
-         * The seed set this identity was generated into, or null for a genuine identity.
-         *
-         * This column, not any role name, is the source of truth for which business rows the
-         * identity may see. Roles are mutable and a SEED_* role could in principle be granted
-         * to a genuine account by mistake; the token cannot be changed by role administration.
-         */
-        public ?string $seedToken = null
+        public string $sessionPublicId
     ) {
     }
 
-    /** The data universe this identity reads and writes by default. */
-    public function universe(): DataUniverse
-    {
-        return DataUniverse::forIdentity($this->seedToken);
-    }
 
-    public function isSeedIdentity(): bool
-    {
-        return $this->universe() === DataUniverse::Seed;
-    }
 
-    /**
-     * The scope this identity may actually use, given what it asked for.
-     *
-     * Only a genuine immutable ADMIN may deliberately look across the boundary, and only when
-     * it explicitly selects a scope. Everyone else is pinned to their own universe no matter
-     * what arrives in the request, so a crafted `universe=all` cannot widen anything.
-     */
-    public function resolveUniverse(mixed $requested = null): DataUniverse
-    {
-        if (!$this->canSelectUniverse()) {
-            return $this->universe();
-        }
 
-        return DataUniverse::fromRequest($requested, $this->universe());
-    }
-
-    /**
-     * Whether this identity may choose which universe to look at.
-     *
-     * The same test that decides whether a requested scope is honoured also decides whether the
-     * selector and the cross-universe counts are shown, so the control can never appear to
-     * someone whose selection would be ignored, and can never be hidden from someone whose
-     * selection is honoured.
-     *
-     * SEED_ADMIN is excluded by the first clause: it is administrative within its own set and is
-     * still a seed identity, so it never sees a REAL label or a REAL count.
-     */
-    public function canSelectUniverse(): bool
-    {
-        return !$this->isSeedIdentity() && $this->hasRole(RoleCatalog::ADMIN);
-    }
 
     public function hasRole(string $role): bool
     {

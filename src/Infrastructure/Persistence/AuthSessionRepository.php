@@ -32,8 +32,7 @@ use CattoLearning\Support\Uuid;
 final class AuthSessionRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
@@ -46,14 +45,13 @@ final class AuthSessionRepository
         // precisely so a signed-in seed identity has a session the cleanup can remove.
         $this->db->executeStatement(
             'INSERT INTO auth_sessions
-                (public_id, seed_token, user_id, token_hash, ip_hash, user_agent,
+                (public_id, user_id, token_hash, ip_hash, user_agent,
                  created_at, last_seen_at, expires_at)
              VALUES
-                (:public_id, :seed_token, :user_id, :token_hash, :ip_hash, :user_agent,
+                (:public_id, :user_id, :token_hash, :ip_hash, :user_agent,
                  :created_at, :last_seen_at, :expires_at)',
             [
                 'public_id' => $publicId,
-                'seed_token' => $this->provenance->fromUser($userId),
                 'user_id' => $userId,
                 'token_hash' => $tokenHash,
                 'ip_hash' => $ipHash,
@@ -78,7 +76,7 @@ final class AuthSessionRepository
         // Encoding the exemption in this query would bury the one rule that prevents a company
         // suspension from locking an administrator out of their own installation.
         $rows = $this->db->fetchAllAssociative(
-            "SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, u.seed_token AS user_seed_token, ue.email AS primary_email,
+            "SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, ue.email AS primary_email,
                     EXISTS (
                         SELECT 1 FROM company_users cu
                         JOIN companies c ON c.id = cu.company_id

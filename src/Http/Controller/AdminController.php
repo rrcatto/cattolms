@@ -83,7 +83,6 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Application\AdministrationSectionRegistry;
 use CattoLearning\Application\RoleAdministrationService;
 use CattoLearning\Company\SelectedCompanyContext;
-use CattoLearning\Seed\SeedDatabaseService;
 
 use CattoLearning\View\ThemeRenderer;
 
@@ -114,7 +113,6 @@ final class AdminController extends BaseController
         private readonly LearningService $learning,
         private readonly MailerInterface $mailer,
         private readonly RoleAdministrationService $roleAdministration,
-        private readonly SeedDatabaseService $seeds,
         private readonly SelectedCompanyContext $companyContext
     ) {
         parent::__construct($f3, $auth, $view);
@@ -147,13 +145,7 @@ final class AdminController extends BaseController
         $capabilities = [];
         foreach ($keys as $key) $capabilities[$key] = $this->sectionCapabilities($user, $key);
 
-        $data = $this->platformAdministration->workspaceUniverseView(
-            $keys,
-            $user->id,
-            $this->universe($user),
-            $this->canSelectUniverse($user),
-            $capabilities
-        ) + $this->platformAdministration->workspacePreview($keys, $user->id, $this->universe($user), $capabilities);
+        $data = $this->platformAdministration->workspacePreview($keys, $user->id, $capabilities);
         $this->render('admin-control-centre', $this->withAdministrationPresentation($data, true, null, $sections) + [
             'title' => 'Administration',
             'page_kicker' => 'Complete permitted platform administration workspace',
@@ -353,7 +345,7 @@ final class AdminController extends BaseController
             'page' => max(1, (int) ($_GET['page'] ?? 1)),
             'after_id' => max(0, (int) ($_GET['after_id'] ?? 0)),
         ];
-        $events = $this->platformAdministration->activityEvents($this->universe(), $filters, 50);
+        $events = $this->platformAdministration->activityEvents($filters, 50);
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
         echo json_encode(['events' => $events], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -364,7 +356,7 @@ final class AdminController extends BaseController
     {
         $this->requirePermission('PLATFORM.ACTIVITY.VIEW');
         $eventId = max(1, (int) $this->f3->get('PARAMS.id'));
-        $event = $this->platformAdministration->activityEvent($eventId, $this->universe());
+        $event = $this->platformAdministration->activityEvent($eventId);
         if ($event === null) {
             $this->f3->error(404, 'The activity event could not be found.');
             return;
@@ -380,10 +372,10 @@ final class AdminController extends BaseController
     {
         $this->requirePermission('PLATFORM.PERSON.VIEW');
         $target = max(1, (int) $this->f3->get('PARAMS.id'));
-        $data = $this->platformAdministration->personForAdministration($target, $this->universe());
-        $library = $this->learning->library($target, $this->universe());
-        $favourites = $this->platformAdministration->favourites($target, $this->universe());
-        $requests = $this->platformAdministration->userRequests($target, $this->universe());
+        $data = $this->platformAdministration->personForAdministration($target);
+        $library = $this->learning->library($target);
+        $favourites = $this->platformAdministration->favourites($target);
+        $requests = $this->platformAdministration->userRequests($target);
         $sessions = $this->auth->activeSessions($target);
         $this->render('admin-person-profile', $data + [
             'title' => 'Manage person',
@@ -402,7 +394,7 @@ final class AdminController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
         $this->handle(function () use ($user): void {
-            $this->platformAdministration->createPerson($_POST, $user->id, $this->universe($user));
+            $this->platformAdministration->createPerson($_POST, $user->id);
             $this->flash('success', 'The person was created.');
             $this->redirect('/admin/people');
         }, '/admin/people');
@@ -414,7 +406,7 @@ final class AdminController extends BaseController
         $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
         $target = max(1, (int) $this->f3->get('PARAMS.id'));
         $this->handle(function () use ($user, $target): void {
-            $this->platformAdministration->updatePerson($target, $_POST, $user->id, $this->universe($user));
+            $this->platformAdministration->updatePerson($target, $_POST, $user->id);
             $this->flash('success', 'The person was updated.');
             $this->redirect('/admin/people/' . $target);
         }, '/admin/people/' . $target);
@@ -595,32 +587,7 @@ final class AdminController extends BaseController
         $this->redirect('/admin/settings');
     }
 
-    /**
-     * Saves the shared SEED System Company's name and mail domain (Stage C).
-     *
-     * Guarded by SYSTEM.SEED.MANAGE rather than SYSTEM.SETTING.MANAGE: this edits seed
-     * infrastructure, and SEED_ADMIN deliberately holds no SYSTEM.* authority, so a generated
-     * administrator cannot reach it.
-     */
-    public function saveSeedSystemCompany(): void
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('SYSTEM.SEED.MANAGE');
-        $this->handle(function () use ($user): void {
-            $this->platformAdministration->saveSeedSystemCompany($_POST, $user->id);
-            $this->flash('success', 'The SEED System Company was saved. Seed mail is delivered to its domain.');
-            $this->redirect('/admin/settings');
-        }, '/admin/settings');
-    }
 
-    public function resetSeedSystemCompany(): void
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('SYSTEM.SEED.MANAGE');
-        $this->platformAdministration->resetSeedSystemCompany($user->id);
-        $this->flash('success', 'The SEED System Company settings now follow .env.');
-        $this->redirect('/admin/settings');
-    }
 
     public function mailPassword(): void
     {
@@ -692,36 +659,21 @@ final class AdminController extends BaseController
         $definition = $this->adminSections->get($key);
         $filters = $this->sectionRequest($key);
         $capabilities = $this->sectionCapabilities($user, $key);
-        $crossUniverse = $this->canSelectUniverse($user);
 
         // A paging or search request replaces one table and nothing else, so it builds one table
-        // and nothing else. The header, the navigation, the summary strip, the universe counts and
-        // any second table on the screen are all still on the reader's screen, unchanged, and
-        // rebuilding them only to throw them away was the largest part of what a page turn cost.
+        // and nothing else. The header, the navigation, the summary strip and any second table on
+        // the screen are all still on the reader's screen, unchanged, and rebuilding them only to
+        // throw them away was the largest part of what a page turn cost.
         $swapping = $this->htmxDataset();
-        $data = in_array($key, ['roles', 'seed'], true)
+        $data = $key === 'roles'
             ? []
             : $this->platformAdministration->sectionData(
                 $key,
                 $user->id,
-                $this->universe($user),
                 $filters,
                 $capabilities,
-                $crossUniverse,
                 $swapping
             );
-        // Merged in front so the selector and its counts win over the empty view defaults that
-        // sectionData() supplies for sections which have neither.
-        $data = $this->platformAdministration->universeView(
-            $key,
-            $user->id,
-            $this->universe($user),
-            $crossUniverse,
-            $filters,
-            $capabilities,
-            null,
-            $swapping === null
-        ) + $data;
         $data = $this->withAdministrationPresentation($data, false, $definition);
         // The Companies table offers a Manage action that hands the row to the Company workspace.
         // Whether to render it is the same question SelectedCompanyContext answers, asked through
