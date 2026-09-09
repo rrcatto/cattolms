@@ -13,7 +13,7 @@
 					· {{ company.name }}
 				{% endif %}
 			</p>
-			<div class="chip-row" style="margin-top:10px">
+			<div class="chip-row cl-mt-2">
 				{% for role in user_roles %}
 					<span class="badge info">{{ role }}</span>
 				{% endfor %}
@@ -106,7 +106,7 @@
 				</div>
 			{% endfor %}
 		</div>
-		<form action="/account/email/secondary" method="post" style="margin-top:16px">
+		<form action="/account/email/secondary" method="post" class="cl-mt-3">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			<div class="field">
 				<label>Add or replace secondary email</label>
@@ -115,7 +115,7 @@
 					A verification link is sent before this address is added.
 				</div>
 			</div>
-			<button class="btn btn-soft btn-sm" type="submit" style="margin-top:10px">Send verification</button>
+			<button class="btn btn-soft btn-sm" type="submit" class="cl-mt-2">Send verification</button>
 		</form>
 	</div>
 </div>

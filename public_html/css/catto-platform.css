@@ -402,3 +402,16 @@
    because it is the same mistake on every form, not a matter of taste per theme. */
 .cl-form-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.5rem}
 .form-grid .field-wide{grid-column:1/-1}
+
+/* v0.7 the small handful of layout utilities the page bodies actually used inline.
+   Twenty-two inline style attributes said one of eight things, and an inline style is the one
+   declaration a theme cannot override - which is the opposite of what a theme is for. The
+   remaining inline styles are per-table column widths and computed values (a progress bar's
+   width, a hero's image), which are genuinely local and stay where they are. */
+.cl-mt-2{margin-top:.625rem}
+.cl-mt-3{margin-top:1rem}
+.cl-row-between{display:flex;justify-content:space-between;gap:.75rem}
+.cl-row-inline{display:flex;align-items:center;gap:.5rem}
+.cl-row-wrap{display:flex;flex-wrap:wrap;gap:.5rem}
+.cl-flex-fill{flex:1}
+.cl-wrap-anywhere{white-space:pre-wrap;overflow-wrap:anywhere}
