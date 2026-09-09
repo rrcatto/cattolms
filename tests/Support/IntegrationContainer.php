@@ -14,8 +14,8 @@ This exists because the suite exhausted PostgreSQL's connection slots on the VPS
 
     FATAL: remaining connection slots are reserved for roles with the SUPERUSER attribute
 
-`CliBootstrap::boot()` builds a fresh PHP-DI container each time it is called, and
-`ConnectionFactory` gives that container a fresh connection - so a fresh PDO connection. Most
+`CliBootstrap::boot()` boots a fresh kernel each time it is called, and that container opens a
+fresh connection - so a fresh PDO connection. Most
 Integration tests call it from `setUp()`, which runs once per *test method* rather than once per
 class. Counted against the current suite that is roughly 93 connections per run, against a default
 `max_connections` of 100, and PHPUnit holds every test object alive for the duration so nothing is
@@ -45,17 +45,17 @@ namespace CattoLearning\Tests\Support;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Infrastructure\Persistence\Database;
-use DI\Container;
+use Psr\Container\ContainerInterface;
 
 final class IntegrationContainer
 {
-    private static ?Container $container = null;
+    private static ?ContainerInterface $container = null;
 
     /** The one container this process uses for Integration tests. */
-    public static function get(): Container
+    public static function get(): ContainerInterface
     {
         if (self::$container === null) {
-            /** @var Container $container */
+            /** @var ContainerInterface $container */
             $container = CliBootstrap::boot()['container'];
             self::$container = $container;
         }

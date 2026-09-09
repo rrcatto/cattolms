@@ -20,6 +20,10 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+        # Public because the command-line tools fetch services from this container by class name.
+        # They boot the same kernel a request does rather than assembling a second graph, and a
+        # private service cannot be fetched. The container is not exposed to anything else.
+        public: true
         bind:
             # The three roots, published as parameters by Kernel::build(). Several services take one
             # as a constructor string, and binding by name here keeps the path out of every
@@ -40,6 +44,13 @@ services:
 
     CattoLearning\Http\Symfony\Listener\:
         resource: '../src/Http/Symfony/Listener/'
+
+    # The web controllers. Registered as a namespace for the same reason as the Symfony ones: a
+    # controller that is not a service is a 500 with no route name in it.
+    CattoLearning\Http\Controller\:
+        resource: '../src/Http/Controller/'
+        exclude: '../src/Http/Controller/BaseController.php'
+        tags: ['controller.service_arguments']
 
     # The application graph a ported route reaches. Registered by namespace: listing services one at
     # a time meant every port added five lines, and forgetting one was a container error at the far
@@ -74,13 +85,6 @@ services:
 
     # The view model is shared with the Fat-Free renderer, which is what keeps one set of
     # navigation and breadcrumb rules while both engines are in use.
-    # Fat-Free's Base, for as long as ThemeRenderer still asks it for the error state and the
-    # response code. It is a singleton either way, so handing Symfony the same instance is what
-    # keeps one renderer serving both routers. This definition goes when Fat-Free does.
-    Base:
-        class: Base
-        factory: ['Base', 'instance']
-
     CattoLearning\View\ThemeRenderer: ~
     CattoLearning\View\ThemeManager:
         arguments:
@@ -94,7 +98,9 @@ services:
 
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'
-        exclude: '../src/Infrastructure/Persistence/{ConnectionFactory.php,PageQuery.php,SessionTimeZoneDriver.php}'
+        # DatabaseSessionHandler is constructed by App::run() before the container exists - the
+        # session has to be open before anything reads an identity - so it is not a service.
+        exclude: '../src/Infrastructure/Persistence/{ConnectionFactory.php,PageQuery.php,SessionTimeZoneDriver.php,DatabaseSessionHandler.php}'
 
     # Repositories depend on Database, not on Doctrine's Connection, because Database infers each
     # bound parameter's PDO type from the PHP value. Same reason as in the PHP-DI container.
@@ -113,7 +119,16 @@ services:
     # Data generation, so the Seed Database screen can move across with the rest.
     CattoLearning\Seed\:
         resource: '../src/Seed/'
-        exclude: '../src/Seed/{SeedGenerationPlan.php}'
+        # SeedNameFactory is built per run with that run's key, by the generator; SeedGenerationPlan
+        # is a value object with a static factory. Neither is a service.
+        exclude: '../src/Seed/{SeedGenerationPlan.php,SeedNameFactory.php}'
+
+    # The word lists ship in the release, the installer publishes them to the instance, and the
+    # instance copy is the one read - so an operator's edits survive every upgrade.
+    CattoLearning\Seed\SeedNamePools:
+        arguments:
+            $instanceRoot: '%catto.instance_root%/storage/seeds'
+            $bundledRoot: '%catto.code_root%/resources/seeds'
 
     # The application services a ported route reaches.
     CattoLearning\Application\:
@@ -130,6 +145,25 @@ services:
 
     CattoLearning\Event\:
         resource: '../src/Event/'
+
+    CattoLearning\Maintenance\:
+        resource: '../src/Maintenance/'
+
+    # LmsMcpTools is constructed per MCP session with that session's identity, by the MCP server
+    # entrypoint. It is not a service.
+    CattoLearning\Mcp\:
+        resource: '../src/Mcp/'
+        exclude: '../src/Mcp/{LmsMcpTools.php}'
+
+    # PluginManager takes the container itself - one of the three places allowed to, see
+    # check-architecture.php - so it is given the container explicitly rather than autowired.
+    CattoLearning\Plugin\:
+        resource: '../src/Plugin/'
+        exclude: '../src/Plugin/{PluginInterface.php,PluginContext.php,PluginManager.php}'
+    CattoLearning\Plugin\PluginManager:
+        arguments:
+            $container: '@service_container'
+            $pluginClasses: []
 
     # Applied to DoctrineBundle's connection. The platform's own ConnectionFactory registers the
     # same middleware, so both connections agree about the session timezone.

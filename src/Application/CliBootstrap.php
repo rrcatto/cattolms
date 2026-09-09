@@ -26,6 +26,7 @@ declare(strict_types=1);
 namespace CattoLearning\Application;
 
 use CattoLearning\Support\Env;
+use CattoLearning\Kernel;
 use Dotenv\Dotenv;
 use RuntimeException;
 
@@ -63,11 +64,12 @@ final class CliBootstrap
         date_default_timezone_set(Env::string('APP_TIMEZONE', 'Africa/Johannesburg'));
 
         $publicRoot = $instanceRoot . '/public_html';
-        $container = ContainerFactory::build(
-            $codeRoot,
-            $instanceRoot,
-            $publicRoot
-        );
+
+        // The same container the web request builds. A tool that assembled its own graph would be
+        // a second wiring to keep in step with the first, and the two would drift.
+        $kernel = new Kernel(Env::string('APP_ENV', 'production'), Env::bool('APP_DEBUG', false), $instanceRoot);
+        $kernel->boot();
+        $container = $kernel->getContainer();
 
         return [
             'container' => $container,

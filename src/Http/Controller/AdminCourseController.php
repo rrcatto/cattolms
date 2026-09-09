@@ -41,6 +41,8 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Course\CoursePortabilityService;
 
@@ -51,27 +53,30 @@ use CattoLearning\View\ThemeRenderer;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Support\Pagination;
 
-use Base;
 
 use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 final class AdminCourseController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CourseService $courses,
         private readonly CoursePortabilityService $portability,
         private readonly PlatformAdministrationService $platformAdministration
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
-    public function createForm(): void
+
+    #[Route('/admin/courses/new', name: 'admin_course_create_form', methods: ['GET'])]
+    public function createForm(): Response
     {
         $user = $this->requirePermission('COURSE.CREATE');
-        $this->render('admin-course-form', [
+        return $this->render('admin-course-form', [
             'title' => 'Create course',
             'course' => $this->blankCourse(),
             'categories' => $this->courses->categories(true),
@@ -81,18 +86,22 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function create(): void
+
+    #[Route('/admin/courses', name: 'admin_course_create', methods: ['POST'])]
+    public function create(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CREATE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $courseId = $this->courses->createBlank($_POST, $user->id);
             $this->flash('success', 'The course was created.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/new');
     }
 
-    public function edit(): void
+
+    #[Route('/admin/courses/{id}', name: 'admin_course_edit', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function edit(): Response
     {
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
@@ -117,7 +126,7 @@ final class AdminCourseController extends BaseController
         if ($currentCategoryId > 0 && !array_filter($categoryOptions, static fn(array $category): bool => (int) $category['id'] === $currentCategoryId)) {
             $categoryOptions[] = $this->courses->category($currentCategoryId);
         }
-        $this->render('admin-course-edit', [
+        return $this->render('admin-course-edit', [
             'title' => 'Edit ' . (string) $course['title'],
             'course' => $course,
             'categories' => $categoryOptions,
@@ -128,7 +137,9 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function preview(): void
+
+    #[Route('/admin/courses/{id}/preview', name: 'admin_course_preview', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function preview(): Response
     {
         $user = $this->requirePermission('COURSE.PREVIEW');
         $course = $this->requireManagedCourse($this->courseId());
@@ -136,7 +147,9 @@ final class AdminCourseController extends BaseController
         $this->redirect('/learn/' . rawurlencode((string) $course['slug']) . '?preview=1');
     }
 
-    public function resetPreview(): void
+
+    #[Route('/admin/courses/{id}/preview/reset', name: 'admin_course_reset_preview', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function resetPreview(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PREVIEW');
@@ -147,7 +160,9 @@ final class AdminCourseController extends BaseController
         $this->redirect('/admin/courses/' . $courseId);
     }
 
-    public function previewModule(): void
+
+    #[Route('/admin/courses/{id}/preview/modules/{module_id}', name: 'admin_course_preview_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['GET'])]
+    public function previewModule(): Response
     {
         $this->requirePermission('COURSE.PREVIEW');
         $courseId = $this->courseId();
@@ -164,7 +179,7 @@ final class AdminCourseController extends BaseController
                 break;
             }
         }
-        $this->render('admin-module-preview', [
+        return $this->render('admin-module-preview', [
             'title' => 'Preview ' . (string) $data['module']['title'],
             'course' => $data['course'],
             'module' => $data['module'],
@@ -175,7 +190,9 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function certificate(): void
+
+    #[Route('/admin/courses/{id}/certificate', name: 'admin_course_certificate', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function certificate(): Response
     {
         $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
         $course = $this->requireManagedCourse($this->courseId());
@@ -183,7 +200,7 @@ final class AdminCourseController extends BaseController
         $sampleName = trim((string) ($profile['certificate_name'] ?? ''))
             ?: trim((string) ($profile['display_name'] ?? ''))
             ?: 'Sample Learner';
-        $this->render('admin-course-certificate', [
+        return $this->render('admin-course-certificate', [
             'title' => 'Certificate · ' . (string) $course['title'],
             'course' => $course,
             'sample_name' => $sampleName,
@@ -192,120 +209,138 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function updateCertificate(): void
+
+    #[Route('/admin/courses/{id}/certificate', name: 'admin_course_update_certificate', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updateCertificate(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->portability->updateCertificateTemplate($courseId, $_POST, $user->id);
             $this->flash('success', 'The certificate template was updated.');
             $this->redirect('/admin/courses/' . $courseId . '/certificate');
         }, '/admin/courses/' . $courseId . '/certificate');
     }
 
-    public function update(): void
+
+    #[Route('/admin/courses/{id}', name: 'admin_course_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function update(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updateCourse($courseId, $_POST, $user->id);
             $this->flash('success', 'The course details were updated.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);
     }
 
-    public function updatePeople(): void
+
+    #[Route('/admin/courses/{id}/people', name: 'admin_course_update_people', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updatePeople(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.OWNERSHIP.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updateCoursePeople($courseId, $_POST, $user->id);
             $this->flash('success', 'The course owner and Course Editors were updated.');
             $this->redirect('/admin/courses/' . $courseId . '#people');
         }, '/admin/courses/' . $courseId);
     }
 
-    public function createPriceVariant(): void
+
+    #[Route('/admin/courses/{id}/pricing', name: 'admin_course_create_price_variant', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function createPriceVariant(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PRICING.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->createPriceVariant($courseId, $_POST, $user->id);
             $this->flash('success', 'The course price option was added.');
             $this->redirect('/admin/courses/' . $courseId . '#pricing');
         }, '/admin/courses/' . $courseId . '#pricing');
     }
 
-    public function updatePriceVariant(): void
+
+    #[Route('/admin/courses/{id}/pricing/{price_variant_id}', name: 'admin_course_update_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    public function updatePriceVariant(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PRICING.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $variantId = $this->priceVariantId();
-        $this->handle(function () use ($user, $courseId, $variantId): void {
+        return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->updatePriceVariant($courseId, $variantId, $_POST, $user->id);
             $this->flash('success', 'The course price option was updated.');
             $this->redirect('/admin/courses/' . $courseId . '#pricing');
         }, '/admin/courses/' . $courseId . '#pricing');
     }
 
-    public function setDefaultPriceVariant(): void
+
+    #[Route('/admin/courses/{id}/pricing/{price_variant_id}/default', name: 'admin_course_set_default_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    public function setDefaultPriceVariant(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PRICING.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $variantId = $this->priceVariantId();
-        $this->handle(function () use ($user, $courseId, $variantId): void {
+        return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->setDefaultPriceVariant($courseId, $variantId, $user->id);
             $this->flash('success', 'The default catalogue price was updated.');
             $this->redirect('/admin/courses/' . $courseId . '#pricing');
         }, '/admin/courses/' . $courseId . '#pricing');
     }
 
-    public function movePriceVariant(): void
+
+    #[Route('/admin/courses/{id}/pricing/{price_variant_id}/move', name: 'admin_course_move_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    public function movePriceVariant(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PRICING.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $variantId = $this->priceVariantId();
-        $this->handle(function () use ($user, $courseId, $variantId): void {
+        return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->movePriceVariant($courseId, $variantId, (string) ($_POST['direction'] ?? ''), $user->id);
             $this->redirect('/admin/courses/' . $courseId . '#pricing');
         }, '/admin/courses/' . $courseId . '#pricing');
     }
 
-    public function deletePriceVariant(): void
+
+    #[Route('/admin/courses/{id}/pricing/{price_variant_id}/delete', name: 'admin_course_delete_price_variant', requirements: ['id' => '\\d+', 'price_variant_id' => '\\d+'], methods: ['POST'])]
+    public function deletePriceVariant(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PRICING.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $variantId = $this->priceVariantId();
-        $this->handle(function () use ($user, $courseId, $variantId): void {
+        return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->deletePriceVariant($courseId, $variantId, $user->id);
             $this->flash('success', 'The course price option was removed.');
             $this->redirect('/admin/courses/' . $courseId . '#pricing');
         }, '/admin/courses/' . $courseId . '#pricing');
     }
 
-    public function status(): void
+
+    #[Route('/admin/courses/{id}/status', name: 'admin_course_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function status(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PUBLISH');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $status = trim((string) ($_POST['status'] ?? ''));
             $this->courses->changeStatus($courseId, $status, $user->id);
             $this->flash('success', 'The course status is now ' . $status . '.');
@@ -313,25 +348,29 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/' . $courseId);
     }
 
-    public function submitForApproval(): void
+
+    #[Route('/admin/courses/{id}/submit-for-approval', name: 'admin_course_submit_for_approval', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function submitForApproval(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PUBLICATION.REQUEST');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->submitForApproval($courseId, $user->id);
             $this->flash('success', 'The course was submitted for platform approval.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);
     }
 
-    public function createModuleForm(): void
+
+    #[Route('/admin/courses/{id}/modules/new', name: 'admin_course_create_module_form', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function createModuleForm(): Response
     {
         $this->requirePermission('COURSE.EDIT');
         $course = $this->requireManagedCourse($this->courseId());
         $nextPosition = count((array) $course['modules']) + 1;
-        $this->render('admin-module-form', [
+        return $this->render('admin-module-form', [
             'title' => 'Add module',
             'course' => $course,
             'module' => [
@@ -355,20 +394,24 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function createModule(): void
+
+    #[Route('/admin/courses/{id}/modules', name: 'admin_course_create_module', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function createModule(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $moduleId = $this->courses->createModule($courseId, $_POST, $user->id);
             $this->flash('success', 'The module was created.');
             $this->redirect('/admin/courses/' . $courseId . '/modules/' . $moduleId);
         }, '/admin/courses/' . $courseId . '/modules/new');
     }
 
-    public function editModule(): void
+
+    #[Route('/admin/courses/{id}/modules/{module_id}', name: 'admin_course_edit_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['GET'])]
+    public function editModule(): Response
     {
         $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
@@ -379,7 +422,7 @@ final class AdminCourseController extends BaseController
             ? $data['assessment']
             : $this->blankAssessment((string) $data['module']['title'] . ' assessment');
         $assessment = $this->prepareAssessment($assessment);
-        $this->render('admin-module-form', [
+        return $this->render('admin-module-form', [
             'title' => 'Edit ' . (string) $data['module']['title'],
             'course' => $data['course'],
             'module' => $data['module'],
@@ -392,42 +435,48 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function updateModule(): void
+
+    #[Route('/admin/courses/{id}/modules/{module_id}', name: 'admin_course_update_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['POST'])]
+    public function updateModule(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $moduleId = $this->moduleId();
-        $this->handle(function () use ($user, $courseId, $moduleId): void {
+        return $this->handle(function () use ($user, $courseId, $moduleId): void {
             $this->courses->updateModule($courseId, $moduleId, $_POST, $user->id);
             $this->flash('success', 'The module was updated.');
             $this->redirect('/admin/courses/' . $courseId . '/modules/' . $moduleId);
         }, '/admin/courses/' . $courseId . '/modules/' . $moduleId);
     }
 
-    public function updateAssessment(): void
+
+    #[Route('/admin/courses/{id}/modules/{module_id}/assessment', name: 'admin_course_update_assessment', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['POST'])]
+    public function updateAssessment(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $moduleId = $this->moduleId();
-        $this->handle(function () use ($user, $courseId, $moduleId): void {
+        return $this->handle(function () use ($user, $courseId, $moduleId): void {
             $this->courses->replaceModuleAssessment($courseId, $moduleId, $_POST, $user->id);
             $this->flash('success', 'The module assessment was updated.');
             $this->redirect('/admin/courses/' . $courseId . '/modules/' . $moduleId . '#assessment');
         }, '/admin/courses/' . $courseId . '/modules/' . $moduleId . '#assessment');
     }
 
-    public function createDiagnosticForm(): void
+
+    #[Route('/admin/courses/{id}/diagnostics/new', name: 'admin_course_create_diagnostic_form', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function createDiagnosticForm(): Response
     {
         $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $course = $this->requireManagedCourse($this->courseId());
         $assessment = $this->blankDiagnostic((string) $course['title'] . ' diagnostic');
         $diagnosticCount = count((array) ($course['diagnostic_assessments'] ?? []));
         $assessment['assessment_key'] = $diagnosticCount === 0 ? 'diagnostic' : 'diagnostic-' . ($diagnosticCount + 1);
-        $this->render('admin-diagnostic-assessment', [
+        return $this->render('admin-diagnostic-assessment', [
             'title' => 'Add diagnostic · ' . (string) $course['title'],
             'course' => $course,
             'modules' => (array) $course['modules'],
@@ -440,27 +489,31 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function createDiagnostic(): void
+
+    #[Route('/admin/courses/{id}/diagnostics', name: 'admin_course_create_diagnostic', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function createDiagnostic(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $diagnosticId = $this->courses->saveDiagnostic($courseId, null, $_POST, $user->id);
             $this->flash('success', 'The course diagnostic was created.');
             $this->redirect('/admin/courses/' . $courseId . '/diagnostics/' . $diagnosticId);
         }, '/admin/courses/' . $courseId . '/diagnostics/new');
     }
 
-    public function editDiagnostic(): void
+
+    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}', name: 'admin_course_edit_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['GET'])]
+    public function editDiagnostic(): Response
     {
         $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $data = $this->courses->diagnosticEditor($courseId, $this->diagnosticId());
         $assessment = $this->prepareAssessment((array) $data['assessment']);
-        $this->render('admin-diagnostic-assessment', [
+        return $this->render('admin-diagnostic-assessment', [
             'title' => 'Diagnostic · ' . (string) $assessment['title'],
             'course' => $data['course'],
             'modules' => $data['modules'],
@@ -473,48 +526,56 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function updateDiagnostic(): void
+
+    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}', name: 'admin_course_update_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['POST'])]
+    public function updateDiagnostic(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $diagnosticId = $this->diagnosticId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId, $diagnosticId): void {
+        return $this->handle(function () use ($user, $courseId, $diagnosticId): void {
             $this->courses->saveDiagnostic($courseId, $diagnosticId, $_POST, $user->id);
             $this->flash('success', 'The course diagnostic was updated.');
             $this->redirect('/admin/courses/' . $courseId . '/diagnostics/' . $diagnosticId);
         }, '/admin/courses/' . $courseId . '/diagnostics/' . $diagnosticId);
     }
 
-    public function deleteDiagnostic(): void
+
+    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}/delete', name: 'admin_course_delete_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['POST'])]
+    public function deleteDiagnostic(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $diagnosticId = $this->diagnosticId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId, $diagnosticId): void {
+        return $this->handle(function () use ($user, $courseId, $diagnosticId): void {
             $this->courses->deleteDiagnostic($courseId, $diagnosticId, $user->id);
             $this->flash('success', 'The course diagnostic was deleted.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);
     }
 
-    public function moveDiagnostic(): void
+
+    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}/move', name: 'admin_course_move_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['POST'])]
+    public function moveDiagnostic(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $diagnosticId = $this->diagnosticId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId, $diagnosticId): void {
+        return $this->handle(function () use ($user, $courseId, $diagnosticId): void {
             $this->courses->moveDiagnostic($courseId, $diagnosticId, (string) ($_POST['direction'] ?? ''), $user->id);
             $this->redirect('/admin/courses/' . $courseId . '#diagnostics');
         }, '/admin/courses/' . $courseId . '#diagnostics');
     }
 
-    public function editFinalAssessment(): void
+
+    #[Route('/admin/courses/{id}/final-assessment', name: 'admin_course_edit_final_assessment', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function editFinalAssessment(): Response
     {
         $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
@@ -524,7 +585,7 @@ final class AdminCourseController extends BaseController
             ? $data['assessment']
             : $this->blankAssessment((string) $data['course']['title'] . ' final assessment');
         $assessment = $this->prepareAssessment($assessment);
-        $this->render('admin-final-assessment', [
+        return $this->render('admin-final-assessment', [
             'title' => 'Final assessment · ' . (string) $data['course']['title'],
             'course' => $data['course'],
             'assessment' => $assessment,
@@ -535,70 +596,81 @@ final class AdminCourseController extends BaseController
         ]);
     }
 
-    public function updateFinalAssessment(): void
+
+    #[Route('/admin/courses/{id}/final-assessment', name: 'admin_course_update_final_assessment', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updateFinalAssessment(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->replaceFinalAssessment($courseId, $_POST, $user->id);
             $this->flash('success', 'The final assessment was updated.');
             $this->redirect('/admin/courses/' . $courseId . '/final-assessment');
         }, '/admin/courses/' . $courseId . '/final-assessment');
     }
 
-    public function updateGradeBands(): void
+
+    #[Route('/admin/courses/{id}/grade-bands', name: 'admin_course_update_grade_bands', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updateGradeBands(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->replaceGradeBands($courseId, $_POST, $user->id);
             $this->flash('success', 'The course grade bands were updated.');
             $this->redirect('/admin/courses/' . $courseId . '#grading');
         }, '/admin/courses/' . $courseId . '#grading');
     }
 
-    public function deleteModule(): void
+
+    #[Route('/admin/courses/{id}/modules/{module_id}/delete', name: 'admin_course_delete_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['POST'])]
+    public function deleteModule(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         $moduleId = $this->moduleId();
-        $this->handle(function () use ($user, $courseId, $moduleId): void {
+        return $this->handle(function () use ($user, $courseId, $moduleId): void {
             $this->courses->deleteModule($courseId, $moduleId, $user->id);
             $this->flash('success', 'The module was deleted.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId . '/modules/' . $moduleId);
     }
 
-    public function importForm(): void
+
+    #[Route('/admin/courses/import', name: 'admin_course_import_form', methods: ['GET'])]
+    public function importForm(): Response
     {
         $user = $this->requirePermission('COURSE.IMPORT');
-        $this->render('admin-course-import', [
+        return $this->render('admin-course-import', [
             'title' => 'Import an HTML or JSON course',
             'categories' => $this->courses->categories(true),
         ]);
     }
 
-    public function stageImport(): void
+    #[Route('/admin/courses/import', name: 'admin_course_stage_import', methods: ['POST'])]
+    public function stageImport(): Response
     {
         $this->requireCsrf();
         $this->requirePermission('COURSE.IMPORT');
-        $this->handle(function (): void {
+        return $this->handle(function (): void {
             $analysis = $this->portability->stageImport((array) ($_FILES['course_file'] ?? $_FILES['course_html'] ?? []), $this->requireUser()->id);
             $this->redirect('/admin/courses/import/preview?key=' . rawurlencode((string) $analysis['import_key']));
         }, '/admin/courses/import');
     }
 
-    public function previewImport(): void
+
+    #[Route('/admin/courses/import/preview', name: 'admin_course_preview_import', methods: ['GET'])]
+    public function previewImport(): Response
     {
         $this->requirePermission('COURSE.IMPORT');
         $key = trim((string) ($_GET['key'] ?? ''));
-        $this->handle(function () use ($key): void {
+        return $this->handle(function () use ($key): Response {
             $analysis = $this->portability->reanalyseImport($key);
             foreach ($analysis['modules'] as &$module) {
                 $blocks = (array) ($module['content_blocks'] ?? $module['blocks'] ?? []);
@@ -659,7 +731,7 @@ final class AdminCourseController extends BaseController
                 fn(array $course): bool => !$this->portability->hasStartedLearners((int) $course['id'])
                     && ($user->hasPermission('PLATFORM.DASHBOARD.VIEW') || (int) ($course['owner_user_id'] ?? 0) === $user->id)
             ));
-            $this->render('admin-course-import-preview', [
+            return $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
                 'categories' => $this->courses->categories(true),
@@ -668,14 +740,16 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/import');
     }
 
-    public function commitImport(): void
+
+    #[Route('/admin/courses/import/commit', name: 'admin_course_commit_import', methods: ['POST'])]
+    public function commitImport(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.IMPORT');
         $key = trim((string) ($_POST['import_key'] ?? ''));
         $categoryId = (int) ($_POST['category_id'] ?? 0);
         $replaceCourseId = (int) ($_POST['replace_course_id'] ?? 0);
-        $this->handle(function () use ($user, $key, $categoryId, $replaceCourseId): void {
+        return $this->handle(function () use ($user, $key, $categoryId, $replaceCourseId): void {
             if ($replaceCourseId > 0) {
                 $this->requireManagedCourse($replaceCourseId);
             }
@@ -685,13 +759,15 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/import/preview?key=' . rawurlencode($key));
     }
 
-    public function grantSelf(): void
+
+    #[Route('/admin/courses/{id}/grant-self', name: 'admin_course_grant_self', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function grantSelf(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.PREVIEW');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $course = $this->courses->adminCourse($courseId);
             $this->courses->grantForTesting($courseId, $user->id, $user->id);
             $this->flash('success', 'The course is in your library. It has not started yet.');
@@ -699,13 +775,15 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/' . $courseId);
     }
 
-    public function grant(): void
+
+    #[Route('/admin/courses/{id}/grant', name: 'admin_course_grant', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function grant(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->grantByEmail(
                 $courseId,
                 (string) ($_POST['email'] ?? ''),
@@ -717,13 +795,15 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/' . $courseId);
     }
 
-    public function uploadMedia(): void
+
+    #[Route('/admin/courses/{id}/media', name: 'admin_course_upload_media', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function uploadMedia(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.MEDIA.MANAGE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->courses->saveMedia(
                 $courseId,
                 (array) ($_FILES['media_file'] ?? []),
@@ -736,13 +816,15 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/' . $courseId . '#media');
     }
 
-    public function importPresentation(): void
+
+    #[Route('/admin/courses/{id}/presentation', name: 'admin_course_import_presentation', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function importPresentation(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.EDIT');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $result = $this->courses->importPresentationFromHtml(
                 $courseId,
                 (array) ($_FILES['course_html'] ?? []),
@@ -757,7 +839,9 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses/' . $courseId . '#presentation');
     }
 
-    public function export(): void
+
+    #[Route('/admin/courses/{id}/export', name: 'admin_course_export', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function export(): Response
     {
         $this->requirePermission('COURSE.EXPORT');
         $courseId = $this->courseId();
@@ -779,39 +863,45 @@ final class AdminCourseController extends BaseController
         exit;
     }
 
-    public function resetCourse(): void
+
+    #[Route('/admin/courses/{id}/reset', name: 'admin_course_reset_course', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function resetCourse(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.DELETE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->portability->resetCourse($courseId, $user->id);
             $this->flash('success', 'The course content was reset. The course shell is ready for re-import.');
             $this->redirect('/admin/courses');
         }, '/admin/courses');
     }
 
-    public function deleteCourse(): void
+
+    #[Route('/admin/courses/{id}/delete', name: 'admin_course_delete_course', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function deleteCourse(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.DELETE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $this->portability->deleteCourse($courseId, $user->id);
             $this->flash('success', 'The course was permanently deleted.');
             $this->redirect('/admin/courses');
         }, '/admin/courses');
     }
 
-    public function cloneRevision(): void
+
+    #[Route('/admin/courses/{id}/revision', name: 'admin_course_clone_revision', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function cloneRevision(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CREATE');
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $newId = $this->portability->cloneRevision($courseId, $user->id);
             $this->flash('success', 'A new draft revision was created.');
             $this->redirect('/admin/courses/' . $newId);
@@ -824,14 +914,14 @@ final class AdminCourseController extends BaseController
         $user = $this->requireUser();
         $course = $this->courses->adminCourse($courseId);
         if (!$user->hasPermission('PLATFORM.DASHBOARD.VIEW') && !$this->courses->userCanManageCourse($courseId, $user->id)) {
-            $this->f3->error(403, 'You do not have permission to manage this course.');
+            throw new AccessDeniedHttpException('You do not have permission to manage this course.');
         }
         return $course;
     }
 
     private function courseId(): int
     {
-        $id = (int) $this->f3->get('PARAMS.id');
+        $id = (int) $this->param('id');
         if ($id < 1) {
             throw new InvalidArgumentException('Invalid course identifier.');
         }
@@ -840,7 +930,7 @@ final class AdminCourseController extends BaseController
 
     private function priceVariantId(): int
     {
-        $id = (int) $this->f3->get('PARAMS.price_variant_id');
+        $id = (int) $this->param('price_variant_id');
         if ($id < 1) {
             throw new InvalidArgumentException('Invalid price variant identifier.');
         }
@@ -849,7 +939,7 @@ final class AdminCourseController extends BaseController
 
     private function moduleId(): int
     {
-        $id = (int) $this->f3->get('PARAMS.module_id');
+        $id = (int) $this->param('module_id');
         if ($id < 1) {
             throw new InvalidArgumentException('Invalid module identifier.');
         }
@@ -858,7 +948,7 @@ final class AdminCourseController extends BaseController
 
     private function diagnosticId(): int
     {
-        $id = (int) $this->f3->get('PARAMS.diagnostic_id');
+        $id = (int) $this->param('diagnostic_id');
         if ($id < 1) {
             throw new InvalidArgumentException('Invalid diagnostic identifier.');
         }

@@ -38,6 +38,7 @@ namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Support\Pagination;
 use PHPUnit\Framework\Attributes\DataProvider;
+use CattoLearning\Tests\Support\RouteTable;
 use PHPUnit\Framework\TestCase;
 
 final class PaginationUiContractTest extends TestCase
@@ -430,12 +431,15 @@ final class PaginationUiContractTest extends TestCase
     {
         $admin = self::read('src/Http/Controller/AdminController.php');
         $courseController = self::read('src/Http/Controller/AdminCourseController.php');
-        $routes = self::read('src/Application/App.php');
-
-        self::assertStringContainsString(
-            "\$routes->add('GET /admin/courses', AdminController::class, 'courses');",
-            $routes,
-            'The Courses list must be routed to the shared Administration controller.'
+        $courses = array_values(array_filter(
+            RouteTable::all(),
+            static fn(array $r): bool => $r['method'] === 'GET' && $r['path'] === '/admin/courses'
+        ));
+        self::assertCount(1, $courses, 'The Courses list is declared exactly once.');
+        self::assertStringEndsWith(
+            'AdminController',
+            $courses[0]['class'],
+            'The Courses list must be served by the shared Administration controller.'
         );
         self::assertStringContainsString(
             "renderAdministrationSection('courses')",

@@ -58,13 +58,13 @@ $need(str_contains($auditBlock,'ip_address INET NULL') && !str_contains($auditBl
 
 
 $app = $read($root . '/src/Application/App.php');
-$containerFactory = $read($root . '/src/Application/ContainerFactory.php');
-$routeRegistrar = $read($root . '/src/Http/Routing/RouteRegistrar.php');
-$need(str_contains($app,"\$f3->set('CONTAINER', \$container)"), 'HTTP bootstrap must register PHP-DI as F3 native PSR-11 CONTAINER.');
-$need(str_contains($app,'new RouteRegistrar($f3)'), 'HTTP bootstrap must register routes without a custom container adapter.');
+// One router, one container. Fat-Free and PHP-DI are gone and neither may come back: two routers
+// meant a route could be claimed twice, and two containers meant one object graph described twice.
+$need(!str_contains($app, 'Base::instance()'), 'Fat-Free must not be reintroduced into the HTTP bootstrap.');
+$need(str_contains($app, 'self::handleWithSymfony('), 'The HTTP bootstrap must hand the request to the Symfony kernel.');
+$need(!is_file($root . '/src/Application/ContainerFactory.php'), 'The PHP-DI composition root must not return.');
+$need(!is_file($root . '/src/Http/Routing/RouteRegistrar.php'), 'The Fat-Free route registrar must not return.');
 $need(!str_contains($app,'new HomeController('), 'HTTP bootstrap must not eagerly construct controllers.');
-$need(str_contains($containerFactory,'ContainerBuilder'), 'PHP-DI composition root is missing.');
-$need(str_contains($routeRegistrar, "\$controllerClass . '->' . \$method"), 'RouteRegistrar must use native F3 Class->method callbacks.');
 $need(!is_file($root . '/src/Http/Routing/LazyControllerHandler.php'), 'Custom LazyControllerHandler must not return; F3 owns PSR-11 route resolution.');
 $need(!is_file($root . '/src/Application/AppContext.php'), 'Obsolete AppContext must not exist.');
 $need(!is_file($root . '/src/Application/ServiceFactory.php'), 'Obsolete ServiceFactory must not exist.');

@@ -36,8 +36,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use Base;
 use CattoLearning\Application\CompanySectionRegistry;
+use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
@@ -45,33 +45,41 @@ use CattoLearning\Company\CompanyService;
 use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class CompanyController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CompanyService $companies,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanySectionRegistry $sections,
         private readonly SelectedCompanyContext $companyContext
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
-    public function registerForm(): void
+
+    #[Route('/company/register', name: 'company_register_form', methods: ['GET'])]
+    public function registerForm(): Response
     {
         $user = $this->requirePermission('COMPANY.CREATE');
         if ($this->companies->forUser($user->id) !== null) $this->redirect('/company');
-        $this->render('company-register', ['title' => 'Register a company account', 'user_email' => $user->primaryEmail]);
+        return $this->render('company-register', ['title' => 'Register a company account', 'user_email' => $user->primaryEmail]);
     }
 
-    public function register(): void
+
+    #[Route('/company/register', name: 'company_register', methods: ['POST'])]
+    public function register(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.CREATE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $this->companies->register($user->id, $user->primaryEmail, (string) ($_POST['name'] ?? ''), (string) ($_POST['domain'] ?? ''));
             $this->flash('success', 'The company account has been created.');
             $this->redirect('/company');
@@ -79,23 +87,31 @@ final class CompanyController extends BaseController
     }
 
     /** Renders every Company section as one presentation-neutral workspace. */
-    public function index(): void
+    #[Route('/company', name: 'company_index', methods: ['GET'])]
+    public function index(): Response
     {
         $user = $this->requirePermission('COMPANY.DASHBOARD.VIEW');
         $data = $this->workspaceData($user);
         $data['company_sections'] = $this->allowedSections($user);
         $data['company_layout'] = 'workspace';
-        $this->render('company-control-centre', $data + [
+        return $this->render('company-control-centre', $data + [
             'title' => 'Company', 'page_kicker' => 'People, requests, learning, credits and courses', 'active_nav' => 'company',
         ]);
     }
 
-    public function dashboard(): void { $this->standalone('dashboard', 'COMPANY.DASHBOARD.VIEW'); }
-    public function people(): void { $this->standalone('people', 'COMPANY.PERSON.VIEW'); }
-    public function requests(): void { $this->standalone('requests', 'COMPANY.REQUEST.VIEW'); }
-    public function enrolments(): void { $this->standalone('enrolments', 'COMPANY.ENROLMENT.VIEW'); }
-    public function credits(): void { $this->standalone('credits', 'COMPANY.CREDIT.VIEW'); }
-    public function courses(): void { $this->standalone('courses', 'COMPANY.COURSE.VIEW'); }
+
+    #[Route('/company/dashboard', name: 'company_dashboard', methods: ['GET'])]
+    public function dashboard(): Response { return $this->standalone('dashboard', 'COMPANY.DASHBOARD.VIEW'); }
+    #[Route('/company/people', name: 'company_people', methods: ['GET'])]
+    public function people(): Response { return $this->standalone('people', 'COMPANY.PERSON.VIEW'); }
+    #[Route('/company/requests', name: 'company_requests', methods: ['GET'])]
+    public function requests(): Response { return $this->standalone('requests', 'COMPANY.REQUEST.VIEW'); }
+    #[Route('/company/enrolments', name: 'company_enrolments', methods: ['GET'])]
+    public function enrolments(): Response { return $this->standalone('enrolments', 'COMPANY.ENROLMENT.VIEW'); }
+    #[Route('/company/credits', name: 'company_credits', methods: ['GET'])]
+    public function credits(): Response { return $this->standalone('credits', 'COMPANY.CREDIT.VIEW'); }
+    #[Route('/company/courses', name: 'company_courses', methods: ['GET'])]
+    public function courses(): Response { return $this->standalone('courses', 'COMPANY.COURSE.VIEW'); }
 
     /**
      * Courses the company has bought access to for its staff.
@@ -104,7 +120,8 @@ final class CompanyController extends BaseController
      * is stock the company sells, the other is stock it consumes - and a single list could answer
      * neither question. See ROADMAP section 3d.
      */
-    public function training(): void { $this->standalone('training', 'COMPANY.COURSE.VIEW'); }
+    #[Route('/company/training', name: 'company_training', methods: ['GET'])]
+    public function training(): Response { return $this->standalone('training', 'COMPANY.COURSE.VIEW'); }
 
     /**
      * The bounded pickers the assign form uses, scoped to the company being administered.
@@ -113,14 +130,13 @@ final class CompanyController extends BaseController
      * PLATFORM.* permissions a company administrator does not hold - and must not be given, since
      * they would then be able to search every person and course on the platform.
      */
-    public function lookup(): void
+    #[Route('/company/lookup/{type}', name: 'company_lookup', requirements: ['type' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function lookup(): Response
     {
         $user = $this->requirePermission('COMPANY.PERSON.VIEW');
-        $type = strtolower(trim((string) $this->f3->get('PARAMS.type')));
+        $type = strtolower(trim((string) $this->param('type')));
         if (!in_array($type, ['people', 'assignable_courses'], true)) {
-            $this->f3->error(400, 'Unknown lookup type.');
-
-            return;
+            throw new BadRequestHttpException('Unknown lookup type.');
         }
 
         $context = $this->companyContext->resolve($user);
@@ -132,7 +148,7 @@ final class CompanyController extends BaseController
         // query string says what to search for, and must not be able to say whose data to search.
         $results = $this->platformAdministration->lookupEntities($type, $query, $companyId);
 
-        $this->renderFragment('partials/entity-lookup-results', [
+        return $this->renderFragment('partials/entity-lookup-results', [
             'lookup_type' => $type,
             'lookup_target' => $target,
             'lookup_query' => trim($query),
@@ -149,12 +165,13 @@ final class CompanyController extends BaseController
      * The owner's second workflow: buy credits, assign, tell the person outside the LMS. The rules
      * live in the service; this checks the permission, reads the form and reports the outcome.
      */
-    public function assignCourse(): void
+    #[Route('/company/enrolments/assign', name: 'company_assign_course', methods: ['POST'])]
+    public function assignCourse(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
 
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $context = $this->companyContext->resolve($user);
             $companyId = (int) $context['company_id'];
             if ($companyId <= 0) {
@@ -184,7 +201,8 @@ final class CompanyController extends BaseController
     }
 
     /** Courses the company may want for its staff but has not bought. */
-    public function favourites(): void { $this->standalone('favourites', 'COMPANY.COURSE.VIEW'); }
+    #[Route('/company/favourites', name: 'company_favourites', methods: ['GET'])]
+    public function favourites(): Response { return $this->standalone('favourites', 'COMPANY.COURSE.VIEW'); }
 
     /**
      * Course performance for this company's own staff.
@@ -193,7 +211,8 @@ final class CompanyController extends BaseController
      * company administrator's to see. This asks the same question of their own people, which is the
      * one they actually have.
      */
-    public function performance(): void { $this->standalone('performance', 'COMPANY.ENROLMENT.VIEW'); }
+    #[Route('/company/performance', name: 'company_performance', methods: ['GET'])]
+    public function performance(): Response { return $this->standalone('performance', 'COMPANY.ENROLMENT.VIEW'); }
 
     /**
      * Adds or removes one company favourite.
@@ -201,13 +220,14 @@ final class CompanyController extends BaseController
      * The company is taken from the context the reader is administering, never from the request: a
      * course id in a URL says which course, and it must not be able to say whose favourite it is.
      */
-    public function toggleFavourite(): void
+    #[Route('/company/favourites/{id}/toggle', name: 'company_toggle_favourite', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function toggleFavourite(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.COURSE.MANAGE');
-        $courseId = (int) $this->f3->get('PARAMS.id');
+        $courseId = (int) $this->param('id');
 
-        $this->handle(function () use ($user, $courseId): void {
+        return $this->handle(function () use ($user, $courseId): void {
             $context = $this->companyContext->resolve($user);
             $companyId = (int) $context['company_id'];
             if ($companyId <= 0) {
@@ -220,11 +240,13 @@ final class CompanyController extends BaseController
         }, '/company/favourites');
     }
 
-    public function createPerson(): void
+
+    #[Route('/company/people', name: 'company_create_person', methods: ['POST'])]
+    public function createPerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             // The old guard refused this outright for a platform administrator, because it asked
             // whether the *actor* belonged to a company. There is always a company in context now,
             // so the question to ask is which one, not whether there is one.
@@ -239,25 +261,29 @@ final class CompanyController extends BaseController
         }, '/company/people');
     }
 
-    public function removePerson(): void
+
+    #[Route('/company/people/{id}/remove', name: 'company_remove_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function removePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $target): void {
+        $target = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $target): void {
             $this->platformAdministration->removeCompanyPerson($user->id, $this->contextCompanyId($user), $target);
             $this->flash('success', 'The person was removed from the company. Their account and learning history remain.');
             $this->redirect('/company/people');
         }, '/company/people');
     }
 
-    public function decideRequest(): void
+
+    #[Route('/company/requests/{id}/decision', name: 'company_decide_request', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function decideRequest(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.REQUEST.MANAGE');
-        $requestId = max(1, (int) $this->f3->get('PARAMS.id'));
+        $requestId = max(1, (int) $this->param('id'));
         $approve = (string) ($_POST['decision'] ?? '') === 'approve';
-        $this->handle(function () use ($user, $requestId, $approve): void {
+        return $this->handle(function () use ($user, $requestId, $approve): void {
             // Scoped to the company in context even for a platform administrator. Deciding a
             // request from the Company workspace means deciding it for the company being
             // administered; the unrestricted path belongs to Administration, not here.
@@ -267,12 +293,14 @@ final class CompanyController extends BaseController
         }, '/company/requests');
     }
 
-    public function removeEnrolment(): void
+
+    #[Route('/company/enrolments/{id}/remove', name: 'company_remove_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function removeEnrolment(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $id): void {
+        $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->removeCompanyEnrolment(
                 $user->id,
                 $this->contextCompanyId($user),
@@ -284,12 +312,14 @@ final class CompanyController extends BaseController
         }, '/company/enrolments');
     }
 
-    public function restoreEnrolment(): void
+
+    #[Route('/company/enrolments/{id}/restore', name: 'company_restore_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function restoreEnrolment(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.ENROLMENT.MANAGE');
-        $id = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $id): void {
+        $id = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->restoreCompanyEnrolment($user->id, $this->contextCompanyId($user), $id);
             $this->flash('success', 'Course access was restored.');
             $this->redirect('/company/enrolments');
@@ -299,12 +329,13 @@ final class CompanyController extends BaseController
     /**
      * Edits the profile fields the company owns for one of its people.
      */
-    public function updatePerson(): void
+    #[Route('/company/people/{id}', name: 'company_update_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updatePerson(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
-        $this->handle(function () use ($user, $target): void {
+        $target = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $target): void {
             $this->platformAdministration->updateCompanyPerson($user->id, $this->contextCompanyId($user), $target, $_POST);
             $this->flash('success', 'The person was updated.');
             $this->redirect('/company/people');
@@ -318,13 +349,14 @@ final class CompanyController extends BaseController
      * once rather than at their next sign-in. Nothing is deleted either way, so enabling returns
      * the learner to exactly where they left off.
      */
-    public function setPersonStatus(): void
+    #[Route('/company/people/{id}/status', name: 'company_set_person_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function setPersonStatus(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.PERSON.MANAGE');
-        $target = max(1, (int) $this->f3->get('PARAMS.id'));
+        $target = max(1, (int) $this->param('id'));
         $status = (string) ($_POST['status'] ?? '');
-        $this->handle(function () use ($user, $target, $status): void {
+        return $this->handle(function () use ($user, $target, $status): void {
             $this->platformAdministration->setCompanyPersonStatus($user->id, $this->contextCompanyId($user), $target, $status);
             $this->flash('success', $status === 'disabled'
                 ? 'The account was disabled and signed out. Their membership and learning history are unchanged.'
@@ -340,12 +372,12 @@ final class CompanyController extends BaseController
      * canonical state stays in the query string: without JavaScript the same URL renders the same
      * page of results as an ordinary GET.
      */
-    public function picker(): void
+    #[Route('/company/picker', name: 'company_picker', methods: ['GET'])]
+    public function picker(): Response
     {
         $user = $this->requirePermission(SelectedCompanyContext::SELECTOR_PERMISSION);
         if (!$this->companyContext->canSelect($user)) {
-            $this->f3->error(403, 'Your account administers a single company.');
-            return;
+            throw new AccessDeniedHttpException('Your account administers a single company.');
         }
 
         // ALL by default, and never the request universe. The picker's job is to show every
@@ -356,11 +388,10 @@ final class CompanyController extends BaseController
             + ['company_context_id' => $this->contextCompanyId($user)];
 
         if ($this->isHtmxRequest()) {
-            $this->renderFragment('partials/company-picker-results', $data);
-            return;
+            return $this->renderFragment('partials/company-picker-results', $data);
         }
 
-        $this->render('company-picker', $data + [
+        return $this->render('company-picker', $data + [
             'title' => 'Switch company', 'page_title' => 'Switch company', 'active_nav' => 'company',
         ]);
     }
@@ -387,7 +418,7 @@ final class CompanyController extends BaseController
      * called the consolidated loader, so opening Company People also fetched requests,
      * enrolments, credits and the entire course list.
      */
-    private function standalone(string $key, string $permission): void
+    private function standalone(string $key, string $permission): Response
     {
         $user = $this->requirePermission($permission);
         $definition = $this->sections->get($key);
@@ -404,7 +435,7 @@ final class CompanyController extends BaseController
             );
         $data['company_section'] = $definition;
         $data['company_layout'] = 'section';
-        $this->render('company-section', $data + [
+        return $this->render('company-section', $data + [
             'title' => $definition['label'] . ' · Company', 'page_title' => $definition['label'], 'page_kicker' => 'Company', 'active_nav' => 'company',
         ]);
     }
@@ -483,11 +514,12 @@ final class CompanyController extends BaseController
      * boundary, and `?company_id=` on a read would be exactly the widening this design exists to
      * refuse - as well as a read that writes, which this project has already been bitten by once.
      */
-    public function selectCompany(): void
+    #[Route('/company/context', name: 'company_select_company', methods: ['POST'])]
+    public function selectCompany(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COMPANY.DASHBOARD.VIEW');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $companyId = (int) ($_POST['company_id'] ?? 0);
             if ($companyId === 0) {
                 // Back to the default rather than to a synthetic "all companies" context, which

@@ -25,20 +25,26 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
 final class AuthController extends BaseController
 {
-    public function loginForm(): void
+    #[Route('/login', name: 'auth_login_form', methods: ['GET'])]
+    public function loginForm(): Response
     {
         if ($this->currentUser() !== null) {
             $this->redirect('/account/library');
         }
-        $this->render('login', [
+        return $this->render('login', [
             'title' => 'Sign in',
             'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/library')),
         ]);
     }
 
-    public function requestLink(): void
+
+    #[Route('/login', name: 'auth_request_link', methods: ['POST'])]
+    public function requestLink(): Response
     {
         $this->requireCsrf();
         $email = (string) ($_POST['email'] ?? '');
@@ -58,22 +64,27 @@ final class AuthController extends BaseController
     }
 
 
-    public function sent(): void
+
+
+    #[Route('/login/sent', name: 'auth_sent', methods: ['GET'])]
+    public function sent(): Response
     {
-        $this->render('login-sent', ['title' => 'Check your email']);
+        return $this->render('login-sent', ['title' => 'Check your email']);
     }
 
-    public function consumeHead(): void
+    #[Route('/auth/consume', name: 'auth_consume_head', methods: ['HEAD'])]
+    public function consumeHead(): Response
     {
         // Link scanners may probe the URL with HEAD. Never consume a token on HEAD.
-        http_response_code(204);
-        header('Cache-Control: no-store');
+        return new Response('', Response::HTTP_NO_CONTENT, ['Cache-Control' => 'no-store']);
     }
 
-    public function consume(): void
+
+    #[Route('/auth/consume', name: 'auth_consume', methods: ['GET'])]
+    public function consume(): Response
     {
         $token = (string) ($_GET['token'] ?? '');
-        $this->handle(function () use ($token): void {
+        return $this->handle(function () use ($token): void {
             $returnPath = $this->auth->consumeLogin($token);
             session_regenerate_id(true);
             $this->flash('success', 'You are signed in.');
@@ -81,7 +92,9 @@ final class AuthController extends BaseController
         }, '/login');
     }
 
-    public function logout(): void
+
+    #[Route('/logout', name: 'auth_logout', methods: ['POST'])]
+    public function logout(): Response
     {
         $this->requireCsrf();
         $this->auth->logout();

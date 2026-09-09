@@ -259,11 +259,24 @@ foreach (["PLATFORM_ASSET_VERSION = '0.6'", "\$model['navigation']", "\$model['f
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);
 
-$app = $read($root . '/src/Application/App.php');
+// Read from the attributes that declare the routes; there is no route table any more.
+$app = '';
+foreach (glob($root . '/src/Http/Controller/*.php') ?: [] as $controller) {
+    $source = (string) file_get_contents($controller);
+    if (preg_match_all("/#\[Route\('([^']*)'[^\n]*?methods: \['([A-Z]+)'\]/", $source, $found, PREG_SET_ORDER)) {
+        foreach ($found as $route) {
+            $app .= $route[2] . ' ' . $route[1] . "\n";
+        }
+    }
+}
 foreach (['GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses','GET /admin/roles'] as $route) {
     $need(str_contains($app, $route), 'Semantic workspace route missing: ' . $route);
 }
-$need(str_contains($app, "GET /account/library', AccountController::class, 'learning'"), 'My Learning direct route must render through AccountController.');
+$account = $read($root . '/src/Http/Controller/AccountController.php');
+$need(
+    (bool) preg_match("/#\[Route\('\/account\/library'[^\n]*\n\s*public function learning\(/", $account),
+    'My Learning direct route must render through AccountController::learning().'
+);
 
 // ---------------------------------------------------------------------------------------------
 // Each of the two screens carries its own dataset state. It used to be one screen carrying both,

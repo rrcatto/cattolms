@@ -18,12 +18,14 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\View\ThemeManager;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 
-use Base;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Serves presentation-only runtime theme metadata required by platform-owned
@@ -32,15 +34,17 @@ use Base;
 final class ThemeController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly ThemeManager $themes
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
-    public function palette(): void
+
+    #[Route('/theme/palette', name: 'theme_palette', methods: ['GET'])]
+    public function palette(): Response
     {
         $key = $this->themes->activeTheme();
         $preview = trim((string) ($_GET['theme_preview'] ?? ''));

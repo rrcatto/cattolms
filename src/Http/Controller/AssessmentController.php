@@ -28,33 +28,37 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Course\AssessmentService;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 
-use Base;
+use Symfony\Component\HttpFoundation\Response;
 
 final class AssessmentController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly AssessmentService $assessments
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
-    public function moduleOverview(): void
+
+    #[Route('/learn/{slug}/module/{position}/assessment', name: 'assessment_module_overview', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'position' => '\\d+'], methods: ['GET'])]
+    public function moduleOverview(): Response
     {
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $position = (int) $this->f3->get('PARAMS.position');
+        $slug = (string) $this->param('slug');
+        $position = (int) $this->param('position');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $position, $preview): void {
+        return $this->handle(function () use ($user, $slug, $position, $preview): Response {
             $data = $this->assessments->moduleOverview($user->id, $slug, $position, $preview);
-            $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
+            return $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
                 'title' => (string) $data['assessment']['title'],
                 'start_action' => '/learn/' . rawurlencode($slug) . '/module/' . $position . '/assessment/start' . $this->previewQuery($preview),
                 'back_url' => '/learn/' . rawurlencode($slug) . '/module/' . $position . $this->previewQuery($preview),
@@ -62,15 +66,17 @@ final class AssessmentController extends BaseController
         }, '/learn/' . rawurlencode($slug) . '/module/' . $position . $this->previewQuery($preview));
     }
 
-    public function diagnosticOverview(): void
+
+    #[Route('/learn/{slug}/diagnostic/{key}', name: 'assessment_diagnostic_overview', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'key' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function diagnosticOverview(): Response
     {
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $key = (string) $this->f3->get('PARAMS.key');
+        $slug = (string) $this->param('slug');
+        $key = (string) $this->param('key');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $key, $preview): void {
+        return $this->handle(function () use ($user, $slug, $key, $preview): Response {
             $data = $this->assessments->diagnosticOverview($user->id, $slug, $key, $preview);
-            $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
+            return $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
                 'title' => (string) $data['assessment']['title'],
                 'start_action' => '/learn/' . rawurlencode($slug) . '/diagnostic/' . rawurlencode($key) . '/start' . $this->previewQuery($preview),
                 'back_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview),
@@ -79,27 +85,31 @@ final class AssessmentController extends BaseController
         }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
     }
 
-    public function startDiagnostic(): void
+
+    #[Route('/learn/{slug}/diagnostic/{key}/start', name: 'assessment_start_diagnostic', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'key' => '[a-zA-Z0-9_-]+'], methods: ['POST'])]
+    public function startDiagnostic(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $key = (string) $this->f3->get('PARAMS.key');
+        $slug = (string) $this->param('slug');
+        $key = (string) $this->param('key');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $key, $preview): void {
+        return $this->handle(function () use ($user, $slug, $key, $preview): void {
             $session = $this->assessments->startDiagnosticAttempt($user->id, $slug, $key, $preview);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/diagnostic/' . rawurlencode($key) . $this->previewQuery($preview));
     }
 
-    public function finalOverview(): void
+
+    #[Route('/learn/{slug}/final/assessment', name: 'assessment_final_overview', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    public function finalOverview(): Response
     {
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
+        $slug = (string) $this->param('slug');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $preview): void {
+        return $this->handle(function () use ($user, $slug, $preview): Response {
             $data = $this->assessments->finalOverview($user->id, $slug, $preview);
-            $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
+            return $this->render('assessment-overview', $this->viewData($data, $slug, $preview) + [
                 'title' => (string) $data['assessment']['title'],
                 'start_action' => '/learn/' . rawurlencode($slug) . '/final/assessment/start' . $this->previewQuery($preview),
                 'back_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview),
@@ -107,47 +117,53 @@ final class AssessmentController extends BaseController
         }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
     }
 
-    public function startModule(): void
+
+    #[Route('/learn/{slug}/module/{position}/assessment/start', name: 'assessment_start_module', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'position' => '\\d+'], methods: ['POST'])]
+    public function startModule(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $position = (int) $this->f3->get('PARAMS.position');
+        $slug = (string) $this->param('slug');
+        $position = (int) $this->param('position');
         $preview = $this->previewMode();
         $mode = (string) ($_POST['mode'] ?? 'graded');
-        $this->handle(function () use ($user, $slug, $position, $preview, $mode): void {
+        return $this->handle(function () use ($user, $slug, $position, $preview, $mode): void {
             $session = $this->assessments->startModuleAttempt($user->id, $slug, $position, $mode, $preview);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/module/' . $position . '/assessment' . $this->previewQuery($preview));
     }
 
-    public function startFinal(): void
+
+    #[Route('/learn/{slug}/final/assessment/start', name: 'assessment_start_final', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['POST'])]
+    public function startFinal(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
+        $slug = (string) $this->param('slug');
         $preview = $this->previewMode();
         $mode = (string) ($_POST['mode'] ?? 'graded');
-        $this->handle(function () use ($user, $slug, $preview, $mode): void {
+        return $this->handle(function () use ($user, $slug, $preview, $mode): void {
             $session = $this->assessments->startFinalAttempt($user->id, $slug, $mode, $preview);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode((string) $session['public_id']) . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/final/assessment' . $this->previewQuery($preview));
     }
 
-    public function session(): void
+
+    #[Route('/learn/{slug}/assessment/session/{session}', name: 'assessment_session', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'session' => '\\d+'], methods: ['GET'])]
+    public function session(): Response
     {
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $publicId = (string) $this->f3->get('PARAMS.session');
+        $slug = (string) $this->param('slug');
+        $publicId = (string) $this->param('session');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $publicId, $preview): void {
+        return $this->handle(function () use ($user, $slug, $publicId, $preview): Response {
             $session = $this->assessments->session($user->id, $publicId);
             if ((string) $session['status'] !== 'in_progress') {
                 $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode($publicId) . '/result' . $this->previewQuery($preview));
             }
             $feedback = is_array($_SESSION['assessment_feedback'] ?? null) ? $_SESSION['assessment_feedback'] : null;
             unset($_SESSION['assessment_feedback']);
-            $this->render('assessment-question', [
+            return $this->render('assessment-question', [
                 'title' => (string) $session['assessment_title'],
                 'session' => $session,
                 'question' => $session['question'],
@@ -161,17 +177,19 @@ final class AssessmentController extends BaseController
         }, '/learn/' . rawurlencode($slug) . $this->previewQuery($preview));
     }
 
-    public function respond(): void
+
+    #[Route('/learn/{slug}/assessment/session/{session}/respond', name: 'assessment_respond', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'session' => '\\d+'], methods: ['POST'])]
+    public function respond(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $publicId = (string) $this->f3->get('PARAMS.session');
+        $slug = (string) $this->param('slug');
+        $publicId = (string) $this->param('session');
         $preview = $this->previewMode();
         $questionId = (int) ($_POST['question_id'] ?? 0);
         $skip = isset($_POST['skip']);
         $optionId = isset($_POST['option_id']) ? (int) $_POST['option_id'] : null;
-        $this->handle(function () use ($user, $slug, $publicId, $preview, $questionId, $optionId, $skip): void {
+        return $this->handle(function () use ($user, $slug, $publicId, $preview, $questionId, $optionId, $skip): void {
             $next = $this->assessments->respond($user->id, $publicId, $questionId, $optionId, $skip);
             if (isset($next['feedback']) && is_array($next['feedback'])) {
                 $_SESSION['assessment_feedback'] = $next['feedback'];
@@ -181,28 +199,32 @@ final class AssessmentController extends BaseController
         }, '/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode($publicId) . $this->previewQuery($preview));
     }
 
-    public function finish(): void
+
+    #[Route('/learn/{slug}/assessment/session/{session}/finish', name: 'assessment_finish', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'session' => '\\d+'], methods: ['POST'])]
+    public function finish(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $publicId = (string) $this->f3->get('PARAMS.session');
+        $slug = (string) $this->param('slug');
+        $publicId = (string) $this->param('session');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $publicId, $preview): void {
+        return $this->handle(function () use ($user, $slug, $publicId, $preview): void {
             $this->assessments->finish($user->id, $publicId);
             $this->redirect('/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode($publicId) . '/result' . $this->previewQuery($preview));
         }, '/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode($publicId) . $this->previewQuery($preview));
     }
 
-    public function result(): void
+
+    #[Route('/learn/{slug}/assessment/session/{session}/result', name: 'assessment_result', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'session' => '\\d+'], methods: ['GET'])]
+    public function result(): Response
     {
         $user = $this->requirePermission('LEARNING.ASSESSMENT.TAKE');
-        $slug = (string) $this->f3->get('PARAMS.slug');
-        $publicId = (string) $this->f3->get('PARAMS.session');
+        $slug = (string) $this->param('slug');
+        $publicId = (string) $this->param('session');
         $preview = $this->previewMode();
-        $this->handle(function () use ($user, $slug, $publicId, $preview): void {
+        return $this->handle(function () use ($user, $slug, $publicId, $preview): Response {
             $session = $this->assessments->result($user->id, $publicId);
-            $this->render('assessment-session-result', [
+            return $this->render('assessment-session-result', [
                 'title' => 'Assessment result',
                 'session' => $session,
                 'course_url' => '/learn/' . rawurlencode($slug) . $this->previewQuery($preview),

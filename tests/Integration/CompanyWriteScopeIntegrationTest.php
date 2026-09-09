@@ -52,13 +52,13 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
-use DI\Container;
+use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\TestCase;
 use Throwable;
 
 final class CompanyWriteScopeIntegrationTest extends TestCase
 {
-    private Container $container;
+    private ContainerInterface $container;
     private Database $db;
     private IntegrationDataFixture $fixture;
     private SelectedCompanyContext $context;

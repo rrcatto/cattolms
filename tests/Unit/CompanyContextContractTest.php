@@ -29,6 +29,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Company\SelectedCompanyContext;
+use CattoLearning\Tests\Support\RouteTable;
 use CattoLearning\Tests\Support\RenderHarness;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -61,7 +62,7 @@ final class CompanyContextContractTest extends TestCase
     /** Selecting is a POST route; nothing in the Company workspace selects on a GET. */
     public function testSelectingIsAPostRoute(): void
     {
-        $routes = self::source('src/Application/App.php');
+        $routes = RouteTable::signatures();
 
         self::assertStringContainsString(
             "POST /company/context",

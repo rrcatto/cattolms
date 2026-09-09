@@ -45,13 +45,13 @@ use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Support\Token;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
-use DI\Container;
+use Psr\Container\ContainerInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class CompanySuspensionIntegrationTest extends TestCase
 {
-    private Container $container;
+    private ContainerInterface $container;
     private Database $db;
     private IntegrationDataFixture $fixture;
     private PlatformAdministrationService $administration;

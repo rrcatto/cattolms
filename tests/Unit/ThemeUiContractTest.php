@@ -100,10 +100,26 @@ final class ThemeUiContractTest extends TestCase
         self::assertStringContainsString("platformAsset('/css/catto-platform.css')", $renderer);
     }
 
-    public function testThemeRendererDoesNotResetStatusDuringF3ErrorRendering(): void
+    /**
+     * The renderer states no status of its own.
+     *
+     * It used to call http_response_code() unless Fat-Free was mid-error, which was a guard against
+     * the renderer overwriting an error status with 200. The status now travels on the Response the
+     * action returns, so the guard and the call both went with Fat-Free - and a renderer that
+     * reached for the status again would reintroduce exactly that bug.
+     */
+    public function testThemeRendererDoesNotSetTheResponseStatusItself(): void
     {
-        $renderer = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeRenderer.php');
-        self::assertStringContainsString("!headers_sent() && \$this->f3->get('ERROR') === null", $renderer);
+        // Comments are stripped first: the changelog records the removal by name, and scanning the
+        // raw file would report the record of the fix as the fault.
+        $renderer = (string) preg_replace(
+            ['#/\*.*?\*/#s', '#//[^\n]*#'],
+            '',
+            (string) file_get_contents(dirname(__DIR__, 2) . '/src/View/ThemeRenderer.php')
+        );
+
+        self::assertStringNotContainsString('http_response_code', $renderer);
+        self::assertStringNotContainsString('$this->f3', $renderer);
     }
 
     public function testThemeManagerIsFilesystemOnlyAndHasNoExport(): void

@@ -25,12 +25,16 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
 final class HelpController extends BaseController
 {
-    public function index(): void
+    #[Route('/help', name: 'help_index', methods: ['GET'])]
+    public function index(): Response
     {
         $this->requireUser();
-        $this->render('help', [
+        return $this->render('help', [
             'title' => 'Help Centre',
             'page_kicker' => 'Workflows and platform guidance',
         ]);

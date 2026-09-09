@@ -33,35 +33,40 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Course\CourseService;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 
-use Base;
 
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 final class AdminCourseCategoryController extends BaseController
 {
     public function __construct(
-        Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CourseService $courses
     ) {
-        parent::__construct($f3, $auth, $view);
+        parent::__construct($auth, $view, $requests);
     }
 
-    public function index(): void
+
+    #[Route('/admin/courses/categories', name: 'admin_course_category_index', methods: ['GET'])]
+    public function index(): Response
     {
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
         // The All/Real/Seed control, for the same reason the tags screen has one: the label is
         // shared and the courses filed under it are not, so a screen with no selector counts REAL
         // only and reports zero against every category of a generated catalogue.
 
-        $this->render('admin-course-categories', [
+        return $this->render('admin-course-categories', [
             'title' => 'Course categories',
             'course_group' => 'categories',
             // Counted in the reader's universe. The label is shared; what is filed under it is
@@ -72,18 +77,22 @@ final class AdminCourseCategoryController extends BaseController
         ]);
     }
 
-    public function create(): void
+
+    #[Route('/admin/courses/categories', name: 'admin_course_category_create', methods: ['POST'])]
+    public function create(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
-        $this->handle(function () use ($user): void {
+        return $this->handle(function () use ($user): void {
             $category = $this->courses->createCategory($_POST, $user->id);
             $this->flash('success', 'The course category “' . (string) $category['name'] . '” was created.');
             $this->redirect('/admin/courses/categories');
         }, '/admin/courses/categories');
     }
 
-    public function edit(): void
+
+    #[Route('/admin/courses/categories/{id}', name: 'admin_course_category_edit', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function edit(): Response
     {
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $categoryId = $this->categoryId();
@@ -92,7 +101,7 @@ final class AdminCourseCategoryController extends BaseController
             $this->courses->categories(),
             static fn(array $candidate): bool => (int) $candidate['id'] !== $categoryId
         ));
-        $this->render('admin-course-category-edit', [
+        return $this->render('admin-course-category-edit', [
             'title' => 'Edit category · ' . (string) $category['name'],
             'course_group' => 'categories',
             'category' => $category,
@@ -103,66 +112,75 @@ final class AdminCourseCategoryController extends BaseController
         ]);
     }
 
-    public function update(): void
+
+    #[Route('/admin/courses/categories/{id}', name: 'admin_course_category_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function update(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $categoryId = $this->categoryId();
-        $this->handle(function () use ($user, $categoryId): void {
+        return $this->handle(function () use ($user, $categoryId): void {
             $this->courses->updateCategory($categoryId, $_POST, $user->id);
             $this->flash('success', 'The course category was updated.');
             $this->redirect('/admin/courses/categories/' . $categoryId);
         }, '/admin/courses/categories/' . $categoryId);
     }
 
-    public function move(): void
+
+    #[Route('/admin/courses/categories/{id}/move', name: 'admin_course_category_move', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function move(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $categoryId = $this->categoryId();
-        $this->handle(function () use ($user, $categoryId): void {
+        return $this->handle(function () use ($user, $categoryId): void {
             $this->courses->moveCategory($categoryId, trim((string) ($_POST['direction'] ?? '')), $user->id);
             $this->redirect('/admin/courses/categories');
         }, '/admin/courses/categories');
     }
 
-    public function delete(): void
+
+    #[Route('/admin/courses/categories/{id}/delete', name: 'admin_course_category_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function delete(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $categoryId = $this->categoryId();
         $replacement = (int) ($_POST['replacement_category_id'] ?? 0);
-        $this->handle(function () use ($user, $categoryId, $replacement): void {
+        return $this->handle(function () use ($user, $categoryId, $replacement): void {
             $this->courses->deleteCategory($categoryId, $replacement > 0 ? $replacement : null, $user->id);
             $this->flash('success', 'The course category was deleted.');
             $this->redirect('/admin/courses/categories');
         }, '/admin/courses/categories/' . $categoryId);
     }
 
-    public function inlineCreate(): void
+
+    #[Route('/admin/courses/categories/inline', name: 'admin_course_category_inline_create', methods: ['POST'])]
+    public function inlineCreate(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
-        header('Content-Type: application/json; charset=utf-8');
+
+        // The one JSON answer outside /api/v1: the category picker creates a category without
+        // leaving the form it is sitting in, so the caller is this platform's own JavaScript.
         try {
             $category = $this->courses->createCategory($_POST, $user->id);
-            http_response_code(201);
-            echo json_encode([
+
+            return new JsonResponse([
                 'category' => [
                     'id' => (int) $category['id'],
                     'name' => (string) $category['name'],
                     'slug' => (string) $category['slug'],
                 ],
-            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            ], Response::HTTP_CREATED);
         } catch (InvalidArgumentException|RuntimeException $e) {
-            http_response_code(422);
-            echo json_encode(['error' => $e->getMessage()], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
     }
 
     private function categoryId(): int
     {
-        $categoryId = (int) $this->f3->get('PARAMS.id');
+        $categoryId = (int) $this->param('id');
         if ($categoryId < 1) {
             throw new InvalidArgumentException('The course category does not exist.');
         }

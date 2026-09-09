@@ -22,6 +22,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Application\AccountSectionRegistry;
+use CattoLearning\Tests\Support\RouteTable;
 use PHPUnit\Framework\TestCase;
 
 final class AccountWorkspaceContractTest extends TestCase
@@ -54,11 +55,16 @@ final class AccountWorkspaceContractTest extends TestCase
     public function testAccountRouteIsConsolidatedRatherThanRedirectingToProfile(): void
     {
         $root = dirname(__DIR__, 2);
-        $app = (string) file_get_contents($root . '/src/Application/App.php');
+        $app = RouteTable::signatures();
         $controller = (string) file_get_contents($root . '/src/Http/Controller/AccountController.php');
         foreach (['GET /account','GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity'] as $route) self::assertStringContainsString($route, $app);
         self::assertStringContainsString("render('account-control-centre'", $controller);
-        self::assertStringContainsString("GET /account/library', AccountController::class, 'learning'", $app);
+        $library = array_values(array_filter(
+            RouteTable::all(),
+            static fn(array $r): bool => $r['method'] === 'GET' && $r['path'] === '/account/library'
+        ));
+        self::assertCount(1, $library, 'The library route is declared exactly once.');
+        self::assertSame('learning', $library[0]['action'], 'My Course Library is served by AccountController::learning().');
         self::assertStringNotContainsString("redirect('/account/profile')", $this->methodSource($root . '/src/Http/Controller/AccountController.php', 'index'));
     }
 

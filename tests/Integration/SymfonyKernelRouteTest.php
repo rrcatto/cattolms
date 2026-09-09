@@ -15,8 +15,8 @@ Architectural boundary: integration test. It boots the real kernel and handles r
 does not go through the web server.
 
 Why the second and third assertions matter as much as the first. Ownership is decided by whether
-the router matches, and the seam falls back to Fat-Free when it does not. A kernel that quietly
-started matching a path Fat-Free still serves would take the request away from the controller that
+the router matches. Fat-Free is gone; what this now guards is that every declared route reaches the
+router, because a route the router cannot find is a 404 on a page that
 answers it, and the failure would look like a missing page rather than a routing mistake.
 
 Changelog:
@@ -30,6 +30,7 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Tests\Support\RouteTable;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
 use CattoLearning\Support\Env;
@@ -67,20 +68,25 @@ final class SymfonyKernelRouteTest extends TestCase
     }
 
     /**
-     * Paths Fat-Free still owns are declined, and a half-ported path is declined per method.
+     * Every route the platform declares is matched by the kernel.
      *
-     * The list is deliberately a sample of each shape the platform routes: a themed page, a page
-     * with a placeholder, a form target, and two method mismatches - POST to a path Symfony owns
-     * only for GET, and a verb no ported route declares at all.
+     * This used to assert the opposite for most paths: while Fat-Free still owned them, a kernel
+     * that quietly started matching one would have taken the request away from the controller that
+     * served it. Fat-Free is gone, so the risk inverted - what would be wrong now is a declared
+     * route the router cannot find, which is a 404 on a page that exists.
      */
-    public function testFatFreeRoutesAreNotMatched(): void
+    public function testEveryDeclaredRouteIsMatchable(): void
     {
-        foreach ([['GET', '/'], ['GET', '/courses'], ['GET', '/courses/anything'],
-                  ['GET', '/login'], ['POST', '/api/v1'], ['POST', '/contact'],
-                  ['DELETE', '/api/v1/admin/courses/1']] as [$method, $path]) {
-            self::assertFalse(
-                $this->kernelMatches(Request::create($path, $method)),
-                $method . ' ' . $path . ' must fall through to Fat-Free.'
+        $router = self::kernel()->getContainer()->get('router');
+        $collection = $router->getRouteCollection();
+
+        $declared = RouteTable::all();
+        self::assertGreaterThan(170, count($declared), 'The declared routes unexpectedly shrank.');
+
+        foreach ($declared as $route) {
+            self::assertNotNull(
+                $collection->get($route['name']),
+                $route['method'] . ' ' . $route['path'] . ' is declared but the router does not carry it.'
             );
         }
     }
@@ -106,21 +112,6 @@ final class SymfonyKernelRouteTest extends TestCase
         self::assertSame($expected, (string) $kernel->fetchOne('SHOW TimeZone'));
     }
 
-    private function kernelMatches(Request $request): bool
-    {
-        $kernel = $this->kernel();
-        /** @var RouterInterface&RequestMatcherInterface $router */
-        $router = $kernel->getContainer()->get('router');
-        $router->getContext()->fromRequest($request);
-
-        try {
-            $router->matchRequest($request);
-        } catch (ResourceNotFoundException | MethodNotAllowedException) {
-            return false;
-        }
-
-        return true;
-    }
 
     private function kernelResponse(Request $request): \Symfony\Component\HttpFoundation\Response
     {

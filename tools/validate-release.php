@@ -51,7 +51,7 @@ $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
 $need(($composer['version'] ?? '') === '0.6', 'composer.json version must be 0.6.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
-foreach (['php-di/php-di','psr/container','friendsofphp/proxy-manager-lts','geocoder-php/geoip2-provider'] as $package) {
+foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bundle','doctrine/dbal'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
 }
 $need(!isset($composer['scripts']['migrate-test']) && !isset($composer['scripts']['migrate:test']), 'A separate test migration command must not be defined.');
@@ -176,15 +176,28 @@ $roles = $read($root . '/src/Infrastructure/Persistence/RoleRepository.php');
 foreach (["in_array(RoleCatalog::ADMIN, \$roleKeys, true)",'return $this->catalog->keys();','acl_revision'] as $token) $need(str_contains($acl, $token), 'ACL service missing protected ADMIN/session-cache contract: ' . $token);
 foreach (["VALUES ('ADMIN','Administrator','System Administrator')",'bootstrapAdministrator','replaceRolePermissions'] as $token) $need(str_contains($roles, $token), 'Role repository missing ACL contract: ' . $token);
 
-$app = $read($root . '/src/Application/App.php');
+// Routes are attributes on the actions that serve them; there is no table to read.
+$app = '';
+foreach (glob($root . '/src/Http/Controller/*.php') ?: [] as $controller) {
+    $source = (string) file_get_contents($controller);
+    if (preg_match_all("/#\[Route\('([^']*)'[^\n]*?methods: \['([A-Z]+)'\]/", $source, $found, PREG_SET_ORDER)) {
+        foreach ($found as $route) {
+            $app .= $route[2] . ' ' . $route[1] . "\n";
+        }
+    }
+}
 $requiredRoutes = [
     'GET /account','GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity',
     'GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses',
     'GET /admin','GET /admin/dashboard','GET /admin/courses','GET /admin/people','GET /admin/companies','GET /admin/course/enrolments','GET /admin/course/credits','GET /admin/activity','GET /admin/reports','GET /admin/themes','GET /admin/roles','GET /admin/settings',
-    'POST /admin/roles/@id/permissions','POST /admin/themes/resync',
+    'POST /admin/roles/{id}/permissions','POST /admin/themes/resync',
 ];
 foreach ($requiredRoutes as $route) $need(str_contains($app, $route), 'Required semantic route missing: ' . $route);
-$need(str_contains($app, "GET /account/library', AccountController::class, 'learning'"), '/account/library must be a standalone Account section, not an unrelated page controller.');
+$accountController = $read($root . '/src/Http/Controller/AccountController.php');
+$need(
+    (bool) preg_match("/#\[Route\('\/account\/library'[^\n]*\n\s*public function learning\(/", $accountController),
+    '/account/library must be a standalone Account section, not an unrelated page controller.'
+);
 $need(!str_contains($app, '/admin?tab=') && !str_contains($app, '/account?tab=') && !str_contains($app, '/company?tab='), 'Top-level workspaces must not use query-string section routing.');
 $need(!str_contains($app, 'http_response_code('), 'App ONERROR must not call http_response_code() after F3 has already emitted an HTTP status header.');
 

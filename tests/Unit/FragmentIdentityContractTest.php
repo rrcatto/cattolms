@@ -56,8 +56,8 @@ final class FragmentIdentityContractTest extends TestCase
         );
 
         foreach ([
-            'protected function render(string $page, array $data = [], int $status = 200): void',
-            'protected function renderFragment(string $template, array $data = [], int $status = 200): void',
+            'protected function render(string $page, array $data = [], int $status = 200): Response',
+            'protected function renderFragment(string $template, array $data = [], int $status = 200): Response',
         ] as $signature) {
             $at = strpos($source, $signature);
             self::assertIsInt($at, $signature . ' must exist.');

@@ -25,13 +25,11 @@ declare(strict_types=1);
 
 namespace CattoLearning\Plugin;
 
-use Base;
 use CattoLearning\Event\EventDispatcher;
 
 final readonly class PluginContext
 {
     public function __construct(
-        public Base $f3,
         public EventDispatcher $events
     ) {
     }
