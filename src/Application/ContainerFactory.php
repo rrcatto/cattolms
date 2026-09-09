@@ -18,7 +18,7 @@ Changelog:
 
 2026/08/25 14:29 SAST
 
-- Stage C: SeedMailRouter is built from RuntimeSettings rather than Env, so the domain Administration displays is the domain seed mail is delivered to.
+- Stage C: GeneratedDomainRouter is built from RuntimeSettings rather than Env, so the domain Administration displays is the domain generated mail is delivered to.
 2026/08/23 04:19 SAST
 - Routed seed mail to the configured SEED_SYSTEM_COMPANY_DOMAIN and moved generated company domains onto the reserved .seed.invalid suffix.
 2026/08/16 21:36 SAST
@@ -38,8 +38,8 @@ use CattoLearning\Course\CourseService;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\GeoIpLocator;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
-use CattoLearning\Infrastructure\Mail\SeedAwareMailer;
-use CattoLearning\Seed\SeedMailRouter;
+use CattoLearning\Infrastructure\Mail\GeneratedDomainMailer;
+use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use CattoLearning\Seed\SeedNamePools;
 use CattoLearning\Infrastructure\Mail\SymfonyMailerAdapter;
 use CattoLearning\Infrastructure\Persistence\ConnectionFactory;
@@ -128,9 +128,9 @@ final class ContainerFactory
             // Reading .env here would let an administrator save a domain that was displayed but
             // never used - a divergence with no symptom until someone waited for mail that had
             // gone somewhere else.
-            SeedMailRouter::class => factory(static fn(RuntimeSettings $settings): SeedMailRouter
-                => new SeedMailRouter($settings->seedSystemCompanyDomain())),
-            MailerInterface::class => autowire(SeedAwareMailer::class)->lazy(),
+            GeneratedDomainRouter::class => factory(static fn(RuntimeSettings $settings): GeneratedDomainRouter
+                => new GeneratedDomainRouter($settings->platformDomain())),
+            MailerInterface::class => autowire(GeneratedDomainMailer::class)->lazy(),
 
             ThemeManager::class => autowire()
                 ->constructorParameter('codeRoot', $codeRoot)

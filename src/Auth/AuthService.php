@@ -183,22 +183,6 @@ final class AuthService
         return (string) $state['return_path'];
     }
 
-    /**
-     * Normalises the identity's seed token to null or a non-empty string.
-     *
-     * PostgreSQL hands back NULL as null, but a driver or a fixture can produce an empty
-     * string, and an empty string would read as "a seed identity" to anything testing for
-     * IS NOT NULL semantics. Collapsing both to null keeps the universe rule unambiguous.
-     */
-    private static function normaliseSeedToken(mixed $value): ?string
-    {
-        if (!is_string($value)) {
-            return null;
-        }
-        $token = trim($value);
-
-        return $token === '' ? null : $token;
-    }
 
     public function currentUser(): ?CurrentUser
     {
@@ -270,8 +254,7 @@ final class AuthService
             $displayName,
             $roles,
             $permissions,
-            (string) $session['public_id'],
-            self::normaliseSeedToken($session['user_seed_token'] ?? null)
+            (string) $session['public_id']
         );
         return $this->currentUser;
     }

@@ -74,7 +74,7 @@ final class AdminCourseController extends BaseController
         $this->render('admin-course-form', [
             'title' => 'Create course',
             'course' => $this->blankCourse(),
-            'categories' => $this->courses->categories($this->universe($user), true),
+            'categories' => $this->courses->categories(true),
             'form_action' => '/admin/courses',
             'form_heading' => 'Create a new course',
             'load_ckeditor' => true,
@@ -86,7 +86,7 @@ final class AdminCourseController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.CREATE');
         $this->handle(function () use ($user): void {
-            $courseId = $this->courses->createBlank($_POST, $user->id, $this->universe($user));
+            $courseId = $this->courses->createBlank($_POST, $user->id);
             $this->flash('success', 'The course was created.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/new');
@@ -102,8 +102,8 @@ final class AdminCourseController extends BaseController
         $people = [];
         $companies = [];
         if ($user->hasPermission('COURSE.OWNERSHIP.MANAGE')) {
-            $peopleData = $this->platformAdministration->sectionData('people', $user->id, $this->universe($user));
-            $companyData = $this->platformAdministration->sectionData('companies', $user->id, $this->universe($user));
+            $peopleData = $this->platformAdministration->sectionData('people', $user->id);
+            $companyData = $this->platformAdministration->sectionData('companies', $user->id);
             $editorIds = array_map(static fn(array $editor): int => (int) $editor['id'], (array) ($course['editors'] ?? []));
             $people = (array) ($peopleData['people'] ?? []);
             foreach ($people as &$person) {
@@ -112,7 +112,7 @@ final class AdminCourseController extends BaseController
             unset($person);
             $companies = (array) ($companyData['companies'] ?? []);
         }
-        $categoryOptions = $this->courses->categories($this->universe($user), true);
+        $categoryOptions = $this->courses->categories(true);
         $currentCategoryId = (int) ($course['category_id'] ?? 0);
         if ($currentCategoryId > 0 && !array_filter($categoryOptions, static fn(array $category): bool => (int) $category['id'] === $currentCategoryId)) {
             $categoryOptions[] = $this->courses->category($currentCategoryId);
@@ -580,7 +580,7 @@ final class AdminCourseController extends BaseController
         $user = $this->requirePermission('COURSE.IMPORT');
         $this->render('admin-course-import', [
             'title' => 'Import an HTML or JSON course',
-            'categories' => $this->courses->categories($this->universe($user), true),
+            'categories' => $this->courses->categories(true),
         ]);
     }
 
@@ -655,14 +655,14 @@ final class AdminCourseController extends BaseController
             // import screen is outside the v0.5.7.6 pagination scope and this surface is
             // recorded as a follow-up candidate for the entity-lookup pattern.
             $replaceable = array_values(array_filter(
-                $this->courses->adminCourses($this->universe($user), null, true, max(Pagination::PAGE_SIZES), 0),
+                $this->courses->adminCourses(null, true, max(Pagination::PAGE_SIZES), 0),
                 fn(array $course): bool => !$this->portability->hasStartedLearners((int) $course['id'])
                     && ($user->hasPermission('PLATFORM.DASHBOARD.VIEW') || (int) ($course['owner_user_id'] ?? 0) === $user->id)
             ));
             $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
-                'categories' => $this->courses->categories($this->universe($user), true),
+                'categories' => $this->courses->categories(true),
                 'replaceable_courses' => $replaceable,
             ]);
         }, '/admin/courses/import');

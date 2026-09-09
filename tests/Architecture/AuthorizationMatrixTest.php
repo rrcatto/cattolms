@@ -182,11 +182,11 @@ final class AuthorizationMatrixTest extends TestCase
             self::assertStringNotContainsString("'SEED.", $source, $file->getPathname());
             foreach ([
                 'hasRole(RoleCatalog::COMPANY_ADMIN',
-                'hasRole(RoleCatalog::SEED_COMPANY_ADMIN',
+                'hasRole(RoleCatalog::COMPANY_ADMIN',
                 'hasRole(RoleCatalog::COURSE_OWNER',
-                'hasRole(RoleCatalog::SEED_COURSE_OWNER',
+                'hasRole(RoleCatalog::COURSE_OWNER',
                 'hasRole(RoleCatalog::COURSE_EDITOR',
-                'hasRole(RoleCatalog::SEED_COURSE_EDITOR',
+                'hasRole(RoleCatalog::COURSE_EDITOR',
             ] as $needle) {
                 if ($file->getFilename() !== 'BaseController.php') {
                     self::assertStringNotContainsString($needle, $source, $file->getPathname() . ' must not determine business resource scope from role names.');

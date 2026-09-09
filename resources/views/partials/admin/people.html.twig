@@ -30,9 +30,6 @@ Changelog:
   - Added the shared genuine-ADMIN data-universe control above the list.
 #}
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people'} %}
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: people_universe_counts} %}
-{% endif %}
 <div class="toolbar">
 	<div>
 	</div>
@@ -111,7 +108,7 @@ Changelog:
 			{% if people_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} people.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/people{{ universe_query }}">View all people</a>
+					<a class="btn btn-soft btn-sm" href="/admin/people">View all people</a>
 				</div>
 			{% endif %}
 		{% endif %}

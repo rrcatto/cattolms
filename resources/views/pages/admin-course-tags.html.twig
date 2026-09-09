@@ -41,9 +41,6 @@ Changelog:
 			<button class="btn btn-primary" type="button" data-open-modal="createTagModal">＋ Create tag</button>
 		</div>
 		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'tags', ds_label: 'Search tags', ds_value: tags_search, ds_action: '/admin/courses/tags'} %}
-		{% if universe_switch %}
-			{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: 0} %}
-		{% endif %}
 		<div id="tags-region" data-server-search-target>
 			<div id="tags-results">
 				{% if tags_pagination %}

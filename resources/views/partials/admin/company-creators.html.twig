@@ -30,9 +30,6 @@ Changelog:
 	</div>
 </div>
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'company_creators', ds_label: 'Search course creators', ds_value: company_creators_search, ds_action: '/admin/companies/creators'} %}
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: company_creators_universe_counts} %}
-{% endif %}
 <div class="toolbar">
 	<div>
 	</div>
@@ -100,7 +97,7 @@ Changelog:
 			{% if company_creators_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} companies.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/companies/creators{{ universe_query }}">View all course creators</a>
+					<a class="btn btn-soft btn-sm" href="/admin/companies/creators">View all course creators</a>
 				</div>
 			{% endif %}
 		{% endif %}

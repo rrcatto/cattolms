@@ -99,8 +99,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
-use CattoLearning\Auth\DataUniverse;
-use CattoLearning\Auth\RoleFamily;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Configuration\RuntimeSettings;
@@ -114,7 +112,6 @@ use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
-use CattoLearning\Seed\SeedMailRouter;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\GeoIpLocator;
@@ -598,9 +595,9 @@ final class PlatformAdministrationService
      *
      * @return list<array{id:int,label:string,detail:string}>
      */
-    public function lookupEntities(string $type, DataUniverse $universe, string $query, int $companyId = 0): array
+    public function lookupEntities(string $type, string $query, int $companyId = 0): array
     {
-        return $this->lookups->search($type, $universe, $query, $companyId);
+        return $this->lookups->search($type, $query, $companyId);
     }
 
     /**
@@ -623,12 +620,9 @@ final class PlatformAdministrationService
             // Every Administration template may ask which universe it is showing and whether to
             // offer the selector. Defaulting them here means a section that has neither still
             // renders: REAL, with no control, which is what an unprivileged identity sees.
-            'universe' => DataUniverse::Real->value,
-            'universe_switch' => null,
             // Appended to the fixed "View all" links a bounded preview renders, so following one
             // keeps the reader in the universe they were looking at. Empty for an identity that
             // cannot choose, which keeps the parameter out of URLs it would mean nothing in.
-            'universe_query' => '',
             // Activity resolves its filter entities through bounded lookups; the preview path
             // applies no filters, so these must still exist for the picker to render.
             'activity_selected_actor' => null,
@@ -662,7 +656,6 @@ final class PlatformAdministrationService
             $defaults[$dataset . '_region'] = $dataset . '-region';
             $defaults[$dataset . '_results'] = $dataset . '-results';
             $defaults[$dataset . '_count'] = 0;
-            $defaults[$dataset . '_universe_counts'] = null;
             $defaults[$dataset . '_search'] = '';
             // The rows themselves. A template reaching a dataset its controller never loaded must
             // render an empty list rather than return 500 on an undefined variable. Defaults are
@@ -686,166 +679,9 @@ final class PlatformAdministrationService
      *
      * @param array<string,mixed> $request Raw request state, keyed with dataset prefixes.
      */
-    /**
-     * The All / Real / Seed view model for one Administration section.
-     *
-     * Kept separate from sectionData() because it answers a different question. sectionData()
-     * loads the rows of one universe; this describes the boundary itself - how many records lie
-     * on each side of it, and where to go to look at the other side. Only an identity that may
-     * actually cross the boundary gets either, which is why an unprivileged caller pays for no
-     * extra query at all.
-     *
-     * @param array<string,mixed> $request Raw request state, so filters and page size survive a switch.
-     * @param array<string,bool> $capabilities Sub-resource visibility, matching sectionData().
-     * @return array<string,mixed>
-     */
-    public function universeView(
-        string $section,
-        int $actorUserId,
-        DataUniverse $selected,
-        bool $crossUniverse,
-        array $request = [],
-        array $capabilities = [],
-        ?string $baseRoute = null,
-        bool $withCounts = true
-    ): array {
-        $view = ['universe' => $selected->value, 'universe_switch' => null, 'universe_query' => ''];
-        if (!$crossUniverse || !isset(self::ADMIN_SECTION_ROUTES[$section])) {
-            return $view;
-        }
-        $view['universe_query'] = '?universe=' . $selected->value;
 
-        $view['universe_switch'] = $this->universeSwitch(
-            $selected,
-            $baseRoute ?? self::ADMIN_SECTION_ROUTES[$section],
-            $this->preservedState($section, $request)
-        );
 
-        // The counts are two extra COUNT(*) queries per dataset - on Enrolments they were two
-        // thirds of the time a page turn took - and they answer a question no page turn changes:
-        // how many records exist in each universe. The strip that displays them sits outside the
-        // swapped region and is not replaced, so a paging request asks for them not to be computed.
-        // The switch itself is still built, because it is cheap and the markup reads it.
-        foreach ($withCounts ? (self::UNIVERSE_COUNTED_DATASETS[$section] ?? []) : [] as $dataset) {
-            $counter = $this->universeCounter($dataset, $actorUserId, $request, $capabilities);
-            if ($counter !== null) {
-                $view[$dataset . '_universe_counts'] = $this->universeCounts($dataset, $counter);
-            }
-        }
 
-        return $view;
-    }
-
-    /**
-     * The same view model for every section of the consolidated workspace.
-     *
-     * The consolidated page shows bounded previews of several sections at once, so it carries
-     * several counts but a single selector: the reader is choosing one universe for the whole
-     * page, and its links return to /admin rather than to any one section.
-     *
-     * @param list<string> $sections
-     * @param array<string,array<string,bool>> $capabilities Keyed by section, matching workspacePreview().
-     * @return array<string,mixed>
-     */
-    public function workspaceUniverseView(
-        array $sections,
-        int $actorUserId,
-        DataUniverse $selected,
-        bool $crossUniverse,
-        array $capabilities = []
-    ): array {
-        $view = ['universe' => $selected->value, 'universe_switch' => null, 'universe_query' => ''];
-        if (!$crossUniverse) {
-            return $view;
-        }
-
-        $view['universe_query'] = '?universe=' . $selected->value;
-        $view['universe_switch'] = $this->universeSwitch($selected, '/admin', []);
-        foreach ($sections as $section) {
-            foreach (self::UNIVERSE_COUNTED_DATASETS[$section] ?? [] as $dataset) {
-                $counter = $this->universeCounter($dataset, $actorUserId, [], $capabilities[$section] ?? []);
-                if ($counter !== null) {
-                    $view[$dataset . '_universe_counts'] = $this->universeCounts($dataset, $counter);
-                }
-            }
-        }
-
-        return $view;
-    }
-
-    /**
-     * Records on each side of the boundary.
-     *
-     * Two queries, not three. The universes partition the table exactly - every row is either
-     * tagged or it is not - so the genuine count is the difference, and asking for it separately
-     * would only add a third scan that could disagree with the other two under concurrent
-     * generation.
-     *
-     * The display strings are built here rather than in the template because F3 has no number
-     * formatter of its own, and a six-figure seed set is exactly where an unseparated digit run
-     * stops being readable.
-     *
-     * Public because the catalogue counts a dataset of its own, outside the administration
-     * sections universeView() serves, and a second counter would be free to disagree with this one
-     * about what "real" means.
-     *
-     * @param callable(DataUniverse):int $count
-     * @return array{label:string,total:int,real:int,seed:int,total_display:string,real_display:string,seed_display:string}
-     */
-    public function universeCounts(string $dataset, callable $count): array
-    {
-        $total = $count(DataUniverse::All);
-        $seed = $count(DataUniverse::Seed);
-        $real = max(0, $total - $seed);
-
-        return [
-            'label' => self::UNIVERSE_COUNT_LABELS[$dataset] ?? 'Records',
-            'total' => $total,
-            'real' => $real,
-            'seed' => $seed,
-            'total_display' => number_format($total),
-            'real_display' => number_format($real),
-            'seed_display' => number_format($seed),
-        ];
-    }
-
-    /**
-     * The count query for one dataset, or null when the caller may not see that dataset.
-     *
-     * Each closure is the counterpart of the row query in sectionDataValues() and carries the
-     * identical membership and filter semantics - the same permission-derived scope for courses,
-     * the same resolved filter set for activity - so the strip above a list always describes
-     * that list rather than a looser set that happens to be cheaper to count.
-     *
-     * @param array<string,mixed> $request
-     * @param array<string,bool> $capabilities
-     * @return (callable(DataUniverse):int)|null
-     */
-    private function universeCounter(string $dataset, int $actorUserId, array $request, array $capabilities): ?callable
-    {
-        return match ($dataset) {
-            'people' => fn(DataUniverse $u): int => $this->administration->peopleCount($u),
-            'companies' => fn(DataUniverse $u): int => $this->administration->companyCount($u, '', 'consumers'),
-            'company_creators' => fn(DataUniverse $u): int => $this->administration->companyCount($u, '', 'creators'),
-            'courses' => fn(DataUniverse $u): int => $this->adminCoursesTotal(
-                $actorUserId,
-                $u,
-                !empty($capabilities['view_all_courses'])
-            ),
-            'requests' => empty($capabilities['view_requests'])
-                ? null
-                : fn(DataUniverse $u): int => $this->administration->requestsCount($u),
-            'enrolments' => empty($capabilities['view_enrolments'])
-                ? null
-                : fn(DataUniverse $u): int => $this->administration->enrolmentsCount($u),
-            'credits' => fn(DataUniverse $u): int => $this->administration->creditLedgerCount($u),
-            'activity' => fn(DataUniverse $u): int => $this->administration->activityCount(
-                $u,
-                $this->activityFilterValues($request)
-            ),
-            default => null,
-        };
-    }
 
     /**
      * The selector itself.
@@ -858,30 +694,6 @@ final class PlatformAdministrationService
      * @param array<string,mixed> $preserved
      * @return array{selected:string,label:string,options:list<array{value:string,label:string,short_label:string,href:string,active:bool}>}
      */
-    /**
-     * The All / Real / Seed selector model.
-     *
-     * Public because the catalogue is not an administration section and so cannot reach it through
-     * universeView(), and building a second one there would be a second control for one job.
-     *
-     * @param array<string,mixed> $preserved
-     * @return array<string,mixed>
-     */
-    public function universeSwitch(DataUniverse $selected, string $base, array $preserved): array
-    {
-        $options = [];
-        foreach ([DataUniverse::All, DataUniverse::Real, DataUniverse::Seed] as $universe) {
-            $options[] = [
-                'value' => $universe->value,
-                'label' => $universe->label(),
-                'href' => $base . '?' . http_build_query($preserved + ['universe' => $universe->value]),
-                'short_label' => $universe->shortLabel(),
-                'active' => $universe === $selected,
-            ];
-        }
-
-        return ['selected' => $selected->value, 'label' => $selected->label(), 'options' => $options];
-    }
 
     /**
      * Request state a universe switch should carry forward: filters and page size, never a page.
@@ -1184,7 +996,7 @@ final class PlatformAdministrationService
      * @param array<string,array<string,bool>> $capabilities Sub-resource visibility, keyed by section.
      * @return array<string,mixed>
      */
-    public function workspacePreview(array $sections, int $actorUserId, DataUniverse $universe, array $capabilities = []): array
+    public function workspacePreview(array $sections, int $actorUserId, array $capabilities = []): array
     {
         $data = [];
         foreach ($sections as $section) {
@@ -1192,7 +1004,7 @@ final class PlatformAdministrationService
             // RoleAdministrationService and SeedDatabaseService supply them through the
             // controller's presentation step.
             if ($section === 'roles' || $section === 'seed') continue;
-            $data += $this->sectionPreviewValues($section, $actorUserId, $universe, $capabilities[$section] ?? []);
+            $data += $this->sectionPreviewValues($section, $actorUserId, $capabilities[$section] ?? []);
         }
 
         return $data + ['is_preview' => true] + $this->datasetDefaults();
@@ -1204,7 +1016,7 @@ final class PlatformAdministrationService
      * @param array<string,bool> $capabilities
      * @return array<string,mixed>
      */
-    private function sectionPreviewValues(string $section, int $actorUserId, DataUniverse $universe, array $capabilities): array
+    private function sectionPreviewValues(string $section, int $actorUserId, array $capabilities): array
     {
         $bounded = function (string $dataset, callable $rows, callable $normalise): array {
             [$fetched, $hasMore] = $this->preview($rows);
@@ -1216,49 +1028,49 @@ final class PlatformAdministrationService
         };
 
         return match ($section) {
-            'dashboard', 'themes', 'settings', 'reports', 'company_report' => $this->sectionDataValues($section, $actorUserId, $universe, [], $capabilities),
+            'dashboard', 'themes', 'settings', 'reports', 'company_report' => $this->sectionDataValues($section, $actorUserId, [], $capabilities),
             'people' => $bounded(
                 'people',
-                fn(int $l, int $o): array => $this->administration->people($universe, $l, $o),
+                fn(int $l, int $o): array => $this->administration->people($l, $o),
                 fn(array $rows): array => $this->normalisePeople($rows, $this->roles->all())
             ) + ['roles' => $this->normalAssignableRoles()],
             // Each half previews its own audience, so the consolidated workspace shows the same
             // rows the section it links to will show.
             'companies' => $bounded(
                 'companies',
-                fn(int $l, int $o): array => $this->administration->companies($universe, $l, $o, '', null, 'consumers'),
+                fn(int $l, int $o): array => $this->administration->companies($l, $o, '', null, 'consumers'),
                 fn(array $rows): array => $this->normaliseCompanies($rows)
-            ) + ['system_company' => $this->systemCompanyContext($actorUserId, $universe)],
+            ) + ['system_company' => $this->systemCompanyContext($actorUserId)],
             'company_creators' => $bounded(
                 'company_creators',
-                fn(int $l, int $o): array => $this->administration->companies($universe, $l, $o, '', null, 'creators'),
+                fn(int $l, int $o): array => $this->administration->companies($l, $o, '', null, 'creators'),
                 fn(array $rows): array => $this->normaliseCompanies($rows)
             ),
             'courses' => $bounded(
                 'courses',
-                fn(int $l, int $o): array => $this->adminCoursePage($actorUserId, $universe, !empty($capabilities['view_all_courses']), $l, $o),
+                fn(int $l, int $o): array => $this->adminCoursePage($actorUserId, !empty($capabilities['view_all_courses']), $l, $o),
                 static fn(array $rows): array => $rows
             ),
             'credits' => $bounded(
                 'credits',
-                fn(int $l, int $o): array => $this->administration->creditLedger($universe, $l, $o),
+                fn(int $l, int $o): array => $this->administration->creditLedger($l, $o),
                 fn(array $rows): array => $this->normaliseCredits($rows)
             ),
             'requests' => empty($capabilities['view_requests'])
                 ? ['requests' => [], 'requests_preview_has_more' => false]
-                : $bounded('requests', fn(int $l, int $o): array => $this->administration->requests($universe, $l, $o), fn(array $r): array => $this->normaliseRequests($r)),
+                : $bounded('requests', fn(int $l, int $o): array => $this->administration->requests($l, $o), fn(array $r): array => $this->normaliseRequests($r)),
             'enrolments' => empty($capabilities['view_enrolments'])
                 ? ['enrolments' => [], 'enrolments_preview_has_more' => false]
-                : $bounded('enrolments', fn(int $l, int $o): array => $this->administration->enrolments($universe, $l, $o), fn(array $r): array => $this->normaliseEnrolments($r)),
-            'activity' => (function () use ($universe): array {
-                $events = $this->normaliseActivity($this->administration->activity($universe, [], self::PREVIEW_PAGE_SIZE + 1, 0));
+                : $bounded('enrolments', fn(int $l, int $o): array => $this->administration->enrolments($l, $o), fn(array $r): array => $this->normaliseEnrolments($r)),
+            'activity' => (function (): array {
+                $events = $this->normaliseActivity($this->administration->activity([], self::PREVIEW_PAGE_SIZE + 1, 0));
                 $hasMore = count($events) > self::PREVIEW_PAGE_SIZE;
                 if ($hasMore) array_pop($events);
 
                 return [
                     'activity_events' => $events,
                     'activity_last_id' => (int) ($events[0]['id'] ?? 0),
-                    'activity_families' => $this->administration->activityFamilies($universe),
+                    'activity_families' => $this->administration->activityFamilies(),
                     'activity_filters' => $this->activityFilterValues([]),
                     'activity_preview_has_more' => $hasMore,
                 ];
@@ -1277,22 +1089,22 @@ final class PlatformAdministrationService
      *
      * @return list<array<string,mixed>>
      */
-    private function adminCoursePage(int $actorUserId, DataUniverse $universe, bool $viewAll, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    private function adminCoursePage(int $actorUserId, bool $viewAll, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         return $viewAll
             // Trimmed here because this list has no normaliser of its own: it returns repository
             // rows straight to the template, so it was the one table still printing a timestamp to
             // the microsecond - the widest column on the screen after the title.
-            ? self::trimTimestamps($this->courses->allCourses($universe, $limit, $offset, $search, $sort))
-            : self::trimTimestamps($this->courses->manageableCourses($actorUserId, $universe, $limit, $offset, $search, $sort));
+            ? self::trimTimestamps($this->courses->allCourses($limit, $offset, $search, $sort))
+            : self::trimTimestamps($this->courses->manageableCourses($actorUserId, $limit, $offset, $search, $sort));
     }
 
     /** Total rows behind adminCoursePage() under the same scope, counted with the identical membership rule. */
-    private function adminCoursesTotal(int $actorUserId, DataUniverse $universe, bool $viewAll, string $search = ''): int
+    private function adminCoursesTotal(int $actorUserId, bool $viewAll, string $search = ''): int
     {
         return $viewAll
-            ? $this->courses->allCoursesCount($universe, $search)
-            : $this->courses->manageableCoursesCount($actorUserId, $universe, $search);
+            ? $this->courses->allCoursesCount($search)
+            : $this->courses->manageableCoursesCount($actorUserId, $search);
     }
 
     /**
@@ -1308,13 +1120,11 @@ final class PlatformAdministrationService
     public function sectionData(
         string $section,
         int $actorUserId,
-        DataUniverse $universe,
         array $activityFilters = [],
         array $capabilities = [],
-        bool $crossUniverse = false,
         ?string $onlyDataset = null
     ): array {
-        return $this->sectionDataValues($section, $actorUserId, $universe, $activityFilters, $capabilities, $crossUniverse, $onlyDataset)
+        return $this->sectionDataValues($section, $actorUserId, $activityFilters, $capabilities, $onlyDataset)
             + $this->datasetDefaults();
     }
 
@@ -1343,31 +1153,29 @@ final class PlatformAdministrationService
     private function sectionDataValues(
         string $section,
         int $actorUserId,
-        DataUniverse $universe,
         array $activityFilters,
         array $capabilities,
-        bool $crossUniverse = false,
         ?string $onlyDataset = null
     ): array {
         // Paging must not silently drop the reader back into their default universe, so the
         // selection travels with every pagination link exactly as a filter does. It is emitted
         // only for an identity that may choose: for everyone else the parameter would be inert
         // decoration in the URL and a hint at a boundary they are not shown.
-        $scope = $crossUniverse ? ['universe' => $universe->value] : [];
+        $scope = [];
 
         return match ($section) {
             'dashboard' => [
-                'overview' => $this->administration->overview($universe),
-                'recent_activity_events' => array_slice($this->normaliseActivity($this->administration->activity($universe, [], 8)), 0, 5),
+                'overview' => $this->administration->overview(),
+                'recent_activity_events' => array_slice($this->normaliseActivity($this->administration->activity([], 8)), 0, 5),
             ],
-            'courses' => (function () use ($actorUserId, $universe, $activityFilters, $capabilities, $scope): array {
+            'courses' => (function () use ($actorUserId, $activityFilters, $capabilities, $scope): array {
                 $viewAll = !empty($capabilities['view_all_courses']);
                 $search = self::searchTerm('courses', $activityFilters);
                 $sort = $this->sortFor('courses', $activityFilters, array_keys(CourseRepository::ADMIN_COURSE_SORTS), 'updated', SortOrder::DESCENDING);
                 $searchFilter = self::withSearch($scope, 'courses', $search);
-                $pagination = $this->paginationFor('courses', $activityFilters, $this->adminCoursesTotal($actorUserId, $universe, $viewAll, $search));
+                $pagination = $this->paginationFor('courses', $activityFilters, $this->adminCoursesTotal($actorUserId, $viewAll, $search));
                 return [
-                    'courses' => $this->adminCoursePage($actorUserId, $universe, $viewAll, $pagination->pageSize, $pagination->offset, $search, $sort),
+                    'courses' => $this->adminCoursePage($actorUserId, $viewAll, $pagination->pageSize, $pagination->offset, $search, $sort),
                     'courses_search' => $search,
                 ]
                     + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'))
@@ -1387,17 +1195,17 @@ final class PlatformAdministrationService
                         'updated' => SortOrder::DESCENDING,
                     ]);
             })(),
-            'people' => (function () use ($activityFilters, $universe, $scope): array {
+            'people' => (function () use ($activityFilters, $scope): array {
                 $allRoles = $this->roles->all();
                 $search = self::searchTerm('people', $activityFilters);
                 $sort = $this->sortFor('people', $activityFilters, array_keys(AdministrationRepository::PEOPLE_SORTS), 'name');
-                $pagination = $this->paginationFor('people', $activityFilters, $this->administration->peopleCount($universe, $search));
+                $pagination = $this->paginationFor('people', $activityFilters, $this->administration->peopleCount($search));
                 // The sort travels on every paging link and the search term travels on every sort
                 // link, so neither control undoes the other.
                 $filters = self::withSearch($scope, 'people', $search) + $sort->toPrefixedArray('people');
 
                 return [
-                    'people' => $this->normalisePeople($this->administration->people($universe, $pagination->pageSize, $pagination->offset, $search, $sort), $allRoles),
+                    'people' => $this->normalisePeople($this->administration->people($pagination->pageSize, $pagination->offset, $search, $sort), $allRoles),
                     'people_search' => $search,
                     'roles' => $this->normalAssignableRoles(),
                 ]
@@ -1422,12 +1230,12 @@ final class PlatformAdministrationService
             // The search term is read here rather than inside the helper so each dataset's wiring is
             // greppable from its own section, which is what DatasetSearchWiringTest asserts: a box
             // whose term the service never reads types into nothing.
-            'companies' => $this->companyAudienceSection('companies', 'consumers', self::searchTerm('companies', $activityFilters), $activityFilters, $universe, $scope)
-                + ['system_company' => $this->systemCompanyContext($actorUserId, $universe)],
-            'company_creators' => $this->companyAudienceSection('company_creators', 'creators', self::searchTerm('company_creators', $activityFilters), $activityFilters, $universe, $scope),
+            'companies' => $this->companyAudienceSection('companies', 'consumers', self::searchTerm('companies', $activityFilters), $activityFilters, $scope)
+                + ['system_company' => $this->systemCompanyContext($actorUserId)],
+            'company_creators' => $this->companyAudienceSection('company_creators', 'creators', self::searchTerm('company_creators', $activityFilters), $activityFilters, $scope),
             // Two sections since v0.6, each with its own route, because a reader could not link to,
             // bookmark or reload one of them while both lived behind in-page tab buttons.
-            'requests' => (function () use ($activityFilters, $capabilities, $universe, $scope): array {
+            'requests' => (function () use ($activityFilters, $capabilities, $scope): array {
                 if (empty($capabilities['view_requests'])) {
                     return ['requests' => []];
                 }
@@ -1436,10 +1244,10 @@ final class PlatformAdministrationService
                 $sort = $this->sortFor('requests', $activityFilters, array_keys(AdministrationRepository::REQUEST_SORTS), 'status');
                 $status = self::requestStatusFilter($activityFilters);
                 $searchFilter = self::withSearch($scope, 'requests', $search) + ($status === '' ? [] : ['requests_status' => $status]);
-                $pagination = $this->paginationFor('requests', $activityFilters, $this->administration->requestsCount($universe, $search, $status));
+                $pagination = $this->paginationFor('requests', $activityFilters, $this->administration->requestsCount($search, $status));
 
                 return [
-                    'requests' => $this->normaliseRequests($this->administration->requests($universe, $pagination->pageSize, $pagination->offset, $search, $sort, $status)),
+                    'requests' => $this->normaliseRequests($this->administration->requests($pagination->pageSize, $pagination->offset, $search, $sort, $status)),
                     'requests_search' => $search,
                     'requests_status' => $status,
                     'requests_status_filters' => self::requestStatusFilters($status, '/admin/course/requests', $searchFilter),
@@ -1454,7 +1262,7 @@ final class PlatformAdministrationService
                         'actions' => 'Actions|6',
                     ], array_keys(AdministrationRepository::REQUEST_SORTS), $searchFilter, ['requested' => SortOrder::DESCENDING]);
             })(),
-            'enrolments' => (function () use ($activityFilters, $capabilities, $universe, $scope): array {
+            'enrolments' => (function () use ($activityFilters, $capabilities, $scope): array {
                 if (empty($capabilities['view_enrolments'])) {
                     return ['enrolments' => []];
                 }
@@ -1462,10 +1270,10 @@ final class PlatformAdministrationService
                 $search = self::searchTerm('enrolments', $activityFilters);
                 $sort = $this->sortFor('enrolments', $activityFilters, array_keys(AdministrationRepository::ENROLMENT_SORTS), 'updated', SortOrder::DESCENDING);
                 $searchFilter = self::withSearch($scope, 'enrolments', $search);
-                $pagination = $this->paginationFor('enrolments', $activityFilters, $this->administration->enrolmentsCount($universe, $search));
+                $pagination = $this->paginationFor('enrolments', $activityFilters, $this->administration->enrolmentsCount($search));
 
                 return [
-                    'enrolments' => $this->normaliseEnrolments($this->administration->enrolments($universe, $pagination->pageSize, $pagination->offset, $search, $sort)),
+                    'enrolments' => $this->normaliseEnrolments($this->administration->enrolments($pagination->pageSize, $pagination->offset, $search, $sort)),
                     'enrolments_search' => $search,
                 ]
                     + $this->paginationView('enrolments', $pagination, '/admin/course/enrolments', 'Enrolments', $searchFilter + $sort->toPrefixedArray('enrolments'))
@@ -1485,13 +1293,13 @@ final class PlatformAdministrationService
             // The credit-entry controls previously loaded every company, person and course to
             // populate three <select> elements. They are now htmx-driven lookups, so this
             // section loads only the ledger page it displays.
-            'credits' => (function () use ($activityFilters, $universe, $scope): array {
+            'credits' => (function () use ($activityFilters, $scope): array {
                 $search = self::searchTerm('credits', $activityFilters);
                 $sort = $this->sortFor('credits', $activityFilters, array_keys(AdministrationRepository::CREDIT_SORTS), 'created', SortOrder::DESCENDING);
                 $searchFilter = self::withSearch($scope, 'credits', $search);
-                $pagination = $this->paginationFor('credits', $activityFilters, $this->administration->creditLedgerCount($universe, $search));
+                $pagination = $this->paginationFor('credits', $activityFilters, $this->administration->creditLedgerCount($search));
                 return [
-                    'credits' => $this->normaliseCredits($this->administration->creditLedger($universe, $pagination->pageSize, $pagination->offset, $search, $sort)),
+                    'credits' => $this->normaliseCredits($this->administration->creditLedger($pagination->pageSize, $pagination->offset, $search, $sort)),
                     'credits_search' => $search,
                 ]
                     + $this->paginationView('credits', $pagination, '/admin/course/credits', 'Credits', $searchFilter + $sort->toPrefixedArray('credits'))
@@ -1513,20 +1321,20 @@ final class PlatformAdministrationService
             // Activity previously reported no total at all, and populated its person, company
             // and course filters by loading those three tables in full. It now counts with the
             // identical filter set and resolves entities through bounded htmx lookups.
-            'activity' => (function () use ($activityFilters, $universe, $scope): array {
+            'activity' => (function () use ($activityFilters, $scope): array {
                 $filters = $this->activityFilterValues($activityFilters);
                 $sort = $this->sortFor('activity', $activityFilters, array_keys(AdministrationRepository::ACTIVITY_SORTS), 'created', SortOrder::DESCENDING);
-                $pagination = $this->paginationFor('activity', $activityFilters, $this->administration->activityCount($universe, $filters));
-                $events = $this->normaliseActivity($this->administration->activity($universe, $filters, $pagination->pageSize, $pagination->offset, $sort));
+                $pagination = $this->paginationFor('activity', $activityFilters, $this->administration->activityCount($filters));
+                $events = $this->normaliseActivity($this->administration->activity($filters, $pagination->pageSize, $pagination->offset, $sort));
 
                 return [
                     'activity_events' => $events,
                     'activity_last_id' => (int) ($events[0]['id'] ?? 0),
-                    'activity_families' => $this->administration->activityFamilies($universe),
+                    'activity_families' => $this->administration->activityFamilies(),
                     'activity_filters' => $filters,
-                    'activity_selected_actor' => $this->lookups->describe('people', $universe, (int) ($filters['actor_id'] ?? 0)),
-                    'activity_selected_company' => $this->lookups->describe('companies', $universe, (int) ($filters['company_id'] ?? 0)),
-                    'activity_selected_course' => $this->lookups->describe('courses', $universe, (int) ($filters['course_id'] ?? 0)),
+                    'activity_selected_actor' => $this->lookups->describe('people', (int) ($filters['actor_id'] ?? 0)),
+                    'activity_selected_company' => $this->lookups->describe('companies', (int) ($filters['company_id'] ?? 0)),
+                    'activity_selected_course' => $this->lookups->describe('courses', (int) ($filters['course_id'] ?? 0)),
                 ]
                     + $this->paginationView('activity', $pagination, '/admin/activity', 'Activity', $filters + $scope + $sort->toPrefixedArray('activity'))
                     + $this->sortView('activity', $sort, '/admin/activity', [
@@ -1542,15 +1350,15 @@ final class PlatformAdministrationService
             })(),
             // Reports holds two datasets on one screen, exactly as Enrolments does, so each keeps
             // its own pagination and its own search rather than sharing one and disagreeing.
-            'company_report' => (function () use ($universe, $activityFilters, $scope): array {
+            'company_report' => (function () use ($activityFilters, $scope): array {
                 $companySearch = self::searchTerm('company_report', $activityFilters);
                 $companySort = $this->sortFor('company_report', $activityFilters, array_keys(AdministrationRepository::COMPANY_REPORT_SORTS), 'company');
                 $companyFilter = self::withSearch($scope, 'company_report', $companySearch);
-                $companyPages = $this->paginationFor('company_report', $activityFilters, $this->administration->companyReportCount($universe, $companySearch));
+                $companyPages = $this->paginationFor('company_report', $activityFilters, $this->administration->companyReportCount($companySearch));
 
                 return [
                     'company_report' => $this->normaliseCompanyReport(
-                        $this->administration->companyReport($universe, $companyPages->pageSize, $companyPages->offset, $companySearch, $companySort)
+                        $this->administration->companyReport($companyPages->pageSize, $companyPages->offset, $companySearch, $companySort)
                     ),
                     'company_report_search' => $companySearch,
                     'course_report' => [],
@@ -1568,20 +1376,20 @@ final class PlatformAdministrationService
                         'completed' => SortOrder::DESCENDING,
                     ]);
             })(),
-            'reports' => (function () use ($universe, $activityFilters, $scope, $onlyDataset): array {
+            'reports' => (function () use ($activityFilters, $scope, $onlyDataset): array {
                 // The summary strip is not swapped by a paging request, so it is not recomputed for
                 // one: its nine aggregate sub-selects are the most expensive thing on the screen.
                 $data = $onlyDataset === null
-                    ? ['report_summary' => $this->administration->reportSummary($universe)]
+                    ? ['report_summary' => $this->administration->reportSummary()]
                     : [];
 
                 if (self::wants($onlyDataset, 'course_report')) {
                     $courseSearch = self::searchTerm('course_report', $activityFilters);
                     $courseSort = $this->sortFor('course_report', $activityFilters, array_keys(AdministrationRepository::COURSE_REPORT_SORTS), 'course');
                     $courseFilter = self::withSearch($scope, 'course_report', $courseSearch);
-                    $coursePages = $this->paginationFor('course_report', $activityFilters, $this->administration->courseReportCount($universe, $courseSearch));
+                    $coursePages = $this->paginationFor('course_report', $activityFilters, $this->administration->courseReportCount($courseSearch));
                     $data['course_report'] = $this->normaliseCourseReport(
-                        $this->administration->courseReport($universe, $coursePages->pageSize, $coursePages->offset, $courseSearch, $courseSort)
+                        $this->administration->courseReport($coursePages->pageSize, $coursePages->offset, $courseSearch, $courseSort)
                     );
                     $data['course_report_search'] = $courseSearch;
                     $data += $this->paginationView('course_report', $coursePages, '/admin/reports', 'Course performance', $courseFilter + $courseSort->toPrefixedArray('course_report'));
@@ -1606,14 +1414,8 @@ final class PlatformAdministrationService
                 return $data;
             })(),
             'themes' => [],
-            'settings' => (function () use ($actorUserId, $universe): array {
-                $systemCompany = $this->systemCompanyContext($actorUserId, $universe);
-
-                // Stage C: the shared SEED System Company is read, never bootstrapped. Rendering
-                // Settings must not create infrastructure, and a database that predates the v0.5.8
-                // baseline simply has no row to show - the fields are disabled rather than the
-                // page failing.
-                $seedCompany = $this->companies->systemCompany(DataUniverse::Seed);
+            'settings' => (function () use ($actorUserId): array {
+                $systemCompany = $this->systemCompanyContext($actorUserId);
 
                 return [
                     'system_company' => $systemCompany,
@@ -1622,12 +1424,6 @@ final class PlatformAdministrationService
                     'mail_settings' => $this->settings->mailAdminView(),
                     'system_company_name' => $this->options->get('system_company_name', (string) $systemCompany['name']),
                     'system_company_domain' => (string) $systemCompany['domain'],
-                    'seed_system_company_present' => $seedCompany !== null,
-                    'seed_system_company_name' => $this->settings->seedSystemCompanyName(),
-                    'seed_system_company_domain' => $this->settings->seedSystemCompanyDomain(),
-                    'seed_system_company_domain_source' => $this->settings->seedSystemCompanyDomainSource(),
-                    'seed_system_company_override' => $this->settings->hasSeedSystemCompanyOverride(),
-                    'seed_mail_rewrite_active' => $this->settings->seedSystemCompanyDomain() !== '',
                 ];
             })(),
             default => throw new InvalidArgumentException('Unknown Administration section: ' . $section),
@@ -1635,7 +1431,7 @@ final class PlatformAdministrationService
     }
 
     /** @return array<string,mixed> */
-    private function systemCompanyContext(int $actorUserId, DataUniverse $universe): array
+    private function systemCompanyContext(int $actorUserId): array
     {
         // This runs while rendering a page, so it must not make the viewer a member of what they
         // are viewing. It used to, and that took /admin/companies?universe=seed down with a 500:
@@ -1644,20 +1440,11 @@ final class PlatformAdministrationService
         // the deactivating half of that membership write had already committed.
         //
         // A read resolves. Only a workflow that genuinely needs membership assigns it.
-        $systemCompany = $this->companies->systemCompany($universe);
+        $systemCompany = $this->companies->systemCompany();
 
         if ($systemCompany === null) {
-            // Nothing to resolve. Bootstrapping is a genuine REAL-universe concern - the SEED
-            // System Company is created by the baseline with the reserved infrastructure token and
-            // must never be created on demand, or a second one appears per seed set.
-            if ($universe === DataUniverse::Seed) {
-                throw new RuntimeException(
-                    'The shared SEED System Company is missing. The database predates the v0.5.8 baseline.'
-                );
-            }
             $systemCompany = $this->companies->ensureSystemCompany(
                 $actorUserId,
-                DataUniverse::Real,
                 $this->options->get('system_company_name', 'System Company'),
                 Env::string('APP_DOMAIN', 'local')
             );
@@ -1666,7 +1453,7 @@ final class PlatformAdministrationService
         // The sweep is universe-scoped on both halves and remains a legitimate invariant: an
         // active identity with no company belongs to its own universe's System Company. It never
         // touches the viewing administrator, because that identity already has a membership.
-        $this->companies->assignUnassignedUsersToSystemCompany((int) $systemCompany['id'], $universe);
+        $this->companies->assignUnassignedUsersToSystemCompany((int) $systemCompany['id']);
 
         return $systemCompany;
     }
@@ -1678,13 +1465,13 @@ final class PlatformAdministrationService
      * an already-capped array, so "People: 250" could mean "at least 250, we stopped looking" —
      * a wrong number rather than a truncated list.
      */
-    private function companyTotal(string $dataset, int $companyId, DataUniverse $universe, string $search = ''): int
+    private function companyTotal(string $dataset, int $companyId, string $search = ''): int
     {
         return match ($dataset) {
-            'people' => $companyId > 0 ? $this->administration->companyPeopleCount($universe, $companyId, $search) : $this->administration->peopleCount($universe, $search),
-            'requests' => $companyId > 0 ? $this->administration->companyRequestsCount($universe, $companyId, $search) : $this->administration->requestsCount($universe, $search),
-            'enrolments' => $companyId > 0 ? $this->administration->companyEnrolmentsCount($universe, $companyId, $search) : $this->administration->enrolmentsCount($universe, $search),
-            'credits' => $companyId > 0 ? $this->administration->companyCreditsCount($universe, $companyId, $search) : $this->administration->creditLedgerCount($universe, $search),
+            'people' => $companyId > 0 ? $this->administration->companyPeopleCount($companyId, $search) : $this->administration->peopleCount($search),
+            'requests' => $companyId > 0 ? $this->administration->companyRequestsCount($companyId, $search) : $this->administration->requestsCount($search),
+            'enrolments' => $companyId > 0 ? $this->administration->companyEnrolmentsCount($companyId, $search) : $this->administration->enrolmentsCount($search),
+            'credits' => $companyId > 0 ? $this->administration->companyCreditsCount($companyId, $search) : $this->administration->creditLedgerCount($search),
             default => 0,
         };
     }
@@ -1694,24 +1481,24 @@ final class PlatformAdministrationService
      *
      * @return list<array<string,mixed>>
      */
-    private function companyRows(string $dataset, int $companyId, DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    private function companyRows(string $dataset, int $companyId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         // The platform-wide branch takes no sort. Its columns are the Administration ones, and a
         // key resolved against the Company whitelist would not be in the Administration map - so it
         // is left on its default rather than being handed a key that method cannot use.
         return match ($dataset) {
             'people' => $companyId > 0
-                ? $this->administration->companyPeople($universe, $companyId, $limit, $offset, $search, $sort)
-                : $this->administration->people($universe, $limit, $offset, $search),
+                ? $this->administration->companyPeople($companyId, $limit, $offset, $search, $sort)
+                : $this->administration->people($limit, $offset, $search),
             'requests' => $companyId > 0
-                ? $this->administration->companyRequests($universe, $companyId, $limit, $offset, $search, $sort)
-                : $this->administration->requests($universe, $limit, $offset, $search),
+                ? $this->administration->companyRequests($companyId, $limit, $offset, $search, $sort)
+                : $this->administration->requests($limit, $offset, $search),
             'enrolments' => $companyId > 0
-                ? $this->administration->companyEnrolments($universe, $companyId, $limit, $offset, $search, $sort)
-                : $this->administration->enrolments($universe, $limit, $offset, $search),
+                ? $this->administration->companyEnrolments($companyId, $limit, $offset, $search, $sort)
+                : $this->administration->enrolments($limit, $offset, $search),
             'credits' => $companyId > 0
-                ? $this->administration->companyCredits($universe, $companyId, $limit, $offset, $search, $sort)
-                : $this->administration->creditLedger($universe, $limit, $offset, $search),
+                ? $this->administration->companyCredits($companyId, $limit, $offset, $search, $sort)
+                : $this->administration->creditLedger($limit, $offset, $search),
             default => [],
         };
     }
@@ -1758,14 +1545,13 @@ final class PlatformAdministrationService
      * @param array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool,universe:DataUniverse} $context
      * @return array<string,mixed>
      */
-    public function companyControlCentre(int $actorUserId, DataUniverse $universe, array $context): array
+    public function companyControlCentre(int $actorUserId, array $context): array
     {
         $companyId = (int) $context['company_id'];
 
         // Once a concrete company is in context, everything shown is that company's universe.
         // Only the All-companies overview uses the requested scope, because only it spans more
         // than one company.
-        $universe = $context['platform_wide'] ? $universe : $context['universe'];
 
         $data = [
             'company' => $context['company'],
@@ -1774,7 +1560,7 @@ final class PlatformAdministrationService
             // other preview here; deep paging lives on /admin/companies, which the table links
             // to. Leaving this empty rendered a table of headings and no rows.
             'companies' => $context['platform_wide']
-                ? $this->normaliseCompanies($this->administration->companies($universe, self::PREVIEW_PAGE_SIZE, 0))
+                ? $this->normaliseCompanies($this->administration->companies(self::PREVIEW_PAGE_SIZE, 0))
                 : [$context['company']],
             'is_preview' => true,
         ] + $this->datasetDefaults();
@@ -1785,7 +1571,7 @@ final class PlatformAdministrationService
         // paginated and searchable rather than as a bounded preview that could not be paged.
         foreach (['people', 'requests', 'enrolments', 'credits'] as $dataset) {
             $data[$dataset] = [];
-            $data[$dataset . '_count'] = $this->companyTotal($dataset, $companyId, $universe);
+            $data[$dataset . '_count'] = $this->companyTotal($dataset, $companyId);
         }
 
         // The consolidated preview must use the same company rule as the standalone Courses
@@ -1794,11 +1580,11 @@ final class PlatformAdministrationService
         $data['courses'] = [];
         $data['training'] = [];
         $data['courses_count'] = $context['platform_wide']
-            ? $this->courses->allCoursesCount($universe)
-            : $this->courses->companyCoursesCount($universe, $companyId, 'owned');
+            ? $this->courses->allCoursesCount()
+            : $this->courses->companyCoursesCount($companyId, 'owned');
         $data['training_count'] = $context['platform_wide']
             ? 0
-            : $this->courses->companyCoursesCount($universe, $companyId, 'training');
+            : $this->courses->companyCoursesCount($companyId, 'training');
 
         return $data;
     }
@@ -1814,10 +1600,9 @@ final class PlatformAdministrationService
      * @param array{mode:string,company:array<string,mixed>,company_id:int,platform_wide:bool,universe:DataUniverse} $context
      * @return array<string,mixed>
      */
-    public function companySectionData(string $section, int $actorUserId, DataUniverse $universe, array $context, array $request = []): array
+    public function companySectionData(string $section, int $actorUserId, array $context, array $request = []): array
     {
         $companyId = (int) $context['company_id'];
-        $universe = $context['platform_wide'] ? $universe : $context['universe'];
 
         // Defaults are NOT unioned in here. `+` keeps the left operand on a key collision, so a
         // defaults array merged in first silently discards every real value added afterwards by a
@@ -1835,22 +1620,22 @@ final class PlatformAdministrationService
         if ($section === 'dashboard') {
             foreach (['people', 'requests', 'enrolments', 'credits'] as $dataset) {
                 $data[$dataset] = [];
-                $data[$dataset . '_count'] = $this->companyTotal($dataset, $companyId, $universe);
+                $data[$dataset . '_count'] = $this->companyTotal($dataset, $companyId);
             }
             $data['courses'] = [];
             $data['training'] = [];
             // Counted by the identical rule each section lists by, so a dashboard figure and the
             // rows behind the tab it links to can never disagree.
             $data['courses_count'] = $context['platform_wide']
-                ? $this->courses->allCoursesCount($universe)
-                : $this->courses->companyCoursesCount($universe, $companyId, 'owned');
+                ? $this->courses->allCoursesCount()
+                : $this->courses->companyCoursesCount($companyId, 'owned');
             $data['training_count'] = $context['platform_wide']
                 ? 0
-                : $this->courses->companyCoursesCount($universe, $companyId, 'training');
+                : $this->courses->companyCoursesCount($companyId, 'training');
             // Only the dashboard renders the platform-wide "All companies" table, so the query
             // stays inside this branch rather than running on every /company/* route.
             if ($context['platform_wide']) {
-                $data['companies'] = $this->normaliseCompanies($this->administration->companies($universe, self::PREVIEW_PAGE_SIZE, 0));
+                $data['companies'] = $this->normaliseCompanies($this->administration->companies(self::PREVIEW_PAGE_SIZE, 0));
             }
 
             return $data + $this->datasetDefaults();
@@ -1858,9 +1643,9 @@ final class PlatformAdministrationService
 
         if ($section === 'favourites') {
             $sort = $this->sortFor('company_favourites', $request, array_keys(CourseRepository::COMPANY_FAVOURITE_SORTS), 'added', SortOrder::DESCENDING);
-            $pagination = $this->paginationFor('company_favourites', $request, $this->courses->companyFavouritesCount($universe, $companyId));
+            $pagination = $this->paginationFor('company_favourites', $request, $this->courses->companyFavouritesCount($companyId));
             $data['company_favourites'] = $companyId > 0
-                ? $this->courses->companyFavourites($universe, $companyId, $pagination->pageSize, $pagination->offset, $sort)
+                ? $this->courses->companyFavourites($companyId, $pagination->pageSize, $pagination->offset, $sort)
                 : [];
             $data['courses'] = [];
             $data['training'] = [];
@@ -1892,16 +1677,16 @@ final class PlatformAdministrationService
             // company senses, so Training Courses has nothing to show them.
             $platformWide = $context['platform_wide'];
             $total = $platformWide
-                ? ($relationship === 'owned' ? $this->courses->allCoursesCount($universe, $search) : 0)
-                : $this->courses->companyCoursesCount($universe, $companyId, $relationship, $search);
+                ? ($relationship === 'owned' ? $this->courses->allCoursesCount($search) : 0)
+                : $this->courses->companyCoursesCount($companyId, $relationship, $search);
             $pagination = $this->paginationFor($dataset, $request, $total);
 
             if ($platformWide) {
                 $rows = $relationship === 'owned'
-                    ? $this->courses->allCourses($universe, $pagination->pageSize, $pagination->offset, $search)
+                    ? $this->courses->allCourses($pagination->pageSize, $pagination->offset, $search)
                     : [];
             } else {
-                $rows = $this->courses->companyCourses($universe, $companyId, $relationship, $pagination->pageSize, $pagination->offset, $search, $sort);
+                $rows = $this->courses->companyCourses($companyId, $relationship, $pagination->pageSize, $pagination->offset, $search, $sort);
             }
 
             $data[$dataset] = $rows;
@@ -1935,12 +1720,12 @@ final class PlatformAdministrationService
             $sort = $this->sortFor('company_performance', $request, array_keys($sortable), 'course');
             $searchFilter = self::withSearch([], 'company_performance', $search);
             $total = $companyId > 0
-                ? $this->administration->companyCourseReportCount($universe, $companyId, $search)
+                ? $this->administration->companyCourseReportCount($companyId, $search)
                 : 0;
             $pagination = $this->paginationFor('company_performance', $request, $total);
             $data['company_performance'] = $companyId > 0
                 ? $this->normaliseCourseReport(
-                    $this->administration->companyCourseReport($universe, $companyId, $pagination->pageSize, $pagination->offset, $search, $sort)
+                    $this->administration->companyCourseReport($companyId, $pagination->pageSize, $pagination->offset, $search, $sort)
                 )
                 : [];
             $data['company_performance_search'] = $search;
@@ -1977,11 +1762,11 @@ final class PlatformAdministrationService
         $sort = $this->sortFor($dataset, $request, array_keys($sortable), (string) $defaultKey, $natural[$defaultKey] ?? SortOrder::ASCENDING);
         $route = self::COMPANY_SECTION_ROUTES[$section] ?? '/company';
         $searchFilter = self::withSearch([], $dataset, $search);
-        $total = $this->companyTotal($dataset, $companyId, $universe, $search);
+        $total = $this->companyTotal($dataset, $companyId, $search);
         $pagination = $this->paginationFor($dataset, $request, $total);
         $data[$dataset] = $this->normaliseCompanyDataset(
             $dataset,
-            $this->companyRows($dataset, $companyId, $universe, $pagination->pageSize, $pagination->offset, $search, $companyId > 0 ? $sort : null)
+            $this->companyRows($dataset, $companyId, $pagination->pageSize, $pagination->offset, $search, $companyId > 0 ? $sort : null)
         );
         $data[$dataset . '_count'] = $total;
         $data[$dataset . '_search'] = $search;
@@ -2011,21 +1796,20 @@ final class PlatformAdministrationService
     }
 
     /** @param array<string,mixed> $input */
-    public function createCompanyPerson(int $actorUserId, int $companyId, array $input, DataUniverse $universe): int
+    public function createCompanyPerson(int $actorUserId, int $companyId, array $input): int
     {
         $company = $this->contextCompany($companyId);
         $email = EmailAddress::normalize((string) ($input['email'] ?? ''));
         if (EmailAddress::domain($email) !== strtolower((string) $company['domain'])) {
             throw new InvalidArgumentException('The staff email address must use ' . $company['domain'] . ' exactly.');
         }
-        $this->assertNormalIdentity($actorUserId);
         $role = strtoupper(trim((string) ($input['role'] ?? RoleCatalog::STUDENT)));
         if (!in_array($role, $this->normalAssignableRoleKeys(), true)) {
             throw new InvalidArgumentException('Choose a valid company role.');
         }
         $input['company_id'] = (int) $company['id'];
         $input['role'] = $role;
-        return $this->createPerson($input, $actorUserId, $universe);
+        return $this->createPerson($input, $actorUserId);
     }
 
     /**
@@ -2146,28 +1930,22 @@ final class PlatformAdministrationService
      * @param array<string,mixed> $request
      * @return array<string,mixed>
      */
-    public function companyPicker(DataUniverse $universe, array $request): array
+    public function companyPicker(array $request): array
     {
         $search = self::searchTerm('picker', $request);
-        $pagination = $this->paginationFor('picker', $request, $this->administration->companyCount($universe, $search));
+        $pagination = $this->paginationFor('picker', $request, $this->administration->companyCount($search));
         $filters = $search === '' ? [] : ['picker_q' => $search];
-        $scoped = $filters + ['universe' => $universe->value];
+        $scoped = $filters;
 
         return [
             'picker_search' => $search,
             'picker_companies' => $this->normaliseCompanies(
-                $this->administration->companies($universe, $pagination->pageSize, $pagination->offset, $search)
+                $this->administration->companies($pagination->pageSize, $pagination->offset, $search)
             ),
             // The scope travels the same way it does everywhere else: in the query string, read
             // back by the picker route, and carried by the search and by every pagination link.
             // It was a select element on this one screen, which meant the modal had a second way
             // of expressing something the rest of the LMS expresses one way.
-            'universe' => $universe->value,
-            'universe_switch' => $this->universeSwitch($universe, '/company/picker', $filters),
-            'universe_counts' => $this->universeCounts(
-                'companies',
-                fn(DataUniverse $scope): int => $this->administration->companyCount($scope, $search)
-            ),
         ] + $this->paginationView('picker', $pagination, '/company/picker', 'Companies', $scoped);
     }
 
@@ -2243,7 +2021,7 @@ final class PlatformAdministrationService
     }
 
     /** @param array<string,mixed> $input */
-    public function createPerson(array $input, int $actorUserId, DataUniverse $universe): int
+    public function createPerson(array $input, int $actorUserId): int
     {
         $email = EmailAddress::normalize((string) ($input['email'] ?? ''));
         $firstName = trim((string) ($input['first_name'] ?? ''));
@@ -2255,13 +2033,11 @@ final class PlatformAdministrationService
         if ($companyId < 1) {
             $system = $this->companies->ensureSystemCompany(
                 $actorUserId,
-                $universe,
                 $this->options->get('system_company_name', 'System Company'),
                 Env::string('APP_DOMAIN', 'local')
             );
             $companyId = (int) $system['id'];
         }
-        $this->assertNormalIdentity($actorUserId);
         $role = strtoupper(trim((string) ($input['role'] ?? RoleCatalog::STUDENT))) ?: RoleCatalog::STUDENT;
         if (!in_array($role, $this->normalAssignableRoleKeys(), true)) {
             throw new InvalidArgumentException('Choose a valid genuine-data role.');
@@ -2271,14 +2047,13 @@ final class PlatformAdministrationService
         // The new identity belongs to the universe of the company it is being placed in, not
         // to the universe of whoever is creating it: a genuine ADMIN adding staff to a SEED
         // company must create a SEED person, or the membership row cannot be written at all.
-        $seedToken = $companyId > 0 ? $this->companies->seedTokenFor($companyId) : null;
 
-        $user = $this->transactions->run(function () use ($email, $firstName, $lastName, $companyId, $role, $actorUserId, $seedToken): array {
+        $user = $this->transactions->run(function () use ($email, $firstName, $lastName, $companyId, $role, $actorUserId): array {
             $user = $this->users->createManagedUser($email, [
                 'first_name' => $firstName,
                 'last_name' => $lastName,
                 'display_name' => trim($firstName . ' ' . $lastName),
-            ], $seedToken);
+            ]);
             $this->roles->assign((int) $user['id'], RoleCatalog::STUDENT);
             if ($role !== RoleCatalog::STUDENT) {
                 $this->roles->assign((int) $user['id'], $role);
@@ -2308,7 +2083,7 @@ final class PlatformAdministrationService
     }
 
     /** @param array<string,mixed> $input */
-    public function updatePerson(int $userId, array $input, int $actorUserId, DataUniverse $universe): void
+    public function updatePerson(int $userId, array $input, int $actorUserId): void
     {
         $primaryEmail = EmailAddress::normalize((string) ($input['primary_email'] ?? ''));
         $secondaryRaw = trim((string) ($input['secondary_email'] ?? ''));
@@ -2322,9 +2097,6 @@ final class PlatformAdministrationService
         }
         $roles = array_values(array_unique(array_map('strval', $roles)));
         $currentRoles = $this->roles->roles($userId);
-        if (RoleFamily::forRoleSet($currentRoles) === RoleFamily::SEED) {
-            throw new InvalidArgumentException('Seed person management becomes available with the Seed Database implementation.');
-        }
         $allowedRoles = array_column($this->roleOptionsForUser($currentRoles), 'role_key');
         $roles = array_values(array_filter($roles, static fn(string $role): bool => in_array(strtoupper($role), $allowedRoles, true)));
         if (in_array(RoleCatalog::ADMIN, $currentRoles, true)
@@ -2333,7 +2105,7 @@ final class PlatformAdministrationService
             throw new InvalidArgumentException('The platform must always have at least one Platform Administrator. Assign another administrator before removing this role.');
         }
 
-        $this->transactions->run(function () use ($userId, $input, $actorUserId, $primaryEmail, $secondaryEmail, $roles, $universe): void {
+        $this->transactions->run(function () use ($userId, $input, $actorUserId, $primaryEmail, $secondaryEmail, $roles): void {
             $this->users->updateProfile($userId, $input);
             $this->users->replacePrimaryEmail($userId, $primaryEmail);
             $this->users->replaceSecondaryEmail($userId, $secondaryEmail);
@@ -2342,7 +2114,6 @@ final class PlatformAdministrationService
             if ($companyId < 1) {
                 $system = $this->companies->ensureSystemCompany(
                     $actorUserId,
-                    $universe,
                     $this->options->get('system_company_name', 'System Company'),
                     Env::string('APP_DOMAIN', 'local')
                 );
@@ -2435,7 +2206,7 @@ final class PlatformAdministrationService
     }
 
     /** @return array<string,mixed> */
-    public function personForAdministration(int $userId, DataUniverse $universe): array
+    public function personForAdministration(int $userId): array
     {
         $profile = $this->users->profile($userId) ?? throw new RuntimeException('The user account does not exist.');
         // The same whole name the person sees on their own profile, composed by the same helper, so
@@ -2467,7 +2238,7 @@ final class PlatformAdministrationService
             'role_options' => $roleOptions,
             // The company reassignment control used to load every company into a <select>.
             // It is now an htmx lookup, so only the currently selected company is resolved.
-            'selected_company' => $this->lookups->describe('companies', $universe, (int) ($profile['company_id'] ?? 0)),
+            'selected_company' => $this->lookups->describe('companies', (int) ($profile['company_id'] ?? 0)),
         ];
     }
 
@@ -2638,7 +2409,7 @@ final class PlatformAdministrationService
                 throw new InvalidArgumentException('Enter one valid System Company domain, for example example.co.za.');
             }
             $this->options->set('system_company_name', $companyName, $actorUserId);
-            $system = $this->companies->ensureSystemCompany($actorUserId, DataUniverse::Real, $companyName, Env::string('APP_DOMAIN', 'local'));
+            $system = $this->companies->ensureSystemCompany($actorUserId, $companyName, Env::string('APP_DOMAIN', 'local'));
             // Saving Settings is a deliberate administrative act in the genuine universe, so the
             // administrator owning the System Company they just configured is correct here. It is
             // stated explicitly rather than happening inside a lookup.
@@ -2657,106 +2428,7 @@ final class PlatformAdministrationService
         $this->audit->record($actorUserId, 'platform.setting_reset', ['setting' => 'platform_name', 'source' => '.env']);
     }
 
-    /**
-     * Saves the shared SEED System Company's name and mail domain.
-     *
-     * Stage C. The row is the one the baseline created with the reserved infrastructure token, and
-     * it is edited in place: the token is never written, `is_system` is never cleared, and the
-     * administrator never becomes a member of it. A REAL administrator's authority over seed
-     * infrastructure comes from ADMIN capability plus a deliberate universe scope, never from
-     * business membership - which is the defect that took `/admin/companies?universe=seed` down.
-     *
-     * Every check happens before the first write, and both writes are in one transaction. A
-     * legality check performed while building the second statement's bindings runs after the first
-     * has already committed, which is how that same defect managed to damage data before throwing.
-     *
-     * @param array<string,mixed> $input
-     */
-    public function saveSeedSystemCompany(array $input, int $actorUserId): void
-    {
-        $name = trim((string) ($input['seed_system_company_name'] ?? ''));
-        $domain = RuntimeSettings::normaliseDomain((string) ($input['seed_system_company_domain'] ?? ''));
 
-        if ($name === '') {
-            throw new InvalidArgumentException('Enter a name for the SEED System Company.');
-        }
-
-        // An empty domain is legitimate: it disables the seed mail rewrite. Anything non-empty
-        // must be a domain rather than an address or a URL.
-        if ($domain !== '') {
-            if (
-                str_contains($domain, '@')
-                || str_contains($domain, '/')
-                || filter_var('admin@' . $domain, FILTER_VALIDATE_EMAIL) === false
-            ) {
-                throw new InvalidArgumentException(
-                    'Enter one valid SEED System Company domain, for example seed.example.co.za.'
-                );
-            }
-
-            // companies.domain is unique platform-wide, so a SEED domain equal to APP_DOMAIN would
-            // collide with the genuine System Company. The migration refuses this at install time
-            // for the same reason; refusing it here keeps the two rules identical.
-            if ($domain === RuntimeSettings::normaliseDomain(Env::string('APP_DOMAIN', 'local'))) {
-                throw new InvalidArgumentException(
-                    'The SEED System Company domain must differ from APP_DOMAIN: companies.domain is unique platform-wide.'
-                );
-            }
-
-            if (str_ends_with($domain, SeedMailRouter::GENERATED_DOMAIN_SUFFIX)) {
-                throw new InvalidArgumentException(
-                    'The SEED System Company domain must be a domain you receive mail for. '
-                    . SeedMailRouter::GENERATED_DOMAIN_SUFFIX . ' is reserved and can never resolve.'
-                );
-            }
-        }
-
-        // Resolve the row before deciding anything about it. The shared SEED System Company is
-        // created by the baseline with the reserved infrastructure token and must never be created
-        // on demand, or a second one appears per seed set.
-        $seedCompany = $this->companies->systemCompany(DataUniverse::Seed);
-        if ($seedCompany === null) {
-            throw new RuntimeException(
-                'The shared SEED System Company is missing. The database predates the v0.5.8 baseline.'
-            );
-        }
-
-        $seedCompanyId = (int) $seedCompany['id'];
-        if ($domain !== '' && $this->companies->domainExistsForOther($domain, $seedCompanyId)) {
-            throw new InvalidArgumentException('That company email domain is already registered.');
-        }
-
-        // Both writes together: the option rows the mail router reads, and the company row the
-        // interface displays. If either fails they must both fail, or the displayed domain and the
-        // delivery domain diverge - the exact divergence this stage exists to prevent.
-        $this->transactions->run(function () use ($seedCompanyId, $name, $domain, $actorUserId): void {
-            $this->settings->saveSeedSystemCompany($name, $domain, $actorUserId);
-
-            // updateManaged() preserves is_system and never touches seed_token, so the row stays
-            // the infrastructure row it was.
-            $this->companies->updateManaged(
-                $seedCompanyId,
-                $name,
-                $domain !== '' ? $domain : (string) ($this->companies->findById($seedCompanyId)['domain'] ?? ''),
-                'system'
-            );
-
-            $this->audit->record($actorUserId, 'platform.seed_system_company_updated', [
-                'company_id' => $seedCompanyId,
-                'domain_configured' => $domain !== '',
-            ]);
-        });
-    }
-
-    /** Returns the SEED System Company settings to their `.env` deployment defaults. */
-    public function resetSeedSystemCompany(int $actorUserId): void
-    {
-        $this->settings->resetSeedSystemCompany();
-        $this->audit->record($actorUserId, 'platform.setting_reset', [
-            'setting' => 'seed_system_company',
-            'source' => '.env',
-        ]);
-    }
 
     /** @return array{password:string,source:string} */
     public function mailPasswordForAdmin(): array
@@ -2787,25 +2459,25 @@ final class PlatformAdministrationService
      * @param array<string,mixed> $filters
      * @return list<array<string,mixed>>
      */
-    public function activityEvents(DataUniverse $universe, array $filters = [], int $limit = 250): array
+    public function activityEvents(array $filters = [], int $limit = 250): array
     {
-        return $this->normaliseActivity($this->administration->activity($universe, $filters, $limit));
+        return $this->normaliseActivity($this->administration->activity($filters, $limit));
     }
 
     /** @return array<string,mixed>|null */
-    public function activityEvent(int $eventId, DataUniverse $universe): ?array
+    public function activityEvent(int $eventId): ?array
     {
         if ($eventId < 1) {
             return null;
         }
-        $events = $this->normaliseActivity($this->administration->activity($universe, ['event_id' => $eventId], 1));
+        $events = $this->normaliseActivity($this->administration->activity(['event_id' => $eventId], 1));
         return $events[0] ?? null;
     }
 
     /** @return list<array<string,mixed>> */
-    public function favourites(int $userId, DataUniverse $universe): array
+    public function favourites(int $userId): array
     {
-        return $this->administration->favourites($userId, $universe);
+        return $this->administration->favourites($userId);
     }
 
     /**
@@ -2814,20 +2486,20 @@ final class PlatformAdministrationService
      * @return list<array<string,mixed>>
      */
     // phpcs:ignore
-    public function favouritesPage(int $userId, DataUniverse $universe, int $limit, int $offset, string $search = ''): array
+    public function favouritesPage(int $userId, int $limit, int $offset, string $search = ''): array
     {
-        return $this->administration->favouritesPage($userId, $universe, $limit, $offset, $search);
+        return $this->administration->favouritesPage($userId, $limit, $offset, $search);
     }
 
-    public function favouritesCount(int $userId, DataUniverse $universe, string $search = ''): int
+    public function favouritesCount(int $userId, string $search = ''): int
     {
-        return $this->administration->favouritesCount($userId, $universe, $search);
+        return $this->administration->favouritesCount($userId, $search);
     }
 
     /** @return list<array<string,mixed>> */
-    public function userRequests(int $userId, DataUniverse $universe): array
+    public function userRequests(int $userId): array
     {
-        return $this->administration->userRequests($userId, $universe);
+        return $this->administration->userRequests($userId);
     }
 
     /**
@@ -2835,14 +2507,14 @@ final class PlatformAdministrationService
      *
      * @return list<array<string,mixed>>
      */
-    public function userRequestsPage(int $userId, DataUniverse $universe, int $limit, int $offset, string $search = ''): array
+    public function userRequestsPage(int $userId, int $limit, int $offset, string $search = ''): array
     {
-        return $this->administration->userRequestsPage($userId, $universe, $limit, $offset, $search);
+        return $this->administration->userRequestsPage($userId, $limit, $offset, $search);
     }
 
-    public function userRequestsCount(int $userId, DataUniverse $universe, string $search = ''): int
+    public function userRequestsCount(int $userId, string $search = ''): int
     {
-        return $this->administration->userRequestsCount($userId, $universe, $search);
+        return $this->administration->userRequestsCount($userId, $search);
     }
 
     public function toggleFavourite(int $userId, int $courseId): bool
@@ -2906,22 +2578,9 @@ final class PlatformAdministrationService
      */
     private function roleOptionsForUser(array $currentRoles): array
     {
-         $family = RoleFamily::forRoleSet($currentRoles);
-        return array_values(array_filter($this->roles->all(), static function (array $role) use ($family): bool {
-            $key = (string) ($role['role_key'] ?? '');
-            if ($family === RoleFamily::SEED) {
-                return str_starts_with($key, 'SEED_');
-            }
-            return $key === RoleCatalog::ADMIN || !RoleCatalog::isSeedRole($key);
-        }));
+        return array_values($this->roles->all());
     }
 
-    private function assertNormalIdentity(int $userId): void
-    {
-        if (RoleFamily::forRoleSet($this->roles->roles($userId)) === RoleFamily::SEED) {
-            throw new InvalidArgumentException('Seed-data creation is not available until Seed Database infrastructure is installed.');
-        }
-    }
 
     private function validateCompanyInput(string $name, string $domain): void
     {
@@ -2994,11 +2653,11 @@ final class PlatformAdministrationService
      * @param array<string,string> $scope
      * @return array<string,mixed>
      */
-    private function companyAudienceSection(string $dataset, string $audience, string $search, array $request, DataUniverse $universe, array $scope): array
+    private function companyAudienceSection(string $dataset, string $audience, string $search, array $request, array $scope): array
     {
         $base = self::ADMIN_SECTION_ROUTES[$dataset];
         $sort = $this->sortFor($dataset, $request, array_keys(AdministrationRepository::COMPANY_SORTS), 'name');
-        $pagination = $this->paginationFor($dataset, $request, $this->administration->companyCount($universe, $search, $audience));
+        $pagination = $this->paginationFor($dataset, $request, $this->administration->companyCount($search, $audience));
         $searchFilter = self::withSearch($scope, $dataset, $search);
         $filters = $searchFilter + $sort->toPrefixedArray($dataset);
 
@@ -3009,7 +2668,7 @@ final class PlatformAdministrationService
         return [
             $dataset . '_search' => $search,
             $dataset => $this->normaliseCompanies(
-                $this->administration->companies($universe, $pagination->pageSize, $pagination->offset, $search, $sort, $audience)
+                $this->administration->companies($pagination->pageSize, $pagination->offset, $search, $sort, $audience)
             ),
         ]
             + $this->paginationView($dataset, $pagination, $base, self::UNIVERSE_COUNT_LABELS[$dataset], $filters)
@@ -3034,15 +2693,6 @@ final class PlatformAdministrationService
                 ? 'System company'
                 : ((string) ($row['company_type'] ?? 'client') === 'course_provider' ? 'Course provider' : 'Client company');
             $row['status_label'] = ucfirst((string) ($row['status'] ?? ''));
-            // Resolved here so no template has to reason about seed_token. A row's universe is a
-            // fact about the row, and the Switch Company picker and the Administration list must
-            // agree about it. Same rule as SelectedCompanyContext::universeOf(): the token is the
-            // only source of truth, and a name or domain says nothing about which universe a
-            // company is in.
-            $isSeed = trim((string) ($row['seed_token'] ?? '')) !== '';
-            $row['universe'] = $isSeed ? DataUniverse::Seed->value : DataUniverse::Real->value;
-            $row['universe_label'] = $isSeed ? 'SEED' : 'REAL';
-            $row['is_seed'] = $isSeed;
         }
         unset($row);
         return self::trimTimestamps($rows);

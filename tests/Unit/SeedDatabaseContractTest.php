@@ -146,7 +146,7 @@ final class SeedDatabaseContractTest extends TestCase
     {
         $generator = self::read('src/Seed/SeedGenerator.php');
 
-        self::assertStringContainsString('RoleCatalog::SEED_STUDENT', $generator);
+        self::assertStringContainsString('RoleCatalog::STUDENT', $generator);
         foreach (['RoleCatalog::ADMIN', 'RoleCatalog::STUDENT,', 'RoleCatalog::COMPANY_ADMIN', 'RoleCatalog::COURSE_OWNER'] as $forbidden) {
             self::assertStringNotContainsString($forbidden, $generator);
         }

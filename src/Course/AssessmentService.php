@@ -29,7 +29,6 @@ namespace CattoLearning\Course;
 
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Slug;
 use InvalidArgumentException;
 use RuntimeException;
@@ -45,9 +44,9 @@ final class AssessmentService
     }
 
     /** @return array<string,mixed> */
-    public function moduleOverview(int $userId, DataUniverse $universe, string $slug, int $position, bool $preview = false): array
+    public function moduleOverview(int $userId, string $slug, int $position, bool $preview = false): array
     {
-        [$course, $enrolment] = $this->courseAndEnrolment($userId, $universe, $slug, $preview);
+        [$course, $enrolment] = $this->courseAndEnrolment($userId, $slug, $preview);
         $module = $this->courses->moduleByPosition((int) $course['id'], $position);
         if ($module === null) {
             throw new InvalidArgumentException('The course module does not exist.');
@@ -60,9 +59,9 @@ final class AssessmentService
     }
 
     /** @return array<string,mixed> */
-    public function finalOverview(int $userId, DataUniverse $universe, string $slug, bool $preview = false): array
+    public function finalOverview(int $userId, string $slug, bool $preview = false): array
     {
-        [$course, $enrolment] = $this->courseAndEnrolment($userId, $universe, $slug, $preview);
+        [$course, $enrolment] = $this->courseAndEnrolment($userId, $slug, $preview);
         if (!$preview && !$this->courses->moduleAssessmentsCompleted((int) $enrolment['id'], (int) $course['id'])) {
             throw new InvalidArgumentException('Complete every required module assessment before attempting the final assessment.');
         }
@@ -74,9 +73,9 @@ final class AssessmentService
     }
 
     /** @return array<string,mixed> */
-    public function diagnosticOverview(int $userId, DataUniverse $universe, string $slug, string $key, bool $preview = false): array
+    public function diagnosticOverview(int $userId, string $slug, string $key, bool $preview = false): array
     {
-        [$course, $enrolment] = $this->courseAndEnrolment($userId, $universe, $slug, $preview);
+        [$course, $enrolment] = $this->courseAndEnrolment($userId, $slug, $preview);
         $assessment = $this->courses->diagnosticAssessment((int) $course['id'], $key, $preview);
         if ($assessment === null) {
             throw new InvalidArgumentException('This course diagnostic does not exist.');
@@ -87,23 +86,23 @@ final class AssessmentService
     }
 
     /** @return array<string,mixed> */
-    public function startDiagnosticAttempt(int $userId, DataUniverse $universe, string $slug, string $key, bool $preview = false): array
+    public function startDiagnosticAttempt(int $userId, string $slug, string $key, bool $preview = false): array
     {
-        $overview = $this->diagnosticOverview($userId, $universe, $slug, $key, $preview);
+        $overview = $this->diagnosticOverview($userId, $slug, $key, $preview);
         return $this->startAttempt($userId, $overview, 'diagnostic');
     }
 
     /** @return array<string,mixed> */
-    public function startModuleAttempt(int $userId, DataUniverse $universe, string $slug, int $position, string $mode, bool $preview = false): array
+    public function startModuleAttempt(int $userId, string $slug, int $position, string $mode, bool $preview = false): array
     {
-        $overview = $this->moduleOverview($userId, $universe, $slug, $position, $preview);
+        $overview = $this->moduleOverview($userId, $slug, $position, $preview);
         return $this->startAttempt($userId, $overview, $mode);
     }
 
     /** @return array<string,mixed> */
-    public function startFinalAttempt(int $userId, DataUniverse $universe, string $slug, string $mode, bool $preview = false): array
+    public function startFinalAttempt(int $userId, string $slug, string $mode, bool $preview = false): array
     {
-        $overview = $this->finalOverview($userId, $universe, $slug, $preview);
+        $overview = $this->finalOverview($userId, $slug, $preview);
         return $this->startAttempt($userId, $overview, $mode);
     }
 
@@ -534,9 +533,9 @@ final class AssessmentService
     }
 
     /** @return array{0:array<string,mixed>,1:array<string,mixed>} */
-    private function courseAndEnrolment(int $userId, DataUniverse $universe, string $slug, bool $preview): array
+    private function courseAndEnrolment(int $userId, string $slug, bool $preview): array
     {
-        $course = $this->courses->findBySlug(Slug::validate($slug), $universe);
+        $course = $this->courses->findBySlug(Slug::validate($slug));
         if ($course === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }

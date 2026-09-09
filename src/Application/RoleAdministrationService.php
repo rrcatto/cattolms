@@ -22,7 +22,6 @@ namespace CattoLearning\Application;
 use CattoLearning\Auth\AclService;
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Auth\RoleFamily;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use RuntimeException;
@@ -103,10 +102,7 @@ final class RoleAdministrationService
         $key = $isBuiltIn
             ? $currentKey
             : $this->normaliseCustomKey((string) ($input['role_key'] ?? $currentKey));
-        if (RoleCatalog::isSeedRole($key) !== RoleCatalog::isSeedRole($currentKey)) {
-            throw new RuntimeException('A role cannot change between the normal and SEED role families.');
-        }
-
+        
         if ($isAdmin) {
             $name = 'Administrator';
             $description = 'System Administrator';
@@ -220,11 +216,7 @@ final class RoleAdministrationService
 
     private function roleFamily(string $roleKey): string
     {
-        return match (RoleFamily::forRole($roleKey)) {
-            RoleFamily::ADMIN => 'Administrator',
-            RoleFamily::SEED => 'Seed',
-            default => 'Normal',
-        };
+        return $roleKey === RoleCatalog::ADMIN ? 'Administrator' : 'Normal';
     }
 
     /**

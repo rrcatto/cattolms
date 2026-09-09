@@ -135,11 +135,6 @@ final class SeedCatalogContractTest extends TestCase
             'course_requests' => ['decided_by_user_id'],
             'course_credits' => ['created_by_user_id'],
             'course_credit_allocations' => ['assigned_by_user_id'],
-            // Amendment, owner's instruction 2026/09/09: a genuine immutable ADMIN straddles both
-            // universes and may bookmark a generated course. Deliberately this column only - a
-            // favourite grants nothing and cascades away with the seed set, so it cannot outlive
-            // the data it points at. See SeedTableCatalog for the full record.
-            'course_favourites' => ['user_id'],
         ], SeedTableCatalog::actorAllowlist());
     }
 
@@ -150,21 +145,30 @@ final class SeedCatalogContractTest extends TestCase
      * references and look superficially similar to the actor columns above.
      */
     /**
-     * The one column the 2026/09/09 amendment moved, and the reason it is safe to have moved it.
+     * The ADMIN exclusion lives in the guard, not in a second list beside it.
      *
-     * A favourite is a bookmark. It grants no access, carries no entitlement, and the row takes
-     * its universe from the course, so it is deleted with the seed set that owns that course. A
-     * REAL administrator holding one therefore leaves nothing behind. That is what separates it
-     * from every entry in the test above, each of which would outlive the generated data or confer
-     * something on the identity holding it.
+     * The owner's REAL/SEED rule never applied to a genuine administrator, and the first attempt at
+     * implementing that dropped the database guards on every identity column - which removed the
+     * protection for ordinary accounts too, and the isolation tests caught it. The guard now
+     * accepts a users reference naming a REAL immutable ADMIN and compares every other identity
+     * exactly as before, so this asserts the declarations are all still there.
      */
-    public function testAFavouriteMayNameARealAdministratorButStillBelongsToTheCourse(): void
+    public function testEveryIdentityReferenceStaysGuarded(): void
     {
-        self::assertTrue(SeedTableCatalog::isActorColumn('course_favourites', 'user_id'));
-
-        // The course reference keeps its guard: the favourite is still the course's universe.
-        $guarded = SeedTableCatalog::sameUniverseReferences()['course_favourites'] ?? [];
-        self::assertSame(['course_id' => 'courses'], $guarded, 'A favourite must still take the universe of its course.');
+        $guards = SeedTableCatalog::sameUniverseReferences();
+        foreach ([
+            'user_emails', 'user_roles', 'auth_sessions', 'company_users', 'courses',
+            'course_editors', 'course_enrolments', 'course_favourites', 'course_requests',
+            'course_credits', 'course_credit_allocations',
+        ] as $table) {
+            $columns = $guards[$table] ?? [];
+            self::assertContains('users', $columns, sprintf(
+                '%s no longer guards its identity reference. The ADMIN exclusion belongs in the '
+                . 'guard, which admits an administrator and refuses everyone else; removing the '
+                . 'declaration admits everyone.',
+                $table
+            ));
+        }
     }
 
     public function testSubjectColumnsAreNeverTreatedAsActorColumns(): void
@@ -174,6 +178,7 @@ final class SeedCatalogContractTest extends TestCase
             ['course_enrolments', 'user_id'],
             ['company_users', 'user_id'],
             ['course_editors', 'user_id'],
+            ['course_favourites', 'user_id'],
             ['course_requests', 'user_id'],
             ['course_credits', 'user_id'],
             ['course_credit_allocations', 'user_id'],

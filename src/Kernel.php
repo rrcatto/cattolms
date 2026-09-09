@@ -50,7 +50,7 @@ final class Kernel extends BaseKernel
     public function __construct(
         string $environment,
         bool $debug,
-        private readonly string $instanceRoot,
+        private readonly string $instanceRoot
     ) {
         parent::__construct($environment, $debug);
     }

@@ -18,7 +18,7 @@ knowing that seed data exists.
 
 Architectural boundary: transport decoration only. It composes no messages and holds no SMTP
 knowledge; SymfonyMailerAdapter still does all of that. The address decision belongs to
-SeedMailRouter, which is why this class contains no string handling of its own.
+GeneratedDomainRouter, which is why this class contains no string handling of its own.
 
 Deliberately not rewritten: sendContactMessage(). Its address is the sender of a public contact
 form, not a recipient, and a generated identity never fills that form in.
@@ -32,13 +32,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Mail;
 
-use CattoLearning\Seed\SeedMailRouter;
 
-final class SeedAwareMailer implements MailerInterface
+final class GeneratedDomainMailer implements MailerInterface
 {
     public function __construct(
         private readonly SymfonyMailerAdapter $mailer,
-        private readonly SeedMailRouter $router
+        private readonly GeneratedDomainRouter $router
     ) {
     }
 

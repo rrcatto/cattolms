@@ -56,7 +56,6 @@ namespace CattoLearning\Course;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Support\Pagination;
@@ -97,17 +96,17 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function catalogue(DataUniverse $universe, CatalogueFilter $filter, int $limit = 25, int $offset = 0): array
+    public function catalogue(CatalogueFilter $filter, int $limit = 25, int $offset = 0): array
     {
-        $courses = $this->decorateCatalogue($this->courses->publishedCourses($universe, $filter, $limit, $offset));
+        $courses = $this->decorateCatalogue($this->courses->publishedCourses($filter, $limit, $offset));
 
-        return $this->decorateCards($courses, $universe);
+        return $this->decorateCards($courses);
     }
 
     /** Total published courses in the same scope the rows use, for "Showing X-Y of Z". */
-    public function catalogueCount(DataUniverse $universe, CatalogueFilter $filter): int
+    public function catalogueCount(CatalogueFilter $filter): int
     {
-        return $this->courses->publishedCoursesCount($universe, $filter);
+        return $this->courses->publishedCoursesCount($filter);
     }
 
     /**
@@ -115,9 +114,9 @@ final class CourseService
      *
      * @return array<string,mixed>|null
      */
-    public function browsableTag(string $slug, DataUniverse $universe): ?array
+    public function browsableTag(string $slug): ?array
     {
-        return $slug === '' ? null : $this->courses->browsableTag($slug, $universe);
+        return $slug === '' ? null : $this->courses->browsableTag($slug);
     }
 
     /**
@@ -133,17 +132,17 @@ final class CourseService
      *
      * @return list<array{label:string,slug:string,total:int,share:int}>
      */
-    public function categoryDistribution(DataUniverse $universe): array
+    public function categoryDistribution(): array
     {
-        return self::scaled($this->courses->categoryDistribution($universe));
+        return self::scaled($this->courses->categoryDistribution());
     }
 
     /**
      * @return list<array{label:string,slug:string,total:int,share:int}>
      */
-    public function tagDistribution(DataUniverse $universe, int $limit = 15): array
+    public function tagDistribution(int $limit = 15): array
     {
-        return self::scaled($this->courses->tagDistribution($universe, $limit));
+        return self::scaled($this->courses->tagDistribution($limit));
     }
 
     /**
@@ -151,9 +150,9 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function tagIndex(DataUniverse $universe): array
+    public function tagIndex(): array
     {
-        return $this->courses->tagIndex($universe);
+        return $this->courses->tagIndex();
     }
 
     /**
@@ -180,9 +179,9 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function popularTags(DataUniverse $universe, int $limit = 24): array
+    public function popularTags(int $limit = 24): array
     {
-        return $this->courses->popularTags($universe, $limit);
+        return $this->courses->popularTags($limit);
     }
 
     /**
@@ -190,15 +189,14 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function tags(DataUniverse $universe, string $search, int $limit, int $offset): array
+    public function tags(string $search, int $limit, int $offset): array
     {
         $tags = $this->courses->tags($search, $limit, $offset);
 
         // The tags are the population; the courses under them are the reader's universe. Two reads
         // because they answer two different questions - see CourseRepository::tags().
         $counts = $this->courses->courseCountsForTags(
-            array_map(static fn(array $tag): int => (int) $tag['id'], $tags),
-            $universe
+            array_map(static fn(array $tag): int => (int) $tag['id'], $tags)
         );
         foreach ($tags as &$tag) {
             $tag['course_count'] = $counts[(int) $tag['id']] ?? 0;
@@ -293,9 +291,9 @@ final class CourseService
      *
      * @return array<string,mixed>|null
      */
-    public function browsableCategory(string $slug, DataUniverse $universe): ?array
+    public function browsableCategory(string $slug): ?array
     {
-        return $slug === '' ? null : $this->courses->browsableCategory($slug, $universe);
+        return $slug === '' ? null : $this->courses->browsableCategory($slug);
     }
 
     /**
@@ -312,16 +310,14 @@ final class CourseService
      * @param list<array<string,mixed>> $selectedTags
      * @return array{trail:list<array<string,mixed>>,children:list<array<string,mixed>>,tags:list<array<string,mixed>>}
      */
-    public function browseContext(?array $category, CatalogueFilter $filter, DataUniverse $universe, int $tagLimit = 24, array $selectedTags = []): array
+    public function browseContext(?array $category, CatalogueFilter $filter, int $tagLimit = 24, array $selectedTags = []): array
     {
         $children = $this->courses->browsableChildCategories(
-            $category === null ? null : (int) $category['id'],
-            $universe
+            $category === null ? null : (int) $category['id']
         );
         if ($children !== []) {
             $counts = $this->courses->categoryFacetCounts(
                 array_map(static fn(array $row): int => (int) $row['id'], $children),
-                $universe,
                 $filter->withoutCategory()
             );
             foreach ($children as &$child) {
@@ -336,11 +332,10 @@ final class CourseService
         // A chosen tag is always offered, whether or not it made the popular list. Without this a
         // reader who arrives on a link to an uncommon tag sees a rail that does not contain it: the
         // filter is on, nothing on screen says so, and there is no control to turn it off.
-        $tags = $this->withSelectedFirst($this->courses->popularTags($universe, $tagLimit), $selectedTags);
+        $tags = $this->withSelectedFirst($this->courses->popularTags($tagLimit), $selectedTags);
         if ($tags !== []) {
             $counts = $this->courses->tagFacetCounts(
                 array_map(static fn(array $row): int => (int) $row['id'], $tags),
-                $universe,
                 $filter->withoutTags()
             );
             foreach ($tags as &$tag) {
@@ -395,9 +390,9 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function featuredCourses(DataUniverse $universe, int $limit = 6): array
+    public function featuredCourses(int $limit = 6): array
     {
-        return $this->decorateCatalogue($this->courses->featuredPublishedCourses($universe, $limit));
+        return $this->decorateCatalogue($this->courses->featuredPublishedCourses($limit));
     }
 
     /**
@@ -428,11 +423,11 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function adminCourses(DataUniverse $universe, ?int $userId = null, bool $platformAdministrator = false, int $limit = 50, int $offset = 0): array
+    public function adminCourses(?int $userId = null, bool $platformAdministrator = false, int $limit = 50, int $offset = 0): array
     {
         return $platformAdministrator || $userId === null
-            ? $this->courses->allCourses($universe, $limit, $offset)
-            : $this->courses->manageableCourses($userId, $universe, $limit, $offset);
+            ? $this->courses->allCourses($limit, $offset)
+            : $this->courses->manageableCourses($userId, $limit, $offset);
     }
 
     public function userCanManageCourse(int $courseId, int $userId): bool
@@ -476,15 +471,15 @@ final class CourseService
      *
      * @return list<array<string,mixed>> Roots, each with a `children` list of the same shape.
      */
-    public function categoryBrowser(DataUniverse $universe): array
+    public function categoryBrowser(): array
     {
         // Two queries for the whole browser, whatever the taxonomy holds: the categories and every
         // category's total. The courses themselves are not fetched here - see the note on the
         // browser page about why an accordion loads its own contents.
-        $totals = $this->courses->categoryCourseTotals($universe);
+        $totals = $this->courses->categoryCourseTotals();
 
         $index = [];
-        foreach ($this->courses->categories($universe) as $row) {
+        foreach ($this->courses->categories() as $row) {
             if ((int) ($row['descendant_course_count'] ?? 0) < 1) {
                 continue;
             }
@@ -524,9 +519,9 @@ final class CourseService
     }
 
     /** One category's published-course total. */
-    public function categoryCourseTotal(int $categoryId, DataUniverse $universe): int
+    public function categoryCourseTotal(int $categoryId): int
     {
-        return $this->courses->categoryCourseTotal($categoryId, $universe);
+        return $this->courses->categoryCourseTotal($categoryId);
     }
 
     /** @return array<string,mixed>|null */
@@ -581,12 +576,12 @@ final class CourseService
      *
      * @return list<array{name:string,slug:string}>
      */
-    public function categoryPath(int $categoryId, DataUniverse $universe): array
+    public function categoryPath(int $categoryId): array
     {
-        $key = $universe->value;
+        $key = 'all';
         if (!isset($this->categoryIndex[$key])) {
             $index = [];
-            foreach ($this->courses->categories($universe) as $row) {
+            foreach ($this->courses->categories() as $row) {
                 $index[(int) $row['id']] = $row;
             }
             $this->categoryIndex[$key] = $index;
@@ -615,7 +610,7 @@ final class CourseService
      * @param list<array<string,mixed>> $courses
      * @return list<array<string,mixed>>
      */
-    public function decorateCards(array $courses, DataUniverse $universe): array
+    public function decorateCards(array $courses): array
     {
         if ($courses === []) {
             return $courses;
@@ -623,7 +618,7 @@ final class CourseService
         $tags = $this->courses->tagsForCourses(array_map(static fn(array $row): int => (int) $row['id'], $courses));
         foreach ($courses as &$course) {
             $course['tags'] = $tags[(int) $course['id']] ?? [];
-            $course['category_path'] = $this->categoryPath((int) ($course['category_id'] ?? 0), $universe);
+            $course['category_path'] = $this->categoryPath((int) ($course['category_id'] ?? 0));
         }
         unset($course);
 
@@ -634,7 +629,7 @@ final class CourseService
      * @param array<string,mixed> $pagination
      * @return list<array<string,mixed>>
      */
-    public function categoryCoursePage(int $categoryId, DataUniverse $universe, array $pagination): array
+    public function categoryCoursePage(int $categoryId, array $pagination): array
     {
         // The payload carries page and page size; the offset is derived rather than stored, so it
         // is derived the same way here as Pagination derives it.
@@ -642,15 +637,14 @@ final class CourseService
         $offset = max(0, ((int) $pagination['page'] - 1) * $pageSize);
 
         return $this->decorateCards(
-            $this->decorateCatalogue($this->courses->categoryCourses($categoryId, $universe, $pageSize, $offset)),
-            $universe
+            $this->decorateCatalogue($this->courses->categoryCourses($categoryId, $pageSize, $offset))
         );
     }
 
     /** @return list<array<string,mixed>> */
-    public function categories(DataUniverse $universe, bool $activeOnly = false): array
+    public function categories(bool $activeOnly = false): array
     {
-        return $this->courses->categories($universe, $activeOnly);
+        return $this->courses->categories($activeOnly);
     }
 
     /**
@@ -720,7 +714,7 @@ final class CourseService
         // category to answer the same question.
         $parentId = $this->parentOf($categoryId);
         $categories = array_values(array_filter(
-            $this->courses->categories(DataUniverse::All),
+            $this->courses->categories(),
             static fn(array $row): bool => (int) ($row['parent_id'] ?? 0) === $parentId
         ));
         $index = null;
@@ -781,9 +775,9 @@ final class CourseService
     }
 
     /** @return array<string,mixed>|null */
-    public function publicCourse(string $slug, DataUniverse $universe): ?array
+    public function publicCourse(string $slug): ?array
     {
-        $course = $this->courses->findBySlug(Slug::validate($slug), $universe, true);
+        $course = $this->courses->findBySlug(Slug::validate($slug), true);
         if ($course === null) {
             return null;
         }
@@ -834,10 +828,10 @@ final class CourseService
     /**
      * @param array<string,mixed> $input
      */
-    public function createBlank(array $input, int $userId, DataUniverse $universe): int
+    public function createBlank(array $input, int $userId): int
     {
         $data = $this->validateCourseInput($input);
-        $data = $this->withDefaultOwnership($data, $userId, $universe);
+        $data = $this->withDefaultOwnership($data, $userId);
 
         $courseId = $this->transactions->run(function () use ($data, $userId): int {
             $courseId = $this->courses->createCourse($data, $userId);
@@ -1588,9 +1582,9 @@ final class CourseService
         $courseData = $this->validateCourseInput($courseData);
         // Import is REAL-only (decision D5), so both the ownership default and the slug
         // collision check are asked about the genuine universe explicitly.
-        $courseData = $this->withDefaultOwnership($courseData, $userId, DataUniverse::Real);
+        $courseData = $this->withDefaultOwnership($courseData, $userId);
 
-        if ($this->courses->findBySlug((string) $courseData['slug'], DataUniverse::Real) !== null) {
+        if ($this->courses->findBySlug((string) $courseData['slug']) !== null) {
             throw new InvalidArgumentException(
                 'A course with the slug ' . $courseData['slug'] . ' already exists.'
             );
@@ -1853,12 +1847,11 @@ final class CourseService
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
-    private function withDefaultOwnership(array $data, int $userId, DataUniverse $universe): array
+    private function withDefaultOwnership(array $data, int $userId): array
     {
-        $systemCompany = $this->companies->systemCompany($universe)
+        $systemCompany = $this->companies->systemCompany()
             ?? $this->companies->ensureSystemCompany(
                 $userId,
-                $universe,
                 $this->options->get('system_company_name', 'System Company'),
                 Env::string('APP_DOMAIN', 'local')
             );

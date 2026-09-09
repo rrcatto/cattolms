@@ -8,9 +8,11 @@ Date time: 2026/08/23 04:19 SAST
 Version: 0.5.8
 
 Description:
-Creates the complete Catto Learning 0.5.8 PostgreSQL baseline schema for a clean disposable development installation, including the Seed Database data-universe schema. Business permissions are shared across normal and SEED_* roles; SYSTEM.* is reserved for platform infrastructure.
+Creates the complete Catto Learning PostgreSQL baseline schema for a clean disposable development installation. There is one kind of data. SYSTEM.* is reserved for platform infrastructure.
 
 Changelog:
+2026/09/09 20:30 SAST
+- Removed the REAL/SEED split entirely, on the owner's instruction: there is one kind of data. Gone are seed_token on every table, the seed_data and seed_data_tables metadata tables, the cross-universe constraint triggers and their function, the five SEED_* roles with their grants, the two role-family guards that kept those roles apart, and the shared SEED System Company. Generated data is now written exactly as hand-entered data is, because that is what it is.
 2026/08/23 04:19 SAST
 - Routed seed mail to the configured SEED_SYSTEM_COMPANY_DOMAIN and moved generated company domains onto the reserved .seed.invalid suffix.
 - Rebased as the single v0.5.8 baseline, adding the Seed Database schema: seed_token on 31 tables, the seed_data and seed_data_tables metadata tables, the widened System Company uniqueness index and the cross-universe integrity triggers, all generated from SeedTableCatalog.
@@ -50,8 +52,6 @@ Changelog:
 
 declare(strict_types=1);
 
-use CattoLearning\Seed\SeedSchema;
-use CattoLearning\Seed\SeedTableCatalog;
 use Phinx\Migration\AbstractMigration;
 
 final class CreateV06Baseline extends AbstractMigration
@@ -170,7 +170,6 @@ private const FOREIGN_KEY_INDEXES = [
         'courses_updated_by_user_fk_idx' => 'courses (updated_by_user_id)',
         'module_progress_module_fk_idx' => 'module_progress (module_id)',
         'role_permissions_permission_fk_idx' => 'role_permissions (permission_id)',
-        'seed_data_created_by_user_fk_idx' => 'seed_data (created_by_user_id)',
         'user_roles_role_fk_idx' => 'user_roles (role_id)',
     ];
 
@@ -234,12 +233,7 @@ INSERT INTO roles (role_key, role_name, role_description) VALUES
     ('STUDENT','Student','Learner with access to the catalogue, assigned courses and own account.'),
     ('COMPANY_ADMIN','CompanyAdministrator','Administrator scoped to their company, learners, requests, credits and courses.'),
     ('COURSE_EDITOR','CourseEditor','Course editor permitted to edit courses explicitly assigned to them.'),
-    ('COURSE_OWNER','CourseOwner','Course owner permitted to manage courses they own.'),
-    ('SEED_STUDENT','SeedStudent','Test learner role reserved for future seeded identities.'),
-    ('SEED_COMPANY_ADMIN','SeedCompanyAdministrator','Test company administrator role reserved for seeded identities.'),
-    ('SEED_COURSE_EDITOR','SeedCourseEditor','Test course editor role reserved for seeded identities.'),
-    ('SEED_COURSE_OWNER','SeedCourseOwner','Test course owner role reserved for seeded identities.'),
-    ('SEED_ADMIN','SeedAdministrator','Platform-style business administrator for SEED data only; no SYSTEM authority.');
+    ('COURSE_OWNER','CourseOwner','Course owner permitted to manage courses they own.');
 
 CREATE TABLE permissions (
     id SMALLSERIAL PRIMARY KEY,
@@ -259,8 +253,6 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('SYSTEM.ROLE.MANAGE','ManageRoles','System · ACL','Create and edit compatible non-ADMIN roles and save ACL assignments.'),
     ('SYSTEM.DATABASE.PRUNE','PruneDatabase','System · Maintenance','Run supported database cleanup operations.'),
     ('SYSTEM.MAIL.TEST','TestMail','System · Maintenance','Send the platform test email.'),
-    ('SYSTEM.SEED.VIEW','ViewSeedData','System · Seed','View seed-set metadata, counts and history when Seed Database is installed.'),
-    ('SYSTEM.SEED.MANAGE','ManageSeedData','System · Seed','Create and clean seed sets when Seed Database is installed.'),
     ('ACCOUNT.VIEW','ViewAccount','Account','Open the signed-in user Account workspace and dashboard.'),
     ('ACCOUNT.PROFILE.VIEW','ViewAccountProfile','Account','View the signed-in user’s own profile and email details.'),
     ('ACCOUNT.PROFILE.EDIT','EditAccountProfile','Account','Edit the signed-in user’s own profile information.'),
@@ -268,7 +260,7 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('ACCOUNT.SESSION.VIEW','ViewAccountSessions','Account','View the signed-in user’s authentication sessions.'),
     ('ACCOUNT.SESSION.MANAGE','ManageAccountSessions','Account','Revoke the signed-in user’s authentication sessions.'),
     ('ACCOUNT.ACTIVITY.VIEW','ViewAccountActivity','Account','View the signed-in user’s own audit activity.'),
-    ('CATALOGUE.VIEW','ViewCatalogue','Catalogue','Browse published catalogue courses visible to the identity’s data universe.'),
+    ('CATALOGUE.VIEW','ViewCatalogue','Catalogue','Browse published catalogue courses.'),
     ('CATALOGUE.COURSE.FAVOURITE','FavouriteCourse','Catalogue','Add or remove a visible course favourite.'),
     ('CATALOGUE.COURSE.REQUEST','RequestCourse','Catalogue','Request access to a visible course.'),
     ('LEARNING.LIBRARY.VIEW','ViewLibrary','Learning','View assigned, active and completed learning visible to the identity.'),
@@ -289,19 +281,19 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('COMPANY.COURSE.VIEW','ViewCompanyCourses','Company','View courses owned by or exposed to the current company.'),
     ('COMPANY.COURSE.MANAGE','ManageCompanyCourses','Company','Manage company-owned courses within current-company scope.'),
     ('COMPANY.CATALOGUE.MANAGE','ManageCompanyCatalogue','Company','Choose permitted catalogue courses exposed to the current company.'),
-    ('PLATFORM.DASHBOARD.VIEW','ViewPlatformDashboard','Platform','View the platform business dashboard within the identity’s data universe.'),
-    ('PLATFORM.PERSON.VIEW','ViewPlatformPeople','Platform','View people platform-wide within the identity’s data universe.'),
-    ('PLATFORM.PERSON.MANAGE','ManagePlatformPeople','Platform','Create, edit, disable and session-manage people platform-wide within the identity’s data universe.'),
-    ('PLATFORM.COMPANY.VIEW','ViewPlatformCompanies','Platform','View companies platform-wide within the identity’s data universe.'),
-    ('PLATFORM.COMPANY.MANAGE','ManagePlatformCompanies','Platform','Create, edit and status-manage companies platform-wide within the identity’s data universe.'),
-    ('PLATFORM.REQUEST.VIEW','ViewPlatformRequests','Platform','View course requests platform-wide within the identity’s data universe.'),
-    ('PLATFORM.REQUEST.MANAGE','ManagePlatformRequests','Platform','Approve or reject course requests platform-wide within the identity’s data universe.'),
-    ('PLATFORM.ENROLMENT.VIEW','ViewPlatformEnrolments','Platform','View enrolments platform-wide within the identity’s data universe.'),
-    ('PLATFORM.ENROLMENT.MANAGE','ManagePlatformEnrolments','Platform','Grant, remove, restore or reset enrolments platform-wide within the identity’s data universe.'),
-    ('PLATFORM.CREDIT.VIEW','ViewPlatformCredits','Platform','View credits platform-wide within the identity’s data universe.'),
-    ('PLATFORM.CREDIT.MANAGE','ManagePlatformCredits','Platform','Create, allocate and manage credits platform-wide within the identity’s data universe.'),
-    ('PLATFORM.ACTIVITY.VIEW','ViewPlatformActivity','Platform','View audit activity platform-wide within the identity’s data universe.'),
-    ('PLATFORM.REPORT.VIEW','ViewPlatformReports','Platform','View operational and learning reports platform-wide within the identity’s data universe.'),
+    ('PLATFORM.DASHBOARD.VIEW','ViewPlatformDashboard','Platform','View the platform business dashboard.'),
+    ('PLATFORM.PERSON.VIEW','ViewPlatformPeople','Platform','View people platform-wide.'),
+    ('PLATFORM.PERSON.MANAGE','ManagePlatformPeople','Platform','Create, edit, disable and session-manage people platform-wide.'),
+    ('PLATFORM.COMPANY.VIEW','ViewPlatformCompanies','Platform','View companies platform-wide.'),
+    ('PLATFORM.COMPANY.MANAGE','ManagePlatformCompanies','Platform','Create, edit and status-manage companies platform-wide.'),
+    ('PLATFORM.REQUEST.VIEW','ViewPlatformRequests','Platform','View course requests platform-wide.'),
+    ('PLATFORM.REQUEST.MANAGE','ManagePlatformRequests','Platform','Approve or reject course requests platform-wide.'),
+    ('PLATFORM.ENROLMENT.VIEW','ViewPlatformEnrolments','Platform','View enrolments platform-wide.'),
+    ('PLATFORM.ENROLMENT.MANAGE','ManagePlatformEnrolments','Platform','Grant, remove, restore or reset enrolments platform-wide.'),
+    ('PLATFORM.CREDIT.VIEW','ViewPlatformCredits','Platform','View credits platform-wide.'),
+    ('PLATFORM.CREDIT.MANAGE','ManagePlatformCredits','Platform','Create, allocate and manage credits platform-wide.'),
+    ('PLATFORM.ACTIVITY.VIEW','ViewPlatformActivity','Platform','View audit activity platform-wide.'),
+    ('PLATFORM.REPORT.VIEW','ViewPlatformReports','Platform','View operational and learning reports platform-wide.'),
     ('COURSE.MANAGEMENT.VIEW','ViewCourseManagement','Courses','Open course-authoring surfaces for courses within resource scope.'),
     ('COURSE.CREATE','CreateCourse','Courses','Create course shells where resource scope permits.'),
     ('COURSE.EDIT','EditCourse','Courses','Edit course metadata, modules and content within resource scope.'),
@@ -325,12 +317,12 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('COMMERCE.PAYMENT.VIEW','ViewOwnPayments','Commerce · Learner','View payment state for the signed-in user’s orders when Commerce is installed.'),
     ('COMPANY.ORDER.VIEW','ViewCompanyOrders','Commerce · Company','View orders belonging to the current company when Commerce is installed.'),
     ('COMPANY.PAYMENT.VIEW','ViewCompanyPayments','Commerce · Company','View payment state for the current company when Commerce is installed.'),
-    ('PLATFORM.ORDER.VIEW','ViewPlatformOrders','Commerce · Platform','View orders platform-wide within the identity’s data universe when Commerce is installed.'),
+    ('PLATFORM.ORDER.VIEW','ViewPlatformOrders','Commerce · Platform','View orders platform-wide when Commerce is installed.'),
     ('PLATFORM.ORDER.MANAGE','ManagePlatformOrders','Commerce · Platform','Perform supported administrative order operations when Commerce is installed.'),
     ('PLATFORM.PAYMENT.VIEW','ViewPlatformPayments','Commerce · Platform','View payment attempts and statuses platform-wide when Commerce is installed.'),
     ('PLATFORM.PAYMENT.MANAGE','ManagePlatformPayments','Commerce · Platform','Perform supported administrative payment operations when Commerce is installed.'),
     ('PLATFORM.PAYMENT.RECONCILE','ReconcilePlatformPayments','Commerce · Platform','Run supported payment reconciliation operations when Commerce is installed.'),
-    ('PLATFORM.REFUND.VIEW','ViewPlatformRefunds','Commerce · Platform','View refunds platform-wide within the identity’s data universe when Commerce is installed.'),
+    ('PLATFORM.REFUND.VIEW','ViewPlatformRefunds','Commerce · Platform','View refunds platform-wide when Commerce is installed.'),
     ('PLATFORM.REFUND.MANAGE','ManagePlatformRefunds','Commerce · Platform','Create and manage supported refunds when Commerce is installed.');
 
 CREATE TABLE role_permissions (
@@ -339,34 +331,6 @@ CREATE TABLE role_permissions (
     PRIMARY KEY (role_id,permission_id)
 );
 
--- SYSTEM.* is platform-infrastructure authority. Business permissions are
--- intentionally shared by normal and SEED_* roles; data-universe isolation is
--- enforced by seed_token-aware queries/schema in the Seed Database stage.
-CREATE OR REPLACE FUNCTION enforce_role_permission_boundary()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE
-    v_role_key VARCHAR(64);
-    v_permission_key VARCHAR(120);
-BEGIN
-    SELECT role_key INTO v_role_key FROM roles WHERE id=NEW.role_id;
-    SELECT permission_key INTO v_permission_key FROM permissions WHERE id=NEW.permission_id;
-    IF v_role_key = 'ADMIN' THEN
-        RETURN NEW;
-    END IF;
-    IF v_permission_key LIKE 'SYSTEM.%' THEN
-        RAISE EXCEPTION 'SYSTEM permissions may be assigned only to ADMIN';
-    END IF;
-    IF LEFT(v_role_key,5) = 'SEED_'
-       AND v_permission_key IN ('COURSE.IMPORT','COURSE.EXPORT') THEN
-        RAISE EXCEPTION 'This business capability is deliberately unavailable to SEED roles';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-CREATE TRIGGER role_permissions_boundary_guard
-BEFORE INSERT OR UPDATE ON role_permissions
-FOR EACH ROW EXECUTE FUNCTION enforce_role_permission_boundary();
-
 CREATE TABLE user_roles (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
@@ -374,42 +338,14 @@ CREATE TABLE user_roles (
     PRIMARY KEY (user_id, role_id)
 );
 
--- This transitional guard prevents normal and SEED_* role families from being
--- mixed before users.seed_token becomes the authoritative identity-universe
--- attribute in the Seed Database schema.
-CREATE OR REPLACE FUNCTION enforce_user_role_family()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE
-    v_new_role VARCHAR(64);
-    v_has_seed BOOLEAN;
-    v_has_normal BOOLEAN;
-BEGIN
-    SELECT role_key INTO v_new_role FROM roles WHERE id=NEW.role_id;
-    SELECT
-        COALESCE(BOOL_OR(LEFT(r.role_key,5) = 'SEED_'), FALSE),
-        COALESCE(BOOL_OR(LEFT(r.role_key,5) <> 'SEED_'), FALSE)
-    INTO v_has_seed, v_has_normal
-    FROM user_roles ur JOIN roles r ON r.id=ur.role_id
-    WHERE ur.user_id=NEW.user_id;
-
-    IF LEFT(v_new_role,5) = 'SEED_' AND v_has_normal THEN
-        RAISE EXCEPTION 'SEED roles cannot be combined with normal roles or ADMIN';
-    ELSIF LEFT(v_new_role,5) <> 'SEED_' AND v_has_seed THEN
-        RAISE EXCEPTION 'Normal roles or ADMIN cannot be combined with SEED roles';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-CREATE TRIGGER user_roles_family_guard
-BEFORE INSERT OR UPDATE ON user_roles
-FOR EACH ROW EXECUTE FUNCTION enforce_user_role_family();
+-- SYSTEM.* is platform-infrastructure authority.
 
 -- ADMIN remains an immutable super-role in application code; these rows make
 -- its effective ACL transparent in the database and Administration UI.
 INSERT INTO role_permissions (role_id,permission_id)
 SELECT r.id,p.id FROM roles r CROSS JOIN permissions p WHERE r.role_key='ADMIN';
 
--- Default capability profiles. STUDENT/SEED_STUDENT are baseline roles;
+-- Default capability profiles. STUDENT is the baseline role;
 -- stronger roles add authority but remain constrained by resource scope.
 INSERT INTO role_permissions (role_id,permission_id)
 SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
@@ -552,212 +488,6 @@ SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
     'COURSE.PRICING.MANAGE',
     'COURSE.OWNERSHIP.MANAGE'
 ) WHERE r.role_key='COURSE_OWNER';
-INSERT INTO role_permissions (role_id,permission_id)
-SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
-    'ACCOUNT.VIEW',
-    'ACCOUNT.PROFILE.VIEW',
-    'ACCOUNT.PROFILE.EDIT',
-    'ACCOUNT.EMAIL.MANAGE',
-    'ACCOUNT.SESSION.VIEW',
-    'ACCOUNT.SESSION.MANAGE',
-    'ACCOUNT.ACTIVITY.VIEW',
-    'CATALOGUE.VIEW',
-    'CATALOGUE.COURSE.FAVOURITE',
-    'CATALOGUE.COURSE.REQUEST',
-    'LEARNING.LIBRARY.VIEW',
-    'LEARNING.COURSE.START',
-    'LEARNING.COURSE.VIEW',
-    'LEARNING.ASSESSMENT.TAKE',
-    'LEARNING.CERTIFICATE.VIEW',
-    'COMPANY.CREATE',
-    'COMMERCE.CART.VIEW',
-    'COMMERCE.CART.MANAGE',
-    'COMMERCE.CHECKOUT.START',
-    'COMMERCE.ORDER.VIEW',
-    'COMMERCE.PAYMENT.VIEW'
-) WHERE r.role_key='SEED_STUDENT';
-INSERT INTO role_permissions (role_id,permission_id)
-SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
-    'ACCOUNT.VIEW',
-    'ACCOUNT.PROFILE.VIEW',
-    'ACCOUNT.PROFILE.EDIT',
-    'ACCOUNT.EMAIL.MANAGE',
-    'ACCOUNT.SESSION.VIEW',
-    'ACCOUNT.SESSION.MANAGE',
-    'ACCOUNT.ACTIVITY.VIEW',
-    'CATALOGUE.VIEW',
-    'CATALOGUE.COURSE.FAVOURITE',
-    'CATALOGUE.COURSE.REQUEST',
-    'LEARNING.LIBRARY.VIEW',
-    'LEARNING.COURSE.START',
-    'LEARNING.COURSE.VIEW',
-    'LEARNING.ASSESSMENT.TAKE',
-    'LEARNING.CERTIFICATE.VIEW',
-    'COMPANY.CREATE',
-    'COMMERCE.CART.VIEW',
-    'COMMERCE.CART.MANAGE',
-    'COMMERCE.CHECKOUT.START',
-    'COMMERCE.ORDER.VIEW',
-    'COMMERCE.PAYMENT.VIEW',
-    'COMPANY.DASHBOARD.VIEW',
-    'COMPANY.PERSON.VIEW',
-    'COMPANY.PERSON.MANAGE',
-    'COMPANY.REQUEST.VIEW',
-    'COMPANY.REQUEST.MANAGE',
-    'COMPANY.ENROLMENT.VIEW',
-    'COMPANY.ENROLMENT.MANAGE',
-    'COMPANY.CREDIT.VIEW',
-    'COMPANY.CREDIT.MANAGE',
-    'COMPANY.COURSE.VIEW',
-    'COMPANY.COURSE.MANAGE',
-    'COMPANY.CATALOGUE.MANAGE',
-    'COMPANY.ORDER.VIEW',
-    'COMPANY.PAYMENT.VIEW',
-    'COURSE.MANAGEMENT.VIEW',
-    'COURSE.CREATE',
-    'COURSE.EDIT',
-    'COURSE.PRICING.MANAGE',
-    'COURSE.ASSESSMENT.MANAGE',
-    'COURSE.CERTIFICATE.MANAGE',
-    'COURSE.PREVIEW',
-    'COURSE.PUBLICATION.REQUEST'
-) WHERE r.role_key='SEED_COMPANY_ADMIN';
-INSERT INTO role_permissions (role_id,permission_id)
-SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
-    'ACCOUNT.VIEW',
-    'ACCOUNT.PROFILE.VIEW',
-    'ACCOUNT.PROFILE.EDIT',
-    'ACCOUNT.EMAIL.MANAGE',
-    'ACCOUNT.SESSION.VIEW',
-    'ACCOUNT.SESSION.MANAGE',
-    'ACCOUNT.ACTIVITY.VIEW',
-    'CATALOGUE.VIEW',
-    'CATALOGUE.COURSE.FAVOURITE',
-    'CATALOGUE.COURSE.REQUEST',
-    'LEARNING.LIBRARY.VIEW',
-    'LEARNING.COURSE.START',
-    'LEARNING.COURSE.VIEW',
-    'LEARNING.ASSESSMENT.TAKE',
-    'LEARNING.CERTIFICATE.VIEW',
-    'COMPANY.CREATE',
-    'COMMERCE.CART.VIEW',
-    'COMMERCE.CART.MANAGE',
-    'COMMERCE.CHECKOUT.START',
-    'COMMERCE.ORDER.VIEW',
-    'COMMERCE.PAYMENT.VIEW',
-    'COURSE.MANAGEMENT.VIEW',
-    'COURSE.EDIT',
-    'COURSE.MEDIA.MANAGE',
-    'COURSE.ASSESSMENT.MANAGE',
-    'COURSE.CERTIFICATE.MANAGE',
-    'COURSE.PREVIEW',
-    'COURSE.PUBLICATION.REQUEST'
-) WHERE r.role_key='SEED_COURSE_EDITOR';
-INSERT INTO role_permissions (role_id,permission_id)
-SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
-    'ACCOUNT.VIEW',
-    'ACCOUNT.PROFILE.VIEW',
-    'ACCOUNT.PROFILE.EDIT',
-    'ACCOUNT.EMAIL.MANAGE',
-    'ACCOUNT.SESSION.VIEW',
-    'ACCOUNT.SESSION.MANAGE',
-    'ACCOUNT.ACTIVITY.VIEW',
-    'CATALOGUE.VIEW',
-    'CATALOGUE.COURSE.FAVOURITE',
-    'CATALOGUE.COURSE.REQUEST',
-    'LEARNING.LIBRARY.VIEW',
-    'LEARNING.COURSE.START',
-    'LEARNING.COURSE.VIEW',
-    'LEARNING.ASSESSMENT.TAKE',
-    'LEARNING.CERTIFICATE.VIEW',
-    'COMPANY.CREATE',
-    'COMMERCE.CART.VIEW',
-    'COMMERCE.CART.MANAGE',
-    'COMMERCE.CHECKOUT.START',
-    'COMMERCE.ORDER.VIEW',
-    'COMMERCE.PAYMENT.VIEW',
-    'COURSE.MANAGEMENT.VIEW',
-    'COURSE.EDIT',
-    'COURSE.MEDIA.MANAGE',
-    'COURSE.ASSESSMENT.MANAGE',
-    'COURSE.CERTIFICATE.MANAGE',
-    'COURSE.PREVIEW',
-    'COURSE.PUBLICATION.REQUEST',
-    'COURSE.CREATE',
-    'COURSE.PRICING.MANAGE',
-    'COURSE.OWNERSHIP.MANAGE'
-) WHERE r.role_key='SEED_COURSE_OWNER';
-INSERT INTO role_permissions (role_id,permission_id)
-SELECT r.id,p.id FROM roles r JOIN permissions p ON p.permission_key IN (
-    'ACCOUNT.VIEW',
-    'ACCOUNT.PROFILE.VIEW',
-    'ACCOUNT.PROFILE.EDIT',
-    'ACCOUNT.EMAIL.MANAGE',
-    'ACCOUNT.SESSION.VIEW',
-    'ACCOUNT.SESSION.MANAGE',
-    'ACCOUNT.ACTIVITY.VIEW',
-    'CATALOGUE.VIEW',
-    'CATALOGUE.COURSE.FAVOURITE',
-    'CATALOGUE.COURSE.REQUEST',
-    'LEARNING.LIBRARY.VIEW',
-    'LEARNING.COURSE.START',
-    'LEARNING.COURSE.VIEW',
-    'LEARNING.ASSESSMENT.TAKE',
-    'LEARNING.CERTIFICATE.VIEW',
-    'COMPANY.CREATE',
-    'COMPANY.DASHBOARD.VIEW',
-    'COMPANY.PERSON.VIEW',
-    'COMPANY.PERSON.MANAGE',
-    'COMPANY.REQUEST.VIEW',
-    'COMPANY.REQUEST.MANAGE',
-    'COMPANY.ENROLMENT.VIEW',
-    'COMPANY.ENROLMENT.MANAGE',
-    'COMPANY.CREDIT.VIEW',
-    'COMPANY.CREDIT.MANAGE',
-    'COMPANY.COURSE.VIEW',
-    'COMPANY.COURSE.MANAGE',
-    'COMPANY.CATALOGUE.MANAGE',
-    'PLATFORM.DASHBOARD.VIEW',
-    'PLATFORM.PERSON.VIEW',
-    'PLATFORM.PERSON.MANAGE',
-    'PLATFORM.COMPANY.VIEW',
-    'PLATFORM.COMPANY.MANAGE',
-    'PLATFORM.REQUEST.VIEW',
-    'PLATFORM.REQUEST.MANAGE',
-    'PLATFORM.ENROLMENT.VIEW',
-    'PLATFORM.ENROLMENT.MANAGE',
-    'PLATFORM.CREDIT.VIEW',
-    'PLATFORM.CREDIT.MANAGE',
-    'PLATFORM.ACTIVITY.VIEW',
-    'PLATFORM.REPORT.VIEW',
-    'COURSE.MANAGEMENT.VIEW',
-    'COURSE.CREATE',
-    'COURSE.EDIT',
-    'COURSE.DELETE',
-    'COURSE.PUBLICATION.REQUEST',
-    'COURSE.PUBLISH',
-    'COURSE.CATEGORY.MANAGE',
-    'COURSE.TAG.MANAGE',
-    'COURSE.PRICING.MANAGE',
-    'COURSE.OWNERSHIP.MANAGE',
-    'COURSE.ASSESSMENT.MANAGE',
-    'COURSE.CERTIFICATE.MANAGE',
-    'COURSE.PREVIEW',
-    'COMMERCE.CART.VIEW',
-    'COMMERCE.CART.MANAGE',
-    'COMMERCE.CHECKOUT.START',
-    'COMMERCE.ORDER.VIEW',
-    'COMMERCE.PAYMENT.VIEW',
-    'COMPANY.ORDER.VIEW',
-    'COMPANY.PAYMENT.VIEW',
-    'PLATFORM.ORDER.VIEW',
-    'PLATFORM.ORDER.MANAGE',
-    'PLATFORM.PAYMENT.VIEW',
-    'PLATFORM.PAYMENT.MANAGE',
-    'PLATFORM.PAYMENT.RECONCILE',
-    'PLATFORM.REFUND.VIEW',
-    'PLATFORM.REFUND.MANAGE'
-) WHERE r.role_key='SEED_ADMIN';
 
 CREATE TABLE auth_login_tokens (
     id BIGSERIAL PRIMARY KEY,
@@ -869,16 +599,7 @@ CREATE INDEX audit_log_user_created_idx ON audit_log(user_id, created_at DESC);
 CREATE INDEX audit_log_event_created_idx ON audit_log(event_key, created_at DESC);
 
 -- Course categories are a browsing taxonomy of at most three levels, and they carry no
--- seed_token: a category is a label, not a business record, and it applies equally to a genuine
--- course and a generated one. Roles and permissions already work this way - a generated person
--- holds SEED_STUDENT from the same roles table a real person holds STUDENT from - and categories
--- were the outlier. Making them universe-aware forced generated courses into generated copies of
--- the taxonomy, so seed data could never exercise the real one, and it forced generated category
--- names to carry a set suffix to avoid colliding with the real ones.
---
--- What remains universe-scoped is everything that hangs off a category: per-category counts,
--- browse listings and tag weights must all be filtered by the reader's data universe, or a
--- category page showing a thousand courses when three are genuine is a leak in a new costume.
+-- A category is a label rather than a business record.
 CREATE TABLE course_categories (
     id BIGSERIAL PRIMARY KEY,
     -- RESTRICT rather than CASCADE. Deleting a parent silently taking three levels of taxonomy
@@ -2167,9 +1888,6 @@ CREATE INDEX course_credit_allocations_credit_status_idx ON course_credit_alloca
 
 SQL);
 
-        // Seed Database schema. Generated from SeedTableCatalog so the columns, indexes and
-        // cross-universe guards cannot drift from the declaration the tests assert.
-        $this->execute(SeedSchema::upSql());
 
         // Search. pg_trgm turns an ILIKE with a leading wildcard into an index lookup; an ordinary
         // B-tree is ordered by prefix and cannot serve one at all. Each expression must match the
@@ -2200,39 +1918,10 @@ SQL);
             . "('7e18415e-2627-43ec-a49f-3303b752eea6',{$nameSql},{$domainSql},'active',TRUE,'system',NULL)"
         );
 
-        // The shared SEED System Company (decision D1). It carries the infrastructure token
-        // rather than any generated set's token, so cleaning up a seed set can never remove it
-        // and the SEED universe always has a default company to attach seed identities to.
-        // `companies.domain` is globally UNIQUE across both universes, so the SEED System
-        // Company cannot reuse APP_DOMAIN: doing so fails this migration outright. The domain is
-        // configured rather than derived, because it is also where seed mail is actually
-        // delivered, so it has to be a domain the operator genuinely receives.
-        $seedName = trim((string) ($_ENV['SEED_SYSTEM_COMPANY_NAME'] ?? '')) ?: 'SEED System Company';
-        $seedDomain = strtolower(ltrim(trim((string) ($_ENV['SEED_SYSTEM_COMPANY_DOMAIN'] ?? '')), '.'));
-        if ($seedDomain === '') {
-            $seedDomain = 'seed.' . $domain;
-        }
-        if ($seedDomain === $domain) {
-            throw new RuntimeException(
-                'SEED_SYSTEM_COMPANY_DOMAIN must differ from APP_DOMAIN: companies.domain is unique platform-wide.'
-            );
-        }
-        $seedNameSql = $this->quote($seedName);
-        $seedDomainSql = $this->quote($seedDomain);
-        $seedTokenSql = $this->quote(SeedTableCatalog::INFRASTRUCTURE_TOKEN);
-        $this->execute(
-            "INSERT INTO companies (public_id,name,domain,status,is_system,company_type,created_by_user_id,seed_token) VALUES "
-            . "('b1f6c0de-5f2a-7c3d-9e41-2a7c5d8b3f10',{$seedNameSql},{$seedDomainSql},'active',TRUE,'system',NULL,{$seedTokenSql}::uuid)"
-        );
-
     }
 
     public function down(): void
     {
-        // Reverse the Seed Database schema first: triggers and the shared function before the
-        // tables they guard, generated from the same catalogue as up().
-        $this->execute(SeedSchema::downSql());
-
         $this->execute(<<<'SQL'
 DROP TABLE IF EXISTS course_credit_allocations;
 DROP TABLE IF EXISTS course_credits;
@@ -2268,9 +1957,7 @@ DROP TABLE IF EXISTS web_sessions;
 DROP TABLE IF EXISTS auth_sessions;
 DROP TABLE IF EXISTS auth_login_tokens;
 DROP TABLE IF EXISTS user_roles;
-DROP FUNCTION IF EXISTS enforce_user_role_family();
 DROP TABLE IF EXISTS role_permissions;
-DROP FUNCTION IF EXISTS enforce_role_permission_boundary();
 DROP TABLE IF EXISTS permissions;
 DROP TABLE IF EXISTS roles;
 DROP TABLE IF EXISTS user_emails;

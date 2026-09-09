@@ -33,21 +33,18 @@ Changelog:
 	{% set ph_kicker = 'Course catalogue' %}
 	{% set ph_title = browse_category ? browse_category.name : 'Browse by category' %}
 	{% set ph_lead = browse_category ? (browse_category.description ?: 'Every course in this part of the catalogue, including the levels beneath it.') : 'Open a category to see the courses in it and the categories beneath it.' %}
-	{% set ph_action_href = '/courses/tags' ~ universe_query %}
+	{% set ph_action_href = '/courses/tags' %}
 	{% set ph_action_label = 'Browse by tag' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-4">
 		{% if browse_trail %}
 			<nav class="cl-breadcrumb" aria-label="Category">
-				<a href="/courses{{ universe_query }}">All courses</a>
+				<a href="/courses">All courses</a>
 				{% for crumb in browse_trail %}
 					<span class="cl-breadcrumb-sep" aria-hidden="true">/</span>
-					<a href="/courses/category/{{ crumb.slug }}{{ universe_query }}" {{ crumb.slug == browse_category.slug ? 'aria-current="page"' : '' }}>{{ crumb.name }}</a>
+					<a href="/courses/category/{{ crumb.slug }}" {{ crumb.slug == browse_category.slug ? 'aria-current="page"' : '' }}>{{ crumb.name }}</a>
 				{% endfor %}
 			</nav>
-		{% endif %}
-		{% if universe_switch %}
-			{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: universe_counts} %}
 		{% endif %}
 		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base} %}
 		<div id="catalogue-region" data-server-search-target>
@@ -71,7 +68,7 @@ Changelog:
 				{% elseif category_tree %}
 					<div class="cl-category-tree section">
 						{% for node in category_tree %}
-							{% include '@platform/partials/category-branch.html.twig' with {node: node, depth: 0, universe_query: universe_query} %}
+							{% include '@platform/partials/category-branch.html.twig' with {node: node, depth: 0} %}
 						{% endfor %}
 					</div>
 				{% else %}

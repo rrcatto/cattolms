@@ -31,7 +31,6 @@ use CattoLearning\Application\AccountSectionRegistry;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\View\ThemeRenderer;
@@ -68,13 +67,13 @@ final class AccountController extends BaseController
     public function dashboard(): void
     {
         $user = $this->requirePermission('ACCOUNT.VIEW');
-        $this->renderAccountSection('dashboard', $this->dashboardData($user->id, $this->universe($user)));
+        $this->renderAccountSection('dashboard', $this->dashboardData($user->id));
     }
 
     public function learning(): void
     {
         $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
-        $this->renderAccountSection('learning', $this->learningData($user->id, $this->universe($user), $this->libraryRequest()));
+        $this->renderAccountSection('learning', $this->learningData($user->id, $this->libraryRequest()));
     }
 
     public function profile(): void
@@ -106,7 +105,7 @@ final class AccountController extends BaseController
     {
         $user = $this->requirePermission('ACCOUNT.ACTIVITY.VIEW');
         $this->renderAccountSection('activity', [
-            'account_activity' => $this->platformAdministration->activityEvents($this->universe($user), ['actor_id' => $user->id], 100),
+            'account_activity' => $this->platformAdministration->activityEvents(['actor_id' => $user->id], 100),
         ]);
     }
 
@@ -152,9 +151,9 @@ final class AccountController extends BaseController
     }
 
     /** @return array<string,mixed> */
-    private function dashboardData(int $userId, DataUniverse $universe): array
+    private function dashboardData(int $userId): array
     {
-        $courses = $this->learning->library($userId, $universe);
+        $courses = $this->learning->library($userId);
         $current = array_values(array_filter($courses, static fn(array $course): bool => in_array((string) ($course['status'] ?? ''), ['assigned','active'], true)));
         $completed = array_values(array_filter($courses, static fn(array $course): bool => (string) ($course['status'] ?? '') === 'completed'));
         $progressValues = array_map(static fn(array $course): int => (int) ($course['progress_percentage'] ?? 0), $current);
@@ -178,11 +177,10 @@ final class AccountController extends BaseController
      * @param array<string,mixed> $request
      * @return array<string,mixed>
      */
-    private function learningData(int $userId, DataUniverse $universe, array $request): array
+    private function learningData(int $userId, array $request): array
     {
         return $this->learning->courseLibraryView(
             $userId,
-            $universe,
             $request,
             fn(string $dataset, array $req, int $total) => $this->platformAdministration->paginationFor($dataset, $req, $total),
             fn(string $dataset, $pagination, string $label, string $search) => $this->platformAdministration->paginationView(
@@ -226,14 +224,14 @@ final class AccountController extends BaseController
         // variable rather than an empty one - which F3 turns into a 500 for the whole page. It is
         // emitted only for an identity that may choose a scope; for everyone else it stays empty,
         // because naming a scope would tell an ordinary reader that a second population exists.
-        $data = ['universe' => $this->canSelectUniverse($user) ? $this->universe($user)->value : ''];
+        $data = [];
         foreach ($sections as $section) {
             $data = array_replace($data, match ((string) $section['key']) {
-                'dashboard' => $this->dashboardData($user->id, $this->universe($user)),
+                'dashboard' => $this->dashboardData($user->id),
                 'profile' => $this->profileData($user->id),
-                'learning' => $this->learningData($user->id, $this->universe($user), $this->libraryRequest()),
+                'learning' => $this->learningData($user->id, $this->libraryRequest()),
                 'sessions' => ['sessions' => $this->auth->activeSessions($user->id)],
-                'activity' => ['account_activity' => $this->platformAdministration->activityEvents($this->universe($user), ['actor_id' => $user->id], 100)],
+                'activity' => ['account_activity' => $this->platformAdministration->activityEvents(['actor_id' => $user->id], 100)],
                 default => [],
             });
         }
@@ -274,7 +272,7 @@ final class AccountController extends BaseController
         $user = $this->requireUser();
         // See workspaceData(): every Account section renders through here, so the scope key is
         // supplied once rather than remembered by each caller.
-        $data += ['universe' => $this->canSelectUniverse($user) ? $this->universe($user)->value : ''];
+
         $definition = $this->sections->get($key);
         $data['account_section'] = $definition;
         $data['account_layout'] = 'section';

@@ -76,13 +76,11 @@ namespace CattoLearning\Course;
 
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Support\Env;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\SortOrder;
 use CattoLearning\Support\Uuid;
 use CattoLearning\View\Artwork\ArtworkGenerator;
 use CattoLearning\Infrastructure\Persistence\PageQuery;
-use CattoLearning\Infrastructure\Persistence\SeedProvenance;
 use CattoLearning\Infrastructure\Persistence\Database;
 use InvalidArgumentException;
 use RuntimeException;
@@ -92,7 +90,6 @@ final class CourseRepository
     public function __construct(
         private readonly Database $db,
         private readonly RuntimeSettings $settings,
-        private readonly SeedProvenance $provenance,
         private readonly ArtworkGenerator $artwork
     ) {
     }
@@ -104,50 +101,8 @@ final class CourseRepository
      * into SQL here; callers must already have normalised them through {@see Pagination}, and
      * the clamp is defence in depth.
      */
-    /**
-     * The universe predicate as an AND-fragment, or an empty string when unrestricted.
-     *
-     * Structure rather than a value, so it is concatenated rather than bound. It originates in
-     * DataUniverse and never in request input.
-     */
-    private static function andScope(DataUniverse $universe, string $alias): string
-    {
-        $predicate = $universe->predicate($alias);
-
-        return $predicate === null ? '' : ' AND ' . $predicate;
-    }
 
     /** The same predicate for a query with no WHERE clause of its own. */
-    /**
-     * The complete WHERE clause for a query whose only conditions are the universe and the search.
-     *
-     * Composed together on purpose. Appending a scope and a search separately means each fragment
-     * has to guess whether a WHERE already exists, and the ALL universe contributes no predicate at
-     * all - so `WHERE`-less SQL met an ` AND ` and Administration Courses returned
-     * "syntax error at or near AND" for every search in the All scope, while Real and Seed worked.
-     * Building the conditions as a list and joining them once removes the guess.
-     *
-     * @return array{0:string,1:array<string,mixed>}
-     */
-    private static function whereScopeAndSearch(DataUniverse $universe, string $alias, string $search): array
-    {
-        $conditions = [];
-
-        $predicate = $universe->predicate($alias);
-        if ($predicate !== null) {
-            $conditions[] = $predicate;
-        }
-
-        [$match, $bindings] = self::andTitleSearch($search);
-        if ($match !== '') {
-            $conditions[] = ltrim(substr($match, strlen(' AND ')));
-        }
-
-        return [
-            $conditions === [] ? '' : ' WHERE ' . implode(' AND ', $conditions),
-            $bindings,
-        ];
-    }
 
     /**
      * The orderings every course list pages on.
@@ -206,7 +161,7 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function publishedCourses(DataUniverse $universe, CatalogueFilter $filter, int $limit, int $offset): array
+    public function publishedCourses(CatalogueFilter $filter, int $limit, int $offset): array
     {
         [$narrow, $bindings] = self::andCatalogueFilter($filter);
 
@@ -221,7 +176,7 @@ final class CourseRepository
         //
         // The whole projection, five price sub-selects and the lateral cover lookup included, was
         // previously evaluated for the entire published catalogue in order to render one page.
-        $keys = "SELECT c.id FROM courses c WHERE c.status = 'published'" . self::andScope($universe, 'c') . $narrow;
+        $keys = "SELECT c.id FROM courses c WHERE c.status = 'published'" . '' . $narrow;
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
                     c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
@@ -307,6 +262,24 @@ final class CourseRepository
     private const LIBRARY_ORDER = 'ce.assigned_at DESC, ce.id DESC';
 
     /**
+     * The WHERE clause and bindings for a title search, or an empty clause when there is none.
+     *
+     * Kept as a helper because two reads share it and a count must filter exactly as its row query
+     * does; a second copy is how the two drift apart.
+     *
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private static function whereSearch(string $search): array
+    {
+        [$match, $bindings] = self::andTitleSearch($search);
+        if ($match === '') {
+            return ['', $bindings];
+        }
+
+        return [' WHERE ' . ltrim(substr($match, strlen(' AND '))), $bindings];
+    }
+
+    /**
      * @return array{0:string,1:array<string,mixed>}
      */
     private static function andTitleSearch(string $search): array
@@ -346,13 +319,13 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function companyCourses(DataUniverse $universe, int $companyId, string $relationship, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function companyCourses(int $companyId, string $relationship, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_COURSE_SORTS, self::COMPANY_COURSE_ORDER, 'c.id');
         [$match, $bindings] = self::andTitleSearch($search);
 
         $keys = "SELECT c.id FROM courses c WHERE " . self::companyCourseWhere($relationship)
-            . self::andScope($universe, 'c') . $match;
+            . '' . $match;
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level, c.status,
                     c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
@@ -421,12 +394,12 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function companyFavourites(DataUniverse $universe, int $companyId, int $limit, int $offset, ?SortOrder $sort = null): array
+    public function companyFavourites(int $companyId, int $limit, int $offset, ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::COMPANY_FAVOURITE_SORTS, self::COMPANY_FAVOURITE_ORDER, 'cf.course_id DESC');
         $keys = 'SELECT cf.course_id AS id FROM company_favourites cf
                    JOIN courses c ON c.id = cf.course_id
-                  WHERE cf.company_id = :company_id' . self::andScope($universe, 'c');
+                  WHERE cf.company_id = :company_id' . '';
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status,
                           cc.name AS category_name, cf.note, cf.created_at,
@@ -446,12 +419,12 @@ final class CourseRepository
         ));
     }
 
-    public function companyFavouritesCount(DataUniverse $universe, int $companyId): int
+    public function companyFavouritesCount(int $companyId): int
     {
         $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total FROM company_favourites cf
                JOIN courses c ON c.id = cf.course_id
-              WHERE cf.company_id = :company_id' . self::andScope($universe, 'c'),
+              WHERE cf.company_id = :company_id' . '',
             ['company_id' => $companyId]
         );
 
@@ -508,11 +481,11 @@ final class CourseRepository
      * Shares its predicate with the row query, so the total cannot describe a different population
      * from the list it heads.
      */
-    public function companyCoursesCount(DataUniverse $universe, int $companyId, string $relationship, string $search = ''): int
+    public function companyCoursesCount(int $companyId, string $relationship, string $search = ''): int
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM courses c
-             WHERE " . self::companyCourseWhere($relationship) . self::andScope($universe, 'c') . self::andTitleSearch($search)[0],
+             WHERE " . self::companyCourseWhere($relationship) . '' . self::andTitleSearch($search)[0],
             ['company_id' => $companyId] + self::andTitleSearch($search)[1]
         );
 
@@ -525,7 +498,7 @@ final class CourseRepository
      * The row query groups by `c.id`, so despite the module/question fan-out one course is one
      * row and a plain count over `courses` describes the same population.
      */
-    public function publishedCoursesCount(DataUniverse $universe, CatalogueFilter $filter): int
+    public function publishedCoursesCount(CatalogueFilter $filter): int
     {
         // The same fragment the rows use, so the total and the list can never describe different
         // populations.
@@ -533,7 +506,7 @@ final class CourseRepository
 
         $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM courses c WHERE c.status = 'published'"
-                . self::andScope($universe, 'c') . $narrow,
+                . '' . $narrow,
             $bindings
         );
 
@@ -548,10 +521,10 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function allCourses(DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function allCourses(int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::ADMIN_COURSE_SORTS, self::ADMIN_COURSE_ORDER, 'c.id');
-        [$where, $bindings] = self::whereScopeAndSearch($universe, 'c', $search);
+        [$where, $bindings] = self::whereSearch($search);
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             PageQuery::deferred(
@@ -593,9 +566,9 @@ final class CourseRepository
     }
 
     /** Total courses in the Administration list; every join above is a LEFT join, so membership is simply `courses`. */
-    public function allCoursesCount(DataUniverse $universe, string $search = ''): int
+    public function allCoursesCount(string $search = ''): int
     {
-        [$where, $bindings] = self::whereScopeAndSearch($universe, 'c', $search);
+        [$where, $bindings] = self::whereSearch($search);
         $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
@@ -609,9 +582,9 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function featuredPublishedCourses(DataUniverse $universe, int $limit = 6): array
+    public function featuredPublishedCourses(int $limit = 6): array
     {
-        return $this->publishedCourses($universe, CatalogueFilter::none(), max(1, min(max(Pagination::PAGE_SIZES), $limit)), 0);
+        return $this->publishedCourses(CatalogueFilter::none(), max(1, min(max(Pagination::PAGE_SIZES), $limit)), 0);
     }
 
     /**
@@ -698,21 +671,21 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function categories(DataUniverse $universe, bool $activeOnly = false): array
+    public function categories(bool $activeOnly = false): array
     {
         // A category exists or it does not. It carried an active flag that nobody asked for and
         // that no screen could explain, so the parameter is now inert and every caller sees the
         // whole taxonomy.
         $active = '';
-        $scope = self::andScope($universe, 'c');
-        $descendantScope = self::andScope($universe, 'dc');
+        $scope = '';
+        $descendantScope = '';
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT cc.*,
                     parent.name AS parent_name,
                     grandparent.name AS grandparent_name,
                     (SELECT COUNT(*)::int FROM courses c
-                      WHERE c.category_id = cc.id{$scope}) AS course_count,
+                      WHERE c.category_id = cc.id) AS course_count,
                     (SELECT COUNT(*)::int FROM courses dc
                       WHERE " . self::inBranchOf('dc', 'cc.id') . "{$descendantScope}) AS descendant_course_count,
                     (SELECT COUNT(*)::int FROM course_categories ch WHERE ch.parent_id = cc.id) AS child_count
@@ -748,11 +721,11 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function categoryCourses(int $categoryId, DataUniverse $universe, int $limit, int $offset): array
+    public function categoryCourses(int $categoryId, int $limit, int $offset): array
     {
         $keys = "SELECT c.id FROM courses c
                   WHERE c.status = 'published' AND c.category_id = :category_id"
-            . self::andScope($universe, 'c');
+            . '';
 
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
                           c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
@@ -788,13 +761,13 @@ final class CourseRepository
      *
      * @return array<int,int> category id => courses filed directly in it
      */
-    public function categoryCourseTotals(DataUniverse $universe): array
+    public function categoryCourseTotals(): array
     {
         $totals = [];
         foreach ($this->db->fetchAllAssociative(
             "SELECT c.category_id, COUNT(*)::int AS total
                FROM courses c
-              WHERE c.status = 'published' AND c.category_id IS NOT NULL" . self::andScope($universe, 'c') . "
+              WHERE c.status = 'published' AND c.category_id IS NOT NULL" . '' . "
               GROUP BY c.category_id"
         ) as $row) {
             $totals[(int) $row['category_id']] = (int) $row['total'];
@@ -804,11 +777,11 @@ final class CourseRepository
     }
 
     /** The total behind {@see categoryCourses()}, under the identical membership rule. */
-    public function categoryCourseTotal(int $categoryId, DataUniverse $universe): int
+    public function categoryCourseTotal(int $categoryId): int
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM courses c
-              WHERE c.status = 'published' AND c.category_id = :category_id" . self::andScope($universe, 'c'),
+              WHERE c.status = 'published' AND c.category_id = :category_id" . '',
             ['category_id' => $categoryId]
         );
 
@@ -885,13 +858,13 @@ final class CourseRepository
      *
      * @return array<string,mixed>|null
      */
-    public function browsableCategory(string $slug, DataUniverse $universe): ?array
+    public function browsableCategory(string $slug): ?array
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT cc.id, cc.parent_id, cc.level, cc.name, cc.slug, cc.description,
                     (SELECT COUNT(*)::int FROM courses dc
                       WHERE dc.status = 'published' AND " . self::inBranchOf('dc', 'cc.id')
-                        . self::andScope($universe, 'dc') . ") AS descendant_course_count
+                        . '' . ") AS descendant_course_count
              FROM course_categories cc
              WHERE cc.slug = :slug
              LIMIT 1",
@@ -934,13 +907,13 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function browsableChildCategories(?int $parentId, DataUniverse $universe): array
+    public function browsableChildCategories(?int $parentId): array
     {
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT cc.id, cc.name, cc.slug, cc.level, cc.description,
                     (SELECT COUNT(*)::int FROM courses dc
                       WHERE dc.status = 'published' AND " . self::inBranchOf('dc', 'cc.id')
-                        . self::andScope($universe, 'dc') . ") AS descendant_course_count
+                        . '' . ") AS descendant_course_count
              FROM course_categories cc
              WHERE TRUE
                AND " . ($parentId === null ? 'cc.parent_id IS NULL' : 'cc.parent_id = :parent') . "
@@ -967,7 +940,7 @@ final class CourseRepository
      * @param list<int> $tagIds
      * @return array<int,int>
      */
-    public function tagFacetCounts(array $tagIds, DataUniverse $universe, CatalogueFilter $filter): array
+    public function tagFacetCounts(array $tagIds, CatalogueFilter $filter): array
     {
         if ($tagIds === []) {
             return [];
@@ -981,7 +954,7 @@ final class CourseRepository
             "SELECT ct.tag_id, COUNT(*)::int AS total
                FROM course_tags ct JOIN courses c ON c.id = ct.course_id
               WHERE ct.tag_id IN ({$ids}) AND c.status = 'published'"
-                . self::andScope($universe, 'c') . $narrow . '
+                . '' . $narrow . '
               GROUP BY ct.tag_id',
             $bindings
         ) as $row) {
@@ -998,7 +971,7 @@ final class CourseRepository
      * @param list<int> $categoryIds
      * @return array<int,int>
      */
-    public function categoryFacetCounts(array $categoryIds, DataUniverse $universe, CatalogueFilter $filter): array
+    public function categoryFacetCounts(array $categoryIds, CatalogueFilter $filter): array
     {
         $counts = [];
         foreach ($categoryIds as $categoryId) {
@@ -1008,7 +981,7 @@ final class CourseRepository
             [$narrow, $bindings] = self::andCatalogueFilter($filter->withCategory((int) $categoryId));
             $rows = $this->db->fetchAllAssociative(
                 "SELECT COUNT(*)::int AS total FROM courses c WHERE c.status = 'published'"
-                    . self::andScope($universe, 'c') . $narrow,
+                    . '' . $narrow,
                 $bindings
             );
             $counts[(int) $categoryId] = (int) ($rows[0]['total'] ?? 0);
@@ -1030,9 +1003,9 @@ final class CourseRepository
      *
      * @return list<array{label:string,slug:string,total:int}>
      */
-    public function categoryDistribution(DataUniverse $universe): array
+    public function categoryDistribution(): array
     {
-        $scope = self::andScope($universe, 'c');
+        $scope = '';
         $rows = $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT cc.name AS label, cc.slug,
                     (SELECT COUNT(*)::int FROM courses c
@@ -1109,7 +1082,7 @@ final class CourseRepository
      * @param list<int> $tagIds
      * @return array<int,int>
      */
-    public function courseCountsForTags(array $tagIds, DataUniverse $universe): array
+    public function courseCountsForTags(array $tagIds): array
     {
         if ($tagIds === []) {
             return [];
@@ -1117,13 +1090,13 @@ final class CourseRepository
 
         // Cast integers from rows this repository has just read, never request text.
         $ids = implode(',', array_map('intval', $tagIds));
-        $scope = self::andScope($universe, 'c');
+        $scope = '';
 
         $counts = [];
         foreach ($this->db->fetchAllAssociative(
             "SELECT ct.tag_id, COUNT(*)::int AS total
                FROM course_tags ct JOIN courses c ON c.id = ct.course_id
-              WHERE ct.tag_id IN ({$ids}){$scope}
+              WHERE ct.tag_id IN ({$ids})
               GROUP BY ct.tag_id"
         ) as $row) {
             $counts[(int) $row['tag_id']] = (int) $row['total'];
@@ -1169,14 +1142,14 @@ final class CourseRepository
      *
      * @return array<string,mixed>|null
      */
-    public function browsableTag(string $slug, DataUniverse $universe): ?array
+    public function browsableTag(string $slug): ?array
     {
-        $scope = self::andScope($universe, 'c');
+        $scope = '';
         $rows = $this->db->fetchAllAssociative(
             "SELECT t.id, t.name, t.slug,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
-                      WHERE ct.tag_id = t.id AND c.status = 'published'{$scope}) AS course_count
+                      WHERE ct.tag_id = t.id AND c.status = 'published') AS course_count
              FROM tags t WHERE t.slug = :slug LIMIT 1",
             ['slug' => $slug]
         );
@@ -1255,15 +1228,15 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function popularTags(DataUniverse $universe, int $limit): array
+    public function popularTags(int $limit): array
     {
-        $scope = self::andScope($universe, 'c');
+        $scope = '';
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT t.id, t.name, t.slug,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
-                      WHERE ct.tag_id = t.id AND c.status = 'published'{$scope}) AS course_count
+                      WHERE ct.tag_id = t.id AND c.status = 'published') AS course_count
              FROM tags t WHERE TRUE
              ORDER BY course_count DESC, t.name, t.id
              LIMIT :limit",
@@ -1280,14 +1253,14 @@ final class CourseRepository
      *
      * @return list<array{label:string,slug:string,total:int}>
      */
-    public function tagDistribution(DataUniverse $universe, int $limit): array
+    public function tagDistribution(int $limit): array
     {
-        $scope = self::andScope($universe, 'c');
+        $scope = '';
         $rows = $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT t.name AS label, t.slug,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
-                      WHERE ct.tag_id = t.id AND c.status = 'published'{$scope}) AS total
+                      WHERE ct.tag_id = t.id AND c.status = 'published') AS total
              FROM tags t WHERE TRUE
              ORDER BY total DESC, t.name, t.id
              LIMIT :limit",
@@ -1301,7 +1274,7 @@ final class CourseRepository
 
         $untagged = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM courses c
-              WHERE c.status = 'published'{$scope}
+              WHERE c.status = 'published'
                 AND NOT EXISTS (SELECT 1 FROM course_tags ct WHERE ct.course_id = c.id)"
         );
         $distribution[] = ['label' => 'Untagged', 'slug' => '', 'total' => (int) ($untagged[0]['total'] ?? 0)];
@@ -1318,15 +1291,15 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function tagIndex(DataUniverse $universe): array
+    public function tagIndex(): array
     {
-        $scope = self::andScope($universe, 'c');
+        $scope = '';
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT t.id, t.name, t.slug, t.icon_svg,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
-                      WHERE ct.tag_id = t.id AND c.status = 'published'{$scope}) AS course_count
+                      WHERE ct.tag_id = t.id AND c.status = 'published') AS course_count
              FROM tags t WHERE TRUE
              ORDER BY t.name, t.id"
         ));
@@ -1557,14 +1530,13 @@ final class CourseRepository
     {
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_price_variants
-                 (public_id,seed_token,course_id,access_period_seconds,price_minor_units,currency_code,
+                 (public_id,course_id,access_period_seconds,price_minor_units,currency_code,
                   label,position,is_active,is_default,created_by_user_id,updated_by_user_id,created_at,updated_at)
-             VALUES (:public_id,:seed_token,:course_id,:access_period_seconds,:price_minor_units,:currency_code,
+             VALUES (:public_id,:course_id,:access_period_seconds,:price_minor_units,:currency_code,
                      :label,:position,:is_active,:is_default,:created_by,:updated_by,:created_at,:updated_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->fromCourse($courseId),
                 'course_id' => $courseId,
                 'access_period_seconds' => (int) $data['access_period_seconds'],
                 'price_minor_units' => (int) $data['price_minor_units'],
@@ -1681,7 +1653,7 @@ final class CourseRepository
     }
 
     /** @return array<string,mixed>|null */
-    public function findBySlug(string $slug, DataUniverse $universe, bool $publishedOnly = false): ?array
+    public function findBySlug(string $slug, bool $publishedOnly = false): ?array
     {
         $sql = 'SELECT c.*, cc.name AS category_name, cc.slug AS category_slug
                 FROM courses c
@@ -1693,7 +1665,7 @@ final class CourseRepository
         // Scoped in SQL rather than by discarding a fetched row. A direct slug lookup that
         // fetches first and filters afterwards still reveals whether the slug exists, which is
         // enough to enumerate the other universe one guess at a time.
-        $sql .= self::andScope($universe, 'c');
+        $sql .= '';
         $sql .= ' LIMIT 1';
         $rows = $this->db->fetchAllAssociative($sql, ['slug' => $slug]);
         return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
@@ -1942,14 +1914,13 @@ final class CourseRepository
 
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_media
-                 (public_id,seed_token,course_id,module_id,media_role,original_filename,storage_key,
+                 (public_id,course_id,module_id,media_role,original_filename,storage_key,
                   mime_type,byte_size,sha256,alt_text,is_public,created_by_user_id,created_at)
-             VALUES (:public_id,:seed_token,:course_id,:module_id,:media_role,:original_filename,:storage_key,
+             VALUES (:public_id,:course_id,:module_id,:media_role,:original_filename,:storage_key,
                      :mime_type,:byte_size,:sha256,:alt_text,:is_public,:created_by,:created_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->fromCourse($courseId),
                 'course_id' => $courseId,
                 'module_id' => $moduleId,
                 'media_role' => (string) $data['media_role'],
@@ -1982,7 +1953,7 @@ final class CourseRepository
     }
 
     /** @param array<string,mixed> $data */
-    public function createCourse(array $data, int $userId, ?string $seedToken = null): int
+    public function createCourse(array $data, int $userId): int
     {
         // The universe is the owning company's, supplied by the caller. Deriving it from $userId
         // would be wrong for a genuine ADMIN creating a course inside a SEED company: ADMIN is a
@@ -1997,7 +1968,7 @@ final class CourseRepository
         $publicId = Uuid::v4();
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO courses
-                 (public_id,seed_token,category_id,slug,title,subtitle,summary,description_html,level,
+                 (public_id,category_id,slug,title,subtitle,summary,description_html,level,
                   estimated_minutes,status,default_access_period_seconds,module_weight,final_weight,
                   certificate_enabled,certificate_title,certificate_template,certificate_body_text,
                   certificate_footer_text,certificate_signatory_name,certificate_signatory_title,
@@ -2005,7 +1976,7 @@ final class CourseRepository
                   parent_course_id,revision_number,publication_approval_status,certificate_template_html,
                   certificate_template_css,interchange_schema_version,created_by_user_id,updated_by_user_id,
                   created_at,updated_at,cover_svg)
-             VALUES (:public_id,:seed_token,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
+             VALUES (:public_id,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
                      :estimated_minutes,:status,:default_access_period_seconds,:module_weight,:final_weight,
                      :certificate_enabled,:certificate_title,:certificate_template,:certificate_body_text,
                      :certificate_footer_text,:certificate_signatory_name,:certificate_signatory_title,
@@ -2016,7 +1987,6 @@ final class CourseRepository
              RETURNING id',
             [
                 'public_id' => $publicId,
-                'seed_token' => $seedToken ?? $this->provenance->fromCompany($ownerCompanyId),
                 'category_id' => $data['category_id'] ?: null,
                 'slug' => (string) $data['slug'],
                 'title' => (string) $data['title'],
@@ -2205,14 +2175,13 @@ final class CourseRepository
         $now = gmdate('Y-m-d H:i:sP');
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_modules
-                 (public_id,seed_token,course_id,module_key,position,title,subtitle,learning_outcomes_html,
+                 (public_id,course_id,module_key,position,title,subtitle,learning_outcomes_html,
                   content_html,summary_html,content_structure,is_review,assessment_required,created_at,updated_at)
-             VALUES (:public_id,:seed_token,:course_id,:module_key,:position,:title,:subtitle,:learning_outcomes_html,
+             VALUES (:public_id,:course_id,:module_key,:position,:title,:subtitle,:learning_outcomes_html,
                      :content_html,:summary_html,:content_structure,:is_review,:assessment_required,:created_at,:updated_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->fromCourse($courseId),
                 'course_id' => $courseId,
                 'module_key' => (string) $data['module_key'],
                 'position' => (int) $data['position'],
@@ -2288,13 +2257,13 @@ final class CourseRepository
         $now = gmdate('Y-m-d H:i:sP');
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_assessments
-                 (public_id,seed_token,course_id,module_id,assessment_type,assessment_key,title,
+                 (public_id,course_id,module_id,assessment_type,assessment_key,title,
                   instructions_html,position,pass_mark,required,result_pass_html,result_fail_html,
                   diagnostic_pass_action,is_visible,practice_enabled,practice_pool_mode,
                   practice_question_count,graded_question_count,maximum_attempts,time_limit_seconds,
                   score_policy,randomise_questions,randomise_options,negative_marking,
                   difficulty_selection,created_at,updated_at)
-             VALUES (:public_id,:seed_token,:course_id,:module_id,:assessment_type,:assessment_key,:title,
+             VALUES (:public_id,:course_id,:module_id,:assessment_type,:assessment_key,:title,
                      :instructions_html,:position,:pass_mark,:required,:result_pass_html,:result_fail_html,
                      :diagnostic_pass_action,:is_visible,:practice_enabled,:practice_pool_mode,
                      :practice_question_count,:graded_question_count,:maximum_attempts,:time_limit_seconds,
@@ -2303,7 +2272,6 @@ final class CourseRepository
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->fromCourse($courseId),
                 'course_id' => $courseId,
                 'module_id' => $moduleId,
                 'assessment_type' => $data['assessment_type'],
@@ -2445,22 +2413,20 @@ final class CourseRepository
         );
 
         // Every row in the graph belongs to the one assessment, so its universe is resolved once.
-        $seedToken = $this->provenance->fromAssessment($assessmentId);
         $now = gmdate('Y-m-d H:i:sP');
 
         foreach ($questions as $questionPosition => $question) {
             $rows = $this->db->fetchAllAssociative(
                 'INSERT INTO assessment_questions
-                     (public_id,seed_token,assessment_id,position,question_html,points,explanation_html,
+                     (public_id,assessment_id,position,question_html,points,explanation_html,
                       difficulty,practice_eligible,graded_eligible,remediation_module_keys,incorrect_points,
                       created_at,updated_at)
-                 VALUES (:public_id,:seed_token,:assessment_id,:position,:question_html,:points,:explanation_html,
+                 VALUES (:public_id,:assessment_id,:position,:question_html,:points,:explanation_html,
                          :difficulty,:practice_eligible,:graded_eligible,:remediation_module_keys,:incorrect_points,
                          :created_at,:updated_at)
                  RETURNING id',
                 [
                     'public_id' => Uuid::v4(),
-                    'seed_token' => $seedToken,
                     'assessment_id' => $assessmentId,
                     'position' => $questionPosition + 1,
                     'question_html' => (string) $question['question_html'],
@@ -2484,11 +2450,10 @@ final class CourseRepository
             foreach ((array) $question['options'] as $optionPosition => $option) {
                 $this->db->executeStatement(
                     'INSERT INTO assessment_options
-                         (public_id,seed_token,question_id,position,option_html,is_correct,created_at,updated_at)
-                     VALUES (:public_id,:seed_token,:question_id,:position,:option_html,:is_correct,:created_at,:updated_at)',
+                         (public_id,question_id,position,option_html,is_correct,created_at,updated_at)
+                     VALUES (:public_id,:question_id,:position,:option_html,:is_correct,:created_at,:updated_at)',
                     [
                         'public_id' => Uuid::v4(),
-                        'seed_token' => $seedToken,
                         'question_id' => $questionId,
                         'position' => $optionPosition + 1,
                         'option_html' => (string) $option['option_html'],
@@ -2509,15 +2474,12 @@ final class CourseRepository
             'DELETE FROM course_grade_bands WHERE course_id = :course_id',
             ['course_id' => $courseId]
         );
-
-        $seedToken = $this->provenance->fromCourse($courseId);
         foreach ($bands as $position => $band) {
             $this->db->executeStatement(
                 'INSERT INTO course_grade_bands
-                     (seed_token,course_id,position,grade_code,grade_label,minimum_percentage,is_passing)
-                 VALUES (:seed_token,:course_id,:position,:grade_code,:grade_label,:minimum_percentage,:is_passing)',
+                     (course_id,position,grade_code,grade_label,minimum_percentage,is_passing)
+                 VALUES (:course_id,:position,:grade_code,:grade_label,:minimum_percentage,:is_passing)',
                 [
-                    'seed_token' => $seedToken,
                     'course_id' => $courseId,
                     'position' => $position + 1,
                     'grade_code' => $band['grade_code'],
@@ -2541,10 +2503,9 @@ final class CourseRepository
     ): void {
         $this->db->executeStatement(
             'INSERT INTO course_edit_history
-                 (seed_token,course_id,user_id,event_key,entity_type,entity_id,summary,snapshot,created_at)
-             VALUES (:seed_token,:course_id,:user_id,:event_key,:entity_type,:entity_id,:summary,:snapshot,:created_at)',
+                 (course_id,user_id,event_key,entity_type,entity_id,summary,snapshot,created_at)
+             VALUES (:course_id,:user_id,:event_key,:entity_type,:entity_id,:summary,:snapshot,:created_at)',
             [
-                'seed_token' => $this->provenance->fromCourse($courseId),
                 'course_id' => $courseId,
                 'user_id' => $userId,
                 'event_key' => $event,
@@ -2586,9 +2547,9 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function library(int $userId, DataUniverse $universe): array
+    public function library(int $userId): array
     {
-        return $this->libraryPage($userId, $universe, self::LIBRARY_STATUSES, 0, 0, '');
+        return $this->libraryPage($userId, self::LIBRARY_STATUSES, 0, 0, '');
     }
 
     /**
@@ -2600,9 +2561,9 @@ final class CourseRepository
      * @param list<string> $statuses
      * @return list<array<string,mixed>>
      */
-    public function libraryPage(int $userId, DataUniverse $universe, array $statuses, int $limit, int $offset, string $search = ''): array
+    public function libraryPage(int $userId, array $statuses, int $limit, int $offset, string $search = ''): array
     {
-        [$where, $bindings] = self::libraryFilter($userId, $universe, $statuses, $search);
+        [$where, $bindings] = self::libraryFilter($userId, $statuses, $search);
 
         $detail = "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.level, c.status AS course_status,
                     cc.name AS category_name,
@@ -2642,9 +2603,9 @@ final class CourseRepository
      *
      * @param list<string> $statuses
      */
-    public function libraryCount(int $userId, DataUniverse $universe, array $statuses = self::LIBRARY_STATUSES, string $search = ''): int
+    public function libraryCount(int $userId, array $statuses = self::LIBRARY_STATUSES, string $search = ''): int
     {
-        [$where, $bindings] = self::libraryFilter($userId, $universe, $statuses, $search);
+        [$where, $bindings] = self::libraryFilter($userId, $statuses, $search);
         $rows = $this->db->fetchAllAssociative(
             'SELECT COUNT(*)::int AS total FROM course_enrolments ce
              JOIN courses c ON c.id = ce.course_id ' . $where,
@@ -2660,7 +2621,7 @@ final class CourseRepository
      * @param list<string> $statuses
      * @return array{0:string,1:array<string,mixed>}
      */
-    private static function libraryFilter(int $userId, DataUniverse $universe, array $statuses, string $search): array
+    private static function libraryFilter(int $userId, array $statuses, string $search): array
     {
         $allowed = array_values(array_intersect(self::LIBRARY_STATUSES, $statuses));
         if ($allowed === []) {
@@ -2676,11 +2637,6 @@ final class CourseRepository
 
         $where = 'WHERE ce.user_id = :user_id AND ce.is_preview = FALSE'
             . ' AND ce.status IN (' . implode(',', $names) . ')';
-
-        $scope = $universe->predicate('ce');
-        if ($scope !== null) {
-            $where .= ' AND ' . $scope;
-        }
 
         [$match, $searchBindings] = self::andTitleSearch($search);
 
@@ -2700,16 +2656,15 @@ final class CourseRepository
         $now = gmdate('Y-m-d H:i:sP');
         $rows = $this->db->fetchAllAssociative(
             "INSERT INTO course_enrolments
-                 (public_id,seed_token,user_id,course_id,source_type,source_reference,status,
+                 (public_id,user_id,course_id,source_type,source_reference,status,
                   access_period_seconds,assigned_at,assigned_by_user_id,created_at,updated_at)
-             VALUES (:public_id,:seed_token,:user_id,:course_id,'administrator',NULL,'assigned',
+             VALUES (:public_id,:user_id,:course_id,'administrator',NULL,'assigned',
                      :access_period_seconds,:assigned_at,:assigned_by,:created_at,:updated_at)
              RETURNING id",
             [
                 'public_id' => Uuid::v4(),
                 // The learner and the course must be in the same universe. forPair() refuses a
                 // mismatch by name rather than leaving the trigger to report a column.
-                'seed_token' => $this->provenance->forPair('users', $userId, 'courses', $courseId),
                 'user_id' => $userId,
                 'course_id' => $courseId,
                 'access_period_seconds' => $accessPeriodSeconds,
@@ -2794,13 +2749,12 @@ final class CourseRepository
     public function touchModule(int $enrolmentId, int $moduleId): void
     {
         $this->db->executeStatement(
-            'INSERT INTO module_progress (enrolment_id,module_id,first_opened_at,last_viewed_at,seed_token)
-             VALUES (:enrolment_id,:module_id,NOW(),NOW(),:seed_token::uuid)
+            'INSERT INTO module_progress (enrolment_id,module_id,first_opened_at,last_viewed_at)
+             VALUES (:enrolment_id,:module_id,NOW(),NOW())
              ON CONFLICT (enrolment_id,module_id) DO UPDATE SET last_viewed_at=NOW()',
             [
                 'enrolment_id' => $enrolmentId,
                 'module_id' => $moduleId,
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
             ]
         );
     }
@@ -2862,14 +2816,13 @@ final class CourseRepository
 
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO assessment_attempts
-                 (public_id,seed_token,enrolment_id,assessment_id,attempt_number,earned_points,
+                 (public_id,enrolment_id,assessment_id,attempt_number,earned_points,
                   maximum_points,percentage,grade_code,passed,submitted_at)
-             VALUES (:public_id,:seed_token,:enrolment_id,:assessment_id,:attempt_number,:earned_points,
+             VALUES (:public_id,:enrolment_id,:assessment_id,:attempt_number,:earned_points,
                      :maximum_points,:percentage,:grade_code,:passed,:submitted_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
                 'enrolment_id' => $enrolmentId,
                 'assessment_id' => $assessmentId,
                 'attempt_number' => $attemptNumber,
@@ -2890,12 +2843,11 @@ final class CourseRepository
         foreach ($responses as $response) {
             $this->db->executeStatement(
                 'INSERT INTO assessment_responses
-                 (attempt_id,question_id,selected_option_id,is_correct,points_awarded,seed_token)
-                 VALUES (:attempt_id,:question_id,:selected_option_id,:is_correct,:points_awarded,:seed_token::uuid)
+                 (attempt_id,question_id,selected_option_id,is_correct,points_awarded)
+                 VALUES (:attempt_id,:question_id,:selected_option_id,:is_correct,:points_awarded)
                  ON CONFLICT (attempt_id,question_id) DO UPDATE
                  SET selected_option_id=EXCLUDED.selected_option_id,is_correct=EXCLUDED.is_correct,points_awarded=EXCLUDED.points_awarded',
                 [
-                    'seed_token' => $this->provenance->fromAttempt($attemptId),
                     'attempt_id' => $attemptId,
                     'question_id' => (int) $response['question_id'],
                     'selected_option_id' => $response['selected_option_id'],
@@ -2916,8 +2868,8 @@ final class CourseRepository
     ): void {
         $this->db->executeStatement(
             'INSERT INTO module_progress
-             (enrolment_id,module_id,first_opened_at,last_viewed_at,completed_at,best_percentage,best_grade_code,seed_token)
-             VALUES (:enrolment_id,:module_id,NOW(),NOW(),NOW(),:percentage,:grade_code,:seed_token::uuid)
+             (enrolment_id,module_id,first_opened_at,last_viewed_at,completed_at,best_percentage,best_grade_code)
+             VALUES (:enrolment_id,:module_id,NOW(),NOW(),NOW(),:percentage,:grade_code)
              ON CONFLICT (enrolment_id,module_id) DO UPDATE SET
                last_viewed_at=NOW(), completed_at=NOW(),
                best_percentage=CASE WHEN module_progress.best_percentage IS NULL OR EXCLUDED.best_percentage>module_progress.best_percentage THEN EXCLUDED.best_percentage ELSE module_progress.best_percentage END,
@@ -2927,7 +2879,6 @@ final class CourseRepository
                 'module_id' => $moduleId,
                 'percentage' => $percentage,
                 'grade_code' => $gradeCode,
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
             ]
         );
     }
@@ -2940,8 +2891,8 @@ final class CourseRepository
     ): void {
         $this->db->executeStatement(
             'INSERT INTO module_progress
-             (enrolment_id,module_id,first_opened_at,last_viewed_at,completed_at,best_percentage,best_grade_code,seed_token)
-             VALUES (:enrolment_id,:module_id,NOW(),NOW(),NOW(),:percentage,:grade_code,:seed_token::uuid)
+             (enrolment_id,module_id,first_opened_at,last_viewed_at,completed_at,best_percentage,best_grade_code)
+             VALUES (:enrolment_id,:module_id,NOW(),NOW(),NOW(),:percentage,:grade_code)
              ON CONFLICT (enrolment_id,module_id) DO UPDATE SET
                last_viewed_at=NOW(),completed_at=NOW(),best_percentage=EXCLUDED.best_percentage,best_grade_code=EXCLUDED.best_grade_code',
             [
@@ -2949,7 +2900,6 @@ final class CourseRepository
                 'module_id' => $moduleId,
                 'percentage' => $percentage,
                 'grade_code' => $gradeCode,
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
             ]
         );
     }
@@ -3016,8 +2966,8 @@ final class CourseRepository
 
         $this->db->executeStatement(
             'INSERT INTO course_results
-             (enrolment_id,module_percentage,final_percentage,overall_percentage,grade_code,passed,calculated_at,seed_token)
-             VALUES (:enrolment_id,:module_percentage,:final_percentage,:overall_percentage,:grade_code,:passed,:calculated_at,:seed_token::uuid)
+             (enrolment_id,module_percentage,final_percentage,overall_percentage,grade_code,passed,calculated_at)
+             VALUES (:enrolment_id,:module_percentage,:final_percentage,:overall_percentage,:grade_code,:passed,:calculated_at)
              ON CONFLICT (enrolment_id) DO UPDATE SET
                module_percentage=EXCLUDED.module_percentage,final_percentage=EXCLUDED.final_percentage,
                overall_percentage=EXCLUDED.overall_percentage,grade_code=EXCLUDED.grade_code,
@@ -3026,7 +2976,6 @@ final class CourseRepository
                 'enrolment_id' => $enrolmentId, 'module_percentage' => $modulePercentage,
                 'final_percentage' => $finalPercentage, 'overall_percentage' => $overallPercentage,
                 'grade_code' => $gradeCode, 'passed' => $passed, 'calculated_at' => $now,
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
             ]
         );
 
@@ -3138,11 +3087,11 @@ final class CourseRepository
 
         $this->db->executeStatement(
             'INSERT INTO certificates
-                 (public_id,seed_token,enrolment_id,certificate_number,learner_name,certificate_title,
+                 (public_id,enrolment_id,certificate_number,learner_name,certificate_title,
                   course_title,grade_code,overall_percentage,certificate_template,certificate_body_text,
                   certificate_footer_text,certificate_signatory_name,certificate_signatory_title,
                   issued_at,template_html_snapshot,template_css_snapshot,rendered_html)
-             VALUES (:public_id,:seed_token,:enrolment_id,:certificate_number,:learner_name,:certificate_title,
+             VALUES (:public_id,:enrolment_id,:certificate_number,:learner_name,:certificate_title,
                      :course_title,:grade_code,:overall_percentage,:certificate_template,:body_text,
                      :footer_text,:signatory_name,:signatory_title,
                      :issued_at,:template_html,:template_css,:rendered_html)
@@ -3160,7 +3109,6 @@ final class CourseRepository
                  rendered_html=EXCLUDED.rendered_html,revoked_at=NULL,revocation_reason=NULL',
             [
                 'public_id' => $publicId,
-                'seed_token' => $this->provenance->fromEnrolment($enrolmentId),
                 'certificate_number' => $certificateNumber,
                 'learner_name' => $learnerName,
                 'certificate_title' => $certificateTitle,
@@ -3318,13 +3266,13 @@ final class CourseRepository
      *
      * @return list<array<string,mixed>>
      */
-    public function manageableCourses(int $userId, DataUniverse $universe, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
+    public function manageableCourses(int $userId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
         $order = self::orderFor($sort, self::ADMIN_COURSE_SORTS, self::ADMIN_COURSE_ORDER, 'c.id');
         [$match, $bindings] = self::andTitleSearch($search);
 
         $keys = "SELECT c.id FROM courses c WHERE (" . self::MANAGEABLE_COURSES_WHERE . ")"
-            . self::andScope($universe, 'c') . $match;
+            . '' . $match;
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             PageQuery::deferred($keys, self::courseAdministrationDetail(), $order, $limit, $offset),
@@ -3333,10 +3281,10 @@ final class CourseRepository
     }
 
     /** Total courses this person may manage; every join in the row query is a LEFT join, so membership is the WHERE clause alone. */
-    public function manageableCoursesCount(int $userId, DataUniverse $universe, string $search = ''): int
+    public function manageableCoursesCount(int $userId, string $search = ''): int
     {
         $rows = $this->db->fetchAllAssociative(
-            "SELECT COUNT(*)::int AS total FROM courses c WHERE (" . self::MANAGEABLE_COURSES_WHERE . ")" . self::andScope($universe, 'c') . self::andTitleSearch($search)[0],
+            "SELECT COUNT(*)::int AS total FROM courses c WHERE (" . self::MANAGEABLE_COURSES_WHERE . ")" . '' . self::andTitleSearch($search)[0],
             ['user_id' => $userId] + self::andTitleSearch($search)[1]
         );
 
@@ -3380,15 +3328,14 @@ final class CourseRepository
         );
         foreach ($userIds as $userId) {
             $this->db->executeStatement(
-                'INSERT INTO course_editors (course_id,user_id,assigned_by_user_id,created_at,seed_token)
-                 VALUES (:course_id,:user_id,:actor_user_id,NOW(),:seed_token::uuid)
+                'INSERT INTO course_editors (course_id,user_id,assigned_by_user_id,created_at)
+                 VALUES (:course_id,:user_id,:actor_user_id,NOW())
                  ON CONFLICT (course_id,user_id) DO UPDATE SET assigned_by_user_id=EXCLUDED.assigned_by_user_id',
                 [
                     'course_id' => $courseId,
                     'user_id' => $userId,
                     'actor_user_id' => $actorUserId,
                     // Editor and course must share a universe; the assigning actor need not.
-                    'seed_token' => $this->provenance->forPair('courses', $courseId, 'users', $userId),
                 ]
             );
         }

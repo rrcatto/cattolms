@@ -33,7 +33,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 
@@ -41,7 +40,6 @@ final class CompanyRepository
 {
     public function __construct(
         private readonly Database $db,
-        private readonly SeedProvenance $provenance,
         // Same namespace, so no import: membership changes more than one row and must not be
         // separable by a failure between the statements.
         private readonly TransactionManager $transactions
@@ -57,13 +55,12 @@ final class CompanyRepository
         // universe its owner does, so a SEED company administrator registers a SEED company.
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO companies
-                (public_id, seed_token, name, domain, status, created_by_user_id, created_at, updated_at)
+                (public_id, name, domain, status, created_by_user_id, created_at, updated_at)
              VALUES
-                (:public_id, :seed_token, :name, :domain, :status, :created_by_user_id, :created_at, :updated_at)
+                (:public_id, :name, :domain, :status, :created_by_user_id, :created_at, :updated_at)
              RETURNING id',
             [
                 'public_id' => Uuid::v4(),
-                'seed_token' => $this->provenance->fromUser($ownerUserId),
                 'name' => $name,
                 'domain' => $domain,
                 'status' => 'active',
@@ -79,8 +76,8 @@ final class CompanyRepository
         }
 
         $this->db->executeStatement(
-            "INSERT INTO company_users (company_id,user_id,company_role,status,created_at,seed_token)
-             VALUES (:company_id,:user_id,'owner','active',:created_at,:seed_token::uuid)
+            "INSERT INTO company_users (company_id,user_id,company_role,status,created_at)
+             VALUES (:company_id,:user_id,'owner','active',:created_at)
              ON CONFLICT (company_id,user_id) DO UPDATE
              SET company_role=EXCLUDED.company_role,status='active'",
             [
@@ -89,7 +86,6 @@ final class CompanyRepository
                 'created_at' => $now,
                 // A membership belongs to both parents at once, so a mismatch is refused here
                 // with both sides named rather than left to the trigger's column-level message.
-                'seed_token' => $this->provenance->forPair('companies', $companyId, 'users', $ownerUserId),
             ]
         );
 
@@ -124,16 +120,6 @@ final class CompanyRepository
         return $rows[0] ?? null;
     }
 
-    /**
-     * The universe one company belongs to, for callers deciding what to create alongside it.
-     *
-     * Exposed here rather than making every service reach for SeedProvenance directly, so the
-     * question "which universe is this company in" has one answer.
-     */
-    public function seedTokenFor(int $companyId): ?string
-    {
-        return $this->provenance->fromCompany($companyId);
-    }
 
     public function domainExists(string $domain): bool
     {
@@ -172,25 +158,21 @@ final class CompanyRepository
     }
 
     /**
-     * The System Company for one universe.
-     *
-     * There is one per universe (decision D1), so this must be asked which one it means rather
-     * than returning whichever row happens to be found first.
+     * The System Company.
      *
      * @return array<string,mixed>|null
      */
-    public function systemCompany(DataUniverse $universe): ?array
+    public function systemCompany(): ?array
     {
         $row = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE is_system = TRUE AND '
-                . ($universe->predicate('') ?? 'seed_token IS NULL') . ' LIMIT 1'
+            'SELECT * FROM companies WHERE is_system = TRUE LIMIT 1'
         );
 
         return $row === false ? null : $row;
     }
 
     /**
-     * The System Company for a universe, created if a genuine bootstrap needs it.
+     * The System Company, created if a genuine bootstrap needs it.
      *
      * This *resolves and bootstraps*. It deliberately no longer assigns the caller to the company
      * it returns, because that conflated three separate things and produced a defect that took a
@@ -205,27 +187,24 @@ final class CompanyRepository
      *
      * @return array<string,mixed>
      */
-    public function ensureSystemCompany(int $actorUserId, DataUniverse $universe, string $name, string $domain): array
+    public function ensureSystemCompany(int $actorUserId, string $name, string $domain): array
     {
-        // There is one System Company per universe (decision D1). The SEED one is created by the
-        // baseline with the reserved infrastructure token and is never created on demand here,
-        // so a SEED context resolves the existing row rather than risking a second one.
-        $systemScope = $universe->predicate('') ?? 'seed_token IS NULL';
+        // There is one System Company.
         $configuredDomain = strtolower(trim($domain));
         $configuredDomain = ltrim($configuredDomain !== '' ? $configuredDomain : 'local', '.');
 
         $existing = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE is_system = TRUE AND ' . $systemScope . ' LIMIT 1'
+            'SELECT * FROM companies WHERE is_system = TRUE LIMIT 1'
         );
 
         if ($existing === false) {
-            // No System Company in this universe yet. Adopt an existing company on the configured
+            // No System Company yet. Adopt an existing company on the configured
             // domain if there is one - preferring a company the actor already belongs to - rather
             // than creating a second organisation alongside it.
             $adopt = $this->db->fetchAssociative(
                 "SELECT c.id FROM companies c
                  LEFT JOIN company_users cu ON cu.company_id=c.id AND cu.user_id=:user_id AND cu.status='active'
-                 WHERE c.status='active' AND lower(c.domain)=:domain AND c." . $systemScope . "
+                 WHERE c.status='active' AND lower(c.domain)=:domain
                  ORDER BY (cu.user_id IS NOT NULL) DESC, c.created_at ASC
                  LIMIT 1",
                 ['user_id' => $actorUserId, 'domain' => $configuredDomain]
@@ -256,7 +235,7 @@ final class CompanyRepository
                     // created by the seed generator with its reserved infrastructure token and is
                     // never created on demand.
                     'INSERT INTO companies
-                        (public_id, seed_token, name, domain, status, is_system, company_type,
+                        (public_id, name, domain, status, is_system, company_type,
                          created_by_user_id, created_at, updated_at)
                      VALUES
                         (:public_id, NULL, :name, :domain, :status, TRUE, :company_type,
@@ -291,27 +270,16 @@ final class CompanyRepository
         return $this->findById($companyId) ?? throw new RuntimeException('System Company could not be loaded.');
     }
 
-    public function assignUnassignedUsersToSystemCompany(int $companyId, DataUniverse $universe): int
+    public function assignUnassignedUsersToSystemCompany(int $companyId): int
     {
-        // This sweep runs on ordinary Administration page loads, so it is the single most
-        // dangerous unscoped write in the codebase once seed identities exist: it would attach
-        // every company-less SEED user to the REAL System Company, creating exactly the
-        // cross-universe company_users row the database now rejects. The rejection would then
-        // surface as a 500 on /admin/companies - the workspace that hosts the Seed section.
-        //
-        // Both halves are scoped: the users considered, and the company they are attached to.
-        // ALL is deliberately treated as REAL here, because a sweep is a write and a write must
-        // choose one universe rather than blend them.
-        $writeUniverse = $universe === DataUniverse::Seed ? DataUniverse::Seed : DataUniverse::Real;
-        $userScope = $writeUniverse->predicate('u');
-        $companyScope = $writeUniverse->predicate('c');
-
+        // This sweep runs on ordinary Administration page loads: every company-less active user
+        // is attached to the System Company.
         $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO company_users (company_id,user_id,company_role,status,created_at,seed_token)
-             SELECT c.id,u.id,\'student\',\'active\',NOW(),u.seed_token
+            'INSERT INTO company_users (company_id,user_id,company_role,status,created_at)
+             SELECT c.id,u.id,\'student\',\'active\',NOW()
              FROM users u
-             JOIN companies c ON c.id=:company_id AND ' . $companyScope . '
-             WHERE u.status=\'active\' AND ' . $userScope . ' AND NOT EXISTS (
+             JOIN companies c ON c.id=:company_id
+             WHERE u.status=\'active\' AND NOT EXISTS (
                  SELECT 1 FROM company_users cu WHERE cu.user_id=u.id AND cu.status=\'active\'
              )
              ON CONFLICT (company_id,user_id)
@@ -326,8 +294,7 @@ final class CompanyRepository
      * Makes the actor the owner of a System Company it has just bootstrapped.
      *
      * Split out of ensureSystemCompany() so the membership write is a deliberate act with a
-     * visible caller rather than a side effect of a lookup. Only same-universe pairs are ever
-     * offered here; a mismatch is refused by assignUser() below, as it should be.
+     * visible caller rather than a side effect of a lookup.
      */
     public function assignSystemCompanyOwner(int $companyId, int $actorUserId): void
     {
@@ -341,12 +308,11 @@ final class CompanyRepository
         // had already committed by the time a cross-universe pairing was refused - leaving the
         // user with no active company membership at all, on what was often a GET request. Doing
         // the validation up front makes the refusal a no-op rather than a partial write.
-        $seedToken = $this->provenance->forPair('companies', $companyId, 'users', $userId);
 
         // Both statements then move together. A user has one active company membership, so the
         // deactivation and the replacement are one change and must not be separable by a failure
         // between them.
-        $this->transactions->run(function () use ($companyId, $userId, $companyRole, $seedToken): void {
+        $this->transactions->run(function () use ($companyId, $userId, $companyRole): void {
             // A user has one active company membership. Composite-key tables are
             // updated with one statement rather than a mapper round trip.
             $this->db->executeStatement(
@@ -355,15 +321,14 @@ final class CompanyRepository
                 ['user_id' => $userId, 'company_id' => $companyId]
             );
             $this->db->executeStatement(
-                "INSERT INTO company_users (company_id,user_id,company_role,status,created_at,seed_token)
-                 VALUES (:company_id,:user_id,:company_role,'active',NOW(),:seed_token::uuid)
+                "INSERT INTO company_users (company_id,user_id,company_role,status,created_at)
+                 VALUES (:company_id,:user_id,:company_role,'active',NOW())
                  ON CONFLICT (company_id,user_id) DO UPDATE
                  SET company_role=EXCLUDED.company_role,status='active'",
                 [
                     'company_id' => $companyId,
                     'user_id' => $userId,
                     'company_role' => $companyRole,
-                    'seed_token' => $seedToken,
                 ]
             );
         });
@@ -378,7 +343,7 @@ final class CompanyRepository
             // is REAL by definition - there is no parent row to inherit provenance from - and
             // writing NULL explicitly records that decision where the guard can see it.
             'INSERT INTO companies
-                (public_id, seed_token, name, domain, status, is_system, company_type,
+                (public_id, name, domain, status, is_system, company_type,
                  created_by_user_id, created_at, updated_at)
              VALUES
                 (:public_id, NULL, :name, :domain, :status, FALSE, :company_type,

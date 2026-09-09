@@ -30,8 +30,7 @@ use CattoLearning\Support\ClientFingerprint;
 final class AuditRepository
 {
     public function __construct(
-        private readonly Database $db,
-        private readonly SeedProvenance $provenance
+        private readonly Database $db
     ) {
     }
 
@@ -43,10 +42,9 @@ final class AuditRepository
         // exactly the accountability the decision D4 allowlist exists to preserve.
         $ipAddress = ClientFingerprint::ipAddress();
         $this->db->executeStatement(
-            'INSERT INTO audit_log (seed_token, user_id, event_key, metadata, ip_address, created_at)
-             VALUES (:seed_token, :user_id, :event_key, :metadata, :ip_address, :created_at)',
+            'INSERT INTO audit_log ( user_id, event_key, metadata, ip_address, created_at)
+             VALUES ( :user_id, :event_key, :metadata, :ip_address, :created_at)',
             [
-                'seed_token' => $this->provenance->fromUser($userId),
                 'user_id' => $userId,
                 'event_key' => $event,
                 'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),

@@ -33,9 +33,6 @@ Changelog:
 		</p>
 	</div>
 </div>
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: activity_universe_counts} %}
-{% endif %}
 <form class="card activity-filters" action="/admin/activity" method="get">
 	<div class="form-grid">
 		<div class="field">
@@ -126,7 +123,7 @@ Changelog:
 			{% if activity_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the {{ preview_page_size }} most recent events.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/activity{{ universe_query }}">View all activity</a>
+					<a class="btn btn-soft btn-sm" href="/admin/activity">View all activity</a>
 				</div>
 			{% endif %}
 		{% endif %}

@@ -40,12 +40,12 @@ Changelog:
 			<nav class="cl-course-crumbs" aria-label="Category">
 				{% for step in course.category_path %}
 					{% if not loop.first %}<span class="cl-course-crumb-sep" aria-hidden="true">/</span>{% endif %}
-					<a href="/courses?open={{ step.slug }}{{ universe_amp|default('') }}#category-{{ step.slug }}">{{ step.name }}</a>
+					<a href="/courses?open={{ step.slug }}#category-{{ step.slug }}">{{ step.name }}</a>
 				{% endfor %}
 			</nav>
 		{% endif %}
 		<h3 class="cl-course-card-title">
-			<a href="/courses/{{ course.slug }}{{ universe_query|default('') }}">{{ course.title }}</a>
+			<a href="/courses/{{ course.slug }}">{{ course.title }}</a>
 		</h3>
 		{% if course.summary %}
 			<p class="cl-course-card-summary">
@@ -55,7 +55,7 @@ Changelog:
 		{% if course.tags is defined and course.tags %}
 			<div class="cl-course-card-tags">
 				{% for course_tag in course.tags|slice(0, 4) %}
-					<a class="cl-tag-chip" href="/courses/tag/{{ course_tag.slug }}{{ universe_query|default('') }}">{{ course_tag.name }}</a>
+					<a class="cl-tag-chip" href="/courses/tag/{{ course_tag.slug }}">{{ course_tag.name }}</a>
 				{% endfor %}
 			</div>
 		{% endif %}
@@ -103,7 +103,7 @@ Changelog:
 					</button>
 				</form>
 			{% endif %}
-			<a class="btn btn-primary btn-sm" href="/courses/{{ course.slug }}{{ universe_query|default('') }}">View course</a>
+			<a class="btn btn-primary btn-sm" href="/courses/{{ course.slug }}">View course</a>
 		</div>
 	</div>
 </article>

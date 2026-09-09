@@ -60,8 +60,8 @@ final class HomeController extends BaseController
     {
         $this->render('home', [
             'title' => 'Practical self-study courses',
-            'featured_courses' => $this->courses->featuredCourses($this->universe(), 6),
-            'published_course_count' => $this->courses->catalogueCount($this->universe(), CatalogueFilter::none()),
+            'featured_courses' => $this->courses->featuredCourses(6),
+            'published_course_count' => $this->courses->catalogueCount(CatalogueFilter::none()),
         ]);
     }
 

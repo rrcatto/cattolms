@@ -35,7 +35,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Infrastructure\Persistence;
 
-use CattoLearning\Auth\DataUniverse;
 
 final class EntityLookupRepository
 {
@@ -69,7 +68,7 @@ final class EntityLookupRepository
      *
      * @return list<array{id:int,label:string,detail:string}>
      */
-    public function search(string $type, DataUniverse $universe, string $query, int $companyId = 0): array
+    public function search(string $type, string $query, int $companyId = 0): array
     {
         $query = trim($query);
         if (!self::isSupportedType($type) || mb_strlen($query) < self::MIN_QUERY_LENGTH) return [];
@@ -78,10 +77,10 @@ final class EntityLookupRepository
         $term = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_substr($query, 0, self::MAX_QUERY_LENGTH)) . '%';
 
         return match ($type) {
-            'people' => $this->searchPeople($term, $companyId, $universe),
-            'companies' => $this->searchCompanies($term, $universe),
-            'courses' => $this->searchCourses($term, $companyId, $universe),
-            'assignable_courses' => $this->searchAssignableCourses($term, $companyId, $universe),
+            'people' => $this->searchPeople($term, $companyId),
+            'companies' => $this->searchCompanies($term),
+            'courses' => $this->searchCourses($term, $companyId),
+            'assignable_courses' => $this->searchAssignableCourses($term, $companyId),
             default => [],
         };
     }
@@ -92,15 +91,15 @@ final class EntityLookupRepository
      *
      * @return array{id:int,label:string,detail:string}|null
      */
-    public function describe(string $type, DataUniverse $universe, int $id, int $companyId = 0): ?array
+    public function describe(string $type, int $id, int $companyId = 0): ?array
     {
         if (!self::isSupportedType($type) || $id <= 0) return null;
 
         // Applied in SQL rather than by discarding a fetched row: a direct id lookup that
         // fetches first and filters afterwards still confirms the row exists, which is enough
         // to probe for the presence of data in the other universe.
-        $scope = self::andScope($universe, 'u');
-        $companyScope = self::andScope($universe, 'c');
+        $scope = '';
+        $companyScope = '';
 
         $rows = match ($type) {
             'people' => $this->db->fetchAllAssociative(
@@ -132,7 +131,7 @@ final class EntityLookupRepository
     }
 
     /** @return list<array{id:int,label:string,detail:string}> */
-    private function searchPeople(string $term, int $companyId, DataUniverse $universe): array
+    private function searchPeople(string $term, int $companyId): array
     {
         return $this->rows($this->db->fetchAllAssociative(
             'SELECT DISTINCT u.id,
@@ -145,7 +144,7 @@ final class EntityLookupRepository
                AND (
                    COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,\'\') ILIKE :term
                    OR ue.email ILIKE :term
-               )' . self::andScope($universe, 'u') . '
+               )' . '' . '
              ORDER BY label, u.id
              LIMIT ' . self::MAX_RESULTS,
             ['term' => $term, 'company_id' => $companyId]
@@ -153,12 +152,12 @@ final class EntityLookupRepository
     }
 
     /** @return list<array{id:int,label:string,detail:string}> */
-    private function searchCompanies(string $term, DataUniverse $universe): array
+    private function searchCompanies(string $term): array
     {
         return $this->rows($this->db->fetchAllAssociative(
             'SELECT c.id, c.name AS label, c.domain AS detail
              FROM companies c
-             WHERE (c.name ILIKE :term OR c.domain ILIKE :term)' . self::andScope($universe, 'c') . '
+             WHERE (c.name ILIKE :term OR c.domain ILIKE :term)' . '' . '
              ORDER BY c.is_system DESC, c.name, c.id
              LIMIT ' . self::MAX_RESULTS,
             ['term' => $term]
@@ -166,13 +165,13 @@ final class EntityLookupRepository
     }
 
     /** @return list<array{id:int,label:string,detail:string}> */
-    private function searchCourses(string $term, int $companyId, DataUniverse $universe): array
+    private function searchCourses(string $term, int $companyId): array
     {
         return $this->rows($this->db->fetchAllAssociative(
             'SELECT c.id, c.title AS label, c.slug AS detail
              FROM courses c
              WHERE (:company_id=0 OR c.owner_company_id=:company_id)
-               AND (c.title ILIKE :term OR c.slug ILIKE :term)' . self::andScope($universe, 'c') . '
+               AND (c.title ILIKE :term OR c.slug ILIKE :term)' . '' . '
              ORDER BY c.title, c.id
              LIMIT ' . self::MAX_RESULTS,
             ['term' => $term, 'company_id' => $companyId]
@@ -193,7 +192,7 @@ final class EntityLookupRepository
      *
      * @return list<array<string,mixed>>
      */
-    private function searchAssignableCourses(string $term, int $companyId, DataUniverse $universe): array
+    private function searchAssignableCourses(string $term, int $companyId): array
     {
         if ($companyId <= 0) {
             return [];
@@ -215,26 +214,13 @@ final class EntityLookupRepository
                                  WHERE cca.credit_id = cr.id AND cca.status IN ('assigned','consumed')
                            )
                     )
-               )" . self::andScope($universe, 'c') . "
+               )" . '' . "
              ORDER BY c.title, c.id
              LIMIT " . self::MAX_RESULTS,
             ['term' => $term, 'company_id' => $companyId]
         ));
     }
 
-    /**
-     * The universe predicate as an AND-fragment, or an empty string when unrestricted.
-     *
-     * Returned as text appended to an existing WHERE rather than bound as a parameter, because
-     * `IS NULL` / `IS NOT NULL` is structure, not a value. The fragment comes from DataUniverse
-     * and never from request input, so nothing untrusted reaches the SQL.
-     */
-    private static function andScope(DataUniverse $universe, string $alias): string
-    {
-        $predicate = $universe->predicate($alias);
-
-        return $predicate === null ? '' : ' AND ' . $predicate;
-    }
 
     /**
      * @param list<array<string,mixed>> $rows

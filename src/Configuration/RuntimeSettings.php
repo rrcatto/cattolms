@@ -54,16 +54,25 @@ final class RuntimeSettings
      * The domain matters more than it looks. It is both the displayed domain of the shared SEED
      * System Company row *and* the address seed mail is actually delivered to. If Settings wrote
      * only `companies.domain`, the displayed domain and the delivery domain would silently
-     * diverge, which is worse than not offering the field at all. `SeedMailRouter` is therefore
+     * diverge, which is worse than not offering the field at all. `GeneratedDomainRouter` is therefore
      * built from this value rather than from `Env` directly.
      */
-    private const SEED_COMPANY_NAME = 'seed_system_company_name';
-    private const SEED_COMPANY_DOMAIN = 'seed_system_company_domain';
 
     public function __construct(
         private readonly OptionRepository $options,
         private readonly SecretCipher $cipher
     ) {
+    }
+
+    /**
+     * The domain this installation answers on.
+     *
+     * Mail to any domain the platform invents is redirected here, so an operator receives it in
+     * one real inbox instead of it bouncing off a name that was never meant to resolve.
+     */
+    public function platformDomain(): string
+    {
+        return self::normaliseDomain(Env::string('APP_DOMAIN', 'local'));
     }
 
     public function platformName(): string
@@ -81,74 +90,12 @@ final class RuntimeSettings
         $this->options->delete('platform_name');
     }
 
-    /** The SEED System Company's display name: database override, then `.env`, then a default. */
-    public function seedSystemCompanyName(): string
-    {
-        $override = $this->options->find(self::SEED_COMPANY_NAME);
-        if ($override !== null && trim($override) !== '') {
-            return trim($override);
-        }
 
-        $configured = trim(Env::string('SEED_SYSTEM_COMPANY_NAME', ''));
 
-        return $configured !== '' ? $configured : 'SEED System Company';
-    }
 
-    /**
-     * The domain seed mail is delivered to, and the SEED System Company's own domain.
-     *
-     * An empty result is meaningful rather than an error: it disables the rewrite, and
-     * `SeedMailRouter` then leaves generated addresses on their `.seed.invalid` domains where they
-     * bounce instead of reaching a stranger. That is the correct behaviour for an installation
-     * that never signs in as a generated identity.
-     */
-    public function seedSystemCompanyDomain(): string
-    {
-        $override = $this->options->find(self::SEED_COMPANY_DOMAIN);
-        if ($override !== null) {
-            return self::normaliseDomain($override);
-        }
 
-        return self::normaliseDomain(Env::string('SEED_SYSTEM_COMPANY_DOMAIN', ''));
-    }
 
-    public function seedSystemCompanyDomainSource(): string
-    {
-        return $this->options->find(self::SEED_COMPANY_DOMAIN) !== null ? 'database' : 'environment';
-    }
 
-    public function seedSystemCompanyNameSource(): string
-    {
-        $override = $this->options->find(self::SEED_COMPANY_NAME);
-
-        return $override !== null && trim($override) !== '' ? 'database' : 'environment';
-    }
-
-    /**
-     * Records the administrator's SEED System Company overrides.
-     *
-     * Storage only. Every legality check - the domain differing from APP_DOMAIN, uniqueness across
-     * `companies`, and the company row itself - belongs to the caller, which performs them before
-     * anything is written. See PlatformAdministrationService::saveSeedSystemCompany().
-     */
-    public function saveSeedSystemCompany(string $name, string $domain, int $actorUserId): void
-    {
-        $this->options->set(self::SEED_COMPANY_NAME, trim($name), $actorUserId);
-        $this->options->set(self::SEED_COMPANY_DOMAIN, self::normaliseDomain($domain), $actorUserId);
-    }
-
-    /** Returns both settings to their `.env` deployment defaults. */
-    public function resetSeedSystemCompany(): void
-    {
-        $this->options->delete(self::SEED_COMPANY_NAME);
-        $this->options->delete(self::SEED_COMPANY_DOMAIN);
-    }
-
-    public function hasSeedSystemCompanyOverride(): bool
-    {
-        return $this->options->find(self::SEED_COMPANY_NAME) !== null
-            || $this->options->find(self::SEED_COMPANY_DOMAIN) !== null;
-    }
 
     /**
      * One spelling of a domain.

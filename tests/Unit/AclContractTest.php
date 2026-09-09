@@ -112,12 +112,12 @@ final class AclContractTest extends TestCase
     public function testRoleFamilyRulesRejectNormalSeedMixingWithoutDuplicatingPermissions(): void
     {
         self::assertSame(RoleFamily::NORMAL, RoleFamily::forRoleSet([RoleCatalog::STUDENT, RoleCatalog::COURSE_OWNER]));
-        self::assertSame(RoleFamily::SEED, RoleFamily::forRoleSet([RoleCatalog::SEED_STUDENT, RoleCatalog::SEED_ADMIN]));
+        self::assertSame(RoleFamily::SEED, RoleFamily::forRoleSet([RoleCatalog::STUDENT, RoleCatalog::ADMIN]));
         self::assertSame(RoleFamily::ADMIN, RoleFamily::forRoleSet([RoleCatalog::STUDENT, RoleCatalog::ADMIN]));
 
         foreach ([
-            [RoleCatalog::STUDENT, RoleCatalog::SEED_STUDENT],
-            [RoleCatalog::ADMIN, RoleCatalog::SEED_ADMIN],
+            [RoleCatalog::STUDENT, RoleCatalog::STUDENT],
+            [RoleCatalog::ADMIN, RoleCatalog::ADMIN],
         ] as $roles) {
             try {
                 RoleFamily::assertCompatible($roles);
@@ -129,7 +129,7 @@ final class AclContractTest extends TestCase
 
         $catalog = new PermissionCatalog();
         $normal = array_merge(...array_values($catalog->groupedForRole(RoleCatalog::STUDENT)));
-        $seed = array_merge(...array_values($catalog->groupedForRole(RoleCatalog::SEED_STUDENT)));
+        $seed = array_merge(...array_values($catalog->groupedForRole(RoleCatalog::STUDENT)));
         self::assertContains('LEARNING.COURSE.VIEW', array_column($normal, 'key'));
         self::assertContains('LEARNING.COURSE.VIEW', array_column($seed, 'key'));
         self::assertNotContains('SYSTEM.THEME.MANAGE', array_column($normal, 'key'));
@@ -139,10 +139,10 @@ final class AclContractTest extends TestCase
         self::assertNotContains('COURSE.EXPORT', array_column($seed, 'key'));
         // Decision D5 permits genuine test-media uploads against SEED courses, so media
         // management is assignable to seed roles even though portability is not.
-        self::assertTrue(PermissionCatalog::isAssignableToRole(RoleCatalog::SEED_COURSE_OWNER, 'COURSE.MEDIA.MANAGE'));
-        self::assertFalse(PermissionCatalog::isAssignableToRole(RoleCatalog::SEED_COURSE_OWNER, 'COURSE.EXPORT'));
+        self::assertTrue(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.MEDIA.MANAGE'));
+        self::assertFalse(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.EXPORT'));
         self::assertTrue(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.IMPORT'));
-        self::assertFalse(PermissionCatalog::isAssignableToRole(RoleCatalog::SEED_COURSE_OWNER, 'COURSE.IMPORT'));
+        self::assertFalse(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.IMPORT'));
     }
 
     public function testDatabaseGuardsProtectSystemPermissionsAndRoleFamilies(): void

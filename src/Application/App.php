@@ -70,7 +70,6 @@ use CattoLearning\Http\Controller\CourseController;
 use CattoLearning\Http\Controller\ContactController;
 use CattoLearning\Http\Controller\AdminCourseController;
 use CattoLearning\Http\Controller\AdminLookupController;
-use CattoLearning\Http\Controller\AdminSeedController;
 use CattoLearning\Http\Controller\AdminCourseCategoryController;
 use CattoLearning\Http\Controller\AdminCourseTagController;
 use CattoLearning\Http\Controller\LearningController;
@@ -261,11 +260,10 @@ final class App
         $routes->add('GET /admin/reports/companies', AdminController::class, 'companyReport');
         $routes->add('GET /admin/themes', AdminController::class, 'themes');
         $routes->add('GET /admin/settings', AdminController::class, 'settings');
-        $routes->add('GET /admin/seed', AdminSeedController::class, 'index');
-        $routes->add('POST /admin/seed/generate', AdminSeedController::class, 'generate');
-        $routes->add('GET /admin/seed/@token', AdminSeedController::class, 'detail');
-        $routes->add('GET /admin/seed/@token/cleanup', AdminSeedController::class, 'cleanupPreview');
-        $routes->add('POST /admin/seed/@token/cleanup', AdminSeedController::class, 'cleanup');
+
+
+
+
         $routes->add('GET /admin/roles', AdminController::class, 'roles');
         $routes->add('GET /admin/roles/@id', AdminController::class, 'role');
         $routes->add('POST /admin/roles', AdminController::class, 'createRole');
@@ -297,8 +295,7 @@ final class App
         $routes->add('POST /admin/settings/mail/password', AdminController::class, 'mailPassword');
         $routes->add('POST /admin/settings/mail', AdminController::class, 'saveMailSettings');
         $routes->add('POST /admin/settings/mail/reset', AdminController::class, 'resetMailSettings');
-        $routes->add('POST /admin/settings/seed-company', AdminController::class, 'saveSeedSystemCompany');
-        $routes->add('POST /admin/settings/seed-company/reset', AdminController::class, 'resetSeedSystemCompany');
+
         $routes->add('POST /admin/themes/activate', AdminController::class, 'activateTheme');
         $routes->add('POST /admin/themes/resync', AdminController::class, 'resyncThemes');
         $routes->add('POST /admin/database/prune', AdminController::class, 'pruneDatabase');
@@ -415,8 +412,8 @@ final class App
                     'is_authenticated' => $currentUser !== null,
                     'is_platform_admin' => $currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false,
                     'is_company_admin' => $currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false,
-                    'is_course_owner' => $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_OWNER) || $currentUser->hasRole(RoleCatalog::SEED_COURSE_OWNER)),
-                    'is_course_editor' => $currentUser !== null && ($currentUser->hasRole(RoleCatalog::COURSE_EDITOR) || $currentUser->hasRole(RoleCatalog::SEED_COURSE_EDITOR)),
+                    'is_course_owner' => $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_OWNER),
+                    'is_course_editor' => $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_EDITOR),
                     'permissions' => $currentUser !== null ? $currentUser->permissions : [],
                     'role_keys' => $currentUser !== null ? $currentUser->roles : [],
                     'user_email' => $currentUser !== null ? $currentUser->primaryEmail : '',

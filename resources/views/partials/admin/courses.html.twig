@@ -44,9 +44,6 @@ Changelog:
 		<a class="btn btn-primary btn-sm" href="/admin/courses/new">Create course</a>
 	</div>
 </div>
-{% if universe_switch %}
-	{% include '@platform/partials/universe-switch.html.twig' with {us: universe_switch, ct: courses_universe_counts} %}
-{% endif %}
 <div id="courses-region" data-server-search-target>
 	<div id="courses-results">
 		{% if courses_pagination %}
@@ -132,7 +129,7 @@ Changelog:
 				{% if courses_preview_has_more %}
 					<div class="pagination-row">
 						<span class="pagination-summary">Showing the first {{ preview_page_size }} courses.</span>
-						<a class="btn btn-soft btn-sm" href="/admin/courses{{ universe_query }}">View all courses</a>
+						<a class="btn btn-soft btn-sm" href="/admin/courses">View all courses</a>
 					</div>
 				{% endif %}
 			{% endif %}
