@@ -47,7 +47,14 @@ Changelog:
 
 {% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base} %}
 
-{% if browse_tags %}
+{#
+	A tag is offered only where choosing it would return something, or where it is already chosen -
+	so the facet has to be built before it is headed. Guarding the heading on browse_tags and the
+	chips on their own counts printed a Tags heading above an empty rail whenever every tag in the
+	branch held nothing, which is the state a new catalogue starts in.
+#}
+{% set rail_tags = browse_tags|filter(rail_tag => rail_tag.course_count > 0 or rail_tag.is_selected) %}
+{% if rail_tags is not empty %}
 	<div class="cl-facet section">
 		<div class="cl-facet-head">
 			<span class="cl-facet-label">Tags</span>
@@ -56,14 +63,12 @@ Changelog:
 			{% endif %}
 		</div>
 		<div class="cl-category-rail" aria-label="Narrow by tag">
-			{% for rail_tag in browse_tags %}
-				{% if rail_tag.course_count > 0 or rail_tag.is_selected %}
-					<a class="cl-tag-chip {{ rail_tag.is_selected ? 'is-selected' : '' }}" href="{{ rail_tag.href }}"
-					   aria-pressed="{{ rail_tag.is_selected ? 'true' : 'false' }}">
-						<span>{{ rail_tag.name }}</span>
-						<span class="cl-category-count">{{ rail_tag.course_count }}</span>
-					</a>
-				{% endif %}
+			{% for rail_tag in rail_tags %}
+				<a class="cl-tag-chip {{ rail_tag.is_selected ? 'is-selected' : '' }}" href="{{ rail_tag.href }}"
+				   aria-pressed="{{ rail_tag.is_selected ? 'true' : 'false' }}">
+					<span>{{ rail_tag.name }}</span>
+					<span class="cl-category-count">{{ rail_tag.course_count }}</span>
+				</a>
 			{% endfor %}
 		</div>
 	</div>
