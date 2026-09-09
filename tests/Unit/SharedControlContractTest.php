@@ -83,7 +83,7 @@ final class SharedControlContractTest extends TestCase
      * mental model covers every list. The picker had a select naming All, Real and Seed, which is
      * both a second control and a second vocabulary for the same idea.
      */
-    public function testTheDataUniverseIsNeverASelectElement(): void
+    public function testAFilterIsNeverASelectElement(): void
     {
         $offenders = [];
 
@@ -134,21 +134,6 @@ final class SharedControlContractTest extends TestCase
         self::assertSame([], $offenders, implode("\n  ", $offenders));
     }
 
-    /**
-     * The shared control renders when a caller has not supplied a scope at all.
-     *
-     * An absent hive key is an undefined variable, and F3 turns that into a 500 for the whole page
-     * rather than an empty value. That is how /account and /account/library began failing the
-     * moment the Course Library started using this control.
-     */
-    public function testTheSearchControlToleratesAnAbsentUniverse(): void
-    {
-        self::assertStringContainsString(
-            'universe is defined',
-            (string) file_get_contents(dirname(__DIR__, 2) . '/' . self::SEARCH_CONTROL),
-            'The shared search control must not read a scope key that a caller may not have set.'
-        );
-    }
 
     /**
      * Every page and partial template, keyed by repository-relative path.

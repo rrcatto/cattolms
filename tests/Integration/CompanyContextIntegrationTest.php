@@ -43,14 +43,13 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
-use CattoLearning\Tests\Support\SeedIntegrationFixture;
+use CattoLearning\Tests\Support\IntegrationDataFixture;
 use DI\Container;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -64,7 +63,7 @@ final class CompanyContextIntegrationTest extends TestCase
 
     private Container $container;
     private Database $db;
-    private SeedIntegrationFixture $fixture;
+    private IntegrationDataFixture $fixture;
     private SelectedCompanyContext $context;
     private PlatformAdministrationService $administration;
 
@@ -74,16 +73,11 @@ final class CompanyContextIntegrationTest extends TestCase
     /** @var array{a:int,b:int} REAL companies */
     private array $real = ['a' => 0, 'b' => 0];
 
-    /** @var array{a:int,b:int} SEED companies */
-    private array $seed = ['a' => 0, 'b' => 0];
-
-    private string $seedToken = '';
-
     protected function setUp(): void
     {
         $this->container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
-        $this->fixture = new SeedIntegrationFixture($this->db);
+        $this->fixture = new IntegrationDataFixture($this->db);
 
         /** @var SelectedCompanyContext $context */
         $context = $this->container->get(SelectedCompanyContext::class);
@@ -97,27 +91,19 @@ final class CompanyContextIntegrationTest extends TestCase
         $_SESSION = [];
 
         $suffix = $this->fixture->suffix();
-        $this->seedToken = $this->fixture->reserveToken();
 
         $this->adminUserId = $this->fixture->createUser('Platform administrator', 'admin-' . $suffix . '@admin-' . $suffix . '.test');
 
-        // Two companies per universe, each genuinely populated.
-        $this->real['a'] = $this->fixture->createCompany($this->adminUserId, 'Real Alpha ' . $suffix, 'real-a-' . $suffix . '.test');
-        $this->real['b'] = $this->fixture->createCompany($this->adminUserId, 'Real Beta ' . $suffix, 'real-b-' . $suffix . '.test');
-        $this->seed['a'] = $this->fixture->createCompany($this->adminUserId, 'Seed Alpha ' . $suffix, 'seed-a-' . $suffix . '.test', $this->seedToken);
-        $this->seed['b'] = $this->fixture->createCompany($this->adminUserId, 'Seed Beta ' . $suffix, 'seed-b-' . $suffix . '.test', $this->seedToken);
+        // Two companies, each genuinely populated, so "only A" is a real claim.
+        $this->real['a'] = $this->fixture->createCompany($this->adminUserId, 'Alpha ' . $suffix, 'a-' . $suffix . '.test');
+        $this->real['b'] = $this->fixture->createCompany($this->adminUserId, 'Beta ' . $suffix, 'b-' . $suffix . '.test');
 
-        // One distinguishable person in each, so "only A" is a real claim.
-        foreach (['real' => $this->real, 'seed' => $this->seed] as $universe => $companies) {
-            $token = $universe === 'seed' ? $this->seedToken : null;
-            foreach ($companies as $letter => $companyId) {
-                $person = $this->fixture->createUser(
-                    ucfirst($universe) . ' ' . $letter . ' person',
-                    $universe . '-' . $letter . '-person-' . $suffix . '@' . $universe . '-' . $letter . '-' . $suffix . '.test',
-                    $token
-                );
-                $this->fixture->addCompanyMember($companyId, $person, $token);
-            }
+        foreach ($this->real as $letter => $companyId) {
+            $person = $this->fixture->createUser(
+                strtoupper($letter) . ' person',
+                $letter . '-person-' . $suffix . '@' . $letter . '-' . $suffix . '.test'
+            );
+            $this->fixture->addCompanyMember($companyId, $person);
         }
 
         // A Company Administrator pinned to REAL company A.
@@ -125,7 +111,7 @@ final class CompanyContextIntegrationTest extends TestCase
             'Company administrator',
             'coadmin-' . $suffix . '@real-a-' . $suffix . '.test'
         );
-        $this->fixture->addCompanyMember($this->real['a'], $this->companyAdminUserId, null, 'administrator');
+        $this->fixture->addCompanyMember($this->real['a'], $this->companyAdminUserId, 'administrator');
     }
 
     protected function tearDown(): void
@@ -135,7 +121,7 @@ final class CompanyContextIntegrationTest extends TestCase
     }
 
     /** @param list<string> $permissions */
-    private function identity(int $userId, array $permissions, ?string $seedToken = null): CurrentUser
+    private function identity(int $userId, array $permissions): CurrentUser
     {
         return new CurrentUser(
             $userId,
@@ -145,7 +131,6 @@ final class CompanyContextIntegrationTest extends TestCase
             [],
             $permissions,
             Uuid::v4(),
-            $seedToken
         );
     }
 
@@ -176,15 +161,14 @@ final class CompanyContextIntegrationTest extends TestCase
      *
      * @return array<string,array<string,mixed>>
      */
-    private function allSections(CurrentUser $user, DataUniverse $universe): array
+    private function allSections(CurrentUser $user): array
     {
-        $context = $this->context->resolve($user, $universe);
+        $context = $this->context->resolve($user);
         $loaded = [];
         foreach (self::SECTIONS as $section) {
             $loaded[$section] = $this->administration->companySectionData(
                 $section,
                 $user->id,
-                $universe,
                 $context
             );
         }
@@ -201,9 +185,9 @@ final class CompanyContextIntegrationTest extends TestCase
      * act on - so every write from that state fell back to the actor's own membership. The
      * workspace now always resolves one concrete company.
      */
-    public function testTheRealSystemCompanyIsTheDefaultForAPlatformAdministrator(): void
+    public function testTheSystemCompanyIsTheDefaultForAPlatformAdministrator(): void
     {
-        $context = $this->context->resolve($this->platformAdmin(), DataUniverse::Real);
+        $context = $this->context->resolve($this->platformAdmin());
 
         self::assertSame('selected', $context['mode']);
         self::assertFalse($context['platform_wide']);
@@ -212,21 +196,20 @@ final class CompanyContextIntegrationTest extends TestCase
             in_array($context['company']['is_system'] ?? false, [true, 1, '1', 't', 'true'], true),
             'The default must be the System Company.'
         );
-        self::assertSame(DataUniverse::Real, $context['universe'], 'The default System Company is the REAL one.');
     }
 
     /** Selecting company A puts every section into company A. */
     public function testSelectingACompanyScopesEverySection(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
 
-        $context = $this->context->resolve($user, DataUniverse::Real);
+        $context = $this->context->resolve($user);
         self::assertSame('selected', $context['mode']);
         self::assertSame($this->real['a'], $context['company_id']);
         self::assertFalse($context['platform_wide']);
 
-        foreach ($this->allSections($user, DataUniverse::Real) as $section => $data) {
+        foreach ($this->allSections($user) as $section => $data) {
             self::assertSame(
                 $this->real['a'],
                 (int) $data['company']['id'],
@@ -241,20 +224,18 @@ final class CompanyContextIntegrationTest extends TestCase
     {
         $user = $this->platformAdmin();
 
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
         $peopleA = $this->administration->companySectionData(
             'people',
             $user->id,
-            DataUniverse::Real,
-            $this->context->resolve($user, DataUniverse::Real)
+            $this->context->resolve($user)
         );
 
-        $this->context->select($user, $this->real['b'], DataUniverse::Real);
+        $this->context->select($user, $this->real['b']);
         $peopleB = $this->administration->companySectionData(
             'people',
             $user->id,
-            DataUniverse::Real,
-            $this->context->resolve($user, DataUniverse::Real)
+            $this->context->resolve($user)
         );
 
         self::assertSame($this->real['a'], (int) $peopleA['company']['id']);
@@ -272,32 +253,16 @@ final class CompanyContextIntegrationTest extends TestCase
         );
     }
 
-    /** A platform administrator may deliberately administer a SEED company under a SEED scope. */
-    public function testASeedCompanyMayBeAdministeredInSeedScope(): void
-    {
-        $user = $this->platformAdmin();
-        $this->context->select($user, $this->seed['a'], DataUniverse::Seed);
 
-        $context = $this->context->resolve($user, DataUniverse::Seed);
-        self::assertSame('selected', $context['mode']);
-        self::assertSame($this->seed['a'], $context['company_id']);
-        self::assertSame(DataUniverse::Seed, $context['universe']);
-
-        // Every section loads without an exception - the original defect was a 500 here.
-        foreach ($this->allSections($user, DataUniverse::Seed) as $section => $data) {
-            self::assertSame($this->seed['a'], (int) $data['company']['id'], $section);
-        }
-    }
-
-    /** Administering a company - REAL or SEED - never creates membership. */
+    /** Administering a company never creates membership in it. */
     public function testAdministeringACompanyNeverCreatesMembership(): void
     {
         $user = $this->platformAdmin();
         $before = $this->membershipCount($this->adminUserId);
 
-        foreach ([[$this->real['a'], DataUniverse::Real], [$this->seed['a'], DataUniverse::Seed]] as [$companyId, $universe]) {
-            $this->context->select($user, $companyId, $universe);
-            $this->allSections($user, $universe);
+        foreach ([$this->real['a'], $this->real['b']] as $companyId) {
+            $this->context->select($user, $companyId);
+            $this->allSections($user);
         }
 
         self::assertSame(
@@ -309,92 +274,27 @@ final class CompanyContextIntegrationTest extends TestCase
             0,
             (int) $this->fixture->scalar(
                 'SELECT COUNT(*)::int AS value FROM company_users WHERE user_id = :id AND company_id = ANY(:ids)',
-                ['id' => $this->adminUserId, 'ids' => '{' . $this->seed['a'] . ',' . $this->seed['b'] . '}']
+                ['id' => $this->adminUserId, 'ids' => '{' . $this->real['a'] . ',' . $this->real['b'] . '}']
             ),
-            'A REAL administrator must never become a member of a SEED company.'
+            'Reading a company workspace must not enrol the administrator in it.'
         );
     }
 
-    /** The administrator stays a REAL identity no matter which universe they administer. */
-    public function testTheAdministratorRemainsARealIdentityThroughout(): void
-    {
-        $user = $this->platformAdmin();
-        $this->context->select($user, $this->seed['a'], DataUniverse::Seed);
-        $this->allSections($user, DataUniverse::Seed);
 
-        self::assertNull(
-            $this->fixture->scalar('SELECT seed_token AS value FROM users WHERE id = :id', ['id' => $this->adminUserId]),
-            'Administering seed data must not make the administrator a seed identity.'
-        );
-    }
 
-    // --- universe agreement --------------------------------------------------------------------
-
-    /**
-     * A SEED company can be selected whatever the request scope says, and the company decides.
-     *
-     * This replaced a test asserting the opposite. Refusing a mismatch was the defect: the Company
-     * workspace carries no universe parameter, so the request universe was always REAL and a SEED
-     * company could never be selected at all. The company row carries seed_token, which is the one
-     * source of truth, so there is no second opinion for it to disagree with.
-     */
-    public function testSelectingASeedCompanySetsTheSeedUniverseWhateverTheRequestScopeSays(): void
-    {
-        $user = $this->platformAdmin();
-
-        $this->context->select($user, $this->seed['a'], DataUniverse::Real);
-
-        $context = $this->context->resolve($user, DataUniverse::Real);
-        self::assertSame('selected', $context['mode']);
-        self::assertSame($this->seed['a'], $context['company_id']);
-        self::assertSame(DataUniverse::Seed, $context['universe'], 'The company determines the universe.');
-    }
-
-    /** A concrete company resolves to its own universe under every request scope. */
-    public function testACompanyAlwaysResolvesToItsOwnUniverse(): void
-    {
-        $user = $this->platformAdmin();
-
-        foreach ([DataUniverse::All, DataUniverse::Real, DataUniverse::Seed] as $requested) {
-            $this->context->select($user, $this->seed['b'], $requested);
-            self::assertSame(DataUniverse::Seed, $this->context->resolve($user, $requested)['universe']);
-
-            $this->context->select($user, $this->real['b'], $requested);
-            self::assertSame(DataUniverse::Real, $this->context->resolve($user, $requested)['universe']);
-        }
-    }
-
-    /**
-     * A SEED selection survives a request that resolves REAL.
-     *
-     * The regression this guards is precise: every /company request resolves the universe to REAL,
-     * so a selection that was re-validated against it was discarded on the very next page load and
-     * the administrator was dropped back to the default without explanation.
-     */
-    public function testASeedSelectionPersistsAcrossRequests(): void
-    {
-        $user = $this->platformAdmin();
-        $this->context->select($user, $this->seed['a'], DataUniverse::Seed);
-
-        for ($request = 0; $request < 3; $request++) {
-            $context = $this->context->resolve($user, DataUniverse::Real);
-            self::assertSame($this->seed['a'], $context['company_id'], 'The selection must persist until changed.');
-            self::assertSame(DataUniverse::Seed, $context['universe']);
-        }
-    }
 
     /** A disabled company stops being administrable and falls back to the default. */
     public function testADisabledCompanyIsDroppedFromTheContext(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
 
         $this->db->executeStatement(
             "UPDATE companies SET status = 'disabled' WHERE id = :id",
             ['id' => $this->real['a']]
         );
 
-        $context = $this->context->resolve($user, DataUniverse::Real);
+        $context = $this->context->resolve($user);
         self::assertNotSame($this->real['a'], $context['company_id'], 'A disabled company must not stay in context.');
         self::assertTrue(
             in_array($context['company']['is_system'] ?? false, [true, 1, '1', 't', 'true'], true),
@@ -412,7 +312,7 @@ final class CompanyContextIntegrationTest extends TestCase
         );
 
         $this->expectException(InvalidArgumentException::class);
-        $this->context->select($user, $this->real['b'], DataUniverse::Real);
+        $this->context->select($user, $this->real['b']);
     }
 
     // --- the ordinary Company Administrator ----------------------------------------------------
@@ -424,7 +324,7 @@ final class CompanyContextIntegrationTest extends TestCase
 
         self::assertFalse($this->context->canSelect($user), 'No switcher for a single-company identity.');
 
-        $context = $this->context->resolve($user, DataUniverse::Real);
+        $context = $this->context->resolve($user);
         self::assertSame('own', $context['mode']);
         self::assertSame($this->real['a'], $context['company_id']);
         self::assertFalse($context['platform_wide'], 'A Company Administrator must never see platform-wide data.');
@@ -437,7 +337,7 @@ final class CompanyContextIntegrationTest extends TestCase
 
         $refused = false;
         try {
-            $this->context->select($user, $this->real['b'], DataUniverse::Real);
+            $this->context->select($user, $this->real['b']);
         } catch (RuntimeException) {
             $refused = true;
         }
@@ -445,7 +345,7 @@ final class CompanyContextIntegrationTest extends TestCase
         self::assertTrue($refused, 'Supplying another company id must be refused, not honoured.');
         self::assertSame(
             $this->real['a'],
-            $this->context->resolve($user, DataUniverse::Real)['company_id'],
+            $this->context->resolve($user)['company_id'],
             'They remain pinned to their own company.'
         );
     }
@@ -458,7 +358,7 @@ final class CompanyContextIntegrationTest extends TestCase
         // Whatever ends up in the session, an identity that may not select is pinned regardless.
         $_SESSION['company_context_id'] = $this->real['b'];
 
-        $context = $this->context->resolve($user, DataUniverse::Real);
+        $context = $this->context->resolve($user);
 
         self::assertSame('own', $context['mode']);
         self::assertSame(
@@ -468,41 +368,7 @@ final class CompanyContextIntegrationTest extends TestCase
         );
     }
 
-    /** A Company Administrator cannot reach a SEED company by any route. */
-    public function testACompanyAdministratorCannotReachASeedCompany(): void
-    {
-        $user = $this->companyAdmin();
 
-        $refused = false;
-        try {
-            $this->context->select($user, $this->seed['a'], DataUniverse::Seed);
-        } catch (Throwable) {
-            $refused = true;
-        }
-        self::assertTrue($refused);
-
-        $_SESSION['company_context_id'] = $this->seed['a'];
-        self::assertSame(
-            $this->real['a'],
-            $this->context->resolve($user, DataUniverse::Real)['company_id'],
-            'Even a planted session id must not move a Company Administrator into seed data.'
-        );
-    }
-
-    /** A generated identity may never select, whatever permissions it carries. */
-    public function testASeedIdentityMayNotSelect(): void
-    {
-        $seedIdentity = $this->identity(
-            $this->adminUserId,
-            [SelectedCompanyContext::SELECTOR_PERMISSION, 'COMPANY.DASHBOARD.VIEW'],
-            $this->seedToken
-        );
-
-        self::assertFalse(
-            $this->context->canSelect($seedIdentity),
-            'users.seed_token decides this, not the permission.'
-        );
-    }
 
     // --- the corrected company courses rule ----------------------------------------------------
 
@@ -527,21 +393,21 @@ final class CompanyContextIntegrationTest extends TestCase
             'Owned by Beta ' . $suffix
         );
 
-        $rows = $courses->companyCourses(DataUniverse::Real, $this->real['a'], 'owned', 100, 0);
+        $rows = $courses->companyCourses($this->real['a'], 'owned', 100, 0);
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
 
         self::assertContains($ownedByA, $ids, 'A company must see the course it owns.');
         self::assertSame(
-            $courses->companyCoursesCount(DataUniverse::Real, $this->real['a'], 'owned'),
+            $courses->companyCoursesCount($this->real['a'], 'owned'),
             count($rows),
             'The count and the rows must describe the same population.'
         );
 
         // And it must not be the whole catalogue.
-        $everything = $courses->allCoursesCount(DataUniverse::Real);
+        $everything = $courses->allCoursesCount();
         self::assertLessThan(
             $everything,
-            $courses->companyCoursesCount(DataUniverse::Real, $this->real['a'], 'owned'),
+            $courses->companyCoursesCount($this->real['a'], 'owned'),
             'A company course list that equals the platform catalogue is the defect Stage D fixed.'
         );
     }
@@ -550,11 +416,11 @@ final class CompanyContextIntegrationTest extends TestCase
     public function testTheWorkspacePreviewAgreesWithTheStandaloneSection(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
-        $context = $this->context->resolve($user, DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
+        $context = $this->context->resolve($user);
 
-        $workspace = $this->administration->companyControlCentre($user->id, DataUniverse::Real, $context);
-        $section = $this->administration->companySectionData('courses', $user->id, DataUniverse::Real, $context);
+        $workspace = $this->administration->companyControlCentre($user->id, $context);
+        $section = $this->administration->companySectionData('courses', $user->id, $context);
 
         self::assertSame(
             (int) $section['courses_count'],
@@ -592,8 +458,8 @@ final class CompanyContextIntegrationTest extends TestCase
         // the course itself, and the course is tracked.
         $administration->addCredit($company, null, $bought, 31536000, 4, 'qa', 'split', $this->adminUserId);
 
-        $ownedIds = array_map(static fn(array $r): int => (int) $r['id'], $courses->companyCourses(DataUniverse::Real, $company, 'owned', 100, 0));
-        $boughtIds = array_map(static fn(array $r): int => (int) $r['id'], $courses->companyCourses(DataUniverse::Real, $company, 'training', 100, 0));
+        $ownedIds = array_map(static fn(array $r): int => (int) $r['id'], $courses->companyCourses($company, 'owned', 100, 0));
+        $boughtIds = array_map(static fn(array $r): int => (int) $r['id'], $courses->companyCourses($company, 'training', 100, 0));
 
         self::assertContains($owned, $ownedIds, 'A course the company made is one it owns.');
         self::assertNotContains($bought, $ownedIds, 'Buying seats does not make a company the owner.');
@@ -603,12 +469,12 @@ final class CompanyContextIntegrationTest extends TestCase
         // Each half's count is the count of that half, not of the union.
         self::assertSame(
             count($ownedIds),
-            $courses->companyCoursesCount(DataUniverse::Real, $company, 'owned'),
+            $courses->companyCoursesCount($company, 'owned'),
             'The owned count and the owned rows must describe one population.'
         );
         self::assertSame(
             count($boughtIds),
-            $courses->companyCoursesCount(DataUniverse::Real, $company, 'training'),
+            $courses->companyCoursesCount($company, 'training'),
             'The training count and the training rows must describe one population.'
         );
     }
@@ -630,7 +496,7 @@ final class CompanyContextIntegrationTest extends TestCase
         $administration->addCredit($company, null, $course, 31536000, 5, 'qa', 'seats', $this->adminUserId);
 
         $rows = array_values(array_filter(
-            $courses->companyCourses(DataUniverse::Real, $company, 'training', 100, 0),
+            $courses->companyCourses($company, 'training', 100, 0),
             static fn(array $r): bool => (int) $r['id'] === $course
         ));
         self::assertCount(1, $rows);
@@ -663,18 +529,18 @@ final class CompanyContextIntegrationTest extends TestCase
             'INSERT INTO course_favourites (user_id, course_id) VALUES (:user_id, :course_id)',
             ['user_id' => $staff, 'course_id' => $course]
         );
-        self::assertSame(0, $courses->companyFavouritesCount(DataUniverse::Real, $company));
+        self::assertSame(0, $courses->companyFavouritesCount($company));
 
         self::assertTrue($courses->toggleCompanyFavourite($company, $course, $this->adminUserId), 'The first toggle adds.');
-        self::assertSame(1, $courses->companyFavouritesCount(DataUniverse::Real, $company));
+        self::assertSame(1, $courses->companyFavouritesCount($company));
 
-        $rows = $courses->companyFavourites(DataUniverse::Real, $company, 100, 0);
+        $rows = $courses->companyFavourites($company, 100, 0);
         self::assertCount(1, $rows);
         self::assertSame($course, (int) $rows[0]['id']);
         self::assertTrue((bool) $rows[0]['is_company_owned'], 'The row says where the course already stands with this company.');
 
         self::assertFalse($courses->toggleCompanyFavourite($company, $course, $this->adminUserId), 'The second toggle removes.');
-        self::assertSame(0, $courses->companyFavouritesCount(DataUniverse::Real, $company));
+        self::assertSame(0, $courses->companyFavouritesCount($company));
 
         // And the staff member still has their own.
         $own = $this->db->fetchAllAssociative(
@@ -686,22 +552,4 @@ final class CompanyContextIntegrationTest extends TestCase
         $this->db->executeStatement('DELETE FROM course_favourites WHERE user_id = :user_id', ['user_id' => $staff]);
     }
 
-    /**
-     * A genuine company cannot favourite a generated course.
-     *
-     * The generic cross-universe trigger cannot be reused on this table - it compares a row against
-     * its own seed_token and this table deliberately has none - so the guard is written for it, and
-     * a guard nobody tests is a guard nobody has.
-     */
-    public function testACompanyFavouriteCannotSpanTwoUniverses(): void
-    {
-        $suffix = $this->fixture->suffix();
-        $seed = $this->fixture->createSeedSet('Fav universe ' . $suffix);
-
-        $this->expectExceptionMessageMatches('/Cross-universe relationship rejected on company_favourites/');
-        $this->db->executeStatement(
-            'INSERT INTO company_favourites (company_id, course_id) VALUES (:company_id, :course_id)',
-            ['company_id' => $this->real['a'], 'course_id' => $seed['course']]
-        );
-    }
 }

@@ -36,7 +36,6 @@ use CattoLearning\Course\CourseService;
 
 use CattoLearning\View\ThemeRenderer;
 
-use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 
 use Base;
@@ -50,8 +49,7 @@ final class AdminCourseCategoryController extends BaseController
         Base $f3,
         AuthService $auth,
         ThemeRenderer $view,
-        private readonly CourseService $courses,
-        private readonly PlatformAdministrationService $platformAdministration
+        private readonly CourseService $courses
     ) {
         parent::__construct($f3, $auth, $view);
     }

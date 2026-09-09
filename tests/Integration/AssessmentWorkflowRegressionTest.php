@@ -29,7 +29,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\AssessmentService;
 use CattoLearning\Course\LearningService;
@@ -67,9 +66,9 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             $finalAssessmentId = $fixture->createAssessment($courseId, null, 'final', 'Final assessment', null, 1);
             $finalQuestion = $fixture->createQuestion($finalAssessmentId);
             $enrolmentId = $fixture->createEnrolment($learnerId, $courseId, $adminId, 2592000);
-            $learning->start($learnerId, DataUniverse::Real, $slug);
+            $learning->start($learnerId, $slug);
 
-            $practice = $assessments->startModuleAttempt($learnerId, DataUniverse::Real, $slug, 1, 'practice');
+            $practice = $assessments->startModuleAttempt($learnerId, $slug, 1, 'practice');
             $practiceResult = $assessments->respond(
                 $learnerId,
                 (string) $practice['public_id'],
@@ -92,7 +91,7 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             );
             self::assertSame([], $progress);
 
-            $graded = $assessments->startModuleAttempt($learnerId, DataUniverse::Real, $slug, 1, 'graded');
+            $graded = $assessments->startModuleAttempt($learnerId, $slug, 1, 'graded');
             $gradedResult = $assessments->respond(
                 $learnerId,
                 (string) $graded['public_id'],
@@ -120,13 +119,13 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             self::assertSame(100.0, (float) $progress[0]['best_percentage']);
 
             try {
-                $assessments->startModuleAttempt($learnerId, DataUniverse::Real, $slug, 1, 'graded');
+                $assessments->startModuleAttempt($learnerId, $slug, 1, 'graded');
                 self::fail('Expected maximum graded-attempt limit to be enforced.');
             } catch (InvalidArgumentException $e) {
                 self::assertSame('No graded assessment attempts remain.', $e->getMessage());
             }
 
-            $final = $assessments->startFinalAttempt($learnerId, DataUniverse::Real, $slug, 'graded');
+            $final = $assessments->startFinalAttempt($learnerId, $slug, 'graded');
             $finalResult = $assessments->respond(
                 $learnerId,
                 (string) $final['public_id'],

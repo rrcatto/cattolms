@@ -134,7 +134,6 @@ final class NavigationContractTest extends TestCase
             $groups['admin-group-catalogue'],
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );
-        self::assertContains('admin-seed', $groups['admin-group-system']);
     }
 
     /**

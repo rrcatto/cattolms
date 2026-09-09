@@ -82,19 +82,6 @@ final class PagingRequestCostContractTest extends TestCase
         self::assertStringNotContainsString("rtrim(\$definition['template']", $admin);
     }
 
-    /**
-     * The universe counts are two COUNT(*) queries per dataset and they cannot change because a
-     * reader moved to page 2. The strip that shows them is outside the swapped region.
-     */
-    public function testTheUniverseCountsAreNotRecomputedForASwap(): void
-    {
-        $service = self::read('src/Application/PlatformAdministrationService.php');
-        $admin = self::read('src/Http/Controller/AdminController.php');
-
-        self::assertStringContainsString('bool $withCounts = true', $service);
-        self::assertStringContainsString('foreach ($withCounts ?', $service);
-        self::assertStringContainsString('$swapping === null', $admin, 'The counts must be asked for only on a full load.');
-    }
 
     /**
      * Enrolments sits under Requests and Reports holds two reports. Turning the page on one used to
@@ -139,6 +126,5 @@ final class PagingRequestCostContractTest extends TestCase
 
         // Permission and universe are both resolved before the hint is even read.
         self::assertStringContainsString('canAccessAdministrationSection($user, $key)', $before);
-        self::assertStringContainsString('$crossUniverse = $this->canSelectUniverse($user);', $before);
     }
 }

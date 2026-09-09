@@ -44,23 +44,21 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Tests\Support\IntegrationContainer;
-use CattoLearning\Tests\Support\SeedIntegrationFixture;
+use CattoLearning\Tests\Support\IntegrationDataFixture;
 use PHPUnit\Framework\TestCase;
 
 final class PaginationDeterminismIntegrationTest extends TestCase
 {
     private Database $db;
-    private SeedIntegrationFixture $fixture;
+    private IntegrationDataFixture $fixture;
     private AdministrationRepository $administration;
     private CourseRepository $courses;
 
     /** The SEED token every fixture row in this test carries, so the reads can be scoped to it. */
-    private string $token = '';
 
     private int $companyId = 0;
 
@@ -78,16 +76,14 @@ final class PaginationDeterminismIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
-        $this->fixture = new SeedIntegrationFixture($this->db);
+        $this->fixture = new IntegrationDataFixture($this->db);
         $this->administration = $container->get(AdministrationRepository::class);
         $this->courses = $container->get(CourseRepository::class);
-
-        $this->token = $this->fixture->reserveToken();
         $suffix = $this->fixture->suffix();
 
-        $owner = $this->fixture->createUser('Pager Owner ' . $suffix, 'pager-owner-' . $suffix . '@seed.test', $this->token);
-        $this->companyId = $this->fixture->createCompany($owner, 'Pager Company ' . $suffix, 'pager-' . $suffix . '.seed.test', $this->token);
-        $this->fixture->addCompanyMember($this->companyId, $owner, $this->token);
+        $owner = $this->fixture->createUser('Pager Owner ' . $suffix, 'pager-owner-' . $suffix . '@seed.test');
+        $this->companyId = $this->fixture->createCompany($owner, 'Pager Company ' . $suffix, 'pager-' . $suffix . '.seed.test');
+        $this->fixture->addCompanyMember($this->companyId, $owner);
 
         // Every person carries the SAME display name, and every course the same title. Ordering by
         // a name alone therefore has no opinion at all about their relative order, which is
@@ -95,18 +91,16 @@ final class PaginationDeterminismIntegrationTest extends TestCase
         for ($index = 0; $index < self::ROWS; $index++) {
             $userId = $this->fixture->createUser(
                 'Pager Person',
-                'pager-' . $index . '-' . $suffix . '@seed.test',
-                $this->token
+                'pager-' . $index . '-' . $suffix . '@seed.test'
             );
-            $this->fixture->addCompanyMember($this->companyId, $userId, $this->token);
+            $this->fixture->addCompanyMember($this->companyId, $userId);
             $this->userIds[] = $userId;
 
             $this->courseIds[] = $this->fixture->createCourse(
                 $owner,
                 $this->companyId,
                 'pager-course-' . $index . '-' . $suffix,
-                'Pager Course',
-                $this->token
+                'Pager Course'
             );
         }
 
@@ -119,33 +113,33 @@ final class PaginationDeterminismIntegrationTest extends TestCase
 
             $this->write(
                 "INSERT INTO course_requests (public_id, user_id, company_id, course_id, access_period_seconds,
-                                              status, requested_at, seed_token)
+                                              status, requested_at)
                  VALUES (gen_random_uuid(), :user_id, :company_id, :course_id, 31536000,
-                         'pending', TIMESTAMPTZ '2026-01-01 00:00:00+00', :token::uuid)",
+                         'pending', TIMESTAMPTZ '2026-01-01 00:00:00+00')",
                 ['user_id' => $learner, 'company_id' => $this->companyId, 'course_id' => $courseId]
             );
             $this->write(
-                "INSERT INTO course_favourites (user_id, course_id, created_at, seed_token)
-                 VALUES (:user_id, :course_id, TIMESTAMPTZ '2026-01-01 00:00:00+00', :token::uuid)",
+                "INSERT INTO course_favourites (user_id, course_id, created_at)
+                 VALUES (:user_id, :course_id, TIMESTAMPTZ '2026-01-01 00:00:00+00')",
                 ['user_id' => $learner, 'course_id' => $courseId]
             );
             // The enrolments are spread one per person as well as gathered on the learner, so the
             // company-scoped list and the learner-scoped one are both longer than a page.
             $this->write(
                 "INSERT INTO course_enrolments (public_id, user_id, course_id, status, access_period_seconds,
-                                                assigned_at, created_at, updated_at, seed_token)
+                                                assigned_at, created_at, updated_at)
                  VALUES (gen_random_uuid(), :user_id, :course_id, 'assigned', 31536000,
                          TIMESTAMPTZ '2026-01-01 00:00:00+00', TIMESTAMPTZ '2026-01-01 00:00:00+00',
-                         TIMESTAMPTZ '2026-01-01 00:00:00+00', :token::uuid)",
+                         TIMESTAMPTZ '2026-01-01 00:00:00+00')",
                 ['user_id' => $learner, 'course_id' => $courseId]
             );
             if ($person !== $learner) {
                 $this->write(
                     "INSERT INTO course_enrolments (public_id, user_id, course_id, status, access_period_seconds,
-                                                    assigned_at, created_at, updated_at, seed_token)
+                                                    assigned_at, created_at, updated_at)
                      VALUES (gen_random_uuid(), :user_id, :course_id, 'assigned', 31536000,
                              TIMESTAMPTZ '2026-01-01 00:00:00+00', TIMESTAMPTZ '2026-01-01 00:00:00+00',
-                             TIMESTAMPTZ '2026-01-01 00:00:00+00', :token::uuid)",
+                             TIMESTAMPTZ '2026-01-01 00:00:00+00')",
                     ['user_id' => $person, 'course_id' => $this->courseIds[0]]
                 );
             }
@@ -153,13 +147,13 @@ final class PaginationDeterminismIntegrationTest extends TestCase
     }
 
     /**
-     * One fixture write, with the seed token supplied.
+     * One fixture write.
      *
      * @param array<string,mixed> $bindings
      */
     private function write(string $sql, array $bindings): void
     {
-        $this->db->executeStatement($sql, $bindings + ['token' => $this->token]);
+        $this->db->executeStatement($sql, $bindings);
     }
 
     protected function tearDown(): void
@@ -211,41 +205,37 @@ final class PaginationDeterminismIntegrationTest extends TestCase
 
     public function testAdministrationPeoplePagesAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $this->assertPagesPartitionTheDataset(
             'Administration People',
-            fn(int $limit, int $offset): array => $this->administration->people($universe, $limit, $offset, 'Pager Person'),
-            $this->administration->peopleCount($universe, 'Pager Person')
+            fn(int $limit, int $offset): array => $this->administration->people($limit, $offset, 'Pager Person'),
+            $this->administration->peopleCount('Pager Person')
         );
     }
 
     public function testCompanyPeoplePagesAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $this->assertPagesPartitionTheDataset(
             'Company People',
-            fn(int $limit, int $offset): array => $this->administration->companyPeople($universe, $this->companyId, $limit, $offset, ''),
-            $this->administration->companyPeopleCount($universe, $this->companyId, '')
+            fn(int $limit, int $offset): array => $this->administration->companyPeople($this->companyId, $limit, $offset, ''),
+            $this->administration->companyPeopleCount($this->companyId, '')
         );
     }
 
     public function testCompanyRequestsPageAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $this->assertPagesPartitionTheDataset(
             'Company Requests',
-            fn(int $limit, int $offset): array => $this->administration->companyRequests($universe, $this->companyId, $limit, $offset, ''),
-            $this->administration->companyRequestsCount($universe, $this->companyId, '')
+            fn(int $limit, int $offset): array => $this->administration->companyRequests($this->companyId, $limit, $offset, ''),
+            $this->administration->companyRequestsCount($this->companyId, '')
         );
     }
 
     public function testCompanyEnrolmentsPageAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $this->assertPagesPartitionTheDataset(
             'Company Enrolments',
-            fn(int $limit, int $offset): array => $this->administration->companyEnrolments($universe, $this->companyId, $limit, $offset, ''),
-            $this->administration->companyEnrolmentsCount($universe, $this->companyId, '')
+            fn(int $limit, int $offset): array => $this->administration->companyEnrolments($this->companyId, $limit, $offset, ''),
+            $this->administration->companyEnrolmentsCount($this->companyId, '')
         );
     }
 
@@ -255,25 +245,23 @@ final class PaginationDeterminismIntegrationTest extends TestCase
      */
     public function testFavouritesPageAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $userId = $this->userIds[0];
 
         $this->assertPagesPartitionTheDataset(
             'Favourites',
-            fn(int $limit, int $offset): array => $this->administration->favouritesPage($userId, $universe, $limit, $offset, ''),
-            $this->administration->favouritesCount($userId, $universe, '')
+            fn(int $limit, int $offset): array => $this->administration->favouritesPage($userId, $limit, $offset, ''),
+            $this->administration->favouritesCount($userId, '')
         );
     }
 
     public function testLearnerRequestsPageAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $userId = $this->userIds[0];
 
         $this->assertPagesPartitionTheDataset(
             'Learner requests',
-            fn(int $limit, int $offset): array => $this->administration->userRequestsPage($userId, $universe, $limit, $offset, ''),
-            $this->administration->userRequestsCount($userId, $universe, '')
+            fn(int $limit, int $offset): array => $this->administration->userRequestsPage($userId, $limit, $offset, ''),
+            $this->administration->userRequestsCount($userId, '')
         );
     }
 
@@ -283,13 +271,12 @@ final class PaginationDeterminismIntegrationTest extends TestCase
      */
     public function testCourseLibraryPagesAsOnePopulation(): void
     {
-        $universe = DataUniverse::Seed;
         $userId = $this->userIds[0];
 
         $this->assertPagesPartitionTheDataset(
             'Course Library',
-            fn(int $limit, int $offset): array => $this->courses->libraryPage($userId, $universe, CourseRepository::LIBRARY_STATUSES, $limit, $offset, ''),
-            $this->courses->libraryCount($userId, $universe, CourseRepository::LIBRARY_STATUSES, '')
+            fn(int $limit, int $offset): array => $this->courses->libraryPage($userId, CourseRepository::LIBRARY_STATUSES, $limit, $offset, ''),
+            $this->courses->libraryCount($userId, CourseRepository::LIBRARY_STATUSES, '')
         );
     }
 
@@ -303,8 +290,7 @@ final class PaginationDeterminismIntegrationTest extends TestCase
      */
     public function testDeferredJoinPreservesTheOrderOfItsKeyQuery(): void
     {
-        $universe = DataUniverse::Seed;
-        $rows = $this->administration->companyPeople($universe, $this->companyId, self::ROWS + 1, 0, '');
+        $rows = $this->administration->companyPeople($this->companyId, self::ROWS + 1, 0, '');
 
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
         $expected = $ids;

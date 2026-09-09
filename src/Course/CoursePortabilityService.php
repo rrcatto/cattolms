@@ -426,10 +426,7 @@ final class CoursePortabilityService
                 $this->courses->updateCourse($replaceCourseId, $data, $userId);
                 $courseId = $replaceCourseId;
             } else {
-                // Explicitly REAL. Passing null rather than letting the repository derive the
-                // token from the owning company keeps D5 true by construction: an imported course
-                // is REAL whatever company it lands in.
-                $courseId = $this->courses->createCourse($data, $userId, null);
+                $courseId = $this->courses->createCourse($data, $userId);
             }
             foreach ((array) ($analysis['diagnostic_assessments'] ?? []) as $diagnostic) {
                 if (!is_array($diagnostic)) {

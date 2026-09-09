@@ -25,7 +25,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -58,7 +57,7 @@ final class CourseAccessLifecycleTest extends TestCase
             self::assertSame('', trim((string) ($before['started_at'] ?? '')));
             self::assertSame('', trim((string) ($before['expires_at'] ?? '')));
 
-            $learning->start($learnerId, DataUniverse::Real, $slug);
+            $learning->start($learnerId, $slug);
             $started = $db->fetchAllAssociative('SELECT status,started_at,expires_at FROM course_enrolments WHERE id=:id', ['id' => $enrolmentId])[0];
             self::assertSame('active', (string) $started['status']);
             $startedAt = (string) $started['started_at'];
@@ -68,7 +67,7 @@ final class CourseAccessLifecycleTest extends TestCase
             $delta = (strtotime($expiresAt) ?: 0) - (strtotime($startedAt) ?: 0);
             self::assertSame(2592000, $delta);
 
-            $learning->start($learnerId, DataUniverse::Real, $slug);
+            $learning->start($learnerId, $slug);
             $again = $db->fetchAllAssociative('SELECT started_at,expires_at FROM course_enrolments WHERE id=:id', ['id' => $enrolmentId])[0];
             self::assertSame($startedAt, (string) $again['started_at']);
             self::assertSame($expiresAt, (string) $again['expires_at']);
@@ -95,7 +94,7 @@ final class CourseAccessLifecycleTest extends TestCase
             $courseId = $fixture->createCourse($adminId, $companyId, $slug, 'QA Preview Course ' . $suffix, 'published');
             $enrolmentId = $fixture->createEnrolment($learnerId, $courseId, $adminId, 86400, true);
 
-            $learning->start($learnerId, DataUniverse::Real, $slug, true);
+            $learning->start($learnerId, $slug, true);
             $row = $db->fetchAllAssociative('SELECT status,started_at,expires_at FROM course_enrolments WHERE id=:id', ['id' => $enrolmentId])[0];
             self::assertSame('active', (string) $row['status']);
             self::assertNotSame('', trim((string) ($row['started_at'] ?? '')));
@@ -128,7 +127,7 @@ final class CourseAccessLifecycleTest extends TestCase
             );
 
             try {
-                $learning->courseHome($learnerId, DataUniverse::Real, $slug);
+                $learning->courseHome($learnerId, $slug);
                 self::fail('Expected expired course access to be rejected.');
             } catch (InvalidArgumentException $e) {
                 self::assertSame('Your access period for this course has expired.', $e->getMessage());

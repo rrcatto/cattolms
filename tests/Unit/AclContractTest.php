@@ -19,7 +19,6 @@ namespace CattoLearning\Tests\Unit;
 
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Auth\RoleCatalog;
-use CattoLearning\Auth\RoleFamily;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -100,7 +99,6 @@ final class AclContractTest extends TestCase
         $migration = self::baselineMigration();
         $expected = [
             'ADMIN','STUDENT','COMPANY_ADMIN','COURSE_EDITOR','COURSE_OWNER',
-            'SEED_STUDENT','SEED_COMPANY_ADMIN','SEED_COURSE_EDITOR','SEED_COURSE_OWNER','SEED_ADMIN',
         ];
         self::assertSame($expected, RoleCatalog::keys());
         foreach ($expected as $role) {
@@ -109,92 +107,8 @@ final class AclContractTest extends TestCase
         self::assertStringContainsString("WHERE r.role_key='ADMIN'", $migration);
     }
 
-    public function testRoleFamilyRulesRejectNormalSeedMixingWithoutDuplicatingPermissions(): void
-    {
-        self::assertSame(RoleFamily::NORMAL, RoleFamily::forRoleSet([RoleCatalog::STUDENT, RoleCatalog::COURSE_OWNER]));
-        self::assertSame(RoleFamily::SEED, RoleFamily::forRoleSet([RoleCatalog::STUDENT, RoleCatalog::ADMIN]));
-        self::assertSame(RoleFamily::ADMIN, RoleFamily::forRoleSet([RoleCatalog::STUDENT, RoleCatalog::ADMIN]));
 
-        foreach ([
-            [RoleCatalog::STUDENT, RoleCatalog::STUDENT],
-            [RoleCatalog::ADMIN, RoleCatalog::ADMIN],
-        ] as $roles) {
-            try {
-                RoleFamily::assertCompatible($roles);
-                self::fail('Normal and SEED role families must not be mixed: ' . implode(',', $roles));
-            } catch (RuntimeException) {
-                self::addToAssertionCount(1);
-            }
-        }
 
-        $catalog = new PermissionCatalog();
-        $normal = array_merge(...array_values($catalog->groupedForRole(RoleCatalog::STUDENT)));
-        $seed = array_merge(...array_values($catalog->groupedForRole(RoleCatalog::STUDENT)));
-        self::assertContains('LEARNING.COURSE.VIEW', array_column($normal, 'key'));
-        self::assertContains('LEARNING.COURSE.VIEW', array_column($seed, 'key'));
-        self::assertNotContains('SYSTEM.THEME.MANAGE', array_column($normal, 'key'));
-        self::assertNotContains('SYSTEM.THEME.MANAGE', array_column($seed, 'key'));
-        self::assertContains('COURSE.IMPORT', array_column($normal, 'key'));
-        self::assertNotContains('COURSE.IMPORT', array_column($seed, 'key'));
-        self::assertNotContains('COURSE.EXPORT', array_column($seed, 'key'));
-        // Decision D5 permits genuine test-media uploads against SEED courses, so media
-        // management is assignable to seed roles even though portability is not.
-        self::assertTrue(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.MEDIA.MANAGE'));
-        self::assertFalse(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.EXPORT'));
-        self::assertTrue(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.IMPORT'));
-        self::assertFalse(PermissionCatalog::isAssignableToRole(RoleCatalog::COURSE_OWNER, 'COURSE.IMPORT'));
-    }
-
-    public function testDatabaseGuardsProtectSystemPermissionsAndRoleFamilies(): void
-    {
-        $migration = self::baselineMigration();
-        foreach ([
-            'enforce_role_permission_boundary',
-            'role_permissions_boundary_guard',
-            'SYSTEM permissions may be assigned only to ADMIN',
-            'This business capability is deliberately unavailable to SEED roles',
-            'enforce_user_role_family',
-            'user_roles_family_guard',
-            'SEED roles cannot be combined with normal roles or ADMIN',
-            'Normal roles or ADMIN cannot be combined with SEED roles',
-        ] as $token) {
-            self::assertStringContainsString($token, $migration);
-        }
-        self::assertStringNotContainsString('enforce_role_permission_universe', $migration);
-        self::assertStringNotContainsString('_universe', $migration);
-    }
-
-    public function testDefaultRoleMappingsReflectApprovedOwnerEditorAndSeedDifferences(): void
-    {
-        $migration = self::baselineMigration();
-
-        $editor = $this->roleMappingBlock($migration, 'COURSE_EDITOR');
-        $owner = $this->roleMappingBlock($migration, 'COURSE_OWNER');
-        self::assertStringContainsString("'COURSE.EXPORT'", $editor);
-        self::assertStringNotContainsString("'COURSE.IMPORT'", $editor);
-        self::assertStringNotContainsString("'COURSE.OWNERSHIP.MANAGE'", $editor);
-        self::assertStringContainsString("'COURSE.IMPORT'", $owner);
-        self::assertStringContainsString("'COURSE.OWNERSHIP.MANAGE'", $owner);
-
-        $seedStudent = $this->roleMappingBlock($migration, 'SEED_STUDENT');
-        self::assertStringContainsString("'LEARNING.COURSE.START'", $seedStudent);
-
-        // Decision D5: SEED course-management roles may upload genuine test media, but course
-        // portability remains REAL-only in both directions.
-        foreach (['SEED_COURSE_EDITOR', 'SEED_COURSE_OWNER'] as $seedCourseRole) {
-            $block = $this->roleMappingBlock($migration, $seedCourseRole);
-            self::assertStringContainsString("'COURSE.MEDIA.MANAGE'", $block);
-            self::assertStringNotContainsString("'COURSE.IMPORT'", $block);
-            self::assertStringNotContainsString("'COURSE.EXPORT'", $block);
-        }
-
-        $seedAdmin = $this->roleMappingBlock($migration, 'SEED_ADMIN');
-        self::assertStringContainsString("'COURSE.PUBLISH'", $seedAdmin);
-        self::assertStringContainsString("'PLATFORM.PAYMENT.RECONCILE'", $seedAdmin);
-        self::assertStringNotContainsString("'COURSE.IMPORT'", $seedAdmin);
-        self::assertStringNotContainsString("'COURSE.EXPORT'", $seedAdmin);
-        self::assertStringNotContainsString("'SYSTEM.", $seedAdmin);
-    }
 
     public function testAdminRecoveryAndAclResolutionAreHardProtected(): void
     {
@@ -248,13 +162,4 @@ final class AclContractTest extends TestCase
         return array_values(array_unique($matches[1]));
     }
 
-    private function roleMappingBlock(string $migration, string $role): string
-    {
-        $needle = ") WHERE r.role_key='" . $role . "';";
-        $end = strpos($migration, $needle);
-        self::assertNotFalse($end, 'Missing mapping for ' . $role);
-        $start = strrpos(substr($migration, 0, (int) $end), 'INSERT INTO role_permissions');
-        self::assertNotFalse($start, 'Missing mapping start for ' . $role);
-        return substr($migration, (int) $start, (int) $end + strlen($needle) - (int) $start);
-    }
 }

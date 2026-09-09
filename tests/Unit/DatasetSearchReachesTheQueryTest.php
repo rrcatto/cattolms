@@ -34,7 +34,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Tests\Support\RecordingDatabase;
@@ -102,45 +101,40 @@ final class DatasetSearchReachesTheQueryTest extends TestCase
     }
 
     /**
-     * The generated SQL is structurally valid in every universe.
+     * The generated SQL is legal, with and without a search term.
      *
-     * The previous version of this test drove every read in the ALL universe and asserted the
-     * predicate and its binding were present - which they were. It never asked whether the
-     * statement it had just built was legal SQL. ALL contributes no scope predicate, so a query
-     * that appended its search as " AND ..." produced
+     * The predecessor of this test asserted that the search predicate and its binding were present -
+     * which they were. It never asked whether the statement it had just built was legal SQL, and a
+     * read whose WHERE clause came from a filter contributing nothing produced
      *
      *     SELECT COUNT(*)::int AS total FROM courses c AND c.title ILIKE :search_term
      *
-     * and Administration Courses returned a 500 for every search in the All scope while Real and
-     * Seed worked. A recorder cannot execute SQL, but it can be asked whether an AND ever precedes
-     * a WHERE, which is exactly the shape of that fault.
+     * which is a 500 on every search. A recorder cannot execute SQL, but it can be asked whether an
+     * AND ever precedes a WHERE, which is exactly the shape of that fault.
      *
      * @param list<mixed> $rowTail
      * @param list<mixed> $countTail
      */
     #[\PHPUnit\Framework\Attributes\DataProvider('reads')]
-    public function testTheGeneratedSqlIsWellFormedInEveryUniverse(
+    public function testTheGeneratedSqlIsWellFormed(
         string $class,
         string $rowMethod,
         string $countMethod,
         array $rowTail,
         array $countTail
     ): void {
-        foreach ([DataUniverse::All, DataUniverse::Real, DataUniverse::Seed] as $universe) {
-            foreach ([[$rowMethod, $rowTail], [$countMethod, $countTail]] as [$method, $tail]) {
-                foreach (['', 'zzqqxx'] as $term) {
-                    [$repository, $recorder] = RecordingDatabase::forRepository($class);
-                    $repository->{$method}(...self::arguments($class, $method, $tail, $term, $universe));
+        foreach ([[$rowMethod, $rowTail], [$countMethod, $countTail]] as [$method, $tail]) {
+            foreach (['', 'zzqqxx'] as $term) {
+                [$repository, $recorder] = RecordingDatabase::forRepository($class);
+                $repository->{$method}(...self::arguments($class, $method, $tail, $term));
 
-                    foreach ($recorder->statements as $sql) {
-                        self::assertFalse(
-                            self::andPrecedesWhere($sql),
-                            $class . '::' . $method . '() built SQL with a condition before any WHERE in the '
-                            . $universe->value . ' universe'
-                            . ($term === '' ? ' with no search term' : ' with a search term') . ':' . "
+                foreach ($recorder->statements as $sql) {
+                    self::assertFalse(
+                        self::andPrecedesWhere($sql),
+                        $class . '::' . $method . '() built SQL with a condition before any WHERE'
+                        . ($term === '' ? ' with no search term' : ' with a search term') . ':' . "
 " . $sql
-                        );
-                    }
+                    );
                 }
             }
         }
@@ -200,7 +194,7 @@ final class DatasetSearchReachesTheQueryTest extends TestCase
     public function testAnEmptyTermAddsNoPredicate(): void
     {
         [$repository, $recorder] = RecordingDatabase::forRepository(AdministrationRepository::class);
-        $repository->people(DataUniverse::All, 50, 0, '');
+        $repository->people(50, 0, '');
 
         self::assertStringNotContainsString(
             'ILIKE',
@@ -211,18 +205,17 @@ final class DatasetSearchReachesTheQueryTest extends TestCase
     }
 
     /**
-     * Arguments for one read: user id where the signature starts with one, then the universe,
-     * then the caller's tail, then the term.
+     * The argument list for one repository read, in the order that read declares.
      *
      * @param list<mixed> $tail
      * @return list<mixed>
      */
-    private static function arguments(string $class, string $method, array $tail, string $term, ?DataUniverse $universe = null): array
+    private static function arguments(string $class, string $method, array $tail, string $term): array
     {
         $parameters = (new ReflectionClass($class))->getMethod($method)->getParameters();
         $leading = ($parameters[0]->getName() === 'userId') ? [1] : [];
 
-        return [...$leading, $universe ?? DataUniverse::All, ...$tail, $term];
+        return [...$leading, ...$tail, $term];
     }
 
 }

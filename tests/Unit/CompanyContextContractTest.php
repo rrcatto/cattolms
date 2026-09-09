@@ -94,25 +94,6 @@ final class CompanyContextContractTest extends TestCase
 
     // --- who may select ------------------------------------------------------------------------
 
-    /**
-     * A generated identity may never select a company, whatever permissions it holds.
-     *
-     * Seed roles carry the same business permission keys as their normal counterparts by design,
-     * so the permission alone cannot be the test. `users.seed_token` is the source of truth for
-     * identity universe, exactly as it is for the data-universe selector.
-     */
-    public function testASeedIdentityMayNeverSelect(): void
-    {
-        $method = (new ReflectionClass(SelectedCompanyContext::class))->getMethod('canSelect');
-        $body = self::source('src/Company/SelectedCompanyContext.php');
-
-        self::assertTrue($method->isPublic());
-        self::assertStringContainsString(
-            'isSeedIdentity()',
-            $body,
-            'The seed-identity test must gate the selector, not the permission alone.'
-        );
-    }
 
     /** The read scope that offers the selector is a view permission, and writes keep their own checks. */
     public function testTheSelectorIsGatedOnReadScope(): void
@@ -201,14 +182,12 @@ final class CompanyContextContractTest extends TestCase
             'company_context_name' => 'Highveld Mining',
             'company_context_domain' => 'highveld.test',
             'company_context_id' => 42,
-            'company_context_universe' => $universe,
             'company_switcher' => [
                 'picker_search' => '',
                 'picker_pagination' => null,
                 'picker_companies' => [[
                     'id' => 7, 'name' => 'Table Bay Logistics', 'domain' => 'tablebay.test',
                     'status' => 'active', 'status_label' => 'Active', 'is_system' => false,
-                    'universe' => 'real', 'universe_label' => 'REAL', 'is_seed' => false,
                 ]],
             ],
         ];
@@ -221,17 +200,9 @@ final class CompanyContextContractTest extends TestCase
 
         self::assertStringContainsString('company-context', $html);
         self::assertStringContainsString('Highveld Mining', $html);
-        self::assertStringContainsString('REAL', $html, 'The administrator must see which universe the company puts them in.');
         self::assertStringContainsString('Switch company', $html);
     }
 
-    /** Administering a generated company says so, because it otherwise looks identical to a real one. */
-    public function testTheControlNamesTheSeedUniverse(): void
-    {
-        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive('seed')));
-
-        self::assertStringContainsString('SEED', $html);
-    }
 
     /** Selecting is a POST carrying a CSRF token, never a link. */
     public function testSelectingIsAPostWithCsrf(): void

@@ -41,23 +41,20 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Tests\Support\IntegrationContainer;
-use CattoLearning\Tests\Support\SeedIntegrationFixture;
+use CattoLearning\Tests\Support\IntegrationDataFixture;
 use PHPUnit\Framework\TestCase;
 
 final class CatalogueBrowseIntegrationTest extends TestCase
 {
     private Database $db;
-    private SeedIntegrationFixture $fixture;
+    private IntegrationDataFixture $fixture;
     private CourseRepository $courses;
     private CourseService $service;
-
-    private string $token = '';
     private int $rootId = 0;
     private int $branchId = 0;
     private int $leafId = 0;
@@ -71,27 +68,25 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
-        $this->fixture = new SeedIntegrationFixture($this->db);
+        $this->fixture = new IntegrationDataFixture($this->db);
         $this->courses = $container->get(CourseRepository::class);
         $this->service = $container->get(CourseService::class);
-
-        $this->token = $this->fixture->reserveToken();
         $suffix = $this->fixture->suffix();
         $this->rootSlug = 'browse-root-' . $suffix;
 
         $this->rootId = $this->fixture->createCategory('Browse Root ' . $suffix, $this->rootSlug);
-        $this->branchId = $this->fixture->createCategory('Browse Branch ' . $suffix, 'browse-branch-' . $suffix, null, $this->rootId);
-        $this->leafId = $this->fixture->createCategory('Browse Leaf ' . $suffix, 'browse-leaf-' . $suffix, null, $this->branchId);
+        $this->branchId = $this->fixture->createCategory('Browse Branch ' . $suffix, 'browse-branch-' . $suffix, $this->rootId);
+        $this->leafId = $this->fixture->createCategory('Browse Leaf ' . $suffix, 'browse-leaf-' . $suffix, $this->branchId);
 
-        $owner = $this->fixture->createUser('Browse Owner ' . $suffix, 'browse-owner-' . $suffix . '@seed.test', $this->token);
-        $company = $this->fixture->createCompany($owner, 'Browse Company ' . $suffix, 'browse-' . $suffix . '.seed.test', $this->token);
-        $this->fixture->addCompanyMember($company, $owner, $this->token);
+        $owner = $this->fixture->createUser('Browse Owner ' . $suffix, 'browse-owner-' . $suffix . '@seed.test');
+        $company = $this->fixture->createCompany($owner, 'Browse Company ' . $suffix, 'browse-' . $suffix . '.seed.test');
+        $this->fixture->addCompanyMember($company, $owner);
 
         // One SEED course at each of the three levels, and one REAL course in the same branch. The
         // REAL one is what makes the universe assertion mean something: it is filed under a label
         // the SEED courses share, so a query that forgets to scope will count it.
         foreach ([$this->rootId, $this->branchId, $this->leafId] as $index => $categoryId) {
-            $courseId = $this->fixture->createCourse($owner, $company, 'browse-seed-' . $index . '-' . $suffix, 'Browse Seed Course', $this->token);
+            $courseId = $this->fixture->createCourse($owner, $company, 'browse-seed-' . $index . '-' . $suffix, 'Browse Seed Course');
             $this->file($courseId, $categoryId);
             $this->seedCourseIds[] = $courseId;
         }
@@ -100,7 +95,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         // uncategorised remainder is non-zero: with every course categorised, a distribution that
         // silently dropped the remainder would still add up, and the assertion below would pass on a
         // query that had stopped counting it.
-        $this->fixture->createCourse($owner, $company, 'browse-orphan-' . $suffix, 'Browse Orphan Course', $this->token);
+        $this->fixture->createCourse($owner, $company, 'browse-orphan-' . $suffix, 'Browse Orphan Course');
 
         // One tag on two of the three, so the tag facet is narrower than the branch and the two can
         // be told apart when they are combined.
@@ -120,9 +115,9 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         // makes about counting.
         $realOwner = $this->fixture->createUser('Browse Real Owner ' . $suffix, 'browse-real-owner-' . $suffix . '@real-' . $suffix . '.test');
         $realCompany = $this->fixture->createCompany($realOwner, 'Browse Real Co ' . $suffix, 'browse-real-' . $suffix . '.test');
-        $this->fixture->addCompanyMember($realCompany, $realOwner, null, 'owner');
+        $this->fixture->addCompanyMember($realCompany, $realOwner, 'owner');
         $this->file(
-            $this->fixture->createCourse($realOwner, $realCompany, 'browse-real-' . $suffix, 'Browse Real Course', null),
+            $this->fixture->createCourse($realOwner, $realCompany, 'browse-real-' . $suffix, 'Browse Real Course'),
             $this->leafId
         );
     }
@@ -144,48 +139,33 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     }
 
     /** @return array{0:int,1:int} the count and the number of rows the same scope returns */
-    private function browse(int $categoryId, DataUniverse $universe): array
+    private function browse(int $categoryId): array
     {
         return [
-            $this->courses->publishedCoursesCount($universe, new CatalogueFilter($categoryId)),
-            count($this->courses->publishedCourses($universe, new CatalogueFilter($categoryId), 100, 0)),
+            $this->courses->publishedCoursesCount(new CatalogueFilter($categoryId)),
+            count($this->courses->publishedCourses(new CatalogueFilter($categoryId), 100, 0)),
         ];
     }
 
     public function testBrowsingALevelIncludesEveryLevelBeneathIt(): void
     {
-        self::assertSame([3, 3], $this->browse($this->rootId, DataUniverse::Seed), 'The root holds all three of its branch.');
-        self::assertSame([2, 2], $this->browse($this->branchId, DataUniverse::Seed), 'The branch holds itself and the leaf.');
-        self::assertSame([1, 1], $this->browse($this->leafId, DataUniverse::Seed), 'The leaf is the narrowest scope.');
+        self::assertSame([4, 4], $this->browse($this->rootId), 'The root holds every course in its branch.');
+        self::assertSame([3, 3], $this->browse($this->branchId), 'The branch holds itself and the leaf.');
+        self::assertSame([2, 2], $this->browse($this->leafId), 'The leaf is the narrowest scope.');
     }
 
-    /**
-     * The category is shared; what is counted under it is not.
-     *
-     * The REAL course sits in the same leaf as a SEED one, so a browse that drops the universe scope
-     * returns four rows at the root instead of three, and a genuine course appears in a generated
-     * catalogue.
-     */
-    public function testTheSameBranchReportsADifferentPopulationInEachUniverse(): void
-    {
-        self::assertSame([3, 3], $this->browse($this->rootId, DataUniverse::Seed));
-        self::assertSame([1, 1], $this->browse($this->leafId, DataUniverse::Real), 'Only the genuine course is REAL.');
-
-        $titles = array_column($this->courses->publishedCourses(DataUniverse::Real, new CatalogueFilter($this->rootId), 100, 0), 'title');
-        self::assertSame(['Browse Real Course'], $titles);
-    }
 
     /** The taxonomy screen's rollup and the browse query must agree; they share one predicate. */
     public function testTheTaxonomyRollupAgreesWithWhatBrowsingReturns(): void
     {
         $rows = [];
-        foreach ($this->courses->categories(DataUniverse::Seed) as $row) {
+        foreach ($this->courses->categories() as $row) {
             $rows[(int) $row['id']] = $row;
         }
 
         foreach ([$this->rootId, $this->branchId, $this->leafId] as $categoryId) {
             self::assertArrayHasKey($categoryId, $rows);
-            [$count] = $this->browse($categoryId, DataUniverse::Seed);
+            [$count] = $this->browse($categoryId);
             self::assertSame(
                 $count,
                 (int) $rows[$categoryId]['descendant_course_count'],
@@ -214,22 +194,21 @@ final class CatalogueBrowseIntegrationTest extends TestCase
      * take one out of the taxonomy is to delete it, which the edit screen already does after
      * reassigning whatever was filed under it.
      */
-    public function testACategoryIsAddressableAndItsCountIsScoped(): void
+    public function testACategoryIsAddressableAndCarriesItsBranchCount(): void
     {
-        $category = $this->courses->browsableCategory($this->rootSlug, DataUniverse::Seed);
+        $category = $this->courses->browsableCategory($this->rootSlug);
         self::assertNotNull($category);
-        self::assertSame(3, (int) $category['descendant_course_count']);
-        self::assertSame(1, (int) ($this->courses->browsableCategory($this->rootSlug, DataUniverse::Real)['descendant_course_count'] ?? 0));
+        self::assertSame(4, (int) $category['descendant_course_count'], 'The root carries every course beneath it.');
     }
 
     /** The narrowing list offers each child with the count that choosing it will actually show. */
     public function testTheNarrowingListCountsTheWholeBranchBehindEachChild(): void
     {
-        $children = $this->courses->browsableChildCategories($this->rootId, DataUniverse::Seed);
+        $children = $this->courses->browsableChildCategories($this->rootId);
 
         self::assertCount(1, $children);
         self::assertSame($this->branchId, (int) $children[0]['id']);
-        self::assertSame(2, (int) $children[0]['descendant_course_count'], 'The branch offers itself and its leaf.');
+        self::assertSame(3, (int) $children[0]['descendant_course_count'], 'The branch offers itself and its leaf.');
     }
 
     /** A tag narrows the catalogue exactly as a category branch does, through the same object. */
@@ -237,9 +216,8 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     {
         $filter = CatalogueFilter::forTag($this->tagId);
 
-        self::assertSame(2, $this->courses->publishedCoursesCount(DataUniverse::Seed, $filter));
-        self::assertCount(2, $this->courses->publishedCourses(DataUniverse::Seed, $filter, 100, 0));
-        self::assertSame(0, $this->courses->publishedCoursesCount(DataUniverse::Real, $filter), 'The tag is shared; its courses are not.');
+        self::assertSame(2, $this->courses->publishedCoursesCount($filter), 'The tag is on two of the courses.');
+        self::assertCount(2, $this->courses->publishedCourses($filter, 100, 0), 'The rows agree with the count.');
     }
 
     /**
@@ -252,8 +230,8 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     {
         $filter = new CatalogueFilter($this->branchId, [$this->tagId]);
 
-        self::assertSame(1, $this->courses->publishedCoursesCount(DataUniverse::Seed, $filter));
-        $rows = $this->courses->publishedCourses(DataUniverse::Seed, $filter, 100, 0);
+        self::assertSame(1, $this->courses->publishedCoursesCount($filter));
+        $rows = $this->courses->publishedCourses($filter, 100, 0);
         self::assertCount(1, $rows);
         self::assertSame($this->seedCourseIds[2], (int) $rows[0]['id']);
     }
@@ -277,8 +255,8 @@ final class CatalogueBrowseIntegrationTest extends TestCase
 
         try {
             $filter = CatalogueFilter::forTag($this->tagId);
-            self::assertSame(2, $this->courses->publishedCoursesCount(DataUniverse::Seed, $filter));
-            self::assertCount(2, $this->courses->publishedCourses(DataUniverse::Seed, $filter, 100, 0));
+            self::assertSame(2, $this->courses->publishedCoursesCount($filter));
+            self::assertCount(2, $this->courses->publishedCourses($filter, 100, 0));
         } finally {
             $this->db->executeStatement('DELETE FROM tags WHERE id = :id', ['id' => $second]);
         }
@@ -287,30 +265,21 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     /** A tag is addressable by its slug, and an unknown slug resolves to nothing. */
     public function testATagIsAddressableBySlug(): void
     {
-        self::assertNotNull($this->courses->browsableTag($this->tagSlug, DataUniverse::Seed));
-        self::assertNull($this->courses->browsableTag($this->tagSlug . '-does-not-exist', DataUniverse::Seed));
+        self::assertNotNull($this->courses->browsableTag($this->tagSlug));
+        self::assertNull($this->courses->browsableTag($this->tagSlug . '-does-not-exist'));
     }
 
-    /** The count beside a tag is the reader's universe, because the label is shared and the courses are not. */
-    public function testTagCountsAreScopedToTheReadersUniverse(): void
-    {
-        self::assertSame(
-            [$this->tagId => 2],
-            $this->courses->courseCountsForTags([$this->tagId], DataUniverse::Seed)
-        );
-        self::assertSame([], $this->courses->courseCountsForTags([$this->tagId], DataUniverse::Real));
-    }
 
     /** A keyword narrows title, subtitle and summary, and its count agrees with its rows. */
     public function testAKeywordNarrowsTheCatalogue(): void
     {
         $hit = new CatalogueFilter(null, [], 'Browse Seed Course');
-        self::assertSame(3, $this->courses->publishedCoursesCount(DataUniverse::Seed, $hit));
-        self::assertCount(3, $this->courses->publishedCourses(DataUniverse::Seed, $hit, 100, 0));
+        self::assertSame(3, $this->courses->publishedCoursesCount($hit));
+        self::assertCount(3, $this->courses->publishedCourses($hit, 100, 0));
 
         $miss = new CatalogueFilter($this->rootId, [], 'no course is called this');
-        self::assertSame(0, $this->courses->publishedCoursesCount(DataUniverse::Seed, $miss));
-        self::assertCount(0, $this->courses->publishedCourses(DataUniverse::Seed, $miss, 100, 0));
+        self::assertSame(0, $this->courses->publishedCoursesCount($miss));
+        self::assertCount(0, $this->courses->publishedCourses($miss, 100, 0));
     }
 
     /** Several tags mean any of them, so adding one can only widen the result. */
@@ -327,12 +296,12 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         );
 
         try {
-            self::assertSame(2, $this->courses->publishedCoursesCount(DataUniverse::Seed, CatalogueFilter::forTag($this->tagId)));
-            self::assertSame(1, $this->courses->publishedCoursesCount(DataUniverse::Seed, CatalogueFilter::forTag($second)));
+            self::assertSame(2, $this->courses->publishedCoursesCount(CatalogueFilter::forTag($this->tagId)));
+            self::assertSame(1, $this->courses->publishedCoursesCount(CatalogueFilter::forTag($second)));
 
             $both = new CatalogueFilter(null, [$this->tagId, $second]);
-            self::assertSame(3, $this->courses->publishedCoursesCount(DataUniverse::Seed, $both), 'Any of the tags, not all of them.');
-            self::assertCount(3, $this->courses->publishedCourses(DataUniverse::Seed, $both, 100, 0));
+            self::assertSame(3, $this->courses->publishedCoursesCount($both), 'Any of the tags, not all of them.');
+            self::assertCount(3, $this->courses->publishedCourses($both, 100, 0));
         } finally {
             $this->db->executeStatement('DELETE FROM tags WHERE id = :id', ['id' => $second]);
         }
@@ -361,12 +330,12 @@ final class CatalogueBrowseIntegrationTest extends TestCase
             $chosen = CatalogueFilter::forTag($this->tagId);
             $ids = [$this->tagId, $second];
 
-            $relaxed = $this->courses->tagFacetCounts($ids, DataUniverse::Seed, $chosen->withoutTags());
+            $relaxed = $this->courses->tagFacetCounts($ids, $chosen->withoutTags());
             self::assertSame(2, $relaxed[$this->tagId]);
             self::assertSame(1, $relaxed[$second], 'The unchosen tag still offers its own courses.');
 
             // What it would look like if the facet were applied to itself, which is the bug.
-            $applied = $this->courses->tagFacetCounts($ids, DataUniverse::Seed, $chosen);
+            $applied = $this->courses->tagFacetCounts($ids, $chosen);
             self::assertArrayNotHasKey($second, $applied, 'Applied to itself, every other option dies.');
         } finally {
             $this->db->executeStatement('DELETE FROM tags WHERE id = :id', ['id' => $second]);
@@ -380,15 +349,14 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         // courses. Counted inside the branch, the tag offers only the leaf one.
         $inBranch = $this->courses->tagFacetCounts(
             [$this->tagId],
-            DataUniverse::Seed,
             (new CatalogueFilter($this->branchId, [$this->tagId]))->withoutTags()
         );
         self::assertSame(1, $inBranch[$this->tagId]);
 
         self::assertSame(
-            [],
-            $this->courses->tagFacetCounts([$this->tagId], DataUniverse::Real, CatalogueFilter::none()),
-            'A generated tag association must not be counted for a genuine reader.'
+            [$this->tagId => 2],
+            $this->courses->tagFacetCounts([$this->tagId], CatalogueFilter::none()),
+            'With no other facet applied the tag offers everything it is on.'
         );
     }
 
@@ -397,7 +365,6 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     {
         $counts = $this->courses->categoryFacetCounts(
             [$this->branchId],
-            DataUniverse::Seed,
             CatalogueFilter::forTag($this->tagId)
         );
 
@@ -415,14 +382,14 @@ final class CatalogueBrowseIntegrationTest extends TestCase
      */
     public function testTheCategoryDistributionAddsUpToTheWholeCatalogue(): void
     {
-        $distribution = $this->courses->categoryDistribution(DataUniverse::Seed);
+        $distribution = $this->courses->categoryDistribution();
         $total = 0;
         foreach ($distribution as $row) {
             $total += $row['total'];
         }
 
         self::assertSame(
-            $this->courses->publishedCoursesCount(DataUniverse::Seed, CatalogueFilter::none()),
+            $this->courses->publishedCoursesCount(CatalogueFilter::none()),
             $total,
             'Top-level branches plus the uncategorised remainder are the whole published catalogue.'
         );
@@ -441,7 +408,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     /** Shares are scaled against the largest row, so exactly one row is full width. */
     public function testDistributionSharesAreScaledAgainstTheLargestRow(): void
     {
-        $rows = $this->service->categoryDistribution(DataUniverse::Seed);
+        $rows = $this->service->categoryDistribution();
         self::assertNotSame([], $rows);
 
         $shares = array_column($rows, 'share');
@@ -466,7 +433,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
      */
     public function testTheTagDistributionReportsTheUntaggedRemainder(): void
     {
-        $rows = $this->courses->tagDistribution(DataUniverse::Seed, 5);
+        $rows = $this->courses->tagDistribution(5);
         $labels = array_column($rows, 'label');
 
         self::assertSame('Untagged', end($labels));
@@ -477,19 +444,4 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         self::assertGreaterThanOrEqual(1, $untagged['total']);
     }
 
-    /** The public tag index counts in the reader's universe, like every other count under a label. */
-    public function testTheTagIndexIsScopedToTheReadersUniverse(): void
-    {
-        $bySlug = [];
-        foreach ($this->courses->tagIndex(DataUniverse::Seed) as $tag) {
-            $bySlug[(string) $tag['slug']] = (int) $tag['course_count'];
-        }
-        self::assertSame(2, $bySlug[$this->tagSlug] ?? -1);
-
-        $real = [];
-        foreach ($this->courses->tagIndex(DataUniverse::Real) as $tag) {
-            $real[(string) $tag['slug']] = (int) $tag['course_count'];
-        }
-        self::assertSame(0, $real[$this->tagSlug] ?? -1, 'A generated association is not a genuine course.');
-    }
 }

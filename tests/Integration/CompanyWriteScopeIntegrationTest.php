@@ -46,13 +46,12 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\CurrentUser;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
-use CattoLearning\Tests\Support\SeedIntegrationFixture;
+use CattoLearning\Tests\Support\IntegrationDataFixture;
 use DI\Container;
 use PHPUnit\Framework\TestCase;
 use Throwable;
@@ -61,7 +60,7 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
 {
     private Container $container;
     private Database $db;
-    private SeedIntegrationFixture $fixture;
+    private IntegrationDataFixture $fixture;
     private SelectedCompanyContext $context;
     private PlatformAdministrationService $administration;
     private AuthSessionRepository $sessions;
@@ -80,7 +79,7 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     {
         $this->container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
-        $this->fixture = new SeedIntegrationFixture($this->db);
+        $this->fixture = new IntegrationDataFixture($this->db);
 
         /** @var SelectedCompanyContext $context */
         $context = $this->container->get(SelectedCompanyContext::class);
@@ -108,10 +107,10 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
 
         // The platform administrator is deliberately a member of company B. If a write ever falls
         // back to the actor's own membership, it lands here - and the assertions catch it.
-        $this->fixture->addCompanyMember($this->real['b'], $this->adminUserId, null, 'administrator');
+        $this->fixture->addCompanyMember($this->real['b'], $this->adminUserId, 'administrator');
 
         $this->companyAdminUserId = $this->fixture->createUser('Company administrator', 'coadmin-' . $this->suffix . '@alpha-' . $this->suffix . '.test');
-        $this->fixture->addCompanyMember($this->real['a'], $this->companyAdminUserId, null, 'administrator');
+        $this->fixture->addCompanyMember($this->real['a'], $this->companyAdminUserId, 'administrator');
     }
 
     protected function tearDown(): void
@@ -123,7 +122,7 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     /** @param list<string> $permissions */
     private function identity(int $userId, array $permissions): CurrentUser
     {
-        return new CurrentUser($userId, Uuid::v4(), 'identity-' . $userId . '@example.test', 'Identity ' . $userId, [], $permissions, Uuid::v4(), null);
+        return new CurrentUser($userId, Uuid::v4(), 'identity-' . $userId . '@example.test', 'Identity ' . $userId, [], $permissions, Uuid::v4());
     }
 
     private function platformAdmin(): CurrentUser
@@ -174,14 +173,14 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testPlatformAdminCreatesPersonIntoTheSelectedCompany(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
 
-        $created = $this->administration->createCompanyPerson($user->id, $this->context->contextCompanyId($user, DataUniverse::Real), [
+        $created = $this->administration->createCompanyPerson($user->id, $this->context->contextCompanyId($user), [
             'first_name' => 'New',
             'last_name' => 'Starter',
             'email' => 'new-starter-' . $this->suffix . '@alpha-' . $this->suffix . '.test',
             'role' => 'STUDENT',
-        ], DataUniverse::Real);
+        ]);
         $this->fixture->rememberUser($created);
 
         self::assertSame($this->real['a'], $this->companyOf($created), 'The person must join the selected company.');
@@ -193,11 +192,11 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     {
         $user = $this->platformAdmin();
 
-        $this->context->select($user, $this->real['b'], DataUniverse::Real);
-        $intoB = $this->administration->createCompanyPerson($user->id, $this->context->contextCompanyId($user, DataUniverse::Real), [
+        $this->context->select($user, $this->real['b']);
+        $intoB = $this->administration->createCompanyPerson($user->id, $this->context->contextCompanyId($user), [
             'first_name' => 'Into', 'last_name' => 'Beta',
             'email' => 'into-beta-' . $this->suffix . '@beta-' . $this->suffix . '.test', 'role' => 'STUDENT',
-        ], DataUniverse::Real);
+        ]);
         $this->fixture->rememberUser($intoB);
 
         self::assertSame($this->real['b'], $this->companyOf($intoB));
@@ -209,8 +208,8 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testEditingIsScopedToTheContextCompany(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
-        $companyId = $this->context->contextCompanyId($user, DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
+        $companyId = $this->context->contextCompanyId($user);
 
         $this->administration->updateCompanyPerson($user->id, $companyId, $this->personInA, [
             'first_name' => 'Edited',
@@ -228,7 +227,7 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testCompanyAdminCannotEditAnotherCompanysPerson(): void
     {
         $user = $this->companyAdmin();
-        $ownCompany = $this->context->contextCompanyId($user, DataUniverse::Real);
+        $ownCompany = $this->context->contextCompanyId($user);
 
         self::assertSame($this->real['a'], $ownCompany, 'A company administrator resolves to their own company.');
 
@@ -250,8 +249,8 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testDisablingStopsLoginEndsSessionsAndKeepsEverything(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
-        $companyId = $this->context->contextCompanyId($user, DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
+        $companyId = $this->context->contextCompanyId($user);
 
         $this->sessions->create($this->personInA, hash('sha256', 'token-' . $this->suffix), 3600, 'ip', 'agent');
         self::assertSame(1, $this->liveSessions($this->personInA), 'The fixture must start with a live session.');
@@ -269,8 +268,8 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testEnablingRestoresTheAccount(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
-        $companyId = $this->context->contextCompanyId($user, DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
+        $companyId = $this->context->contextCompanyId($user);
 
         $this->administration->setCompanyPersonStatus($user->id, $companyId, $this->personInA, 'disabled');
         $this->administration->setCompanyPersonStatus($user->id, $companyId, $this->personInA, 'active');
@@ -283,12 +282,12 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testDisablingRefusesAnotherCompanysPerson(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
 
         $this->expectExceptionMessageMatches('/not an active member/i');
         $this->administration->setCompanyPersonStatus(
             $user->id,
-            $this->context->contextCompanyId($user, DataUniverse::Real),
+            $this->context->contextCompanyId($user),
             $this->personInB,
             'disabled'
         );
@@ -305,11 +304,11 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testRemovalEndsMembershipWithoutDisablingTheAccount(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
 
         $this->administration->removeCompanyPerson(
             $user->id,
-            $this->context->contextCompanyId($user, DataUniverse::Real),
+            $this->context->contextCompanyId($user),
             $this->personInA
         );
 
@@ -321,12 +320,12 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     public function testRemovalRefusesAnotherCompanysPerson(): void
     {
         $user = $this->platformAdmin();
-        $this->context->select($user, $this->real['a'], DataUniverse::Real);
+        $this->context->select($user, $this->real['a']);
 
         $this->expectExceptionMessageMatches('/not an active member/i');
         $this->administration->removeCompanyPerson(
             $user->id,
-            $this->context->contextCompanyId($user, DataUniverse::Real),
+            $this->context->contextCompanyId($user),
             $this->personInB
         );
     }
@@ -343,11 +342,11 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     {
         $repository = IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AdministrationRepository::class);
 
-        $firstPage = $repository->companies(DataUniverse::Real, 1, 0);
+        $firstPage = $repository->companies(1, 0);
         $names = array_column($firstPage, 'name');
         self::assertNotContains('Beta ' . $this->suffix, $names, 'The fixture must place the match off the first page.');
 
-        $found = $repository->companies(DataUniverse::Real, 25, 0, 'Beta ' . $this->suffix);
+        $found = $repository->companies(25, 0, 'Beta ' . $this->suffix);
         self::assertNotSame([], $found, 'Search must reach the whole dataset, not the rendered page.');
         self::assertContains('Beta ' . $this->suffix, array_column($found, 'name'));
     }
@@ -358,8 +357,8 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
         $repository = IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AdministrationRepository::class);
 
         $term = 'Beta ' . $this->suffix;
-        $rows = $repository->companies(DataUniverse::Real, 100, 0, $term);
-        $count = $repository->companyCount(DataUniverse::Real, $term);
+        $rows = $repository->companies(100, 0, $term);
+        $count = $repository->companyCount($term);
 
         self::assertSame(count($rows), $count, 'A count that disagrees with its rows is the defect this guards.');
     }
@@ -369,21 +368,12 @@ final class CompanyWriteScopeIntegrationTest extends TestCase
     {
         $repository = IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AdministrationRepository::class);
 
-        $byDomain = $repository->companies(DataUniverse::Real, 25, 0, 'beta-' . $this->suffix . '.test');
+        $byDomain = $repository->companies(25, 0, 'beta-' . $this->suffix . '.test');
         self::assertContains('Beta ' . $this->suffix, array_column($byDomain, 'name'));
 
-        $all = $repository->companyCount(DataUniverse::Real, '');
+        $all = $repository->companyCount('');
         self::assertGreaterThanOrEqual(2, $all, 'An empty term must return the whole selected universe.');
-        self::assertGreaterThan($repository->companyCount(DataUniverse::Real, $this->suffix . '-no-such-company'), $all);
+        self::assertGreaterThan($repository->companyCount($this->suffix . '-no-such-company'), $all);
     }
 
-    /** Search honours the universe predicate rather than replacing it. */
-    public function testSearchStaysInsideItsUniverse(): void
-    {
-        $repository = IntegrationContainer::get()->get(\CattoLearning\Infrastructure\Persistence\AdministrationRepository::class);
-
-        $seedMatches = $repository->companies(DataUniverse::Seed, 25, 0, 'Alpha ' . $this->suffix);
-
-        self::assertSame([], $seedMatches, 'A REAL company must not surface in a SEED search.');
-    }
 }

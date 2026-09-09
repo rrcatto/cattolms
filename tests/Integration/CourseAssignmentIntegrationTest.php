@@ -50,18 +50,17 @@ use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use Psr\Container\ContainerInterface;
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Tests\Support\FakeMailer;
 use CattoLearning\Tests\Support\IntegrationContainer;
-use CattoLearning\Tests\Support\SeedIntegrationFixture;
+use CattoLearning\Tests\Support\IntegrationDataFixture;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class CourseAssignmentIntegrationTest extends TestCase
 {
     private Database $db;
-    private SeedIntegrationFixture $fixture;
+    private IntegrationDataFixture $fixture;
     private PlatformAdministrationService $service;
     private AdministrationRepository $administration;
     private FakeMailer $mailer;
@@ -76,7 +75,7 @@ final class CourseAssignmentIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
-        $this->fixture = new SeedIntegrationFixture($this->db);
+        $this->fixture = new IntegrationDataFixture($this->db);
         $this->administration = $container->get(AdministrationRepository::class);
         $this->mailer = new FakeMailer();
 
@@ -87,7 +86,7 @@ final class CourseAssignmentIntegrationTest extends TestCase
         $this->adminId = $this->fixture->createUser('Assign admin ' . $suffix, 'assign-admin-' . $suffix . '@example.test');
         $this->staffId = $this->fixture->createUser('Assign staff ' . $suffix, 'assign-staff-' . $suffix . '@example.test');
         $this->companyId = $this->fixture->createCompany($this->adminId, 'Assign Co ' . $suffix, 'assign-' . $suffix . '.example.test');
-        $this->fixture->addCompanyMember($this->companyId, $this->adminId, null, 'owner');
+        $this->fixture->addCompanyMember($this->companyId, $this->adminId, 'owner');
         $this->fixture->addCompanyMember($this->companyId, $this->staffId);
 
         $this->ownedCourse = $this->fixture->createCourse($this->adminId, $this->companyId, 'assign-owned-' . $suffix, 'Owned ' . $suffix);

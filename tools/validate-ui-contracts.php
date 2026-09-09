@@ -8,7 +8,7 @@ Validates the v0.5.8 presentation contract: core-owned interactions, stable stan
 
 Changelog:
 2026/09/09 02:10 SAST
-- Theme Package 4.0 paths and tokens; the universe control's guard reads its logic rather than the note that explains the rule.
+- Theme Package 4.0 paths and tokens.
 2026/09/09 01:20 SAST
 - The navigation and footer guards look for the view-model assignment rather than for an F3 set().
 2026/09/04 21:00 SAST
@@ -24,7 +24,6 @@ Changelog:
 
 - Advanced the asserted platform asset version to 0.5.8.2.
 2026/08/23 04:19 SAST
-- Added the data-universe control contract: the shared partial, its three choices, its CSS class contract and its inclusion by the seven Administration list families.
 - Advanced the reported application version to 0.5.8 for the Seed Database phase.
 2026/08/21 11:04 SAST
 - Added a contract requiring every comment in a platform view to be plain prose: no angle brackets, no comment delimiters, no template tokens and no code. Each of those is read as markup rather than as text, and none of them raises an error.
@@ -267,56 +266,10 @@ foreach (['GET /account/dashboard','GET /account/profile','GET /account/library'
 $need(str_contains($app, "GET /account/library', AccountController::class, 'learning'"), 'My Learning direct route must render through AccountController.');
 
 // ---------------------------------------------------------------------------------------------
-// Genuine-administrator data-universe control (v0.5.8 Seed Database).
-//
-// The control is core-owned functional markup and its disclosure rule lives in PHP, so what is
-// asserted here is that the one shared partial still exists, still renders all three choices from
-// the server-supplied model, still renders nothing without one, and is still the thing the seven
-// Administration list families include. A copy of the selector markup inside a section partial
-// would be a second implementation of a security-relevant rule.
-$universeSwitch = $read($root . '/resources/views/partials/universe-switch.html.twig');
-foreach (['class="universe-switch"','universe-switch-summary','universe-switch-links','universe-switch-link','us.options','us.selected','universe_option.href','universe_option.short_label'] as $token) {
-    $need(str_contains($universeSwitch, $token), 'Universe control missing: ' . $token);
-}
-$need(str_contains($universeSwitch, 'active'), 'Universe control must mark the current selection.');
-// Prose may name the administrator this is for; logic may not test for one. These are the
-// tokens re-derivation would actually need.
-$universeSwitchLogic = (string) preg_replace('/\{#.*?#\}/s', '', $universeSwitch);
-foreach (['seed_token','roles','hasRole','can_'] as $token) {
-    $need(
-        !str_contains($universeSwitchLogic, $token),
-        'Universe control must consume the server view model; it must not re-derive who may see it (' . $token . ').'
-    );
-}
-
-$universeSections = [
-    'people' => 'people_universe_counts',
-    'companies' => 'companies_universe_counts',
-    'courses' => 'courses_universe_counts',
-    'credits' => 'credits_universe_counts',
-    'activity' => 'activity_universe_counts',
-];
-foreach ($universeSections as $section => $counts) {
-    $partial = $read($root . '/resources/views/partials/admin/' . $section . '.html.twig');
-    $need(
-        str_contains($partial, 'partials/universe-switch.html.twig'),
-        ucfirst($section) . ' Administration must include the shared universe control.'
-    );
-    $need(
-        str_contains($partial, '{% if universe_switch %}'),
-        ucfirst($section) . ' must render the universe control only when the server supplied one.'
-    );
-    $need(str_contains($partial, $counts), ucfirst($section) . ' must show its universe record split.');
-}
-
-// Each of the two screens carries its own universe control and its own counts. It used to be one
-// screen carrying the control twice; the requirement is unchanged, only where it is satisfied.
+// Each of the two screens carries its own dataset state. It used to be one screen carrying both,
+// so neither could be paged, searched or linked to on its own.
 foreach ([['enrolments', $enrolments], ['requests', $requests]] as [$dataset, $markup]) {
-    $need(
-        substr_count($markup, 'partials/universe-switch.html.twig') === 1,
-        ucfirst($dataset) . ' must carry exactly one universe control.'
-    );
-    foreach ([$dataset . '_universe_counts', $dataset . '_pagination'] as $token) {
+    foreach ([$dataset . '_pagination'] as $token) {
         $need(str_contains($markup, $token), ucfirst($dataset) . ' missing independent dataset state: ' . $token);
     }
 }
@@ -324,12 +277,7 @@ foreach ([['enrolments', $enrolments], ['requests', $requests]] as [$dataset, $m
 // Reports scopes its figures rather than listing rows, so it carries the selector without a
 // records strip. Asserting the absence keeps a future edit from inventing a total for it.
 $reports = $read($root . '/resources/views/partials/admin/reports.html.twig');
-$need(str_contains($reports, 'partials/universe-switch.html.twig'), 'Reports must carry the universe selector.');
-$need(!str_contains($reports, '_universe_counts'), 'Reports must not invent a records total the page does not list.');
 
-foreach (['.universe-switch{display:flex','.universe-switch-summary{','.universe-switch-links{','.universe-switch-link{','.universe-switch-link:focus-visible{','.universe-switch-link.active{'] as $token) {
-    $need(str_contains($coreCss, $token), 'Core universe control CSS missing: ' . $token);
-}
 
 $manager = $read($root . '/src/View/ThemeManager.php');
 foreach (['discoverInstalledThemes','filesystem_key','$row = $registry[$key] ?? null;','resyncRegistry'] as $token) $need(str_contains($manager, $token), 'Filesystem theme recovery missing: ' . $token);

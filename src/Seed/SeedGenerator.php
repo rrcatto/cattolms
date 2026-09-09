@@ -47,8 +47,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Seed;
 
-use CattoLearning\Auth\RoleCatalog;
+use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use CattoLearning\Infrastructure\Persistence\SeedRepository;
+use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Support\Slug;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
@@ -103,7 +104,8 @@ final class SeedGenerator
 
     public function __construct(
         private readonly SeedNamePools $pools,
-        private readonly ArtworkGenerator $artwork
+        private readonly ArtworkGenerator $artwork,
+        private readonly SeedRepository $repository
     ) {
     }
 

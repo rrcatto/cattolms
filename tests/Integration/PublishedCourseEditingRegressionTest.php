@@ -25,7 +25,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
-use CattoLearning\Auth\DataUniverse;
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Course\CourseService;
@@ -85,7 +84,7 @@ final class PublishedCourseEditingRegressionTest extends TestCase
             self::assertSame('Updated QA Course ' . $suffix, (string) $updated['title']);
             self::assertSame('Updated while already published.', (string) $updated['summary']);
 
-            $catalogue = $repository->findBySlug($slug, DataUniverse::Real);
+            $catalogue = $repository->findBySlug($slug);
             self::assertNotNull($catalogue);
             self::assertSame('Updated QA Course ' . $suffix, (string) $catalogue['title']);
         } finally {
