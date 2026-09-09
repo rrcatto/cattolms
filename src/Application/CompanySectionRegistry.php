@@ -13,19 +13,19 @@ final class CompanySectionRegistry
     public function all(): array
     {
         return [
-            $this->s('dashboard','Dashboard','dashboard','/company/dashboard','partials/company/dashboard.html','Company enrolments and account overview.'),
-            $this->s('people','People','people','/company/people','partials/company/people.html','People belonging to this company.'),
-            $this->s('requests','Course Requests','requests','/company/requests','partials/company/requests.html','Incoming learner course requests.'),
-            $this->s('enrolments','Enrolments','enrolments','/company/enrolments','partials/company/enrolments.html','Company learner enrolments and progress.'),
-            $this->s('credits','Credits','credits','/company/credits','partials/company/credits.html','Course and access-period credit pools.'),
+            $this->s('dashboard','Dashboard','dashboard','/company/dashboard','partials/company/dashboard.html.twig','Company enrolments and account overview.'),
+            $this->s('people','People','people','/company/people','partials/company/people.html.twig','People belonging to this company.'),
+            $this->s('requests','Course Requests','requests','/company/requests','partials/company/requests.html.twig','Incoming learner course requests.'),
+            $this->s('enrolments','Enrolments','enrolments','/company/enrolments','partials/company/enrolments.html.twig','Company learner enrolments and progress.'),
+            $this->s('credits','Credits','credits','/company/credits','partials/company/credits.html.twig','Course and access-period credit pools.'),
             // The labels say what each screen is rather than what it is called internally. "Company
             // Courses" and "Training Courses" were indistinguishable from each other on a menu:
             // both are courses and both belong to the company, and neither name said which was the
             // ones it made and which the ones it paid for.
-            $this->s('courses','Courses Created','courses','/company/courses','partials/company/courses.html','Courses this company owns and offers.'),
-            $this->s('training','Courses Bought','courses','/company/training','partials/company/training.html','Courses this company has bought access to for its staff.'),
-            $this->s('favourites','Favourites','courses','/company/favourites','partials/company/favourites.html','Courses this company may want for its staff but has not bought.'),
-            $this->s('performance','Performance','reports','/company/performance','partials/company/performance.html','How this company\'s staff are doing, course by course.'),
+            $this->s('courses','Courses Created','courses','/company/courses','partials/company/courses.html.twig','Courses this company owns and offers.'),
+            $this->s('training','Courses Bought','courses','/company/training','partials/company/training.html.twig','Courses this company has bought access to for its staff.'),
+            $this->s('favourites','Favourites','courses','/company/favourites','partials/company/favourites.html.twig','Courses this company may want for its staff but has not bought.'),
+            $this->s('performance','Performance','reports','/company/performance','partials/company/performance.html.twig','How this company\'s staff are doing, course by course.'),
         ];
     }
     /** @return array{key:string,label:string,icon:string,route:string,template:string,description:string} */

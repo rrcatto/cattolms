@@ -113,10 +113,10 @@ final class CompanyManagementContractTest extends TestCase
     /** The Administration companies list uses the shared live search control. */
     public function testAdministrationCompaniesUsesTheSharedSearchControl(): void
     {
-        $markup = self::source('resources/views/partials/admin/companies.html');
+        $markup = self::source('resources/views/partials/admin/companies.html.twig');
 
-        self::assertStringContainsString('partials/dataset-search.html', $markup);
-        self::assertStringContainsString("ds_name='companies'", $markup);
+        self::assertStringContainsString('partials/dataset-search.html.twig', $markup);
+        self::assertStringContainsString("ds_name: 'companies'", $markup);
         self::assertStringContainsString('id="companies-region"', $markup, 'The swap target must be a wrapper that always survives.');
         self::assertStringContainsString('id="companies-results"', $markup);
         self::assertStringNotContainsString('data-filter-input', $markup, 'A paginated table must not pretend to search by hiding rows.');
@@ -130,7 +130,7 @@ final class CompanyManagementContractTest extends TestCase
      */
     public function testTheSharedSearchControlIsLiveAndDegrades(): void
     {
-        $markup = self::source('resources/views/partials/dataset-search.html');
+        $markup = self::source('resources/views/partials/dataset-search.html.twig');
 
         self::assertStringContainsString('delay:300ms', $markup, 'Typing must not fire a request until the reader pauses.');
         self::assertStringContainsString('input changed', $markup, 'The input event catches typing, pasting and clearing; an unchanged value fires nothing.');
@@ -159,7 +159,7 @@ final class CompanyManagementContractTest extends TestCase
     /** Manage hands one company to the Company workspace, as a POST. */
     public function testAdministrationCompaniesOffersManageAsAPost(): void
     {
-        $markup = self::source('resources/views/partials/admin/companies.html');
+        $markup = self::source('resources/views/partials/admin/companies.html.twig');
 
         self::assertStringContainsString('action="/company/context"', $markup);
         self::assertStringContainsString('name="company_id"', $markup);
@@ -184,7 +184,7 @@ final class CompanyManagementContractTest extends TestCase
     /** Disable and Remove are separate actions with separate destinations. */
     public function testDisableAndRemoveAreSeparateActions(): void
     {
-        $markup = self::source('resources/views/partials/company/people.html');
+        $markup = self::source('resources/views/partials/company/people.html.twig');
 
         self::assertStringContainsString('/status', $markup);
         self::assertStringContainsString('/remove', $markup);
@@ -200,7 +200,7 @@ final class CompanyManagementContractTest extends TestCase
      */
     public function testTheConfirmationsDescribeWhatActuallyHappens(): void
     {
-        $markup = self::source('resources/views/partials/company/people.html');
+        $markup = self::source('resources/views/partials/company/people.html.twig');
 
         self::assertStringContainsString('signed out', $markup, 'Disabling must say the person is signed out.');
         self::assertStringContainsString('learning history are kept', $markup, 'Disabling must say nothing is deleted.');
@@ -210,7 +210,7 @@ final class CompanyManagementContractTest extends TestCase
     /** Editing a person is offered, and does not pretend to manage identity or roles. */
     public function testPersonEditIsOfferedAndScopedToProfileFields(): void
     {
-        $markup = self::source('resources/views/partials/company/people.html');
+        $markup = self::source('resources/views/partials/company/people.html.twig');
 
         self::assertStringContainsString('name="certificate_name"', $markup);
         self::assertStringContainsString('name="mobile_number"', $markup);
@@ -223,7 +223,7 @@ final class CompanyManagementContractTest extends TestCase
     /** The picker results render, and selecting one is a POST carrying CSRF. */
     public function testPickerResultsRenderAndSelectViaPost(): void
     {
-        $html = RenderHarness::render('partials/company-picker-results.html', RenderHarness::baseHive() + [
+        $html = RenderHarness::render('partials/company-picker-results.html.twig', RenderHarness::baseHive() + [
             'picker_companies' => [[
                 'id' => 7, 'name' => 'Table Bay Logistics', 'domain' => 'tablebay.test',
                 'status' => 'active', 'status_label' => 'Active', 'is_system' => false,
@@ -243,7 +243,7 @@ final class CompanyManagementContractTest extends TestCase
     /** A disabled company is shown but cannot be chosen. */
     public function testADisabledCompanyCannotBeSelectedFromThePicker(): void
     {
-        $html = RenderHarness::render('partials/company-picker-results.html', RenderHarness::baseHive() + [
+        $html = RenderHarness::render('partials/company-picker-results.html.twig', RenderHarness::baseHive() + [
             'picker_companies' => [[
                 'id' => 9, 'name' => 'Dormant Co', 'domain' => 'dormant.test',
                 'status' => 'disabled', 'status_label' => 'Disabled', 'is_system' => false,
@@ -261,7 +261,7 @@ final class CompanyManagementContractTest extends TestCase
     /** The company already in context is marked rather than offered again. */
     public function testTheCurrentCompanyIsMarkedNotOffered(): void
     {
-        $html = RenderHarness::render('partials/company-picker-results.html', RenderHarness::baseHive() + [
+        $html = RenderHarness::render('partials/company-picker-results.html.twig', RenderHarness::baseHive() + [
             'picker_companies' => [[
                 'id' => 5, 'name' => 'Current Co', 'domain' => 'current.test',
                 'status' => 'active', 'status_label' => 'Active', 'is_system' => false,
@@ -276,21 +276,22 @@ final class CompanyManagementContractTest extends TestCase
         self::assertStringNotContainsString('name="company_id"', $html);
     }
 
-    /** Every template comment in the new markup is plain prose. */
-    public function testNewTemplateCommentsArePlainProse(): void
+    /**
+     * The controls' notes stay out of the response.
+     *
+     * They were HTML comments and had to be plain prose, because F3 parsed its own tags inside a
+     * comment and a delimiter written in a comment body ended it early. A Twig comment does not
+     * survive compilation, so what is asserted now is that the notes are Twig comments.
+     */
+    public function testNewTemplateNotesAreNotServed(): void
     {
         foreach ([
-            'resources/views/partials/company-picker-results.html',
-            'resources/views/partials/company-context.html',
-            'resources/views/pages/company-picker.html',
-            'resources/views/partials/company/people.html',
-        ] as $template) {
-            preg_match_all('/<!--(.*?)-->/s', self::source($template), $comments);
-            foreach ($comments[1] as $comment) {
-                self::assertStringNotContainsString('{{', $comment, $template . ': a template token inside a comment becomes real markup.');
-                self::assertStringNotContainsString('<', $comment, $template . ': an angle bracket inside a comment becomes a tag.');
-                self::assertStringNotContainsString('--', $comment, $template . ': a comment delimiter inside a comment ends it early.');
-            }
+            'resources/views/partials/company-picker-results.html.twig',
+            'resources/views/partials/company-context.html.twig',
+            'resources/views/pages/company-picker.html.twig',
+            'resources/views/partials/company/people.html.twig',
+        ] as $path) {
+            self::assertStringNotContainsString('<!--', self::source($path), $path . ' serves an HTML comment.');
         }
     }
 

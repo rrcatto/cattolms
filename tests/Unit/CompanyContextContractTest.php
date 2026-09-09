@@ -217,7 +217,7 @@ final class CompanyContextContractTest extends TestCase
     /** The control names the company being administered and which universe that puts it in. */
     public function testTheControlRendersForAPlatformAdministrator(): void
     {
-        $html = RenderHarness::render('partials/company-context.html', RenderHarness::hiveWith(self::switcherHive()));
+        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive()));
 
         self::assertStringContainsString('company-context', $html);
         self::assertStringContainsString('Highveld Mining', $html);
@@ -228,7 +228,7 @@ final class CompanyContextContractTest extends TestCase
     /** Administering a generated company says so, because it otherwise looks identical to a real one. */
     public function testTheControlNamesTheSeedUniverse(): void
     {
-        $html = RenderHarness::render('partials/company-context.html', RenderHarness::hiveWith(self::switcherHive('seed')));
+        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive('seed')));
 
         self::assertStringContainsString('SEED', $html);
     }
@@ -236,7 +236,7 @@ final class CompanyContextContractTest extends TestCase
     /** Selecting is a POST carrying a CSRF token, never a link. */
     public function testSelectingIsAPostWithCsrf(): void
     {
-        $html = RenderHarness::render('partials/company-context.html', RenderHarness::hiveWith(self::switcherHive()));
+        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive()));
 
         self::assertStringContainsString('action="/company/context"', $html);
         self::assertStringContainsString('method="post"', $html);
@@ -252,7 +252,7 @@ final class CompanyContextContractTest extends TestCase
      */
     public function testThePickerModalIsAccessible(): void
     {
-        $html = RenderHarness::render('partials/company-context.html', RenderHarness::hiveWith(self::switcherHive()));
+        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive()));
 
         self::assertStringContainsString('role="dialog"', $html);
         self::assertStringContainsString('aria-modal="true"', $html);
@@ -263,7 +263,7 @@ final class CompanyContextContractTest extends TestCase
     /** Without JavaScript the switcher still has a destination. */
     public function testThePickerHasANonJavascriptFallback(): void
     {
-        $html = RenderHarness::render('partials/company-context.html', RenderHarness::hiveWith(self::switcherHive()));
+        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive()));
 
         self::assertStringContainsString('/company/picker', $html);
         self::assertStringContainsString('method="get"', $html, 'Search must work as an ordinary GET form.');
@@ -272,7 +272,7 @@ final class CompanyContextContractTest extends TestCase
     /** An ordinary Company Administrator is shown no switcher at all. */
     public function testTheControlIsAbsentWithoutTheCapability(): void
     {
-        $html = RenderHarness::render('partials/company-context.html', RenderHarness::hiveWith([
+        $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith([
             'can_select_company' => false,
             'company_context_mode' => 'own',
             'company_context_name' => 'Table Bay Logistics',
@@ -291,20 +291,19 @@ final class CompanyContextContractTest extends TestCase
     }
 
     /**
-     * The control's own markup carries no template tokens inside comments.
+     * The control's notes stay out of the response.
      *
-     * F3 parses its own tags inside HTML comments, and a comment delimiter written inside a
-     * comment body ends it early and leaks the remainder onto the page. This has happened before.
+     * They used to be HTML comments, and the rule then was that they had to be plain prose: F3
+     * parsed its own tags inside a comment, and a comment delimiter written in a comment body
+     * ended it early and leaked the remainder onto the page. Both hazards are gone with the
+     * template language - a Twig comment does not survive compilation - so what is asserted now is
+     * that the notes are Twig comments rather than that their contents are safe as HTML.
      */
-    public function testTheControlsCommentsArePlainProse(): void
+    public function testTheControlsNotesAreNotServed(): void
     {
-        $markup = self::source('resources/views/partials/company-context.html');
+        $markup = self::source('resources/views/partials/company-context.html.twig');
 
-        preg_match_all('/<!--(.*?)-->/s', $markup, $comments);
-        foreach ($comments[1] as $comment) {
-            self::assertStringNotContainsString('{{', $comment, 'A template token inside a comment becomes real markup.');
-            self::assertStringNotContainsString('<', $comment, 'An angle bracket inside a comment becomes a tag.');
-            self::assertStringNotContainsString('--', $comment, 'A comment delimiter inside a comment ends it early.');
-        }
+        self::assertStringNotContainsString('<!--', $markup, 'An HTML comment is served verbatim; use a Twig comment.');
+        self::assertStringContainsString('{#', $markup, 'The control should still explain itself to the next reader.');
     }
 }

@@ -1,0 +1,9 @@
+<article class="card h-100 cl-course-card overflow-hidden">
+  {% if course.cover_media_public_id %}<img src="/course-media/{{ course.cover_media_public_id }}" class="cl-course-cover" alt="">{% else %}<div class="cl-course-cover cl-course-cover-placeholder"><span>{{ course.cover_initial }}</span></div>{% endif %}
+  <div class="card-body p-4 d-flex flex-column">
+    <div class="d-flex flex-wrap gap-2 mb-3">{% if course.category_name %}{% if course.category_name %}<span class="badge cl-badge-soft">{{ course.category_name }}</span>{% endif %}{% endif %}{% if course.level %}<span class="badge text-bg-light">{{ course.level }}</span>{% endif %}</div>
+    <h3 class="h4">{{ course.title }}</h3>
+    <p class="text-body-secondary flex-grow-1">{{ course.summary }}</p>
+    <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-2"><small>{{ course.module_count }} modules · {{ course.question_count }} questions</small><a class="stretched-link fw-semibold" href="/courses/{{ course.slug }}">View course</a></div>
+  </div>
+</article>

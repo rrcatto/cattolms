@@ -109,15 +109,15 @@ final class ThemePaletteTest extends TestCase
     {
         $dir = $this->root . '/instance/themes/' . $key;
         mkdir($dir . '/public/css', 0775, true);
-        file_put_contents($dir . '/base.html', <<<'HTML'
-<!doctype html><html><head><repeat group="{{ @platform.styles }}" value="{{ @style }}"><link rel="stylesheet" href="{{ @style }}"></repeat></head><body>{{ @content | raw }}<repeat group="{{ @platform.scripts }}" value="{{ @script }}"><script src="{{ @script }}"></script></repeat></body></html>
-HTML);
+        file_put_contents($dir . '/base.html.twig', <<<'TWIG'
+<!doctype html><html><head>{% for style in platform.styles %}<link rel="stylesheet" href="{{ style }}">{% endfor %}</head><body>{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}{% for script in platform.scripts %}<script src="{{ script }}"></script>{% endfor %}</body></html>
+TWIG);
         file_put_contents($dir . '/public/css/theme.css', 'body{font-family:sans-serif}');
 
         $manifest = [
             'format' => 'catto-learning-theme',
-            'schema_version' => '3.0',
-            'template_api' => '1.0',
+            'schema_version' => '4.0',
+            'template_api' => '2.0',
             'theme' => [
                 'name' => ucfirst(str_replace('-v1.0.0', '', $key)),
                 'slug' => str_replace('-v1.0.0', '', $key),

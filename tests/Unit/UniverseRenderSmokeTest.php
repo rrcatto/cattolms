@@ -49,14 +49,14 @@ final class UniverseRenderSmokeTest extends TestCase
     public static function countedFamilies(): array
     {
         return [
-            'people' => ['partials/admin/people.html', 'people', '/admin/people'],
-            'companies' => ['partials/admin/companies.html', 'companies', '/admin/companies'],
-            'courses' => ['partials/admin/courses.html', 'courses', '/admin/courses'],
-            'credits' => ['partials/admin/credits.html', 'credits', '/admin/course/credits'],
-            'activity' => ['partials/admin/activity.html', 'activity', '/admin/activity'],
+            'people' => ['partials/admin/people.html.twig', 'people', '/admin/people'],
+            'companies' => ['partials/admin/companies.html.twig', 'companies', '/admin/companies'],
+            'courses' => ['partials/admin/courses.html.twig', 'courses', '/admin/courses'],
+            'credits' => ['partials/admin/credits.html.twig', 'credits', '/admin/course/credits'],
+            'activity' => ['partials/admin/activity.html.twig', 'activity', '/admin/activity'],
             // Two screens with two routes since v0.6, not two tabs on one.
-            'requests' => ['partials/admin/requests.html', 'requests', '/admin/course/requests'],
-            'enrolments' => ['partials/admin/enrolments.html', 'enrolments', '/admin/course/enrolments'],
+            'requests' => ['partials/admin/requests.html.twig', 'requests', '/admin/course/requests'],
+            'enrolments' => ['partials/admin/enrolments.html.twig', 'enrolments', '/admin/course/enrolments'],
         ];
     }
 
@@ -160,7 +160,7 @@ final class UniverseRenderSmokeTest extends TestCase
     public function testTheActiveChoiceIsTheSelectedUniverse(DataUniverse $selected): void
     {
         $markup = RenderHarness::render(
-            'partials/admin/people.html',
+            'partials/admin/people.html.twig',
             self::hive('people', '/admin/people', $selected)
         );
 
@@ -205,9 +205,9 @@ final class UniverseRenderSmokeTest extends TestCase
         $hive['course_report'] = [];
         $hive['company_report'] = [];
 
-        self::assertNull(RenderHarness::renderError('partials/admin/reports.html', $hive));
+        self::assertNull(RenderHarness::renderError('partials/admin/reports.html.twig', $hive));
 
-        $markup = RenderHarness::render('partials/admin/reports.html', $hive);
+        $markup = RenderHarness::render('partials/admin/reports.html.twig', $hive);
         self::assertStringContainsString('class="universe-switch"', $markup);
         self::assertStringNotContainsString('universe-switch-summary', $markup);
     }
@@ -322,7 +322,7 @@ final class UniverseRenderSmokeTest extends TestCase
         $hive['universe_query'] = '?universe=seed';
         $hive['universe_switch'] = self::selector(DataUniverse::Seed, '/admin');
 
-        $markup = RenderHarness::render('partials/admin/people.html', $hive);
+        $markup = RenderHarness::render('partials/admin/people.html.twig', $hive);
         self::assertStringContainsString('href="/admin/people?universe=seed"', $markup);
     }
 
@@ -333,7 +333,7 @@ final class UniverseRenderSmokeTest extends TestCase
         $hive['is_preview'] = true;
         $hive['people_preview_has_more'] = true;
 
-        $markup = RenderHarness::render('partials/admin/people.html', $hive);
+        $markup = RenderHarness::render('partials/admin/people.html.twig', $hive);
         self::assertStringContainsString('href="/admin/people"', $markup);
     }
 }

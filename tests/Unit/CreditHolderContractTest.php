@@ -57,10 +57,10 @@ final class CreditHolderContractTest extends TestCase
 
     public function testTheGrantFormOffersNoIndividualHolder(): void
     {
-        $form = self::read('resources/views/partials/admin/credits.html');
+        $form = self::read('resources/views/partials/admin/credits.html.twig');
 
-        self::assertStringContainsString("lk_name='company_id'", $form);
-        self::assertStringContainsString("lk_label='Company holding the credit',lk_empty='Search for the company',lk_selected=0,lk_required=1", $form);
+        self::assertStringContainsString("lk_name: 'company_id'", $form);
+        self::assertStringContainsString("lk_label: 'Company holding the credit', lk_empty: 'Search for the company', lk_selected: 0, lk_required: 1", $form);
         self::assertStringNotContainsString("lk_name='user_id'", $form, 'The individual holder control must not return.');
     }
 

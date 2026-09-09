@@ -67,7 +67,7 @@ final class CompanyWorkspaceContractTest extends TestCase
         $service = (string) file_get_contents($root . '/src/Application/PlatformAdministrationService.php');
 
         foreach (['companies', 'company_creators'] as $dataset) {
-            $file = $dataset === 'companies' ? 'companies.html' : 'company-creators.html';
+            $file = $dataset === 'companies' ? 'companies.html.twig' : 'company-creators.html.twig';
             $partial = (string) file_get_contents($root . '/resources/views/partials/admin/' . $file);
             self::assertStringContainsString('<table>', $partial);
             self::assertStringNotContainsString('grid grid-3', $partial);
@@ -75,7 +75,7 @@ final class CompanyWorkspaceContractTest extends TestCase
             // survived the move to the shared control and rendered directly above it, and its links
             // used a bare `page` parameter that AdminController::sectionRequest() never reads, so
             // every one of them returned page 1.
-            self::assertStringContainsString('with="pg=@' . $dataset . '_pagination"', $partial);
+            self::assertStringContainsString('with {pg: ' . $dataset . '_pagination}', $partial);
             self::assertStringNotContainsString('/admin/companies?page=', $partial);
             self::assertStringNotContainsString('@' . $dataset . '_total_pages', $partial);
             // The row count is the shared control's own summary now. It used to be printed again in
@@ -103,17 +103,17 @@ final class CompanyWorkspaceContractTest extends TestCase
     public function testCompanyCreateAndEditControlsUseUsableCoreModals(): void
     {
         $root = dirname(__DIR__, 2);
-        $modals = (string) file_get_contents($root . '/resources/views/partials/admin/company-modals.html');
+        $modals = (string) file_get_contents($root . '/resources/views/partials/admin/company-modals.html.twig');
         $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
         $js = (string) file_get_contents($root . '/public_html/js/platform-overrides.js');
-        self::assertStringContainsString('data-open-modal="company-add"', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html'));
+        self::assertStringContainsString('data-open-modal="company-add"', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
         self::assertStringContainsString('id="company-add-title">Add Company</h3>', $modals);
         self::assertStringContainsString('Create Company</button>', $modals);
-        self::assertStringContainsString('data-open-modal="company-edit-', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html'));
+        self::assertStringContainsString('data-open-modal="company-edit-', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
         self::assertStringContainsString('id="company-edit-', $modals);
-        foreach (['companies.html', 'company-creators.html'] as $file) {
+        foreach (['companies.html.twig', 'company-creators.html.twig'] as $file) {
             self::assertStringContainsString(
-                'partials/admin/company-modals.html',
+                'partials/admin/company-modals.html.twig',
                 (string) file_get_contents($root . '/resources/views/partials/admin/' . $file),
                 $file . ' must include the shared company dialogs rather than carry its own copy.'
             );

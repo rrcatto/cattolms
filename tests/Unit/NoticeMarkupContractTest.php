@@ -42,7 +42,7 @@ final class NoticeMarkupContractTest extends TestCase
         );
 
         foreach ($directory as $file) {
-            if ($file->isDir() || $file->getExtension() !== 'html') continue;
+            if ($file->isDir() || $file->getExtension() !== 'twig') continue;
             $markup = (string) file_get_contents($file->getPathname());
 
             // The body of each notice: the div that follows the icon span.

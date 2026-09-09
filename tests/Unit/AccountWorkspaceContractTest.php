@@ -64,26 +64,26 @@ final class AccountWorkspaceContractTest extends TestCase
 
     public function testProfileContainsOnlyProfileAndEmailAccountInformation(): void
     {
-        $profile = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/profile.html');
+        $profile = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/profile.html.twig');
         foreach (['Personal particulars','Email addresses','Primary login address','secondary email'] as $token) self::assertStringContainsString($token, $profile);
         foreach (['Course history','Current courses','Active sessions','Account activity'] as $token) self::assertStringNotContainsString($token, $profile);
     }
 
     public function testDashboardShowsLearningStatsCourseHistoryGradesAndCertificateStatus(): void
     {
-        $dashboard = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/dashboard.html');
+        $dashboard = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/dashboard.html.twig');
         foreach (['Current courses','Completed','Certificates','Current progress','Course history','overall_grade_code','certificate_public_id'] as $token) self::assertStringContainsString($token, $dashboard);
     }
 
     public function testSessionsAndActivityRemainDifferentSections(): void
     {
         $root = dirname(__DIR__, 2) . '/resources/views/partials/account/';
-        $sessions = (string) file_get_contents($root . 'sessions.html');
-        $activity = (string) file_get_contents($root . 'activity.html');
+        $sessions = (string) file_get_contents($root . 'sessions.html.twig');
+        $activity = (string) file_get_contents($root . 'activity.html.twig');
         self::assertStringContainsString('Active sessions', $sessions);
         self::assertStringContainsString('/account/sessions/revoke', $sessions);
         self::assertStringContainsString('Account activity', $activity);
-        self::assertStringContainsString('@account_activity', $activity);
+        self::assertStringContainsString('account_activity', $activity);
     }
 
     public function testThemeRendererProvidesStableAccountSectionObject(): void
@@ -114,7 +114,7 @@ final class AccountWorkspaceContractTest extends TestCase
     }
     public function testAccountWorkspaceUsesCanonicalAdministrationAccordionMarkup(): void
     {
-        $workspace = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/account-control-centre.html');
+        $workspace = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/account-control-centre.html.twig');
         foreach (['cl-admin-section-summary','cl-admin-section-title','cl-admin-section-description','cl-admin-section-toggle','cl-admin-section-actions','cl-admin-section-link'] as $token) {
             self::assertStringContainsString($token, $workspace);
         }

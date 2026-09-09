@@ -212,7 +212,7 @@ final class AclContractTest extends TestCase
     public function testRoleAdministrationUsesExplicitSaveAndStructuredAuditChanges(): void
     {
         $root = dirname(__DIR__, 2);
-        $edit = (string) file_get_contents($root . '/resources/views/pages/admin-role-edit.html');
+        $edit = (string) file_get_contents($root . '/resources/views/pages/admin-role-edit.html.twig');
         $service = (string) file_get_contents($root . '/src/Application/RoleAdministrationService.php');
         $app = (string) file_get_contents($root . '/src/Application/App.php');
         self::assertStringContainsString('name="permissions[]"', $edit);

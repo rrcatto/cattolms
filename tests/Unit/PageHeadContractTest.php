@@ -33,6 +33,14 @@ sitting:
 None of the three is visible by reading the markup, which is exactly why they are asserted.
 
 Changelog:
+
+2026/09/09 02:10 SAST
+- Dropped the two parser tests. One required every ph_ parameter to be a single expression and the
+  other forbade passing them on an include, because F3 compiled a set attribute into PHP and split
+  an include's arguments on commas: literal text beside a token was a syntax error at render, and a
+  comma inside a value truncated the rest. Twig has neither behaviour - a set is an ordinary
+  expression and an include's arguments are a hash - so both tests guarded a hazard that no longer
+  exists. The three that remain are about the page, not the parser.
 2026/09/07 16:00 SAST
 - Created with the shared page header.
 */
@@ -57,11 +65,11 @@ final class PageHeadContractTest extends TestCase
      * @var array<string,string>
      */
     private const WITHOUT_HEADER = [
-        'home.html' => 'Its own hero; a header would be a second title.',
-        'error.html' => 'No context to describe.',
-        'course-detail.html' => 'The course is the hero.',
-        'learn-module.html' => 'Carries its own course toolbar, which is the compact header.',
-        'assessment-question.html' => 'One question, full width, nothing else on screen.',
+        'home.html.twig' => 'Its own hero; a header would be a second title.',
+        'error.html.twig' => 'No context to describe.',
+        'course-detail.html.twig' => 'The course is the hero.',
+        'learn-module.html.twig' => 'Carries its own course toolbar, which is the compact header.',
+        'assessment-question.html.twig' => 'One question, full width, nothing else on screen.',
     ];
 
     /**
@@ -75,7 +83,7 @@ final class PageHeadContractTest extends TestCase
      */
     private static function pages(): array
     {
-        $paths = glob(dirname(__DIR__, 2) . '/resources/views/pages/*.html') ?: [];
+        $paths = glob(dirname(__DIR__, 2) . '/resources/views/pages/*.html.twig') ?: [];
         self::assertNotSame([], $paths, 'No page templates were found, so these tests prove nothing.');
 
         return $paths;
@@ -88,7 +96,7 @@ final class PageHeadContractTest extends TestCase
         foreach (self::pages() as $path) {
             $name = basename($path);
             $markup = (string) file_get_contents($path);
-            $has = str_contains($markup, 'partials/page-head.html');
+            $has = str_contains($markup, 'partials/page-head.html.twig');
 
             if (isset(self::WITHOUT_HEADER[$name])) {
                 self::assertFalse(
@@ -127,66 +135,6 @@ final class PageHeadContractTest extends TestCase
     }
 
     /**
-     * Every header parameter compiles.
-     *
-     * A set attribute is one expression. Literal text mixed with a template token is a PHP syntax
-     * error at render, and unbalanced tokens are the same.
-     */
-    public function testHeaderParametersAreSingleCompilableExpressions(): void
-    {
-        $offenders = [];
-
-        foreach (array_merge(self::pages(), glob(dirname(__DIR__, 2) . '/resources/views/partials/*.html') ?: []) as $path) {
-            $markup = (string) file_get_contents($path);
-            if (preg_match('/<set ph_[^>]*\/>/', $markup, $block) !== 1) {
-                continue;
-            }
-
-            preg_match_all('/(ph_[a-z_]+)="([^"]*)"/', $block[0], $attributes, PREG_SET_ORDER);
-            foreach ($attributes as [, $key, $value]) {
-                if (!str_contains($value, '{{')) {
-                    continue;
-                }
-                if (substr_count($value, '{{') !== substr_count($value, '}}')) {
-                    $offenders[] = basename($path) . ' ' . $key . ': unbalanced tokens';
-                    continue;
-                }
-                // One token spanning the whole value, or nothing but tokens.
-                if (preg_match('/^\{\{.*\}\}$/s', trim($value)) !== 1 || substr_count($value, '{{') > 1) {
-                    $offenders[] = basename($path) . ' ' . $key . ': literal text mixed with a token';
-                }
-            }
-        }
-
-        self::assertSame(
-            [],
-            $offenders,
-            "A set attribute is one expression, not interpolated text. Write a mixed value as a "
-            . "concatenation:\n  " . implode("\n  ", $offenders)
-        );
-    }
-
-    /** The parameters never travel on an include's with attribute, which splits them on commas. */
-    public function testHeaderParametersAreNeverPassedOnAnIncludeWith(): void
-    {
-        $offenders = [];
-
-        foreach (array_merge(self::pages(), glob(dirname(__DIR__, 2) . '/resources/views/partials/*.html') ?: []) as $path) {
-            $markup = (string) file_get_contents($path);
-            if (preg_match('/page-head\.html" with=/', $markup) === 1) {
-                $offenders[] = basename($path);
-            }
-        }
-
-        self::assertSame(
-            [],
-            $offenders,
-            'F3 splits a with attribute on every comma, quoted or not, so a lead containing one '
-            . 'silently becomes two broken parameters.'
-        );
-    }
-
-    /**
      * No screen carries two headings for itself.
      *
      * Adding the shared header to pages that already had their own produced eleven screens with the
@@ -202,7 +150,7 @@ final class PageHeadContractTest extends TestCase
         foreach (self::pages() as $path) {
             $name = basename($path);
             $markup = (string) file_get_contents($path);
-            if (!str_contains($markup, 'partials/page-head.html')) {
+            if (!str_contains($markup, 'partials/page-head.html.twig')) {
                 continue;
             }
 
@@ -211,7 +159,7 @@ final class PageHeadContractTest extends TestCase
                 continue;
             }
             // The compact header exists precisely for a screen whose own artefact carries the title.
-            if (str_contains($markup, 'ph_compact=')) {
+            if (str_contains($markup, 'set ph_compact')) {
                 continue;
             }
             $offenders[] = $name;

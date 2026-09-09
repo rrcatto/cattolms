@@ -199,12 +199,12 @@ final class NavigationContractTest extends TestCase
     public function testFactoryResetRendersCoreNavigationArraysInsteadOfHardCodedMenus(): void
     {
         $root = dirname(__DIR__, 2) . '/themes/factory-reset';
-        $base = (string) file_get_contents($root . '/base.html');
-        $nav = (string) file_get_contents($root . '/partials/navigation.html');
-        $footer = (string) file_get_contents($root . '/partials/footer.html');
-        self::assertStringContainsString('@navigation', $base);
-        self::assertStringContainsString('@navigation', $nav);
-        self::assertStringContainsString('@footer_navigation', $footer);
+        $base = (string) file_get_contents($root . '/base.html.twig');
+        $nav = (string) file_get_contents($root . '/partials/navigation.html.twig');
+        $footer = (string) file_get_contents($root . '/partials/footer.html.twig');
+        self::assertStringContainsString('navigation', $base);
+        self::assertStringContainsString('navigation', $nav);
+        self::assertStringContainsString('footer_navigation', $footer);
         self::assertStringNotContainsString('href="/admin" data-nav-item="administration"', $nav);
         self::assertStringNotContainsString('href="/company" data-nav-item="company"', $nav);
     }
@@ -223,10 +223,10 @@ final class NavigationContractTest extends TestCase
      */
     public function testTheThirdNavigationLevelIsAFlyoutReachableWithoutAMouse(): void
     {
-        $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/themes/factory-reset/partials/navigation.html');
+        $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/themes/factory-reset/partials/navigation.html.twig');
 
-        self::assertStringContainsString('count(@child.children) > 0', $nav, 'A menu child may hold children and the theme must render them.');
-        self::assertStringContainsString('@grandchild.href', $nav);
+        self::assertStringContainsString('child.children|length > 0', $nav, 'A menu child may hold children and the theme must render them.');
+        self::assertStringContainsString('grandchild.href', $nav);
         self::assertStringContainsString('class="nav-group"', $nav);
         self::assertStringContainsString('class="nav-subpanel"', $nav);
         self::assertMatchesRegularExpression(

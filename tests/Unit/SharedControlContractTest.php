@@ -11,8 +11,8 @@ Description:
 Asserts that the shared UI controls are the only implementations of their jobs.
 
 The owner's rule is that one pattern serves one job everywhere: a table searches through
-partials/dataset-search.html, pages through partials/pagination.html, and a data scope is chosen
-through partials/universe-switch.html and the universe query parameter. The rule was stated,
+partials/dataset-search.html.twig, pages through partials/pagination.html.twig, and a data scope is chosen
+through partials/universe-switch.html.twig and the universe query parameter. The rule was stated,
 written into the project instructions, and then broken three times in the same feature - the Switch
 Company modal, the standalone picker page and the Administration Courses route each grew a search
 of their own, one of which needed the Enter key because its htmx trigger sat on the form rather
@@ -36,7 +36,7 @@ use PHPUnit\Framework\TestCase;
 final class SharedControlContractTest extends TestCase
 {
     /** The one search control. Everything else includes it. */
-    private const SEARCH_CONTROL = 'resources/views/partials/dataset-search.html';
+    private const SEARCH_CONTROL = 'resources/views/partials/dataset-search.html.twig';
 
     /**
      * The one legitimate other search input, and why.
@@ -46,7 +46,7 @@ final class SharedControlContractTest extends TestCase
      * shared control, used the same way everywhere it appears, so it is a second pattern for a
      * second job rather than a second pattern for this one.
      */
-    private const ENTITY_LOOKUP = 'resources/views/partials/entity-lookup.html';
+    private const ENTITY_LOOKUP = 'resources/views/partials/entity-lookup.html.twig';
 
     /**
      * No template builds its own search box.
@@ -97,7 +97,7 @@ final class SharedControlContractTest extends TestCase
             [],
             $offenders,
             "The data universe is chosen through the universe query parameter and "
-            . "partials/universe-switch.html, never a select:\n  " . implode("\n  ", $offenders)
+            . "partials/universe-switch.html.twig, never a select:\n  " . implode("\n  ", $offenders)
         );
     }
 
@@ -144,7 +144,7 @@ final class SharedControlContractTest extends TestCase
     public function testTheSearchControlToleratesAnAbsentUniverse(): void
     {
         self::assertStringContainsString(
-            'isset(@universe)',
+            'universe is defined',
             (string) file_get_contents(dirname(__DIR__, 2) . '/' . self::SEARCH_CONTROL),
             'The shared search control must not read a scope key that a caller may not have set.'
         );
@@ -163,7 +163,7 @@ final class SharedControlContractTest extends TestCase
         foreach (['resources/views/pages', 'resources/views/partials'] as $directory) {
             $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $directory));
             foreach ($files as $file) {
-                if (!$file->isFile() || $file->getExtension() !== 'html') {
+                if (!$file->isFile() || $file->getExtension() !== 'twig') {
                     continue;
                 }
                 $path = strtr($file->getPathname(), '\\', '/');

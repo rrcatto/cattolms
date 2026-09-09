@@ -13,11 +13,11 @@ final class AccountSectionRegistry
     public function all(): array
     {
         return [
-            $this->s('dashboard','Dashboard','dashboard','/account/dashboard','partials/account/dashboard.html','Learning progress, course history and account statistics.'),
-            $this->s('profile','Profile','account','/account/profile','partials/account/profile.html','Personal details and email addresses.'),
-            $this->s('learning','My Course Library','learning','/account/library','partials/account/learning.html','Current, completed, favourite and requested courses.'),
-            $this->s('sessions','Sessions','sessions','/account/sessions','partials/account/sessions.html','Active sign-in sessions and device access.'),
-            $this->s('activity','Activity','activity','/account/activity','partials/account/activity.html','Audit activity performed by this account.'),
+            $this->s('dashboard','Dashboard','dashboard','/account/dashboard','partials/account/dashboard.html.twig','Learning progress, course history and account statistics.'),
+            $this->s('profile','Profile','account','/account/profile','partials/account/profile.html.twig','Personal details and email addresses.'),
+            $this->s('learning','My Course Library','learning','/account/library','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),
+            $this->s('sessions','Sessions','sessions','/account/sessions','partials/account/sessions.html.twig','Active sign-in sessions and device access.'),
+            $this->s('activity','Activity','activity','/account/activity','partials/account/activity.html.twig','Audit activity performed by this account.'),
         ];
     }
     /** @return array{key:string,label:string,icon:string,route:string,template:string,description:string} */

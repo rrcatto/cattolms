@@ -1,0 +1,11 @@
+{% extends layout %}
+
+{% block page_body %}
+{% set ph_back_href = '/account' %}
+{% set ph_back_label = 'Account' %}
+{% set ph_kicker = 'Account' %}
+{% set ph_title = 'My sessions' %}
+{% set ph_lead = 'Where your account is signed in, and how to end a session.' %}
+{% include '@platform/partials/page-head.html.twig' %}
+{% include '@platform/partials/account/sessions.html.twig' %}
+{% endblock %}

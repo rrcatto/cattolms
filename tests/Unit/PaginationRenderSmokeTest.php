@@ -107,17 +107,17 @@ final class PaginationRenderSmokeTest extends TestCase
     public static function listPartials(): array
     {
         return [
-            ['partials/admin/people.html', 'people', '/admin/people'],
-            ['partials/admin/companies.html', 'companies', '/admin/companies'],
-            ['partials/admin/courses.html', 'courses', '/admin/courses'],
-            ['partials/admin/credits.html', 'credits', '/admin/course/credits'],
-            ['partials/admin/enrolments.html', 'enrolments', '/admin/course/enrolments'],
-            ['partials/admin/activity.html', 'activity', '/admin/activity'],
-            ['partials/company/people.html', 'people', '/company/people'],
-            ['partials/company/requests.html', 'requests', '/company/requests'],
-            ['partials/company/enrolments.html', 'enrolments', '/company/enrolments'],
-            ['partials/company/credits.html', 'credits', '/company/credits'],
-            ['partials/company/courses.html', 'courses', '/company/courses'],
+            ['partials/admin/people.html.twig', 'people', '/admin/people'],
+            ['partials/admin/companies.html.twig', 'companies', '/admin/companies'],
+            ['partials/admin/courses.html.twig', 'courses', '/admin/courses'],
+            ['partials/admin/credits.html.twig', 'credits', '/admin/course/credits'],
+            ['partials/admin/enrolments.html.twig', 'enrolments', '/admin/course/enrolments'],
+            ['partials/admin/activity.html.twig', 'activity', '/admin/activity'],
+            ['partials/company/people.html.twig', 'people', '/company/people'],
+            ['partials/company/requests.html.twig', 'requests', '/company/requests'],
+            ['partials/company/enrolments.html.twig', 'enrolments', '/company/enrolments'],
+            ['partials/company/credits.html.twig', 'credits', '/company/credits'],
+            ['partials/company/courses.html.twig', 'courses', '/company/courses'],
         ];
     }
 
@@ -128,7 +128,7 @@ final class PaginationRenderSmokeTest extends TestCase
         $hive = self::baseHive();
         $hive['is_preview'] = false;
         $hive[$dataset . '_pagination'] = self::pagination($dataset, $base);
-        if ($template === 'partials/admin/enrolments.html') {
+        if ($template === 'partials/admin/enrolments.html.twig') {
             $hive['requests_pagination'] = self::pagination('requests', $base);
             $hive['enrolments_pagination'] = self::pagination('enrolments', $base);
         }
@@ -152,7 +152,7 @@ final class PaginationRenderSmokeTest extends TestCase
         $hive = self::baseHive();
         $hive['pg'] = self::pagination('people', '/admin/people');
 
-        self::assertNull(self::renderError('partials/pagination.html', $hive));
+        self::assertNull(self::renderError('partials/pagination.html.twig', $hive));
     }
 
     public function testEntityLookupRendersWithAndWithoutASelection(): void
@@ -164,7 +164,7 @@ final class PaginationRenderSmokeTest extends TestCase
             ];
 
             self::assertNull(
-                self::renderError('partials/entity-lookup.html', $hive),
+                self::renderError('partials/entity-lookup.html.twig', $hive),
                 'The entity lookup must render whether or not something is already selected.'
             );
         }
@@ -179,7 +179,7 @@ final class PaginationRenderSmokeTest extends TestCase
                 'lookup_searched' => true,
             ];
 
-            self::assertNull(self::renderError('partials/entity-lookup-results.html', $hive));
+            self::assertNull(self::renderError('partials/entity-lookup-results.html.twig', $hive));
         }
     }
 
@@ -194,7 +194,7 @@ final class PaginationRenderSmokeTest extends TestCase
         $directory = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::root() . '/resources/views'));
 
         foreach ($directory as $file) {
-            if ($file->isDir() || $file->getExtension() !== 'html') continue;
+            if ($file->isDir() || $file->getExtension() !== 'twig') continue;
             $markup = (string) file_get_contents($file->getPathname());
             if (preg_match_all('/<!--(.*?)-->/s', $markup, $comments) === 0) continue;
 
@@ -210,14 +210,14 @@ final class PaginationRenderSmokeTest extends TestCase
 
     /**
      * An optional array variable defaults to a falsy scalar, so it must be guarded before any
-     * property access. `{{ @thing.id ?: '' }}` still evaluates the offset and fatals.
+     * property access. `{{ thing.id ?: '' }}` still evaluates the offset and fatals.
      */
     public function testOptionalArrayVariablesAreGuardedBeforeDereference(): void
     {
-        $markup = (string) file_get_contents(self::root() . '/resources/views/partials/entity-lookup.html');
+        $markup = (string) file_get_contents(self::root() . '/resources/views/partials/entity-lookup.html.twig');
 
         self::assertStringNotContainsString('@lk_selected.id ?:', $markup);
-        self::assertStringContainsString('@lk_selected ? @lk_selected.id', $markup);
+        self::assertStringContainsString('lk_selected ? lk_selected.id', $markup);
     }
 
     /**
@@ -246,7 +246,7 @@ final class PaginationRenderSmokeTest extends TestCase
         $close = '--' . '>';
 
         foreach ($directory as $file) {
-            if ($file->isDir() || $file->getExtension() !== 'html') continue;
+            if ($file->isDir() || $file->getExtension() !== 'twig') continue;
             $markup = (string) file_get_contents($file->getPathname());
             $offset = 0;
             while (($commentAt = strpos($markup, $open, $offset)) !== false) {
@@ -288,9 +288,9 @@ final class PaginationRenderSmokeTest extends TestCase
             'lk_required' => 1, 'lk_empty' => 'All people',
         ];
 
-        self::assertNull(self::renderError('partials/entity-lookup.html', $hive));
+        self::assertNull(self::renderError('partials/entity-lookup.html.twig', $hive));
 
-        $markup = \Template::instance()->render('partials/entity-lookup.html');
+        $markup = RenderHarness::render('partials/entity-lookup.html.twig', $hive);
         self::assertMatchesRegularExpression(
             '/<input type="hidden"[^<>]*value="7"[^<>]*>/s',
             $markup,
