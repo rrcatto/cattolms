@@ -1,0 +1,7 @@
+[
+    "@symfony\/stimulus-bundle",
+    "@hotwired\/stimulus",
+    "\/assets\/@symfony\/stimulus-bundle\/controllers.js",
+    "\/assets\/controllers\/tag_cloud_controller.js",
+    "TagCloud"
+]

@@ -1,129 +1,135 @@
 {
-  "name": "catto-learning/lms",
-  "description": "Open-source learning commerce and delivery platform built with PHP, Fat-Free Framework and PostgreSQL.",
-  "type": "project",
-  "require": {
-    "php": ">=8.5.9 <9.0",
-    "ext-dom": "*",
-    "ext-fileinfo": "*",
-    "ext-json": "*",
-    "ext-mbstring": "*",
-    "ext-openssl": "*",
-    "ext-pdo": "*",
-    "ext-pdo_pgsql": "*",
-    "ext-zip": "*",
-    "bcosca/fatfree-core": "^3.9",
-    "doctrine/dbal": "^4.0",
-    "doctrine/doctrine-bundle": "^3.0",
-    "friendsofphp/proxy-manager-lts": "^1.0.19",
-    "geocoder-php/geoip2-provider": "^4.0",
-    "mcp/sdk": "^0.7",
-    "php-di/php-di": "^7.1",
-    "psr/container": "^2.0",
-    "robmorgan/phinx": "^0.16",
-    "symfony/cache": "7.4.*",
-    "symfony/clock": "7.4.*",
-    "symfony/config": "7.4.*",
-    "symfony/console": "7.4.*",
-    "symfony/dependency-injection": "7.4.*",
-    "symfony/doctrine-bridge": "7.4.*",
-    "symfony/dotenv": "7.4.*",
-    "symfony/error-handler": "7.4.*",
-    "symfony/event-dispatcher": "7.4.*",
-    "symfony/filesystem": "7.4.*",
-    "symfony/finder": "7.4.*",
-    "symfony/framework-bundle": "7.4.*",
-    "symfony/http-foundation": "7.4.*",
-    "symfony/http-kernel": "7.4.*",
-    "symfony/mailer": "^7.4",
-    "symfony/mime": "7.4.*",
-    "symfony/password-hasher": "7.4.*",
-    "symfony/property-access": "7.4.*",
-    "symfony/property-info": "7.4.*",
-    "symfony/routing": "7.4.*",
-    "symfony/runtime": "7.4.*",
-    "symfony/security-bundle": "7.4.*",
-    "symfony/security-core": "7.4.*",
-    "symfony/security-csrf": "7.4.*",
-    "symfony/security-http": "7.4.*",
-    "symfony/string": "7.4.*",
-    "symfony/twig-bridge": "7.4.*",
-    "symfony/twig-bundle": "7.4.*",
-    "symfony/type-info": "7.4.*",
-    "symfony/uid": "7.4.*",
-    "symfony/var-dumper": "7.4.*",
-    "symfony/var-exporter": "7.4.*",
-    "symfony/yaml": "7.4.*",
-    "vlucas/phpdotenv": "^5.6"
-  },
-  "require-dev": {
-    "phpstan/phpstan": "^2.1",
-    "phpunit/phpunit": "^12.0"
-  },
-  "autoload": {
-    "psr-4": {
-      "CattoLearning\\": "src/"
-    }
-  },
-  "autoload-dev": {
-    "psr-4": {
-      "CattoLearning\\Tests\\": "tests/"
-    }
-  },
-  "config": {
-    "optimize-autoloader": true,
-    "sort-packages": true,
-    "allow-plugins": {
-      "php-http/discovery": true,
-      "symfony/runtime": true
+    "name": "catto-learning/lms",
+    "description": "Open-source learning commerce and delivery platform built with PHP, Fat-Free Framework and PostgreSQL.",
+    "type": "project",
+    "require": {
+        "php": ">=8.5.9 <9.0",
+        "ext-dom": "*",
+        "ext-fileinfo": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "ext-pdo": "*",
+        "ext-pdo_pgsql": "*",
+        "ext-zip": "*",
+        "bcosca/fatfree-core": "^3.9",
+        "doctrine/dbal": "^4.0",
+        "doctrine/doctrine-bundle": "^3.0",
+        "friendsofphp/proxy-manager-lts": "^1.0.19",
+        "geocoder-php/geoip2-provider": "^4.0",
+        "mcp/sdk": "^0.7",
+        "php-di/php-di": "^7.1",
+        "psr/container": "^2.0",
+        "robmorgan/phinx": "^0.16",
+        "symfony/asset-mapper": "7.4.*",
+        "symfony/cache": "7.4.*",
+        "symfony/clock": "7.4.*",
+        "symfony/config": "7.4.*",
+        "symfony/console": "7.4.*",
+        "symfony/dependency-injection": "7.4.*",
+        "symfony/doctrine-bridge": "7.4.*",
+        "symfony/dotenv": "7.4.*",
+        "symfony/error-handler": "7.4.*",
+        "symfony/event-dispatcher": "7.4.*",
+        "symfony/filesystem": "7.4.*",
+        "symfony/finder": "7.4.*",
+        "symfony/framework-bundle": "7.4.*",
+        "symfony/http-client": "7.4.*",
+        "symfony/http-foundation": "7.4.*",
+        "symfony/http-kernel": "7.4.*",
+        "symfony/mailer": "^7.4",
+        "symfony/mime": "7.4.*",
+        "symfony/password-hasher": "7.4.*",
+        "symfony/property-access": "7.4.*",
+        "symfony/property-info": "7.4.*",
+        "symfony/routing": "7.4.*",
+        "symfony/runtime": "7.4.*",
+        "symfony/security-bundle": "7.4.*",
+        "symfony/security-core": "7.4.*",
+        "symfony/security-csrf": "7.4.*",
+        "symfony/security-http": "7.4.*",
+        "symfony/stimulus-bundle": "^3.4",
+        "symfony/string": "7.4.*",
+        "symfony/twig-bridge": "7.4.*",
+        "symfony/twig-bundle": "7.4.*",
+        "symfony/type-info": "7.4.*",
+        "symfony/uid": "7.4.*",
+        "symfony/var-dumper": "7.4.*",
+        "symfony/var-exporter": "7.4.*",
+        "symfony/yaml": "7.4.*",
+        "vlucas/phpdotenv": "^5.6"
     },
-    "platform": {
-      "php": "8.5.9"
-    }
-  },
-  "scripts": {
-    "analyse": "php -d memory_limit=-1 vendor/bin/phpstan analyse",
-    "migrate": "vendor/bin/phinx migrate -c phinx.php -e development",
-    "migrations:status": "vendor/bin/phinx status -c phinx.php -e development",
-    "test": "vendor/bin/phpunit",
-    "architecture:check": "php tools/check-architecture.php",
-    "release:validate": "php tools/validate-release.php",
-    "api-token:create": "php tools/create-api-token.php",
-    "api-token:list": "php tools/list-api-tokens.php",
-    "mcp:serve": "php tools/mcp-server.php",
-    "api-token:revoke": "php tools/revoke-api-token.php",
-    "runtime:check": "php tools/check-runtime-hazards.php",
-    "test-suite:check": "php tools/check-test-suite.php",
-    "test:unit": "vendor/bin/phpunit --testsuite Unit",
-    "test:architecture": "vendor/bin/phpunit --testsuite Architecture",
-    "test:integration": "vendor/bin/phpunit --testsuite Integration",
-    "qa": [
-      "@test-suite:check",
-      "@test",
-      "@analyse",
-      "@architecture:check",
-      "@runtime:check",
-      "php tools/validate-ui-contracts.php",
-      "@release:validate"
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "CattoLearning\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CattoLearning\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true,
+            "symfony/runtime": true
+        },
+        "platform": {
+            "php": "8.5.9"
+        }
+    },
+    "scripts": {
+        "analyse": "php -d memory_limit=-1 vendor/bin/phpstan analyse",
+        "migrate": "vendor/bin/phinx migrate -c phinx.php -e development",
+        "migrations:status": "vendor/bin/phinx status -c phinx.php -e development",
+        "test": "vendor/bin/phpunit",
+        "architecture:check": "php tools/check-architecture.php",
+        "release:validate": "php tools/validate-release.php",
+        "api-token:create": "php tools/create-api-token.php",
+        "api-token:list": "php tools/list-api-tokens.php",
+        "mcp:serve": "php tools/mcp-server.php",
+        "api-token:revoke": "php tools/revoke-api-token.php",
+        "runtime:check": "php tools/check-runtime-hazards.php",
+        "test-suite:check": "php tools/check-test-suite.php",
+        "test:unit": "vendor/bin/phpunit --testsuite Unit",
+        "test:architecture": "vendor/bin/phpunit --testsuite Architecture",
+        "test:integration": "vendor/bin/phpunit --testsuite Integration",
+        "qa": [
+            "@test-suite:check",
+            "@test",
+            "@analyse",
+            "@architecture:check",
+            "@runtime:check",
+            "php tools/validate-ui-contracts.php",
+            "@release:validate"
+        ],
+        "themes:sync": "php tools/sync-themes.php",
+        "seeds:publish": "php tools/publish-seed-names.php",
+        "seeds:generate": "php tools/seed-generate.php",
+        "smoke:install": [
+            "php tools/reset-development-database.php --force",
+            "@migrate",
+            "@migrations:status",
+            "@themes:sync",
+            "@seeds:publish",
+            "php tools/smoke-app-boot.php"
+        ]
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Richard Catto",
+            "role": "Project creator and maintainer"
+        }
     ],
-    "themes:sync": "php tools/sync-themes.php",
-    "seeds:publish": "php tools/publish-seed-names.php",
-    "seeds:generate": "php tools/seed-generate.php",
-    "smoke:install": [
-      "php tools/reset-development-database.php --force",
-      "@migrate",
-      "@migrations:status",
-      "@themes:sync",
-      "@seeds:publish",
-      "php tools/smoke-app-boot.php"
-    ]
-  },
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Richard Catto",
-      "role": "Project creator and maintainer"
+    "version": "0.6",
+    "extra": {
+        "public-dir": "public_html"
     }
-  ],
-  "version": "0.6"
 }

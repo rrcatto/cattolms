@@ -32,14 +32,28 @@ Changelog:
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-4">
 		{% if tag_index %}
-			<div class="cl-facet section">
+{#
+			The importmap goes before any module script on the page. Themes put the platform's own
+			scripts at the end of the body, so emitting it here keeps it first without asking five
+			themes to carry a tag for one page.
+#}
+			{{ importmap() }}
+			<div class="cl-facet section cl-tag-cloud-shell" {{ stimulus_controller('tag-cloud') }}>
 				<div class="cl-facet-head">
 					<span class="cl-facet-label">Tags</span>
 					{% if selected_tag %}
 						<a class="btn btn-soft btn-sm" href="/courses/tags">Clear tag</a>
 					{% endif %}
 				</div>
-				{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_index} %}
+{#
+				Two renderings of the same thing. The list is what the server sends and what a reader
+				without JavaScript keeps; the canvas is what the Stimulus controller fills, and it
+				hides the list only once it has something to show in its place.
+#}
+				<div {{ stimulus_target('tag-cloud', 'source') }}>
+					{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_index} %}
+				</div>
+				<div class="cl-tag-cloud-canvas" {{ stimulus_target('tag-cloud', 'canvas') }} aria-hidden="true"></div>
 			</div>
 		{% else %}
 			<div class="empty section">

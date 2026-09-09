@@ -77,11 +77,10 @@ printf(
 
 $startedAt = microtime(true);
 $result = $container->get(SeedDatabaseService::class)->generate($volume, $description, (int) $administrator['id']);
-$token = (string) ($result['token'] ?? $result['seed_token'] ?? '');
+
 
 printf(
-    "Wrote %s rows in %.1fs. Seed token %s\n",
+    "Wrote %s rows in %.1fs.\n",
     number_format((int) array_sum((array) ($result['tables'] ?? []))),
-    microtime(true) - $startedAt,
-    $token
+    microtime(true) - $startedAt
 );

@@ -615,3 +615,23 @@
 .cl-favourite:focus-visible{outline:2px solid currentColor;outline-offset:1px}
 .cl-favourite.is-on{color:#c8971b;border-color:currentColor}
 .cl-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+
+/* v0.7 the animated tag cloud, and the list it is drawn over.
+
+   Two renderings of the same vocabulary. The list is what the server sends and what a reader
+   without JavaScript keeps; the canvas is what the Stimulus controller fills, and the controller
+   hides the list only once it has something to show in its place. Neither is styled to assume the
+   other ran: with no controller the page is a list of chips, which is a usable page. */
+.cl-tag-cloud-shell{position:relative;min-width:0}
+.cl-tag-cloud-canvas{display:none}
+.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:block;min-height:clamp(20rem,46vw,34rem);text-align:center}
+/* The library positions each word absolutely and sets its own font-size and opacity for depth, so
+   what core states here is only what it does not: the colour, the cursor and the hit feedback. */
+.cl-tag-cloud-shell .tagcloud{display:inline-block;font-weight:700;color:inherit}
+.cl-tag-cloud-shell .tagcloud--item{cursor:pointer;padding:.1rem .25rem;border-radius:6px;color:inherit}
+.cl-tag-cloud-shell .tagcloud--item:hover{background:color-mix(in srgb,currentColor 14%,transparent)}
+@media(prefers-reduced-motion:reduce){
+	/* The sphere spins continuously, so a reader who asked for less motion gets the list instead. */
+	.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:none}
+	.cl-tag-cloud-shell.is-animated [data-tag-cloud-target="source"]{display:block!important}
+}
