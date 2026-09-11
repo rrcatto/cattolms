@@ -36,14 +36,19 @@
 							<span class="small muted">{{ user_name ?: user_email }}</span>
 						</div>
 					</header>
+					{#
+						The page body sits in a boxed container so the slanted page canvas shows around
+						it rather than behind it. The footer is outside that box, as it is in Radiant
+						Learning: it is the end of the page, not part of its content.
+					#}
 					<div class="content">
 						{% include '@theme/partials/flash.html.twig' %}
 						{% block page_content %}
 							{% block page_body %}
 							{% endblock %}
 						{% endblock %}
-						{% include '@theme/partials/footer.html.twig' %}
 					</div>
+					{% include '@theme/partials/footer.html.twig' %}
 				</main>
 			</div>
 		{% else %}

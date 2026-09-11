@@ -422,7 +422,11 @@ h1,h2,h3,h4,h5,h6,.page-title,.stat-value{font-weight:700;letter-spacing:-.018em
 .public-nav .btn-ghost{color:var(--on-primary);border-color:color-mix(in srgb,var(--on-primary) 38%,transparent)}.public-nav .btn-ghost:hover{background:color-mix(in srgb,var(--on-primary) 12%,transparent)}
 /* Radiant Learning 2.1.2 — deliberately distinct database theme. No gradients. */
 .rl-body{background:#f7fafc}
-.rl-shell{min-height:100vh;background:#f7fafc}
+/* No background of its own. The shell spans the whole viewport, so a colour here is a sheet laid
+   over the page canvas - and the canvas is the platform's slanted texture. The boxed container
+   below (.rl-content) is what the page content sits on; everything around it is meant to be the
+   texture showing through. */
+.rl-shell{min-height:100vh}
 .rl-header{position:sticky;top:0;z-index:40;background:var(--primary);color:var(--on-primary);border-bottom:4px solid var(--highlight);box-shadow:0 8px 24px rgba(10,30,45,.13)}
 .rl-header-inner{max-width:1600px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;gap:24px}
 .rl-brand{display:flex;align-items:center;gap:11px;min-width:max-content;color:var(--on-primary)}
@@ -612,15 +616,26 @@ Nested inline,a group with four children made the panel four rows taller whether
 @media(min-width:821px){
 .rl-menu-panel{overflow:visible}
 .rl-menu-panel .nav-group{position:static}
+/* The flyout opens flush against the panel, not six pixels away from it.
+
+   The sub-panel is a child of the group, so hovering the sub-panel keeps the group hovered and the
+   menu open - but only if the pointer can get there without leaving the group first. With a 6px
+   gap it could not: crossing that dead strip dropped :hover, the panel vanished mid-reach, and
+   none of the entries could be clicked at all. The separation is drawn with a transparent border
+   instead, which is part of the element and therefore still hoverable. */
 .rl-menu-panel .nav-subpanel{
-    position:absolute;left:calc(100% + 6px);top:6px;
+    position:absolute;left:100%;top:0;
     display:none;min-width:15rem;margin:0;padding:7px;
-    border:1px solid var(--cl-border,var(--line,#dfe4ea));border-left:1px solid var(--cl-border,var(--line,#dfe4ea));
+    border:1px solid var(--cl-border,var(--line,#dfe4ea));
+    border-left:6px solid transparent;
+    background-clip:padding-box;
     border-radius:12px;
     background:var(--cl-lightest,#fff);
     box-shadow:0 18px 44px rgba(23,33,43,.18);
     z-index:5}
 .rl-menu-panel .nav-group:hover>.nav-subpanel,.rl-menu-panel .nav-group:focus-within>.nav-subpanel{display:grid}
+/* Keeps the group hovered while the pointer is anywhere in its own flyout. */
+.rl-menu-panel .nav-subpanel:hover{display:grid}
 .rl-menu-panel .nav-group-caret{margin-left:auto;opacity:.6}
 }
 .rl-user-chip{display:flex;align-items:center;gap:8px;white-space:nowrap}
