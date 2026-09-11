@@ -466,3 +466,31 @@ a width-only rule leaves the height to default,and an SVG with no height renders
 body[data-cl-palette-managed="1"] .sidebar .nav-subpanel,body.cl-palette-managed .sidebar .nav-subpanel{background:var(--cl-darkest)!important;border-color:var(--cl-dark)!important;color:var(--cl-on-color-1)!important}
 body[data-cl-palette-managed="1"] .sidebar .nav-group-label,body.cl-palette-managed .sidebar .nav-group-label{color:var(--cl-on-color-1)!important}
 body[data-cl-palette-managed="1"] .sidebar .nav-group+.nav-group,body.cl-palette-managed .sidebar .nav-group+.nav-group{border-top-color:var(--cl-dark)!important}
+
+/* The boxed page container, as Radiant Learning has.
+
+   The page canvas is the platform's slanted texture, and content read directly off a texture is
+   hard work. So the body sits in one box with a surface, a border and a radius, and the texture
+   shows around it rather than behind it. Owner's instruction, 2026/09/11.
+
+   The footer is deliberately outside this box - it is the end of the page rather than part of its
+   content - and the signed-out shell gets the same treatment so both look alike.
+
+   A course page opts out: its reading column sets its own width and padding, and a second box
+   round it would inset the text twice. */
+.main>.content,.public-shell>.public-main{
+  max-width:1600px;
+  margin:22px auto;
+  padding:28px;
+  min-width:0;
+  background:var(--cl-lightest,var(--surface,#fff));
+  border:1px solid var(--cl-border,var(--line,#dfe4ea));
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(23,33,43,.06);
+}
+.cl-course-page .main>.content,.cl-course-page .public-shell>.public-main{
+  max-width:none;margin:0;padding:0;background:none;border:0;border-radius:0;box-shadow:none;
+}
+@media(max-width:640px){
+  .main>.content,.public-shell>.public-main{margin:12px 10px;padding:18px;border-radius:12px}
+}
