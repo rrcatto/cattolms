@@ -32,7 +32,7 @@ Changelog:
 
 declare(strict_types=1);
 
-namespace CattoLearning\Http\Symfony;
+namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
@@ -41,10 +41,11 @@ use CattoLearning\Course\CourseService;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-final class CourseTagController
+final class CourseTagController extends BaseController
 {
     /** Five cards across, five rows to a page. */
     private const PAGE_SIZE = 25;
@@ -52,11 +53,13 @@ final class CourseTagController
     private const DATASET = 'catalogue';
 
     public function __construct(
+        AuthService $auth,
+        ThemeRenderer $view,
+        RequestStack $requests,
         private readonly CourseService $courses,
-        private readonly PlatformAdministrationService $platformAdministration,
-        private readonly AuthService $auth,
-        private readonly ThemeRenderer $view
+        private readonly PlatformAdministrationService $platformAdministration
     ) {
+        parent::__construct($auth, $view, $requests);
     }
 
     #[Route('/courses/tags', name: 'course_tags', methods: ['GET'])]
@@ -73,7 +76,7 @@ final class CourseTagController
 
     private function page(Request $request, string $slug): Response
     {
-        $identity = $this->auth->currentUser();
+        $identity = $this->currentUser();
         $selectedTags = $this->courses->activeTagsBySlug(array_filter([$slug]));
         $search = trim((string) $request->query->get(PlatformAdministrationService::searchParam(self::DATASET), ''));
 
@@ -110,7 +113,7 @@ final class CourseTagController
             unset($course);
         }
 
-        return new Response($this->view->render('course-tags', [
+        return $this->render('course-tags', [
             'title' => $tag !== null ? 'Courses tagged ' . (string) $tag['name'] : 'Browse by tag',
             'page_kicker' => 'Every label in the catalogue',
             'tag_index' => $this->weighted($this->courses->tagIndex()),
@@ -135,7 +138,7 @@ final class CourseTagController
                 'page',
                 'page_size'
             ),
-        ] + $pagination->toArray()));
+        ] + $pagination->toArray());
     }
 
     /**

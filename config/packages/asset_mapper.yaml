@@ -2,18 +2,20 @@
 # Date time: 2026/09/09 23:58 SAST
 # Version: 0.7
 # Description:
-#   AssetMapper, for the Symfony UX trial on /courses/tags.
+#   AssetMapper, the platform's front-end asset pipeline for Symfony UX.
 #
 #   AssetMapper rather than Webpack Encore because it needs no npm toolchain: the importmap is
 #   PHP-side and vendored files are committed, so deploying is still copying a directory. A build
-#   step would be a second thing to keep working on the server, and the trial is meant to answer
-#   whether UX earns its place, not to install a front-end pipeline first.
+#   step would be a second thing to keep working on the server. Adding a dependency is
+#   `bin/console importmap:require`, which vendors it into assets/vendor/, never an npm install.
 #
 #   `public_path` points at the code root's public_html, which is the *source* of the web root. The
 #   instance web root under runtime/ is a selective copy, so compiled assets are published the same
 #   way css/ and js/ already are.
 #
 # Changelog:
+# 2026/09/10 18:39 SAST
+# - Symfony UX adopted as the platform's second layer; the wording no longer describes a trial.
 # 2026/09/09 23:58 SAST
 # - Created for the Symfony UX trial.
 framework:

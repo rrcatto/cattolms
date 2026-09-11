@@ -44,11 +44,17 @@ final class AccountWorkspaceContractTest extends TestCase
         return (string) file_get_contents($matches[0]);
     }
 
-    public function testAccountRegistryDefinesFiveDistinctSectionsAndSemanticRoutes(): void
+    public function testAccountRegistryDefinesSevenDistinctSectionsAndSemanticRoutes(): void
     {
+        // Seven since 2026/09/10. Profile became three sections - Personal Particulars, Email
+        // Addresses and Social Media - on the owner's instruction, each with its own page under a
+        // Profile pop-out, because each is a separate decision with its own rules.
         $sections = (new AccountSectionRegistry())->all();
-        self::assertSame(['dashboard','profile','learning','sessions','activity'], array_column($sections, 'key'));
-        self::assertSame(['/account/dashboard','/account/profile','/account/library','/account/sessions','/account/activity'], array_column($sections, 'route'));
+        self::assertSame(['dashboard','profile','emails','social','learning','sessions','activity'], array_column($sections, 'key'));
+        self::assertSame(
+            ['/account/dashboard','/account/profile','/account/emails','/account/social','/account/library','/account/sessions','/account/activity'],
+            array_column($sections, 'route')
+        );
         foreach ($sections as $section) self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
     }
 
@@ -68,11 +74,49 @@ final class AccountWorkspaceContractTest extends TestCase
         self::assertStringNotContainsString("redirect('/account/profile')", $this->methodSource($root . '/src/Http/Controller/AccountController.php', 'index'));
     }
 
-    public function testProfileContainsOnlyProfileAndEmailAccountInformation(): void
+    public function testEachProfilePageHoldsItsOwnSubjectAndNothingElse(): void
     {
-        $profile = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/profile.html.twig');
-        foreach (['Personal particulars','Email addresses','Primary login address','secondary email'] as $token) self::assertStringContainsString($token, $profile);
-        foreach (['Course history','Current courses','Active sessions','Account activity'] as $token) self::assertStringNotContainsString($token, $profile);
+        $root = dirname(__DIR__, 2) . '/resources/views/partials/account/';
+        // Comments are stripped first. Each of these templates explains in its header what it no
+        // longer holds, and a check that reads the prose along with the markup reports the
+        // explanation as the thing it was warning about. Two guards in this codebase have already
+        // been defeated by their own comments; this one reads markup only.
+        $particulars = self::markupOf($root . 'profile.html.twig');
+        $emails = self::markupOf($root . 'emails.html.twig');
+        $social = self::markupOf($root . 'social.html.twig');
+
+        // Each page names its own subject in the section head's eyebrow, which carries the section
+        // label from AccountSectionRegistry. The headings below it are free to be a sentence; the
+        // eyebrow is the identity, so that is what these assert.
+        foreach (['Personal Particulars','Profile image','/account/profile/image'] as $token) self::assertStringContainsString($token, $particulars);
+        // The three used to be one screen of three unrelated forms. Each page now holds its own
+        // subject, and this is the assertion that stops them drifting back together.
+        foreach (['Email Addresses','/account/email/secondary','Course history','Active sessions'] as $token) self::assertStringNotContainsString($token, $particulars);
+
+        foreach (['Email Addresses','cannot be changed','/account/email/secondary','/account/email/remove'] as $token) self::assertStringContainsString($token, $emails);
+        foreach (['Personal Particulars','Profile image'] as $token) self::assertStringNotContainsString($token, $emails);
+
+        foreach (['Social Media','/account/social','social_links'] as $token) self::assertStringContainsString($token, $social);
+        foreach (['Personal Particulars','Email Addresses'] as $token) self::assertStringNotContainsString($token, $social);
+    }
+
+    public function testTheSignedInAddressIsShownAndNeverOfferedAsAField(): void
+    {
+        // The owner's rule, 2026/09/10: a user cannot change the address they signed in with. The
+        // guarantee is that no route edits it, and this asserts the interface says so rather than
+        // leaving the reader to discover it by finding no control.
+        $emails = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/emails.html.twig');
+        self::assertStringContainsString('cannot be changed', $emails);
+
+        $editing = array_values(array_filter(
+            RouteTable::all(),
+            static fn(array $r): bool => $r['method'] === 'POST' && str_contains($r['path'], '/account/email/')
+        ));
+        self::assertSame(
+            ['/account/email/secondary', '/account/email/remove'],
+            array_column($editing, 'path'),
+            'The only writes are adding an alternative address and removing one. Nothing edits the primary.'
+        );
     }
 
     public function testDashboardShowsLearningStatsCourseHistoryGradesAndCertificateStatus(): void
@@ -133,5 +177,11 @@ final class AccountWorkspaceContractTest extends TestCase
         self::assertNotFalse($start);
         $next = strpos($source, "\n    public function ", $start + 1);
         return substr($source, $start, $next === false ? null : $next - $start);
+    }
+
+    /** One template's markup, with its Twig comments removed. */
+    private static function markupOf(string $path): string
+    {
+        return (string) preg_replace('/\{#.*?#\}/s', '', (string) file_get_contents($path));
     }
 }

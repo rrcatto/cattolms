@@ -2,6 +2,7 @@
     "@symfony\/stimulus-bundle",
     "@hotwired\/stimulus",
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js",
+    "\/assets\/controllers\/profile_image_controller.js",
     "\/assets\/controllers\/tag_cloud_controller.js",
     "TagCloud"
 ]

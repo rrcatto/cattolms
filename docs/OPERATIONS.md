@@ -5,6 +5,8 @@
 **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
 **Environment:** disposable TEST/DEV until explicitly declared production
 
+Out of date - does not document v0.7
+
 ## v0.6 is a reset, not an upgrade
 
 **There is no migration path from 0.5.8.3 to v0.6.** v0.6 collapses the 0.5.8 baseline and the five
@@ -63,11 +65,11 @@ sudo mv -Tf /usr/local/lib/php/catto-learning/current.tmp /usr/local/lib/php/cat
 Then clear the two caches that key on the unchanged `current/...` paths and would otherwise keep serving the previous version:
 
 ```bash
-rm -f /home/prettythings/storage/cache/*.php
+sudo -u www-data /usr/local/lib/php/catto-learning/current/bin/console cache:clear
 sudo systemctl reload php8.5-fpm
 ```
 
-The first is F3's compiled templates. `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so the compiled-template filename hash is identical across versions and F3 recompiles only when the source is newer than the compiled file. A deployment that preserves timestamps can leave the source older, in which case the old markup keeps being served. The second is opcache, which has the same exposure on the same paths.
+The first is Symfony's compiled container and Twig's compiled templates, both under `storage/cache/`. `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so those cache paths are identical across versions and nothing in them looks stale after the symlink moves. `cache:clear` must run as the web server's user, or it writes a cache directory PHP-FPM afterwards cannot overwrite. The second is opcache, which has the same exposure on the same paths.
 
 After deploying, run the QA gate below, then the browser acceptance pass.
 
@@ -100,9 +102,38 @@ chmod 755 /home/prettythings/releases/deploy-catto-learning-v0.5.7.5.1.sh
   reset
 ```
 
-Required PHP extensions: DOM, fileinfo, JSON, mbstring, OpenSSL, PDO/PostgreSQL and ZIP.
+Required PHP extensions: DOM, fileinfo, GD, JSON, mbstring, OpenSSL, PDO/PostgreSQL and ZIP.
+
+GD is required from v0.7 for the profile image: an upload is validated, cropped to a square and
+resized to 256x256 before it is stored. Without it the profile image control is the only thing that
+fails, but it fails at upload time rather than at boot.
 
 `composer migrate` is the canonical migration command. There is no separate `migrate-test` convention.
+
+## Bundled themes
+
+The platform ships five themes as source trees under `themes/` in the code root: Factory Reset,
+Factory Reset Sidebar, Gilded Noir, Light Default and Radiant Learning. They are versioned and
+committed with the code.
+
+```bash
+composer themes:install            # install any that are missing, and publish every one's assets
+composer themes:install -- --force # replace installed themes at the same version - development only
+composer themes:package            # rebuild extras/themes/*.zip from the trees
+```
+
+`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up with all
+five. On an existing instance run `themes:install` after deploying a release: it leaves every
+already-installed theme exactly as it is and republishes browser assets, which is what a deployment
+that overlays the code root but not the public web root needs.
+
+**`--force` is not an upgrade path.** An installed theme is an immutable release; replacing one at
+the same version produces two builds wearing one version number. On a server whose themes are
+accepted releases, use a new version instead.
+
+Never install or update a theme by copying files into `/home/<site-user>/themes/` by hand. Those
+paths are written by the site user, and files placed there by another user cannot be replaced by
+the installer afterwards.
 
 ## VPS QA gate
 
@@ -110,6 +141,7 @@ Run from `/usr/local/lib/php/catto-learning/current`:
 
 ```bash
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer migrations:status
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer themes:install
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer themes:sync
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer test:unit
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer test:architecture

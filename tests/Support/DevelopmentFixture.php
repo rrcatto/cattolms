@@ -88,8 +88,8 @@ final class DevelopmentFixture
     public function createCompany(int $actorUserId, string $name, string $domain): int
     {
         $id = (int) $this->db->fetchAllAssociative(
-            "INSERT INTO companies (public_id,name,domain,status,is_system,company_type,created_by_user_id)
-             VALUES (:public_id,:name,:domain,'active',FALSE,'client',:actor) RETURNING id",
+            "INSERT INTO companies (public_id,name,domain,status,is_system,created_by_user_id)
+             VALUES (:public_id,:name,:domain,'active',FALSE,:actor) RETURNING id",
             ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
         )[0]['id'];
         $this->companies[] = $id;

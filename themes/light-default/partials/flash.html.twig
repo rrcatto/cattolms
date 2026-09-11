@@ -1,0 +1,15 @@
+{#
+  Flash presentation only. Dismissal and auto-hide behaviour belong to the
+  platform script through data-flash-message / data-flash-close.
+#}
+{% if flash %}
+	<div class="ld-flash-stack" aria-live="polite">
+		{% for message in flash %}
+			<div class="ld-flash ld-flash-{{ message.type }}" data-flash-message data-flash-type="{{ message.type }}">
+				<span class="ld-flash-dot" aria-hidden="true"></span>
+				<span class="ld-flash-text">{{ message.message }}</span>
+				<button class="ld-flash-close" type="button" data-flash-close aria-label="Dismiss message">×</button>
+			</div>
+		{% endfor %}
+	</div>
+{% endif %}

@@ -5,6 +5,8 @@
 
 This file is self-contained. A human or AI theme author can build a compliant theme without the LMS source code or any other project document.
 
+This document needs to be updated for CattoLMS v0.7 - it is out of date
+
 ## 1. Boundary
 
 Themes are immutable **presentation** packages.
@@ -24,7 +26,7 @@ base.html
 public/css/theme.css
 ```
 
-A full production theme should also provide `pages/` wrappers, reusable partials and assets appropriate to its design. F3 templates contain no PHP. `public/css/theme.css` must exist and be non-empty; core loads it automatically, so do not list it in `theme.json.styles`.
+A full production theme should also provide `pages/` wrappers, reusable partials and assets appropriate to its design. Theme templates are Twig (`.html.twig`) and contain no PHP. `public/css/theme.css` must exist and be non-empty; core loads it automatically, so do not list it in `theme.json.styles`.
 
 `base.html` must preserve:
 
@@ -156,14 +158,18 @@ Home /                         Catalogue /courses
 Help /help                     Contact /contact
 
 Account /account
+  All sections /account
   Dashboard /account/dashboard
-  Profile /account/profile
-  My Learning /account/library
+  Profile                                [group]
+    Personal Particulars /account/profile
+    Email Addresses /account/emails
+    Social Media /account/social
+  My Course Library /account/library
   Sessions /account/sessions
   Activity /account/activity
 
 Company /company                         [permission-gated]
-  All company sections /company
+  All sections /company
   Dashboard /company/dashboard
   People                                 [group]
     People /company/people
@@ -177,7 +183,7 @@ Company /company                         [permission-gated]
     Credits /company/credits
 
 Administration /admin                    [permission-gated]
-  All administration /admin
+  All sections /admin
   Dashboard /admin/dashboard
   Courses                                [group]
     Courses /admin/courses
@@ -241,7 +247,7 @@ key, label, icon, route, template, description, content
 | standalone section | `@admin.section` | `@account.section` | `@company.section` |
 | detail/editor fallback | `@content` | `@content` | `@content` |
 
-Canonical Account sections: Dashboard, Profile, My Learning, Sessions, Activity.  
+Canonical Account sections: Dashboard, Profile (Personal Particulars, Email Addresses, Social Media), My Course Library, Sessions, Activity.  
 Canonical Company sections: Dashboard, People, Course Requests, Learning, Course Credits, Courses.  
 Canonical Administration sections are the navigation children listed above.
 

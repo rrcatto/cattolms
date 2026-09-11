@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!--
+    Light Default icon sprite.
+
+    Symbol ids match the stable semantic "key" values supplied by the core
+    @navigation hierarchy, so base.html resolves artwork without keeping a
+    second route table. Icons are decorative: every destination also renders a
+    readable text label, and an unknown future key simply paints no glyph while
+    its label continues to work.
+  -->
+
+  <!-- Primary destinations -->
+  <symbol id="nav-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.4 12 4l8 6.4V19a1 1 0 0 1-1 1h-4.5v-5.6h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="nav-catalogue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="7" height="7" rx="1.4"/><rect x="13.5" y="4.5" width="7" height="7" rx="1.4"/><rect x="3.5" y="14.5" width="7" height="5" rx="1.4"/><rect x="13.5" y="14.5" width="7" height="5" rx="1.4"/></symbol>
+  <symbol id="nav-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .9-1 1.6v.4"/><path d="M12 16.7h.01"/></symbol>
+  <symbol id="nav-contact" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="5.4" width="17.6" height="13.2" rx="2"/><path d="m3.8 7 8.2 6 8.2-6"/></symbol>
+  <symbol id="nav-company" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V6.4a1 1 0 0 1 1-1h7v14.6"/><path d="M12 20V10h6.6a1 1 0 0 1 1 1v9"/><path d="M2.6 20h18.8M6.9 8.6h2.2M6.9 12h2.2M6.9 15.4h2.2M14.6 13.2h2.2M14.6 16.4h2.2"/></symbol>
+  <symbol id="nav-administration" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M12 3.4v2.1M12 18.5v2.1M20.6 12h-2.1M5.5 12H3.4M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5M18.1 18.1l-1.5-1.5M7.4 7.4 5.9 5.9"/></symbol>
+  <symbol id="nav-account" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.6" r="3.6"/><path d="M4.8 20a7.4 7.4 0 0 1 14.4 0"/></symbol>
+  <symbol id="nav-signin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14.4 4.6h3.6a2 2 0 0 1 2 2v10.8a2 2 0 0 1-2 2h-3.6"/><path d="M10.4 15.6 14 12l-3.6-3.6M14 12H4"/></symbol>
+  <symbol id="nav-signout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 4.6H6a2 2 0 0 0-2 2v10.8a2 2 0 0 0 2 2h3.6"/><path d="m16 15.6 3.6-3.6L16 8.4M19.6 12h-10"/></symbol>
+
+  <!-- Account children -->
+  <symbol id="nav-account-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="4.6" width="16.8" height="14.8" rx="2"/><path d="M9.6 4.6v14.8"/></symbol>
+  <symbol id="nav-account-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="4.6" width="7" height="6" rx="1.3"/><rect x="13.4" y="4.6" width="7" height="10.4" rx="1.3"/><rect x="3.6" y="13.4" width="7" height="6" rx="1.3"/><rect x="13.4" y="17.9" width="7" height="1.5" rx=".7"/></symbol>
+  <symbol id="nav-account-profile" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.6" r="3.4"/><path d="M5.4 19.6a6.6 6.6 0 0 1 13.2 0"/></symbol>
+  <symbol id="nav-account-learning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.6h5.4A2.6 2.6 0 0 1 12 8.2v10.2a2.2 2.2 0 0 0-2.2-2.2H4z"/><path d="M20 5.6h-5.4A2.6 2.6 0 0 0 12 8.2v10.2a2.2 2.2 0 0 1 2.2-2.2H20z"/></symbol>
+  <symbol id="nav-account-sessions" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="4.8" width="12.4" height="9.4" rx="1.6"/><path d="M7 18.4h5.2"/><rect x="17" y="11" width="4.2" height="8.4" rx="1.4"/></symbol>
+  <symbol id="nav-account-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 12.6h4l2.3-5.8 3.4 10.4 2.4-6.2 1.4 3.2h3.7"/></symbol>
+
+  <!-- Company children -->
+  <symbol id="nav-company-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="4.6" width="16.8" height="14.8" rx="2"/><path d="M3.6 9.4h16.8"/></symbol>
+  <symbol id="nav-company-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="4.6" width="7" height="6" rx="1.3"/><rect x="13.4" y="4.6" width="7" height="10.4" rx="1.3"/><rect x="3.6" y="13.4" width="7" height="6" rx="1.3"/></symbol>
+  <symbol id="nav-company-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="8.8" r="3.1"/><path d="M3.4 19.2a5.9 5.9 0 0 1 11.6 0"/><path d="M16 6.2a3 3 0 0 1 0 5.8M17.4 19.2a5.4 5.4 0 0 0-1.6-3.9"/></symbol>
+  <symbol id="nav-company-requests" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.6" y="3.8" width="14.8" height="16.4" rx="2"/><path d="M8.4 9h7.2M8.4 12.6h7.2M8.4 16.2h4"/></symbol>
+  <symbol id="nav-company-learning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.4 21 9l-9 4.6L3 9z"/><path d="M6.6 11.2v4.4c0 1.6 2.4 2.9 5.4 2.9s5.4-1.3 5.4-2.9v-4.4"/></symbol>
+  <symbol id="nav-company-credits" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6.6" rx="7.4" ry="2.8"/><path d="M4.6 6.6v10.8c0 1.5 3.3 2.8 7.4 2.8s7.4-1.3 7.4-2.8V6.6"/><path d="M4.6 12c0 1.5 3.3 2.8 7.4 2.8s7.4-1.3 7.4-2.8"/></symbol>
+  <symbol id="nav-company-courses" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="4.6" width="16.8" height="14.8" rx="2"/><path d="M7.4 9h9.2M7.4 12.6h9.2M7.4 16.2h5.4"/></symbol>
+
+  <!-- Administration children -->
+  <symbol id="nav-admin-all" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3.6" width="7" height="7" rx="1.4"/><rect x="13.4" y="3.6" width="7" height="7" rx="1.4"/><rect x="3.6" y="13.4" width="7" height="7" rx="1.4"/><rect x="13.4" y="13.4" width="7" height="7" rx="1.4"/></symbol>
+  <symbol id="nav-admin-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16.6a8 8 0 1 1 16 0"/><path d="m12 16.6 3.6-4.8"/><circle cx="12" cy="16.6" r="1.2"/></symbol>
+  <symbol id="nav-admin-courses" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.6h5.4A2.6 2.6 0 0 1 12 8.2v10.2a2.2 2.2 0 0 0-2.2-2.2H4z"/><path d="M20 5.6h-5.4A2.6 2.6 0 0 0 12 8.2v10.2a2.2 2.2 0 0 1 2.2-2.2H20z"/></symbol>
+  <symbol id="nav-admin-people" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9.2" cy="8.8" r="3.1"/><path d="M3.4 19.2a5.9 5.9 0 0 1 11.6 0"/><path d="M16 6.2a3 3 0 0 1 0 5.8M17.4 19.2a5.4 5.4 0 0 0-1.6-3.9"/></symbol>
+  <symbol id="nav-admin-companies" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V6.4a1 1 0 0 1 1-1h7v14.6"/><path d="M12 20V10h6.6a1 1 0 0 1 1 1v9"/><path d="M2.6 20h18.8M6.9 8.6h2.2M6.9 12h2.2M6.9 15.4h2.2"/></symbol>
+  <symbol id="nav-admin-enrolments" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="4.2" width="15.6" height="15.6" rx="2.4"/><path d="m8.2 12.2 2.8 2.8 5-5.8"/></symbol>
+  <symbol id="nav-admin-credits" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="5.6" width="18.4" height="12.8" rx="2.2"/><path d="M2.8 10h18.4M6.4 14.4h3.4"/></symbol>
+  <symbol id="nav-admin-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.2 12a8.2 8.2 0 1 1-2.6-6"/><path d="M20.4 4.4v4h-4"/><path d="M12 7.8V12l2.8 1.8"/></symbol>
+  <symbol id="nav-admin-reports" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.6h16"/><rect x="5.6" y="11" width="3.2" height="6" rx="1"/><rect x="10.4" y="7" width="3.2" height="10" rx="1"/><rect x="15.2" y="13.4" width="3.2" height="3.6" rx="1"/></symbol>
+  <symbol id="nav-admin-themes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6c4.6 0 8.4 3.4 8.4 7.6 0 2.6-2.1 4.1-4.3 4.1h-1.5c-1.2 0-2 1-2 2 0 .5.2.9.5 1.3.3.4.4.7.4 1 0 .5-.5.8-1.5.8-4.6 0-8.4-3.9-8.4-8.4S7.4 3.6 12 3.6Z"/><circle cx="8.4" cy="10.4" r="1"/><circle cx="12" cy="7.8" r="1"/><circle cx="15.6" cy="10.4" r="1"/></symbol>
+  <symbol id="nav-admin-roles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.6 19.4 6v5.4c0 4-3.1 7.4-7.4 9-4.3-1.6-7.4-5-7.4-9V6z"/><path d="m9.2 12 2 2 3.6-4"/></symbol>
+  <symbol id="nav-admin-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.8"/><path d="M12 3.4v2.1M12 18.5v2.1M20.6 12h-2.1M5.5 12H3.4M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5M18.1 18.1l-1.5-1.5M7.4 7.4 5.9 5.9"/></symbol>
+
+  <!-- Theme interface glyphs -->
+  <symbol id="ld-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7.4h12M6 12h12M6 16.6h7.2"/></symbol>
+  <symbol id="ld-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="ld-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="ld-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+  <symbol id="ld-location" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M3.8 12h16.4"/><path d="M12 3.8a13 13 0 0 1 0 16.4 13 13 0 0 1 0-16.4Z"/></symbol>
+</svg>

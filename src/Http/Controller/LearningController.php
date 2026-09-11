@@ -94,7 +94,7 @@ final class LearningController extends BaseController
             // that a second population of data exists, which they must never learn from this page.
             //
             // It must always be present as a key even when empty, because the template reads it -
-            // an absent key is an undefined variable, and F3 turns that into a 500 for the whole
+            // an absent key is an undefined variable, and strict_variables makes that an error for the whole
             // page. That is exactly how /account and /account/library began returning
             // "Undefined variable $universe" the moment this page started using the shared control.
         ];

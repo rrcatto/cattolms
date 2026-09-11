@@ -23,6 +23,9 @@ The rewrite is deliberately narrow. An address that is not recognisably invented
 untouched, because diverting a genuine address would be worse than any bounce.
 
 Changelog:
+2026/09/10 02:25 SAST
+- A generated company domain is now the company name and nothing else, and a generated local part drops the run suffix. Owner's instruction: the domain is name.invalid. The old form appended a company index and a sixteen-character run suffix to both halves, which produced hundred-character addresses that no table column could display.
+
 2026/09/09 20:10 SAST
 - Replaces GeneratedDomainRouter. Delivery now goes to APP_DOMAIN rather than a configured seed domain, and nothing here refers to seed data: there is one kind of data, and these are simply the domains the platform invents.
 */
@@ -56,23 +59,30 @@ final class GeneratedDomainRouter
     /**
      * The domain for one generated company.
      *
-     * The run suffix and the company index both appear so the domain is unique across companies
-     * within a run and across runs, which `companies.domain` requires globally.
+     * The company's own name and nothing else. `companies.domain` is unique platform-wide and this
+     * has to satisfy that, but the name already carries the uniqueness: the name factory draws
+     * every company name from a remembered set and redraws on a repeat, primed with the names
+     * already in the database. Bolting an index and a run suffix on top of a name that is already
+     * unique bought nothing and cost a great deal - it produced addresses a hundred characters
+     * long, which no column on any screen has room for.
      */
-    public static function generatedDomain(string $companySlug, int $index, string $runSuffix): string
+    public static function generatedDomain(string $companySlug): string
     {
-        return $companySlug . '-' . $index . '-' . $runSuffix . self::GENERATED_DOMAIN_SUFFIX;
+        return $companySlug . self::GENERATED_DOMAIN_SUFFIX;
     }
 
     /**
      * The local part for one generated identity.
      *
-     * Unique on its own, because the rewrite below discards the domain. The person's name is kept
-     * so the address is still recognisable in an inbox.
+     * The person's name plus their row index. Unlike a company name, a person's first and last
+     * name are not unique on their own: the name factory guarantees the whole display name is
+     * unique, middle names included, so two people can legitimately share `first last`. The index
+     * settles that, and an email address is a technical identifier rather than a name, so it is
+     * allowed to carry one.
      */
-    public static function generatedLocalPart(string $nameSlug, int $index, string $runSuffix): string
+    public static function generatedLocalPart(string $nameSlug, int $index): string
     {
-        return strtolower($nameSlug) . '.' . $index . '.' . $runSuffix;
+        return strtolower($nameSlug) . '.' . $index;
     }
 
     /**

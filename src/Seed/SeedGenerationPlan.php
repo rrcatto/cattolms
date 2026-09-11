@@ -36,9 +36,13 @@ final class SeedGenerationPlan
     /**
      * Largest set one request may ask for.
      *
-     * The generator runs in a single transaction, and every insert is checked by the
-     * cross-universe triggers, so an unbounded request would hold a long write transaction on a
-     * development database. Generate several sets rather than one enormous one.
+     * The generator runs in a single transaction, so an unbounded request would hold a long write
+     * transaction on a development database. Generate several sets rather than one enormous one.
+     *
+     * This is a policy ceiling, not a memory one. The generator streams: it builds a chunk of rows,
+     * writes it, keeps the generated ids and discards the rows, so its peak cost is set by
+     * SeedGenerator::GENERATION_CHUNK rather than by the size of the request. A full 500,000-row
+     * set peaks at about 58 MB against the deployed 128 MB limit.
      */
     public const MAXIMUM_VOLUME = 500000;
 

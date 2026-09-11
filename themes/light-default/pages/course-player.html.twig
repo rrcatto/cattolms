@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Course player family. The shell widens for reading; module order and progression stay core-owned.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-player" data-ld-family="course-player">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

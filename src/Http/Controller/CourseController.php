@@ -336,7 +336,19 @@ final class CourseController extends BaseController
         // Resolved the same way the page that linked here resolved it, or opening an accordion
         // would swap in a different universe's courses than the one the reader is looking at.
 
-        $node = ['slug' => $slug, 'name' => (string) $category['name']]
+        // The same model the page build supplies, because it renders the same partial. Without
+        // can_favourite the card simply omitted the favourite star, and every category on the
+        // catalogue loads through this route rather than inline - so the control was missing
+        // everywhere while the template that draws it was correct.
+        $node = [
+            'slug' => $slug,
+            'name' => (string) $category['name'],
+            'can_favourite' => $this->currentUser() !== null,
+            // Back to this category, open, and scrolled to it. Only the no-JavaScript path uses
+            // this - with htmx the star swaps in place and nothing navigates - but that path
+            // otherwise returned the reader to the top of a catalogue with every accordion shut.
+            'favourite_return' => '/courses?open=' . rawurlencode($slug) . '#category-' . rawurlencode($slug),
+        ]
             + $this->categoryCourses(
                 $slug,
                 (int) $category['id'],
@@ -367,10 +379,53 @@ final class CourseController extends BaseController
             $preserved
         );
 
+        // Which of these the reader has already favourited. Without it every star on the catalogue
+        // renders empty whatever the database says, so favouriting appeared to do nothing and
+        // un-favouriting was impossible: the control could only ever be in one state.
         return [
-            'courses' => $this->courses->categoryCoursePage($categoryId, $pagination),
+            'courses' => $this->withFavourites($this->courses->categoryCoursePage($categoryId, $pagination)),
             'pagination' => $pagination,
         ];
+    }
+
+    /**
+     * The first row of a list, for the single-row case withFavourites() is handed.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return array<string,mixed>
+     */
+    private static function first(array $rows): array
+    {
+        return $rows[0] ?? [];
+    }
+
+    /**
+     * Mark which of these courses the signed-in reader has already favourited.
+     *
+     * Every catalogue surface needs this and each one was doing it for itself, which is how the
+     * category accordion came to be the one that did not: its stars rendered empty however many
+     * favourites the reader had.
+     *
+     * @param list<array<string,mixed>> $courses
+     * @return list<array<string,mixed>>
+     */
+    private function withFavourites(array $courses): array
+    {
+        $user = $this->currentUser();
+        if ($user === null || $courses === []) {
+            return $courses;
+        }
+
+        $favourites = [];
+        foreach ($this->platformAdministration->favourites($user->id) as $item) {
+            $favourites[(int) $item['id']] = true;
+        }
+        foreach ($courses as &$course) {
+            $course['is_favourite'] = isset($favourites[(int) $course['id']]);
+        }
+        unset($course);
+
+        return $courses;
     }
 
     /**
@@ -567,14 +622,35 @@ final class CourseController extends BaseController
         // the ordinary path no longer refuses one. Provenance can still refuse a write the reader
         // is not entitled to make, and when it does the answer is a message on the page they were
         // on rather than an exception reaching the browser as a 500.
+        $failed = false;
+        $added = false;
         try {
             $added = $this->platformAdministration->toggleFavourite($user->id, $courseId);
-            $this->flash('success', $added ? 'The course was added to your favourites.' : 'The course was removed from your favourites.');
         } catch (RuntimeException) {
+            $failed = true;
+        }
+
+        $return = (string) ($_POST['return'] ?? '/courses');
+        $return = str_starts_with($return, '/') ? $return : '/courses';
+
+        // htmx asked for the star, so it gets the star. Swapping one control in place is the whole
+        // point of a toggle: a full page reload to fill in a star loses the reader's scroll position
+        // and, on the catalogue, closes the category they had opened to get here.
+        if ($this->isHtmxRequest() && !$failed) {
+            return $this->renderFragment('partials/course-favourite', [
+                'course' => ['id' => $courseId, 'is_favourite' => $added],
+                'favourite_return' => $return,
+            ]);
+        }
+
+        // No flash on success. A flash is a banner at the top of the page, and a banner is a reason
+        // to scroll to the top - which on the catalogue means leaving the category the reader had
+        // opened. Filling in the star already says the star was filled in; saying it twice, in a
+        // place the reader has to travel to, says it worse.
+        if ($failed) {
             $this->flash('error', 'That course could not be added to your favourites.');
         }
-        $return = (string) ($_POST['return'] ?? '/courses');
-        $this->redirect(str_starts_with($return, '/') ? $return : '/courses');
+        $this->redirect($return);
     }
 
 
@@ -593,7 +669,13 @@ final class CourseController extends BaseController
     }
 
 
-    #[Route('/courses/{slug}', name: 'course_detail', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
+    // Matched last, whatever order the route files are loaded in. `/courses/{slug}` accepts any
+    // single word, so it accepts `/courses/tags` too: without a negative priority it swallows every
+    // named route under /courses that happens to be declared after it, and the symptom is a 404
+    // reading "The course could not be found" on a page that has nothing to do with a course.
+    // Declaration order is not a safe place to encode this - moving a controller between two
+    // directories was enough to break it once.
+    #[Route('/courses/{slug}', name: 'course_detail', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'], priority: -10)]
     public function detail(): Response
     {
         $slug = (string) $this->param('slug');
@@ -613,11 +695,18 @@ final class CourseController extends BaseController
         $enrolment = $user !== null
             ? $this->courses->enrolmentForUser($user->id, (int) $course['id'])
             : null;
+        // The course's own page had no favourite control at all: a reader could favourite a course
+        // from a card in the catalogue and then open it and find nothing saying so, and no way to
+        // change their mind without going back.
+        $course = self::first($this->withFavourites([$course]));
+
         return $this->render('course-detail', [
             'title' => (string) $course['title'],
             'course' => $course,
             'has_access' => $enrolment !== null,
             'enrolment_status' => is_array($enrolment) ? (string) $enrolment['status'] : '',
+            'can_favourite' => $user !== null,
+            'favourite_return' => '/courses/' . (string) $course['slug'],
             'course_content_mode' => true,
         ]);
     }

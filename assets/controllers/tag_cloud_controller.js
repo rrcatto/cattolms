@@ -13,6 +13,8 @@ Description:
   Clicking a word navigates to the same href the plain link carries. The mapping is by index rather
   than by text, because TagCloud renders the string it was given and two tags may share a name.
 Changelog:
+  2026/09/10 02:25 SAST
+  - The full vocabulary folds into a disclosure once the sphere runs, instead of staying above it.
   2026/09/10 00:15 SAST
   - Created for the Symfony UX trial.
 */
@@ -20,7 +22,7 @@ import { Controller } from '@hotwired/stimulus';
 import TagCloud from 'TagCloud';
 
 export default class extends Controller {
-    static targets = ['source', 'canvas'];
+    static targets = ['source', 'canvas', 'disclosure'];
 
     static values = {
         radius: { type: Number, default: 260 },
@@ -54,9 +56,13 @@ export default class extends Controller {
         });
 
         this.canvasTarget.addEventListener('click', this.onClick);
-        // The list is kept when it holds more than the sphere shows, so nothing becomes
-        // unreachable just because it did not fit on the ball.
-        this.sourceTarget.hidden = links.length <= shown.length;
+        // The list folds away rather than disappearing. Every tag stays reachable - the sphere
+        // animates the heaviest eighty and the disclosure holds all of them - but several hundred
+        // chips no longer sit above the control the page exists for.
+        if (this.hasDisclosureTarget) {
+            this.disclosureTarget.open = false;
+            this.disclosureTarget.hidden = false;
+        }
         this.element.classList.add('is-animated');
     }
 
@@ -67,7 +73,9 @@ export default class extends Controller {
         }
         // Put the list back. A controller that disconnects and leaves the page with neither its
         // enhancement nor its fallback has made the page worse than not running at all.
-        this.sourceTarget.hidden = false;
+        if (this.hasDisclosureTarget) {
+            this.disclosureTarget.open = true;
+        }
         this.element.classList.remove('is-animated');
     }
 

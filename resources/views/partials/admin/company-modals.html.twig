@@ -14,10 +14,9 @@ Description:
 
   The rows to build Edit dialogs for arrive as one parameter, so each screen passes its own dataset.
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags inside
-  comments, so a tag written out as a usage example becomes a real tag in the compiled template. Keep
-  every comment plain prose: no angle brackets, no comment delimiters, no template tokens and no
-  code.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
   2026/09/07 17:20 SAST
   - Extracted from the Companies list partial when Companies split into two screens.
@@ -43,8 +42,11 @@ Changelog:
 							<label>Registered email domain</label>
 							<input name="domain" placeholder="example.co.za" required>
 						</div>
-						<div class="field full">
-							<label>Company type</label><select name="company_type"><option value="client">Client company</option><option value="course_provider">Course provider</option></select>
+						<div class="field field-wide">
+							<span class="cl-inferred-label">Company type</span>
+							<p class="help">
+								A company is a client once it holds course credits or has staff, and a course provider once it owns a course. It can be both. Nothing is chosen here because nothing needs to be: the type follows from what the company does.
+							</p>
 						</div>
 					</div>
 				</div>
@@ -75,15 +77,26 @@ Changelog:
 								<label>Domain</label>
 								<input name="domain" value="{{ company.domain }}" required>
 							</div>
-							<div class="field full">
-								<label>Company type</label><select name="company_type" {{ company.is_system ? 'disabled' : '' }}>
-								<option value="client" {{ company.company_type=='client' ? 'selected' : '' }}>Client company</option>
-								<option value="course_provider" {{ company.company_type=='course_provider' ? 'selected' : '' }}>Course provider</option>
-								<option value="system" {{ company.company_type=='system' ? 'selected' : '' }}>System Company</option>
-								</select>
-								{% if company.is_system %}
-									<input type="hidden" name="company_type" value="system">
-								{% endif %}
+{#
+							Company type is shown, not chosen. It is derived from what the company
+							actually does, so there is nothing here to submit and no way for the
+							stored answer to disagree with the real one. The System Company is the
+							one exception, because being the System Company is a property of the
+							installation rather than of anything the company has done.
+#}
+							<div class="field field-wide">
+								<span class="cl-inferred-label">Company type</span>
+								<div class="chip-row">
+									{% if company.is_system %}
+										<span class="badge permanent">System company</span>
+									{% else %}
+										<span class="badge {{ company.is_client ? 'good' : 'muted' }}">{{ company.is_client ? 'Client' : 'Not yet a client' }}</span>
+										<span class="badge {{ company.is_course_provider ? 'good' : 'muted' }}">{{ company.is_course_provider ? 'Course provider' : 'Not a course provider' }}</span>
+									{% endif %}
+								</div>
+								<div class="help">
+									Client once it holds course credits or has staff; course provider once it owns a course. A company can be both, and neither is chosen here.
+								</div>
 							</div>
 						</div>
 					</div>

@@ -31,22 +31,31 @@ Changelog:
 	{% set ph_title = 'Course tags' %}
 	{% set ph_lead = 'Cross-cutting labels a course may carry as many of as it needs.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<div class="container-fluid cl-container-wide pt-4">
-		{% include '@platform/partials/admin/course-group-nav.html.twig' %}
-	</div>
-	<section class="container-fluid cl-container-wide py-5">
-		<div class="toolbar">
-			<div>
-			</div>
-			<button class="btn btn-primary" type="button" data-open-modal="createTagModal">＋ Create tag</button>
-		</div>
-		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'tags', ds_label: 'Search tags', ds_value: tags_search, ds_action: '/admin/courses/tags'} %}
-		<div id="tags-region" data-server-search-target>
-			<div id="tags-results">
-				{% if tags_pagination %}
-					{% include '@platform/partials/pagination.html.twig' with {pg: tags_pagination} %}
-				{% endif %}
-				<div class="card">
+	{# The plain section wrapper the other Courses pages use, so the card lands in the same place. #}
+	<section class="section">
+		<div class="grid section">
+			<div class="card">
+				{% include '@platform/partials/admin/course-group-nav.html.twig' %}
+				<div class="section-head">
+					<div>
+						<div class="eyebrow">
+							Course Tags
+						</div>
+						<h2>
+							The catalogue's tags
+						</h2>
+						<p>
+							Tags a course can carry. A tag crosses categories, so the same tag may appear on courses filed in different branches.
+						</p>
+					</div>
+					<button class="btn btn-primary" type="button" data-open-modal="createTagModal">＋ Create tag</button>
+				</div>
+			{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'tags', ds_label: 'Search tags', ds_value: tags_search, ds_action: '/admin/courses/tags'} %}
+			<div id="tags-region" data-server-search-target>
+				<div id="tags-results">
+					{% if tags_pagination %}
+						{% include '@platform/partials/pagination.html.twig' with {pg: tags_pagination} %}
+					{% endif %}
 					<div class="table-wrap">
 						<table class="table align-middle mb-0">
 							<thead>
@@ -90,12 +99,13 @@ Changelog:
 							</tbody>
 						</table>
 					</div>
+					{% if tags_pagination %}
+						{% include '@platform/partials/pagination.html.twig' with {pg: tags_pagination} %}
+					{% endif %}
 				</div>
-				{% if tags_pagination %}
-					{% include '@platform/partials/pagination.html.twig' with {pg: tags_pagination} %}
-				{% endif %}
 			</div>
 		</div>
+	</div>
 	</section>
 	<div class="modal-backdrop" id="createTagModal" role="dialog" aria-modal="true" aria-labelledby="createTagTitle" aria-hidden="true" hidden>
 		<div class="modal-card">

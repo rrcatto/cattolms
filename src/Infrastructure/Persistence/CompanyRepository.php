@@ -215,11 +215,10 @@ final class CompanyRepository
                 $adopted = $this->findById($companyId);
                 $this->db->executeStatement(
                     'UPDATE companies
-                        SET is_system = TRUE, company_type = :company_type, name = :name,
+                        SET is_system = TRUE, name = :name,
                             updated_at = :updated_at
                       WHERE id = :id',
                     [
-                        'company_type' => 'system',
                         'name' => trim((string) ($adopted['name'] ?? '')) !== ''
                             ? (string) $adopted['name']
                             : (trim($name) !== '' ? trim($name) : 'System Company'),
@@ -235,10 +234,10 @@ final class CompanyRepository
                     // created by the seed generator with its reserved infrastructure token and is
                     // never created on demand.
                     'INSERT INTO companies
-                        (public_id, name, domain, status, is_system, company_type,
+                        (public_id, name, domain, status, is_system,
                          created_by_user_id, created_at, updated_at)
                      VALUES
-                        (:public_id, NULL, :name, :domain, :status, TRUE, :company_type,
+                        (:public_id, NULL, :name, :domain, :status, TRUE,
                          :created_by_user_id, :created_at, :updated_at)
                      RETURNING id',
                     [
@@ -246,7 +245,6 @@ final class CompanyRepository
                         'name' => trim($name) !== '' ? trim($name) : 'System Company',
                         'domain' => $configuredDomain,
                         'status' => 'active',
-                        'company_type' => 'system',
                         'created_by_user_id' => $actorUserId,
                         'created_at' => $now,
                         'updated_at' => $now,
@@ -334,8 +332,17 @@ final class CompanyRepository
         });
     }
 
-    /** @return array<string,mixed> */
-    public function createManaged(int $actorUserId, string $name, string $domain, string $type): array
+    /**
+     * Create a company from Administration.
+     *
+     * No type is taken, because there is no longer one to take: what a company is - a client, a
+     * course provider, or both - is inferred from what it owns and what it holds. A new company
+     * owns nothing and holds nothing, so it starts as a client, which is exactly what an empty
+     * company is.
+     *
+     * @return array<string,mixed>
+     */
+    public function createManaged(int $actorUserId, string $name, string $domain): array
     {
         $now = gmdate('Y-m-d H:i:sP');
         $rows = $this->db->fetchAllAssociative(
@@ -343,10 +350,10 @@ final class CompanyRepository
             // is REAL by definition - there is no parent row to inherit provenance from - and
             // writing NULL explicitly records that decision where the guard can see it.
             'INSERT INTO companies
-                (public_id, name, domain, status, is_system, company_type,
+                (public_id, name, domain, status, is_system,
                  created_by_user_id, created_at, updated_at)
              VALUES
-                (:public_id, NULL, :name, :domain, :status, FALSE, :company_type,
+                (:public_id, NULL, :name, :domain, :status, FALSE,
                  :created_by_user_id, :created_at, :updated_at)
              RETURNING id',
             [
@@ -354,7 +361,6 @@ final class CompanyRepository
                 'name' => trim($name),
                 'domain' => strtolower(trim($domain)),
                 'status' => 'active',
-                'company_type' => in_array($type, ['client','course_provider'], true) ? $type : 'client',
                 'created_by_user_id' => $actorUserId,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -365,23 +371,17 @@ final class CompanyRepository
             ?? throw new RuntimeException('The company could not be created.');
     }
 
-    public function updateManaged(int $companyId, string $name, string $domain, string $type): void
+    /** Rename a company and change its registered domain. Its type is not stored, so not written. */
+    public function updateManaged(int $companyId, string $name, string $domain): void
     {
-        $company = $this->findById($companyId)
-            ?? throw new RuntimeException('The company does not exist.');
+        $this->findById($companyId) ?? throw new RuntimeException('The company does not exist.');
 
         $this->db->executeStatement(
-            'UPDATE companies SET name = :name, domain = :domain, company_type = :company_type,
-                    updated_at = :updated_at
+            'UPDATE companies SET name = :name, domain = :domain, updated_at = :updated_at
               WHERE id = :id',
             [
                 'name' => trim($name),
                 'domain' => strtolower(trim($domain)),
-                // The System Company keeps its type whatever the form said; the invariant is the
-                // repository's to hold, not the screen's.
-                'company_type' => $this->databaseBoolean($company['is_system'])
-                    ? 'system'
-                    : (in_array($type, ['client','course_provider'], true) ? $type : 'client'),
                 'updated_at' => gmdate('Y-m-d H:i:sP'),
                 'id' => $companyId,
             ]
@@ -426,20 +426,13 @@ final class CompanyRepository
         }
     }
 
-    public function updateCompany(int $companyId, string $name, string $type): void
+    public function updateCompany(int $companyId, string $name): void
     {
-        $company = $this->findById($companyId)
-            ?? throw new RuntimeException('The company does not exist.');
-
-        $values = ['name' => trim($name), 'updated_at' => gmdate('Y-m-d H:i:sP')];
-        if (!$this->databaseBoolean($company['is_system'])) {
-            $values['company_type'] = in_array($type, ['client','course_provider'], true) ? $type : 'client';
-        }
-        $assignments = implode(', ', array_map(static fn(string $c): string => $c . ' = :' . $c, array_keys($values)));
+        $this->findById($companyId) ?? throw new RuntimeException('The company does not exist.');
 
         $this->db->executeStatement(
-            'UPDATE companies SET ' . $assignments . ' WHERE id = :id',
-            $values + ['id' => $companyId]
+            'UPDATE companies SET name = :name, updated_at = :updated_at WHERE id = :id',
+            ['name' => trim($name), 'updated_at' => gmdate('Y-m-d H:i:sP'), 'id' => $companyId]
         );
     }
 

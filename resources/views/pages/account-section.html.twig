@@ -19,6 +19,7 @@ Changelog:
 	{% set ph_lead = account_section.description %}
 	{% set ph_action_href = '/account' %}
 	{% set ph_action_label = 'All account sections' %}
+	{# The page head brings the identity band with it, on this page as on every other. #}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{{ account_section.content|raw }}
 {% endblock %}

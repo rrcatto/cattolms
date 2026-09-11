@@ -66,6 +66,7 @@ use CattoLearning\Application\AccountSectionRegistry;
 use CattoLearning\Application\CompanySectionRegistry;
 use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Support\Csrf;
+use CattoLearning\Support\SocialPlatform;
 use CattoLearning\View\Twig\ThemeTemplates;
 use Twig\Environment;
 use CattoLearning\Support\Env;
@@ -73,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.6';
+    private const PLATFORM_ASSET_VERSION = '0.7';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -293,11 +294,27 @@ final class ThemeRenderer
             'parent_name' => (string) $themeInfo['parent_name'],
             'parent_version' => (string) $themeInfo['parent_version'],
         ];
+        // The page canvas carries the slanted texture on every theme. It is added here rather than
+        // asked of each theme's body rule, because the texture is a named platform element and a
+        // theme that painted its own would fork it. A theme re-colours it through the three
+        // --cl-texture custom properties. Owner's instruction, 2026/09/11.
+        $bodyClass = trim('cl-page-texture ' . (string) ($data['body_class'] ?? ''));
+
+        // The reader's palette, rendered into the markup rather than left for the switcher to stamp
+        // on after the page has painted. The switcher stores the choice in a cookie as well as in
+        // localStorage precisely so this can be known before a byte of HTML is written.
+        $palette = $_COOKIE['cl_palette'] ?? null;
+        if (is_string($palette) && preg_match('/^\d{1,2}$/', $palette) === 1) {
+            $bodyClass .= ' cl-palette-managed cl-palette-' . $palette;
+        }
+
+        // Both spellings are in use: two themes render body_class and three render page.body_class.
+        $model['body_class'] = $bodyClass;
         $model['page'] = [
             'type' => $family,
             'title' => (string) ($data['page_title'] ?? $data['title'] ?? ''),
             'subtitle' => (string) ($data['page_kicker'] ?? ''),
-            'body_class' => (string) ($data['body_class'] ?? ''),
+            'body_class' => $bodyClass,
         ];
         $model['user'] = [
             'logged_in' => (bool) ($data['is_authenticated'] ?? false),
@@ -306,6 +323,7 @@ final class ThemeRenderer
         ];
         $model['navigation'] = $navigation;
         $model['footer_navigation'] = $this->footerNavigation($data);
+        $model['footer_social'] = $this->footerSocial($data);
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
         $model['sidebar'] = '';
@@ -363,10 +381,34 @@ final class ThemeRenderer
             'icon'=>$this->navigationIcon($icon),'icon_id'=>self::navigationIconId($icon),
             'active'=>$isActive,'method'=>$method,'csrf'=>$token,'children'=>$children,
         ];
+        // The page being read, for marking the entry that leads to it. Only the path is compared:
+        // a query string is a view of a page rather than a different page, so paging or searching a
+        // list must not unmark the entry the reader arrived through.
+        $here = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        $here = rtrim(is_string($here) && $here !== '' ? $here : '/', '/') ?: '/';
+
+        // A group is active when the page is one of its own, which is what a group knowing only its
+        // first child's href could not express: Administration's System group heads to Themes, so
+        // every other section under it left the group looking unvisited.
+        $marksHere = function (string $href, array $children) use ($here): bool {
+            $target = rtrim((string) parse_url($href, PHP_URL_PATH), '/') ?: '/';
+            if ($target === $here) {
+                return true;
+            }
+            foreach ($children as $grandchild) {
+                $inner = rtrim((string) parse_url((string) $grandchild['href'], PHP_URL_PATH), '/') ?: '/';
+                if ($inner === $here) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
         $child = fn(string $key,string $label,string $href,string $icon,array $children = []): array => [
             'key'=>$key,'label'=>$label,'href'=>$href,
             'icon'=>$this->navigationIcon($icon),'icon_id'=>self::navigationIconId($icon),
-            'method'=>'GET','children'=>$children,
+            'method'=>'GET','active'=>$marksHere($href, $children),'children'=>$children,
         ];
 
         $items = [
@@ -407,7 +449,10 @@ final class ThemeRenderer
                 }
             }
 
-            $companyChildren = [$child('company-all','All company sections','/company','▤')];
+            // "All sections" first, then the dashboard, then the groups. The same three-step shape
+            // opens Company, Administration and Account, so the first two entries of a menu mean
+            // the same thing wherever the reader is. Owner's instruction, 2026/09/11.
+            $companyChildren = [$child('company-all','All sections','/company','all')];
             if (isset($visibleCompanySections['dashboard'])) {
                 $dashboard = $visibleCompanySections['dashboard'];
                 $companyChildren[] = $child('company-dashboard',$dashboard['label'],$dashboard['route'],$dashboard['icon']);
@@ -515,7 +560,7 @@ final class ThemeRenderer
         }
 
         if ($adminChildren !== []) {
-            array_unshift($adminChildren, $child('admin-all', 'All administration', '/admin', 'all'));
+            array_unshift($adminChildren, $child('admin-all', 'All sections', '/admin', 'all'));
             $items[] = $item('administration', 'Administration', '/admin', 'administration', $active === 'admin', children: $adminChildren);
         }
 
@@ -523,14 +568,52 @@ final class ThemeRenderer
             $accountPermissionBySection = [
                 'dashboard' => 'ACCOUNT.VIEW',
                 'profile' => 'ACCOUNT.PROFILE.VIEW',
+                'emails' => 'ACCOUNT.PROFILE.VIEW',
+                'social' => 'ACCOUNT.PROFILE.VIEW',
                 'learning' => 'LEARNING.LIBRARY.VIEW',
                 'sessions' => 'ACCOUNT.SESSION.VIEW',
                 'activity' => 'ACCOUNT.ACTIVITY.VIEW',
             ];
-            $accountChildren = [$child('account-all','Account dashboard','/account','dashboard')];
+            // Profile is a group of three rather than three siblings. The owner's instruction,
+            // 2026/09/10: Personal Particulars, Email Addresses and Social Media sit under a
+            // Profile pop-out. Listed flat they would be three of six items in the Account menu,
+            // and nothing in it would say the three belong together.
+            $profileSectionKeys = ['profile', 'emails', 'social'];
+
+            // All sections, the dashboard, Profile, then the rest - the shape Company and
+            // Administration already open with. Owner's instruction, 2026/09/11.
+            //
+            // Composed in that order rather than appended and then spliced into place by index.
+            // The entries are permission-filtered, so any of them can be absent: the splice put
+            // Profile at index 1 whatever was there, which is the dashboard only when the reader
+            // can see the dashboard, and the second item otherwise.
+            $accountChildren = [$child('account-all','All sections','/account','all')];
+            $profileChildren = [];
+            $dashboardChild = null;
+            $remainingChildren = [];
+
             foreach ($this->accountSections->all() as $section) {
                 if (!$this->can($data, $accountPermissionBySection[$section['key']] ?? 'ACCOUNT.VIEW')) continue;
-                $accountChildren[] = $child('account-'.$section['key'],$section['label'],$section['route'],$section['icon']);
+                $entry = $child('account-'.$section['key'],$section['label'],$section['route'],$section['icon']);
+                if (in_array($section['key'], $profileSectionKeys, true)) {
+                    $profileChildren[] = $entry;
+                    continue;
+                }
+                if ($section['key'] === 'dashboard') {
+                    $dashboardChild = $entry;
+                    continue;
+                }
+                $remainingChildren[] = $entry;
+            }
+
+            if ($dashboardChild !== null) {
+                $accountChildren[] = $dashboardChild;
+            }
+            if ($profileChildren !== []) {
+                $accountChildren[] = $child('account-profile-group','Profile','/account/profile','profile',$profileChildren);
+            }
+            foreach ($remainingChildren as $entry) {
+                $accountChildren[] = $entry;
             }
             $items[] = $item('account','Account','/account','account',$active==='account',children:$accountChildren);
             $items[] = $item('signout','Sign out','/logout','signout',false,'POST',$csrf);
@@ -538,6 +621,37 @@ final class ThemeRenderer
             $items[] = $item('signin','Register / Sign in','/login','signin',$active==='login');
         }
         return $items;
+    }
+
+    /**
+     * The platform's own social marks, for the footer.
+     *
+     * Core owns the list and the symbols; where the address comes from is the installation's
+     * business. A key with no configured address still renders its mark - the row is part of the
+     * footer's shape rather than a set of links that appears once somebody fills a form in - but
+     * it renders as plain text rather than a link to nowhere.
+     *
+     * The keys are SocialPlatform's, so a mark and a link cannot disagree about which service
+     * they name.
+     *
+     * @param array<string,mixed> $data
+     * @return list<array{key:string,label:string,href:string}>
+     */
+    private function footerSocial(array $data): array
+    {
+        $configured = $data['platform_social'] ?? [];
+        $configured = is_array($configured) ? $configured : [];
+
+        $marks = [];
+        foreach (['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'] as $key) {
+            $marks[] = [
+                'key' => $key,
+                'label' => SocialPlatform::label($key),
+                'href' => trim((string) ($configured[$key] ?? '')),
+            ];
+        }
+
+        return $marks;
     }
 
     /**
@@ -601,7 +715,7 @@ final class ThemeRenderer
         'account', 'company', 'administration', 'all',
         'dashboard', 'people', 'companies', 'courses', 'enrolments', 'credits',
         'requests', 'activity', 'reports', 'themes', 'settings', 'roles', 'seed',
-        'sessions', 'learning', 'profile',
+        'sessions', 'learning', 'profile', 'social',
     ];
 
     /** The symbol an unknown key resolves to, so a menu item is never iconless. */

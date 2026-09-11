@@ -1,5 +1,10 @@
 {% extends layout %}
 {% block page_body %}
+	{#
+		Home has a hero rather than a page head, so it includes the identity band directly. It is
+		still the same band in the same place - first thing under the top of the page.
+	#}
+	{% include '@platform/partials/account/identity-head.html.twig' %}
 	<section class="cl-hero" style="--cl-hero-image:url('/img/hero-learning.svg')">
 		<div class="container py-5 py-lg-6">
 			<div class="row align-items-center min-vh-hero">
@@ -46,7 +51,9 @@
 		</div>
 	</section>
 	<section class="container py-5 py-lg-6">
-		<div class="row align-items-end mb-4">
+		{# The catalogue introduction is text, so it sits on a surface like every other block. #}
+		<div class="card mb-4">
+		<div class="row align-items-end">
 			<div class="col-lg-8">
 				<span class="cl-kicker text-primary">Course catalogue</span>
 				<h2 class="display-5 fw-bold mb-2">
@@ -59,6 +66,7 @@
 			<div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
 				<a class="btn btn-outline-primary" href="/courses">View all courses</a>
 			</div>
+		</div>
 		</div>
 		{% if published_course_count > 0 %}
 			<div class="row g-4">

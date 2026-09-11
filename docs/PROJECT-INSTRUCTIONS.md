@@ -9,7 +9,7 @@ This is the canonical developer brief for the Catto Learning LMS. Read it with `
 
 ## 1. Project purpose
 
-Catto Learning is a multi-company learning-management and course-commerce platform built with PHP, Fat-Free Framework (F3), PostgreSQL and server-rendered HTML. It supports course authoring/import, learner progress and assessments, company learning administration, role-based access control, external themes, API/MCP access and a planned commerce layer.
+Catto Learning is a multi-company learning-management and course-commerce platform built with PHP, Symfony, Twig, PostgreSQL and server-rendered HTML. It supports course authoring/import, learner progress and assessments, company learning administration, role-based access control, external themes, API/MCP access and a planned commerce layer.
 
 ## 2. Change control
 
@@ -25,15 +25,15 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 
 ## 3. Runtime and composition architecture
 
-- PHP >=8.5.9 <9.0; F3 3.9; PHP-DI 7; PSR-11; PostgreSQL.
-- F3 receives the PHP-DI container through native `CONTAINER`; normal HTTP routes remain `Class->method`.
-- PHP-DI autowiring stays enabled.
-- HTTP controllers must not extend F3 `Prefab` because that bypasses PSR-11 controller resolution.
-- Controllers, services and repositories use constructor injection. They must not query the DI container or `$f3->get('CONTAINER')` as a service locator.
-- Container access is limited to composition/integration boundaries (`ContainerFactory`, HTTP/CLI bootstrap and plugin composition).
-- F3 owns framework internals; PHP-DI owns the Catto Learning application object graph.
-- Route-level lazy construction is the default. Proxy laziness is selective; `MailerInterface` is the established example.
-- Do not restore the removed `AppContext`, `ServiceFactory` or custom F3/PHP-DI bridge.
+- PHP >=8.5.9 <9.0; Symfony 8.1; Twig; PSR-11; PostgreSQL.
+- Symfony owns framework internals **and** the application object graph. Fat-Free Framework and PHP-DI are gone, and `tools/check-architecture.php` fails the build if either reappears.
+- The whole graph is wired in `config/services.yaml`; autowiring stays enabled.
+- Routes are `#[Route]` attributes on the actions themselves, discovered from `src/Http/Controller/` and `src/Http/Symfony/` by `config/routes.yaml`. There is no central route table: to map a URL to code, grep for the path.
+- Controllers, services and repositories use constructor injection. They must not query the container as a service locator; container access is allowed only in `CliBootstrap` and `PluginManager`.
+- Persistence is Doctrine DBAL behind the `Database` interface. The F3 `DB\SQL` wrapper and its mappers are gone and may not return.
+- Bind parameters by name without a colon (`['id' => 1]`, not `[':id' => 1]`) and let `Database` infer the PDO type from the PHP value.
+- Proxy laziness is selective; `MailerInterface` is the established example.
+- Do not restore the removed `AppContext`, `ServiceFactory`, `LazyControllerHandler`, `RouteRegistrar` or any F3/PHP-DI bridge.
 
 ## 4. Roles, permissions and ACL
 

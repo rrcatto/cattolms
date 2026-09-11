@@ -1,14 +1,18 @@
 {
     "app": {
-        "path": "\/assets\/app-JMughI-.js",
+        "path": "\/assets\/app-we5Kv_X.js",
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-j-V9kmg.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-1hL7MHB.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/profile_image_controller.js": {
+        "path": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",
         "type": "js"
     },
     "\/assets\/controllers\/tag_cloud_controller.js": {
-        "path": "\/assets\/controllers\/tag_cloud_controller-4IR0FpU.js",
+        "path": "\/assets\/controllers\/tag_cloud_controller-2s0XeI0.js",
         "type": "js"
     },
     "@hotwired\/stimulus": {

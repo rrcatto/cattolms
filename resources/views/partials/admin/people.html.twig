@@ -12,11 +12,9 @@ Description:
   particulars, both email addresses, company, roles, account status, sessions and learning all
   live on that screen.
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags
-  inside comments, so a tag written out as a usage example becomes a real tag in the compiled
-  template. A comment delimiter written inside a comment body ends it early and leaks the
-  remainder onto the page. Keep every comment plain prose: no angle brackets, no comment
-  delimiters, no template tokens and no code, not even to document one.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
 	2026/08/31 19:05 SAST
 	- Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
@@ -29,143 +27,160 @@ Changelog:
   2026/08/23 04:19 SAST
   - Added the shared genuine-ADMIN data-universe control above the list.
 #}
-{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people'} %}
-<div class="toolbar">
-	<div>
-	</div>
-	{% if can_manage_people %}
-		<button class="btn btn-primary" type="button" data-open-modal="quickAddPersonModal">＋ Add person</button>
-	{% endif %}
-</div>
-<div id="people-region" data-server-search-target>
-	<div id="people-results">
-		{% if people_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: people_pagination} %}
-		{% endif %}
-		<div class="notice">
-			<span>ⓘ</span>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
 			<div>
-				<strong>One complete profile:</strong> open any person to edit personal particulars, primary and secondary email addresses, company, roles, account status, sessions and learning information from the same screen.
+				<div class="eyebrow">
+					People
+				</div>
+				<h2>
+					Everyone on the platform
+				</h2>
+				<p>
+					People, roles, organisations and learner access.
+				</p>
 			</div>
 		</div>
-		<div class="table-wrap section">
-			<table>
-				<thead>
-					<tr>
-						{% for sh in people_sort_headers %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: people_region, sort_results: people_results} %}
-						{% endfor %}
-					</tr>
-				</thead>
-				<tbody>
-					{% for person in people %}
-						<tr data-person-row>
-							<td>
-								<div class="person">
-									<div class="avatar">
-										U
-									</div>
-									<div>
-										<strong title="{{ person.name }}">{{ person.name }}</strong>
-										<div class="muted small" title="{{ person.email }}">
-											{{ person.email }}
-										</div>
-									</div>
-								</div>
-							</td>
-							<td>
-								{{ person.company_name ?: '—' }}
-							</td>
-							<td>
-								<div class="role-list">
-									{% for role in person.roles %}
-										<span class="badge info">{{ role }}</span>
-									{% endfor %}
-								</div>
-							</td>
-							<td>
-								{{ person.course_count }}
-							</td>
-							<td>
-								{{ person.created_at }}
-							</td>
-							<td>
-								{{ person.last_login_at ?: 'Never' }}
-							</td>
-							<td>
-								<div class="row-actions">
-									<a class="btn btn-primary btn-sm" href="/admin/people/{{ person.id }}" title="Open this person's full profile">Edit</a>
-								</div>
-							</td>
-						</tr>
-					{% endfor %}
-				</tbody>
-			</table>
-		</div>
-		{% if people_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: people_pagination} %}
-		{% else %}
-			{% if people_preview_has_more %}
-				<div class="pagination-row">
-					<span class="pagination-summary">Showing the first {{ preview_page_size }} people.</span>
-					<a class="btn btn-soft btn-sm" href="/admin/people">View all people</a>
-				</div>
+		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people'} %}
+		<div class="toolbar">
+			<div>
+			</div>
+			{% if can_manage_people %}
+				<button class="btn btn-primary" type="button" data-open-modal="quickAddPersonModal">＋ Add person</button>
 			{% endif %}
-		{% endif %}
-	</div>
-</div>
-{% if can_manage_people %}
-	<div class="modal-backdrop" id="quickAddPersonModal" role="dialog" aria-modal="true" aria-labelledby="quickAddPersonTitle" aria-hidden="true" hidden>
-		<div class="modal-card">
-			<div class="modal-head">
-				<div>
-					<div class="eyebrow">
-						People
+		</div>
+		<div id="people-region" data-server-search-target>
+			<div id="people-results">
+				{% if people_pagination %}
+					{% include '@platform/partials/pagination.html.twig' with {pg: people_pagination} %}
+				{% endif %}
+				<div class="notice">
+					<span>ⓘ</span>
+					<div>
+						<strong>One complete profile:</strong> open any person to edit personal particulars, primary and secondary email addresses, company, roles, account status, sessions and learning information from the same screen.
 					</div>
-					<h3 id="quickAddPersonTitle">
-						Add person
-					</h3>
 				</div>
-				<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
-			</div>
-			<form action="/admin/people" method="post">
-				<div class="modal-body">
-					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div class="form-grid">
-						<div class="field">
-							<label>First name</label>
-							<input name="first_name" required>
-						</div>
-						<div class="field">
-							<label>Last name</label>
-							<input name="last_name" required>
-						</div>
-						<div class="field full">
-							<label>Email address</label>
-							<input type="email" name="email" required>
-						</div>
-						<div class="field full">
-							<label>Initial role</label><select name="role">
-							{% for role in roles %}
-								<option value="{{ role.role_key }}">{{ role.role_name }}</option>
+				<div class="table-wrap section">
+					<table>
+						<thead>
+							<tr>
+								{% for sh in people_sort_headers %}
+									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: people_region, sort_results: people_results} %}
+								{% endfor %}
+							</tr>
+						</thead>
+						<tbody>
+							{% for person in people %}
+								<tr data-person-row>
+									<td>
+										<div class="person">
+											<div class="avatar">
+												U
+											</div>
+											<div>
+												<strong title="{{ person.name }}">{{ person.name }}</strong>
+												<div class="muted small" title="{{ person.email }}">
+													{{ person.email }}
+												</div>
+											</div>
+										</div>
+									</td>
+									<td>
+										{{ person.company_name ?: '—' }}
+									</td>
+									<td>
+										<div class="role-list">
+											{% for role in person.roles %}
+												<span class="badge info">{{ role }}</span>
+											{% endfor %}
+										</div>
+									</td>
+									<td>
+										{{ person.course_count }}
+									</td>
+									<td>
+										{{ person.created_at }}
+									</td>
+									<td>
+										{{ person.last_login_at ?: 'Never' }}
+									</td>
+									<td>
+										<div class="row-actions">
+											<a class="btn btn-primary btn-sm" href="/admin/people/{{ person.id }}" title="Open this person's full profile">Edit</a>
+										</div>
+									</td>
+								</tr>
 							{% endfor %}
-							</select>
-							<div class="help">
-								The person is initially added to the System Company. Open their full profile afterwards only if they belong to another company.
+						</tbody>
+					</table>
+				</div>
+				{% if people_pagination %}
+					{% include '@platform/partials/pagination.html.twig' with {pg: people_pagination} %}
+				{% else %}
+					{% if people_preview_has_more %}
+						<div class="pagination-row">
+							<span class="pagination-summary">Showing the first {{ preview_page_size }} people.</span>
+							<a class="btn btn-soft btn-sm" href="/admin/people">View all people</a>
+						</div>
+					{% endif %}
+				{% endif %}
+			</div>
+		</div>
+		{% if can_manage_people %}
+			<div class="modal-backdrop" id="quickAddPersonModal" role="dialog" aria-modal="true" aria-labelledby="quickAddPersonTitle" aria-hidden="true" hidden>
+				<div class="modal-card">
+					<div class="modal-head">
+						<div>
+							<div class="eyebrow">
+								People
+							</div>
+							<h3 id="quickAddPersonTitle">
+								Add person
+							</h3>
+						</div>
+						<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
+					</div>
+					<form action="/admin/people" method="post">
+						<div class="modal-body">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+							<div class="form-grid">
+								<div class="field">
+									<label>First name</label>
+									<input name="first_name" required>
+								</div>
+								<div class="field">
+									<label>Last name</label>
+									<input name="last_name" required>
+								</div>
+								<div class="field full">
+									<label>Email address</label>
+									<input type="email" name="email" required>
+								</div>
+								<div class="field full">
+									<label>Initial role</label><select name="role">
+									{% for role in roles %}
+										<option value="{{ role.role_key }}">{{ role.role_name }}</option>
+									{% endfor %}
+									</select>
+									<div class="help">
+										The person is initially added to the System Company. Open their full profile afterwards only if they belong to another company.
+									</div>
+								</div>
+								<div class="field full">
+									<label>
+									<input type="checkbox" name="send_notice" value="1" style="width:auto;margin-right:7px">
+									Send plain account notification email</label>
+								</div>
 							</div>
 						</div>
-						<div class="field full">
-							<label>
-							<input type="checkbox" name="send_notice" value="1" style="width:auto;margin-right:7px">
-							Send plain account notification email</label>
+						<div class="modal-foot">
+							<button class="btn btn-ghost" type="button" data-close-modal>Cancel</button>
+							<button class="btn btn-primary" type="submit">Create person</button>
 						</div>
-					</div>
+					</form>
 				</div>
-				<div class="modal-foot">
-					<button class="btn btn-ghost" type="button" data-close-modal>Cancel</button>
-					<button class="btn btn-primary" type="submit">Create person</button>
-				</div>
-			</form>
-		</div>
+			</div>
+		{% endif %}
 	</div>
-{% endif %}
+</div>

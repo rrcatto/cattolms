@@ -138,19 +138,13 @@ final class App
     }
 
     /**
-     * Lets the Symfony kernel answer the request if it owns the route.
+     * Hands the request to the Symfony kernel, which owns every route.
      *
-     * The router is asked before the kernel handles anything, rather than handling first and
-     * reading a 404 off the response. Those are different questions: a ported controller is
-     * entitled to answer 404 itself, and treating that as "Symfony does not own this URL" would
-     * hand the request to Fat-Free and render the wrong not-found page. Matching first keeps
-     * ownership a routing fact.
-     *
-     * A method mismatch falls through for the same reason: while a path is half ported, Symfony
-     * may own GET and Fat-Free still own POST.
-     *
-     * The kernel is discarded again when it does not match, so a Fat-Free request pays for one
-     * compiled-matcher lookup and nothing else - no application service is constructed.
+     * There is no second router to fall through to and no ownership question left to ask: the
+     * kernel handles the request, answers its own 404 when nothing matches, and terminates.
+     * The dual-router arrangement this method carried during the migration is gone with
+     * Fat-Free, and reintroducing one is a build failure - check-runtime-hazards.php greps this
+     * bootstrap for the Fat-Free entry point and fails if it ever reappears.
      */
     private static function handleWithSymfony(string $instanceRoot): void
     {

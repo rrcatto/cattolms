@@ -59,6 +59,21 @@ use RuntimeException;
 
 final class SeedGenerator
 {
+    /**
+     * How many rows of one kind are held in PHP memory at a time.
+     *
+     * The generator's cost used to be linear in the size of the whole set, because each phase built
+     * every row for its table before writing any of them - and a set of 500,000 rows needed roughly
+     * 120 MB against a 128 MB limit, so the largest sets could not finish at all. Building a chunk,
+     * writing it, resolving its ids and discarding it holds the row arrays at a fixed size instead,
+     * and only the generated ids survive a phase: those are packed integer lists costing about
+     * eight bytes each, which is what the children genuinely need to reference their parents.
+     *
+     * The value trades round trips against memory. SeedRepository::insertMany batches at 250, so a
+     * chunk of 2,000 is eight statements and never a per-row round trip.
+     */
+    private const GENERATION_CHUNK = 2000;
+
     /** Seed roles a generated identity may hold. Never a normal role, never ADMIN. */
     private const SEED_ROLE_MIX = [
         RoleCatalog::STUDENT,
@@ -141,8 +156,28 @@ final class SeedGenerator
 
         $suffix = $this->setUniqueKey($token);
 
-        $companies = $this->generateCompanies($plan, $token, $suffix);
-        $people = $this->generatePeople($plan, $token, $suffix, $companies, $roleIds);
+        try {
+            return $this->build($plan, $token, $suffix, $roleIds);
+        } finally {
+            // The name factory holds a hash of every name in the database, which is the largest
+            // thing this class builds and is of no use once the set is written. names() already
+            // says these exist only during a generation; this is what makes that true, rather
+            // than leaving the set alive on the generator for as long as the container holds it.
+            $this->names = null;
+            $this->random = null;
+        }
+    }
+
+    /**
+     * The generation itself, so generate() can release the per-run state in a finally.
+     *
+     * @param array<string,int> $roleIds
+     * @return array<string,int> rows written per table
+     */
+    private function build(SeedGenerationPlan $plan, string $token, string $suffix, array $roleIds): array
+    {
+        $companies = $this->generateCompanies($plan, $token);
+        $people = $this->generatePeople($plan, $token, $companies, $roleIds);
         $categories = $this->assignableCategories();
         $courses = $this->generateCourses($plan, $token, $suffix, $categories, $companies, $people);
         $this->generateEnrolmentActivity($plan, $token, $suffix, $courses, $people);
@@ -224,24 +259,24 @@ final class SeedGenerator
     }
 
     /** @return list<array{id:int,domain:string,name:string}> */
-    private function generateCompanies(SeedGenerationPlan $plan, string $token, string $suffix): array
+    private function generateCompanies(SeedGenerationPlan $plan, string $token): array
     {
         $rows = [];
         $meta = [];
         for ($i = 0; $i < $plan->companies; $i++) {
             $name = $this->names()->company();
-            // Domains are globally unique across both universes, so every generated one carries
-            // the company index and the set suffix. The .seed.invalid suffix is reserved by
-            // RFC 2606 and can never resolve, so an address here is undeliverable unless the
-            // seed mail router rewrites it to the operator's real inbox.
-            $domain = GeneratedDomainRouter::generatedDomain(Slug::from($name), $i, $suffix);
+            // The domain is the company's name. `companies.domain` is unique platform-wide and
+            // the name already carries that uniqueness, so nothing is appended to it. The
+            // .invalid suffix is reserved by RFC 2606 and can never resolve, so an address here
+            // is undeliverable unless the mail router rewrites it to the operator's inbox.
+            $domain = GeneratedDomainRouter::generatedDomain(Slug::from($name));
             $meta[] = ['name' => $name, 'domain' => $domain];
-            $rows[] = [Uuid::v4(), $name, $domain, 'active', false, 'client', $token];
+            $rows[] = [Uuid::v4(), $name, $domain, 'active', false];
         }
 
         $ids = $this->write(
             'companies',
-            ['public_id', 'name', 'domain', 'status', 'is_system', 'company_type'],
+            ['public_id', 'name', 'domain', 'status', 'is_system'],
             $rows,
             true
         );
@@ -259,82 +294,93 @@ final class SeedGenerator
      * @param array<string,int> $roleIds
      * @return array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>}
      */
-    private function generatePeople(SeedGenerationPlan $plan, string $token, string $suffix, array $companies, array $roleIds): array
+    private function generatePeople(SeedGenerationPlan $plan, string $token, array $companies, array $roleIds): array
     {
-        $userRows = [];
-        $identities = [];
-        for ($i = 0; $i < $plan->users; $i++) {
-            $person = $this->names()->person();
-            $roleKey = self::SEED_ROLE_MIX[$i % count(self::SEED_ROLE_MIX)];
-            // Deliberately lopsided. Spread evenly, a set of 7,500 people across 938 companies
-            // gives every company eight staff, and a company screen is never tested against
-            // anything bigger than a page. Every fifth person joins the first company instead, so
-            // one company holds a fifth of the set and the rest keep a realistic long tail.
-            $company = $i % 5 === 0
-                ? $companies[0]
-                : $companies[$i % count($companies)];
-
-            $identities[] = [
-                'first' => $person['first'],
-                'last' => $person['last'],
-                'role' => $roleKey,
-                'company' => $company,
-            ];
-            $userRows[] = [
-                Uuid::v4(),
-                $person['display'],
-                $person['first'],
-                $person['middle'],
-                $person['last'],
-                'active',
-                $token,
-            ];
-        }
-
-        $userIds = $this->write(
-            'users',
-            ['public_id', 'display_name', 'first_name', 'middle_names', 'last_name', 'status'],
-            $userRows,
-            true
-        );
-
-        $emailRows = [];
-        $roleRows = [];
-        $membershipRows = [];
         $buckets = ['all' => [], 'students' => [], 'owners' => [], 'editors' => [], 'admins' => []];
+        $roleMixCount = count(self::SEED_ROLE_MIX);
+        $companyCount = count($companies);
 
-        foreach ($userIds as $index => $userId) {
-            $identity = $identities[$index];
-            // The local part must be unique on its own, not merely within its domain: the mail
-            // router discards the generated domain, so two identities differing only by company
-            // would otherwise collapse onto one real inbox.
-            $local = GeneratedDomainRouter::generatedLocalPart(
-                Slug::from($identity['first'] . '-' . $identity['last']),
-                $index,
-                $suffix
+        // One chunk at a time. Every row array below is discarded before the next chunk is built,
+        // so what survives the loop is the id lists in $buckets and nothing else.
+        for ($offset = 0; $offset < $plan->users; $offset += self::GENERATION_CHUNK) {
+            $size = min(self::GENERATION_CHUNK, $plan->users - $offset);
+
+            $userRows = [];
+            // A packed list, not a map: the keys were the same four strings 37,500 times over, and
+            // the company was held as a nested copy of the whole company row rather than the two
+            // fields the loop below reads.
+            $identities = [];
+
+            for ($j = 0; $j < $size; $j++) {
+                $i = $offset + $j;
+                $person = $this->names()->person();
+                $roleKey = self::SEED_ROLE_MIX[$i % $roleMixCount];
+                // Deliberately lopsided. Spread evenly, a set of 7,500 people across 938 companies
+                // gives every company eight staff, and a company screen is never tested against
+                // anything bigger than a page. Every fifth person joins the first company instead,
+                // so one company holds a fifth of the set and the rest keep a realistic long tail.
+                $company = $i % 5 === 0
+                    ? $companies[0]
+                    : $companies[$i % $companyCount];
+
+                // The global index travels with the row: it settles the email local part, and a
+                // chunk-local index would repeat it every chunk.
+                $identities[] = [$person['first'], $person['last'], $roleKey, $company['id'], $company['domain'], $i];
+                $userRows[] = [
+                    Uuid::v4(),
+                    $person['display'],
+                    $person['first'],
+                    $person['middle'],
+                    $person['last'],
+                    'active',
+                ];
+            }
+
+            $userIds = $this->write(
+                'users',
+                ['public_id', 'display_name', 'first_name', 'middle_names', 'last_name', 'status'],
+                $userRows,
+                true
             );
-            $emailRows[] = [$userId, $local . '@' . $identity['company']['domain'], true, $token];
-            $roleRows[] = [$userId, $roleIds[$identity['role']], $token];
-            $membershipRows[] = [
-                $identity['company']['id'],
-                $userId,
-                $this->companyRoleFor($identity['role']),
-                'active',
-                $token,
-            ];
+            unset($userRows);
 
-            $buckets['all'][] = $userId;
-            $buckets[match ($identity['role']) {
-                RoleCatalog::COURSE_OWNER => 'owners',
-                RoleCatalog::COURSE_EDITOR => 'editors',
-                RoleCatalog::COMPANY_ADMIN => 'admins',
-                default => 'students',
-            }][] = $userId;
+            $emailRows = [];
+            $roleRows = [];
+            $membershipRows = [];
+
+            foreach ($userIds as $index => $userId) {
+                [$first, $last, $roleKey, $companyId, $companyDomain, $globalIndex] = $identities[$index];
+                // Name plus row index. The name factory guarantees the whole display name is
+                // unique, middle names included, so `first last` on its own is not - the index
+                // settles it.
+                $local = GeneratedDomainRouter::generatedLocalPart(
+                    Slug::from($first . '-' . $last),
+                    $globalIndex
+                );
+                $emailRows[] = [$userId, $local . '@' . $companyDomain, true];
+                $roleRows[] = [$userId, $roleIds[$roleKey]];
+                $membershipRows[] = [
+                    $companyId,
+                    $userId,
+                    $this->companyRoleFor($roleKey),
+                    'active',
+                ];
+
+                $buckets['all'][] = $userId;
+                $buckets[match ($roleKey) {
+                    RoleCatalog::COURSE_OWNER => 'owners',
+                    RoleCatalog::COURSE_EDITOR => 'editors',
+                    RoleCatalog::COMPANY_ADMIN => 'admins',
+                    default => 'students',
+                }][] = $userId;
+            }
+            unset($identities, $userIds);
+
+            $this->write('user_emails', ['user_id', 'email', 'is_primary'], $emailRows);
+            $this->write('user_roles', ['user_id', 'role_id'], $roleRows);
+            $this->write('company_users', ['company_id', 'user_id', 'company_role', 'status'], $membershipRows);
+            unset($emailRows, $roleRows, $membershipRows);
         }
-
-        $this->write('user_emails', ['user_id', 'email', 'is_primary'], $emailRows);
-        $this->write('user_roles', ['user_id', 'role_id'], $roleRows);
-        $this->write('company_users', ['company_id', 'user_id', 'company_role', 'status'], $membershipRows);
 
         if ($buckets['owners'] === []) {
             $buckets['owners'] = array_slice($buckets['all'], 0, 1);
@@ -391,69 +437,81 @@ final class SeedGenerator
         array $companies,
         array $people
     ): array {
-        $courseRows = [];
         $titles = [];
-        // Artwork is generated here rather than backfilled afterwards, for the same reason a real
-        // course gets its cover in the same statement that creates it: a course without one is a
-        // grey rectangle, and a catalogue of them is indistinguishable from a broken image.
-        $publicIds = [];
         // The category each course belongs to, kept so the tags can be drawn from the same place
         // the title was. Before this the two were unrelated: a course called "Abattoir Hygiene"
         // could be filed under Cloud Infrastructure and tagged by arithmetic on its row number.
         $courseCategories = [];
-        for ($i = 0; $i < $plan->courses; $i++) {
-            $category = $categories === [] ? null : $categories[$i % count($categories)];
-            $courseCategories[] = $category;
-            $title = $category === null
-                ? $this->names()->courseTitle()
-                : $this->names()->courseTitleFor((string) $category['name']);
-            $owner = $people['owners'][$i % count($people['owners'])];
-            $company = $companies[$i % count($companies)];
-            // Two thirds published so the catalogue has volume, the rest draft so the
-            // Administration status filters have something to separate.
-            $status = $i % 3 === 2 ? 'draft' : 'published';
+        $courseIds = [];
+        $categoryCount = count($categories);
+        $ownerCount = count($people['owners']);
+        $companyCount = count($companies);
 
-            $titles[] = $title;
-            $publicId = Uuid::v4();
-            $publicIds[] = $publicId;
-            $courseRows[] = [
-                $publicId,
-                $category === null ? null : $category['id'],
-                Slug::from($title) . '-' . $i . '-' . $suffix,
-                $title,
-                'Generated seed course for volume testing.',
-                'standard',
-                60,
-                $status,
-                31536000,
-                0.6,
-                0.4,
-                true,
-                'classic',
-                $owner,
-                $company['id'],
-                1,
-                'approved',
-                $owner,
-                $owner,
-                $status === 'published' ? gmdate('Y-m-d H:i:sP') : null,
-                $token,
-                $this->artwork->courseCover($publicId, $title),
-            ];
+        // Chunked because a course row is the widest the generator writes: twenty-one columns, one
+        // of which is the generated SVG cover. Artwork is produced here rather than backfilled
+        // afterwards, for the same reason a real course gets its cover in the statement that
+        // creates it - a course without one is a grey rectangle, and a catalogue of them is
+        // indistinguishable from a broken image - but only a chunk of them need exist at once.
+        for ($offset = 0; $offset < $plan->courses; $offset += self::GENERATION_CHUNK) {
+            $size = min(self::GENERATION_CHUNK, $plan->courses - $offset);
+            $courseRows = [];
+
+            for ($j = 0; $j < $size; $j++) {
+                $i = $offset + $j;
+                $category = $categories === [] ? null : $categories[$i % $categoryCount];
+                $courseCategories[] = $category;
+                $title = $category === null
+                    ? $this->names()->courseTitle()
+                    : $this->names()->courseTitleFor((string) $category['name']);
+                $owner = $people['owners'][$i % $ownerCount];
+                $company = $companies[$i % $companyCount];
+                // Two thirds published so the catalogue has volume, the rest draft so the
+                // Administration status filters have something to separate.
+                $status = $i % 3 === 2 ? 'draft' : 'published';
+
+                $titles[] = $title;
+                $publicId = Uuid::v4();
+                $courseRows[] = [
+                    $publicId,
+                    $category === null ? null : $category['id'],
+                    Slug::from($title) . '-' . $i . '-' . $suffix,
+                    $title,
+                    'Generated seed course for volume testing.',
+                    'standard',
+                    60,
+                    $status,
+                    31536000,
+                    0.6,
+                    0.4,
+                    true,
+                    'classic',
+                    $owner,
+                    $company['id'],
+                    1,
+                    'approved',
+                    $owner,
+                    $owner,
+                    $status === 'published' ? gmdate('Y-m-d H:i:sP') : null,
+                    $this->artwork->courseCover($publicId, $title),
+                ];
+            }
+
+            foreach ($this->write(
+                'courses',
+                [
+                    'public_id', 'category_id', 'slug', 'title', 'summary', 'level', 'estimated_minutes',
+                    'status', 'default_access_period_seconds', 'module_weight', 'final_weight',
+                    'certificate_enabled', 'certificate_template', 'owner_user_id', 'owner_company_id',
+                    'revision_number', 'publication_approval_status', 'created_by_user_id',
+                    'updated_by_user_id', 'published_at', 'cover_svg',
+                ],
+                $courseRows,
+                true
+            ) as $courseId) {
+                $courseIds[] = $courseId;
+            }
+            unset($courseRows);
         }
-
-        $courseIds = $this->write(
-            'courses',
-            [
-                'public_id', 'category_id', 'slug', 'title', 'summary', 'level', 'estimated_minutes',
-                'status', 'default_access_period_seconds', 'module_weight', 'final_weight',
-                'certificate_enabled', 'certificate_template', 'owner_user_id', 'owner_company_id',
-                'revision_number', 'publication_approval_status', 'created_by_user_id',
-                'updated_by_user_id', 'published_at', 'cover_svg',
-            ],
-            $courseRows,
-            true
-        );
 
         // Grade bands, a price and an editor are cheap and belong to every course: they are what a
         // catalogue row displays. Modules, assessments, questions and answer options are the
@@ -495,7 +553,7 @@ final class SeedGenerator
         $rows = [];
         foreach ($courseIds as $courseId) {
             foreach (self::GRADE_BANDS as $position => $band) {
-                $rows[] = [$courseId, $position + 1, $band[0], $band[1], $band[2], $band[3], $token];
+                $rows[] = [$courseId, $position + 1, $band[0], $band[1], $band[2], $band[3]];
             }
         }
 
@@ -517,7 +575,7 @@ final class SeedGenerator
             $owner = $people['owners'][$index % count($people['owners'])];
             $rows[] = [
                 Uuid::v4(), $courseId, 31536000, (($this->next(40) + 5) * 10000),
-                'ZAR', '12 months', 1, true, true, $owner, $owner, $token,
+                'ZAR', '12 months', 1, true, true, $owner, $owner,
             ];
         }
 
@@ -540,7 +598,7 @@ final class SeedGenerator
         $editors = $people['editors'] !== [] ? $people['editors'] : $people['owners'];
         $rows = [];
         foreach ($courseIds as $index => $courseId) {
-            $rows[] = [$courseId, $editors[$index % count($editors)], $token];
+            $rows[] = [$courseId, $editors[$index % count($editors)]];
         }
 
         $this->write('course_editors', ['course_id', 'user_id'], $rows);
@@ -644,7 +702,7 @@ final class SeedGenerator
                 $order[] = $courseId;
                 $rows[] = [
                     Uuid::v4(), $courseId, 'module-' . $position, $position,
-                    'Module ' . $position, 'Generated module content for volume testing.', $token,
+                    'Module ' . $position, 'Generated module content for volume testing.',
                 ];
             }
         }
@@ -663,7 +721,7 @@ final class SeedGenerator
             for ($position = 1; $position <= SeedGenerationPlan::BLOCKS_PER_MODULE; $position++) {
                 $blockRows[] = [
                     Uuid::v4(), $moduleId, $position, 'html',
-                    'Section ' . $position, '<p>Generated seed content.</p>', $token,
+                    'Section ' . $position, '<p>Generated seed content.</p>',
                 ];
             }
         }
@@ -696,13 +754,13 @@ final class SeedGenerator
                 $order[] = $courseId;
                 $rows[] = [
                     Uuid::v4(), $courseId, $moduleId, 'module', 'Module ' . ($position + 1) . ' assessment',
-                    $position + 1, 50.0, true, 5, 1800, 'highest', $token,
+                    $position + 1, 50.0, true, 5, 1800, 'highest',
                 ];
             }
             $order[] = $courseId;
             $rows[] = [
                 Uuid::v4(), $courseId, null, 'final', 'Final assessment',
-                99, 60.0, true, 5, 3600, 'highest', $token,
+                99, 60.0, true, 5, 3600, 'highest',
             ];
         }
 
@@ -730,55 +788,67 @@ final class SeedGenerator
      */
     private function generateQuestions(array $assessmentIds, string $token): array
     {
-        $rows = [];
-        $order = [];
-        foreach ($assessmentIds as $assessmentId) {
-            for ($position = 1; $position <= SeedGenerationPlan::QUESTIONS_PER_ASSESSMENT; $position++) {
-                $order[] = $assessmentId;
-                $rows[] = [
-                    Uuid::v4(), $assessmentId, $position,
-                    '<p>Generated question ' . $position . ' for volume testing.</p>',
-                    1, 'standard', $token,
-                ];
-            }
-        }
-
-        $ids = $this->write(
-            'assessment_questions',
-            ['public_id', 'assessment_id', 'position', 'question_html', 'points', 'difficulty'],
-            $rows,
-            true
-        );
-
         $byAssessment = [];
-        $optionRows = [];
-        $optionOwners = [];
-        foreach ($ids as $index => $questionId) {
-            $byAssessment[$order[$index]][] = $questionId;
-            // Exactly one correct option per question: the schema enforces it with a partial
-            // unique index, and a question with none would be unanswerable.
-            $correct = $this->next(SeedGenerationPlan::OPTIONS_PER_QUESTION) + 1;
-            for ($position = 1; $position <= SeedGenerationPlan::OPTIONS_PER_QUESTION; $position++) {
-                $optionOwners[] = $questionId;
-                $optionRows[] = [
-                    Uuid::v4(), $questionId, $position,
-                    '<p>Option ' . $position . '</p>', $position === $correct, $token,
-                ];
-            }
-        }
-
-        // The ids are captured because assessment_responses.selected_option_id is NOT NULL: a
-        // response cannot be recorded without naming a real option.
-        $optionIds = $this->write(
-            'assessment_options',
-            ['public_id', 'question_id', 'position', 'option_html', 'is_correct'],
-            $optionRows,
-            true
-        );
-
         $optionsByQuestion = [];
-        foreach ($optionIds as $index => $optionId) {
-            $optionsByQuestion[$optionOwners[$index]][] = $optionId;
+
+        $perQuestion = SeedGenerationPlan::OPTIONS_PER_QUESTION;
+        $perAssessment = SeedGenerationPlan::QUESTIONS_PER_ASSESSMENT;
+
+        // Chunked by assessment so a whole set's questions and their four-times-larger option
+        // bank are never all in memory at once. The two parallel arrays this used to carry - one
+        // naming each question's assessment, one naming each option's question - are gone: the
+        // shape is fixed at a constant per parent, so the parent of row n is arithmetic on n, and
+        // a 60,000-entry index does not need to be built to record what division already knows.
+        $chunk = max(1, intdiv(self::GENERATION_CHUNK, $perAssessment));
+
+        foreach (array_chunk($assessmentIds, $chunk) as $assessmentChunk) {
+            $rows = [];
+            foreach ($assessmentChunk as $assessmentId) {
+                for ($position = 1; $position <= $perAssessment; $position++) {
+                    $rows[] = [
+                        Uuid::v4(), $assessmentId, $position,
+                        '<p>Generated question ' . $position . ' for volume testing.</p>',
+                        1, 'standard',
+                    ];
+                }
+            }
+
+            $ids = $this->write(
+                'assessment_questions',
+                ['public_id', 'assessment_id', 'position', 'question_html', 'points', 'difficulty'],
+                $rows,
+                true
+            );
+            unset($rows);
+
+            $optionRows = [];
+            foreach ($ids as $index => $questionId) {
+                $byAssessment[$assessmentChunk[intdiv($index, $perAssessment)]][] = $questionId;
+                // Exactly one correct option per question: the schema enforces it with a partial
+                // unique index, and a question with none would be unanswerable.
+                $correct = $this->next($perQuestion) + 1;
+                for ($position = 1; $position <= $perQuestion; $position++) {
+                    $optionRows[] = [
+                        Uuid::v4(), $questionId, $position,
+                        '<p>Option ' . $position . '</p>', $position === $correct,
+                    ];
+                }
+            }
+
+            // The ids are captured because assessment_responses.selected_option_id is NOT NULL: a
+            // response cannot be recorded without naming a real option.
+            $optionIds = $this->write(
+                'assessment_options',
+                ['public_id', 'question_id', 'position', 'option_html', 'is_correct'],
+                $optionRows,
+                true
+            );
+            unset($optionRows);
+
+            foreach ($optionIds as $index => $optionId) {
+                $optionsByQuestion[$ids[intdiv($index, $perQuestion)]][] = $optionId;
+            }
+            unset($ids, $optionIds);
         }
 
         return ['questions' => $byAssessment, 'options' => $optionsByQuestion];
@@ -805,182 +875,217 @@ final class SeedGenerator
         $learners = $people['students'];
         $now = gmdate('Y-m-d H:i:sP');
 
-        $enrolmentRows = [];
-        $context = [];
         $seenPairs = [];
         // How many enrolments have been given a full history so far. The plan caps it.
         $worked = 0;
-        for ($i = 0; $i < $plan->enrolments; $i++) {
-            $learner = $learners[$i % count($learners)];
-            $course = $courses[($i * 7 + intdiv($i, count($learners))) % count($courses)];
+        // Certificate numbers run across the whole set, so the counter cannot live inside a chunk:
+        // reset per chunk it would issue SEED-<key>-000000 once per chunk instead of once.
+        $certificateSequence = 0;
+        $learnerCount = count($learners);
+        $courseCount = count($courses);
 
-            // One active enrolment per learner and course: the schema enforces it with a partial
-            // unique index. The plan never asks for more enrolments than there are people and each
-            // pass takes the next person in turn, so a repeat should be impossible - but the guard
-            // stays, because a skipped row here is a silent under-delivery rather than an error,
-            // which is precisely how the old shortfall stayed invisible.
-            $pair = $learner . ':' . $course['id'];
-            if (isset($seenPairs[$pair])) {
-                continue;
-            }
-            $seenPairs[$pair] = true;
+        // This phase writes eleven tables and used to build every row of all of them before
+        // issuing a single statement, which is why it was the largest of the six. A chunk of
+        // enrolments now carries its own progress, attempts, responses, sessions, results and
+        // certificates through to the database and is then discarded.
+        //
+        // One consequence worth stating: the random sequence is consumed in a different order than
+        // it was when every enrolment's attempts were built before any enrolment's responses. A
+        // token still rebuilds its own graph exactly - that is what reproducibility means here -
+        // but a token does not rebuild the graph the previous arrangement produced for it.
+        for ($offset = 0; $offset < $plan->enrolments; $offset += self::GENERATION_CHUNK) {
+            $size = min(self::GENERATION_CHUNK, $plan->enrolments - $offset);
 
-            $stage = $i % 3;
-            $status = match ($stage) {
-                0 => 'assigned',
-                1 => 'active',
-                default => 'completed',
-            };
+            $enrolmentRows = [];
+            $context = [];
 
-            $context[] = ['course' => $course, 'status' => $status, 'learner' => $learner];
-            $enrolmentRows[] = [
-                Uuid::v4(), $learner, $course['id'], 'seed', $status, 31536000,
-                $stage > 0 ? $now : null,
-                $stage === 2 ? $now : null,
-                $token,
-            ];
-        }
+            for ($j = 0; $j < $size; $j++) {
+                $i = $offset + $j;
+                $learner = $learners[$i % $learnerCount];
+                $course = $courses[($i * 7 + intdiv($i, $learnerCount)) % $courseCount];
 
-        $enrolmentIds = $this->write(
-            'course_enrolments',
-            ['public_id', 'user_id', 'course_id', 'source_type', 'status', 'access_period_seconds', 'started_at', 'completed_at'],
-            $enrolmentRows,
-            true
-        );
-
-        $progressRows = [];
-        $attemptRows = [];
-        $attemptContext = [];
-        $sessionRows = [];
-        $sessionContext = [];
-        $resultRows = [];
-        $certificateRows = [];
-
-        foreach ($enrolmentIds as $index => $enrolmentId) {
-            $entry = $context[$index];
-            $course = $entry['course'];
-            $complete = $entry['status'] === 'completed';
-
-            // Only the planned share of enrolments is worked through, and the projection counts
-            // the same figure. The two used to disagree in both directions: the projection assumed
-            // every enrolment produced attempts, sessions and answers while the generator skipped
-            // every one that had not been started, so those four tables under-delivered by exactly
-            // a third; and progress was written for every enrolment whose course happened to have
-            // modules, which the projection had no way to predict, so that one over-delivered.
-            //
-            // Progress belongs inside this gate rather than above it. Module progress means
-            // somebody opened the modules, and an enrolment with no assessment activity at all did
-            // not.
-            if ($worked >= $plan->workedEnrolments || $course['assessments'] === []) {
-                continue;
-            }
-            $worked++;
-
-            foreach ($course['modules'] as $moduleId) {
-                $progressRows[] = [
-                    $enrolmentId, $moduleId, $now, $now,
-                    $complete ? $now : null,
-                    $complete ? 75.0 : null,
-                    $complete ? 'MERIT' : null,
-                    $token,
-                ];
-            }
-
-            $assessmentId = $course['assessments'][0];
-            $questions = $course['questions'][$assessmentId] ?? [];
-            $maximum = max(1, count($questions));
-
-            for ($attempt = 1; $attempt <= SeedGenerationPlan::ATTEMPTS_PER_ENROLMENT; $attempt++) {
-                $earned = $this->next($maximum + 1);
-                $percentage = round($earned / $maximum * 100, 2);
-                $attemptContext[] = ['questions' => $questions, 'earned' => $earned, 'options' => $course['options']];
-                $attemptRows[] = [
-                    Uuid::v4(), $enrolmentId, $assessmentId, $attempt,
-                    $earned, $maximum, $percentage,
-                    $this->gradeFor($percentage), $percentage >= 50.0, $now, $token,
-                ];
-            }
-
-            $sessionContext[] = $questions;
-            $sessionRows[] = [
-                Uuid::v4(), $enrolmentId, $assessmentId, 'graded', 1, 'submitted',
-                $maximum, $maximum, $now, gmdate('Y-m-d H:i:sP', time() + 3600), $now, $token,
-            ];
-
-            if ($complete) {
-                $overall = round(60 + $this->next(40), 2);
-                $resultRows[] = [$enrolmentId, $overall, $overall, $overall, $this->gradeFor($overall), $overall >= 50.0, $token];
-
-                $certificateRows[] = [
-                    Uuid::v4(), $enrolmentId,
-                    'SEED-' . strtoupper($suffix) . '-' . str_pad((string) count($certificateRows), 6, '0', STR_PAD_LEFT),
-                    'Seed Learner', $course['title'], $this->gradeFor($overall), $overall, $now, $token,
-                ];
-            }
-        }
-
-        $this->write(
-            'module_progress',
-            ['enrolment_id', 'module_id', 'first_opened_at', 'last_viewed_at', 'completed_at', 'best_percentage', 'best_grade_code'],
-            $progressRows
-        );
-
-        $attemptIds = $this->write(
-            'assessment_attempts',
-            ['public_id', 'enrolment_id', 'assessment_id', 'attempt_number', 'earned_points', 'maximum_points', 'percentage', 'grade_code', 'passed', 'submitted_at'],
-            $attemptRows,
-            true
-        );
-
-        $responseRows = [];
-        foreach ($attemptIds as $index => $attemptId) {
-            $entry = $attemptContext[$index];
-            foreach ($entry['questions'] as $position => $questionId) {
-                $options = $entry['options'][$questionId] ?? [];
-                if ($options === []) {
+                // One active enrolment per learner and course: the schema enforces it with a
+                // partial unique index. The plan never asks for more enrolments than there are
+                // people and each pass takes the next person in turn, so a repeat should be
+                // impossible - but the guard stays, because a skipped row here is a silent
+                // under-delivery rather than an error, which is precisely how the old shortfall
+                // stayed invisible.
+                $pair = $learner . ':' . $course['id'];
+                if (isset($seenPairs[$pair])) {
                     continue;
                 }
-                $responseRows[] = [
-                    $attemptId,
-                    $questionId,
-                    $options[$this->next(count($options))],
-                    $position < $entry['earned'],
-                    $token,
+                $seenPairs[$pair] = true;
+
+                $stage = $i % 3;
+                $status = match ($stage) {
+                    0 => 'assigned',
+                    1 => 'active',
+                    default => 'completed',
+                };
+
+                $context[] = [$course, $status];
+                $enrolmentRows[] = [
+                    Uuid::v4(), $learner, $course['id'], 'seed', $status, 31536000,
+                    $stage > 0 ? $now : null,
+                    $stage === 2 ? $now : null,
                 ];
             }
-        }
-        $this->write('assessment_responses', ['attempt_id', 'question_id', 'selected_option_id', 'is_correct'], $responseRows);
 
-        $sessionIds = $this->write(
-            'assessment_sessions',
-            ['public_id', 'enrolment_id', 'assessment_id', 'attempt_mode', 'attempt_number', 'status', 'selected_question_count', 'current_sequence', 'started_at', 'deadline_at', 'completed_at'],
-            $sessionRows,
-            true
-        );
-
-        $sessionQuestionRows = [];
-        foreach ($sessionIds as $index => $sessionId) {
-            foreach ($sessionContext[$index] as $position => $questionId) {
-                $sessionQuestionRows[] = [$sessionId, $questionId, $position + 1, 'answered', $now, $token];
+            if ($enrolmentRows === []) {
+                continue;
             }
+
+            $enrolmentIds = $this->write(
+                'course_enrolments',
+                ['public_id', 'user_id', 'course_id', 'source_type', 'status', 'access_period_seconds', 'started_at', 'completed_at'],
+                $enrolmentRows,
+                true
+            );
+            unset($enrolmentRows);
+
+            $progressRows = [];
+            $attemptRows = [];
+            $attemptContext = [];
+            $sessionRows = [];
+            $sessionContext = [];
+            $resultRows = [];
+            $certificateRows = [];
+
+            foreach ($enrolmentIds as $index => $enrolmentId) {
+                [$course, $entryStatus] = $context[$index];
+                $complete = $entryStatus === 'completed';
+
+                // Only the planned share of enrolments is worked through, and the projection counts
+                // the same figure. The two used to disagree in both directions: the projection
+                // assumed every enrolment produced attempts, sessions and answers while the
+                // generator skipped every one that had not been started, so those four tables
+                // under-delivered by exactly a third; and progress was written for every enrolment
+                // whose course happened to have modules, which the projection had no way to
+                // predict, so that one over-delivered.
+                //
+                // Progress belongs inside this gate rather than above it. Module progress means
+                // somebody opened the modules, and an enrolment with no assessment activity at all
+                // did not.
+                if ($worked >= $plan->workedEnrolments || $course['assessments'] === []) {
+                    continue;
+                }
+                $worked++;
+
+                foreach ($course['modules'] as $moduleId) {
+                    $progressRows[] = [
+                        $enrolmentId, $moduleId, $now, $now,
+                        $complete ? $now : null,
+                        $complete ? 75.0 : null,
+                        $complete ? 'MERIT' : null,
+                    ];
+                }
+
+                $assessmentId = $course['assessments'][0];
+                $questions = $course['questions'][$assessmentId] ?? [];
+                $maximum = max(1, count($questions));
+
+                for ($attempt = 1; $attempt <= SeedGenerationPlan::ATTEMPTS_PER_ENROLMENT; $attempt++) {
+                    $earned = $this->next($maximum + 1);
+                    $percentage = round($earned / $maximum * 100, 2);
+                    $attemptContext[] = [$questions, $earned, $course['options']];
+                    $attemptRows[] = [
+                        Uuid::v4(), $enrolmentId, $assessmentId, $attempt,
+                        $earned, $maximum, $percentage,
+                        $this->gradeFor($percentage), $percentage >= 50.0, $now,
+                    ];
+                }
+
+                $sessionContext[] = $questions;
+                $sessionRows[] = [
+                    Uuid::v4(), $enrolmentId, $assessmentId, 'graded', 1, 'submitted',
+                    $maximum, $maximum, $now, gmdate('Y-m-d H:i:sP', time() + 3600), $now,
+                ];
+
+                if ($complete) {
+                    $overall = round(60 + $this->next(40), 2);
+                    $resultRows[] = [$enrolmentId, $overall, $overall, $overall, $this->gradeFor($overall), $overall >= 50.0];
+
+                    $certificateRows[] = [
+                        Uuid::v4(), $enrolmentId,
+                        'SEED-' . strtoupper($suffix) . '-' . str_pad((string) $certificateSequence, 6, '0', STR_PAD_LEFT),
+                        'Seed Learner', $course['title'], $this->gradeFor($overall), $overall, $now,
+                    ];
+                    $certificateSequence++;
+                }
+            }
+            unset($context, $enrolmentIds);
+
+            $this->write(
+                'module_progress',
+                ['enrolment_id', 'module_id', 'first_opened_at', 'last_viewed_at', 'completed_at', 'best_percentage', 'best_grade_code'],
+                $progressRows
+            );
+            unset($progressRows);
+
+            $attemptIds = $this->write(
+                'assessment_attempts',
+                ['public_id', 'enrolment_id', 'assessment_id', 'attempt_number', 'earned_points', 'maximum_points', 'percentage', 'grade_code', 'passed', 'submitted_at'],
+                $attemptRows,
+                true
+            );
+            unset($attemptRows);
+
+            $responseRows = [];
+            foreach ($attemptIds as $index => $attemptId) {
+                [$entryQuestions, $entryEarned, $entryOptions] = $attemptContext[$index];
+                foreach ($entryQuestions as $position => $questionId) {
+                    $options = $entryOptions[$questionId] ?? [];
+                    if ($options === []) {
+                        continue;
+                    }
+                    $responseRows[] = [
+                        $attemptId,
+                        $questionId,
+                        $options[$this->next(count($options))],
+                        $position < $entryEarned,
+                    ];
+                }
+            }
+            unset($attemptContext, $attemptIds);
+            $this->write('assessment_responses', ['attempt_id', 'question_id', 'selected_option_id', 'is_correct'], $responseRows);
+            unset($responseRows);
+
+            $sessionIds = $this->write(
+                'assessment_sessions',
+                ['public_id', 'enrolment_id', 'assessment_id', 'attempt_mode', 'attempt_number', 'status', 'selected_question_count', 'current_sequence', 'started_at', 'deadline_at', 'completed_at'],
+                $sessionRows,
+                true
+            );
+            unset($sessionRows);
+
+            $sessionQuestionRows = [];
+            foreach ($sessionIds as $index => $sessionId) {
+                foreach ($sessionContext[$index] as $position => $questionId) {
+                    $sessionQuestionRows[] = [$sessionId, $questionId, $position + 1, 'answered', $now];
+                }
+            }
+            unset($sessionContext, $sessionIds);
+            $this->write(
+                'assessment_session_questions',
+                ['session_id', 'question_id', 'sequence', 'response_status', 'submitted_at'],
+                $sessionQuestionRows
+            );
+            unset($sessionQuestionRows);
+
+            $this->write(
+                'course_results',
+                ['enrolment_id', 'module_percentage', 'final_percentage', 'overall_percentage', 'grade_code', 'passed'],
+                $resultRows
+            );
+            unset($resultRows);
+
+            $this->write(
+                'certificates',
+                ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'issued_at'],
+                $certificateRows
+            );
+            unset($certificateRows);
         }
-        $this->write(
-            'assessment_session_questions',
-            ['session_id', 'question_id', 'sequence', 'response_status', 'submitted_at'],
-            $sessionQuestionRows
-        );
-
-        $this->write(
-            'course_results',
-            ['enrolment_id', 'module_percentage', 'final_percentage', 'overall_percentage', 'grade_code', 'passed'],
-            $resultRows
-        );
-
-        $this->write(
-            'certificates',
-            ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'issued_at'],
-            $certificateRows
-        );
     }
 
     private function gradeFor(float $percentage): string
@@ -1023,7 +1128,7 @@ final class SeedGenerator
                 continue;
             }
             $seen[$pair] = true;
-            $favouriteRows[] = [$learner, $course['id'], $token];
+            $favouriteRows[] = [$learner, $course['id']];
         }
         $this->write('course_favourites', ['user_id', 'course_id'], $favouriteRows);
 
@@ -1033,7 +1138,7 @@ final class SeedGenerator
             $course = $courses[($i * 5) % count($courses)];
             $requestRows[] = [
                 Uuid::v4(), $learner, $companies[$i % count($companies)]['id'], $course['id'],
-                31536000, $i % 2 === 0 ? 'pending' : 'approved', $token,
+                31536000, $i % 2 === 0 ? 'pending' : 'approved',
             ];
         }
         $this->write(
@@ -1048,7 +1153,7 @@ final class SeedGenerator
             $creditRows[] = [
                 Uuid::v4(), $companies[$i % count($companies)]['id'], null,
                 $courses[($i * 2) % count($courses)]['id'], 31536000,
-                $this->next(8) + 2, 'seed', $token,
+                $this->next(8) + 2, 'seed',
             ];
         }
         $creditIds = $this->write(
@@ -1060,7 +1165,7 @@ final class SeedGenerator
 
         $allocationRows = [];
         foreach ($creditIds as $index => $creditId) {
-            $allocationRows[] = [$creditId, $learners[$index % count($learners)], null, 'assigned', $token];
+            $allocationRows[] = [$creditId, $learners[$index % count($learners)], null, 'assigned'];
         }
         $this->write(
             'course_credit_allocations',
@@ -1085,7 +1190,6 @@ final class SeedGenerator
                 'course.created',
                 'course',
                 'Generated seed course created.',
-                $token,
             ];
         }
         $this->write(
@@ -1102,7 +1206,7 @@ final class SeedGenerator
         $actors = $people['all'] !== [] ? $people['all'] : [null];
         $auditRows = [];
         for ($i = 0; $i < $plan->auditEntries; $i++) {
-            $auditRows[] = [$actors[$i % count($actors)], $events[$i % count($events)], $token];
+            $auditRows[] = [$actors[$i % count($actors)], $events[$i % count($events)]];
         }
         $this->write('audit_log', ['user_id', 'event_key'], $auditRows);
     }

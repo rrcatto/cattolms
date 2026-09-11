@@ -1,8 +1,9 @@
 {
-    "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-j-V9kmg.js",
+    "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-1hL7MHB.js",
     "@symfony\/stimulus-bundle\/loader.js": "\/assets\/@symfony\/stimulus-bundle\/loader-IOzBDLu.js",
-    "app.js": "\/assets\/app-JMughI-.js",
-    "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-4IR0FpU.js",
+    "app.js": "\/assets\/app-we5Kv_X.js",
+    "controllers\/profile_image_controller.js": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",
+    "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-2s0XeI0.js",
     "vendor\/@hotwired\/stimulus\/stimulus.index.js": "\/assets\/vendor\/@hotwired\/stimulus\/stimulus.index-ryewcoo.js",
     "vendor\/TagCloud\/TagCloud.index.js": "\/assets\/vendor\/TagCloud\/TagCloud.index-r_BOY6F.js"
 }

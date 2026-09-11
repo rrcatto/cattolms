@@ -15,9 +15,9 @@ Description:
 	requests and enrolments, because they grow at different rates and a reader paging one must not
 	lose their place in the other.
 
-	WARNING: never write an F3 tag, an angle bracket or a comment delimiter inside a template
-	comment. F3 parses its own tags inside comments, and a delimiter written here ends the comment
-	early and leaks the remainder onto the page.
+	WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+	written inside a comment body ends the comment early and leaks the remainder onto the page.
+	Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
 	2026/08/31 19:05 SAST
 	- Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
@@ -27,14 +27,21 @@ Changelog:
 	2026/08/23 04:19 SAST
 	- Added the shared genuine-ADMIN data-universe control; Reports scopes its figures rather than listing rows, so it carries the selector without a records strip.
 #}
-<div class="section-head">
-	<div>
-		<h2>
-			Reports
-		</h2>
-		<p>
-			Operational and learning results summarised into useful figures. Detailed event history belongs in Activity.
-		</p>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Course Performance
+				</div>
+				<h2>
+					Reports
+				</h2>
+				<p>
+					Operational and learning results summarised into useful figures. Detailed event history belongs in Activity.
+				</p>
+			</div>
+		</div>
 	</div>
 </div>
 <div class="admin-reports-grid">

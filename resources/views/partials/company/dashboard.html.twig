@@ -10,8 +10,9 @@ Description:
 	number here and the rows behind that tab describe one population. A dashboard figure produced
 	by a different query from the list it summarises is how the two come to disagree.
 
-	WARNING: never write an F3 tag, an angle bracket or a comment delimiter inside a template
-	comment. Keep every comment plain prose.
+	WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+	written inside a comment body ends the comment early and leaks the remainder onto the page.
+	Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
 	2026/08/31 19:05 SAST
 	- Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
@@ -19,16 +20,23 @@ Changelog:
 	- Added the Courses figure, making five; renamed the learning wording to enrolments; added the
 	  metadata header and tab indentation.
 #}
-<div class="section-head">
-	<div>
-		<h2>
-			{{ company.name }}
-		</h2>
-		<p>
-			{{ company_platform_wide ? 'Platform-wide company overview for ADMIN.' : 'Company enrolments and account overview.' }}
-		</p>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Dashboard
+				</div>
+				<h2>
+					{{ company.name }}
+				</h2>
+				<p>
+					{{ company_platform_wide ? 'Platform-wide company overview for ADMIN.' : 'Company enrolments and account overview.' }}
+				</p>
+			</div>
+			<span class="badge info">{{ company.domain }}</span>
+		</div>
 	</div>
-	<span class="badge info">{{ company.domain }}</span>
 </div>
 <div class="stat-grid">
 	<div class="stat-card">

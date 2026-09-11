@@ -209,11 +209,11 @@ abstract class BaseController
     {
         $currentUser = $this->currentUser();
 
-        // Never place CurrentUser or another application object in the F3 hive.
-        // F3 recursively escapes hive values before rendering and attempts to
-        // write escaped values back to public properties. CurrentUser is a
-        // readonly value object, so passing it to a template causes a fatal
-        // "Cannot modify readonly property" error.
+        // Templates get flat scalars, never CurrentUser itself. The original reason was F3's,
+        // which recursively escaped values before rendering and wrote them back to public
+        // properties - fatal against a readonly value object. Twig does not do that, so the rule
+        // is no longer load-bearing, but it stays: a template that can only read booleans cannot
+        // grow its own authorisation logic, which is what keeps the decisions in the ACL.
         $data['is_authenticated'] = $currentUser !== null;
         $data['is_platform_admin'] = $currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false;
         $data['is_company_admin'] = $currentUser?->hasPermission('COMPANY.DASHBOARD.VIEW') ?? false;
@@ -221,6 +221,28 @@ abstract class BaseController
         $data['is_course_editor'] = $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_EDITOR);
         $data['user_email'] = $currentUser === null ? '' : $currentUser->primaryEmail;
         $data['user_name'] = $currentUser === null ? '' : $currentUser->displayName;
+
+        // The identity band under the page head, on every page rather than only in Account. A
+        // signed-out reader gets the same band with a placeholder and a way in, so the header does
+        // not change shape depending on who is looking at it.
+        if ($currentUser !== null) {
+            $card = $this->auth->identityCard($currentUser->id);
+            $data['identity_name'] = $card['name'] !== '' ? $card['name'] : $currentUser->displayName;
+            $data['identity_email'] = $card['email'] !== '' ? $card['email'] : $currentUser->primaryEmail;
+            $data['identity_status'] = $card['status'];
+            // No fingerprint in the address: this is rendered on every page, and computing one
+            // would mean loading the stored bytes on every page to hash them. The route already
+            // answers with a private, week-long cache, and a changed picture is a changed row that
+            // the browser re-requests when that week is out.
+            $data['identity_image'] = $card['has_image'] ? '/account/profile/image' : '';
+            $data['identity_roles'] = $currentUser->roles;
+        } else {
+            $data['identity_name'] = '';
+            $data['identity_email'] = '';
+            $data['identity_status'] = '';
+            $data['identity_image'] = '';
+            $data['identity_roles'] = [];
+        }
         $data['permissions'] = $currentUser === null ? [] : $currentUser->permissions;
         $data['role_keys'] = $currentUser === null ? [] : $currentUser->roles;
         // Stable presentation capabilities let platform-owned templates hide
@@ -264,7 +286,7 @@ abstract class BaseController
             $data[$flag] = $currentUser?->hasPermission($permission) ?? false;
         }
         // Which link the Courses group sub-navigation shows as current. Defaulted for every render
-        // because the partial is included by three screens and an unset variable is a 500 in F3,
+        // because the partial is included by three screens and an unset variable is an error under
         // not a blank - the same trap the dataset-search universe key fell into.
         $data['course_group'] = $data['course_group'] ?? '';
         $data['company_group'] = $data['company_group'] ?? '';

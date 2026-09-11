@@ -15,11 +15,9 @@ Description:
   application URL and domain, and the cookie and session settings are never exposed here.
 
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags
-  inside comments, so a tag written out as a usage example becomes a real tag in the compiled
-  template. A comment delimiter written inside a comment body ends it early and leaks the
-  remainder onto the page. Keep every comment plain prose: no angle brackets, no comment
-  delimiters, no template tokens and no code, not even to document one.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
   2026/08/29 14:32 SAST
   - Added the required file metadata header and reindented with tabs. Block structure is now
@@ -29,14 +27,21 @@ Changelog:
   - Stage C: added the editable SEED System Company card, its missing-row warning and its reset
     control.
 #}
-<div class="section-head">
-	<div>
-		<h2>
-			Platform settings
-		</h2>
-		<p>
-			Administrator overrides are stored in PostgreSQL. Where an override is absent, the LMS falls back to the corresponding value in <span class="mono">.env</span>.
-		</p>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Settings
+				</div>
+				<h2>
+					Platform settings
+				</h2>
+				<p>
+					Administrator overrides are stored in PostgreSQL. Where an override is absent, the LMS falls back to the corresponding value in <span class="mono">.env</span>.
+				</p>
+			</div>
+		</div>
 	</div>
 </div>
 <div class="admin-settings-layout">

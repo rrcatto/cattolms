@@ -8,17 +8,21 @@ Date time: 2026/09/09 23:58 SAST
 Version: 0.7
 
 Description:
-The importmap for the Symfony UX trial.
+The importmap for Symfony UX.
 
 Every entry is vendored into assets/vendor/ and committed, so a deployment copies files rather than
 resolving anything at install time. That is the whole reason AssetMapper was chosen over a bundler:
 there is no npm step to keep working on the server.
 
 TagCloud.js is the owner's choice for the animated cloud on /courses/tags. It is a small standalone
-library with no dependencies of its own, which is what makes it a fair test of the UX integration
-rather than a test of a dependency tree.
+library with no dependencies of its own, so it costs the importmap one entry and nothing further.
+
+Add a dependency with `bin/console importmap:require <package>`, which vendors it into
+assets/vendor/ and commits it. There is no npm step, and adding one would defeat the choice.
 
 Changelog:
+2026/09/10 18:39 SAST
+- Symfony UX adopted as the platform's second layer; the wording no longer describes a trial.
 2026/09/09 23:58 SAST
 - Created for the Symfony UX trial.
 */

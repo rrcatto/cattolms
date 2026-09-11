@@ -19,7 +19,7 @@ three-root deployment model that App::run() already encodes:
   - Cache and logs go to the INSTANCE root, not the project directory. `code/current` is a symlink
     to a release directory that several instances may share and that a deployment replaces
     wholesale; writing a compiled container into it would put instance state inside a release. The
-    instance root is the writable tree, and it is already where F3's cache and the application log
+    instance root is the writable tree, and it is already where the compiled cache and the application log
     live.
   - Configuration comes from the instance `.env`, the same file App::run() reads through vlucas
     dotenv. Symfony's own Dotenv is not used, because two loaders reading two files is how a

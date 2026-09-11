@@ -1,21 +1,23 @@
-# Catto Learning LMS 0.6
+# Catto Learning LMS 0.7
 
-**LMS version:** 0.6  
-**Date time:** 2026/09/08 03:30 SAST  
+**LMS version:** 0.7  
+**Date time:** 2026/09/10 02:25 SAST  
 
-Catto Learning is a PHP/Fat-Free Framework/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
+Catto Learning is a PHP/Symfony/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
 
-Version 0.6 is the **catalogue and scale stage**. It collapses the 0.5.8 schema and everything after it into one canonical baseline, makes the course taxonomy a real one, and takes every list to a size the platform can actually be judged at.
+Version 0.7 is the **framework and data-model reset**. Two things happened at once, and each of them alone would have justified the number.
 
-Version 0.5.8 was the **Seed Database stage**, and its model is unchanged. An administrator can generate a disposable set of realistic SEED records — people, companies, courses, assessments, enrolments, results and audit activity — so the interface can be exercised at realistic volume without anyone building test data by hand. Every generated row lives in a separate data universe that ordinary users, the public catalogue and the REST/MCP surfaces never see.
+**Fat-Free Framework and PHP-DI are gone.** The HTTP kernel, routing, dependency injection, session handling and error pages are Symfony 8.1; templates are Twig with `strict_variables`. Routes are declared as `#[Route]` attributes on the controllers themselves rather than in a central registrar, and the object graph is wired in `config/services.yaml`. Nothing about the layering changed — thin controllers, services holding the business rules, repositories holding every line of SQL behind the `Database` interface — only the framework underneath it.
 
-Version 0.5.7.6 made this possible by paginating every list and pairing it with a count query describing the same population; version 0.5.7.5.1 established the ACL foundation. Both models are unchanged here.
+**There is one kind of data.** The REAL/SEED universe split is removed in full: no `seed_token` columns, no cross-universe constraint triggers, no `DataUniverse` parameter threaded through every repository read, no universe switch in the interface, no `SEED_*` role family. The Seed Database generator remains, and is still how the interface is exercised at volume — it now simply writes ordinary rows. Every record in the platform is disposable development data until the owner declares production.
 
-The rule the whole stage rests on:
+## What 0.7 changes
 
-> Permissions answer **what an identity may do**. `seed_token` and universe-aware query scope answer **which business rows that identity may see or touch**. They are separate mechanisms and must never be merged.
+**One baseline, and a reset install.** As with 0.6 there is no upgrade path: installing 0.7 means `composer smoke:install` and a discarded database. `release:validate` still enforces the migration shape — exactly one baseline, any number of additive migrations, and a non-baseline migration that drops or recreates a table fails the build.
 
-There are exactly two business-data universes: `REAL = seed_token IS NULL` and `SEED = seed_token IS NOT NULL`.
+**Symfony UX.** AssetMapper and StimulusBundle are installed, with no npm toolchain: controllers live in `assets/controllers/` and reach the browser through the importmap. The first surface built on it is the animated tag cloud at `/courses/tags`.
+
+**A documented UI rule book.** `docs/ux-ui-rules.md` records every interface rule the owner has given — table column sizing, stacked row actions, the slanted texture, shared-control reuse — so a rule stated once is not re-litigated on the next surface.
 
 ## What 0.6 changes
 
@@ -167,19 +169,19 @@ reset.** There is no incremental path across that boundary. Upgrading *within* 0
 
 ## Architecture summary
 
-- PHP >=8.5.9 <9.0, F3 3.9, PHP-DI 7/PSR-11 and PostgreSQL. Verified on PHP 8.5.10 and PostgreSQL 16.15.
+- PHP >=8.5.9 <9.0, Symfony 8.1, Twig and PostgreSQL. Verified on PHP 8.5.10 and PostgreSQL 16.15.
+- Symfony's dependency-injection container wires the whole object graph from `config/services.yaml`; every class takes constructor injection and nothing reaches for the container as a service locator.
+- Persistence is Doctrine DBAL behind the `Database` interface. There is no ORM: repositories write SQL and return arrays.
 - Database-backed roles and one shared business capability catalogue using resource-first/action-last uppercase dot notation.
-- `SYSTEM.*` permissions are ADMIN-only infrastructure capabilities, including `SYSTEM.SEED.VIEW` and `SYSTEM.SEED.MANAGE`. `SEED_ADMIN` administers seed *business* data and receives no `SYSTEM.*` authority, so it can never reach the Seed Database section.
-- Built-in roles: `ADMIN`, `STUDENT`, `COMPANY_ADMIN`, `COURSE_EDITOR`, `COURSE_OWNER` and five `SEED_*` counterparts.
-- Normal and seed role families cannot be mixed on one identity; `users.seed_token`, not any role name, is the identity-universe source of truth.
-- Course import and export remain REAL-only; SEED course-management roles may upload genuine test media.
-- API/MCP authorization uses transport scope plus the same ordinary business permission model as Web, and both surfaces are REAL-only because an API token is never issued to a seed identity.
+- `SYSTEM.*` permissions are ADMIN-only infrastructure capabilities, including `SYSTEM.SEED.VIEW` and `SYSTEM.SEED.MANAGE` for the Seed Database generator.
+- Built-in roles: `ADMIN`, `STUDENT`, `COMPANY_ADMIN`, `COURSE_EDITOR` and `COURSE_OWNER`. There is one role family and one kind of business data.
+- API/MCP authorization uses transport scope plus the same ordinary business permission model as Web.
 - Core-owned permission-filtered primary/footer navigation, and a core-owned navigation icon sprite that every theme renders identically.
 - Consolidated `/admin`, `/account` and `/company` workspaces plus semantic direct section routes.
-- **One shared control per job**: pagination, live dataset search and the All/Real/Seed scope switch. Every paginated list uses all three; a second implementation fails the build.
-- htmx is a platform-owned progressive enhancement: every surface using it renders server-side first, and every control works as an ordinary form without JavaScript.
-- Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata. Bundled default is Factory Reset 1.0.4, with further installable packages in `extras/themes/`.
-- Theme Package schema 3.0 / Template API 1.0 / Theme SDK 3.1.
+- **One shared control per job**: pagination, live dataset search, the sortable column header and the row action menu. Every paginated list uses them; a second implementation fails the build.
+- htmx is a platform-owned progressive enhancement: every surface using it renders server-side first, and every control works as an ordinary form without JavaScript. Symfony UX/Stimulus is the second, additive enhancement layer.
+- Filesystem-authoritative immutable themes; `theme_registry` is rebuildable metadata. Bundled default is Factory Reset, with further installable packages in `extras/themes/`.
+- Theme Package schema 4.0 / Twig Template API / Theme SDK.
 - Course authoring/import, assessments, progress/results, certificates and company credit workflows.
 - Optional local GeoIP through Geocoder PHP/GeoLite2.
 

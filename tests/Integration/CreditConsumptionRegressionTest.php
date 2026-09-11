@@ -44,8 +44,8 @@ final class CreditConsumptionRegressionTest extends TestCase
                 ['id' => Uuid::v4(), 'name' => 'QA learner ' . $suffix]
             )[0]['id'];
             $companyId = (int) $db->fetchAllAssociative(
-                "INSERT INTO companies (public_id,name,domain,status,is_system,company_type,created_by_user_id)
-                 VALUES (:public_id,:name,:domain,'active',FALSE,'client',:user_id) RETURNING id",
+                "INSERT INTO companies (public_id,name,domain,status,is_system,created_by_user_id)
+                 VALUES (:public_id,:name,:domain,'active',FALSE,:user_id) RETURNING id",
                 ['public_id' => Uuid::v4(), 'name' => 'QA Company ' . $suffix, 'domain' => 'qa-' . $suffix . '.example', 'user_id' => $adminId]
             )[0]['id'];
             $courseId = (int) $db->fetchAllAssociative(

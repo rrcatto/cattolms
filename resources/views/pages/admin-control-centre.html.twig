@@ -4,6 +4,24 @@
 	{% set ph_title = 'Platform administration' %}
 	{% set ph_lead = 'Every top-level Administration area is available in one workspace. Open only the sections you need.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
+	{# Every workspace opens on a card, as its sections do. #}
+	<div class="grid section">
+		<div class="card">
+			<div class="section-head">
+				<div>
+					<div class="eyebrow">
+						All sections
+					</div>
+					<h2>
+						Platform administration
+					</h2>
+					<p>
+						Every administration section in one place. Each one also has a page of its own.
+					</p>
+				</div>
+			</div>
+		</div>
+	</div>
 	<section class="cl-admin-workspace section" data-admin-workspace>
 		{% for section in admin_sections %}
 			<details class="cl-admin-section" data-admin-section="{{ section.key }}" {{ section.key=='dashboard' ? 'open' : '' }}>

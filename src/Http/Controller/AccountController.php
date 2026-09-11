@@ -33,8 +33,13 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Course\LearningService;
+use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
+use CattoLearning\Support\ProfileImage;
+use CattoLearning\Support\SocialPlatform;
 use CattoLearning\View\ThemeRenderer;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class AccountController extends BaseController
@@ -46,7 +51,8 @@ final class AccountController extends BaseController
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanyService $companies,
-        private readonly AccountSectionRegistry $sections
+        private readonly AccountSectionRegistry $sections,
+        private readonly UserProfileRepository $profiles
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -58,6 +64,9 @@ final class AccountController extends BaseController
         $user = $this->requirePermission('ACCOUNT.VIEW');
         $sections = $this->allowedSections($user);
         $data = $this->workspaceData($user, $sections);
+        // The workspace opens with the identity head as the standalone pages do, and it cannot rely
+        // on the profile section having contributed the data: that section is permission-gated.
+        $data += $this->identityHeadData($user->id);
         $data['account_sections'] = $sections;
         $data['account_layout'] = 'workspace';
         return $this->render('account-control-centre', $data + [
@@ -99,6 +108,134 @@ final class AccountController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->auth->updateProfile($user->id, $_POST);
             $this->flash('success', 'Your profile was updated.');
+            $this->redirect('/account/profile');
+        }, '/account/profile');
+    }
+
+
+    #[Route('/account/emails', name: 'account_emails', methods: ['GET'])]
+    public function emails(): Response
+    {
+        $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
+        return $this->renderAccountSection('emails', $this->emailData($user->id));
+    }
+
+
+    #[Route('/account/social', name: 'account_social', methods: ['GET'])]
+    public function social(): Response
+    {
+        $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
+        return $this->renderAccountSection('social', $this->socialData($user->id));
+    }
+
+
+    /**
+     * Store every social link in one submission.
+     *
+     * The whole set is posted and the whole set is written, because that is what the form means: a
+     * field left empty is an instruction to remove that link, and a per-platform endpoint would
+     * need a delete control beside every field to say the same thing. Validation runs over all
+     * twelve before anything is written, so one bad address does not leave eleven saved and the
+     * form redisplayed as though nothing happened.
+     */
+    #[Route('/account/social', name: 'account_update_social', methods: ['POST'])]
+    public function updateSocial(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
+
+        return $this->handle(function () use ($user): void {
+            $submitted = $this->request()->request->all('social');
+            $resolved = [];
+            foreach (SocialPlatform::keys() as $platform) {
+                $resolved[$platform] = SocialPlatform::normalise(
+                    $platform,
+                    is_string($submitted[$platform] ?? null) ? $submitted[$platform] : ''
+                );
+            }
+
+            foreach ($resolved as $platform => $url) {
+                if ($url === null) {
+                    $this->profiles->removeSocialLink($user->id, $platform);
+                    continue;
+                }
+                $this->profiles->storeSocialLink($user->id, $platform, $url);
+            }
+
+            $this->flash('success', 'Your social media links were saved.');
+            $this->redirect('/account/social');
+        }, '/account/social');
+    }
+
+
+    /**
+     * Serve this person's own profile image.
+     *
+     * Deliberately the signed-in person's own image and not an image by id. Nothing on the platform
+     * yet shows one person another person's picture, so an endpoint that took an id would be a
+     * broader disclosure than any screen asks for. When a screen needs one, it gets its own route
+     * with its own rule about who may see what.
+     */
+    #[Route('/account/profile/image', name: 'account_profile_image', methods: ['GET'])]
+    public function profileImage(): Response
+    {
+        $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
+        $image = $this->profiles->image($user->id);
+        if ($image === null) {
+            throw new NotFoundHttpException('No profile image has been uploaded.');
+        }
+
+        return new Response($image['bytes'], 200, [
+            'Content-Type' => $image['mime_type'],
+            'Content-Length' => (string) strlen($image['bytes']),
+            // Private, because it is one person's picture, and immutable because the URL carries a
+            // fingerprint of the stored bytes - a new image is a new address.
+            'Cache-Control' => 'private, max-age=604800, immutable',
+        ]);
+    }
+
+
+    #[Route('/account/profile/image', name: 'account_upload_profile_image', methods: ['POST'])]
+    public function uploadProfileImage(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
+
+        return $this->handle(function () use ($user): void {
+            // What the reader chose in the editor, if the editor ran. It is not trusted any further
+            // than the file would have been: it goes through the same validation, the same pixel
+            // caps and the same re-encode, so a hand-posted field is only ever a differently shaped
+            // upload. What it saves is the guessing - the server no longer has to decide which part
+            // of the picture the square holds.
+            $bytes = ProfileImage::decodeEditedImage($this->posted('edited_image'));
+
+            if ($bytes === null) {
+                $upload = $this->request()->files->get('image');
+                if ($upload === null || !$upload->isValid()) {
+                    throw new RuntimeException('No image was received. Please choose a file and try again.');
+                }
+                $bytes = (string) file_get_contents((string) $upload->getPathname());
+            }
+
+            // Validate and resize. ProfileImage does the whole of that and knows nothing about
+            // HTTP, which is what makes every rule in it testable without a request.
+            $image = ProfileImage::fromUpload($bytes);
+            $this->profiles->storeImage($user->id, $image->bytes, $image->mimeType, $image->width, $image->height);
+            $this->flash('success', 'Your profile image was updated.');
+            $this->redirect('/account/profile');
+        }, '/account/profile');
+    }
+
+
+    #[Route('/account/profile/image/remove', name: 'account_remove_profile_image', methods: ['POST'])]
+    public function removeProfileImage(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
+
+        return $this->handle(function () use ($user): void {
+            $this->profiles->removeImage($user->id);
+            $this->flash('success', 'Your profile image was removed.');
             $this->redirect('/account/profile');
         }, '/account/profile');
     }
@@ -242,7 +379,7 @@ final class AccountController extends BaseController
     private function workspaceData(CurrentUser $user, array $sections): array
     {
         // The shared search control reads the data scope, and an absent key is an undefined
-        // variable rather than an empty one - which F3 turns into a 500 for the whole page. It is
+        // variable rather than an empty one - which strict_variables makes an error for the page. It is
         // emitted only for an identity that may choose a scope; for everyone else it stays empty,
         // because naming a scope would tell an ordinary reader that a second population exists.
         $data = [];
@@ -250,6 +387,8 @@ final class AccountController extends BaseController
             $data = array_replace($data, match ((string) $section['key']) {
                 'dashboard' => $this->dashboardData($user->id),
                 'profile' => $this->profileData($user->id),
+                'emails' => $this->emailData($user->id),
+                'social' => $this->socialData($user->id),
                 'learning' => $this->learningData($user->id, $this->libraryRequest()),
                 'sessions' => ['sessions' => $this->auth->activeSessions($user->id)],
                 'activity' => ['account_activity' => $this->platformAdministration->activityEvents(['actor_id' => $user->id], 100)],
@@ -265,6 +404,8 @@ final class AccountController extends BaseController
         $permissions = [
             'dashboard' => 'ACCOUNT.VIEW',
             'profile' => 'ACCOUNT.PROFILE.VIEW',
+            'emails' => 'ACCOUNT.PROFILE.VIEW',
+            'social' => 'ACCOUNT.PROFILE.VIEW',
             'learning' => 'LEARNING.LIBRARY.VIEW',
             'sessions' => 'ACCOUNT.SESSION.VIEW',
             'activity' => 'ACCOUNT.ACTIVITY.VIEW',
@@ -275,16 +416,63 @@ final class AccountController extends BaseController
         ));
     }
 
+    /**
+     * The identity shown under the page head on every Account page.
+     *
+     * Separate from profileData() because it is now page chrome rather than the subject of one
+     * screen: Sessions and Activity need the name and the avatar to render their header, and
+     * neither needs the address list or the image size the particulars form works with.
+     *
+     * @return array<string,mixed>
+     */
+    private function identityHeadData(int $userId): array
+    {
+        $user = $this->requireUser();
+        $image = $this->profiles->image($userId);
+
+        return [
+            'profile' => $this->auth->profile($userId),
+            'company' => $this->companies->forUser($userId),
+            'user_roles' => $user->roles,
+            'profile_image_url' => $image === null
+                ? ''
+                : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
+        ];
+    }
+
     /** @return array<string,mixed> */
     private function profileData(int $userId): array
     {
         $user = $this->requireUser();
+        // The image is addressed rather than embedded. A data URI would put a hundred kilobytes of
+        // base64 into every render of the page and defeat the browser cache; a URL is cached like
+        // any other image, and the cache key changes when the image does because the address
+        // carries the time it was stored.
+        $image = $this->profiles->image($userId);
         return [
             'profile' => $this->auth->profile($userId),
             'emails' => $this->auth->emails($userId),
             'company' => $this->companies->forUser($userId),
             'user_roles' => $user->roles,
+            'profile_image_url' => $image === null
+                ? ''
+                : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
+            'profile_image_size' => ProfileImage::SIZE,
         ];
+    }
+
+    /** @return array<string,mixed> */
+    private function emailData(int $userId): array
+    {
+        return ['emails' => $this->auth->emails($userId)];
+    }
+
+    /** @return array<string,mixed> */
+    private function socialData(int $userId): array
+    {
+        // The catalogue decides which platforms exist and in what order; this only fills in what
+        // the person has stored against each.
+        return ['social_links' => SocialPlatform::form($this->profiles->socialLinks($userId))];
     }
 
     /** @param array<string,mixed> $data */
@@ -295,6 +483,10 @@ final class AccountController extends BaseController
         // supplied once rather than remembered by each caller.
 
         $definition = $this->sections->get($key);
+        // The identity head is part of the Account page frame, so it is supplied here once rather
+        // than by each section's own data method - five of the six would otherwise have to know
+        // about a header they do not use.
+        $data += $this->identityHeadData($user->id);
         $data['account_section'] = $definition;
         $data['account_layout'] = 'section';
         return $this->render('account-section', $data + [

@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Course catalogue family: course card grid, categories and filters.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-catalogue" data-ld-family="catalogue">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

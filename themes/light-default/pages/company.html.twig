@@ -1,0 +1,17 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Company family.
+
+  The tab deck this replaced put every workspace section on one horizontal strip. With eleven
+  sections that strip scrolled sideways, so the sections past the fold were reachable only by
+  dragging a scrollbar the reader had no reason to expect - and the platform had already settled on
+  accordions for exactly this shape of list.
+
+  It also meant this theme carried its own copy of a control core already owns. Rendering the
+  platform's workspace unchanged is both the fix and one less thing to keep in step.
+#}
+	<div class="ld-page ld-page-company" data-ld-family="company">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

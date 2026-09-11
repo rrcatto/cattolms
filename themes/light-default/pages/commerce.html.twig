@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Commerce family: orders, credits and purchasing surfaces.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-commerce" data-ld-family="commerce">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

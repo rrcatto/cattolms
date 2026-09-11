@@ -19,6 +19,8 @@ Description:
   Comments here are plain prose only: no angle brackets, no comment delimiters, no template tokens
   and no code.
 Changelog:
+  2026/09/10 02:25 SAST
+  - The sphere is the control and comes first; the full vocabulary folds into a disclosure beneath it. It sat under several hundred chips, so the page read as a list of chips with something below it.
   2026/09/09 17:40 SAST
   - Became the tag page proper: the cloud stays, and a chosen tag lists its courses below it, searched and paginated.
 #}
@@ -46,14 +48,22 @@ Changelog:
 					{% endif %}
 				</div>
 {#
-				Two renderings of the same thing. The list is what the server sends and what a reader
-				without JavaScript keeps; the canvas is what the Stimulus controller fills, and it
-				hides the list only once it has something to show in its place.
+				Two renderings of the same thing, and the sphere comes first in the document because
+				it is the control. The list is what the server sends and what a reader without
+				JavaScript keeps; the canvas is what the Stimulus controller fills. Once the sphere
+				is running the controller folds the list into the disclosure below it, so the whole
+				vocabulary is still one click away without a wall of several hundred chips sitting
+				above the thing the page is for.
 #}
-				<div {{ stimulus_target('tag-cloud', 'source') }}>
-					{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_index} %}
-				</div>
 				<div class="cl-tag-cloud-canvas" {{ stimulus_target('tag-cloud', 'canvas') }} aria-hidden="true"></div>
+				<details class="cl-tag-cloud-all" open {{ stimulus_target('tag-cloud', 'disclosure') }}>
+					<summary>
+						All {{ tag_index|length }} tags
+					</summary>
+					<div {{ stimulus_target('tag-cloud', 'source') }}>
+						{% include '@platform/partials/tag-cloud.html.twig' with {cloud_tags: tag_index} %}
+					</div>
+				</details>
 			</div>
 		{% else %}
 			<div class="empty section">

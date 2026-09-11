@@ -696,6 +696,142 @@ final class ThemeManager
         throw new RuntimeException('The theme is not installed: ' . $key . '.');
     }
 
+    /**
+     * Every theme shipped in the code root, by slug, in a dependency-safe order.
+     *
+     * `themes/` in the code root is the versioned home of the themes this platform ships. Factory
+     * Reset has always lived there; the rest joined it so a checkout carries the interface it was
+     * designed against rather than expecting an operator to upload four packages by hand.
+     *
+     * Parents come before children. A child theme cannot install until the exact parent it names is
+     * installed, and the order a directory listing happens to return is not a dependency order:
+     * `factory-reset-sidebar` sorts before `factory-reset` on any case-sensitive scan.
+     *
+     * @return list<string>
+     */
+    public function bundledThemeSlugs(): array
+    {
+        $root = rtrim($this->codeRoot, '/') . '/themes';
+        $standalone = [];
+        $children = [];
+        foreach (scandir($root) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) continue;
+            $manifestPath = $root . '/' . $entry . '/theme.json';
+            if (!is_dir($root . '/' . $entry) || !is_file($manifestPath)) continue;
+            $manifest = json_decode((string) file_get_contents($manifestPath), true);
+            if (!is_array($manifest)) continue;
+            if (is_array($manifest['parent'] ?? null)) $children[] = $entry; else $standalone[] = $entry;
+        }
+        sort($standalone);
+        sort($children);
+
+        return array_merge($standalone, $children);
+    }
+
+    /** The directory one bundled theme ships in. */
+    public function bundledThemeRoot(string $slug): string
+    {
+        return rtrim($this->codeRoot, '/') . '/themes/' . $slug;
+    }
+
+    /**
+     * Install one bundled theme into the instance, if it is not already there.
+     *
+     * Returns what happened, so an installer can report it: 'installed', 'replaced', 'skipped'
+     * (already present), or 'bundled' (Factory Reset, which needs no copy).
+     *
+     * Already-present is a skip rather than an error, and that is the whole point of the method. An
+     * installed theme is an immutable release: reinstalling one at the same version would produce
+     * two different builds wearing one version number, so a routine install must be able to run
+     * against an instance that already has these themes and leave them exactly as they are.
+     * `$force` exists for the deliberate case - a local rebuild during development - and says so.
+     *
+     * Factory Reset is never copied. It is discovered from the code root directly and preferred
+     * over any installed copy, so writing one would create precisely the stale duplicate that
+     * discovery exists to shadow.
+     */
+    public function installBundledTheme(string $slug, bool $force = false): string
+    {
+        $source = $this->bundledThemeRoot($slug);
+        $manifest = $this->validator->validateInstalledDirectory($source);
+        $meta = (array) $manifest['theme'];
+        $key = $this->installKey((string) $meta['slug'], (string) $meta['version']);
+
+        if ($source === $this->bundledFactoryResetRoot()) {
+            $this->publish($this->defaultThemeKey());
+            return 'bundled';
+        }
+
+        $destination = $this->themesRoot() . '/' . $key;
+        if (is_dir($destination) && !$force) {
+            // Published anyway. The browser-visible copy lives in the public root, which is a
+            // different tree and can be missing or stale while the installed theme is perfectly
+            // present - a deployment that overlays one and not the other leaves exactly that.
+            $this->publish($key);
+            return 'skipped';
+        }
+
+        $replaced = is_dir($destination);
+        $this->ensureDirectory($this->themesRoot());
+        $suffix = bin2hex(random_bytes(8));
+        $temporary = $this->themesRoot() . '/.install-' . $suffix;
+        $superseded = $this->themesRoot() . '/.replaced-' . $suffix;
+        try {
+            $this->copyTree($source, $temporary);
+            // Validated again from the copy rather than trusting the validation of the source. What
+            // gets installed is what was written, and a copy that lost a file would otherwise be
+            // discovered as a broken theme later instead of failing here.
+            $this->validator->validateInstalledDirectory($temporary);
+
+            // The old release is moved aside, not deleted, and only deleted once the new one is in
+            // place. Deleting first means a delete that fails halfway - which is what a directory
+            // this user cannot fully write produces - leaves the instance with a theme that is
+            // neither the old release nor the new one. Two renames cannot do that: either the swap
+            // happened or it did not.
+            if ($replaced && !rename($destination, $superseded)) {
+                throw new RuntimeException('Unable to set the installed theme aside: ' . $slug . '.');
+            }
+            if (!rename($temporary, $destination)) {
+                if ($replaced) rename($superseded, $destination);
+                throw new RuntimeException('Unable to install the bundled theme: ' . $slug . '.');
+            }
+        } catch (\Throwable $e) {
+            $this->removeDirectory($temporary);
+            throw $e;
+        }
+        // Past the swap, so a failure to tidy up is not a failed install. The leftover is hidden
+        // from discovery by its leading dot either way.
+        if ($replaced) {
+            try {
+                $this->removeDirectory($superseded);
+            } catch (\Throwable) {
+            }
+        }
+
+        $this->publish($key);
+
+        return $replaced ? 'replaced' : 'installed';
+    }
+
+    /** Copy one directory tree, files only, with the permissions an installed theme carries. */
+    private function copyTree(string $source, string $destination): void
+    {
+        $this->ensureDirectory($destination);
+        foreach (scandir($source) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) continue;
+            $from = $source . '/' . $entry;
+            $to = $destination . '/' . $entry;
+            if (is_dir($from)) {
+                $this->copyTree($from, $to);
+                continue;
+            }
+            if (!copy($from, $to)) {
+                throw new RuntimeException('Unable to copy theme file: ' . $from);
+            }
+            @chmod($to, 0644);
+        }
+    }
+
     private function bundledFactoryResetRoot(): string
     {
         return rtrim($this->codeRoot, '/') . '/themes/factory-reset';
@@ -758,11 +894,16 @@ final class ThemeManager
             }
             $css .= '--cl-darkest:var(--cl-color-1);--cl-dark:var(--cl-color-2);--cl-accent:var(--cl-color-3);--cl-light:var(--cl-color-4);--cl-lightest:var(--cl-color-5);';
             $css .= '--cl-page-bg:var(--cl-color-5);--cl-navbar-bg:var(--cl-color-1);--cl-sidebar-bg:var(--cl-color-1);--cl-large-block-bg:var(--cl-color-1);--cl-active-bg:var(--cl-color-2);--cl-button-bg:var(--cl-color-3);--cl-button-border:var(--cl-color-2);--cl-border:var(--cl-color-4);';
+            // The page canvas is the slanted texture, so a palette re-colours its two bands rather
+            // than painting a flat colour over it. The lighter band is the palette's page colour;
+            // the darker one is that colour carrying a little of the darkest, which keeps the
+            // texture tonal in every palette instead of a fixed grey that fights four of them.
+            $css .= '--cl-texture-light:var(--cl-color-5);--cl-texture-dark:color-mix(in srgb,var(--cl-color-5) 92%,var(--cl-color-1));';
             $css .= '--primary:var(--cl-color-1);--secondary:var(--cl-color-2);--accent:var(--cl-color-3);--highlight:var(--cl-color-3);--warm:var(--cl-color-4);--bg:var(--cl-color-5);--surface:var(--cl-color-5);--on-primary:var(--cl-on-color-1);--on-secondary:var(--cl-on-color-2);--on-accent:var(--cl-on-color-3);--on-highlight:var(--cl-on-color-3);--on-warm:var(--cl-on-color-4);--ink:var(--cl-color-1);--ink-2:var(--cl-color-2);';
             $css .= "}\n";
         }
         $css .= <<<'CSS'
-body[data-cl-palette-managed="1"]{background:var(--cl-page-bg)!important;color:var(--cl-darkest)}
+body[data-cl-palette-managed="1"]{color:var(--cl-darkest)}
 body[data-cl-palette-managed="1"] [data-theme-nav],body[data-cl-palette-managed="1"] .navbar,body[data-cl-palette-managed="1"] .sidebar,body[data-cl-palette-managed="1"] .rl-header{background:var(--cl-navbar-bg)!important;color:var(--cl-on-color-1)!important}
 body[data-cl-palette-managed="1"] [data-theme-nav] a,body[data-cl-palette-managed="1"] [data-theme-nav] button,body[data-cl-palette-managed="1"] .sidebar a,body[data-cl-palette-managed="1"] .sidebar button,body[data-cl-palette-managed="1"] .rl-header a,body[data-cl-palette-managed="1"] .rl-header button{color:var(--cl-on-color-1)}
 body[data-cl-palette-managed="1"] [data-nav-item].active,body[data-cl-palette-managed="1"] .nav-link.active,body[data-cl-palette-managed="1"] .rl-nav>a.active{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 3px 0 var(--cl-accent)}
@@ -793,10 +934,54 @@ body[data-cl-palette-managed="1"] .card,body[data-cl-palette-managed="1"] .stat-
 body[data-cl-palette-managed="1"] .cl-nav-panel{color:var(--cl-darkest)}
 body[data-cl-palette-managed="1"] .cl-nav-panel a,body[data-cl-palette-managed="1"] .cl-nav-panel button{color:inherit}
 CSS;
+        $css = self::alsoMatchPaletteClasses($css);
         if (file_put_contents($target, $css) === false) {
             throw new RuntimeException('Unable to write generated theme palette stylesheet: ' . $target);
         }
         @chmod($target, 0644);
+    }
+
+    /**
+     * Lets every palette rule match a class as well as the data attribute.
+     *
+     * The attribute is set by script, after the document has loaded and after a request to
+     * /theme/palette has come back - so the page painted in the theme's own colours and repainted
+     * in the palette's a round trip later. That is the flash. The class is set by the server, in
+     * the markup, from the reader's stored choice, so the first paint is already right; the script
+     * still sets the attribute afterwards, and because both selectors carry the same declarations
+     * nothing changes on screen when it does.
+     *
+     * Each selector is rewritten individually rather than the prefix being replaced across the
+     * whole list: `body[...] .sidebar, body[...] .navbar` handled as a string would produce a rule
+     * that matches `body` on its own, and repaint the entire page in navigation colours.
+     */
+    private static function alsoMatchPaletteClasses(string $css): string
+    {
+        $rewrite = static function (string $selector): string {
+            $class = preg_replace(
+                ['/body\[data-cl-palette-managed="1"\]/', '/\[data-cl-palette="(\d+)"\]/'],
+                ['body.cl-palette-managed', '.cl-palette-$1'],
+                $selector
+            );
+
+            return $class === $selector ? $selector : $selector . ',' . $class;
+        };
+
+        return (string) preg_replace_callback(
+            '/^([^{}@\/][^{}]*)\{/m',
+            static function (array $match) use ($rewrite): string {
+                $selectors = array_map('trim', explode(',', $match[1]));
+                $out = [];
+                foreach ($selectors as $selector) {
+                    if ($selector !== '') {
+                        $out[] = $rewrite($selector);
+                    }
+                }
+
+                return implode(',', $out) . '{';
+            },
+            $css
+        );
     }
 
     private function relativeLuminance(string $hex): float

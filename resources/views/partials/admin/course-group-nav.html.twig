@@ -23,10 +23,9 @@ Description:
   A tab the reader cannot use is not shown at all rather than shown disabled: the strip is a map of
   where this operator can go, and a dead entry on it is a map of somebody else's platform.
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags inside
-  comments, so a tag written out as a usage example becomes a real tag in the compiled template. Keep
-  every comment plain prose: no angle brackets, no comment delimiters, no template tokens and no
-  code.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
   2026/09/07 13:45 SAST
   - Became the group's tab strip: Course Tags joined it, Enrolments and Requests split into two

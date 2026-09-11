@@ -152,4 +152,65 @@ final class FormSpacingContractTest extends TestCase
 
         self::assertSame([], $offenders, 'A tag carries two class attributes; every parser discards the second.');
     }
+
+    public function testFieldsLaidOutByAContainerTakeOnlyTheContainerSpacing(): void
+    {
+        // The owner, 2026/09/10: "Middle names field is not aligned vertically with First name
+        // field". Both are .field in a two-column .form-grid, and .field+.field added a top margin
+        // to every field but the first - so the right-hand field of each row sat one rem lower than
+        // the left-hand one. The grid already states the space between rows as a gap; the margin on
+        // top of it is not extra air, it is a misalignment.
+        $css = self::stylesheet();
+
+        self::assertStringContainsString(
+            '.field+.field{margin-top:1rem}',
+            $css,
+            'Consecutive fields in ordinary flow still need air between them.'
+        );
+
+        self::assertMatchesRegularExpression(
+            '/\.form-grid[^{]*\.field\+\.field[^{]*\{[^}]*margin-top:0/',
+            $css,
+            'A field inside .form-grid must take the grid gap and nothing else, or every field in '
+            . 'the second column is pushed below the one beside it.'
+        );
+    }
+
+    public function testAFullWidthFieldIsFullWidthWhicheverSpellingTheMarkupUses(): void
+    {
+        // Two spellings are in use - `field-wide` and `field full` - and core defined only the
+        // first. `.full` existed in one theme out of five, so in every other theme a field the
+        // markup declares as full width rendered at half width inside a two-column form. Forty-two
+        // fields across eleven templates use the second spelling, so core states both.
+        $css = self::stylesheet();
+
+        foreach (['.form-grid .field-wide{grid-column:1/-1}', '.form-grid .field.full{grid-column:1/-1}'] as $rule) {
+            self::assertStringContainsString($rule, $css, 'Core must state ' . $rule);
+        }
+    }
+
+    public function testCoreStatesTheSpaceBeneathASectionHeading(): void
+    {
+        // .section-head is core markup on card after card, and core said nothing about the space
+        // under it. One theme out of five set a bottom margin; on the other four every card header
+        // touched its own content. The owner reported it three times as missing white space, and
+        // each time it looked like a one-screen bug because it was one screen at a time.
+        //
+        // The pattern is the point: where core emits the markup, core states the spacing. A theme
+        // can still restyle it - theme CSS loads afterwards - but a missing theme rule can no
+        // longer be the difference between readable and flush.
+        self::assertMatchesRegularExpression(
+            '/\.section-head\{[^}]*margin-bottom:[^0][^}]*\}/',
+            self::stylesheet(),
+            'Core must state a non-zero space beneath a section heading.'
+        );
+    }
+
+    /** The core stylesheet with its comments removed, so a guard cannot match its own prose. */
+    private static function stylesheet(): string
+    {
+        $css = (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css');
+
+        return (string) preg_replace('#/\*.*?\*/#s', '', $css);
+    }
 }

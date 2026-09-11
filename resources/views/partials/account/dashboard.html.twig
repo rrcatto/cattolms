@@ -1,4 +1,21 @@
-<div class="grid grid-4">
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Dashboard
+				</div>
+				<h2>
+					Your learning at a glance
+				</h2>
+				<p>
+					Learning progress, course history and account statistics.
+				</p>
+			</div>
+		</div>
+	</div>
+</div>
+<div class="grid grid-4 section">
 	<div class="stat-card">
 		<div class="stat-value">
 			{{ account_stats.current_courses }}
@@ -44,69 +61,76 @@
 		</div>
 	</div>
 </div>
-<div class="section-head section">
-	<div>
-		<h2>
-			Course history
-		</h2>
-		<p>
-			Every course assigned to this account, including completion result and certificate status.
-		</p>
-	</div>
-</div>
-<div class="table-wrap">
-	<table>
-		<thead>
-			<tr>
-				<th style="width:50%">
-					Course
-				</th>
-				<th style="width:12%">
-					Status
-				</th>
-				<th style="width:12%">
-					Progress
-				</th>
-				<th style="width:12%">
-					Grade
-				</th>
-				<th style="width:14%">
-					Certificate
-				</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% for course in account_courses %}
-				<tr>
-					<td>
-						<strong>{{ course.title }}</strong>
-						<div class="small muted">
-							{{ course.category_name }}
-						</div>
-					</td>
-					<td>
-						{{ course.status }}
-					</td>
-					<td>
-						{{ course.progress_percentage }}%
-					</td>
-					<td>
-						{{ course.overall_grade_code ?: '—' }}
-					</td>
-					<td>
-						{% if course.certificate_public_id %}
-							<span class="badge good">Issued</span> <a class="btn btn-soft btn-sm" href="/certificates/{{ course.certificate_public_id }}">View</a>
-						{% else %}
-							<span class="muted">Not issued</span>
-						{% endif %}
-					</td>
-				</tr>
-			{% endfor %}
-		</tbody>
-	</table>
-	{% if not account_courses %}
-		<div class="empty">
-			No courses have been assigned yet.
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Course History
+				</div>
+				<h2>
+					Course history
+				</h2>
+				<p>
+					Every course assigned to this account, including completion result and certificate status.
+				</p>
+			</div>
 		</div>
-	{% endif %}
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th style="width:50%">
+							Course
+						</th>
+						<th style="width:12%">
+							Status
+						</th>
+						<th style="width:12%">
+							Progress
+						</th>
+						<th style="width:12%">
+							Grade
+						</th>
+						<th style="width:14%">
+							Certificate
+						</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for course in account_courses %}
+						<tr>
+							<td>
+								<strong>{{ course.title }}</strong>
+								<div class="small muted">
+									{{ course.category_name }}
+								</div>
+							</td>
+							<td>
+								{{ course.status }}
+							</td>
+							<td>
+								{{ course.progress_percentage }}%
+							</td>
+							<td>
+								{{ course.overall_grade_code ?: '—' }}
+							</td>
+							<td>
+								{% if course.certificate_public_id %}
+									<span class="badge good">Issued</span> <a class="btn btn-soft btn-sm" href="/certificates/{{ course.certificate_public_id }}">View</a>
+								{% else %}
+									<span class="muted">Not issued</span>
+								{% endif %}
+							</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+			{% if not account_courses %}
+				<div class="empty">
+					No courses have been assigned yet.
+				</div>
+			{% endif %}
+		</div>
+	</div>
 </div>

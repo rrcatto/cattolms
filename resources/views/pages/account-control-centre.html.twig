@@ -3,18 +3,23 @@
 	{% set ph_kicker = 'Account' %}
 	{% set ph_title = 'My account' %}
 	{% set ph_lead = 'Every part of your account in one place.' %}
+	{# The page head brings the identity band with it. #}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<div class="section-head">
-		<div>
-			<div class="eyebrow">
-				Account
+	<div class="grid section">
+		<div class="card">
+			<div class="section-head">
+				<div>
+					<div class="eyebrow">
+						All sections
+					</div>
+					<h2>
+						Your account
+					</h2>
+					<p>
+						Dashboard, profile, learning, login sessions and account activity in one place.
+					</p>
+				</div>
 			</div>
-			<h2>
-				Your account
-			</h2>
-			<p>
-				Dashboard, profile, learning, login sessions and account activity in one place.
-			</p>
 		</div>
 	</div>
 	<div class="cl-account-workspace section" data-account-workspace>
