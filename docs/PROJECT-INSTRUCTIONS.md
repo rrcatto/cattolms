@@ -34,6 +34,17 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 - Bind parameters by name without a colon (`['id' => 1]`, not `[':id' => 1]`) and let `Database` infer the PDO type from the PHP value.
 - Proxy laziness is selective; `MailerInterface` is the established example.
 - Do not restore the removed `AppContext`, `ServiceFactory`, `LazyControllerHandler`, `RouteRegistrar` or any F3/PHP-DI bridge.
+- The front end is Symfony UX and AssetMapper, with no npm step: `importmap.php` is PHP-side and everything under `assets/vendor/` is committed, so deploying stays a directory copy. Add a dependency with `bin/console importmap:require`, never `npm install`. Editing front-end code takes three steps — edit, `bin/console asset-map:compile` into the code root's `public_html/assets/`, then publish that to the instance web root.
+- Anything rendered on every page belongs in `BaseController::viewIdentity()` or in `ThemeRenderer`, not in one controller. The identity band under the page head is the worked example: it is assembled once at the single choke point every page passes through, rather than by each section's own data method.
+- A reader's display preferences are rendered into the markup server-side, from a cookie, and only then adjusted by script. A preference applied by script alone paints the page twice — once in the default and once in the choice — and the second paint is a visible flash.
+
+## 3a. Performance shape
+
+- A bulk write streams. Build a chunk, write it, keep the generated identifiers and discard the rows; never accumulate a whole set in PHP before issuing a statement. The seed generator is the reference implementation: it went from ~120 MB for 500,000 rows, which could not finish against the deployed 128 MB limit, to about 58 MB, by chunking every phase.
+- Never build a parallel index of parents where the shape is a fixed count per parent. The parent of row *n* is arithmetic on *n*; a 60,000-entry lookup recording what integer division already knows is pure cost.
+- A set primed from the whole database grows with the installation's history rather than with the request. Key such sets by a 64-bit hash rather than by the value: 141,067 names cost 26 MB as string keys and 12 MB as integer keys.
+- Release per-run state when the run finishes. `SeedGenerator` holds the name factory only for the duration of a generation, which `names()` had always implied and nothing had enforced.
+→ Guarded by `SeedGeneratorMemoryTest`, which asserts the shape of the curve — ten times the rows must not cost ten times the memory — rather than an absolute ceiling, which would be flaky across allocators.
 
 ## 4. Roles, permissions and ACL
 

@@ -1,13 +1,48 @@
-# Catto Learning 0.6 — Development Handoff
+# Catto Learning 0.7 — Development Handoff
 
-**LMS version:** 0.6  
-**Date time:** 2026/09/08 03:30 SAST  
-**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
-**Status:** v0.5.8.3 is the accepted VPS version and is published on `main`. v0.6 is feature complete with local gates green — 674 tests, PHPStan level 6, architecture, runtime hazard, UI contract and release validation — every route returning its expected status, and a 250,000-row seed set generated. Owner browser acceptance is outstanding. **v0.6 is not deployed to the VPS and cannot be upgraded into**: it rebases the schema onto one baseline, so installing it is `composer smoke:install` and a discarded database.
+**LMS version:** 0.7  
+**Date time:** 2026/09/12 SAST  
+**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15  
+**Status:** v0.7 is published on `main` and on `dev-v0.7`, tagged `v0.7.0` at the migration commit.
+Gate green — 556 tests, 8,303 assertions, PHPStan level 6, architecture, runtime hazard, UI contract
+and release validation — with every route returning its expected status and the 500,000-row seed
+maximum completing inside the deployed 128 MB limit. Owner browser acceptance is ongoing rather than
+outstanding: the interface work below was done against his direct review, theme by theme.
+**v0.7 cannot be upgraded into**: it inherits v0.6's single baseline, so installing it is
+`composer smoke:install` and a discarded database.
 
-Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
+Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next
+development work.
 
-This is out of date because it does not document v0.7
+## 0. v0.7 — where things stand
+
+**Framework.** Symfony 8.1.6 owns the kernel, routing, the container, sessions and error pages;
+Twig with `strict_variables` renders. Fat-Free and PHP-DI are gone from the tree and from the code.
+The 7.4 → 8.1.6 step needed one change: `Voter::voteOnAttribute()` gained a `?Vote` parameter.
+
+**Interface.** One page shape across the platform — page head, identity band, body on cards in a
+boxed container — with the slanted texture as the canvas and nothing rendered directly on it. The
+footer is core-owned markup every theme includes. Navigation marks the current entry at all three
+levels and keeps its scroll position across a page load. `docs/ux-ui-rules.md` is the rule book and
+now carries all of this; read the relevant section before changing any screen.
+
+**Seed generator.** Streams rather than accumulating, so the advertised maximum is reachable. See
+`PROJECT-INSTRUCTIONS.md` §3a for the four rules that keep it that way.
+
+**Themes.** Factory Reset and Radiant Learning both received sustained investment and are no longer
+"must keep rendering" only. Gilded Noir remains the acceptance theme.
+
+### Known gaps
+
+- **Footer social marks have nowhere to point.** No platform-level social settings exist, so the
+  marks render at reduced opacity as non-links. They become links as soon as `platform_social`
+  carries addresses; a Settings field per platform is the obvious home and is not built.
+- **Sidebar themes still nest the third navigation level** rather than flying it out, because the
+  sidebar is a scroll container and a scrolling ancestor clips an absolute popout. The owner has
+  asked for popouts everywhere; the trade-off — the sidebar can no longer scroll — has not been
+  chosen. See `PopoutClippingContractTest`.
+- **The `v0.7.0` tag sits at the migration commit**, not at the head of the interface work that
+  followed it.
 
 ## 0q. v0.6 — making it fit by making it smaller
 

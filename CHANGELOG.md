@@ -1,7 +1,60 @@
 # Changelog
 
-**LMS version:** 0.6  
-**Date time:** 2026/09/08 03:30 SAST  
+**LMS version:** 0.7  
+**Date time:** 2026/09/12 SAST  
+
+## 2026-09-12 SAST — v0.7 Symfony 8.1.6, and one page shape
+
+Gate green: 556 tests, 8,303 assertions, PHPStan level 6 over `src/` and `tests/`, architecture,
+runtime hazard, UI contract and release validation. **This release cannot be upgraded into** — it
+inherits v0.6's single-baseline schema, so installing it is `composer smoke:install` and a discarded
+database.
+
+### Framework
+
+- Fat-Free Framework and PHP-DI are gone. The HTTP kernel, routing, the container, session handling
+  and error pages are Symfony 8.1.6; templates are Twig with `strict_variables`.
+  `tools/check-architecture.php` fails the build if either returns.
+- Routes are `#[Route]` attributes on the actions themselves. There is no central route table.
+- Symfony 7.4 → 8.1.6 needed exactly one code change: `Voter::voteOnAttribute()` gained a `?Vote`
+  parameter, so `ApiScopeVoter` and `PermissionVoter` carry the new signature.
+- Symfony UX and AssetMapper are the front end, with no npm step. `importmap.php` is PHP-side and
+  `assets/vendor/` is committed, so deploying stays a directory copy.
+
+### Data
+
+- The REAL/SEED universe split is removed in full: no `seed_token`, no cross-universe triggers, no
+  `DataUniverse`, no `SEED_*` role family. The generator stayed and writes ordinary rows.
+- `companies.company_type` is gone; a company is a provider or a client by what it owns or holds,
+  derived on read as indexed `EXISTS` probes.
+
+### Seed generator
+
+- Memory no longer follows the size of the request. Each phase builds a chunk, writes it, keeps the
+  generated identifiers and discards the rows, so a 500,000-row set peaks at about 58 MB against the
+  deployed 128 MB limit rather than the ~120 MB that put the largest sets out of reach.
+- `SeedNameFactory` keys its used-name sets by a 64-bit hash rather than by the name: those sets are
+  primed from the whole database, so they grew with the installation's history rather than the
+  request. 141,067 names went from 26 MB to 12 MB.
+- `generate()` releases the name factory when it finishes, which `names()` had always implied.
+- `SeedGeneratorMemoryTest` asserts the shape of the curve rather than an absolute ceiling.
+
+### Interface
+
+- One page shape everywhere: page head, identity band, then the body on cards inside a boxed
+  container. The canvas is the slanted texture, and nothing renders directly on it — audited against
+  the delivered HTML of every route, not the templates.
+- The identity band is included by the page head, so no page can forget it or misplace it. A
+  signed-out reader gets the same band with a way in.
+- The site footer is core-owned markup every theme includes, replacing five inline footers. It
+  carries the standard links and social marks on a light palette surface.
+- Navigation marks the current entry at all three levels; a group is marked with
+  `nav-group-current`, never `active`, which the palette paints as a filled pill.
+- The navigation keeps its scroll position across a page load.
+- The palette is rendered server-side from a cookie, so a page paints in its colours once instead of
+  repainting after a fetch resolves.
+- Palettes are ordered darkest to lightest, because the platform reads the five positionally.
+  Carnival Cotton Candy replaces Slate & Peach.
 
 ## 2026-09-08 03:30 SAST — v0.6 catalogue, scale, and one canonical baseline
 

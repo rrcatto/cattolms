@@ -17,7 +17,7 @@
    ========================================================================== */
 
 :root{
-  /* Fallback = "Slate & Peach" after the platform's luminance sort. */
+  /* Fallback = the theme's first palette after the platform's luminance sort. */
   --cl-color-1:#2A324B;
   --cl-color-2:#767B91;
   --cl-color-3:#C7CCDB;
