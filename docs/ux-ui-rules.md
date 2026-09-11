@@ -86,6 +86,37 @@ accordion pattern. `/admin?tab=…` is not to be reintroduced.
 **1.6 Never restyle an accepted design for variety.** Visual change happens because the owner asked
 for it or because a rule here demands it.
 
+**1.7 Every page is built the same way.** Page head, then the identity band, then the body on cards:
+
+```
+<section class="cl-page-head">      the title band
+<section class="cl-identity-head">  who is reading, joined to the head above it
+<div class="grid … section">        the columns the body uses
+  <div class="card">                the surface
+    <div class="section-head">      eyebrow, h2, description
+```
+
+The eyebrow names the section and comes from the section registry, so the card, the menu entry and
+the page head cannot disagree about what a section is called. A page with several cards repeats the
+card, not the grid.
+→ Enforced by `tools/validate-ui-contracts.php` and the section contract tests.
+
+**1.8 Nothing renders on the page canvas.** The canvas is the slanted texture, and text read
+directly off a texture is hard work. Every block of words sits on a surface — a card, a table
+wrapper, a notice, the pagination control, the footer. Core gives a surface to the containers that
+are otherwise bare (`.toolbar`, `.section-head`, `.notice`, `.dataset-search`) when they are not
+already inside a card, so this holds without each template having to remember it.
+
+The check is the delivered HTML, not the template: walk every text node's ancestors and look for one
+that paints a background. A partial can look carded in source and still render bare once a wrapper
+decides otherwise.
+
+**1.9 The page body sits in a boxed container.** Each theme puts the body in one box with a surface,
+a border and a radius — `.rl-content` in Radiant Learning, `.main > .content` in Factory Reset — so
+the texture shows *around* the page rather than behind its text. The footer sits outside that box:
+it is the end of the page, not part of its content. A course page opts out, because its reading
+column already sets its own width and a second box would inset the text twice.
+
 ---
 
 ## 2. Tables
@@ -197,6 +228,38 @@ sprite. Icons are stroked, not filled, and take `currentColor`.
 **5.4 Navigation is permission-filtered by core.** A theme renders the `navigation` array it is
 given and never maintains its own route list.
 
+**5.5 The entry leading to the page being read is marked, at every level.** Core decides it — each
+child and grandchild carries `active` — and a theme renders it. Marking only the top-level item
+leaves a reader who has opened Administration → System → Themes with no indication of where they
+are. Only the path is compared, never the query string: paging or searching a list is a view of a
+page, not a different page, and must not unmark the entry the reader arrived through.
+
+**5.5a A group is marked with `nav-group-current`, never `active`.** The palette paints anything
+carrying `data-nav-item` and `active` as a filled pill, which is right for a link. A group is a
+container holding several links, so the same class turns the whole group into a slab of colour with
+its heading inside it. The group says it is current under its own class and core marks the heading,
+not the block.
+
+**5.5b Put the state on the link, not on what is inside it.** A child anchor that carries no class
+of its own is easy to mark by rewriting "the first class attribute on the line" — which is the
+`nav-icon` inside the anchor. The state then lands on the SVG, where nothing styles it, and the
+entry is never marked at all.
+
+**5.6 A flyout anchors to its own group.** The group is the positioning context, so `left: 100%` is
+that group's right edge and `top: 0` its own top: the flyout opens level with the entry being
+pointed at, and touching it. Anchored to the *panel* instead, every flyout opens at the panel's
+top-right corner whichever group is hovered — they all line up with each other instead of with their
+own entry, and reaching one from a group part way down the list means travelling up and across,
+which leaves the group, drops `:hover`, and closes the flyout while the pointer is still moving
+toward it. There must be no gap between a group and its flyout for the same reason; draw the
+separation with a transparent border, which is part of the element and still hoverable.
+
+**5.7 The navigation keeps its scroll position across a page load.** Every link is an ordinary link,
+so following one is a full document load and a navigation that is its own scroll container comes
+back at the top — the menu moves out from under the pointer and the reader has to scroll back before
+clicking anything else. The position is remembered per tab and restored as soon as the element
+exists, not on `DOMContentLoaded`: restoring later is the same jump one step further on.
+
 ---
 
 ## 6. Named UI elements
@@ -222,14 +285,45 @@ button. It does **not** show the access period. Cards lay out five across, up to
 
 **6.4 Dataset search, pagination, sortable header.** The three shared table controls in section 2.
 
+**6.5 Page canvas.** The slanted texture, on the body of every page in every theme. `ThemeRenderer`
+puts `cl-page-texture` on the body, and core paints it with a rule qualified by the element
+(`body.cl-page-texture`) so it outranks a theme's own `body{background:…}` on specificity alone,
+without `!important` and without depending on stylesheet order. A palette re-colours the canvas by
+setting the texture's two band colours — never by painting a flat colour over it, which is what a
+`background` on the shell or on `body[data-cl-palette-managed]` does.
+
+**6.6 Identity band.** Who the reader is, directly under the page head on every page. Included by
+`partials/page-head.html.twig` rather than by each page, so a page cannot forget it and cannot put
+it anywhere else. A signed-out reader gets the same band — same height, same shape — with an account
+mark and a way in; a header that appears for some readers and not others makes the page jump about
+depending on who is looking at it.
+Core classes: `.cl-identity-head`, `.cl-identity-head-inner`, `.cl-identity-head-meta`.
+
+**6.7 Site footer.** Core-owned markup in `partials/site-footer.html.twig`, included by every
+theme's own footer partial. It was five inline footers that disagreed with each other and none of
+which had a surface. A theme changes how it looks by changing the palette, not by rewriting it.
+It carries the footer navigation and the social marks, on a light pastel surface with a dark border.
+→ Enforced by `NavigationContractTest`, `tools/validate-ui-contracts.php` and `validate-release.php`,
+each of which checks both halves: the theme delegates, and the core footer renders the array.
+
+**6.8 Social marks.** Brand glyphs in the core sprite as `social-<key>`, keyed to `SocialPlatform`
+so a mark and a link cannot disagree about which service they name. These are the one exception to
+rule 5.3's stroked style: a brand mark is a solid shape, and outlining one leaves the letterforms
+inside Facebook and LinkedIn with no interior. The sprite carries
+`symbol[id^="social-"] { fill: currentColor; stroke: none }` for exactly that reason.
+
 ---
 
 ## 7. Themes
 
 **7.1 Gilded Noir is the acceptance theme.** Test there first; a defect there is a defect. Light
 Default is the other theme that matters. Factory Reset must keep working because it is the recovery
-theme. Factory Reset Sidebar and Radiant Learning must keep building and rendering, but do not
-warrant investment.
+theme. Factory Reset Sidebar must keep building and rendering.
+
+Radiant Learning is no longer in that last category. From 2026/09/10 the owner worked in it and in
+Factory Reset directly, and both received sustained investment: the boxed page container, the
+third-level flyout, the page canvas and the identity band were all shaped there. Treat a defect in
+either as a defect.
 
 **7.2 The footer is visually distinct from what sits above it.** In a sidebar theme the footer must
 not be the same colour as the sidebar. In Light Default the footer background is dark.
@@ -244,6 +338,29 @@ Learning: rounded border on the container body, and a rounded footer spanning th
 → Enforced by `tools/check-runtime-hazards.php`.
 
 **7.6 Anything user-visible that names the platform reads it from settings.** Never a literal.
+
+**7.7 A theme does not define a rule in the `cl-` namespace.** That namespace is core's. Factory
+Reset and Radiant Learning each carried a `.cl-footer` rule — dead code targeting a class nothing
+emitted, until core introduced the site footer, at which point both woke up, matched core's own
+selector at equal specificity, loaded afterwards, and painted the new footer dark grey with
+invisible icons.
+
+**7.8 The palette is applied before the page paints, not after.** The reader's choice is rendered
+into the markup as body classes from a cookie, so the first paint is already the chosen palette.
+The switcher still sets the data attributes afterwards, and every palette rule matches both forms,
+so nothing changes on screen when it does. Applying the palette only from script — which waited for
+`DOMContentLoaded` and then for a fetch of `/theme/palette` to return — meant every page painted in
+the theme's own colours and repainted a round trip later. That is the flash.
+
+When duplicating a palette selector to match both forms, rewrite each selector in the list
+individually. Replacing the prefix across a comma-separated list turns `body[…] .sidebar, body[…]
+.navbar` into a rule that matches bare `body`, and paints the entire page in navigation colours.
+
+**7.9 Palette colours are ordered darkest to lightest.** The platform reads the five positionally:
+colour 1 is the darkest and drives navigation and ink, colour 3 is the middle tone the footer takes,
+colour 5 is the lightest and drives the page canvas. A palette handed over in the order someone
+happened to write it puts a mid tone where the ink belongs. The shipped palettes are Carnival Cotton
+Candy, Coastal Blue and Forest & Sand.
 
 ---
 
@@ -340,6 +457,23 @@ UI change works.
 ---
 
 ## Changelog
+
+2026/09/12 SAST
+
+- Recorded the page shape the platform now uses throughout: 1.7 how every page is built, 1.8 that
+  nothing renders on the page canvas and that the check is the delivered HTML, 1.9 the boxed
+  container the body sits in.
+- Navigation gained 5.5 to 5.7: marking the current entry at every level, why a group takes
+  `nav-group-current` rather than `active`, why the state goes on the link and not on the icon
+  inside it, why a flyout anchors to its own group, and keeping the scroll position across a load.
+- Named elements 6.5 to 6.8: the page canvas, the identity band, the core-owned site footer and the
+  social marks — including why the marks are the one exception to the stroked-icon rule.
+- Themes gained 7.7 to 7.9: a theme may not define a rule in the `cl-` namespace, the palette is
+  applied before the page paints rather than after, and palette colours are ordered darkest to
+  lightest because the platform reads them positionally.
+- 7.1 corrected. Radiant Learning was listed as not warranting investment; from 2026/09/10 the owner
+  worked in it and in Factory Reset directly and both were shaped extensively, so a defect in either
+  is a defect.
 
 2026/09/10 09:15 SAST
 

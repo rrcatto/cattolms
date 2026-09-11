@@ -19,6 +19,14 @@ Version 0.7 is the **framework and data-model reset**. Two things happened at on
 
 **A documented UI rule book.** `docs/ux-ui-rules.md` records every interface rule the owner has given — table column sizing, stacked row actions, the slanted texture, shared-control reuse — so a rule stated once is not re-litigated on the next surface.
 
+**One page shape, on every page.** Page head, then the identity band saying who is reading, then the body on cards inside a boxed container. The page canvas is the slanted texture and nothing renders directly on it: every block of words sits on a surface, which is checked against the delivered HTML rather than the templates. The site footer is core-owned markup that every theme includes, carrying the standard links and the social marks, and replacing five inline footers that had drifted apart.
+
+**Navigation that says where you are.** The entry leading to the current page is marked at all three levels, the group holding it is marked as current, and the menu keeps its scroll position across a page load instead of jumping back to the top on every click.
+
+**The palette is applied before the page paints.** The reader's choice is rendered into the markup from a cookie, so a page paints in its chosen colours once. Applied only from script — after `DOMContentLoaded` and after a fetch returned — it painted twice, and the second paint was a visible flash.
+
+**A seed generator that streams.** The full 500,000-row maximum now completes against the deployed 128 MB limit, peaking at about 58 MB. Each phase builds a chunk, writes it, keeps the generated identifiers and discards the rows, so cost follows the chunk rather than the size of the request.
+
 ## What 0.6 changes
 
 Five things, and the first one is why this release cannot be upgraded into.

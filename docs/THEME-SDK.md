@@ -113,8 +113,20 @@ key, label, href, icon, active, method, csrf, children
 Child fields:
 
 ```text
-key, label, href, icon, method, children
+key, label, href, icon, active, method, children
 ```
+
+`active` is supplied at every level, not only on primary items: a child is active when it leads to
+the page being read, and a group is active when the page is one of its own children. Render it —
+a theme that marks only the primary item leaves a reader three levels deep with no indication of
+where they are.
+
+Put the class on the element itself. Two shipped themes had their child anchor carry no class of
+its own, and the state was added to the `nav-icon` inside the link instead, where nothing styles it.
+
+A **group** takes `nav-group-current`, not `active`. The palette paints anything carrying
+`data-nav-item` and `active` as a filled pill, which is right for a link and turns a group — a
+container of several links — into a solid block with its heading inside it.
 
 A child may itself hold `children`. That third level is not optional decoration: Administration is
 grouped rather than flat, and a theme that renders only two levels shows twelve sections as one
@@ -227,7 +239,26 @@ If custom icons are used, cover every received key and retain readable labels.
 
 ## 6. Footer and breadcrumbs
 
-`@footer_navigation` is literal and always supplied. Items are `{key,label,href}`. Public links include Home, Catalogue, Help, Contact and Privacy; Account/Company/Administration appear when authorised. Themes may add decorative/social content but must render the supplied standard links instead of maintaining a separate site-link list.
+**The footer is core-owned markup.** Since 2026/09/11 a theme's `partials/footer.html.twig` includes
+core's rather than writing its own:
+
+```twig
+{% include '@platform/partials/site-footer.html.twig' %}
+```
+
+Keep the file — the Theme Package format expects a theme to carry one — but the markup, the standard
+links and the social marks come from core. This replaced five inline footers that had drifted apart
+and none of which gave the footer a surface of its own. A theme changes how the footer looks by
+changing the palette it is coloured from.
+
+The footer sits **outside** the theme's boxed page container, where the theme has one: it is the end
+of the page rather than part of its content.
+
+`@footer_navigation` is still supplied and is what the core footer renders. Items are
+`{key,label,href}`. Public links include Home, Catalogue, Help, Contact and Privacy;
+Account/Company/Administration appear when authorised. `@footer_social` accompanies it — items are
+`{key,label,href}`, keyed to `SocialPlatform`, and a key with no configured address still renders
+its mark but is not wrapped in a link.
 
 `@breadcrumbs` items are `{label,href,current}`; ancestors are linked and the current item is normally unlinked.
 

@@ -241,7 +241,7 @@ OFFSET walk itself rather than a defect: reaching row 100,000 means passing the 
 
 ## ACL verification after reset
 
-0.5.8 should expose the same built-in roles as 0.5.7.5.1, unchanged:
+v0.7 exposes one role family. The `SEED_*` roles are gone with the REAL/SEED split:
 
 ```text
 ADMIN
@@ -249,16 +249,13 @@ STUDENT
 COMPANY_ADMIN
 COURSE_EDITOR
 COURSE_OWNER
-SEED_STUDENT
-SEED_COMPANY_ADMIN
-SEED_COURSE_EDITOR
-SEED_COURSE_OWNER
-SEED_ADMIN
 ```
 
 Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
 
-The Commerce permission set is reserved in the ACL now but Commerce itself is not installed. The `SEED_*` roles and `SYSTEM.SEED.*` keys are no longer preparatory: `seed_token`, generation, cleanup and query isolation are all present in this version.
+The Commerce permission set is reserved in the ACL now but Commerce itself is not installed.
+`SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is
+no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
 
 ## Browser acceptance after clean QA
 
@@ -301,6 +298,33 @@ Request logging records method + URL path only. Query strings are excluded so lo
 
 Core and theme browser assets are emitted with content fingerprints. A repaired CSS/JS file therefore receives a new browser URL automatically after publication.
 
+## Working tree traps
+
+**Never check out a branch in the served directory.** `code/current` is what the web server serves,
+so `git checkout main` replaces the running application. Checking out v0.6 while `vendor/` holds
+Symfony gives every request `Class "Base" not found`, because the old code wants Fat-Free and it is
+no longer installed. To move a branch pointer, use `git branch -f main dev-0.7`, or push a ref
+directly with `git push origin dev-0.7:main`. Neither touches a single file.
+
+**A path checkout does not delete.** `git checkout <branch> -- .` writes the files the branch has
+and leaves behind every file the branch dropped. After restoring this way, remove what does not
+belong: ask the commit what should exist (`git ls-tree -r --name-only <branch>`) rather than asking
+the diff what was deleted, because `--diff-filter=D` misses a file that was *renamed* away. A single
+leftover Fat-Free class is enough to stop Symfony building its container.
+
+**`core.fileMode` is false in this repository.** Git therefore ignores the executable bit, and a
+file that is executable on disk can be stored as `100644`. A later checkout writes it without the
+bit and `bin/console` answers `Permission denied`. Fix the stored mode, not just the file:
+
+```bash
+chmod +x bin/console
+git update-index --chmod=+x bin/console
+```
+
+**Build output under `public_html/assets/` is owned by the container user**, because
+`asset-map:compile` runs as `cattotest`. The host cannot delete it; remove it from inside the
+container. The same applies to anything else PHP-FPM writes.
+
 ## Development database cleanup
 
 The database is currently disposable. To clear accumulated Activity during development:
@@ -340,15 +364,27 @@ Theme source under `/home/<site-user>/themes/` is authoritative. `themes:sync` s
 
 ## Seed Database
 
-Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.VIEW` and
-`SYSTEM.SEED.MANAGE`. `SEED_ADMIN` administers seed *business* data and cannot reach this section.
+Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE`.
 
 **Generating.** Enter an approximate record count. It is a soft whole-set target across every
 seeded table, not a per-table quota, and lands within about 1% of the request from 1,000 upward.
 Generation runs in one transaction, so a failure rolls the whole set back and leaves nothing
 behind. Start at 1,000 to confirm the graph looks right, then scale to 25,000 and beyond.
 
-**What a set contains.** People with `SEED_*` roles, companies, courses with modules,
+**Memory.** The full 500,000-row maximum completes against the deployed `memory_limit=128M`,
+peaking at about 58 MB on a fresh database. It did not always: every phase used to build all of its
+rows before writing any of them, which made cost linear in the request and put the largest sets out
+of reach with `Allowed memory size ... exhausted`. The generator now streams — a chunk is built,
+written, its identifiers kept and its rows discarded — so peak cost follows
+`SeedGenerator::GENERATION_CHUNK` rather than the volume asked for. Generating repeatedly adds a
+few MB per set, because the name factory is primed with every name already stored so a later set
+cannot repeat one; three consecutive maximum sets peak at about 75 MB.
+
+**There is no cleanup by token.** Generated rows are ordinary rows, so a set cannot be selectively
+removed once written. Resetting the database is the only way back to a clean state, which is what
+`composer smoke:install` does.
+
+**What a set contains.** People, companies, courses with modules,
 content blocks, assessments, questions and options, grade bands, price variants, editors,
 enrolments with progress, attempts, responses, sessions, results, certificates, favourites,
 requests, credits, allocations, edit history and audit activity — 29 tables.
