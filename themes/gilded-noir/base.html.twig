@@ -50,7 +50,7 @@
 										<nav aria-label="{{ item.label }} navigation">
 											{% for child in item.children %}
 												{% if child.children|length > 0 %}
-													<div class="nav-group nav-flyout-edge {{ child.active ? 'active' : '' }}" data-nav-item="{{ child.key }}">
+													<div class="nav-group nav-flyout-edge {{ child.active ? 'nav-group-current' : '' }}" data-nav-item="{{ child.key }}">
 														<button class="nav-group-label" type="button" aria-haspopup="true">
 														<svg class="gn-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>
 														<span>{{ child.label }}</span>

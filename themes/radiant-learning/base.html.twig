@@ -31,7 +31,7 @@
 											<nav aria-label="{{ nav.label }}">
 												{% for child in nav.children %}
 													{% if child.children|length > 0 %}
-														<div class="nav-group {{ child.active ? 'active' : '' }}" data-nav-item="{{ child.key }}">
+														<div class="nav-group {{ child.active ? 'nav-group-current' : '' }}" data-nav-item="{{ child.key }}">
 															<div class="nav-group-label">
 																<svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg><span>{{ child.label }}</span>
 															</div>
@@ -42,7 +42,7 @@
 															</div>
 														</div>
 													{% else %}
-														<a href="{{ child.href }}" data-nav-item="{{ child.key }}"><svg class="nav-icon {{ child.active ? 'active' : '' }}" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}</a>
+														<a class="{{ child.active ? 'active' : '' }}" href="{{ child.href }}" data-nav-item="{{ child.key }}"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}</a>
 													{% endif %}
 												{% endfor %}
 											</nav>

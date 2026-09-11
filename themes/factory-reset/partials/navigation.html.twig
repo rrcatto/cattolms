@@ -20,7 +20,7 @@
 					<div class="account-menu-panel cl-nav-panel">
 						{% for child in nav.children %}
 							{% if child.children|length > 0 %}
-								<div class="nav-group {{ child.active ? 'active' : '' }}" data-nav-item="{{ child.key }}">
+								<div class="nav-group {{ child.active ? 'nav-group-current' : '' }}" data-nav-item="{{ child.key }}">
 									<button class="nav-group-label" type="button" aria-haspopup="true"><svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#{{ child.icon_id }}"></use></svg>{{ child.label }}<span class="nav-group-caret" aria-hidden="true">&rsaquo;</span></button>
 									<div class="nav-subpanel cl-nav-panel">
 										{% for grandchild in child.children %}
