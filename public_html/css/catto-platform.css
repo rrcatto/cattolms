@@ -170,6 +170,14 @@
 .nav-subpanel{display:none;position:absolute;top:-7px;left:100%;z-index:1070;min-width:13.5rem;padding:7px;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)}
 .nav-group:hover>.nav-subpanel,.nav-group:focus-within>.nav-subpanel{display:grid;gap:2px}
 .nav-group:hover>.nav-group-label,.nav-group:focus-within>.nav-group-label{opacity:1}
+/* The group holding the page being read.
+
+   Marked on the heading, never on the group itself. A group is a container of several links, and
+   the palette paints anything carrying data-nav-item and `active` as a solid pill - which is right
+   for a link and turns a whole group into a slab of colour. So the group says it is current under
+   its own class, and what changes is the heading: full strength rather than the dimmed default,
+   with a rule down its leading edge. */
+.nav-group-current>.nav-group-label{opacity:1;box-shadow:inset 2px 0 currentColor}
 .nav-group:hover>.nav-group-label .nav-group-caret,.nav-group:focus-within>.nav-group-label .nav-group-caret{transform:translateX(3px)}
 .nav-flyout-left>.nav-subpanel{left:auto;right:100%}
 /* A group inside a panel that is anchored near the window edge. It still opens to the right, which
