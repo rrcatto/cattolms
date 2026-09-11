@@ -96,6 +96,24 @@ final class SeedRepository
             return [];
         }
 
+        // A row wider than the column list is a bug, not a row with spare parts.
+        //
+        // The loop below walks the columns and indexes into the row, so a value past the last
+        // column is silently dropped - and a value in front of it silently lands in the wrong
+        // column. That is exactly what happened to generated course artwork: a leftover token sat
+        // second-from-last in the row, took the `cover_svg` column, and pushed the artwork off the
+        // end. Every catalogue card rendered a sixteen-character hex string instead of a cover, and
+        // nothing failed anywhere.
+        $width = count($columns);
+        foreach ($rows as $index => $row) {
+            if (count($row) !== $width) {
+                throw new \RuntimeException(
+                    'Seed insert into ' . $table . ' has ' . $width . ' columns but row ' . $index
+                    . ' has ' . count($row) . ' values. A row must state exactly one value per column.'
+                );
+            }
+        }
+
         $ids = [];
         foreach (array_chunk($rows, self::INSERT_BATCH) as $chunk) {
             $placeholders = [];

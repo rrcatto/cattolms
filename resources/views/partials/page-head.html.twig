@@ -33,13 +33,9 @@ Description:
 
   Core owns this markup. Themes style it through the page-head classes.
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags inside
-  comments, so a tag written out as a usage example becomes a real tag in the compiled template. Keep
-  every comment plain prose: no angle brackets, no comment delimiters, no template tokens and no
-  code.
-  Every optional parameter is read through an isset guard. A caller that never sets a key at all
-  leaves an undefined variable, and F3 turns that into a 500 for the whole page rather than an empty
-  value - so forgetting one has to be a missing line in the header, never a broken screen.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 
 Changelog:
   2026/09/07 15:00 SAST
@@ -85,3 +81,9 @@ Changelog:
 		</div>
 	</section>
 {% endif %}
+{#
+	The identity band belongs to the head rather than to the page, so it is included here instead of
+	by each page. That is also what keeps it directly beneath the head: a page that included it
+	itself could put it anywhere, and most pages never included it at all.
+#}
+{% include '@platform/partials/account/identity-head.html.twig' %}

@@ -8,21 +8,25 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Builds the Twig environment the Fat-Free request path renders with.
+Builds a Twig environment matching the served one, for tests that render templates directly.
 
 Architectural boundary: view plumbing. It configures an engine; it renders nothing.
 
-There are two environments while both request paths exist - TwigBundle builds one for routes the
-Symfony kernel owns, and this builds the other for routes Fat-Free still owns. They render the same
-templates, so a setting present in one and not the other would make a page behave differently
-according to which router happened to answer it. The three that matter are set here and in
-config/packages/twig.yaml, and TwigEnvironmentParityTest asserts the two agree.
+Nothing in src/ uses this - TwigBundle builds the environment that actually serves pages. It exists
+so tests/Support/RenderHarness.php can render a template without booting the kernel, and its whole
+purpose is to be configured identically to config/packages/twig.yaml. A setting present in one and
+not the other would let a template pass a unit test and then behave differently when served, which
+is the one failure this class can cause and the reason to keep the two in step by hand.
 
 strict_variables is the one worth naming. An undefined variable is an error rather than a silent
-blank: Fat-Free turned one into a 500 for the whole page, and Twig's default is to render nothing at
-all, which is worse because it is invisible.
+blank, because Twig's default is to render nothing at all - no page breaks, and nothing says the
+value never arrived.
 
 Changelog:
+2026/09/10 18:39 SAST
+- Description corrected: the second environment served Fat-Free routes, which no longer exist, so
+  this is now the test render harness's environment and nothing else. Dropped the reference to
+  TwigEnvironmentParityTest, which was never written.
 2026/09/09 02:10 SAST
 - Created with the Twig template port.
 */

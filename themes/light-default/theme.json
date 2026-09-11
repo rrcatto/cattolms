@@ -1,0 +1,66 @@
+{
+  "format": "catto-learning-theme",
+  "schema_version": "4.0",
+  "template_api": "2.0",
+  "theme": {
+    "name": "Light Default",
+    "slug": "light-default",
+    "version": "2.0.0",
+    "author": "Richard Catto",
+    "created_at": "2026-08-20T19:05:00+02:00",
+    "description": "Light application theme: compact typography, a full-width sticky translucent top navigation bar outside a rounded boxed content frame, a slanted textured page canvas, and palette-coloured page-heading bands across every LMS surface."
+  },
+  "parent": null,
+  "styles": [],
+  "scripts": [
+    "js/theme.js"
+  ],
+  "external": {
+    "styles": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    ],
+    "scripts": []
+  },
+  "palettes": [
+    {
+      "name": "Carnival Cotton Candy",
+      "colors": [
+        "#15616D",
+        "#FF715B",
+        "#FF90B3",
+        "#66C7F4",
+        "#FFECD1"
+      ]
+    },
+    {
+      "name": "Coastal Blue",
+      "colors": [
+        "#173B57",
+        "#3F88C5",
+        "#F5F9FC",
+        "#9CC7E4",
+        "#DCECF5"
+      ]
+    },
+    {
+      "name": "Forest & Sand",
+      "colors": [
+        "#24362B",
+        "#557A55",
+        "#F7F4EA",
+        "#A8B7A1",
+        "#D8B26E"
+      ]
+    },
+    {
+      "name": "Plum & Rose",
+      "colors": [
+        "#3C2844",
+        "#8B5B7D",
+        "#FBF6F8",
+        "#D8B6C7",
+        "#E8A4A7"
+      ]
+    }
+  ]
+}

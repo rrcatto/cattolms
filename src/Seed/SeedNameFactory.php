@@ -61,13 +61,13 @@ final class SeedNameFactory
 
     private readonly Randomizer $random;
 
-    /** @var array<string,true> Person names already issued or already in the database. */
+    /** @var array<int,true> Person names already issued or already in the database, by hash. */
     private array $usedPeople = [];
 
-    /** @var array<string,true> */
+    /** @var array<int,true> */
     private array $usedCompanies = [];
 
-    /** @var array<string,true> */
+    /** @var array<int,true> */
     private array $usedCourses = [];
 
     public function __construct(
@@ -201,12 +201,24 @@ final class SeedNameFactory
     {
         $levels = $this->pool('course-levels');
         $subjects = $this->pool('course-subjects');
+        $topics = $this->pool('course-topics');
 
         for ($attempt = 0; $attempt < self::MAX_ATTEMPTS; $attempt++) {
-            $prefix = $attempt < count($levels)
-                ? ''
-                : $subjects[$this->random->getInt(0, count($subjects) - 1)] . ' ';
-            $title = $prefix . $categoryName . ': ' . $levels[$this->random->getInt(0, count($levels) - 1)];
+            // The category leads, because a course filed under Health and Safety should say so, and
+            // there are only ever a few dozen categories. The variety therefore has to come from
+            // what follows the colon, and it has to come from more than one word: a quarter of a
+            // million courses across forty-five categories is five thousand titles per category,
+            // and one word per title would spend the pool and read as a list of near-identical
+            // names long before that. Two words is fifty million per category.
+            $tail = $levels[$this->random->getInt(0, count($levels) - 1)];
+            if ($this->random->getInt(1, 5) > 2) {
+                $tail .= ' ' . $topics[$this->random->getInt(0, count($topics) - 1)];
+            }
+            // A leading subject appears on a minority, so the column is not one shape repeated.
+            $prefix = $this->random->getInt(1, 5) === 1
+                ? $subjects[$this->random->getInt(0, count($subjects) - 1)] . ' '
+                : '';
+            $title = $prefix . $categoryName . ': ' . $tail;
 
             if (!isset($this->usedCourses[self::key($title)])) {
                 $this->usedCourses[self::key($title)] = true;
@@ -215,7 +227,7 @@ final class SeedNameFactory
             }
         }
 
-        throw self::exhausted('course titles', count($levels) * count($subjects));
+        throw self::exhausted('course titles', count($levels) * count($topics) * count($subjects));
     }
 
     public function courseTitle(): string
@@ -276,9 +288,25 @@ final class SeedNameFactory
     }
 
     /** Case and spacing are not what makes two names different, so neither decides uniqueness. */
-    private static function key(string $name): string
+    /**
+     * The set key for a name: a 64-bit hash of it, not the name itself.
+     *
+     * These sets are primed with every name already in the database, so their size follows the
+     * installation's accumulated history rather than the size of the set being generated - a small
+     * request pays for every row ever generated before it. Holding the normalised names as string
+     * keys cost 26 MB at 141,067 people; the same names as integer keys cost 12 MB, because an
+     * integer key is a bucket and a string key is a bucket plus an interned string.
+     *
+     * Nothing ever reads a name back out - only membership is ever asked - so the original is not
+     * needed. A collision would cost one unnecessary redraw and can never produce a duplicate: the
+     * database's own UNIQUE constraints remain the authority on that, and this set is only how the
+     * factory avoids proposing a name it would then have to retry.
+     */
+    private static function key(string $name): int
     {
-        return mb_strtolower((string) preg_replace('/\s+/', ' ', trim($name)));
+        $normalised = mb_strtolower((string) preg_replace('/\s+/', ' ', trim($name)));
+
+        return (int) unpack('q', substr(hash('xxh128', $normalised, true), 0, 8))[1];
     }
 
     private static function exhausted(string $kind, int $capacity): RuntimeException

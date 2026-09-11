@@ -13,7 +13,7 @@ Puts the platform's standing response headers on every response the Symfony kern
 Architectural boundary: HTTP edge. It reads nothing and decides nothing; it only ensures a header
 set is present.
 
-Why it exists. Fat-Free emits X-Frame-Options, X-XSS-Protection and X-Content-Type-Options on every
+Why it exists. Fat-Free emitted X-Frame-Options, X-XSS-Protection and X-Content-Type-Options on every
 response it serves, so every page and every API document the platform has ever returned carries
 them. Symfony does not, and a route that stopped carrying them the day it was ported would be a
 regression nobody would see - the response still looks right. Setting them at the kernel edge means

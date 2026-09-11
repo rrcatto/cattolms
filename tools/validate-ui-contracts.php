@@ -54,8 +54,13 @@ $need((array) ($manifest['scripts'] ?? []) === [], 'Factory Reset must not own c
 
 $base = $read($root . '/themes/factory-reset/base.html.twig');
 foreach (['{% block page_body %}','platform.styles','platform.scripts','navigation'] as $token) $need(str_contains($base, $token), 'Factory Reset base contract missing: ' . $token);
+// The footer is core-owned markup that every theme includes, so the theme delegates and core is
+// where footer_navigation is read. Both halves are checked: a theme that stopped delegating, or a
+// core footer that stopped rendering the array, each breaks the same contract.
 $factoryFooter = $read($root . '/themes/factory-reset/partials/footer.html.twig');
-$need(str_contains($factoryFooter, 'footer_navigation'), 'Factory Reset footer must render the core footer_navigation array.');
+$need(str_contains($factoryFooter, '@platform/partials/site-footer.html.twig'), 'Factory Reset footer must include the core site footer.');
+$coreFooter = $read($root . '/resources/views/partials/site-footer.html.twig');
+$need(str_contains($coreFooter, 'footer_navigation'), 'The core footer must render the core footer_navigation array.');
 
 $coreJs = $read($root . '/public_html/js/platform-overrides.js');
 foreach (['data-open-modal','details.account-menu','dataset.tabHistory','localStorage','/theme/palette','cl-palette-switcher','modal.hidden = true','modal.hidden = false'] as $token) {
@@ -244,9 +249,34 @@ foreach (['name="permissions[]"','Save permissions','<details class="acl-group">
 $need(!str_contains($roleEdit, 'class="acl-grid"'), 'ACL permission editor must use grouped accordions instead of permission cards.');
 $need(!str_contains(strtolower($roleEdit), 'autosave'), 'ACL permission editor must not autosave.');
 
+// Profile is three pages since 2026/09/10, on the owner's instruction: Personal Particulars, Email
+// Addresses and Social Media, each under the Profile pop-out. Each is checked for its own subject,
+// and each is checked for not having absorbed one of the others - which is the shape they started
+// in and the shape they would drift back to.
 $profile = $read($root . '/resources/views/partials/account/profile.html.twig');
-foreach (['Personal particulars','Email addresses','Primary login address','secondary email'] as $token) $need(str_contains($profile, $token), 'Account Profile missing: ' . $token);
-foreach (['Course history','Active sessions','Account activity'] as $token) $need(!str_contains($profile, $token), 'Account Profile must not contain dashboard/session/activity content: ' . $token);
+foreach (['Personal particulars','Profile image','/account/profile/image'] as $token) $need(str_contains($profile, $token), 'Personal Particulars missing: ' . $token);
+// The image editor is an enhancement over a form that already works. The file input and the submit
+// must not depend on it, and the editor panel must start hidden - shown only once the controller
+// has a picture to edit. Without that, a reader with no JavaScript gets an empty canvas and no way
+// to send anything.
+foreach (['name="image"', 'name="edited_image"', 'type="submit"'] as $token) $need(str_contains($profile, $token), 'The profile image form must work without the editor: ' . $token);
+$need((bool) preg_match('/stimulus_target\(\x27profile-image\x27, \x27editor\x27\) \}\}\s+hidden/', $profile), 'The profile image editor panel must start hidden.');
+// Rule 0.2: every form ends in one action row, and the profile screen's two cards each have one.
+// The report that produced the rule was "there is no save image button" - there was, and it was
+// indistinguishable from the help text above it.
+$need(substr_count($profile, 'cl-form-actions') >= 2, 'Both cards on Personal Particulars must end in a cl-form-actions row.');
+$need(str_contains($profile, 'Save profile image'), 'The profile image card must name its own save action.');
+$need(
+    !(bool) preg_match('/<button[^>]*type="submit"[^>]*>\s*Save profile image/s', substr($profile, 0, strpos($profile, 'cl-form-actions') ?: 0)),
+    'The save action must live inside the action row, not loose in the form.'
+);
+foreach (['Course history','Active sessions','Account activity'] as $token) $need(!str_contains($profile, $token), 'Personal Particulars must not contain dashboard/session/activity content: ' . $token);
+
+$profileEmails = $read($root . '/resources/views/partials/account/emails.html.twig');
+foreach (['Email Addresses','cannot be changed','/account/email/secondary','/account/email/remove'] as $token) $need(str_contains($profileEmails, $token), 'Email Addresses missing: ' . $token);
+
+$profileSocial = $read($root . '/resources/views/partials/account/social.html.twig');
+foreach (['Social Media','social_links','name="social['] as $token) $need(str_contains($profileSocial, $token), 'Social Media missing: ' . $token);
 $dashboard = $read($root . '/resources/views/partials/account/dashboard.html.twig');
 foreach (['Current courses','Completed','Certificates','Course history','overall_grade_code','certificate_public_id'] as $token) $need(str_contains($dashboard, $token), 'Account Dashboard missing: ' . $token);
 
@@ -254,7 +284,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is built as a plain array now rather than written into F3's hive, so these look
 // for the assignment rather than for set(). What is being protected is unchanged: every page is
 // given navigation, a footer and its section keys, whichever engine renders it.
-foreach (["PLATFORM_ASSET_VERSION = '0.6'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.7'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer contract missing: ' . $token);
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);

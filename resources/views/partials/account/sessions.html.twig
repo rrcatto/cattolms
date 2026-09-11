@@ -1,39 +1,46 @@
-<div class="section-head">
-	<div>
-		<h2>
-			Active sessions
-		</h2>
-		<p>
-			Login sessions and device access are separate from account activity.
-		</p>
-	</div>
-</div>
-<div class="list-group shadow-sm">
-	{% for session in sessions %}
-		<div class="list-group-item p-4">
-			<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
-				<div>
-					<strong>{{ session.user_agent }}</strong>
-					{% if session.is_current %}
-						<span class="badge text-bg-success ms-2">Current</span>
-					{% endif %}
-					<div class="small text-secondary mt-2">
-						Created {{ session.created_at }} · Last active {{ session.last_seen_at }} · Expires {{ session.expires_at }}
-					</div>
-					{% if session.revoked_at %}
-						<div class="text-danger small">
-							Revoked {{ session.revoked_at }}
-						</div>
-					{% endif %}
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Sessions
 				</div>
-				{% if not session.revoked_at %}
-					<form action="/account/sessions/revoke" method="post">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<input type="hidden" name="session_id" value="{{ session.public_id }}">
-						<button class="btn btn-outline-danger" type="submit">Revoke</button>
-					</form>
-				{% endif %}
+				<h2>
+					Active sessions
+				</h2>
+				<p>
+					Login sessions and device access are separate from account activity.
+				</p>
 			</div>
 		</div>
-	{% endfor %}
+		<div class="list-group shadow-sm">
+			{% for session in sessions %}
+				<div class="list-group-item p-4">
+					<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+						<div>
+							<strong>{{ session.user_agent }}</strong>
+							{% if session.is_current %}
+								<span class="badge text-bg-success ms-2">Current</span>
+							{% endif %}
+							<div class="small text-secondary mt-2">
+								Created {{ session.created_at }} · Last active {{ session.last_seen_at }} · Expires {{ session.expires_at }}
+							</div>
+							{% if session.revoked_at %}
+								<div class="text-danger small">
+									Revoked {{ session.revoked_at }}
+								</div>
+							{% endif %}
+						</div>
+						{% if not session.revoked_at %}
+							<form action="/account/sessions/revoke" method="post">
+								<input type="hidden" name="csrf" value="{{ csrf }}">
+								<input type="hidden" name="session_id" value="{{ session.public_id }}">
+								<button class="btn btn-outline-danger" type="submit">Revoke</button>
+							</form>
+						{% endif %}
+					</div>
+				</div>
+			{% endfor %}
+		</div>
+	</div>
 </div>

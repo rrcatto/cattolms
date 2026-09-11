@@ -37,6 +37,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\LoginTokenRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use CattoLearning\Tests\Support\FakeMailer;
@@ -205,7 +206,8 @@ final class AuthWorkflowRegressionTest extends TestCase
             $container->get(AuthSessionRepository::class),
             $container->get(AuditRepository::class),
             $mailer,
-            $container->get(EventDispatcher::class)
+            $container->get(EventDispatcher::class),
+            $container->get(UserProfileRepository::class)
         );
     }
 }

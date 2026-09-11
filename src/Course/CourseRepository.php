@@ -1293,14 +1293,26 @@ final class CourseRepository
      */
     public function tagIndex(): array
     {
-        $scope = '';
-
+        // Only tags a reader can actually follow.
+        //
+        // A tag exists because a course needed it - nothing creates one on its own - but a tag whose
+        // courses are all drafts has nothing to show a visitor, and it was being listed at zero. The
+        // owner's report was that empty tags existed; what existed was tags that were empty *to the
+        // public*, which from the catalogue is the same thing and is worse, because following one
+        // leads to a page saying nothing carries it.
+        //
+        // The count and the filter are the same predicate, so a tag can never be listed with a
+        // number the page it leads to disagrees with. Administration lists tags through its own
+        // query and still sees every one of them, which is where an unused tag should be visible.
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT t.id, t.name, t.slug, t.icon_svg,
-                    (SELECT COUNT(*)::int FROM course_tags ct
-                       JOIN courses c ON c.id = ct.course_id
-                      WHERE ct.tag_id = t.id AND c.status = 'published') AS course_count
-             FROM tags t WHERE TRUE
+            "SELECT t.id, t.name, t.slug, t.icon_svg, x.course_count
+             FROM tags t
+             JOIN LATERAL (
+                 SELECT COUNT(*)::int AS course_count
+                   FROM course_tags ct
+                   JOIN courses c ON c.id = ct.course_id
+                  WHERE ct.tag_id = t.id AND c.status = 'published'
+             ) x ON x.course_count > 0
              ORDER BY t.name, t.id"
         ));
     }
@@ -3143,7 +3155,7 @@ final class CourseRepository
              JOIN courses c ON c.id = ce.course_id
              LEFT JOIN companies oc ON oc.id = c.owner_company_id
              LEFT JOIN LATERAL (
-                 SELECT name FROM companies WHERE company_type = 'system' ORDER BY id LIMIT 1
+                 SELECT name FROM companies WHERE is_system = TRUE ORDER BY id LIMIT 1
              ) sc ON TRUE
              WHERE ce.id = :enrolment_id
              LIMIT 1",
@@ -3159,7 +3171,7 @@ final class CourseRepository
              FROM courses c
              LEFT JOIN companies oc ON oc.id = c.owner_company_id
              LEFT JOIN LATERAL (
-                 SELECT name FROM companies WHERE company_type = 'system' ORDER BY id LIMIT 1
+                 SELECT name FROM companies WHERE is_system = TRUE ORDER BY id LIMIT 1
              ) sc ON TRUE
              WHERE c.id = :course_id
              LIMIT 1",

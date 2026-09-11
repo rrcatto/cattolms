@@ -581,9 +581,8 @@ final class PlatformAdministrationService
     /**
      * Every view variable a list partial may read, defaulted to a safe falsy value.
      *
-     * F3 compiles `{{ @foo }}` to `$foo` and `Preview::sandbox()` extracts only the hive keys
-     * that actually exist, so a template reading a variable the current code path never set
-     * raises "Undefined variable" and returns a 500. Consolidated previews and standalone
+     * strict_variables is on, so a template reading a variable the current code path never set
+     * raises an error rather than rendering a silent blank. Consolidated previews and standalone
      * pages legitimately set different subsets of these, so every path starts from the full
      * set and overrides what it genuinely has. This is what makes the two rendering modes
      * share one partial safely.
@@ -627,7 +626,7 @@ final class PlatformAdministrationService
             $defaults[$dataset . '_preview_has_more'] = false;
             // Sort state, defaulted for every dataset whether or not it sorts yet. A partial that
             // renders sortable headings in a section which supplied none would otherwise read an
-            // undefined variable, which F3 turns into a 500 for the whole page rather than a blank.
+            // undefined variable, which strict_variables makes an error for the whole page rather than a blank.
             $defaults[$dataset . '_sort_headers'] = [];
             $defaults[$dataset . '_sort'] = '';
             $defaults[$dataset . '_dir'] = '';
@@ -641,7 +640,7 @@ final class PlatformAdministrationService
             $defaults[$dataset] = [];
         }
 
-        // Course Requests narrows by status, and F3 turns an unset template variable into a 500
+        // Course Requests narrows by status, and strict_variables makes an unset template variable an error
         // for the whole page rather than an empty value.
         $defaults['requests_status'] = '';
         $defaults['requests_status_filters'] = [];
@@ -1120,13 +1119,13 @@ final class PlatformAdministrationService
                 ]
                     + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'))
                     + $this->sortView('courses', $sort, '/admin/courses', [
-                        'title' => 'Course|33',
-                        'category' => 'Category|17',
-                        'status' => 'Status|7',
-                        'ownership' => 'Ownership|19',
-                        'learners' => 'Learners|5',
+                        'title' => 'Course|30',
+                        'category' => 'Category|16',
+                        'status' => 'Status|6',
+                        'ownership' => 'Ownership|22',
+                        'learners' => 'Learners|6',
                         'started' => 'Started|5',
-                        'updated' => 'Updated|8',
+                        'updated' => 'Updated|9',
                         'actions' => 'Actions|6',
                     ], array_keys(CourseRepository::ADMIN_COURSE_SORTS), $searchFilter, [
                         'editors' => SortOrder::DESCENDING,
@@ -1154,12 +1153,12 @@ final class PlatformAdministrationService
                     // header row is then one repeat over this model rather than markup that has to
                     // agree with it.
                     + $this->sortView('people', $sort, '/admin/people', [
-                        'name' => 'Person|36',
-                        'company' => 'Company|22',
-                        'roles' => 'Roles|17',
-                        'courses' => 'Courses|5',
-                        'created' => 'Created|7',
-                        'last_login' => 'Last login|7',
+                        'name' => 'Person|34',
+                        'company' => 'Company|21',
+                        'roles' => 'Roles|12',
+                        'courses' => 'Courses|7',
+                        'created' => 'Created|11',
+                        'last_login' => 'Last login|9',
                         'actions' => 'Actions|6',
                     ], array_keys(AdministrationRepository::PEOPLE_SORTS), self::withSearch($scope, 'people', $search), [
                         'courses' => SortOrder::DESCENDING,
@@ -1194,12 +1193,12 @@ final class PlatformAdministrationService
                 ]
                     + $this->paginationView('requests', $pagination, '/admin/course/requests', 'Course requests', $searchFilter + $sort->toPrefixedArray('requests'))
                     + $this->sortView('requests', $sort, '/admin/course/requests', [
-                        'learner' => 'Learner|26',
-                        'course' => 'Course|30',
+                        'learner' => 'Learner|18',
+                        'course' => 'Course|34',
                         'company' => 'Company|22',
-                        'requested' => 'Requested|8',
+                        'requested' => 'Requested|10',
                         'status' => 'Status|8',
-                        'actions' => 'Actions|6',
+                        'actions' => 'Actions|8',
                     ], array_keys(AdministrationRepository::REQUEST_SORTS), $searchFilter, ['requested' => SortOrder::DESCENDING]);
             })(),
             'enrolments' => (function () use ($activityFilters, $capabilities, $scope): array {
@@ -1218,11 +1217,11 @@ final class PlatformAdministrationService
                 ]
                     + $this->paginationView('enrolments', $pagination, '/admin/course/enrolments', 'Enrolments', $searchFilter + $sort->toPrefixedArray('enrolments'))
                     + $this->sortView('enrolments', $sort, '/admin/course/enrolments', [
-                        'learner' => 'Learner|30',
-                        'course' => 'Course|44',
-                        'status' => 'State|8',
-                        'progress' => 'Progress|12',
-                        'actions' => 'Actions|6',
+                        'learner' => 'Learner|20',
+                        'course' => 'Course|46',
+                        'status' => 'State|9',
+                        'progress' => 'Progress|13',
+                        'actions' => 'Actions|12',
                     ], array_keys(AdministrationRepository::ENROLMENT_SORTS), $searchFilter, [
                         'progress' => SortOrder::DESCENDING,
                         'assigned' => SortOrder::DESCENDING,
@@ -1244,12 +1243,12 @@ final class PlatformAdministrationService
                 ]
                     + $this->paginationView('credits', $pagination, '/admin/course/credits', 'Credits', $searchFilter + $sort->toPrefixedArray('credits'))
                     + $this->sortView('credits', $sort, '/admin/course/credits', [
-                        'holder' => 'Company|32',
-                        'course' => 'Course|42',
+                        'holder' => 'Company|26',
+                        'course' => 'Course|40',
                         'period' => 'Period|8',
-                        'available' => 'Available|6',
-                        'assigned' => 'Assigned|6',
-                        'consumed' => 'Consumed|6',
+                        'available' => 'Available|9',
+                        'assigned' => 'Assigned|9',
+                        'consumed' => 'Consumed|8',
                     ], array_keys(AdministrationRepository::CREDIT_SORTS), $searchFilter, [
                         'available' => SortOrder::DESCENDING,
                         'assigned' => SortOrder::DESCENDING,
@@ -1278,13 +1277,13 @@ final class PlatformAdministrationService
                 ]
                     + $this->paginationView('activity', $pagination, '/admin/activity', 'Activity', $filters + $scope + $sort->toPrefixedArray('activity'))
                     + $this->sortView('activity', $sort, '/admin/activity', [
-                        'created' => 'Time|10',
-                        'actor' => 'Actor|16',
-                        'company' => 'Company|14',
-                        'event' => 'Activity|21',
-                        'subject' => 'Subject|17',
-                        'ip' => 'IP|8',
-                        'location' => 'Location|8',
+                        'created' => 'Time|13',
+                        'actor' => 'Actor|12',
+                        'company' => 'Company|12',
+                        'event' => 'Activity|26',
+                        'subject' => 'Subject|13',
+                        'ip' => 'IP|9',
+                        'location' => 'Location|9',
                         'actions' => 'Actions|6',
                     ], array_keys(AdministrationRepository::ACTIVITY_SORTS), $filters + $scope, ['created' => SortOrder::DESCENDING]);
             })(),
@@ -1305,11 +1304,11 @@ final class PlatformAdministrationService
                 ]
                     + $this->paginationView('company_report', $companyPages, '/admin/reports/companies', 'Company Enrolments', $companyFilter + $companySort->toPrefixedArray('company_report'))
                     + $this->sortView('company_report', $companySort, '/admin/reports/companies', [
-                        'company' => 'Company|62',
-                        'people' => 'People|7',
-                        'enrolments' => 'Enrolments|10',
-                        'completed' => 'Completed|10',
-                        'completion' => 'Completion|11',
+                        'company' => 'Company|52',
+                        'people' => 'People|10',
+                        'enrolments' => 'Enrolments|13',
+                        'completed' => 'Completed|12',
+                        'completion' => 'Completion|13',
                     ], array_keys(AdministrationRepository::COMPANY_REPORT_SORTS), $companyFilter, [
                         'people' => SortOrder::DESCENDING,
                         'enrolments' => SortOrder::DESCENDING,
@@ -1334,13 +1333,13 @@ final class PlatformAdministrationService
                     $data['course_report_search'] = $courseSearch;
                     $data += $this->paginationView('course_report', $coursePages, '/admin/reports', 'Course performance', $courseFilter + $courseSort->toPrefixedArray('course_report'));
                     $data += $this->sortView('course_report', $courseSort, '/admin/reports', [
-                        'course' => 'Course|52',
+                        'course' => 'Course|41',
                         'status' => 'Status|8',
-                        'enrolments' => 'Enrolments|9',
-                        'started' => 'Started|7',
-                        'completed' => 'Completed|9',
-                        'completion' => 'Completion|8',
-                        'average' => 'Average result|7',
+                        'enrolments' => 'Enrolments|11',
+                        'started' => 'Started|8',
+                        'completed' => 'Completed|10',
+                        'completion' => 'Completion|11',
+                        'average' => 'Avg result|11',
                     ], array_keys(AdministrationRepository::COURSE_REPORT_SORTS), $courseFilter, [
                         'enrolments' => SortOrder::DESCENDING,
                         'started' => SortOrder::DESCENDING,
@@ -1454,17 +1453,17 @@ final class PlatformAdministrationService
         return match ($dataset) {
             'people' => [
                 AdministrationRepository::COMPANY_PEOPLE_SORTS,
-                ['person' => 'Person|52', 'role' => 'Role|18', 'courses' => 'Courses|6', 'account' => 'Account|10', 'actions' => 'Actions|14'],
+                ['person' => 'Person|45', 'role' => 'Role|12', 'courses' => 'Courses|11', 'account' => 'Account|12', 'actions' => 'Actions|20'],
                 ['courses' => SortOrder::DESCENDING, 'last_login' => SortOrder::DESCENDING],
             ],
             'requests' => [
                 AdministrationRepository::COMPANY_REQUEST_SORTS,
-                ['learner' => 'Learner|30', 'course' => 'Course|44', 'requested' => 'Requested|8', 'status' => 'Status|8', 'actions' => 'Actions|10'],
+                ['learner' => 'Learner|24', 'course' => 'Course|42', 'requested' => 'Requested|10', 'status' => 'Status|9', 'actions' => 'Actions|15'],
                 ['requested' => SortOrder::DESCENDING],
             ],
             'enrolments' => [
                 AdministrationRepository::COMPANY_ENROLMENT_SORTS,
-                ['learner' => 'Learner|30', 'course' => 'Course|46', 'status' => 'Status|8', 'progress' => 'Progress|8', 'actions' => 'Actions|8'],
+                ['learner' => 'Learner|24', 'course' => 'Course|42', 'status' => 'Status|9', 'progress' => 'Progress|12', 'actions' => 'Actions|13'],
                 ['assigned' => SortOrder::DESCENDING],
             ],
             default => [
@@ -2072,9 +2071,8 @@ final class PlatformAdministrationService
     {
         $name = trim((string) ($input['name'] ?? ''));
         $domain = strtolower(trim((string) ($input['domain'] ?? '')));
-        $type = (string) ($input['company_type'] ?? 'client');
         $this->validateCompanyInput($name, $domain);
-        $company = $this->companies->createManaged($actorUserId, $name, $domain, $type);
+        $company = $this->companies->createManaged($actorUserId, $name, $domain);
         $this->audit->record($actorUserId, 'company.created', ['company_id' => (int) $company['id']]);
         return (int) $company['id'];
     }
@@ -2084,7 +2082,6 @@ final class PlatformAdministrationService
     {
         $name = trim((string) ($input['name'] ?? ''));
         $domain = strtolower(trim((string) ($input['domain'] ?? '')));
-        $type = (string) ($input['company_type'] ?? 'client');
         $company = $this->companies->findById($companyId);
         if ($company === null) {
             throw new RuntimeException('The company does not exist.');
@@ -2095,7 +2092,7 @@ final class PlatformAdministrationService
         if ($this->companies->domainExistsForOther($domain, $companyId)) {
             throw new InvalidArgumentException('That company email domain is already registered.');
         }
-        $this->companies->updateManaged($companyId, $name, $domain, $type);
+        $this->companies->updateManaged($companyId, $name, $domain);
         if (in_array($company['is_system'] ?? false, [true,1,'1','t','true'], true)) {
             $this->options->set('system_company_name', $name, $actorUserId);
         }
@@ -2357,7 +2354,7 @@ final class PlatformAdministrationService
             if ($this->companies->domainExistsForOther($companyDomain, (int) $system['id'])) {
                 throw new InvalidArgumentException('That company email domain is already registered.');
             }
-            $this->companies->updateManaged((int) $system['id'], $companyName, $companyDomain, 'system');
+            $this->companies->updateManaged((int) $system['id'], $companyName, $companyDomain);
         }
         $this->audit->record($actorUserId, 'platform.settings_updated');
     }
@@ -2551,11 +2548,11 @@ final class PlatformAdministrationService
             $row['roles'] = array_map(static fn(string $key): string => $roleNames[$key] ?? ucwords(str_replace('_', ' ', $key)), $keys);
             // Platform-wide people queries do not join company_users, while the
             // Company People partial is shared with company-scoped queries. Keep
-            // the row shape stable so F3 never compiles a missing array-key read.
+            // the row shape stable so the partial never reads a missing array key.
             $row['company_role'] = (string) ($row['company_role'] ?? '');
             // Same reason: the Company People editor reads these, and the platform-wide people
-            // query does not select them. Keep the row shape stable so F3 never compiles a
-            // missing array-key read into an undefined variable.
+            // query does not select them. Keep the row shape stable so the partial never reads a
+            // missing array key.
             $row['certificate_name'] = (string) ($row['certificate_name'] ?? '');
             $row['mobile_number'] = (string) ($row['mobile_number'] ?? '');
             $row['middle_names'] = (string) ($row['middle_names'] ?? '');
@@ -2629,9 +2626,18 @@ final class PlatformAdministrationService
         foreach ($rows as &$row) {
             $isSystem = in_array($row['is_system'] ?? false, [true, 1, '1', 't', 'true'], true);
             $row['is_system'] = $isSystem;
-            $row['company_type_label'] = $isSystem
-                ? 'System company'
-                : ((string) ($row['company_type'] ?? 'client') === 'course_provider' ? 'Course provider' : 'Client company');
+            // What a company is, is what it does. A provider owns courses; a client holds credits
+            // or has staff. Both are true of a company that does both, which is the whole reason
+            // the stored single choice was removed. The two facts arrive as columns on the query
+            // that read the row - they are index lookups, so a page of rows costs a page of probes.
+            $row['is_course_provider'] = in_array($row['is_course_provider'] ?? false, [true, 1, '1', 't', 'true'], true);
+            $row['is_client'] = in_array($row['is_client'] ?? false, [true, 1, '1', 't', 'true'], true);
+            $roles = [];
+            if ($row['is_client']) $roles[] = 'Client';
+            if ($row['is_course_provider']) $roles[] = 'Course provider';
+            // A company that has done neither yet is a client: it was created to have staff trained,
+            // and that is the state every new company starts in.
+            $row['company_type_label'] = $isSystem ? 'System company' : ($roles === [] ? 'Client' : implode(' · ', $roles));
             $row['status_label'] = ucfirst((string) ($row['status'] ?? ''));
         }
         unset($row);

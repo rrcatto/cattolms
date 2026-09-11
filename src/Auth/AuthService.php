@@ -35,6 +35,7 @@ use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\LoginTokenRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
+use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\ClientFingerprint;
@@ -68,8 +69,30 @@ final class AuthService
         private readonly AuthSessionRepository $sessions,
         private readonly AuditRepository $audit,
         private readonly MailerInterface $mailer,
-        private readonly EventDispatcher $events
+        private readonly EventDispatcher $events,
+        private readonly UserProfileRepository $profiles
     ) {
+    }
+
+    /**
+     * The identity shown in the header of every page: who this is, and whether there is a picture.
+     *
+     * One call rather than two lookups spread across BaseController, because it runs on every
+     * render. hasImage() is an existence check and never loads the bytes - the header only needs
+     * to know whether to address the image route or draw an initial.
+     *
+     * @return array{name:string,email:string,status:string,has_image:bool}
+     */
+    public function identityCard(int $userId): array
+    {
+        $profile = $this->profile($userId);
+
+        return [
+            'name' => (string) ($profile['full_name'] ?? ''),
+            'email' => (string) ($profile['primary_email'] ?? ''),
+            'status' => (string) ($profile['status'] ?? ''),
+            'has_image' => $this->profiles->hasImage($userId),
+        ];
     }
 
     public function requestLogin(string $inputEmail, string $returnPath = '/account/library'): void

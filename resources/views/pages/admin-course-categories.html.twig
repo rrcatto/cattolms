@@ -8,88 +8,101 @@
 	{% set ph_action_href = '/admin/courses' %}
 	{% set ph_action_label = 'Courses' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<div class="container-fluid cl-container-wide pt-4">
-		{% include '@platform/partials/admin/course-group-nav.html.twig' %}
-	</div>
-	<section class="container-fluid cl-container-wide py-5">
-		<div class="row g-4">
-			<div class="col-12">
-				<div class="card">
-					<div class="toolbar p-3">
-						<div>
+	{#
+		The wrapper Courses, Requests and Enrolments use, which is the plain section that
+		admin-section.html.twig puts round a section body - no container of its own.
+
+		It used to be container-fluid cl-container-wide py-5, which imposes a different maximum
+		width and its own padding, so the card sat at a different place on the page from every
+		other Courses page and appeared to jump when moving between them.
+	#}
+	<section class="section">
+		<div class="grid section">
+			<div class="card">
+				{% include '@platform/partials/admin/course-group-nav.html.twig' %}
+				<div class="section-head">
+					<div>
+						<div class="eyebrow">
+							Course Categories
 						</div>
-						<button class="btn btn-primary" type="button" data-open-modal="createCategoryModal">＋ Create category</button>
+						<h2>
+							The catalogue taxonomy
+						</h2>
+						<p>
+							The categories a course can be filed under. A course is named after its category and tagged with the branch it belongs to.
+						</p>
 					</div>
-					<div class="table-wrap">
-						<table class="table table-hover align-middle mb-0">
-							<thead>
-								<tr>
-									<th style="width:52%">
-										Category
-									</th>
-									<th style="width:8%">
-										Courses
-									</th>
-									<th style="width:14%">
-										With sub-categories
-									</th>
-									<th style="width:12%">
-										Order
-									</th>
-									<th class="cell-actions" style="width:14%">
-										Actions
-									</th>
-								</tr>
-							</thead>
-							<tbody>
-								{% for category_index, category in categories %}
-									<tr data-category-row>
-										<td>
-											<span class="cl-category-depth cl-category-depth-{{ category.level }}"><span class="cl-category-level" title="Level {{ category.level }}">L{{ category.level }}</span>{{ category.name }}</span>
-											{% if category.parent_name %}
-												<div class="small text-body-secondary cl-category-depth cl-category-depth-{{ category.level }}" style="border:0">
-													in {{ category.grandparent_name ? category.grandparent_name ~ ' › ' : '' }}{{ category.parent_name }}
-												</div>
-											{% endif %}
-											{% if category.description %}
-												<div class="small text-body-secondary mt-1">
-													{{ category.description }}
-												</div>
-											{% endif %}
-										</td>
-										<td>
-											{{ category.course_count }}
-										</td>
-										<td>
-											{{ category.descendant_course_count }}
-											{% if category.child_count %}
-												<div class="small text-body-secondary">
-													{{ category.child_count }} sub
-												</div>
-											{% endif %}
-										</td>
-										<td class="cell-actions">
-											<div class="row-actions">
-												<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													<input type="hidden" name="direction" value="up">
-													<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index==0 ? 'disabled' : '' }}>↑</button>
-												</form>
-												<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													<input type="hidden" name="direction" value="down">
-													<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index+1==categories|length ? 'disabled' : '' }}>↓</button>
-												</form>
+					<button class="btn btn-primary" type="button" data-open-modal="createCategoryModal">＋ Create category</button>
+				</div>
+				<div class="table-wrap">
+					<table class="table table-hover align-middle mb-0">
+						<thead>
+							<tr>
+								<th style="width:52%">
+									Category
+								</th>
+								<th style="width:8%">
+									Courses
+								</th>
+								<th style="width:14%">
+									With sub-categories
+								</th>
+								<th style="width:12%">
+									Order
+								</th>
+								<th class="cell-actions" style="width:14%">
+									Actions
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							{% for category_index, category in categories %}
+								<tr data-category-row>
+									<td>
+										<span class="cl-category-depth cl-category-depth-{{ category.level }}"><span class="cl-category-level" title="Level {{ category.level }}">L{{ category.level }}</span>{{ category.name }}</span>
+										{% if category.parent_name %}
+											<div class="small text-body-secondary cl-category-depth cl-category-depth-{{ category.level }}" style="border:0">
+												in {{ category.grandparent_name ? category.grandparent_name ~ ' › ' : '' }}{{ category.parent_name }}
 											</div>
-										</td>
-										<td class="cell-actions">
-											<a class="btn btn-sm btn-primary" href="/admin/courses/categories/{{ category.id }}">Manage</a>
-										</td>
-									</tr>
-								{% endfor %}
-							</tbody>
-						</table>
-					</div>
+										{% endif %}
+										{% if category.description %}
+											<div class="small text-body-secondary mt-1">
+												{{ category.description }}
+											</div>
+										{% endif %}
+									</td>
+									<td>
+										{{ category.course_count }}
+									</td>
+									<td>
+										{{ category.descendant_course_count }}
+										{% if category.child_count %}
+											<div class="small text-body-secondary">
+												{{ category.child_count }} sub
+											</div>
+										{% endif %}
+									</td>
+									<td class="cell-actions">
+										<div class="row-actions">
+											<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
+												<input type="hidden" name="csrf" value="{{ csrf }}">
+												<input type="hidden" name="direction" value="up">
+												<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index==0 ? 'disabled' : '' }}>↑</button>
+											</form>
+											<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
+												<input type="hidden" name="csrf" value="{{ csrf }}">
+												<input type="hidden" name="direction" value="down">
+												<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index+1==categories|length ? 'disabled' : '' }}>↓</button>
+											</form>
+										</div>
+									</td>
+									<td class="cell-actions">
+										<a class="btn btn-sm btn-primary" href="/admin/courses/categories/{{ category.id }}">Manage</a>
+									</td>
+								</tr>
+							{% endfor %}
+						</tbody>
+					</table>
 				</div>
 			</div>
 		</div>

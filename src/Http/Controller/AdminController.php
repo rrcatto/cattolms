@@ -761,10 +761,6 @@ final class AdminController extends BaseController
                 $swapping
             );
         $data = $this->withAdministrationPresentation($data, false, $definition);
-        // The Companies table offers a Manage action that hands the row to the Company workspace.
-        // Whether to render it is the same question SelectedCompanyContext answers, asked through
-        // the context itself so the button appears exactly where the selection would be honoured.
-        $data['can_select_company'] = $this->companyContext->canSelect($user);
 
         // Which tab each group strip shows as current. Set before the swap branch, not after it: a
         // section body includes its group strip, so a fragment that omitted these would render the
@@ -838,6 +834,18 @@ final class AdminController extends BaseController
 
 
             $data['seed_cleanup_preview'] = null;
+        }
+        if (in_array('companies', $sectionKeys, true) || in_array('company_creators', $sectionKeys, true)) {
+            // The Companies table offers a Manage action that hands the row to the Company
+            // workspace. Whether to render it is the same question SelectedCompanyContext answers,
+            // asked through the context itself so the button appears exactly where the selection
+            // would be honoured.
+            //
+            // It is set here, in the one builder both /admin and /admin/companies call, rather than
+            // in either route. Set in the section route alone - which is where it was - the same
+            // table rendered from the same partial offered Manage on the standalone page and only
+            // Edit inside the workspace accordion, and nothing anywhere said so.
+            $data['can_select_company'] = $this->companyContext->canSelect($this->requireUser());
         }
 
         if ($workspace) {

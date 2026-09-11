@@ -1,0 +1,24 @@
+{
+  "format": "catto-learning-theme",
+  "schema_version": "4.0",
+  "template_api": "2.0",
+  "theme": {
+    "name": "Gilded Noir",
+    "slug": "gilded-noir",
+    "version": "2.0.0",
+    "author": "Catto Learning",
+    "created_at": "2026-08-19T01:05:00+02:00",
+    "description": "Luxury black, gold, silver and ivory full Catto Learning application skin based on Gilded Noir 1.1.2, with an abacus/scales/parchment home hero, sphere footer, section imagery, core-owned navigation/footer contracts, and complete page-family coverage."
+  },
+  "parent": null,
+  "styles": [],
+  "scripts": [
+    "js/theme.js"
+  ],
+  "external": {
+    "styles": [
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Jost:wght@400;500;600;700&family=Marcellus&display=swap"
+    ],
+    "scripts": []
+  }
+}

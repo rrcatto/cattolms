@@ -7,6 +7,8 @@
 
 Read `PROJECT-INSTRUCTIONS.md` first. This file records the current implementation boundary and next development work.
 
+This is out of date because it does not document v0.7
+
 ## 0q. v0.6 — making it fit by making it smaller
 
 The owner's correction, and the better answer: **shrink the output rather than cut it**. Truncation
@@ -219,8 +221,10 @@ carry a header fails the test too - the list cannot rot in either direction.
 **Three template traps, all found by breaking pages.** They are worth recording because none is
 visible by reading the markup:
 
-- **F3 splits an include's `with` attribute on every comma, quoted or not.** A lead containing a
-  comma silently became two broken parameters. That is why the header's parameters are `set` tags.
+- **Historical, and the reason the markup still looks this way:** F3 split an include's `with`
+  attribute on every comma, quoted or not, so a lead containing a comma silently became two broken
+  parameters. That is why the header's parameters are `set` tags. Twig parses `with` as a real
+  expression and has no such hazard, so new includes need not follow the pattern.
 - **A `set` attribute is evaluated as one expression, not as interpolated text.** Literal words mixed
   with template tokens compile to a PHP syntax error and take the whole page down. A mixed value has
   to be written as a concatenation.
@@ -918,10 +922,10 @@ No database schema change, no new migration and no database reset. The baseline 
 
 Two caches key on the unchanged `current/...` paths and will keep serving the previous version after the symlink is repointed:
 
-- F3's compiled templates, because `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so the compiled filename hash does not change between versions and F3 only recompiles when the source is newer than the compiled file;
+- Symfony's compiled container and Twig's compiled templates, because `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so those cache paths do not change between versions;
 - PHP's opcache, for the same reason.
 
-Clear the instance `storage/cache` compiled templates and reload PHP-FPM as part of every deployment. `OPERATIONS.md` carries the commands.
+Run `bin/console cache:clear` as the web server's user and reload PHP-FPM as part of every deployment. `OPERATIONS.md` carries the commands.
 
 ### Known gaps carried forward
 

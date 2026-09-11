@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Assessment family: overview, question and result surfaces.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-assessment" data-ld-family="assessment">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

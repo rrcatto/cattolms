@@ -456,7 +456,10 @@ SELECT c.*,
          WHERE co.owner_company_id=c.id) AS owned_course_count,
        (SELECT COUNT(*)::int FROM course_enrolments ce
           JOIN company_users lcu ON lcu.user_id=ce.user_id AND lcu.company_id=c.id AND lcu.status='active'
-         WHERE ce.is_preview=FALSE AND ce.status IN ('assigned','active','completed')) AS enrolment_count
+         WHERE ce.is_preview=FALSE AND ce.status IN ('assigned','active','completed')) AS enrolment_count,
+       EXISTS (SELECT 1 FROM courses pc WHERE pc.owner_company_id=c.id) AS is_course_provider,
+       (EXISTS (SELECT 1 FROM course_credits cc WHERE cc.company_id=c.id)
+        OR EXISTS (SELECT 1 FROM company_users ccu WHERE ccu.company_id=c.id AND ccu.status='active')) AS is_client
 FROM page
 JOIN companies c ON c.id=page.id
 SQL;
@@ -506,7 +509,9 @@ SQL;
     public const COMPANY_SORTS = [
         'name' => 'c.name',
         'domain' => 'c.domain',
-        'type' => 'c.company_type',
+        // Ordering by what a company is, now that nothing stores it. Provider first, then both,
+        // then client - the same order the label reads in, so the sort agrees with the column.
+        'type' => "(CASE WHEN EXISTS (SELECT 1 FROM courses sc WHERE sc.owner_company_id=c.id) THEN 1 ELSE 0 END)",
         'people' => "(SELECT COUNT(*) FROM company_users cu WHERE cu.company_id=c.id AND cu.status='active')",
         'courses' => '(SELECT COUNT(*) FROM courses co WHERE co.owner_company_id=c.id)',
         'enrolments' => "(SELECT COUNT(*) FROM course_enrolments ce
@@ -633,7 +638,7 @@ SQL;
     /** @var array<string,string> */
     public const COMPANY_REPORT_SORTS = [
         'company' => 'co.name',
-        'type' => 'co.company_type',
+        'type' => "(CASE WHEN EXISTS (SELECT 1 FROM courses sco WHERE sco.owner_company_id=co.id) THEN 1 ELSE 0 END)",
         'people' => "(SELECT COUNT(*) FROM company_users scu WHERE scu.company_id=co.id AND scu.status='active')",
         'enrolments' => "(SELECT COUNT(*) FROM course_enrolments se
                             JOIN company_users scu ON scu.user_id=se.user_id AND scu.company_id=co.id AND scu.status='active'
@@ -1447,7 +1452,10 @@ SQL;
         $companyScope .= $match;
 
         $detail = <<<'SQL'
-SELECT co.id,co.name,co.company_type,
+SELECT co.id,co.name,
+       EXISTS (SELECT 1 FROM courses pco WHERE pco.owner_company_id=co.id) AS is_course_provider,
+       (EXISTS (SELECT 1 FROM course_credits cco WHERE cco.company_id=co.id)
+        OR EXISTS (SELECT 1 FROM company_users ccu2 WHERE ccu2.company_id=co.id AND ccu2.status='active')) AS is_client,
        COUNT(DISTINCT cu.user_id) FILTER (WHERE cu.status='active')::int AS people,
        COUNT(DISTINCT ce.id) FILTER (WHERE ce.is_preview=FALSE)::int AS enrolments,
        COUNT(DISTINCT ce.id) FILTER (WHERE ce.is_preview=FALSE AND ce.status='completed')::int AS completed

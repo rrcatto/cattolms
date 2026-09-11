@@ -16,7 +16,7 @@ passport; it decides nothing about what that identity may do.
 The platform's session is a PostgreSQL-backed PHP session opened by App::run() before either router
 sees the request, and AuthService::currentUser() is the single place that turns it into an identity -
 including the company-suspension check. This reuses that rather than reading the session itself, so
-a Symfony route and a Fat-Free route cannot disagree about who is signed in while the two coexist.
+the web firewall and the API firewall cannot disagree about who is signed in.
 
 It authenticates every request and never refuses one. An anonymous visitor is not an error on a
 platform whose catalogue is public; routes that need an identity say so with #[IsGranted].

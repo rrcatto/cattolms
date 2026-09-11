@@ -11,7 +11,7 @@ Description:
 Authenticates an API request from its Bearer token.
 
 Architectural boundary: HTTP edge. It reads one header and delegates the whole of the decision to
-ApiAuthService, which is the same code the Fat-Free API controllers call. Authentication is not
+ApiAuthService, which is the same code every other API entry point calls. Authentication is not
 reimplemented here - if it were, the two interfaces could disagree about which tokens are valid.
 
 It is also the firewall's entry point, so a request that arrives with no token at all is refused in

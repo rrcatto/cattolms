@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Error family: status pages rendered by core.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-error ld-page-centred" data-ld-family="error">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

@@ -6,6 +6,54 @@
     else callback();
   };
 
+  /*
+    The navigation keeps its scroll position across a page load.
+
+    Every link is an ordinary link, so following one is a full document load and the navigation -
+    which is its own scroll container, fixed beside the page - comes back at the top. A reader who
+    had scrolled down to reach a link found the menu had moved out from under the pointer, and had
+    to scroll back before clicking anything else.
+
+    The position is restored as early as the element exists rather than on DOMContentLoaded, so the
+    menu is already where it was when the page first paints instead of jumping afterwards - which
+    would be the same complaint with an extra step. Saved on scroll, and again on the way out, so a
+    click that leaves immediately still records where the reader was.
+
+    sessionStorage, not localStorage: this is where you were during this visit, and it should not
+    outlive the tab. Every access is wrapped, because a browser set to refuse site data throws on
+    the property itself rather than returning nothing.
+  */
+  const NAV_SCROLL_KEY = 'catto-learning:nav-scroll';
+  const navScroller = () => document.querySelector('.sidebar, .side-nav, [data-theme-nav]');
+
+  const restoreNavScroll = () => {
+    const nav = navScroller();
+    if (!nav) return false;
+    try {
+      const saved = Number(sessionStorage.getItem(NAV_SCROLL_KEY) || 0);
+      if (saved > 0 && nav.scrollHeight > nav.clientHeight) nav.scrollTop = saved;
+    } catch (_) {}
+
+    let pending = 0;
+    const remember = () => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        try { sessionStorage.setItem(NAV_SCROLL_KEY, String(nav.scrollTop)); } catch (_) {}
+      });
+    };
+    nav.addEventListener('scroll', remember, {passive:true});
+    // pagehide rather than unload: unload is ignored by browsers that keep a page for the back
+    // button, and this must be recorded on the way to the next page.
+    window.addEventListener('pagehide', () => {
+      try { sessionStorage.setItem(NAV_SCROLL_KEY, String(nav.scrollTop)); } catch (_) {}
+    });
+
+    return true;
+  };
+
+  if (!restoreNavScroll()) ready(restoreNavScroll);
+
   ready(() => {
     let modalTrigger = null;
     const closeModal = modal => {
@@ -216,7 +264,12 @@
     fetch(paletteUrl,{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'}).then(response=>response.ok?response.json():null).then(config=>{
       if(!config?.enabled||!Array.isArray(config.palettes)||config.palettes.length<1)return;
       const themeKey=String(config.theme_key||'theme'),storagePrefix=`catto-learning:${themeKey}:palette`,paletteCount=config.palettes.length;let selected=0,hidden=false;try{selected=Number(localStorage.getItem(storagePrefix)||0);hidden=localStorage.getItem(`${storagePrefix}:hidden`)==='1';}catch(_){} if(!Number.isInteger(selected)||selected<0||selected>=paletteCount)selected=0;
-      const apply=index=>{selected=index;document.body.dataset.clPaletteManaged='1';document.body.dataset.clPalette=String(index);document.querySelectorAll('.cl-palette-option').forEach((button,i)=>{button.classList.toggle('active',i===index);button.setAttribute('aria-pressed',i===index?'true':'false');});try{localStorage.setItem(storagePrefix,String(index));}catch(_){}};
+      // The class is what the server renders from the cookie, so the first paint is already the
+      // chosen palette. Setting it again here changes nothing on screen; the data attributes are
+      // kept because the shipped stylesheets match both forms.
+      const apply=index=>{selected=index;const body=document.body;body.dataset.clPaletteManaged='1';body.dataset.clPalette=String(index);body.classList.add('cl-palette-managed');body.className=body.className.replace(/\bcl-palette-\d+\b/g,'').trim()+' cl-palette-'+index;document.querySelectorAll('.cl-palette-option').forEach((button,i)=>{button.classList.toggle('active',i===index);button.setAttribute('aria-pressed',i===index?'true':'false');});try{localStorage.setItem(storagePrefix,String(index));}catch(_){}
+        // A year, path-wide, lax: the palette is a display preference and is read on every request.
+        try{document.cookie='cl_palette='+encodeURIComponent(String(index))+';path=/;max-age=31536000;samesite=lax';}catch(_){}};
       apply(selected);
       if(config.switcher_visible===false||paletteCount<2)return;
       const dock=document.createElement('aside');dock.className='cl-palette-switcher';dock.setAttribute('aria-label','Colour palette');dock.innerHTML='<div class="cl-palette-head"><strong>Colour palette</strong><button class="cl-palette-hide" type="button">Hide</button></div><div class="cl-palette-options"></div>';const options=dock.querySelector('.cl-palette-options');

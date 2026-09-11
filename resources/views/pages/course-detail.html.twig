@@ -14,9 +14,20 @@
 							<span class="badge text-bg-light">{{ course.level }}</span>
 						{% endif %}
 					</div>
-					<h1 class="display-4 fw-bold">
-						{{ course.title }}
-					</h1>
+					<div class="cl-course-detail-headline">
+						<h1 class="display-4 fw-bold">
+							{{ course.title }}
+						</h1>
+{#
+						The same star, the same partial and the same toggle as the catalogue card.
+						A reader who favourites a course from a card and then opens it should find
+						the control in the state they left it, and be able to change their mind
+						without going back.
+#}
+						{% if can_favourite is defined and can_favourite %}
+							{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_return: favourite_return|default('/courses')} %}
+						{% endif %}
+					</div>
 					{% if course.subtitle %}
 						<p class="h4 text-white-50">
 							{{ course.subtitle }}
@@ -139,7 +150,9 @@
 										{% endfor %}
 									</div>
 									{% if is_authenticated %}
-										<button class="btn btn-primary w-100" type="submit">Request course</button>
+										<div class="cl-form-actions">
+											<button class="btn btn-primary w-100" type="submit">Request course</button>
+										</div>
 										<p class="small text-body-secondary mt-2 mb-0">
 											Direct cart checkout is the next commerce stage.
 										</p>

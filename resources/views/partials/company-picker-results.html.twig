@@ -19,11 +19,9 @@ Description:
   a generated one must be able to see which is which before choosing, not afterwards. The company
   chosen is what sets the workspace universe.
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags
-  inside comments, so a tag written out as a usage example becomes a real tag in the compiled
-  template. A comment delimiter written inside a comment body ends it early and leaks the
-  remainder onto the page. Keep every comment plain prose: no angle brackets, no comment
-  delimiters, no template tokens and no code, not even to document one.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
 	2026/09/03 03:18 SAST
 	- Fixed the ALL-universe SQL error on Administration Courses search, the undefined universe 500 on Account routes, and rebuilt the Switch Company picker on the shared search, the shared pagination and the standard universe query parameter.
@@ -39,19 +37,16 @@ Changelog:
 			<table>
 				<thead>
 					<tr>
-						<th style="width:46%">
+						<th style="width:36%">
 							Company
 						</th>
-						<th style="width:24%">
+						<th style="width:34%">
 							Domain
 						</th>
-						<th style="width:8%">
-							Data
-						</th>
-						<th style="width:10%">
+						<th style="width:12%">
 							Status
 						</th>
-						<th class="cell-actions" style="width:12%">
+						<th class="cell-actions" style="width:18%">
 							Actions
 						</th>
 					</tr>
@@ -67,9 +62,6 @@ Changelog:
 							</td>
 							<td class="mono small">
 								{{ company.domain }}
-							</td>
-							<td>
-								
 							</td>
 							<td>
 								<span class="badge {{ company.status=='active' ? 'good' : 'danger' }}">{{ company.status_label }}</span>

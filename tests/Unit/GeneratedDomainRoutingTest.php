@@ -33,21 +33,33 @@ use PHPUnit\Framework\TestCase;
 
 final class GeneratedDomainRoutingTest extends TestCase
 {
-    public function testAnInventedDomainCanNeverResolve(): void
+    public function testAnInventedDomainIsTheCompanyNameAndNothingElse(): void
     {
-        $domain = GeneratedDomainRouter::generatedDomain('highveld-mining', 3, 'a1b2c3d4');
+        $domain = GeneratedDomainRouter::generatedDomain('highveld-mining');
 
-        self::assertStringEndsWith('.invalid', $domain, 'An invented domain must be undeliverable by construction.');
-        self::assertStringContainsString('highveld-mining', $domain, 'The company should still be recognisable.');
+        self::assertSame(
+            'highveld-mining.invalid',
+            $domain,
+            'The owner asked for name.invalid. An index or a run suffix here produced addresses no table column could display.'
+        );
+    }
+
+    public function testAnInventedLocalPartCarriesTheNameAndTheRowIndex(): void
+    {
+        self::assertSame(
+            'jane-doe.7',
+            GeneratedDomainRouter::generatedLocalPart('Jane-Doe', 7),
+            'A person name is not unique on its own, so the address - a technical identifier - carries the index.'
+        );
     }
 
     public function testAnInventedAddressIsDeliveredToThePlatformDomain(): void
     {
         $router = new GeneratedDomainRouter('catto.test');
-        $address = 'jane.doe.7.a1b2c3d4@highveld-mining-3-a1b2c3d4.invalid';
+        $address = 'jane-doe.7@highveld-mining.invalid';
 
         self::assertSame(
-            'jane.doe.7.a1b2c3d4@catto.test',
+            'jane-doe.7@catto.test',
             $router->deliveryAddress($address),
             'The local part is kept so the recipient is recognisable; only the domain is rewritten.'
         );

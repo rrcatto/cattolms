@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Learner library family. Core supplies its own tab strip and panels.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-library" data-ld-family="library">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

@@ -13,7 +13,7 @@
 #   Application/, Course/,
 #   Auth/, Seed/, View/       services, constructor-injected.
 #   Infrastructure/Persistence/  repositories, constructor-injected.
-#   Http/Controller/          F3 controllers; the Symfony ones live in Http/Symfony/.
+#   Http/Controller/          page controllers; framework-facing classes live in Http/Symfony/.
 #
 # So registration follows that split rather than pointing at `src/` wholesale.
 services:
@@ -83,8 +83,8 @@ services:
         arguments:
             $loader: '@twig.loader.native_filesystem'
 
-    # The view model is shared with the Fat-Free renderer, which is what keeps one set of
-    # navigation and breadcrumb rules while both engines are in use.
+    # One view model for every page, which is what keeps a single set of navigation and
+    # breadcrumb rules rather than one per controller.
     CattoLearning\View\ThemeRenderer: ~
     CattoLearning\View\ThemeManager:
         arguments:

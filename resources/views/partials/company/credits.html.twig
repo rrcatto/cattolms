@@ -12,11 +12,9 @@ Description:
   The four counts are shown separately for that reason: total, available, assigned and consumed are
   four different states, and collapsing them would hide the one an administrator needs.
 
-  WARNING: a template comment is not a safe place to document syntax. F3 parses its own tags
-  inside comments, so a tag written out as a usage example becomes a real tag in the compiled
-  template. A comment delimiter written inside a comment body ends it early and leaks the
-  remainder onto the page. Keep every comment plain prose: no angle brackets, no comment
-  delimiters, no template tokens and no code, not even to document one.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
 	2026/08/31 19:05 SAST
 	- Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
@@ -26,62 +24,79 @@ Changelog:
   2026/08/30 21:10 SAST
   - Added the shared live search control and its result region.
 #}
-{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'credits', ds_label: 'Search credits', ds_value: credits_search, ds_action: '/company/credits'} %}
-<div id="credits-region" data-server-search-target>
-	<div id="credits-results">
-		{% if credits_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: credits_pagination} %}
-		{% endif %}
-		<div class="notice">
-			<span>ⓘ</span>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
 			<div>
-				Credits are tied to a course and access period and are consumed when the learner starts the course.
+				<div class="eyebrow">
+					Credits
+				</div>
+				<h2>
+					Credit pools
+				</h2>
+				<p>
+					Course and access-period credit pools.
+				</p>
 			</div>
 		</div>
-		<div class="table-wrap section">
-			<table>
-				<thead>
-					<tr>
-						{% for sh in credits_sort_headers %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: credits_region, sort_results: credits_results} %}
-						{% endfor %}
-					</tr>
-				</thead>
-				<tbody>
-					{% for credit in credits %}
-						<tr>
-							<td>
-								{{ credit.course_title }}
-							</td>
-							<td>
-								{{ credit.access_period_label }}
-							</td>
-							<td>
-								{{ credit.quantity }}
-							</td>
-							<td>
-								{{ credit.available_count }}
-							</td>
-							<td>
-								{{ credit.assigned_count }}
-							</td>
-							<td>
-								{{ credit.consumed_count }}
-							</td>
-						</tr>
-					{% endfor %}
-				</tbody>
-			</table>
-		</div>
-		{% if credits_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: credits_pagination} %}
-		{% else %}
-			{% if credits_preview_has_more %}
-				<div class="pagination-row">
-					<span class="pagination-summary">Showing the first {{ preview_page_size }} credit records.</span>
-					<a class="btn btn-soft btn-sm" href="/company/credits">View all credit records</a>
+		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'credits', ds_label: 'Search credits', ds_value: credits_search, ds_action: '/company/credits'} %}
+		<div id="credits-region" data-server-search-target>
+			<div id="credits-results">
+				{% if credits_pagination %}
+					{% include '@platform/partials/pagination.html.twig' with {pg: credits_pagination} %}
+				{% endif %}
+				<div class="notice">
+					<span>ⓘ</span>
+					<div>
+						Credits are tied to a course and access period and are consumed when the learner starts the course.
+					</div>
 				</div>
-			{% endif %}
-		{% endif %}
+				<div class="table-wrap section">
+					<table>
+						<thead>
+							<tr>
+								{% for sh in credits_sort_headers %}
+									{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: credits_region, sort_results: credits_results} %}
+								{% endfor %}
+							</tr>
+						</thead>
+						<tbody>
+							{% for credit in credits %}
+								<tr>
+									<td>
+										{{ credit.course_title }}
+									</td>
+									<td>
+										{{ credit.access_period_label }}
+									</td>
+									<td>
+										{{ credit.quantity }}
+									</td>
+									<td>
+										{{ credit.available_count }}
+									</td>
+									<td>
+										{{ credit.assigned_count }}
+									</td>
+									<td>
+										{{ credit.consumed_count }}
+									</td>
+								</tr>
+							{% endfor %}
+						</tbody>
+					</table>
+				</div>
+				{% if credits_pagination %}
+					{% include '@platform/partials/pagination.html.twig' with {pg: credits_pagination} %}
+				{% else %}
+					{% if credits_preview_has_more %}
+						<div class="pagination-row">
+							<span class="pagination-summary">Showing the first {{ preview_page_size }} credit records.</span>
+							<a class="btn btn-soft btn-sm" href="/company/credits">View all credit records</a>
+						</div>
+					{% endif %}
+				{% endif %}
+			</div>
+		</div>
 	</div>
 </div>

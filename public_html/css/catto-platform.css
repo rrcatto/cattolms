@@ -56,7 +56,10 @@
 .universe-switch{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem;padding:.6rem .85rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff)}.universe-switch-summary{margin:0;display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-size:.9rem}.universe-switch-noun{font-weight:600}.universe-switch-split{opacity:.75}.universe-switch-links{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}.universe-switch-legend{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;opacity:.7;margin-right:.15rem}.universe-switch-link{display:inline-block;padding:.3rem .7rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.85rem;line-height:1.4;text-decoration:none;color:inherit;background:transparent}.universe-switch-link:hover{border-color:currentColor}.universe-switch-link:focus-visible{outline:2px solid currentColor;outline-offset:2px}.universe-switch-link.active{font-weight:700;border-color:currentColor;background:var(--cl-page-muted,rgba(0,0,0,.07))}
 @media (max-width:640px){.universe-switch{flex-direction:column;align-items:stretch}.universe-switch-links{justify-content:space-between}}
 /* Company context switcher (v0.5.8.3 Stage D). Core-owned, complete on its own: Gilded Noir has no .company-context rules, so this must not depend on a theme. */
-.company-context{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem 1rem;padding:.85rem 1rem;margin:0 0 1rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-muted,rgba(0,0,0,.03))}
+/* A surface, not a tint. The translucent black this used to carry was invisible against a plain
+   page and turned into a grey wash once the canvas became a texture, which is the one thing the
+   band must not be: it says which company everything below it belongs to. */
+.company-context{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem 1rem;padding:.85rem 1rem;margin:0 0 1rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,var(--r,12px));background:var(--cl-page-surface,#fff)}
 .company-context-current{display:flex;flex-direction:column;gap:.15rem;min-width:14rem;flex:1 1 14rem}
 .company-context-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;opacity:.7}
 .company-context-name{font-size:1.02rem;line-height:1.3}
@@ -212,7 +215,8 @@
 .cl-tag-chip:hover{border-color:currentColor}
 .cl-tag-chip.is-selected{border-color:currentColor;font-weight:800;box-shadow:inset 0 0 0 1px currentColor}
 .cl-tag-chip.is-selected .cl-category-count{opacity:.85}
-.cl-facet{display:grid;gap:.5rem}
+/* A facet carries a label and its controls, so it is text and needs a surface like the rest. */
+.cl-facet{display:grid;gap:.5rem;padding:1rem 1.1rem;border:1px solid var(--cl-border,var(--line,#dfe4ea));border-radius:var(--cl-radius,var(--r,12px));background:var(--cl-page-surface,#fff)}
 .cl-facet-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
 .cl-facet-label{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
 .cl-tag-cloud{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem}
@@ -285,8 +289,17 @@
 .table-wrap td .d-flex{flex-wrap:nowrap!important}
 .table-wrap td>div,.table-wrap td>p,.table-wrap td>span.muted,.table-wrap td>.small{display:inline!important;margin:0}
 .table-wrap td>div.muted::before,.table-wrap td>.small.muted::before{content:"·";margin:0 .4rem;opacity:.5}
-.table-wrap td .person{display:inline-flex!important;align-items:center;gap:.4rem;max-width:100%;overflow:hidden}
-.table-wrap td .person>div{display:inline!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table-wrap td .person{display:flex!important;align-items:center;gap:.4rem;max-width:100%;min-width:0;overflow:hidden}
+/* The name is never the thing that gets cut.
+
+   Name and address share one line, and laid out as plain inline text they shrank together: a
+   generated address ran to a hundred characters, so it ate the column and the person's name was
+   truncated to make room for the tail of an email nobody reads. The name now takes the width it
+   needs and the address takes whatever is left, ellipsised. That is the priority the reader has. */
+.table-wrap td .person>div{display:flex!important;align-items:baseline;gap:.4rem;min-width:0;max-width:100%;overflow:hidden}
+.table-wrap td .person>div>strong{flex:0 0 auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table-wrap td .person>div>:not(strong){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table-wrap td .person>div>:not(strong)::before{content:"·";margin-right:.4rem;opacity:.5}
 .table-wrap td .role-list{display:inline-flex!important;flex-wrap:nowrap!important;gap:.25rem;overflow:hidden}
 /* Two or more actions in a row is a menu, not a row of buttons.
 
@@ -404,7 +417,13 @@
 /* v0.7 form actions. A submit button hard against the last field reads as part of the field, and
    under Factory Reset the contact form's button was touching the textarea. Core owns the spacing
    because it is the same mistake on every form, not a matter of taste per theme. */
-.cl-form-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.5rem}
+/* Where a form ends and its actions begin. Separated by a hairline, because a reader looking for
+   "how do I save this" should find one place on every form rather than scanning for whichever
+   button happens to be primary-coloured. */
+.cl-form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid color-mix(in srgb,currentColor 14%,transparent)}
+/* Anything after the first action is secondary and sits away from it, so Save and Remove are never
+   two equal-looking buttons side by side. */
+.cl-form-actions>.cl-form-actions-secondary{margin-left:auto}
 
 /* v0.7 the small handful of layout utilities the page bodies actually used inline.
    Twenty-two inline style attributes said one of eight things, and an inline style is the one
@@ -460,6 +479,12 @@
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;min-width:0}
 .form-grid .field{display:grid;gap:.4rem;min-width:0}
 .form-grid .field-wide{grid-column:1/-1}
+/* `field full` means the same thing and is what forty-two fields across eleven templates actually
+   say. Core defined only .field-wide, and .full existed in exactly one of the five themes - so in
+   every other theme, this platform's own included, a field marked full width rendered at half width
+   inside a two-column form. One alias rather than forty-two template edits: the markup is not wrong,
+   the stylesheet was incomplete. */
+.form-grid .field.full{grid-column:1/-1}
 @media(max-width:720px){.form-grid{grid-template-columns:minmax(0,1fr)}}
 
 /* Bootstrap's card-body padding is 1rem, which is thin for a page whose whole content is one form.
@@ -494,6 +519,125 @@
 .container.cl-narrow{max-width:38rem}
 .container.cl-medium{max-width:54rem}
 .cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+/* Nothing reads directly off the page canvas.
+
+   The canvas is a texture, so any block of text that is not on a surface sits on stripes. Most of
+   the platform's content is on a card already; what is left is the handful of blocks that are
+   direct children of a section body or of a results region - a heading toolbar, a section head, a
+   notice, an empty state. Those are listed here rather than fixed one template at a time, because
+   they recur across roughly a hundred partials and a rule cannot be forgotten the way an edit to
+   one file can.
+
+   Written as "not inside a card" rather than by naming the containers they sit in. The obvious
+   anchor would have been cl-section-body, which is the htmx swap target every section page wraps
+   its content in - and styling it is exactly what CoreStyleNamespaceContractTest forbids, because
+   a behaviour hook that also carries layout cannot be moved without moving the layout with it.
+   The same classes inside a card are already on a surface, and a second one would draw a box in a
+   box, which is what the negation excludes. */
+.toolbar:not(.card *):not(.cl-footer *),
+.section-head:not(.card *),
+.notice:not(.card *),
+/* The search control carries a label, a status and a line of help, all of which are text. It is
+   rendered above the results region on every paginated list, so outside a card it was the other
+   block of words left standing on the texture. */
+.dataset-search:not(.card *){
+  padding:1rem 1.1rem;
+  border:1px solid var(--cl-border,var(--line,#dfe4ea));
+  border-radius:var(--cl-radius,var(--r,12px));
+  background:var(--cl-page-surface,#fff);
+  color:var(--cl-ink,var(--ink,#18212b))}
+/* Pagination sits on a surface of its own.
+
+   The control is rendered inside the results region, above and below the table, and a results
+   region has no background - so once the page canvas became a texture the row count, the page
+   numbers and the rows-per-page control were the one piece of text still standing on it. It is
+   given the card's surface rather than the card itself, because it is a control belonging to the
+   list beneath it and not a section of the page. */
+.pagination-row{
+  padding:.7rem .9rem;
+  border:1px solid var(--cl-border,var(--line,#dfe4ea));
+  border-radius:var(--cl-radius,var(--r,12px));
+  background:var(--cl-page-surface,#fff);
+  color:var(--cl-ink,var(--ink,#18212b))}
+/* The site footer: a section on its own surface, like every other block on the page.
+
+   It used to be a bare rule and some text, so once the page canvas became a texture the footer was
+   the one thing standing on it with nothing behind it. The surface is a light tone taken from the
+   palette rather than a fixed colour, so it belongs to whichever palette is active. */
+.cl-footer{
+  margin:1.25rem auto 2rem;max-width:1320px;
+  /* Heavier than the hairline the cards use, because the footer is a band at the end of the page
+     rather than one card among several, and it carries a dark edge against a light fill. */
+  border:2px solid var(--cl-darkest,#22303f);
+  border-radius:var(--cl-radius,var(--r,12px));
+  /* The palette's middle colour. Owner's instruction, 2026/09/11: across the shipped palettes that
+     is the light tone each one is built around - Coastal Blue #F5F9FC, Forest & Sand #F7F4EA,
+     Slate & Peach #F7C59F - so the footer belongs to the palette instead of being a grey that
+     three of them disagree with. The fallback is a pastel, for an installation running no palette
+     at all. */
+  background:var(--cl-accent,color-mix(in srgb,var(--cl-light,#dcecf5) 38%,#fff));
+  /* Stated, not inherited. The footer sits at the end of the document, so whatever colour the
+     page body happens to carry would otherwise decide whether the footer is legible. */
+  color:var(--cl-darkest,#22303f)}
+.cl-footer-inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;padding:1.15rem 1.4rem}
+.cl-footer-mark{font-size:.82rem}
+.cl-footer-nav{display:flex;flex-wrap:wrap;gap:.9rem;font-size:.82rem}
+.cl-footer-nav a{color:inherit;text-decoration:none;font-weight:600}
+.cl-footer-nav a:hover{text-decoration:underline}
+.cl-footer-social{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin:0;padding:0;list-style:none}
+.cl-footer-social a,.cl-footer-social>li>span{
+  display:inline-grid;place-items:center;width:2.4rem;height:2.4rem;
+  border-radius:50%;color:var(--cl-darkest,#22303f);
+  background:#fff;border:2px solid var(--cl-darkest,#22303f)}
+.cl-footer-social a:hover{background:var(--cl-lightest,#f5f9fc)}
+.cl-footer-social a:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+/* No address configured yet, so it is not a link - but it still has to be visible, because the row
+   is part of the footer rather than something that appears once a form is filled in. Dimmed just
+   enough to read as inactive, never so far that it disappears. */
+.cl-footer-social>li>span{opacity:.72}
+.cl-footer-social-icon{width:22px;height:22px;display:block;stroke-width:1.9}
+/* The rounded table's top corners.
+
+   A theme gives .table-wrap a border-radius, but core forces overflow:visible on it so the row
+   actions menu can be drawn outside the wrapper - and a border-radius only clips children while
+   overflow is not visible. The header cells carry a background, so their square top corners sat
+   over the curve and left a notch in each one. The body rows have no background of their own, so
+   the bottom corners always looked right and only the top two were wrong.
+
+   Clipping is not available here and must not be reintroduced: that is what PopoutClippingContract
+   Test exists to prevent. So the two corner cells are rounded to match the wrapper instead. */
+.table-wrap>table>thead>tr:first-child>th:first-child{border-start-start-radius:var(--cl-radius,var(--r,12px))}
+.table-wrap>table>thead>tr:first-child>th:last-child{border-start-end-radius:var(--cl-radius,var(--r,12px))}
+/* The identity head, and the joint between it and the page head above it.
+
+   Core owns both because core emits both. The identity used to be a card inside Personal
+   Particulars, so it was styled by whichever theme happened to define .profile-head - two of the
+   five did - and on the other three it rendered as an unstyled div. As page chrome it has to look
+   the same everywhere, so the structure is stated here and only the colours come from the theme.
+
+   The pair reads as one block: the page head keeps its top corners, the identity head keeps its
+   bottom corners, and the edge where they meet is square. The join is expressed with :has() so
+   nothing changes on the pages that have a page head and no identity head - which is every page
+   outside the Account workspace. */
+.cl-page-head:has(+ .cl-identity-head){
+  border-start-start-radius:var(--cl-radius,1rem);border-start-end-radius:var(--cl-radius,1rem);
+  border-end-start-radius:0;border-end-end-radius:0;
+  border-bottom:0;margin-bottom:0}
+.cl-identity-head{
+  border-start-start-radius:0;border-start-end-radius:0;
+  border-end-start-radius:var(--cl-radius,1rem);border-end-end-radius:var(--cl-radius,1rem);
+  margin-top:0;
+  background:var(--cl-page-surface,#fff);
+  color:var(--cl-ink,var(--ink,#18212b));
+  border-bottom:1px solid var(--cl-border,#dfe4ea)}
+.cl-identity-head-inner{display:flex;align-items:center;flex-wrap:wrap;gap:.9rem;padding-block:1rem}
+/* The signed-out mark. A symbol rather than an initial, because there is no name to take one
+   from, and the band has to keep its height whoever is reading. */
+.cl-identity-head-anonymous{display:grid;place-items:center;color:var(--cl-ink,var(--ink,#18212b));opacity:.55}
+.cl-identity-head-anonymous svg{fill:none;stroke:currentColor;stroke-width:1.9}
+.cl-identity-head-meta{min-width:0}
+.cl-identity-head-meta h2{margin:0;font-size:1.15rem;line-height:1.25}
+.cl-identity-head-meta p{margin:.15rem 0 0;font-size:.85rem;opacity:.75}
 .cl-filter-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
 .cl-filter-chip{display:inline-flex;align-items:center;padding:.3rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.8rem;line-height:1.4;text-decoration:none;color:inherit}
 /* The selected state keeps the inherited text colour and tints the ground with a share of it, so
@@ -537,9 +681,26 @@
 .field{display:grid;gap:.4rem!important;min-width:0}
 /* Air between one field and the next, and before whatever ends the form. Light Default is the only
    theme that spaced consecutive fields, and it did it with a margin on every field including the
-   last one inside a grid cell. */
+   last one inside a grid cell.
+
+   The margin is for fields stacked in ordinary flow. A container that lays its fields out with grid
+   or flex already states the space between them as a gap, and the margin then lands on top of it -
+   on every field except the first. In a two-column form that put the right-hand field of each row
+   one rem lower than the left-hand one, which is why Middle names never lined up with First name.
+   Fields laid out by a container take the container's spacing and nothing else. */
 .field+.field{margin-top:1rem}
-.field+.btn,.field+button,.field+.cl-form-actions{margin-top:1rem}
+.form-grid>.field+.field,.form-grid .field+.field,.cl-field-row>.field+.field,.field-row>.field+.field{margin-top:0}
+/* The general sibling combinator, not the adjacent one, and the difference is a real defect.
+
+   The profile image form is: a field, then the editor panel, then the submit. The editor is hidden
+   until a picture is chosen, and a hidden element still counts as the sibling in between - so the
+   adjacent rule stopped matching and the submit button sat flush against the grey help text above
+   it, reading as part of that text rather than as the action. The button beneath it, in its own
+   form, did have spacing and looked like the card's real control. The owner's report was that there
+   was no save button; what there was, was a save button nobody could pick out.
+
+   `~` matches however many elements sit between, hidden or not. */
+.field~.btn,.field~button,.field~.cl-form-actions{margin-top:1rem}
 
 /* v0.7 the two Help accordion levels are laid out the same way.
 
@@ -624,7 +785,15 @@
    other ran: with no controller the page is a list of chips, which is a usable page. */
 .cl-tag-cloud-shell{position:relative;min-width:0}
 .cl-tag-cloud-canvas{display:none}
-.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:block;min-height:clamp(20rem,46vw,34rem);text-align:center}
+.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:block;min-height:clamp(22rem,48vw,38rem);text-align:center}
+/* Without a controller the disclosure would hide the list behind a click for no reason, so it opens
+   by default and the controller folds it once it has a sphere to show in its place. */
+.cl-tag-cloud-all{margin-top:.6rem}
+.cl-tag-cloud-all>summary{cursor:pointer;font-size:.8rem;font-weight:600;letter-spacing:.03em;opacity:.75;padding:.3rem 0;list-style:none}
+.cl-tag-cloud-all>summary::-webkit-details-marker{display:none}
+.cl-tag-cloud-all>summary::before{content:"\25B8";display:inline-block;margin-right:.4rem;transition:transform .15s}
+.cl-tag-cloud-all[open]>summary::before{transform:rotate(90deg)}
+.cl-tag-cloud-shell:not(.is-animated) .cl-tag-cloud-all>summary{display:none}
 /* The library positions each word absolutely and sets its own font-size and opacity for depth, so
    what core states here is only what it does not: the colour, the cursor and the hit feedback. */
 .cl-tag-cloud-shell .tagcloud{display:inline-block;font-weight:700;color:inherit}
@@ -647,3 +816,110 @@
    Core owns the sprite, so core states how it is drawn. A theme still sets the colour, because
    currentColor is whatever the theme painted the text. */
 .nav-icon{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+/* The tag row says what it is. A row of chips under a description is otherwise decoration. */
+.cl-course-card-tags{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem}
+.cl-course-card-tags-label{font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-right:.1rem}
+/* Slanted texture: a named platform UI element.
+
+   The owner's definition, 2026/09/10: bands slanting at 45 degrees from top left to bottom right,
+   two band rows each about 10px thick, alternating in colour, a light grey with a darker grey.
+
+   It began as Light Default's stage canvas and is now core's, so every theme has it. A theme
+   re-colours it by setting the three custom properties - never by writing its own gradient, which
+   is how one texture becomes five textures that disagree about the angle. The band thickness is a
+   property too, because the same texture behind a small element wants a finer band.
+
+   Painted through a ::before rather than on the element itself: a background set directly is the
+   one thing a theme's own background rule silently overwrites, and the texture is meant to sit
+   under whatever the element already paints. */
+:root{--cl-texture-light:#f5f7f9;--cl-texture-dark:#edf0f3;--cl-texture-band:10px;--cl-texture-angle:45deg}
+.cl-slanted-texture{position:relative;isolation:isolate}
+.cl-slanted-texture>*{position:relative;z-index:1}
+.cl-slanted-texture::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2))}
+/* Where the texture is the element's own surface rather than a layer beneath its children. */
+.cl-slanted-texture-flat{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2))}
+/* The page canvas. ThemeRenderer puts this on every body, so the texture is the platform's
+   background rather than one theme's.
+
+   Qualified with body so it outranks a theme's own `body{background:...}` without !important:
+   that rule is a single element selector, and this is an element plus a class. Attached rather
+   than scrolling, so the bands stay put instead of sliding under a long page - the texture is the
+   surface the page sits on, not part of its content. */
+body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2)) fixed}
+/* The profile image, on the header and on its own panel.
+
+   Sized in the markup as well as here, so the page does not reflow between the layout arriving and
+   the image arriving - a 128px hole that becomes a 128px picture, rather than nothing that becomes
+   something and pushes the form down as it does. */
+.cl-profile-avatar{width:72px;height:72px;border-radius:14px;object-fit:cover;flex:0 0 auto;display:block}
+.cl-profile-avatar-empty{width:72px;height:72px;border-radius:14px;flex:0 0 auto}
+.cl-profile-image-panel{display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-start}
+.cl-profile-image-preview{width:128px;height:128px;border-radius:18px;object-fit:cover;flex:0 0 auto;display:block;border:1px solid color-mix(in srgb,currentColor 16%,transparent)}
+.cl-profile-image-empty{display:grid;place-items:center;font-size:2.6rem;font-weight:700;opacity:.45;background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-profile-image-actions{flex:1 1 16rem;min-width:0}
+/* A fact the interface shows rather than a control it offers. Styled like a label so it sits in the
+   form's rhythm, but it is not a label - there is no field for it to name. */
+.cl-inferred-label{font-size:.78rem;font-weight:600;letter-spacing:.01em;opacity:.85}
+/* The profile image editor.
+
+   Shown only once the Stimulus controller has a picture to edit; without JavaScript the panel is
+   never revealed and the file input beside it is the whole control, which is the platform's rule
+   for every enhancement. */
+.cl-profile-image-current{display:grid;gap:.4rem;justify-items:center;flex:0 0 auto}
+.cl-image-editor{display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-start;margin:.9rem 0 1rem}
+.cl-image-editor-stage{position:relative;flex:0 0 auto;line-height:0}
+/* The frame is the crop. Everything drawn outside it is dimmed rather than hidden, so the reader
+   can see what is being left out while they drag - a hard edge shows the result but not the choice. */
+.cl-image-editor-canvas{display:block;width:min(320px,60vw);height:auto;aspect-ratio:1;border-radius:14px;background:color-mix(in srgb,currentColor 8%,transparent);cursor:grab;touch-action:none}
+.cl-image-editor-canvas:active{cursor:grabbing}
+.cl-image-editor-mask{position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,currentColor 30%,transparent)}
+.cl-image-editor-controls{flex:1 1 14rem;min-width:0;display:grid;gap:.75rem}
+.cl-image-editor-buttons{display:flex;flex-wrap:wrap;gap:.4rem}
+.cl-image-editor-controls input[type="range"]{width:100%}
+.cl-image-editor-preview{display:grid;gap:.3rem;justify-items:start}
+.cl-image-editor-preview canvas{width:96px;height:96px;border-radius:14px;background:color-mix(in srgb,currentColor 8%,transparent);border:1px solid color-mix(in srgb,currentColor 16%,transparent)}
+/* The course card header: the course name and the favourite star, over the artwork.
+
+   The artwork is a background layer rather than content, and the scrim over it is what keeps a
+   white title legible whatever colours the generated cover happens to draw. Both are behind the
+   headline in the stacking order, and neither takes pointer events, so the title stays a link and
+   the star stays a button. */
+.cl-course-card-header{position:relative;isolation:isolate;display:flex;align-items:flex-end;min-height:8.5rem;overflow:hidden}
+.cl-course-card-art{position:absolute;inset:0;z-index:0;line-height:0;pointer-events:none}
+.cl-course-card-art svg,.cl-course-card-art img{display:block;width:100%;height:100%;object-fit:cover}
+.cl-course-card-art .cl-course-cover-placeholder{display:grid;place-items:center;width:100%;height:100%;font-size:2.4rem;font-weight:800;color:#fff;background:linear-gradient(135deg,#243b53,#486581)}
+.cl-course-card-header::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(to top,rgba(12,20,28,.86) 0%,rgba(12,20,28,.55) 45%,rgba(12,20,28,.12) 100%)}
+.cl-course-card-headline{position:relative;z-index:2;display:flex;align-items:flex-start;gap:.5rem;width:100%;padding:.7rem .8rem}
+.cl-course-card-headline .cl-course-card-title{flex:1 1 auto;min-width:0;margin:0;font-size:.98rem;line-height:1.25;text-wrap:balance}
+.cl-course-card-headline .cl-course-card-title a{color:#fff;text-decoration:none;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cl-course-card-headline .cl-course-card-title a:hover{text-decoration:underline}
+.cl-favourite-form{flex:0 0 auto;margin:0;line-height:0}
+/* The star reads on the artwork whichever way it sits, so it carries its own disc rather than
+   relying on the scrim behind it. */
+.cl-course-card-headline .cl-favourite{display:grid;place-items:center;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;cursor:pointer;font-size:1.15rem;line-height:1;color:#fff;background:rgba(12,20,28,.45);backdrop-filter:blur(2px);transition:transform .12s,background .12s,color .12s}
+.cl-course-card-headline .cl-favourite:hover{background:rgba(12,20,28,.7);transform:scale(1.08)}
+.cl-course-card-headline .cl-favourite.is-on{color:#ffd54a}
+.cl-course-card-headline .cl-favourite:focus-visible{outline:2px solid #fff;outline-offset:2px}
+/* The course detail headline: the course title and the same favourite star the card carries.
+
+   Only the row is stated here. The star sits on the page background rather than on cover artwork,
+   so it keeps the ordinary bordered .cl-favourite form and needs no scrim treatment of its own. */
+.cl-course-detail-headline{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+.cl-course-detail-headline>h1{flex:1 1 auto;min-width:0;margin:0;text-wrap:balance}
+/* Space below a section heading, stated by core because the markup is core's.
+
+   .section-head is emitted by the platform on card after card, and core said nothing at all about
+   the space beneath it - so whether a heading touched the thing it introduces depended entirely on
+   which theme was installed. One of the five set a bottom margin. On the other four, every card
+   header sat flush against its own content, which is what the owner kept reporting as "no white
+   space between UI elements".
+
+   This is the same failure as .field having no gap and .field full having no width: core owning the
+   markup and leaving its spacing to the theme. A theme may still space it differently - theme CSS
+   loads after this - but it can no longer be the only thing standing between a heading and legible
+   spacing. */
+.section-head{margin-bottom:1rem}
+.section-head>div{min-width:0}
+.section-head+*{margin-top:0}
+/* The panel a section head introduces keeps its own air even where a theme collapses the heading. */
+.cl-profile-image-panel{margin-top:.25rem}

@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Generic content family: Help, Contact, Privacy and other core pages.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-content" data-ld-family="content">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

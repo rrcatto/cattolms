@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Course detail family: pricing, access periods and start/request actions.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-course-detail" data-ld-family="course-detail">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

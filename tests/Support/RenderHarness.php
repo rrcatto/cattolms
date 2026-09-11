@@ -311,7 +311,7 @@ final class RenderHarness
             ]],
             'companies' => [[
                 'id' => 1, 'name' => 'C', 'domain' => 'c.test', 'status' => 'active', 'is_system' => false,
-                'company_type' => 'client', 'company_type_label' => 'Client company',
+                'is_client' => true, 'is_course_provider' => false, 'company_type_label' => 'Client',
                 'status_label' => 'Active', 'people_count' => 1, 'owned_course_count' => 0,
                 'enrolment_count' => 0, 'created_at' => '2026-01-01',
             ]],

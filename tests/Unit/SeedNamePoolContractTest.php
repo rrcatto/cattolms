@@ -261,4 +261,61 @@ final class SeedNamePoolContractTest extends TestCase
         self::assertStringContainsString('"@seeds:publish"', $composer, 'A first install must publish the name lists.');
         self::assertFileExists(self::root() . '/tools/publish-seed-names.php');
     }
+
+    public function testNoSingleWordDominatesAPageOfGeneratedNames(): void
+    {
+        // The owner's report, 2026/09/10: "these course names have way too many duplicates". They
+        // were not duplicated - every one was unique, because the factory redraws on a repeat. They
+        // were repetitive, which is a different property and the one a reader actually sees: forty
+        // one level words served two and a half thousand courses, so each appeared about seventy
+        // five times and every card read as a variation of the same few templates.
+        //
+        // Uniqueness is asserted elsewhere. This asserts variety: across a realistic set, no single
+        // word may account for more than a small share of the names it appears in.
+        $factory = new SeedNameFactory(self::pools(), 'variety-check');
+
+        $courseWords = [];
+        $companyWords = [];
+        $sample = 2000;
+        for ($index = 0; $index < $sample; $index++) {
+            foreach (self::words($factory->courseTitleFor('Health and Safety')) as $word) {
+                $courseWords[$word] = ($courseWords[$word] ?? 0) + 1;
+            }
+            foreach (self::words($factory->company()) as $word) {
+                $companyWords[$word] = ($companyWords[$word] ?? 0) + 1;
+            }
+        }
+
+        // The category leads every course title by design, so it is exempt: a course filed under
+        // Health and Safety should say so. Everything after it has to vary.
+        foreach (['health', 'and', 'safety'] as $expected) {
+            unset($courseWords[$expected]);
+        }
+
+        arsort($courseWords);
+        arsort($companyWords);
+        $worstCourse = array_key_first($courseWords);
+        $worstCompany = array_key_first($companyWords);
+
+        // Three per cent. The measured worst is around one, so there is real headroom; the old
+        // forty-one-word level pool put "level" - from "Level 1" through "Level 5" - at about
+        // twelve, so this is a threshold the reported problem fails rather than a formality.
+        self::assertLessThan(
+            $sample * 0.03,
+            $courseWords[$worstCourse],
+            'The word "' . $worstCourse . '" appears in ' . $courseWords[$worstCourse] . ' of ' . $sample
+            . ' course titles. A page of cards then reads as one name repeated.'
+        );
+        self::assertLessThan(
+            $sample * 0.03,
+            $companyWords[$worstCompany],
+            'The word "' . $worstCompany . '" appears in ' . $companyWords[$worstCompany] . ' of ' . $sample . ' company names.'
+        );
+    }
+
+    /** @return list<string> */
+    private static function words(string $name): array
+    {
+        return array_values(array_filter(preg_split('/[^a-z0-9]+/i', mb_strtolower($name)) ?: []));
+    }
 }

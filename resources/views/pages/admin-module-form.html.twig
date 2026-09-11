@@ -62,7 +62,9 @@
 								</div>
 							</div>
 						</div>
-						<button class="btn btn-primary mt-4" type="submit">{{ module.id ? 'Save module' : 'Create module' }}</button>
+						<div class="cl-form-actions">
+							<button class="btn btn-primary" type="submit">{{ module.id ? 'Save module' : 'Create module' }}</button>
+						</div>
 					</div>
 				</form>
 				{% if module.id %}

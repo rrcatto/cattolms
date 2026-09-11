@@ -51,14 +51,34 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account', $byKey['account']['href'] ?? null);
         self::assertSame('/logout', $byKey['signout']['href'] ?? null);
 
+        // The Account menu is three levels since 2026/09/10: Profile is a pop-out holding Personal
+        // Particulars, Email Addresses and Social Media. Every entry is collected regardless of
+        // depth, as the Company menu below already does - what matters is that a section is
+        // reachable, not which level it is reachable from.
         $accountChildren = [];
-        foreach ((array) ($byKey['account']['children'] ?? []) as $child) $accountChildren[(string) $child['key']] = $child;
+        foreach ((array) ($byKey['account']['children'] ?? []) as $child) {
+            $accountChildren[(string) $child['key']] = $child;
+            foreach ((array) ($child['children'] ?? []) as $grandchild) {
+                $accountChildren[(string) $grandchild['key']] = $grandchild;
+            }
+        }
         self::assertSame('/account', $accountChildren['account-all']['href'] ?? null);
         self::assertSame('/account/dashboard', $accountChildren['account-dashboard']['href'] ?? null);
+        self::assertSame('/account/profile', $accountChildren['account-profile-group']['href'] ?? null);
         self::assertSame('/account/profile', $accountChildren['account-profile']['href'] ?? null);
+        self::assertSame('/account/emails', $accountChildren['account-emails']['href'] ?? null);
+        self::assertSame('/account/social', $accountChildren['account-social']['href'] ?? null);
         self::assertSame('/account/library', $accountChildren['account-learning']['href'] ?? null);
         self::assertSame('/account/sessions', $accountChildren['account-sessions']['href'] ?? null);
         self::assertSame('/account/activity', $accountChildren['account-activity']['href'] ?? null);
+
+        // Profile is a group, not a leaf. If it ever stops carrying children the three pages become
+        // three more siblings in a menu of six, which is the shape the owner asked to be rid of.
+        self::assertCount(
+            3,
+            (array) ($accountChildren['account-profile-group']['children'] ?? []),
+            'Profile must hold Personal Particulars, Email Addresses and Social Media.'
+        );
 
         // The Company menu is three levels since v0.6, for the reason Administration is: eight flat
         // destinations is a list to read rather than a structure to navigate. Every entry is
@@ -203,7 +223,14 @@ final class NavigationContractTest extends TestCase
         $footer = (string) file_get_contents($root . '/partials/footer.html.twig');
         self::assertStringContainsString('navigation', $base);
         self::assertStringContainsString('navigation', $nav);
-        self::assertStringContainsString('footer_navigation', $footer);
+
+        // The footer is core's markup now, so the theme delegates rather than repeating it. What
+        // this asserted before - that the theme's own footer read footer_navigation - was a proxy
+        // for "the footer is not a hard-coded menu", and delegation satisfies that more strongly:
+        // there is no theme markup left to hard-code anything into.
+        self::assertStringContainsString('@platform/partials/site-footer.html.twig', $footer);
+        $coreFooter = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/site-footer.html.twig');
+        self::assertStringContainsString('footer_navigation', $coreFooter);
         self::assertStringNotContainsString('href="/admin" data-nav-item="administration"', $nav);
         self::assertStringNotContainsString('href="/company" data-nav-item="company"', $nav);
     }
@@ -226,7 +253,10 @@ final class NavigationContractTest extends TestCase
 
         self::assertStringContainsString('child.children|length > 0', $nav, 'A menu child may hold children and the theme must render them.');
         self::assertStringContainsString('grandchild.href', $nav);
-        self::assertStringContainsString('class="nav-group"', $nav);
+        // Asserted as a class rather than a whole attribute, for the reason given below about the
+        // panel: the group also carries its active state now, so the entry leading to the page
+        // being read can be marked.
+        self::assertMatchesRegularExpression('/class="[^"]*\bnav-group\b[^"]*"/', $nav);
         // The panel may carry more than one class - it also marks itself as a navigation surface so
         // the generated palette leaves its text colour alone - so the class is asserted, not the
         // whole attribute.
@@ -250,10 +280,101 @@ final class NavigationContractTest extends TestCase
         self::assertStringNotContainsString('nav-subpanel', $js);
     }
 
+    /**
+     * Every workspace menu opens the same way: All sections, then the dashboard.
+     *
+     * Owner's instruction, 2026/09/11. The point is that the first two entries mean the same thing
+     * in all three menus, so this asserts the top-level order rather than mere reachability - which
+     * the hierarchy test above already covers, and which stayed true while the Account menu had
+     * Profile sitting above its own dashboard.
+     */
+    public function testEveryWorkspaceMenuOpensWithAllSectionsThenTheDashboard(): void
+    {
+        $method = new ReflectionMethod(ThemeRenderer::class, 'navigation');
+        $items = $method->invoke($this->renderer(), [
+            'active_nav' => 'admin',
+            'is_authenticated' => true,
+            'is_platform_admin' => true,
+            'permissions' => (new PermissionCatalog())->keys(),
+        ], 'csrf-example');
+
+        $byKey = [];
+        foreach ($items as $item) {
+            $byKey[(string) $item['key']] = $item;
+        }
+
+        foreach (['company' => 'company', 'administration' => 'admin', 'account' => 'account'] as $menu => $prefix) {
+            $children = array_values((array) ($byKey[$menu]['children'] ?? []));
+            self::assertNotSame([], $children, $menu . ' has no menu.');
+
+            self::assertSame(
+                $prefix . '-all',
+                (string) ($children[0]['key'] ?? ''),
+                'The ' . $menu . ' menu must open with its All sections entry.'
+            );
+            self::assertSame(
+                'All sections',
+                (string) ($children[0]['label'] ?? ''),
+                'Every workspace menu names that entry the same way.'
+            );
+            self::assertSame(
+                $prefix . '-dashboard',
+                (string) ($children[1]['key'] ?? ''),
+                'The dashboard is the second entry of the ' . $menu . ' menu, before any group.'
+            );
+        }
+    }
+
+    /**
+     * Account reads: all sections, the dashboard, who you are, then what you are doing.
+     *
+     * Profile is third rather than second. It was second, above the dashboard, because it was
+     * spliced in at a fixed index instead of being composed in order.
+     */
+    public function testTheAccountMenuIsOrderedAllSectionsDashboardProfileThenTheRest(): void
+    {
+        $method = new ReflectionMethod(ThemeRenderer::class, 'navigation');
+        $items = $method->invoke($this->renderer(), [
+            'active_nav' => 'account',
+            'is_authenticated' => true,
+            'is_platform_admin' => true,
+            'permissions' => (new PermissionCatalog())->keys(),
+        ], 'csrf-example');
+
+        $account = [];
+        foreach ($items as $item) {
+            if ((string) $item['key'] === 'account') {
+                $account = array_values((array) ($item['children'] ?? []));
+            }
+        }
+
+        $keys = array_map(static fn(array $child): string => (string) $child['key'], $account);
+
+        self::assertSame(
+            [
+                'account-all',
+                'account-dashboard',
+                'account-profile-group',
+                'account-learning',
+                'account-sessions',
+                'account-activity',
+            ],
+            $keys,
+            'The Account menu order is the owner\'s, and Profile is a pop-out in third place.'
+        );
+
+        // Third place is only correct while Profile is still a pop-out; flattened, it would be
+        // three more siblings sitting between the dashboard and the library.
+        self::assertCount(3, (array) ($account[2]['children'] ?? []));
+    }
+
     public function testNavigationDocumentationDefinesAccountCompanyAndAdministrationMenus(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2) . '/docs/THEME-SDK.md');
-        foreach (['Dashboard','Profile','My Learning','Sessions','Activity','Company','People','Course Requests','Course Credits','Administration','Roles & ACL','Themes','Settings','footer_navigation'] as $label) {
+        // The labels asserted here are the ones the section registries actually issue. "My Learning"
+        // stood here while the registry said "My Course Library", so the documentation and the test
+        // agreed with each other and neither agreed with the platform.
+        foreach (['All sections','Dashboard','Profile','My Course Library','Sessions','Activity','Company','People','Course Requests','Course Credits','Administration','Roles & ACL','Themes','Settings','footer_navigation'] as $label) {
             self::assertStringContainsString($label, $doc);
         }
     }

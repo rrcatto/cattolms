@@ -14,7 +14,7 @@ known, and derives the offset, the "Showing X-Y of Z / Page N of M" display valu
 adaptive numbered-page window the shared control renders.
 
 Architectural boundary: this is a pure value object. It contains no SQL, no PostgreSQL
-knowledge, no F3 template knowledge and no route knowledge. Repositories consume only its
+knowledge, no template knowledge and no route knowledge. Repositories consume only its
 integer limit/offset; services map its scalars onto dataset-prefixed view variables.
 
 Usage order matters. The total must be counted before the row query runs, because an

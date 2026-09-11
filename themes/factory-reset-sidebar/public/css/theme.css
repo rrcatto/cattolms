@@ -1,0 +1,288 @@
+/* Factory Reset Sidebar 1.0.1
+   Child variant of Factory Reset 1.0.1.
+   Palette-enabled: Catto Learning supplies --cl-* variables after automatic
+   darkest-to-lightest sorting. Layout and visual treatment remain theme-owned. */
+
+:root{
+  --fs-sidebar-width:286px;
+  --fs-page:#E1E5EE;
+  --fs-dark:#2A324B;
+  --fs-mid:#767B91;
+  --fs-accent:#F7C59F;
+  --fs-light:#C7CCDB;
+  --fs-text:#2A324B;
+  --fs-surface:#fff;
+}
+
+.factory-sidebar-theme{background:var(--cl-page-bg,var(--fs-page));color:var(--cl-darkest,var(--fs-text))}
+/* The shell is a grid: sidebar and main side by side, footer spanning both.
+   It used to be the parent's fixed sidebar with the footer inside .main, so the dark sidebar ran
+   down the left to the bottom of the viewport and the dark footer sat to its right, meeting in an
+   L. A grid puts the footer under both columns, which is what a page-wide footer means. */
+.fs-shell{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:var(--fs-sidebar-width) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr) auto;
+  grid-template-areas:"sidebar main" "footer footer";
+}
+.fs-sidebar.sidebar{
+  grid-area:sidebar;
+  /* Sticky in its own column rather than fixed to the viewport: fixed took it out of the grid, and
+     a column that is not in the grid cannot have a footer placed beneath it. */
+  position:sticky!important;
+  inset:auto!important;
+  top:0;
+  align-self:start;
+  height:100vh;
+  overflow-y:auto;
+  width:var(--fs-sidebar-width);
+  padding:22px 16px 26px;
+  background:var(--cl-sidebar-bg,var(--fs-dark))!important;
+  color:var(--cl-on-color-1,#fff)!important;
+  border-right:0;
+  box-shadow:14px 0 34px rgba(20,27,38,.14);
+  /* position:sticky makes this a stacking context, and .fs-main follows it in the document - so
+     without a z-index the whole main column, page background included, painted over anything the
+     sidebar tried to open beside it. The pop-out menus were not missing; they were behind the page.
+     Stated on the rail rather than on the panel, because a z-index inside a stacking context can
+     never lift its contents out of it. */
+  z-index:70;
+}
+.fs-main.main{z-index:1}
+.fs-sidebar .brand{padding:2px 8px 22px;color:var(--cl-on-color-1,#fff)}
+.fs-sidebar .brand-mark{background:var(--cl-accent,var(--fs-accent));color:var(--cl-on-color-3,var(--fs-dark));box-shadow:none}
+.fs-sidebar .brand strong{font-size:1rem;color:var(--cl-on-color-1,#fff)!important}
+.fs-sidebar .brand small{display:block;margin-top:2px;color:color-mix(in srgb,var(--cl-on-color-1,#fff) 66%,transparent);font-size:.72rem}
+.fs-sidebar .side-label{color:color-mix(in srgb,var(--cl-on-color-1,#fff) 52%,transparent);padding-top:16px}
+.fs-sidebar .nav-link{color:color-mix(in srgb,var(--cl-on-color-1,#fff) 82%,transparent);border:1px solid transparent}
+.fs-sidebar .nav-link:hover{background:color-mix(in srgb,var(--cl-dark,var(--fs-mid)) 60%,transparent);color:var(--cl-on-color-1,#fff)}
+.fs-sidebar .nav-link.active,
+.fs-sidebar .fs-submenu.active>summary{
+  background:var(--cl-active-bg,var(--fs-mid))!important;
+  color:var(--cl-on-color-2,#fff)!important;
+  border-color:color-mix(in srgb,var(--cl-accent,var(--fs-accent)) 72%,transparent)!important;
+  box-shadow:inset 4px 0 var(--cl-accent,var(--fs-accent))!important;
+}
+.fs-sidebar .nav-icon{color:inherit;opacity:.78}
+.fs-submenu{margin:2px 0}
+.fs-submenu>summary{list-style:none;cursor:pointer}
+.fs-submenu>summary::-webkit-details-marker{display:none}
+.fs-submenu .fs-chevron{margin-left:auto;transition:transform .16s ease}
+.fs-submenu[open] .fs-chevron{transform:rotate(180deg)}
+/* The sub-menu pops out beside the rail rather than expanding inside it.
+
+   Expanding inline pushed everything below it down, and with several groups open the rail became a
+   long wall of text that scrolled far past the viewport - which is the one thing a fixed sidebar
+   exists to avoid. Opening to the side keeps the rail the same height however many groups are open.
+
+   The rail is position:fixed and its own scroll container, so the panel is positioned against the
+   shell rather than the rail: a child of a scrolling box cannot escape it. Narrow screens keep the
+   inline list, where there is no room to the side to open into. */
+.fs-submenu-panel{display:grid;gap:2px;margin:4px 0 7px 30px;padding:5px 0 4px 12px;border-left:1px solid color-mix(in srgb,var(--cl-on-color-1,#fff) 22%,transparent)}
+@media(min-width:961px){
+	/* .fs-sidebar.sidebar sets overflow-y:auto, and a one-class override never reached it - so the
+	   rail stayed its own scroll box and clipped every pop-out at its right edge. On a wide screen
+	   the rail holds a single column of top-level items and fits the viewport, so it does not need
+	   to scroll; the inline list on a narrow screen still does, and keeps the scroll box there. */
+	.fs-sidebar.sidebar{overflow:visible}
+	.fs-submenu{position:static}
+	.fs-submenu[open]>.fs-submenu-panel{
+		position:absolute;
+		left:calc(100% - 6px);
+		min-width:15rem;
+		margin:0;
+		padding:8px;
+		z-index:5;
+		border-left:0;
+		border-radius:12px;
+		background:var(--cl-sidebar-bg,var(--fs-dark));
+		box-shadow:0 18px 44px rgba(9,28,42,.34);
+		outline:1px solid color-mix(in srgb,var(--cl-on-color-1,#fff) 16%,transparent);
+	}
+	.fs-submenu{position:relative}
+}
+.fs-submenu-panel a{display:block;padding:7px 9px;border-radius:7px;color:color-mix(in srgb,var(--cl-on-color-1,#fff) 78%,transparent);font-size:.78rem;font-weight:680}
+.fs-submenu-panel a:hover{background:color-mix(in srgb,var(--cl-dark,var(--fs-mid)) 64%,transparent);color:var(--cl-on-color-1,#fff)}
+
+.fs-main.main{grid-area:main;margin-left:0!important;min-width:0;display:flex;flex-direction:column}
+.fs-topbar.topbar{
+  min-height:66px;
+  padding:11px 28px;
+  background:color-mix(in srgb,var(--cl-lightest,var(--fs-page)) 82%,white)!important;
+  color:var(--cl-darkest,var(--fs-dark));
+  border-bottom:1px solid var(--cl-border,var(--fs-light));
+}
+.fs-topbar-left{display:flex;align-items:center;gap:13px;min-width:0}
+.fs-breadcrumbs{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden;font-size:.82rem}
+.fs-breadcrumbs a{color:var(--cl-dark,var(--fs-mid));font-weight:700}
+.fs-breadcrumbs a:hover{color:var(--cl-darkest,var(--fs-dark));text-decoration:underline}
+.fs-breadcrumb-separator{color:color-mix(in srgb,var(--cl-dark,var(--fs-mid)) 48%,transparent)}
+.fs-breadcrumb-current{font-weight:850;color:var(--cl-darkest,var(--fs-dark));overflow:hidden;text-overflow:ellipsis}
+.fs-account-actions{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.fs-account-actions form{margin:0}
+.fs-profile-link{font-size:.82rem;font-weight:800;color:var(--cl-dark,var(--fs-mid))}
+.fs-profile-link:hover{color:var(--cl-darkest,var(--fs-dark));text-decoration:underline}
+
+.fs-content.content{width:100%;max-width:1680px;margin:0 auto;flex:1;padding:30px 34px 44px}
+.factory-sidebar-theme .card,
+.factory-sidebar-theme .panel,
+.factory-sidebar-theme .stat-card{
+  background:color-mix(in srgb,var(--cl-lightest,var(--fs-page)) 42%,white);
+  border-color:var(--cl-border,var(--fs-light));
+}
+.factory-sidebar-theme .btn-primary{
+  background:var(--cl-button-bg,var(--fs-accent))!important;
+  border:1px solid var(--cl-button-border,var(--fs-mid))!important;
+  color:var(--cl-on-color-3,var(--fs-dark))!important;
+  box-shadow:0 2px 0 color-mix(in srgb,var(--cl-button-border,var(--fs-mid)) 70%,black);
+}
+.factory-sidebar-theme .btn-primary:hover{transform:translateY(-1px);box-shadow:0 3px 0 color-mix(in srgb,var(--cl-button-border,var(--fs-mid)) 74%,black)}
+.factory-sidebar-theme .cl-hero,
+.factory-sidebar-theme .cl-page-head,
+.factory-sidebar-theme .cl-feature-band{
+  background-color:var(--cl-large-block-bg,var(--fs-dark))!important;
+  color:var(--cl-on-color-1,#fff)!important;
+}
+.factory-sidebar-theme .cl-hero .cl-kicker{color:var(--cl-accent,var(--fs-accent))}
+.factory-sidebar-theme .course-cover,
+.factory-sidebar-theme .visual{background:var(--cl-darkest,var(--fs-dark))}
+
+/* The footer is a different colour from the sidebar, deliberately.
+
+   Both used to resolve to the same value - the sidebar to --cl-sidebar-bg and the footer to
+   --cl-darkest, and under the managed palette both of those are colour 1, while the theme's own
+   fallbacks were both --fs-dark. Two adjoining surfaces in one colour read as a single L-shaped
+   block wrapped around the content rather than as a rail and a footer, and the sidebar appeared to
+   have no bottom.
+
+   Taking the footer one step lighter is what makes the sidebar visibly end at it. The accent rule
+   above the footer stays, so the boundary is stated twice: by tone and by line. */
+/* The footer is a different surface from the sidebar, not a different shade of it.
+
+   It was the palette's mid tone against the sidebar's darkest, which is a real difference in
+   lightness and no difference at all in kind: two dark blue-greys meeting at a corner still read as
+   one dark region. It is now a light surface carrying the platform's slanted texture, with the
+   accent rule above it - so where the sidebar ends and the footer begins is not a matter of
+   noticing a shade. Every colour inside it is restated below, because the ink was white. */
+.fs-footer{
+  grid-area:footer;
+  position:relative;
+  isolation:isolate;
+  margin-top:0;
+  padding:44px 34px 22px;
+  background:var(--cl-lightest,var(--fs-page));
+  color:var(--cl-darkest,var(--fs-text));
+  border-top:4px solid var(--cl-accent,var(--fs-accent));
+  --cl-texture-dark:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 9%,transparent);
+  --cl-texture-light:transparent;
+}
+.fs-footer::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:repeating-linear-gradient(var(--cl-texture-angle,45deg),var(--cl-texture-dark) 0 var(--cl-texture-band,10px),var(--cl-texture-light) var(--cl-texture-band,10px) calc(var(--cl-texture-band,10px) * 2));
+}
+.fs-footer>*{position:relative;z-index:1}
+.fs-footer-grid{max-width:1500px;margin:0 auto;display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:34px}
+/* Ink on the footer's light ground. Every one of these was a tint of white, because the footer was
+   dark; they are tints of the darkest palette colour now, resolved the same way. */
+.fs-footer h2{margin:0 0 13px;font-size:.76rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cl-darkest,var(--fs-text))}
+.fs-footer p{max-width:48ch;color:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 72%,transparent);font-size:.82rem;line-height:1.6}
+.fs-footer section>a{display:block;width:max-content;max-width:100%;margin:8px 0;color:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 82%,transparent);font-size:.82rem}
+.fs-footer section>a:hover{color:var(--cl-darkest,var(--fs-text));text-decoration:underline}
+.fs-footer-brand{display:flex;align-items:center;gap:11px}
+.fs-footer-brand strong{display:block;color:var(--cl-darkest,var(--fs-text))}
+.fs-footer .brand-mark{background:var(--cl-sidebar-bg,var(--fs-dark));color:var(--cl-on-color-1,#fff)}
+.fs-footer-brand span:last-child{display:block;margin-top:2px;font-size:.72rem;color:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 62%,transparent)}
+.fs-socials{display:flex;gap:9px;flex-wrap:wrap}
+.fs-socials span{width:36px;height:36px;display:grid;place-items:center;border-radius:9px;border:1px solid color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 26%,transparent);background:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 7%,transparent);color:var(--cl-darkest,var(--fs-text))}
+.fs-socials svg{width:19px;height:19px;fill:currentColor}
+.fs-social-note{font-size:.7rem!important;color:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 58%,transparent)}
+.fs-footer-bottom{max-width:1500px;margin:30px auto 0;padding-top:17px;border-top:1px solid color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 20%,transparent);font-size:.72rem;color:color-mix(in srgb,var(--cl-darkest,var(--fs-text)) 56%,transparent)}
+
+.cl-honeypot{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}
+.contact-card{max-width:900px}
+.contact-form textarea{resize:vertical;min-height:180px}
+
+@media(max-width:1080px){
+  .fs-footer-grid{grid-template-columns:1.4fr 1fr 1fr}
+  .fs-footer-grid section:last-child{grid-column:2/4}
+}
+@media(max-width:860px){
+  .fs-sidebar.sidebar{transform:translateX(-100%);transition:transform .2s ease}
+  .fs-sidebar.sidebar.open{transform:none}
+  .fs-main.main{margin-left:0}
+  .fs-topbar.topbar{padding:10px 18px}
+  .fs-content.content{padding:22px 18px 34px}
+  .fs-footer{padding:36px 20px 20px}
+  .fs-footer-grid{grid-template-columns:1fr 1fr}
+  .fs-footer-grid section:last-child{grid-column:auto}
+}
+@media(max-width:620px){
+  .fs-account-actions .fs-profile-link{display:none}
+  .fs-breadcrumbs{font-size:.76rem}
+  .fs-footer-grid{grid-template-columns:1fr}
+}
+
+/* Icon sizing, v1.0.2. Both dimensions; an SVG with neither renders at 300x150. */
+.nav-icon{width:18px;height:18px;flex:0 0 auto;vertical-align:-.15em}
+
+/* Third navigation level, v1.0.3. Core owns the flyout; this gives its panel the sidebar's dark
+   surface, because core defaults it to the light page surface and this rail is dark. It opens to
+   the right, over the content area, which is where a left rail has room. */
+.fs-submenu-panel .nav-subpanel{background:var(--cl-darkest,var(--fs-dark,#111827));border:1px solid color-mix(in srgb,var(--cl-on-color-1,#fff) 18%,transparent);color:var(--cl-on-color-1,#fff);box-shadow:18px 0 44px rgba(0,0,0,.34)}
+.fs-submenu-panel .nav-group+.nav-group{border-top-color:color-mix(in srgb,var(--cl-on-color-1,#fff) 18%,transparent)}
+.fs-submenu-panel .nav-group-label{color:color-mix(in srgb,var(--cl-on-color-1,#fff) 78%,transparent);font-size:.7rem;letter-spacing:.08em;opacity:.75}
+.fs-submenu-panel .nav-group:hover>.nav-group-label,.fs-submenu-panel .nav-group:focus-within>.nav-group-label{color:var(--cl-on-color-1,#fff);opacity:1}
+
+/* Third-level navigation nests rather than flies out.
+
+   The sidebar scrolls, and a scrolling box clips anything drawn outside it - which is exactly what
+   a flyout is. The panels were rendered and then clipped away, so the third level looked like a
+   button that did nothing. Nesting is what a sidebar is for: its space runs downwards. */
+.fs-sidebar .nav-group{display:block;position:static}
+/* Core dims this to 62% opacity for the flyout it was designed for. Compounded with a 74% white
+   it came to 3.5:1 against the sidebar, below the 4.5:1 a heading of this size needs. Opacity is
+   reset and the colour raised; it now measures 7.05:1 at worst across the shipped palettes. */
+.fs-sidebar .nav-group-label{
+  display:flex;align-items:center;gap:10px;width:100%;opacity:1;
+  border:0;background:transparent;padding:9px 11px;border-radius:9px;
+  color:color-mix(in srgb,var(--cl-on-color-1,#fff) 78%,transparent);
+  font:inherit;font-weight:700;text-align:left}
+.fs-sidebar .nav-group:hover>.nav-group-label{opacity:1}
+.fs-sidebar .nav-group-label:hover{background:color-mix(in srgb,var(--cl-dark,var(--fs-mid)) 60%,transparent);color:var(--cl-on-color-1,#fff)}
+.fs-sidebar .nav-group-caret{margin-left:auto;opacity:.6;transform:rotate(90deg)}
+.fs-sidebar .nav-subpanel{
+  position:static!important;display:grid!important;gap:2px;
+  margin:2px 0 6px 18px;padding:4px 0 4px 11px;
+  border:0!important;border-left:1px solid color-mix(in srgb,var(--cl-on-color-1,#fff) 18%,transparent)!important;
+  background:transparent!important;box-shadow:none!important;min-width:0!important}
+.fs-sidebar .nav-sublink{
+  display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;
+  color:color-mix(in srgb,var(--cl-on-color-1,#fff) 68%,transparent);font-size:.84rem}
+.fs-sidebar .nav-sublink:hover{background:color-mix(in srgb,var(--cl-dark,var(--fs-mid)) 55%,transparent);color:var(--cl-on-color-1,#fff)}
+
+/* The accordions core renders, in this theme's colours. Without these the light default card sat
+   on the light content area with no edge at all, which is the "accordion styling" defect. */
+.factory-sidebar-theme .cl-admin-section,
+.factory-sidebar-theme .cl-category-branch,
+.factory-sidebar-theme .cl-help-group{
+  border-color:var(--cl-border,#d7dee7);
+  background:var(--cl-page-surface,#fff);
+  box-shadow:0 1px 2px rgba(20,27,38,.05)}
+.factory-sidebar-theme .cl-admin-section-summary:hover,
+.factory-sidebar-theme .cl-category-summary:hover,
+.factory-sidebar-theme .cl-help-group>summary:hover{background:color-mix(in srgb,var(--cl-accent,var(--fs-accent)) 7%,transparent)}
+.factory-sidebar-theme .cl-admin-section[open]>.cl-admin-section-summary,
+.factory-sidebar-theme .cl-category-branch[open]>.cl-category-summary,
+.factory-sidebar-theme .cl-help-group[open]>summary{box-shadow:inset 3px 0 var(--cl-accent,var(--fs-accent))}
+
+@media (max-width:900px){
+  /* One column, sidebar above the content, and it stops being sticky: a full-height sticky column
+     on a phone is a screen of navigation the reader has to scroll past to reach the page. */
+  .fs-shell{grid-template-columns:minmax(0,1fr);grid-template-areas:"sidebar" "main" "footer"}
+  .fs-sidebar.sidebar{position:static!important;height:auto;width:auto}
+}

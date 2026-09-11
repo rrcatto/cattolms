@@ -24,69 +24,86 @@ Changelog:
   2026/09/07 19:00 SAST
   - Created by splitting Company Courses into what the company owns and what it has bought.
 #}
-{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'training', ds_label: 'Search training courses', ds_value: training_search, ds_action: '/company/training'} %}
-<div id="training-region" data-server-search-target>
-	<div id="training-results">
-		{% if training_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: training_pagination} %}
-		{% endif %}
-		<div class="notice">
-			<span>ⓘ</span>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
 			<div>
-				<strong>Courses this company has bought access to.</strong> Each row shows how many seats were purchased and how many are still free to assign. Courses this company owns are under <a href="/company/courses">Courses Created</a> and cost nothing to train staff on.
-			</div>
-		</div>
-		{% if training %}
-			<div class="table-wrap">
-				<table>
-					<thead>
-						<tr>
-							{% for sh in training_sort_headers %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: training_region, sort_results: training_results} %}
-							{% endfor %}
-						</tr>
-					</thead>
-					<tbody>
-						{% for course in training %}
-							<tr>
-								<td>
-									<strong>{{ course.title }}</strong>
-									<div class="muted small">
-										{{ course.owner_company_name ?: 'Platform course' }}
-									</div>
-								</td>
-								<td>
-									{{ course.category_name ?: '—' }}
-								</td>
-								<td>
-									{{ course.credits_bought }}
-								</td>
-								<td>
-									<strong>{{ course.credits_bought - course.credits_used }}</strong>
-								</td>
-								<td>
-									{{ course.staff_enrolled }}
-								</td>
-								<td>
-									{{ course.staff_completed }}
-								</td>
-							</tr>
-						{% endfor %}
-					</tbody>
-				</table>
-			</div>
-		{% else %}
-			<div class="empty">
-				<h3>
-					No training courses yet
-				</h3>
+				<div class="eyebrow">
+					Courses Bought
+				</div>
+				<h2>
+					Courses bought for staff
+				</h2>
 				<p>
-					When this company buys access to a course it does not own, it appears here with the seats it holds.
+					Courses this company has bought access to for its staff.
 				</p>
 			</div>
-		{% endif %}
-		{% if training_pagination %}
-			{% include '@platform/partials/pagination.html.twig' with {pg: training_pagination} %}
-		{% endif %}
+		</div>
+		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'training', ds_label: 'Search training courses', ds_value: training_search, ds_action: '/company/training'} %}
+		<div id="training-region" data-server-search-target>
+			<div id="training-results">
+				{% if training_pagination %}
+					{% include '@platform/partials/pagination.html.twig' with {pg: training_pagination} %}
+				{% endif %}
+				<div class="notice">
+					<span>ⓘ</span>
+					<div>
+						<strong>Courses this company has bought access to.</strong> Each row shows how many seats were purchased and how many are still free to assign. Courses this company owns are under <a href="/company/courses">Courses Created</a> and cost nothing to train staff on.
+					</div>
+				</div>
+				{% if training %}
+					<div class="table-wrap">
+						<table>
+							<thead>
+								<tr>
+									{% for sh in training_sort_headers %}
+										{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: training_region, sort_results: training_results} %}
+									{% endfor %}
+								</tr>
+							</thead>
+							<tbody>
+								{% for course in training %}
+									<tr>
+										<td>
+											<strong>{{ course.title }}</strong>
+											<div class="muted small">
+												{{ course.owner_company_name ?: 'Platform course' }}
+											</div>
+										</td>
+										<td>
+											{{ course.category_name ?: '—' }}
+										</td>
+										<td>
+											{{ course.credits_bought }}
+										</td>
+										<td>
+											<strong>{{ course.credits_bought - course.credits_used }}</strong>
+										</td>
+										<td>
+											{{ course.staff_enrolled }}
+										</td>
+										<td>
+											{{ course.staff_completed }}
+										</td>
+									</tr>
+								{% endfor %}
+							</tbody>
+						</table>
+					</div>
+				{% else %}
+					<div class="empty">
+						<h3>
+							No training courses yet
+						</h3>
+						<p>
+							When this company buys access to a course it does not own, it appears here with the seats it holds.
+						</p>
+					</div>
+				{% endif %}
+				{% if training_pagination %}
+					{% include '@platform/partials/pagination.html.twig' with {pg: training_pagination} %}
+				{% endif %}
+			</div>
+		</div>
 	</div>
 </div>

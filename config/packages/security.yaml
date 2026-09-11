@@ -41,9 +41,9 @@ security:
         # is public. Routes that need an identity say so themselves with #[IsGranted].
         #
         # Not stateless, but not session-managing either: App::run() opens the PostgreSQL-backed
-        # session before either router sees the request, and AuthService owns it. Symfony reads that
-        # identity rather than keeping one of its own, so a Symfony route and a Fat-Free route
-        # cannot disagree about who is signed in while the two coexist.
+        # session before the kernel sees the request, and AuthService owns it. Symfony reads that
+        # identity rather than keeping one of its own, so the web firewall and the API firewall
+        # cannot disagree about who is signed in.
         web:
             pattern: ^/
             stateless: true

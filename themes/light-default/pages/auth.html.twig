@@ -1,0 +1,10 @@
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+{#
+  Passwordless authentication family: login, link-sent and company registration.
+  The platform-owned functional page body is preserved exactly as supplied.
+#}
+	<div class="ld-page ld-page-auth ld-page-centred" data-ld-family="auth">
+		{{ block('page_body') }}
+	</div>
+{% endblock %}

@@ -1,52 +1,59 @@
-<div class="section-head">
-	<div>
-		<h2>
-			Theme Manager
-		</h2>
-		<p>
-			Install immutable Theme Package 3.0 ZIP releases, preview them, switch the live theme, or uninstall an inactive theme.
-		</p>
-	</div>
-	<a class="btn btn-ghost btn-sm" href="/help#theme-sdk">Theme SDK help</a>
-</div>
-<div class="notice">
-	<span>i</span>
-	<div>
-		<strong>The LMS does not edit or export themes.</strong>
-		<br>
-		Theme authors maintain source externally and publish each update as a new version. Installed name + version releases remain side-by-side. Factory Reset is the default theme, not a fallback for unrelated themes.
-	</div>
-</div>
-<div class="toolbar section">
-	<div>
-		<h3 style="margin:0">
-			Installed themes
-		</h3>
-		<p class="muted small">
-			The filesystem is authoritative. PostgreSQL keeps a rebuildable metadata registry so parent/child relationships and theme status can be presented clearly.
-		</p>
-	</div>
-	<div class="row-actions">
-		<form action="/admin/themes/resync" method="post">
-			<input type="hidden" name="csrf" value="{{ csrf }}">
-			<button class="btn btn-soft" type="submit">Re-sync themes</button>
-		</form>
-		<details>
-			<summary class="btn btn-primary">
-				Import theme ZIP
-			</summary>
-			<form action="/admin/themes/import" method="post" enctype="multipart/form-data" class="card theme-popover-form">
-				<input type="hidden" name="csrf" value="{{ csrf }}">
-				<div class="field">
-					<label>Theme Package 3.0 ZIP</label>
-					<input type="file" name="theme_file" accept=".zip,application/zip" required>
-					<div class="help">
-						The package is validated and inspected before installation. A repaired theme may reuse the same name and version after the defective installed copy has been uninstalled.
-					</div>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Themes
 				</div>
-				<button class="btn btn-primary cl-mt-2">Inspect package</button>
-			</form>
-		</details>
+				<h2>
+					Theme Manager
+				</h2>
+				<p>
+					Install immutable Theme Package 3.0 ZIP releases, preview them, switch the live theme, or uninstall an inactive theme.
+				</p>
+			</div>
+			<a class="btn btn-ghost btn-sm" href="/help#theme-sdk">Theme SDK help</a>
+		</div>
+		<div class="notice">
+			<span>i</span>
+			<div>
+				<strong>The LMS does not edit or export themes.</strong>
+				<br>
+				Theme authors maintain source externally and publish each update as a new version. Installed name + version releases remain side-by-side. Factory Reset is the default theme, not a fallback for unrelated themes.
+			</div>
+		</div>
+		<div class="toolbar section">
+			<div>
+				<h3 style="margin:0">
+					Installed themes
+				</h3>
+				<p class="muted small">
+					The filesystem is authoritative. PostgreSQL keeps a rebuildable metadata registry so parent/child relationships and theme status can be presented clearly.
+				</p>
+			</div>
+			<div class="row-actions">
+				<form action="/admin/themes/resync" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					<button class="btn btn-soft" type="submit">Re-sync themes</button>
+				</form>
+				<details>
+					<summary class="btn btn-primary">
+						Import theme ZIP
+					</summary>
+					<form action="/admin/themes/import" method="post" enctype="multipart/form-data" class="card theme-popover-form">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<div class="field">
+							<label>Theme Package 3.0 ZIP</label>
+							<input type="file" name="theme_file" accept=".zip,application/zip" required>
+							<div class="help">
+								The package is validated and inspected before installation. A repaired theme may reuse the same name and version after the defective installed copy has been uninstalled.
+							</div>
+						</div>
+						<button class="btn btn-primary cl-mt-2">Inspect package</button>
+					</form>
+				</details>
+			</div>
+		</div>
 	</div>
 </div>
 {% if theme_registry_out_of_sync %}
@@ -63,16 +70,16 @@
 	<table>
 		<thead>
 			<tr>
-				<th style="width:44%">
+				<th style="width:50%">
 					Theme
 				</th>
-				<th style="width:10%">
+				<th style="width:11%">
 					Version
 				</th>
-				<th style="width:12%">
+				<th style="width:10%">
 					Status
 				</th>
-				<th class="cell-actions" style="width:34%">
+				<th class="cell-actions" style="width:29%">
 					Actions
 				</th>
 			</tr>
@@ -148,6 +155,6 @@
 		</tbody>
 	</table>
 </div>
-<p class="small muted">
+<p class="small muted notice">
 	Theme source is stored on the filesystem. Catto Learning keeps only the selected active-theme identifier in application settings.
 </p>

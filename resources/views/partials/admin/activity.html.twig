@@ -10,8 +10,9 @@ Description:
   it is looking at: new events belong at the top of the first page and nowhere else, so
   prepending them onto page four would be inventing rows that do not belong there.
 
-  NOTE: never write an F3 tag in angle brackets inside a template comment. F3 parses its own
-  tags inside HTML comments, so a documented example compiles into a real tag.
+  WARNING: a template comment is not a safe place to document syntax. A comment delimiter
+  written inside a comment body ends the comment early and leaks the remainder onto the page.
+  Keep every comment plain prose: no comment delimiters and no code, not even to document one.
 Changelog:
   2026/09/04 20:49 SAST
   - Pagination 2.0: wrapped the table and control in the shared results region and told the live
@@ -23,14 +24,21 @@ Changelog:
   2026/08/20 20:02 SAST
   - Replaced the whole-table select controls with bounded entity lookups and added pagination.
 #}
-<div class="section-head">
-	<div>
-		<h2>
-			Activity
-		</h2>
-		<p>
-			A chronological view of audited activity across the LMS. Filter it to the people, companies, courses or event types you need.
-		</p>
+<div class="grid section">
+	<div class="card">
+		<div class="section-head">
+			<div>
+				<div class="eyebrow">
+					Activity
+				</div>
+				<h2>
+					Activity
+				</h2>
+				<p>
+					A chronological view of audited activity across the LMS. Filter it to the people, companies, courses or event types you need.
+				</p>
+			</div>
+		</div>
 	</div>
 </div>
 <form class="card activity-filters" action="/admin/activity" method="get">

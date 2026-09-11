@@ -10,6 +10,13 @@
 # unless doctrine/orm is installed. Its absence here is the whole of turning the ORM off.
 doctrine:
     dbal:
+        # Off deliberately, and not only to save memory. With kernel.debug on, DoctrineBundle
+        # registers BacktraceDebugDataHolder, which retains every executed query *and a backtrace
+        # per query* for the lifetime of the request. WebProfilerBundle is not installed, so
+        # nothing can ever read any of it. On a bulk write - the Seed Database generator issues
+        # tens of thousands of inserts in one request - that is pure cost: it accounted for 9.5 MB
+        # of a 70 MB peak at 100,000 rows, and the backtrace capture is paid on every statement.
+        profiling: false
         driver: pdo_pgsql
         host: '%env(DB_HOST)%'
         port: '%env(int:DB_PORT)%'

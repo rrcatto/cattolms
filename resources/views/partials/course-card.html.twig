@@ -20,21 +20,46 @@ Description:
   The card is no longer one big stretched link: it carries several real links now, and a stretched
   link would swallow every one of them.
 Changelog:
+  2026/09/10 08:30 SAST
+  - The header carries the course name and the favourite star over the artwork, and the star toggles in place instead of reloading the page.
+  2026/09/10 02:25 SAST
+  - Labelled the tag row. A row of chips under a description reads as decoration until it says what it is.
   2026/09/09 17:10 SAST
   - Rebuilt to the owner's specification: cover, name, description, category breadcrumb, tags, price, level, module count, favourite and an explicit View course action. Access period removed.
   2026/09/09 05:00 SAST
   - Draws the generated cover where no image has been uploaded.
 #}
 <article class="card h-100 cl-course-card overflow-hidden">
-	{% if course.cover_media_public_id %}
-		<img src="/course-media/{{ course.cover_media_public_id }}" class="cl-course-cover" alt="">
-	{% elseif course.cover_svg is defined and course.cover_svg %}
-		<div class="cl-course-cover cl-course-cover-generated">{{ course.cover_svg|raw }}</div>
-	{% else %}
-		<div class="cl-course-cover cl-course-cover-placeholder">
-			<span>{{ course.cover_initial }}</span>
+{#
+	The header carries the course name and the favourite star, over the artwork. The owner's
+	instruction, 2026/09/10: the band at the top of a card was a picture and nothing else, so the
+	one thing a reader is looking for - which course is this - was below it in the body, and the
+	star was at the very bottom of the card.
+
+	The artwork is a background rather than content: it is decoration behind the two things that
+	matter, and a scrim keeps the title legible whatever colours the artwork happens to use.
+#}
+	<header class="cl-course-card-header">
+		<div class="cl-course-card-art" aria-hidden="true">
+			{% if course.cover_media_public_id %}
+				<img src="/course-media/{{ course.cover_media_public_id }}" class="cl-course-cover" alt="">
+			{% elseif course.cover_svg is defined and course.cover_svg starts with '<svg' %}
+				{{ course.cover_svg|raw }}
+			{% else %}
+				<div class="cl-course-cover-placeholder">
+					<span>{{ course.cover_initial|default(course.title|slice(0, 1)|upper) }}</span>
+				</div>
+			{% endif %}
 		</div>
-	{% endif %}
+		<div class="cl-course-card-headline">
+			<h3 class="cl-course-card-title">
+				<a href="/courses/{{ course.slug }}">{{ course.title }}</a>
+			</h3>
+			{% if can_favourite is defined and can_favourite %}
+				{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_return: favourite_return|default('/courses')} %}
+			{% endif %}
+		</div>
+	</header>
 	<div class="card-body cl-course-card-body">
 		{% if course.category_path is defined and course.category_path %}
 			<nav class="cl-course-crumbs" aria-label="Category">
@@ -44,9 +69,6 @@ Changelog:
 				{% endfor %}
 			</nav>
 		{% endif %}
-		<h3 class="cl-course-card-title">
-			<a href="/courses/{{ course.slug }}">{{ course.title }}</a>
-		</h3>
 		{% if course.summary %}
 			<p class="cl-course-card-summary">
 				{{ course.summary }}
@@ -54,6 +76,7 @@ Changelog:
 		{% endif %}
 		{% if course.tags is defined and course.tags %}
 			<div class="cl-course-card-tags">
+				<span class="cl-course-card-tags-label">Tags</span>
 				{% for course_tag in course.tags|slice(0, 4) %}
 					<a class="cl-tag-chip" href="/courses/tag/{{ course_tag.slug }}">{{ course_tag.name }}</a>
 				{% endfor %}
@@ -90,19 +113,6 @@ Changelog:
 			{% endif %}
 		</dl>
 		<div class="cl-course-card-foot">
-			{% if can_favourite is defined and can_favourite %}
-				<form action="/courses/favourite" method="post">
-					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<input type="hidden" name="course_id" value="{{ course.id }}">
-					<input type="hidden" name="return" value="{{ favourite_return|default('/courses') }}">
-					<button class="cl-favourite {{ course.is_favourite is defined and course.is_favourite ? 'is-on' : '' }}" type="submit"
-					        aria-pressed="{{ course.is_favourite is defined and course.is_favourite ? 'true' : 'false' }}"
-					        title="{{ course.is_favourite is defined and course.is_favourite ? 'Remove from favourites' : 'Add to favourites' }}">
-						<span aria-hidden="true">{{ course.is_favourite is defined and course.is_favourite ? '★' : '☆' }}</span>
-						<span class="cl-visually-hidden">{{ course.is_favourite is defined and course.is_favourite ? 'Remove from favourites' : 'Add to favourites' }}</span>
-					</button>
-				</form>
-			{% endif %}
 			<a class="btn btn-primary btn-sm" href="/courses/{{ course.slug }}">View course</a>
 		</div>
 	</div>

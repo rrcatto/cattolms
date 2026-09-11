@@ -36,6 +36,7 @@ namespace CattoLearning\Auth\Security;
 use CattoLearning\Api\Security\ApiUser;
 use CattoLearning\Auth\PermissionCatalog;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /** @extends Voter<string,mixed> */
@@ -50,7 +51,7 @@ final class PermissionVoter extends Voter
         return in_array($attribute, $this->catalog->keys(), true);
     }
 
-    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
+    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote = null): bool
     {
         $user = $token->getUser();
 
