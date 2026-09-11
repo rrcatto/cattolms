@@ -593,17 +593,18 @@ Core dims this to 62% opacity,which is fine on the flyout it was designed for an
   color:var(--ink-2,#355066);font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .rl-menu-panel .nav-group:hover>.nav-group-label{opacity:1}
 /* Third-level menus pop out to the side rather than nesting inline.
-Nested inline,a group with four children made the panel four rows taller whether or not anybody
-   wanted that group,and with three groups open the panel ran past the bottom of the window. The
-   panel is the positioning context and the group is static within it,so the sub-panel opens
-   against the panel's right edge on hover or focus. Owner's instruction,2026/09/10.
 
-   Narrow screens keep the inline list: there is no room to the side to open into.
+   Nested inline, a group with four children made the panel four rows taller whether or not anybody
+   wanted that group, and with three groups open the panel ran past the bottom of the window.
+   Owner's instruction, 2026/09/10.
 
-   The panel is already position:absolute,which is a positioning context in its own right,so it
-   needs no position:relative to anchor the sub-panel. Declaring one here re-declared the property
-   later in the sheet at equal specificity and so replaced the absolute positioning: the panel went
-   back into the flow and opening a menu grew the header instead of drawing over the page. */
+   Narrow screens keep the inline list: there is no room to the side to open into. The desktop
+   block below is where the flyout is positioned, and it anchors to the group rather than to the
+   panel - see the note there for why.
+
+   The panel itself must stay position:absolute. Re-declaring position on it later in this sheet at
+   equal specificity replaced that, put the panel back in the flow, and opening a menu grew the
+   header instead of drawing over the page. */
 .rl-menu-panel .nav-subpanel{
   position:static;display:grid;gap:1px;min-width:0;
   margin:0 0 0 12px;padding:0 0 0 10px;
@@ -615,14 +616,21 @@ Nested inline,a group with four children made the panel four rows taller whether
 }
 @media(min-width:821px){
 .rl-menu-panel{overflow:visible}
-.rl-menu-panel .nav-group{position:static}
-/* The flyout opens flush against the panel, not six pixels away from it.
+/* The group is the positioning context, not the panel.
 
-   The sub-panel is a child of the group, so hovering the sub-panel keeps the group hovered and the
-   menu open - but only if the pointer can get there without leaving the group first. With a 6px
-   gap it could not: crossing that dead strip dropped :hover, the panel vanished mid-reach, and
-   none of the entries could be clicked at all. The separation is drawn with a transparent border
-   instead, which is part of the element and therefore still hoverable. */
+   This replaces the arrangement noted above, in which the group was static and the panel anchored
+   the flyout. Against the panel, left:100% means the width of the whole panel and top:0 means the
+   panel's top - so every flyout opened at the panel's top-right corner no matter which group was
+   hovered, and they all lined up with each other instead of with their own group.
+
+   That also made them unreachable. Getting to a flyout pinned at the top right, from a group part
+   way down the list, means travelling up and across - which leaves the group, drops :hover, and
+   closes the flyout while the pointer is still moving toward it.
+
+   Anchored to the group, left:100% is the group's own right edge and top:0 its own top: the flyout
+   opens level with the entry being pointed at and touching it, so the pointer crosses no gap and
+   never leaves the element keeping the menu open. Owner's instruction, 2026/09/11. */
+.rl-menu-panel .nav-group{position:relative}
 .rl-menu-panel .nav-subpanel{
     position:absolute;left:100%;top:0;
     display:none;min-width:15rem;margin:0;padding:7px;
