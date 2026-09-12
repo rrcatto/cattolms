@@ -1,10 +1,17 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.5.8.3  
-**Date time:** 2026/08/25 14:29 SAST  
-**Current stage:** v0.5.8.2 accepted and tagged 2026/08/25. v0.5.8.3 adds Stage C (editable SEED System Company Settings) and Stage D (Platform ADMIN selected-company context), awaiting VPS verification and browser acceptance; then volume acceptance; Commerce next
+**Current LMS version:** 0.7  
+**Date time:** 2026/09/12 SAST  
+**Current stage:** v0.7 released 2026/09/12 — Symfony 8.1 in place of Fat-Free and PHP-DI, the REAL/SEED split removed, and the interface work that followed. 0.5.8.3 remains the accepted VPS version. Commerce next.
 
 Only the project owner decides future release numbers.
+
+**Reading the stage records below.** Sections 1 to 1c record what was decided and delivered at the
+time, and several of them specify the REAL/SEED universe in detail: seed-aware tables, `seed_token`,
+constraint triggers, the `SEED_*` role family, the All/Real/Seed control. **All of that was removed
+in v0.7** and none of it describes the platform now — `PROJECT-INSTRUCTIONS.md` section 5 is the
+current statement, and it is deliberately short. The stage records are kept because how a decision
+was reached stays useful after the decision is reversed, not because they are still in force.
 
 ## 1. v0.5.7.5.1 ACL foundation
 

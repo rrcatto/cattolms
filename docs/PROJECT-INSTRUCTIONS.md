@@ -1,9 +1,9 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.5.8.3 (VPS) · 0.6 published, not deployed  
-**Date time:** 2026/09/06 14:00 SAST  
-**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
-**Current phase:** TEST/DEV; v0.6 rebases the schema onto one canonical baseline and adds the course taxonomy, so it is a reset-required install rather than an upgrade from 0.5.8.3
+**Current approved LMS version:** 0.7 (released 2026/09/12; 0.5.8.3 remains the accepted VPS version)  
+**Date time:** 2026/09/12 SAST  
+**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15  
+**Current phase:** TEST/DEV; v0.7 inherits v0.6's single baseline, so it is a reset-required install rather than an upgrade from anything
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -48,15 +48,17 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 
 ## 4. Roles, permissions and ACL
 
-The ACL deliberately separates three questions:
+The ACL deliberately separates two questions:
 
 ```text
 role -> permissions        = what may this identity do?
-data universe             = which REAL or SEED records may it see/use?
 resource relationship     = which specific own/company/assigned/platform records are in scope?
 ```
 
-Do not encode all three concerns into permission names.
+There were three until v0.7. The data universe was the third — "which REAL or SEED records may it
+see?" — and it is gone; see section 5.
+
+Do not encode both concerns into permission names.
 
 ### Permission catalogue
 
@@ -100,19 +102,14 @@ STUDENT
 COMPANY_ADMIN
 COURSE_EDITOR
 COURSE_OWNER
-SEED_STUDENT
-SEED_COMPANY_ADMIN
-SEED_COURSE_EDITOR
-SEED_COURSE_OWNER
-SEED_ADMIN
 ```
 
-- Every normal user receives `STUDENT` as the baseline role.
-- Future generated seed users receive `SEED_STUDENT` as their baseline role.
+**That is the whole list.** The five `SEED_*` roles were removed in v0.7 with the rest of the
+REAL/SEED split and are not to be reintroduced: there is one role family, one business catalogue,
+and a generated identity holds exactly the roles a hand-entered one holds.
+
+- Every user receives `STUDENT` as the baseline role.
 - Stronger roles add capabilities rather than replacing the baseline learner role.
-- Normal and `SEED_*` roles may use the same business permission keys but cannot be mixed on one identity.
-- `SEED_ADMIN` is a test business administrator only; it receives no SYSTEM authority.
-- Seed-only roles deliberately cannot receive `COURSE.IMPORT`, `COURSE.EXPORT` or `COURSE.MEDIA.MANAGE`; generated test courses/media are managed by Seed Database rather than external package/file workflows.
 - `ADMIN` / `Administrator` / `System Administrator` is immutable, receives the complete permission catalogue and remains the recovery administrator through `APP_ADMIN_EMAIL`.
 - There is deliberately no per-user permission override table; use roles.
 
@@ -134,51 +131,46 @@ The exceptional immutable `ADMIN` recovery boundary may remain explicit where re
 
 API/MCP transport scopes are separate from ACL permissions. An API/MCP operation requires its transport scope **and** the same ordinary business permission required by the equivalent Web operation. Do not recreate `API.*` ACL permissions.
 
-## 5. REAL/SEED data isolation for the next stage
+## 5. There is one kind of data
 
-REAL versus SEED is a **data-visibility property**, not a duplicated permission catalogue.
+**The REAL/SEED split is gone, in full, and is not to be reintroduced.** The owner's instruction:
+"It is all one. There is only one type of data... ALL DATA IS DISPOSABLE AND IT IS ALL ONE TYPE."
+This section used to specify the opposite at length; what follows is what replaced it.
 
-Seed Database will make `seed_token` the authoritative provenance/identity-universe signal on seedable data. Repository/service queries and database constraints must enforce the boundary.
+Removed with the split: `seed_token` on every table, the `seed_data` and `seed_data_tables`
+metadata tables, the cross-universe constraint triggers and their function, `DataUniverse` and the
+parameter threaded through every repository read, the All/Real/Seed control above the Administration
+lists, `SeedTableCatalog`, the shared SEED System Company, and the five `SEED_*` roles. A generated
+row is written exactly as a hand-entered row is, because that is what it is.
 
-Required invariants:
+**The generator stayed, and the distinction matters.** Removing the classification was asked for;
+removing the generator was not. Administration → Seed Database, guarded by `SYSTEM.SEED.MANAGE`, is
+still how the interface is exercised at volume. Do not remove it and do not rename it.
 
-- normal users see/interact only with REAL business records;
-- seeded users see/interact only with SEED business records;
-- genuine `ADMIN` may deliberately see/manage both;
-- REAL and SEED business records must never form cross-universe relationships;
-- seed-set tokens identify provenance/cleanup batches, not security boundaries; different seed sets may interact inside the SEED universe;
-- seed business data cannot belong to a REAL company or REAL user;
-- actions performed by seeded identities create SEED/test records;
-- seed generation gives each generated company a domain on the reserved `.seed.invalid` suffix, keeps every generated local part unique, and sends no email at all; delivery for any seed address is re-routed to `SEED_SYSTEM_COMPANY_DOMAIN`.
+Three rules from that era survive, because none of them was about universes:
 
-Two further rules govern what happens after generation:
+- **A generated company's domain is its name plus `.invalid`.** RFC 2606 reserves the suffix, so an
+  invented address cannot leave the building. `GeneratedDomainMailer` re-addresses mail for one to
+  the same local part at `APP_DOMAIN`; nothing in the mail path refers to seed data.
+- **Nothing is ever appended to a generated name to make it unique** — no digits, no set key, no
+  characters of any kind. If a pool needs more names, edit the word list in `storage/seeds/`.
+- **Generation sends no email at all**, and never fabricates `course_media`, `auth_sessions`,
+  `auth_login_tokens`, `api_tokens` or `web_sessions`.
 
-- **A new row's universe comes from the resource it belongs to, never from the identity that created it.** A genuine `ADMIN` operating on a generated aggregate writes a SEED business row and remains the recorded actor on it. Only the explicit actor/audit allowlist may name a REAL identity from a SEED row; ownership, membership, subject and learner references may not.
-- **Course import and export are REAL-only.** A generated course cannot be exported and a seed identity cannot import, so generated content cannot be laundered into the genuine universe through a portable package.
+**There is no cleanup by token**, because there is no token. A set cannot be selectively removed
+once written; `composer smoke:install` and a discarded database is the way back, which is acceptable
+only while the database is disposable TEST/DEV state.
 
-### What is not in a universe: labels
+### Labels classify a course, and always did
 
 **A category and a tag classify a course; they do not describe a person, a company or a
-transaction.** They are shared vocabulary, exactly as `roles` and `permissions` already are — a
-generated identity holds `SEED_STUDENT` from the same `roles` table a genuine identity holds
-`STUDENT` from — and they carry no `seed_token`.
-
-`course_categories` was seed-aware until v0.6. It should not have been: owner decision D3 approved
-the table inventory in bulk with two named changes, and categories were never considered
-individually. The cost showed in two places. A generated course could only sit in a generated
-category, so seed data could never exercise the real taxonomy and browsing a category would never
-show the volume that had been generated to test it; and generated category names had to carry a set
-suffix to avoid colliding with the genuine ones, which is the kind of appended nonsense the naming
-rules forbid everywhere else. `tags` and `course_tags` were built universe-free from the start.
-
-**The label is shared; what is counted under it is not.** Per-category counts, browse listings, tag
-weights and the administration distribution charts are all filtered by the reader's data universe. A
-category page reporting a thousand courses when three of them are genuine would be a universe leak
-in a new costume, and it is the specific mistake this exception makes possible.
-
-All of this is implemented: `seed_token` on 30 application tables, the two metadata tables,
-generation, cleanup, query isolation, the PostgreSQL constraint triggers, and the visible
-genuine-`ADMIN` All / Real / Seed control.
+transaction.** They are shared vocabulary, exactly as `roles` and `permissions` are. `tags` and
+`course_tags` were built this way from the start; `course_categories` was seed-aware until v0.6 and
+should not have been. The cost showed twice: a generated course could only sit in a generated
+category, so generated data could never exercise the real taxonomy; and generated category names had
+to carry a set suffix to avoid colliding with genuine ones, which is exactly the appended nonsense
+the naming rules forbid everywhere else. Both objections outlived the universe that produced them,
+and neither table carries provenance now.
 
 ## 6. Core-owned workspaces and navigation
 

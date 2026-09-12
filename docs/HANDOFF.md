@@ -3,11 +3,20 @@
 **LMS version:** 0.7  
 **Date time:** 2026/09/12 SAST  
 **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15  
-**Status:** v0.7 is published on `main` and on `dev-v0.7`, tagged `v0.7.0` at the migration commit.
-Gate green — 556 tests, 8,303 assertions, PHPStan level 6, architecture, runtime hazard, UI contract
-and release validation — with every route returning its expected status and the 500,000-row seed
-maximum completing inside the deployed 128 MB limit. Owner browser acceptance is ongoing rather than
-outstanding: the interface work below was done against his direct review, theme by theme.
+**Status:** released. `main` and `dev-v0.7` are in sync at the head of the interface work, and the
+owner declared the release on 2026/09/12. Gate green — 562 tests, 8,890 assertions, PHPStan level 6,
+architecture, runtime hazard, UI contract and release validation — with every route returning its
+expected status and the 500,000-row seed maximum completing inside the deployed 128 MB limit. Owner
+browser acceptance is ongoing rather than outstanding: the interface work below was done against his
+direct review, theme by theme.
+
+One qualification on "gate green", because it will be met on a second run rather than a first:
+`SeedGeneratorMemoryTest` now fails intermittently with a 128 MB exhaustion in
+`SeedNameFactory::reserve`, and passes in isolation every time. It is arithmetic rather than a
+regression — that factory primes its "already used" sets from every name in the database so a later
+set cannot repeat one, the development database is at ~156,000 users, and every `qa` run leaves its
+generated rows behind because generated rows are ordinary rows now. See the known gaps below.
+
 **v0.7 cannot be upgraded into**: it inherits v0.6's single baseline, so installing it is
 `composer smoke:install` and a discarded database.
 
@@ -26,6 +35,32 @@ footer is core-owned markup every theme includes. Navigation marks the current e
 levels and keeps its scroll position across a page load. `docs/ux-ui-rules.md` is the rule book and
 now carries all of this; read the relevant section before changing any screen.
 
+**The identity in the bar, and what a faded notice leaves behind** — the last two pieces before the
+release, both reported from the browser rather than found by testing.
+
+The Gilded Noir chip was printing the full name where the display name is what the reader chose to
+be called: `RichardC`, not `Richard Royston Catto`. They are different values and neither
+abbreviates the other, so `BaseController` now publishes `identity_display_name` and the chip reads
+it, keeping `identity_name` as the fallback because the column is nullable. Core's band keeps the
+full name — it has the room, and the other four themes render it. Sign out became **Logout**, one
+word, so the bar holds the identity beside it on one line. The avatar was 2rem in a row whose 46px
+brand mark already sets the height, so it was small against space the bar had already paid for; it
+is now the mark's size.
+
+`IdentityDisplayNameContractTest` carries the rule worth keeping from that: the two branches of
+`viewIdentity()` must define the same `identity_*` keys, whatever the set grows to. Twig runs with
+`strict_variables`, so a key defined for a signed-in reader and forgotten for a signed-out one is
+not a blank on the page — it is a 500 for everybody else.
+
+The flash defect was one line of consequence from a missing removal. A dismissed message was taken
+out of the document and the `.flash-stack` around it was not, and that stack is not inert: every
+theme gives it a bottom margin, 24px in Gilded Noir. So a saved-settings notice on Administration
+Settings faded, its margin stayed, and the page head never returned to the top of its boxed
+container with nothing on screen to explain the gap. The stack now goes with the last message it
+holds. `:empty` cannot express this in CSS — the whitespace text nodes between the messages survive
+their removal — which is why the sweep lives in the dismissal. Rule 6.11, enforced by
+`FlashDismissalContractTest`.
+
 **Seed generator.** Streams rather than accumulating, so the advertised maximum is reachable. See
 `PROJECT-INSTRUCTIONS.md` §3a for the four rules that keep it that way.
 
@@ -42,7 +77,25 @@ now carries all of this; read the relevant section before changing any screen.
   asked for popouts everywhere; the trade-off — the sidebar can no longer scroll — has not been
   chosen. See `PopoutClippingContractTest`.
 - **The `v0.7.0` tag sits at the migration commit**, not at the head of the interface work that
-  followed it.
+  followed it. The release of 2026/09/12 did not move it: retagging is the owner's call, and moving
+  an existing tag changes what it has always meant.
+- **Both measurement instruments are dead in v0.7**, and the gate cannot see it.
+  `tools/benchmark-pagination.php` imports `CattoLearning\Auth\DataUniverse` and fatals on the
+  missing class; `tools/seed-benchmark-dataset.php` calls `SeedRepository::sets()`, which is gone,
+  and still inserts the dropped `seed_token` and `company_type` columns. Neither was carried across
+  when the universe was removed. `tools/check-architecture.php` scans `src/` only, so a banned
+  symbol living under `tools/` fails nothing — widening it is the cheap guard. The repair itself is
+  bounded: drop the universe argument, and drop set registration, `--list` and `--remove`, which
+  have nothing to key on now. `docs/OPERATIONS.md` records this beside the numbers they produced.
+- **Radiant Learning's flash messages neither close nor auto-hide.** It renders its own flash
+  markup inline in `base.html.twig` with none of the three hooks rule 6.11 names, so the shared
+  dismissal never finds them. The other four themes share one partial. A defect in that theme
+  rather than an exception to the rule.
+- **`SeedGeneratorMemoryTest` is drifting into the memory ceiling**, for the reason its own docblock
+  predicted: the name factory primes from every name stored, and nothing removes the rows each `qa`
+  run leaves behind. It failed two of three consecutive runs on 2026/09/12 at ~156,000 users and
+  passed alone every time. Three ways out, none of them chosen: clear the accumulated rows, bound
+  the priming, or give that test a scratch database.
 
 ## 0q. v0.6 — making it fit by making it smaller
 
