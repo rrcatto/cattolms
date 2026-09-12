@@ -239,6 +239,11 @@ abstract class BaseController
             // For anywhere only one badge fits - a navigation bar, a compact chip. Which role is
             // senior is an ACL question, so the catalogue answers it rather than each theme.
             $data['identity_role'] = RoleCatalog::mostSenior($currentUser->roles);
+            // The display name is its own value, not a shortening of the full name: `RichardC`
+            // where the full name is `Richard Royston Catto`. Anywhere asking for the display name
+            // wants this column, and composing the full name there instead prints middle names
+            // nobody asked to see.
+            $data['identity_display_name'] = $currentUser->displayName;
         } else {
             $data['identity_name'] = '';
             $data['identity_email'] = '';
@@ -246,6 +251,7 @@ abstract class BaseController
             $data['identity_image'] = '';
             $data['identity_roles'] = [];
             $data['identity_role'] = '';
+            $data['identity_display_name'] = '';
         }
         $data['permissions'] = $currentUser === null ? [] : $currentUser->permissions;
         $data['role_keys'] = $currentUser === null ? [] : $currentUser->roles;

@@ -82,20 +82,28 @@
 									body. The band is core's and is right for the themes built round a wide
 									content column; this theme's body is narrower and it did not fit.
 
-									It sits here, immediately before Sign out, because that is the end of the
+									It sits here, immediately before Logout, because that is the end of the
 									bar and the identity belongs with the control that ends the session. Only
 									the name and one badge are certain of their space: the address is offered
 									and hidden by CSS when the bar is too narrow to hold it.
+
+									The name shown is the display name - `RichardC` - and not the full name it
+									is not an abbreviation of. A bar has one line to spend, and a full name
+									spends it on middle names nobody asked this control to show. identity_name
+									remains the fallback, because the display name column is nullable.
 #}
 									{% if user.logged_in %}
+										{% set gn_identity_label = identity_display_name is defined and identity_display_name
+											? identity_display_name
+											: (identity_name is defined and identity_name ? identity_name : user.name) %}
 										<div class="gn-identity" data-nav-item="identity">
 											{% if identity_image is defined and identity_image %}
-												<img class="gn-identity-avatar" src="{{ identity_image }}" alt="" width="32" height="32">
+												<img class="gn-identity-avatar" src="{{ identity_image }}" alt="" width="46" height="46">
 											{% else %}
-												<span class="gn-identity-avatar gn-identity-avatar-empty" aria-hidden="true">{{ identity_name is defined and identity_name ? identity_name|slice(0, 1)|upper : '?' }}</span>
+												<span class="gn-identity-avatar gn-identity-avatar-empty" aria-hidden="true">{{ gn_identity_label ? gn_identity_label|slice(0, 1)|upper : '?' }}</span>
 											{% endif %}
 											<span class="gn-identity-text">
-												<strong class="gn-identity-name">{{ identity_name is defined and identity_name ? identity_name : user.name }}</strong>
+												<strong class="gn-identity-name">{{ gn_identity_label }}</strong>
 												{% if identity_email is defined and identity_email %}
 													<span class="gn-identity-email">{{ identity_email }}</span>
 												{% endif %}

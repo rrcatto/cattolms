@@ -616,7 +616,9 @@ final class ThemeRenderer
                 $accountChildren[] = $entry;
             }
             $items[] = $item('account','Account','/account','account',$active==='account',children:$accountChildren);
-            $items[] = $item('signout','Sign out','/logout','signout',false,'POST',$csrf);
+            // "Logout" rather than "Sign out": one word, and the navigation bar has to hold the
+            // identity beside it on a single line. Owner's instruction, 2026/09/12.
+            $items[] = $item('signout','Logout','/logout','signout',false,'POST',$csrf);
         } else {
             $items[] = $item('signin','Register / Sign in','/login','signin',$active==='login');
         }
