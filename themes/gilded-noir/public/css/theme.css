@@ -3284,22 +3284,26 @@ body.gn-body.cl-page-texture {
 .gn-body .cl-identity-head { display: none; }
 
 /* --- The identity chip -------------------------------------------------------------------------
-   In the bar, at the end, immediately before Sign out. The avatar is sized from the bar's own line
-   height rather than a fixed pixel count, so it scales with the header instead of fighting it. */
+   In the bar, at the end, immediately before Logout.
+
+   The avatar is the brand mark's size, and that is the whole sizing rule: the mark at the other end
+   of the bar already sets how tall this row is, so anything smaller than 46px leaves space the bar
+   has already paid for. It was 2rem and read as an afterthought beside it. The chip hugs it with
+   3px, so the picture is what grows rather than the padding around it. */
 .gn-identity {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   min-width: 0;
   max-width: 22rem;
-  padding: 4px 10px 4px 4px;
+  padding: 3px 12px 3px 3px;
   border: 1px solid rgba(191, 167, 93, .28);
   border-radius: 999px;
   background: rgba(191, 167, 93, .07);
 }
 .gn-identity-avatar {
-  width: 2rem;
-  height: 2rem;
+  width: 46px;
+  height: 46px;
   flex: 0 0 auto;
   border-radius: 50%;
   object-fit: cover;
@@ -3311,7 +3315,7 @@ body.gn-body.cl-page-texture {
   background: rgba(191, 167, 93, .18);
   color: var(--gn-gold, #bfa75d);
   font-weight: 700;
-  font-size: .8rem;
+  font-size: 1.15rem;
 }
 /* The two lines are allowed to shrink; the badge and the avatar are not. */
 .gn-identity-text {
