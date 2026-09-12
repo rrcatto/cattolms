@@ -1,11 +1,20 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.6 (in development; 0.5.8.3 is the accepted VPS version)  
-**Date time:** 2026/09/06 14:00 SAST  
-**Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15, 2026/09/03  
+**LMS:** 0.7  
+**Date time:** 2026/09/12 SAST  
+**Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15  
 **Environment:** disposable TEST/DEV until explicitly declared production
 
-Out of date - does not document v0.7
+**How much of this document is v0.7.** The install, reset, QA-gate and Seed Database instructions
+below are current, and the sections that described the REAL/SEED universe have been corrected to say
+what v0.7 actually does rather than left to mislead. The pagination-benchmark numbers are v0.6's and
+are labelled as such, because the two instruments that produced them do not run on v0.7 — that
+section says why. Everything else still reads as it was written for v0.6 and has not been re-verified
+line by line; where it and `PROJECT-INSTRUCTIONS.md` disagree, the latter is current.
+
+**v0.7 is a reset for the same reason v0.6 was.** It inherits v0.6's single baseline, so there is no
+upgrade path into it either: installing v0.7 is `composer smoke:install` and a discarded database.
+The section below is v0.6's account of that, and every word of it applies unchanged.
 
 ## v0.6 is a reset, not an upgrade
 
@@ -203,8 +212,22 @@ catto 'php tools/seed-benchmark-dataset.php --list'   # the seed batches present
 catto 'php tools/seed-benchmark-dataset.php --remove=<token>'
 ```
 
-The batch is ordinary SEED data registered in `seed_data`, so Administration → Seed Database cleans
-it up like any other set; `--remove` is the same operation from the command line.
+**Neither instrument runs on v0.7, and the commands above are the v0.6 ones.** Both were written
+against the universe model and neither was carried across when it was removed:
+`benchmark-pagination.php` imports `CattoLearning\Auth\DataUniverse` and fatals on the class;
+`seed-benchmark-dataset.php` calls `SeedRepository::sets()`, which no longer exists, and its inserts
+still name the dropped `seed_token` and `company_type` columns. Every listed command therefore ends
+in an uncaught `Error` rather than a measurement.
+
+The gate does not catch this and is not wrong to miss it: `tools/check-architecture.php` scans
+`src/` only, so a banned symbol surviving under `tools/` fails nothing. Widening it is the cheap
+guard if these are repaired.
+
+Repairing them is bounded work rather than a rewrite — drop the universe argument from the
+benchmark's calls, and drop set registration, `--list` and `--remove` from the dataset writer, which
+have nothing to key on now that a generated row is an ordinary row. Removal becomes what it is
+everywhere else: reset the database. Until then, treat the numbers below as the v0.6 record they
+are.
 
 `composer qa` passes with the batch loaded — 580 tests in about four and a half minutes rather than
 the usual one — but it is close to Composer's 300-second per-script process timeout, so a slower
@@ -393,35 +416,18 @@ Never fabricated: `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tok
 `web_sessions`. Generation sends **zero email**.
 
 **Signing in as a generated identity.** Request an ordinary passwordless login for the generated
-address. The stored address uses a synthetic `.seed.invalid` domain, but the message is delivered
-to the local part at `SEED_SYSTEM_COMPANY_DOMAIN`, so it arrives in the one inbox you configured.
+address. The stored domain is the company's name plus `.invalid` — RFC 2606 reserves that suffix so
+the address can never leave the building — and `GeneratedDomainMailer` re-addresses the message to
+the same local part at `APP_DOMAIN`, so it arrives in the one inbox you already read. There is no
+`SEED_SYSTEM_COMPANY_DOMAIN` any more, and nothing in the mail path refers to seed data: these are
+simply the domains the platform invents.
 
-**Cleaning up.** The Clean up action previews what it will remove first, including SEED rows in
-other sets that depend on the one being removed — seed tokens record where data came from, they
-are not separate tenancies. REAL rows are never eligible. Current counts are recalculated from the
-physical rows afterwards; nothing stores a remaining count.
+**There is nothing to clean up, switch between or verify the isolation of.** Those three
+operations were this section's bulk until v0.7 and all three are gone with the REAL/SEED split:
+there is no Clean up action, no All/Real/Seed control above the Administration lists, and no
+cross-universe trigger to test an INSERT against. A generated row is an ordinary row. If the
+paragraphs you remember are the ones that described them, they described v0.6.
 
-**Switching universe.** A genuine ADMIN sees an All / Real / Seed control above every
-Administration list, with the record split beside it. Switching keeps your filters and
-rows-per-page but returns you to page 1, because a deep page number rarely exists in the other
-population. Nobody else sees the control, and a hand-typed `?universe=all` does nothing for an
-ordinary or a seed identity.
-
-Gilded Noir has no rules for the control yet, so it falls back to core CSS inside the dark skin.
-Core styles it completely, including the active state and the focus ring; enhancing the theme
-needs a version number from you.
-
-**Verifying isolation.** The Seed integration suite does this automatically as part of
-`composer qa`, including both directions and the intended exceptions. To check by hand, this must
-be rejected by the database:
-
-```sql
-INSERT INTO course_enrolments (public_id, user_id, course_id, access_period_seconds)
-SELECT gen_random_uuid(),
-       (SELECT id FROM users WHERE seed_token IS NULL LIMIT 1),
-       (SELECT id FROM courses WHERE seed_token IS NOT NULL LIMIT 1),
-       31536000;
-```
-
-If it succeeds, the cross-universe guard is not working and no other isolation claim can be
-trusted.
+What replaces all three is the single sentence above: reset the database. `composer smoke:install`
+is the whole cleanup story now, and it is the only one, which is why generating is safe to do
+freely and impossible to undo selectively.
