@@ -69,13 +69,7 @@
 		</div>
 		</div>
 		{% if published_course_count > 0 %}
-			<div class="row g-4">
-				{% for course in featured_courses %}
-					<div class="col-md-6 col-xl-4">
-						{% include '@platform/partials/course-card.html.twig' %}
-					</div>
-				{% endfor %}
-			</div>
+			{% include '@platform/partials/course-showcase.html.twig' %}
 		{% else %}
 			<div class="cl-empty-state">
 				<div class="cl-empty-icon">

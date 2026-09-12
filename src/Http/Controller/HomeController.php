@@ -61,10 +61,35 @@ final class HomeController extends BaseController
     #[Route('/', name: 'home_index', methods: ['GET'])]
     public function index(): Response
     {
+        $showcase = $this->courses->showcaseCourses(0);
+
         return $this->render('home', [
             'title' => 'Practical self-study courses',
-            'featured_courses' => $this->courses->featuredCourses(6),
-            'published_course_count' => $this->courses->catalogueCount(CatalogueFilter::none()),
+            'showcase_courses' => $showcase['courses'],
+            'showcase_cycle' => $showcase['cycle'],
+            'published_course_count' => $showcase['total'],
+        ]);
+    }
+
+    /**
+     * The showcase region on its own, for the fifteen-second refresh.
+     *
+     * A fragment rather than a page: htmx replaces the region and nothing else, so the rest of the
+     * home page - including anything the reader is part way through - is left alone.
+     *
+     * The cycle arrives in the query string because the region's own markup put it there. It is
+     * untrusted and needs no validation beyond becoming an integer: it only ever decides which
+     * window of the published catalogue is shown, never what a reader may see. Every course in the
+     * result is published, whatever number is supplied.
+     */
+    #[Route('/courses/showcase', name: 'home_course_showcase', methods: ['GET'], priority: 10)]
+    public function courseShowcase(): Response
+    {
+        $showcase = $this->courses->showcaseCourses((int) ($_GET['cycle'] ?? 0));
+
+        return $this->renderFragment('partials/course-showcase', [
+            'showcase_courses' => $showcase['courses'],
+            'showcase_cycle' => $showcase['cycle'],
         ]);
     }
 

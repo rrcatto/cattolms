@@ -3252,3 +3252,111 @@ a.gn-crumb:hover { color: var(--gn-gold-bright); text-decoration: underline; tex
   opacity: 1;
 }
 .gn-menu-panel .nav-group-label .gn-icon { width: 15px; height: 15px; color: inherit; opacity: .9; }
+
+/* == 20  v2.0.1 — this theme keeps its own canvas, its own footer, and its identity in the bar ===
+
+   Gilded Noir is a designed theme rather than a variation on the others, and core's cross-theme
+   defaults do not all suit it. These rules are the insulation: each one names what core does and
+   what this theme does instead. Owner's instruction, 2026/09/12.
+   ============================================================================================= */
+
+/* --- The canvas ---------------------------------------------------------------------------------
+   Core paints the platform's 45-degree slanted texture on every body. This theme already has its
+   own engraved canvas on .gn-canvas - gold hairlines raked up from the left at 14 degrees, a narrow
+   band against a wide gap - so core's arrived on top of it and the two fought. The body keeps the
+   theme's own ground and nothing else; .gn-canvas supplies the texture over it.
+
+   Qualified body.gn-body.cl-page-texture, which outranks core's body.cl-page-texture on
+   specificity, so no !important is needed and load order does not matter. */
+body.gn-body.cl-page-texture {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(191, 167, 93, .16), transparent 30%),
+    radial-gradient(circle at 88% 0%, rgba(255, 255, 255, .09), transparent 22%),
+    linear-gradient(160deg, #060607 0%, #101012 44%, #0b0b0c 100%);
+  background-attachment: fixed;
+}
+
+/* --- The identity band --------------------------------------------------------------------------
+   Core puts .cl-identity-head under the page head on every page. This theme's content column is
+   narrower than the themes it was designed against and the band did not fit, so the identity moves
+   into the navigation bar instead - see .gn-identity below. Hidden rather than restyled: there is
+   one identity on the page and two would be worse than none. */
+.gn-body .cl-identity-head { display: none; }
+
+/* --- The identity chip -------------------------------------------------------------------------
+   In the bar, at the end, immediately before Sign out. The avatar is sized from the bar's own line
+   height rather than a fixed pixel count, so it scales with the header instead of fighting it. */
+.gn-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  max-width: 22rem;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid rgba(191, 167, 93, .28);
+  border-radius: 999px;
+  background: rgba(191, 167, 93, .07);
+}
+.gn-identity-avatar {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(191, 167, 93, .45);
+}
+.gn-identity-avatar-empty {
+  display: grid;
+  place-items: center;
+  background: rgba(191, 167, 93, .18);
+  color: var(--gn-gold, #bfa75d);
+  font-weight: 700;
+  font-size: .8rem;
+}
+/* The two lines are allowed to shrink; the badge and the avatar are not. */
+.gn-identity-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+.gn-identity-name {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--gn-ivory, #efe9dd);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gn-identity-email {
+  font-size: .68rem;
+  color: color-mix(in srgb, var(--gn-ivory, #efe9dd) 62%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gn-identity-role {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(191, 167, 93, .18);
+  border: 1px solid rgba(191, 167, 93, .4);
+  color: var(--gn-gold, #bfa75d);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* The address is the first thing to go: it is the least load-bearing of the three, and a bar that
+   wraps is worse than a bar that says less. The name and the badge always remain. */
+@media (max-width: 1500px) {
+  .gn-identity-email { display: none; }
+}
+@media (max-width: 1180px) {
+  .gn-identity { max-width: 14rem; }
+  .gn-identity-role { display: none; }
+}
+@media (max-width: 900px) {
+  .gn-identity-text { display: none; }
+  .gn-identity { padding: 4px; border-color: transparent; background: none; }
+}

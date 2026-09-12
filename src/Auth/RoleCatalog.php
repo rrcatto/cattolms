@@ -55,6 +55,39 @@ final class RoleCatalog
         return self::STUDENT;
     }
 
+    /**
+     * The most senior role an identity holds, for anywhere only one can be shown.
+     *
+     * all() is ordered for reading rather than by seniority - STUDENT sits second - so the order is
+     * stated here instead of being inferred from it. A caller that picked "the first role" would
+     * label a platform administrator a student on most accounts, because STUDENT is the baseline
+     * every identity carries.
+     *
+     * An unrecognised role ranks below every built-in one: a role added to the database that the
+     * catalogue does not know about should not outrank ADMIN by accident.
+     *
+     * @param list<string> $roleKeys
+     */
+    public static function mostSenior(array $roleKeys): string
+    {
+        $precedence = [
+            self::ADMIN,
+            self::COMPANY_ADMIN,
+            self::COURSE_OWNER,
+            self::COURSE_EDITOR,
+            self::STUDENT,
+        ];
+
+        $held = array_map(static fn(string $key): string => strtoupper(trim($key)), $roleKeys);
+        foreach ($precedence as $role) {
+            if (in_array($role, $held, true)) {
+                return $role;
+            }
+        }
+
+        return $held[0] ?? '';
+    }
+
     /** @return array{key:string,name:string,description:string} */
     private static function r(string $key, string $name, string $description): array
     {
