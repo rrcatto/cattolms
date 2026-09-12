@@ -527,6 +527,20 @@
 .container.cl-narrow{max-width:38rem}
 .container.cl-medium{max-width:54rem}
 .cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+/* Controls sitting in a row line up with each other.
+
+   A row of actions is rarely all one element: a plain button, a button inside a form because it
+   posts, and a summary styled as a button because it opens a panel. A summary is a list-item box
+   rather than an inline-flex one, and a form is a block, so left alone the three sit at three
+   different heights and baselines - which is what put Import theme ZIP below Re-sync themes.
+
+   The wrappers are given no height of their own and the summary is made the same kind of box as the
+   button, so the row aligns whatever mix of controls it happens to hold. */
+.row-actions,.cl-form-actions,.toolbar>.row-actions{align-items:center}
+.row-actions>form,.row-actions>details,.toolbar>form,.toolbar>details{display:flex;align-items:center;margin:0}
+summary.btn{display:inline-flex;align-items:center;justify-content:center;list-style:none}
+summary.btn::-webkit-details-marker{display:none}
+summary.btn::marker{content:""}
 /* Nothing reads directly off the page canvas.
 
    The canvas is a texture, so any block of text that is not on a surface sits on stripes. Most of

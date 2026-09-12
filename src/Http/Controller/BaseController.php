@@ -236,12 +236,16 @@ abstract class BaseController
             // the browser re-requests when that week is out.
             $data['identity_image'] = $card['has_image'] ? '/account/profile/image' : '';
             $data['identity_roles'] = $currentUser->roles;
+            // For anywhere only one badge fits - a navigation bar, a compact chip. Which role is
+            // senior is an ACL question, so the catalogue answers it rather than each theme.
+            $data['identity_role'] = RoleCatalog::mostSenior($currentUser->roles);
         } else {
             $data['identity_name'] = '';
             $data['identity_email'] = '';
             $data['identity_status'] = '';
             $data['identity_image'] = '';
             $data['identity_roles'] = [];
+            $data['identity_role'] = '';
         }
         $data['permissions'] = $currentUser === null ? [] : $currentUser->permissions;
         $data['role_keys'] = $currentUser === null ? [] : $currentUser->roles;

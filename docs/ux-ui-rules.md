@@ -86,6 +86,27 @@ accordion pattern. `/admin?tab=…` is not to be reintroduced.
 **1.6 Never restyle an accepted design for variety.** Visual change happens because the owner asked
 for it or because a rule here demands it.
 
+**1.6a Elements sitting in a row line up with each other.** A control that sits a few pixels above
+or below the one beside it breaks the interface — the owner's words: *"This type of misalignment of
+UI elements breaks a UI."* Watch the rows that mix element kinds, which is where it happens: a plain
+button, a button inside a form because it posts, and a `<summary>` styled as a button because it
+opens a panel. A `<summary>` is a list-item box rather than an inline-flex one, and a form is a
+block, so left alone the three sit at three different heights. Core normalises this on `.row-actions`
+and `summary.btn`; a new row of controls should need nothing further, and if it does, fix it in core
+rather than on the page.
+
+**1.6b Gilded Noir is insulated from cross-theme UI work.** It is a designed theme rather than a
+variation on the others, and a change rolled out across themes does not automatically apply to it.
+Roll UI change into the other themes and leave Gilded Noir alone unless the owner says to include
+it. **Navigation is the exception**: menus, their contents and their behaviour stay the same across
+every theme unless the owner says otherwise. Owner's instruction, 2026/09/12, after a cross-theme
+pass replaced its footer, doubled its background texture and put a band in its page body that did
+not fit.
+
+Where core introduces a platform-wide default that does not suit it, Gilded Noir overrides that
+default in its own stylesheet and says which core behaviour it is replacing and why — see section 20
+of its theme CSS.
+
 **1.7 Every page is built the same way.** Page head, then the identity band, then the body on cards:
 
 ```
@@ -275,6 +296,12 @@ and the band thickness from `--cl-texture-band`, so a theme re-colours it by set
 properties rather than by writing its own gradient.
 → Enforced by `SlantedTextureContractTest`.
 
+**6.1a Gilded Noir keeps its own texture instead.** *GN texture*: gold hairlines raked **up from the
+left** at about 14 degrees — shallower than the platform's 45 — in two bands of unequal width, a
+narrow line against a wide gap. It sits on the theme's fixed `.gn-canvas` over the theme's own dark
+ground. Gilded Noir therefore suppresses the platform canvas rather than carrying both: two textures
+on one page fight each other, and the owner chose this one for this theme.
+
 **6.2 Course card.** A course card carries, in this order: the course icon or image, the course name,
 the description, the category breadcrumb with every ancestor category clickable, the tags under a
 "Tags" label, the price, the level, the number of modules, the favourite star, and a "View course"
@@ -311,6 +338,18 @@ so a mark and a link cannot disagree about which service they name. These are th
 rule 5.3's stroked style: a brand mark is a solid shape, and outlining one leaves the letterforms
 inside Facebook and LinkedIn with no interior. The sprite carries
 `symbol[id^="social-"] { fill: currentColor; stroke: none }` for exactly that reason.
+
+**6.9 Course showcase.** The home page shows nine courses and changes them every fifteen seconds,
+swapping only the showcase region rather than reloading the page. Up to ninety published courses the
+window pages through them in order and wraps, so every course is seen once per lap; beyond ninety it
+lands somewhere random instead, because paging would take too many laps to be a showcase. The nine
+arrive with the page, so a reader without JavaScript sees a full showcase that simply does not move.
+Core class: `#course-showcase`, partial `partials/course-showcase.html.twig`.
+
+**6.10 Tag cloud.** The tags page shows its tags on arrival. Nothing is folded away behind a
+disclosure or an accordion: the page exists to show the tags, so making the reader open something
+first is the one thing it must not do. The animated sphere is decoration over the list, never a
+replacement for it.
 
 ---
 
@@ -457,6 +496,14 @@ UI change works.
 ---
 
 ## Changelog
+
+2026/09/12 SAST — second pass
+
+- 1.6a: elements in a row line up, and the mixed-element rows are where it goes wrong.
+- 1.6b: Gilded Noir is insulated from cross-theme UI work; navigation is the exception.
+- 6.1a: GN texture — the theme keeps its own and suppresses the platform canvas.
+- 6.9: the nine-course home showcase, paging to ninety and sampling beyond it.
+- 6.10: the tags page shows its tags on arrival, behind nothing.
 
 2026/09/12 SAST
 

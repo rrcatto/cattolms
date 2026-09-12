@@ -395,6 +395,63 @@ final class CourseService
         return $this->decorateCatalogue($this->courses->featuredPublishedCourses($limit));
     }
 
+    /** How many courses a catalogue may hold before the showcase stops paging and starts sampling. */
+    public const SHOWCASE_LOOP_CEILING = 90;
+
+    /** How many courses the home page showcases at a time. */
+    public const SHOWCASE_SIZE = 9;
+
+    /**
+     * The home page showcase: a window onto the published catalogue that moves on each refresh.
+     *
+     * Two behaviours, and which one applies is a property of the catalogue rather than a setting.
+     * Up to SHOWCASE_LOOP_CEILING courses the window pages through them in order and wraps, so a
+     * reader watching for a while sees all of them and sees each one once per lap. Beyond that
+     * paging would take too many laps to be worth calling a showcase, so the window lands somewhere
+     * random instead. Owner's instruction, 2026/09/12.
+     *
+     * The random case moves the window rather than shuffling rows: `ORDER BY random()` sorts the
+     * whole matching set to take nine of it, which on a large catalogue is a full scan and sort on
+     * every refresh of a public page. Choosing the offset costs nothing and the deferred-join
+     * pagination underneath is already indexed for it.
+     *
+     * @return array{courses:list<array<string,mixed>>,cycle:int,total:int,looping:bool}
+     */
+    public function showcaseCourses(int $cycle, int $limit = self::SHOWCASE_SIZE): array
+    {
+        $limit = max(1, $limit);
+        $total = $this->courses->publishedCoursesCount(CatalogueFilter::none());
+        $cycle = max(0, $cycle);
+
+        if ($total <= $limit) {
+            // Everything fits, so there is nothing to move: the same set every time is correct.
+            return [
+                'courses' => $this->decorateCatalogue($this->courses->publishedCourses(CatalogueFilter::none(), $limit, 0)),
+                'cycle' => 0,
+                'total' => $total,
+                'looping' => true,
+            ];
+        }
+
+        $looping = $total <= self::SHOWCASE_LOOP_CEILING;
+        if ($looping) {
+            $pages = (int) ceil($total / $limit);
+            $offset = ($cycle % max(1, $pages)) * $limit;
+            // The last page of an uneven division would show fewer than a full row, so it is pulled
+            // back to end flush against the final course instead.
+            $offset = min($offset, max(0, $total - $limit));
+        } else {
+            $offset = random_int(0, $total - $limit);
+        }
+
+        return [
+            'courses' => $this->decorateCatalogue($this->courses->publishedCourses(CatalogueFilter::none(), $limit, $offset)),
+            'cycle' => $cycle + 1,
+            'total' => $total,
+            'looping' => $looping,
+        ];
+    }
+
     /**
      * @param list<array<string,mixed>> $courses
      * @return list<array<string,mixed>>

@@ -77,6 +77,34 @@
 								</details>
 							{% else %}
 								{% if item.method == 'POST' %}
+{#
+									The signed-in identity, in the bar rather than as a band across the page
+									body. The band is core's and is right for the themes built round a wide
+									content column; this theme's body is narrower and it did not fit.
+
+									It sits here, immediately before Sign out, because that is the end of the
+									bar and the identity belongs with the control that ends the session. Only
+									the name and one badge are certain of their space: the address is offered
+									and hidden by CSS when the bar is too narrow to hold it.
+#}
+									{% if user.logged_in %}
+										<div class="gn-identity" data-nav-item="identity">
+											{% if identity_image is defined and identity_image %}
+												<img class="gn-identity-avatar" src="{{ identity_image }}" alt="" width="32" height="32">
+											{% else %}
+												<span class="gn-identity-avatar gn-identity-avatar-empty" aria-hidden="true">{{ identity_name is defined and identity_name ? identity_name|slice(0, 1)|upper : '?' }}</span>
+											{% endif %}
+											<span class="gn-identity-text">
+												<strong class="gn-identity-name">{{ identity_name is defined and identity_name ? identity_name : user.name }}</strong>
+												{% if identity_email is defined and identity_email %}
+													<span class="gn-identity-email">{{ identity_email }}</span>
+												{% endif %}
+											</span>
+											{% if identity_role is defined and identity_role %}
+												<span class="gn-identity-role">{{ identity_role }}</span>
+											{% endif %}
+										</div>
+									{% endif %}
 									<form class="gn-nav-form" action="{{ item.href }}" method="post" data-nav-item="{{ item.key }}">
 										<input type="hidden" name="csrf" value="{{ item.csrf }}">
 										<button class="gn-nav-link gn-nav-signout" type="submit">

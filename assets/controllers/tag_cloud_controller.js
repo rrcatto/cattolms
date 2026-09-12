@@ -56,11 +56,12 @@ export default class extends Controller {
         });
 
         this.canvasTarget.addEventListener('click', this.onClick);
-        // The list folds away rather than disappearing. Every tag stays reachable - the sphere
-        // animates the heaviest eighty and the disclosure holds all of them - but several hundred
-        // chips no longer sit above the control the page exists for.
+        // The list stays open. It used to fold away once the sphere ran, on the reasoning that
+        // several hundred chips should not sit above the control the page exists for - but that
+        // made the tags something the reader had to open before seeing any of them, on a page whose
+        // whole purpose is to show them. Owner's instruction, 2026/09/12: show the tags.
         if (this.hasDisclosureTarget) {
-            this.disclosureTarget.open = false;
+            this.disclosureTarget.open = true;
             this.disclosureTarget.hidden = false;
         }
         this.element.classList.add('is-animated');
