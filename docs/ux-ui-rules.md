@@ -351,6 +351,17 @@ disclosure or an accordion: the page exists to show the tags, so making the read
 first is the one thing it must not do. The animated sphere is decoration over the list, never a
 replacement for it.
 
+**6.11 Flash message.** A transient notice sits above the page head and takes its space with it when
+it goes. Success hides itself after 4.5 seconds, info after 6.5, and every message carries a close
+control; on the way out the *container* goes too once it holds nothing, or its bottom margin is left
+holding open a gap the reader can no longer account for and the page head never returns to the top
+of its boxed container. Owner's instruction, 2026/09/12, from Administration Settings after a save.
+Core hooks the themes must emit: `.flash-stack` around the messages, `data-flash-message` on each,
+`data-flash-close` on its control — the dismissal in `platform-overrides.js` finds the stack through
+them. Note that `:empty` cannot do this in CSS: the whitespace text nodes between the messages
+survive their removal, so the stack is never empty in the selector's sense.
+→ Enforced by `FlashDismissalContractTest`.
+
 ---
 
 ## 7. Themes
@@ -496,6 +507,10 @@ UI change works.
 ---
 
 ## Changelog
+
+2026/09/12 SAST — third pass
+
+- 6.11: a flash message takes its container with it, so the page head returns to the top of the box.
 
 2026/09/12 SAST — second pass
 

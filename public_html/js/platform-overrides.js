@@ -126,8 +126,23 @@
     const mobileMenu = document.getElementById('mobileMenu'); const sidebar = document.getElementById('sidebar');
     if (mobileMenu && sidebar) mobileMenu.addEventListener('click', () => sidebar.classList.toggle('open'));
 
+    /* A dismissed message takes its container with it when it was the last one.
+
+       The message was being removed and the .flash-stack around it was not, which is not an empty
+       element with no consequences: every theme gives the stack a bottom margin (24px in Gilded
+       Noir), so a saved-settings notice that had faded out left that margin sitting above the page
+       head, and the header never returned to the top of its container. Nothing on screen explained
+       the gap, because the thing that reserved it was gone.
+
+       :empty cannot express this in CSS - the whitespace text nodes between the messages survive
+       removal, so the stack is never empty in the selector's sense - which is why the sweep is
+       here, where the removal happens. */
+    const dropEmptyStack = stack => {
+      if (stack && stack.isConnected && stack.querySelector('[data-flash-message]') === null) stack.remove();
+    };
     document.querySelectorAll('[data-flash-message]').forEach(flash => {
-      const dismiss = () => { flash.classList.add('flash-hiding'); setTimeout(() => flash.remove(), 180); };
+      const stack = flash.closest('.flash-stack');
+      const dismiss = () => { flash.classList.add('flash-hiding'); setTimeout(() => { flash.remove(); dropEmptyStack(stack); }, 180); };
       flash.querySelector('[data-flash-close]')?.addEventListener('click', dismiss);
       const type = flash.dataset.flashType || 'info'; if (type === 'success' || type === 'info') setTimeout(dismiss, type === 'success' ? 4500 : 6500);
     });
