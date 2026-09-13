@@ -52,5 +52,7 @@ interface MailerInterface
 
     public function sendContactMessage(string $name, string $email, string $subject, string $message): void;
 
+    public function sendInvoice(string $email, string $number, string $pdf): void;
+
     public function sendTestMessage(string $email): void;
 }

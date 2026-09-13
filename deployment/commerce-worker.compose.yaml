@@ -1,0 +1,9 @@
+# Overlay for the local workspace env/compose.yaml. Reuses its PHP image and mounts.
+services:
+  commerce-worker:
+    extends:
+      service: php
+    image: localhost/env_php:latest
+    user: "1000:1000"
+    command: ["php", "bin/console", "commerce:maintain", "--watch", "--no-debug"]
+    restart: unless-stopped

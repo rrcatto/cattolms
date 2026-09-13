@@ -1,0 +1,7 @@
+# Effective terms are copied into orders; changing defaults never rewrites a purchase.
+commerce:
+    terms_version: commerce-development-2026-09-12
+    payment_due_days: 7
+    activation_deadline_days: 90
+    tax_enabled: false
+    currency: ZAR

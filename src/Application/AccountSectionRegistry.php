@@ -21,7 +21,7 @@ final class AccountSectionRegistry
             $this->s('profile','Personal Particulars','account','/account/profile','partials/account/profile.html.twig','Your name, identity details and profile image.'),
             $this->s('emails','Email Addresses','contact','/account/emails','partials/account/emails.html.twig','The addresses you sign in with.'),
             $this->s('social','Social Media','social','/account/social','partials/account/social.html.twig','Links to your profiles elsewhere.'),
-            $this->s('learning','My Course Library','learning','/account/library','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),
+            $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),
             $this->s('sessions','Sessions','sessions','/account/sessions','partials/account/sessions.html.twig','Active sign-in sessions and device access.'),
             $this->s('activity','Activity','activity','/account/activity','partials/account/activity.html.twig','Audit activity performed by this account.'),
         ];

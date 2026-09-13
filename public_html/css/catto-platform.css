@@ -945,3 +945,23 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .section-head+*{margin-top:0}
 /* The panel a section head introduces keeps its own air even where a theme collapses the heading. */
 .cl-profile-image-panel{margin-top:.25rem}
+
+/* Shared breadcrumb cart: mouse hover, keyboard focus and touch disclosure. */
+.cl-cart-chrome { margin-inline-start:auto; display:flex; align-items:center; justify-content:flex-end; gap:.65rem; flex-shrink:0; }
+.cl-cart-prompt { font-size:.8rem; white-space:nowrap; }
+.cl-cart-menu { position:relative; }
+.cl-cart-menu > summary { display:flex; align-items:center; gap:.3rem; cursor:pointer; list-style:none; padding:.45rem; border-radius:.4rem; }
+.cl-cart-menu > summary::-webkit-details-marker { display:none; }
+.cl-cart-menu > summary:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.cl-cart-count { min-width:1.3rem; height:1.3rem; padding:0 .25rem; display:grid; place-items:center; border-radius:1rem; font-size:.75rem; font-weight:700; }
+.cl-cart-panel { position:absolute; inset-inline-end:0; top:100%; z-index:1100; width:min(23rem, calc(100vw - 2rem)); max-height:70vh; overflow:auto; padding:1rem; border:1px solid; border-radius:.5rem; font-size:.9rem; text-align:left; }
+.cl-cart-menu:not([open]) > .cl-cart-panel { display:none; }
+.cl-cart-heading { font-size:1.05rem; font-weight:700; }
+.cl-cart-line, .cl-cart-total, .cl-cart-links { display:flex; justify-content:space-between; gap:1rem; padding:.7rem 0; }
+.cl-cart-line { border-bottom:1px solid; }
+.cl-cart-line > span { white-space:nowrap; }
+.cl-cart-total { margin:0; }
+.cl-checkout-steps { display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
+.cl-checkout-steps [aria-current] { font-weight:700; text-decoration:underline; }
+.cl-public-cart-bar { display:flex; align-items:center; max-width:1200px; margin:auto; padding:.75rem 1rem; }
+@media (max-width:700px) { .cl-cart-prompt { display:none; } }

@@ -66,6 +66,11 @@ final class FakeMailer implements MailerInterface
         $this->record('contact', compact('name', 'email', 'subject', 'message'));
     }
 
+    public function sendInvoice(string $email, string $number, string $pdf): void
+    {
+        $this->record('invoice', compact('email', 'number', 'pdf'));
+    }
+
     public function sendTestMessage(string $email): void
     {
         $this->record('test', compact('email'));

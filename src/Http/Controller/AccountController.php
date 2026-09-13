@@ -85,6 +85,7 @@ final class AccountController extends BaseController
     }
 
 
+    #[Route('/account/courses', name: 'account_courses', methods: ['GET'])]
     #[Route('/account/library', name: 'account_learning', methods: ['GET'])]
     public function learning(): Response
     {
@@ -344,7 +345,7 @@ final class AccountController extends BaseController
             fn(string $dataset, $pagination, string $label, string $search) => $this->platformAdministration->paginationView(
                 $dataset,
                 $pagination,
-                '/account/library',
+                '/account/courses',
                 $label,
                 $search === '' ? [] : [PlatformAdministrationService::searchParam($dataset) => $search]
             )

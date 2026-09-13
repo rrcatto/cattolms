@@ -176,7 +176,7 @@ Account /account
     Personal Particulars /account/profile
     Email Addresses /account/emails
     Social Media /account/social
-  My Course Library /account/library
+  My Courses /account/courses
   Sessions /account/sessions
   Activity /account/activity
 
@@ -278,7 +278,7 @@ key, label, icon, route, template, description, content
 | standalone section | `@admin.section` | `@account.section` | `@company.section` |
 | detail/editor fallback | `@content` | `@content` | `@content` |
 
-Canonical Account sections: Dashboard, Profile (Personal Particulars, Email Addresses, Social Media), My Course Library, Sessions, Activity.  
+Canonical Account sections: Dashboard, Profile (Personal Particulars, Email Addresses, Social Media), My Courses, Sessions, Activity.
 Canonical Company sections: Dashboard, People, Course Requests, Learning, Course Credits, Courses.  
 Canonical Administration sections are the navigation children listed above.
 
@@ -390,3 +390,8 @@ Theme Manager inspection should disclose meaningful package inventory, including
 ## 16. Versioning and repair
 
 New design/functionality gets a new theme version. A defective artifact may be repaired and reissued with the same name/version; uninstall the defective installed copy before reinstalling that exact release. Installed theme releases are immutable and coexist by identity/version.
+### Breadcrumb cart
+
+Include `@platform/partials/cart-summary.html.twig` at the right of the breadcrumb bar for guests and signed-in users. Core supplies `cart_summary` (items, count, total_label). The shared disclosure supports hover, focus and click; it links to `/cart` and `/checkout`. Account → COURSES contains My Orders (`/account/orders`) and My Courses (`/account/courses`). There is no top-level Purchases menu.
+
+Themes must style `.cl-cart-count`, `.cl-cart-panel` and `.cl-cart-line` with their own palette and give the panel an opaque surface. Apply primary-button styling inside `.cl-cart-chrome` as well as the main content wrapper; breadcrumb actions must not fall back to Bootstrap’s blue. Core cart CSS supplies no palette colours.

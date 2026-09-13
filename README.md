@@ -1,9 +1,23 @@
-# Catto Learning LMS 0.7
+# Catto Learning LMS 0.8
 
-**LMS version:** 0.7  
-**Date time:** 2026/09/10 02:25 SAST  
+**LMS version:** 0.8
+**Date time:** 2026/09/13 SAST
 
-Catto Learning is a PHP/Symfony/PostgreSQL learning-management and planned course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
+Catto Learning is a PHP/Symfony/PostgreSQL learning-management and course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
+
+## v0.8 — Adding commerce to the LMS
+
+Individual course purchasing now includes guest carts, staged checkout, Omnipay Dummy card simulations, manual EFT instructions, immutable invoices and downloadable PDFs. Account → COURSES contains My Orders and My Courses. The breadcrumb cart shows its item count, prices, total and checkout actions using the active theme’s styling.
+
+Checkout collects profile details, payment method and invoice-email preference before “Place my order”. Failed payments can be retried or changed to EFT. Unpaid orders cancel after seven days; paid access starts voluntarily or automatically after 90 days. Administration → Settings uses separate accordions and saves, including bank details stored in `app_options`.
+
+Upgrade an existing v0.7 database with the additive migrations; do not reset it. Run `composer install`, `composer migrate`, and schedule `php bin/console commerce:maintain` every minute (or run it with `--watch`). See [Operations](docs/OPERATIONS.md) for publishing assets and configuring EFT.
+
+This is the initial individual-purchase implementation. Real payment processors, bank-payment confirmation administration, company credit purchases, wallets, gifts and refund workflows remain future work in the [commerce plan](docs/COMMERCE-IMPLEMENTATION-PLAN.md). Dummy payments are enabled only in development and tests.
+
+Validation in the local Podman environment: 590 tests, 9,172 assertions, PHPStan and all repository quality gates passed. The repository refs for this update are `main`, `dev-v0.8` and annotated tag `v0.8`.
+
+## Inherited v0.7 foundation
 
 Version 0.7 is the **framework and data-model reset**. Two things happened at once, and each of them alone would have justified the number.
 

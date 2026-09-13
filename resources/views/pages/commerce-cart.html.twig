@@ -1,0 +1,22 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_title = 'My Cart' %}{% set ph_kicker = '' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="container cl-medium py-5"><div class="card"><div class="card-body">
+        <p><a href="/courses">Continue shopping</a></p>
+        {% for item in cart.items %}
+            <div class="border-bottom py-3">
+                <h2 class="h5"><a href="/courses/{{ item.slug }}">{{ item.title }}</a></h2>
+                <p>{{ item.days }} days of access · {{ item.price_label }}</p>
+                <form action="/cart/remove" method="post">
+                    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.id }}">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit">Remove</button>
+                </form>
+            </div>
+        {% else %}<p>Your cart is empty. <a href="/courses">Browse courses</a>.</p>{% endfor %}
+        {% if cart.items %}
+            <p class="h4 mt-4">Total: {{ cart.total_label }}</p>
+            <div class="cl-form-actions"><a class="btn btn-primary" href="/checkout">Checkout</a></div>
+        {% endif %}
+    </div></div></section>
+{% endblock %}

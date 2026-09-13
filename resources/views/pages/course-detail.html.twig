@@ -129,13 +129,13 @@
 							<a class="btn btn-primary w-100" href="/learn/{{ course.slug }}">Open course</a>
 						{% else %}
 							{% if course.price_variants %}
-								<form action="/courses/request" method="post">
+								<form action="/cart/add" method="post">
 									<input type="hidden" name="csrf" value="{{ csrf }}">
 									<input type="hidden" name="course_id" value="{{ course.id }}">
 									<div class="vstack gap-2 mb-3">
 										{% for price_index, price in course.price_variants %}
 											<label class="border rounded p-3 d-flex align-items-start gap-3">
-											<input class="form-check-input mt-1" type="radio" name="access_period_seconds" value="{{ price.access_period_seconds }}" {{ price.is_default ? 'checked' : '' }} required>
+											<input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.is_default ? 'checked' : '' }} required>
 											<span class="flex-grow-1"><strong>{{ price.price_label }}</strong>
 											<br>
 											<span>{{ price.access_period_label }} access</span>
@@ -149,16 +149,13 @@
 											</label>
 										{% endfor %}
 									</div>
-									{% if is_authenticated %}
-										<div class="cl-form-actions">
-											<button class="btn btn-primary w-100" type="submit">Request course</button>
-										</div>
-										<p class="small text-body-secondary mt-2 mb-0">
-											Direct cart checkout is the next commerce stage.
-										</p>
-									{% else %}
-										<a class="btn btn-primary w-100" href="/login?return={{ '/courses/'~course.slug|urlencode }}">Sign in to continue</a>
-									{% endif %}
+                                    <div class="cl-form-actions">
+                                        <button class="btn btn-primary" type="submit" name="action" value="add">Add to cart</button>
+                                        <button class="btn btn-outline-primary" type="submit" name="action" value="buy_now">Buy now</button>
+                                        {% if is_authenticated and 'CATALOGUE.COURSE.REQUEST' in permissions %}
+                                            <button class="btn btn-outline-secondary" type="submit" name="action" value="request">Request from my company</button>
+                                        {% endif %}
+                                    </div>
 								</form>
 							{% else %}
 								<div class="alert alert-warning mb-0">

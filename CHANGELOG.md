@@ -1,7 +1,20 @@
 # Changelog
 
-**LMS version:** 0.7  
-**Date time:** 2026/09/12 SAST  
+**LMS version:** 0.8
+**Date time:** 2026/09/13 SAST
+
+## 2026-09-13 SAST — v0.8 Adding commerce to the LMS
+
+- Add guest and account carts, Add to cart / Buy now actions, and a theme-styled breadcrumb cart with item count and hover/touch summary.
+- Add profile, payment and review checkout stages; integrate Omnipay Dummy simulations with retryable payment attempts and idempotent fulfilment.
+- Preserve order and financial-document snapshots; provide invoice/receipt PDFs, optional invoice emails and durable delivery retries.
+- Support manual EFT instructions using a unique order-number reference. Store editable bank details in `app_options` under Administration → Settings.
+- Group Settings into accordions with independent saves. Put My Orders and My Courses under Account → COURSES.
+- Add seven-day unpaid-order cancellation, voluntary or 90-day automatic access activation, and access expiry checks across learning and assessments.
+- Stream seed-name reservations and roll back memory-test fixtures so repeated QA runs do not accumulate generated records.
+- Apply additive migrations to v0.7; keep the previous baseline and historical records intact.
+
+Local Podman validation: 590 tests, 9,172 assertions, PHPStan level 6, architecture, runtime, UI and release gates passed. This release implements individual purchases; the remaining commerce roadmap and real processor integrations are not yet complete.
 
 ## 2026-09-12 SAST — v0.7 Symfony 8.1.6, and one page shape
 

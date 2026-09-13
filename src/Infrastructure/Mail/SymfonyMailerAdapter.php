@@ -144,6 +144,11 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    public function sendInvoice(string $email, string $number, string $pdf): void
+    {
+        $this->send($email, 'Invoice '.$number, '<p>Your invoice is attached and is available in My Orders.</p>', 'Your invoice is attached and is available in My Orders.', attachment: $pdf, attachmentName: $number.'.pdf');
+    }
+
     public function sendTestMessage(string $email): void
     {
         $appName = $this->settings->platformName();
@@ -161,7 +166,9 @@ class SymfonyMailerAdapter implements MailerInterface
         string $html,
         string $text,
         ?string $replyToEmail = null,
-        string $replyToName = ''
+        string $replyToName = '',
+        ?string $attachment = null,
+        string $attachmentName = ''
     ): void
     {
         if (filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
@@ -184,6 +191,7 @@ class SymfonyMailerAdapter implements MailerInterface
         } elseif ($configuration['reply_to'] !== '') {
             $message->replyTo($configuration['reply_to']);
         }
+        if ($attachment !== null) $message->attach($attachment, $attachmentName, 'application/pdf');
         $mailer->send($message);
     }
 

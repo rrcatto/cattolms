@@ -1600,6 +1600,10 @@ final class CourseRepository
         if ($variant === null) {
             throw new RuntimeException('The course price variant does not exist.');
         }
+        if ($this->db->fetchOne('SELECT id FROM commerce_order_items WHERE variant_id=:id LIMIT 1', ['id'=>$variantId])) {
+            $this->db->executeStatement('UPDATE course_price_variants SET is_active=FALSE,is_default=FALSE WHERE id=:id', ['id'=>$variantId]);
+            return;
+        }
         $position = (int) $variant['position'];
         $this->db->executeStatement(
             'DELETE FROM course_price_variants WHERE course_id=:course_id AND id=:id',

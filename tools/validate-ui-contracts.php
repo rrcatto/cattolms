@@ -284,7 +284,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is built as a plain array now rather than written into F3's hive, so these look
 // for the assignment rather than for set(). What is being protected is unchanged: every page is
 // given navigation, a footer and its section keys, whichever engine renders it.
-foreach (["PLATFORM_ASSET_VERSION = '0.7'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer contract missing: ' . $token);
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);

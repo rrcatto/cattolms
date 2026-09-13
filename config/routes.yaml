@@ -14,3 +14,9 @@ web:
         path: ../src/Http/Controller/
         namespace: CattoLearning\Http\Controller
     type: attribute
+
+commerce:
+    resource:
+        path: ../src/Commerce/Http/
+        namespace: CattoLearning\Commerce\Http
+    type: attribute

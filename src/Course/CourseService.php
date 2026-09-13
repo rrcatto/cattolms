@@ -63,6 +63,7 @@ use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Slug;
+use CattoLearning\Commerce\Application\AccessService;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -87,7 +88,8 @@ final class CourseService
         private readonly OptionRepository $options,
         private readonly HtmlSanitizer $sanitizer,
         private readonly LegacyHtmlCourseImporter $importer,
-        private readonly string $storageRoot
+        private readonly string $storageRoot,
+        private readonly ?AccessService $commerceAccess = null
     ) {
     }
 
@@ -503,7 +505,15 @@ final class CourseService
      */
     public function userCanAccessMedia(int $userId, array $media, bool $platformAdministrator = false): bool
     {
-        return $platformAdministrator || $this->courses->enrolment($userId, (int) ($media['course_id'] ?? 0)) !== null;
+        if ($platformAdministrator) return true;
+        $enrolment = $this->courses->enrolment($userId, (int) ($media['course_id'] ?? 0));
+        if ($enrolment === null) return false;
+        try {
+            $this->commerceAccess?->assertAccess((int)$enrolment['id']);
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+        return true;
     }
 
     /**

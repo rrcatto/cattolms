@@ -316,6 +316,7 @@ final class AuthService
                 throw new RuntimeException('Profile fields may not exceed 160 characters.');
             }
         }
+        if (mb_strlen((string) ($data['billing_address'] ?? '')) > 2000) throw new RuntimeException('Billing address may not exceed 2000 characters.');
         $birthdate = trim((string) ($data['birthdate'] ?? ''));
         if ($birthdate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthdate) !== 1) {
             throw new RuntimeException('Enter the birthdate in YYYY-MM-DD format.');

@@ -249,43 +249,35 @@ final class SeedRepository
         return $lookup;
     }
 
-    /**
-     * Every person name already in the database, so a new set cannot reissue one.
-     *
-     * Both universes are read, not just the generated one. A generated person sharing a name with
-     * a real member of staff is exactly as confusing as two generated people sharing one, and the
-     * name space is large enough that excluding real names costs nothing.
-     *
-     * @return list<string>
-     */
-    public function existingDisplayNames(): array
+    /** @return iterable<string> Existing names are streamed in bounded batches. */
+    public function existingDisplayNames(): iterable
     {
-        return $this->column('SELECT display_name FROM users WHERE display_name IS NOT NULL');
+        return $this->column('users', 'display_name');
     }
 
-    /** @return list<string> */
-    public function existingCompanyNames(): array
+    /** @return iterable<string> */
+    public function existingCompanyNames(): iterable
     {
-        return $this->column('SELECT name FROM companies');
+        return $this->column('companies', 'name');
     }
 
-    /** @return list<string> */
-    public function existingCourseTitles(): array
+    /** @return iterable<string> */
+    public function existingCourseTitles(): iterable
     {
-        return $this->column('SELECT title FROM courses');
+        return $this->column('courses', 'title');
     }
 
-    /** @return list<string> */
-    private function column(string $sql): array
+    /** @return iterable<string> Table and column names are private, fixed call-site constants. */
+    private function column(string $table, string $column): iterable
     {
-        $values = [];
-        foreach ($this->db->fetchAllAssociative($sql) as $row) {
-            $value = trim((string) (array_values($row)[0] ?? ''));
-            if ($value !== '') {
-                $values[] = $value;
+        $after = 0;
+        do {
+            $rows = $this->db->fetchAllAssociative("SELECT id, {$column} AS value FROM {$table} WHERE id>:after ORDER BY id LIMIT 1000", ['after'=>$after]);
+            foreach ($rows as $row) {
+                $after = (int) $row['id'];
+                $value = trim((string) ($row['value'] ?? ''));
+                if ($value !== '') yield $value;
             }
-        }
-
-        return $values;
+        } while (count($rows) === 1000);
     }
 }

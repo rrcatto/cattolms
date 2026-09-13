@@ -170,3 +170,20 @@ services:
     CattoLearning\Infrastructure\Persistence\SessionTimeZoneMiddleware:
         arguments: ['%env(APP_TIMEZONE)%']
         tags: ['doctrine.middleware']
+
+    CattoLearning\Commerce\Application\:
+        resource: '../src/Commerce/Application/'
+    CattoLearning\Commerce\Infrastructure\:
+        resource: '../src/Commerce/Infrastructure/'
+    CattoLearning\Commerce\Policy\:
+        resource: '../src/Commerce/Policy/'
+    CattoLearning\Commerce\Workflow\:
+        resource: '../src/Commerce/Workflow/'
+    CattoLearning\Commerce\Contract\PaymentGatewayInterface: '@CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter'
+    CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter:
+        arguments:
+            $environment: '%kernel.environment%'
+
+    CattoLearning\Commerce\Http\:
+        resource: '../src/Commerce/Http/'
+        tags: ['controller.service_arguments']

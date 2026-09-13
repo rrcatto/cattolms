@@ -293,3 +293,26 @@
     }).catch(()=>{});
   });
 })();
+// The breadcrumb cart uses native disclosure semantics for keyboard and touch.
+// Hover changes the same open state, so assistive technology sees the visible state.
+document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
+    cart.addEventListener('mouseenter', function () {
+        if (window.matchMedia('(hover: hover)').matches) cart.open = true;
+    });
+    cart.addEventListener('mouseleave', function () {
+        if (!cart.contains(document.activeElement)) cart.open = false;
+    });
+    cart.addEventListener('focusout', function (event) {
+        if (!cart.contains(event.relatedTarget)) cart.open = false;
+    });
+    cart.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            cart.open = false;
+            cart.querySelector('summary').focus();
+            event.preventDefault();
+        }
+    });
+    document.addEventListener('click', function (event) {
+        if (!cart.contains(event.target)) cart.open = false;
+    });
+});
