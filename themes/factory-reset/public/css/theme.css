@@ -494,3 +494,8 @@ body[data-cl-palette-managed="1"] .sidebar .nav-group+.nav-group,body.cl-palette
 @media(max-width:640px){
   .main>.content,.public-shell>.public-main{margin:12px 10px;padding:18px;border-radius:12px}
 }
+
+/* Theme-owned cart material; core supplies disclosure and geometry only. */
+.cl-cart-count { background:var(--primary); color:var(--on-primary); }
+.cl-cart-panel { background:var(--surface); color:var(--ink); border-color:var(--line); box-shadow:var(--shadow); }
+.cl-cart-line { border-color:var(--line); }

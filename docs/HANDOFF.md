@@ -1,4 +1,18 @@
-# Catto Learning 0.7 — Development Handoff
+# Catto Learning 0.8 — Development Handoff
+
+**Date:** 2026/09/13 SAST
+**Update:** Adding commerce to the LMS
+**Git publication:** `main`, `dev-v0.8`, annotated tag `v0.8`
+
+The individual purchase flow is implemented: guest carts, staged checkout, profile capture, Omnipay Dummy simulations, manual EFT instructions, payment retries, immutable orders/invoices, PDF downloads, optional invoice email and access timing. Settings now have independent accordion forms, with bank details stored in `app_options`. Cart colours and surfaces belong to the active theme.
+
+Run additive migrations against v0.7, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. Local Podman QA passed 590 tests and 9,172 assertions, PHPStan and all validators; guest cart and settings layouts were checked in Chromium at desktop and mobile sizes.
+
+The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures.
+
+## Historical v0.7 handoff
+
+### Catto Learning 0.7 — Development Handoff
 
 **LMS version:** 0.7  
 **Date time:** 2026/09/12 SAST  

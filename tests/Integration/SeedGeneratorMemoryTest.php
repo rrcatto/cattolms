@@ -68,13 +68,22 @@ final class SeedGeneratorMemoryTest extends TestCase
     private const SMALL = 500;
     private const LARGE = 5000;
 
+    private ?SeedGenerator $seedGenerator = null;
+    private ?\CattoLearning\Infrastructure\Persistence\Database $database = null;
+
     private function generator(): SeedGenerator
     {
+        if ($this->seedGenerator !== null) return $this->seedGenerator;
         $container = CliBootstrap::boot()['container'];
-        $generator = $container->get(SeedGenerator::class);
-        self::assertInstanceOf(SeedGenerator::class, $generator);
+        $this->database = $container->get(\CattoLearning\Infrastructure\Persistence\Database::class);
+        $this->database->beginTransaction();
+        $this->seedGenerator = $container->get(SeedGenerator::class);
+        return $this->seedGenerator;
+    }
 
-        return $generator;
+    protected function tearDown(): void
+    {
+        if ($this->database?->isTransactionActive()) $this->database->rollBack();
     }
 
     /**

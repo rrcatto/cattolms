@@ -68,7 +68,11 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account/profile', $accountChildren['account-profile']['href'] ?? null);
         self::assertSame('/account/emails', $accountChildren['account-emails']['href'] ?? null);
         self::assertSame('/account/social', $accountChildren['account-social']['href'] ?? null);
-        self::assertSame('/account/library', $accountChildren['account-learning']['href'] ?? null);
+        self::assertSame('/account/courses', $accountChildren['account-learning']['href'] ?? null);
+        self::assertSame('/account/orders', $accountChildren['account-orders']['href'] ?? null);
+        self::assertSame('COURSES', $accountChildren['account-courses-group']['label'] ?? null);
+        self::assertCount(2, $accountChildren['account-courses-group']['children']);
+        self::assertArrayNotHasKey('commerce', $byKey);
         self::assertSame('/account/sessions', $accountChildren['account-sessions']['href'] ?? null);
         self::assertSame('/account/activity', $accountChildren['account-activity']['href'] ?? null);
 
@@ -355,7 +359,7 @@ final class NavigationContractTest extends TestCase
                 'account-all',
                 'account-dashboard',
                 'account-profile-group',
-                'account-learning',
+                'account-courses-group',
                 'account-sessions',
                 'account-activity',
             ],
@@ -374,7 +378,7 @@ final class NavigationContractTest extends TestCase
         // The labels asserted here are the ones the section registries actually issue. "My Learning"
         // stood here while the registry said "My Course Library", so the documentation and the test
         // agreed with each other and neither agreed with the platform.
-        foreach (['All sections','Dashboard','Profile','My Course Library','Sessions','Activity','Company','People','Course Requests','Course Credits','Administration','Roles & ACL','Themes','Settings','footer_navigation'] as $label) {
+        foreach (['All sections','Dashboard','Profile','My Courses','Sessions','Activity','Company','People','Course Requests','Course Credits','Administration','Roles & ACL','Themes','Settings','footer_navigation'] as $label) {
             self::assertStringContainsString($label, $doc);
         }
     }

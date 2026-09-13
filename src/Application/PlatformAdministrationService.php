@@ -1361,6 +1361,7 @@ final class PlatformAdministrationService
                     'platform_name' => $this->settings->platformName(),
                     'platform_name_source' => $this->settings->platformNameSource(),
                     'mail_settings' => $this->settings->mailAdminView(),
+                    'bank_details' => $this->settings->bankDetails(),
                     'system_company_name' => $this->options->get('system_company_name', (string) $systemCompany['name']),
                     'system_company_domain' => (string) $systemCompany['domain'],
                 ];
@@ -2357,6 +2358,17 @@ final class PlatformAdministrationService
             $this->companies->updateManaged((int) $system['id'], $companyName, $companyDomain);
         }
         $this->audit->record($actorUserId, 'platform.settings_updated');
+    }
+
+    /** Bank settings are saved independently of platform identity and SMTP configuration.
+     * @param array<string,mixed> $input
+     */
+    public function saveBankDetails(array $input, int $actorUserId): void
+    {
+        $this->transactions->run(function () use ($input, $actorUserId): void {
+            $this->settings->saveBankDetails($input, $actorUserId);
+            $this->audit->record($actorUserId, 'platform.bank_details_updated');
+        });
     }
 
     public function resetPlatformName(int $actorUserId): void

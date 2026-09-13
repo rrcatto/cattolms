@@ -716,7 +716,7 @@ a.gn-crumb:hover { color: var(--gn-gold-bright); text-decoration: underline; tex
 
 /* == 10  Buttons and actions ============================================== */
 
-.gn-main .btn, .gn-btn {
+.gn-main .btn, .gn-body .cl-cart-chrome .btn, .gn-btn {
   --bs-btn-padding-y: .62rem;
   --bs-btn-padding-x: 1.15rem;
   --bs-btn-font-family: var(--gn-font-ui);
@@ -745,10 +745,10 @@ a.gn-crumb:hover { color: var(--gn-gold-bright); text-decoration: underline; tex
 }
 
 .gn-main .btn-lg { --bs-btn-padding-y: .82rem; --bs-btn-padding-x: 1.6rem; --bs-btn-font-size: .95rem; }
-.gn-main .btn-sm { --bs-btn-padding-y: .42rem; --bs-btn-padding-x: .8rem; --bs-btn-font-size: .78rem; --bs-btn-border-radius: var(--gn-radius-sm); border-radius: var(--gn-radius-sm); }
+.gn-main .btn-sm, .gn-body .cl-cart-chrome .btn-sm { --bs-btn-padding-y: .42rem; --bs-btn-padding-x: .8rem; --bs-btn-font-size: .78rem; --bs-btn-border-radius: var(--gn-radius-sm); border-radius: var(--gn-radius-sm); }
 
 /* Primary — gilded, raised, with a real pressed state. */
-.gn-main .btn-primary, .gn-main .button-primary, .gn-main .btn-accent, .gn-btn-gold {
+.gn-main .btn-primary, .gn-body .cl-cart-chrome .btn-primary, .gn-main .button-primary, .gn-main .btn-accent, .gn-btn-gold {
   --bs-btn-color: #1b1608;
   --bs-btn-bg: linear-gradient(135deg, #f2dfa4, #d4bb74 56%, #b89c5c);
   --bs-btn-border-color: #a78f53;
@@ -766,12 +766,12 @@ a.gn-crumb:hover { color: var(--gn-gold-bright); text-decoration: underline; tex
   border: 1px solid #a78f53;
   box-shadow: var(--gn-shadow-raise);
 }
-.gn-main .btn-primary:hover, .gn-main .btn-accent:hover, .gn-btn-gold:hover {
+.gn-main .btn-primary:hover, .gn-body .cl-cart-chrome .btn-primary:hover, .gn-main .btn-accent:hover, .gn-btn-gold:hover {
   color: #1b1608;
   background: linear-gradient(135deg, #f8ebc0, #ddc684 56%, #c4a866);
   box-shadow: 0 3px 0 rgba(111, 90, 47, .3), 0 12px 26px rgba(35, 28, 12, .24);
 }
-.gn-main .btn-primary:active, .gn-btn-gold:active {
+.gn-main .btn-primary:active, .gn-body .cl-cart-chrome .btn-primary:active, .gn-btn-gold:active {
   background: linear-gradient(135deg, #c0a662, #ac9257);
   box-shadow: inset 0 2px 5px rgba(60, 46, 14, .35);
 }
@@ -3364,3 +3364,13 @@ body.gn-body.cl-page-texture {
   .gn-identity-text { display: none; }
   .gn-identity { padding: 4px; border-color: transparent; background: none; }
 }
+
+/* Breadcrumb commerce uses the same gold actions and dark surface as navigation. */
+.gn-breadcrumb-inner { display:flex; align-items:center; gap:1rem; }
+.gn-body .cl-cart-chrome { color:var(--gn-on-dark); }
+.gn-body .cl-cart-count { background:var(--gn-gold); color:var(--gn-black); }
+.gn-body .cl-cart-panel { background:var(--gn-black-soft); color:var(--gn-on-dark); border-color:var(--gn-line-strong); box-shadow:0 26px 60px rgba(0,0,0,.55); }
+.gn-body .cl-cart-panel a:not(.btn) { color:var(--gn-gold-bright); }
+.gn-body .cl-cart-panel a:not(.btn):hover { color:var(--gn-gold-soft); }
+.gn-body .cl-cart-line { border-color:var(--gn-line-strong); }
+@media (max-width:700px) { .gn-breadcrumb-inner { flex-wrap:wrap; } }

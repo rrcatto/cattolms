@@ -85,11 +85,11 @@ final class SeedNameFactory
      * The caller passes what the database already holds, so a second seed set cannot repeat a
      * person, company or course title from the first.
      *
-     * @param list<string> $people
-     * @param list<string> $companies
-     * @param list<string> $courses
+     * @param iterable<string> $people
+     * @param iterable<string> $companies
+     * @param iterable<string> $courses
      */
-    public function reserve(array $people, array $companies, array $courses): void
+    public function reserve(iterable $people, iterable $companies, iterable $courses): void
     {
         foreach ($people as $name) $this->usedPeople[self::key($name)] = true;
         foreach ($companies as $name) $this->usedCompanies[self::key($name)] = true;

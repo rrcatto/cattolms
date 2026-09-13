@@ -657,3 +657,11 @@ Core dims this to 62% opacity,which is fine on the flyout it was designed for an
 .rl-nav{order:3;width:100%;flex-basis:100%}
 .rl-header-actions{margin-left:auto}
 }
+
+/* Theme-owned cart material; core supplies disclosure and geometry only. */
+.cl-cart-count { background:var(--primary); color:var(--on-primary); }
+.cl-cart-panel { background:var(--surface); color:var(--ink); border-color:var(--line); box-shadow:var(--shadow); }
+.cl-cart-line { border-color:var(--line); }
+
+.rl-context-inner { display:flex; align-items:center; gap:1rem; }
+@media(max-width:700px) { .rl-context-inner { flex-wrap:wrap; } }

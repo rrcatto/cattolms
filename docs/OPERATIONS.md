@@ -1,9 +1,17 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.7  
-**Date time:** 2026/09/12 SAST  
-**Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15  
+**LMS:** 0.8
+**Date time:** 2026/09/12 SAST
+**Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
 **Environment:** disposable TEST/DEV until explicitly declared production
+
+## v0.8 commerce upgrade from v0.7
+
+Use the existing database and run `composer install` followed by `composer migrate`. The three commerce migrations are additive. Do not use `smoke:install` to upgrade a populated v0.7 development instance. Publish core CSS/JS and the modified bundled themes using the development publication procedure below.
+
+Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It cancels overdue unpaid orders, advances access deadlines and retries requested invoice emails. The local Podman setup uses a dedicated worker; `deployment/commerce-worker.compose.yaml` exports its configuration for use with the workspace’s `env/compose.yaml`.
+
+Configure Administration → Settings → Bank details before providing EFT instructions to customers. The Dummy gateway simulates card outcomes only in development/test environments. No live payment-processor credentials are included in this update.
 
 **How much of this document is v0.7.** The install, reset, QA-gate and Seed Database instructions
 below are current, and the sections that described the REAL/SEED universe have been corrected to say
@@ -431,3 +439,9 @@ paragraphs you remember are the ones that described them, they described v0.6.
 What replaces all three is the single sentence above: reset the database. `composer smoke:install`
 is the whole cleanup story now, and it is the only one, which is why generating is safe to do
 freely and impossible to undo selectively.
+
+### EFT bank details
+
+Configure Administration → Settings → Bank details before accepting EFT payments. Bank name, account name, account number and branch code are stored together as JSON under `commerce_bank_details` in `app_options`, with the saving administrator and timestamp. There is no environment-variable fallback. Existing EFT orders display the current settings together with their unique order reference; when unconfigured they ask the customer to check the order again before paying. Invoice snapshots remain unchanged.
+
+Settings use individual accordions and separate saves for platform identity, outgoing mail and bank details. Saving one section does not submit another section’s fields. Configuration guidance and maintenance keep their own accordions.

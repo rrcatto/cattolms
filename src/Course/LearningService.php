@@ -34,6 +34,7 @@ use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Support\Slug;
+use CattoLearning\Commerce\Application\AccessService;
 use InvalidArgumentException;
 
 final class LearningService
@@ -55,7 +56,8 @@ final class LearningService
         private readonly CoursePortabilityRepository $portability,
         private readonly ContentBlockRenderer $blockRenderer,
         private readonly AuditRepository $audit,
-        private readonly AdministrationRepository $administration
+        private readonly AdministrationRepository $administration,
+        private readonly ?AccessService $commerceAccess = null
     ) {
     }
 
@@ -170,7 +172,9 @@ final class LearningService
         if ($enrolment === null) {
             throw new InvalidArgumentException($preview ? 'Start a course preview first.' : 'This course is not in your library.');
         }
-        $this->assertNotExpired($enrolment);
+        if (!($this->commerceAccess?->assertAccess((int)$enrolment['id']) ?? false)) {
+            $this->assertNotExpired($enrolment);
+        }
         $course['modules'] = $this->courses->modules((int) $course['id']);
         $course['grade_bands'] = $this->courses->gradeBands((int) $course['id']);
         $course['enrolment'] = $enrolment;
@@ -200,6 +204,7 @@ final class LearningService
         if ($enrolment === null) {
             throw new InvalidArgumentException('This course is not in your library.');
         }
+        if ($this->commerceAccess?->start((int)$enrolment['id'])) return;
         if ((string) $enrolment['status'] === 'assigned') {
             $this->courses->startEnrolment((int) $enrolment['id'], $userId);
             $this->audit->record($userId, 'course.started', [

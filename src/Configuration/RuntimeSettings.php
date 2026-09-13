@@ -75,6 +75,36 @@ final class RuntimeSettings
         return self::normaliseDomain(Env::string('APP_DOMAIN', 'local'));
     }
 
+    /**
+     * Current EFT instructions are administrator-managed database settings, never deployment defaults.
+     * @return array{bank_name:string,account_name:string,account_number:string,branch_code:string,configured:bool}
+     */
+    public function bankDetails(): array
+    {
+        $saved = json_decode($this->options->get('commerce_bank_details', '{}'), true, 512, JSON_THROW_ON_ERROR);
+        $details = [];
+        foreach (['bank_name','account_name','account_number','branch_code'] as $field) {
+            $details[$field] = (string) ($saved[$field] ?? '');
+        }
+        return $details + ['configured'=>!in_array('', $details, true)];
+    }
+
+    /** Validates the whole section before replacing its single app_options record.
+     * @param array<string,mixed> $input
+     */
+    public function saveBankDetails(array $input, int $actorUserId): void
+    {
+        $details = [];
+        foreach (['bank_name','account_name','account_number','branch_code'] as $field) {
+            $value = trim((string) ($input[$field] ?? ''));
+            if ($value === '' || mb_strlen($value) > 160) throw new InvalidArgumentException('Complete all four bank details fields (up to 160 characters each).');
+            $details[$field] = $value;
+        }
+        if (preg_match('/^[0-9]{1,34}$/D', $details['account_number']) !== 1) throw new InvalidArgumentException('Enter the bank account number using digits only.');
+        if (preg_match('/^[0-9]{6}$/D', $details['branch_code']) !== 1) throw new InvalidArgumentException('Enter the six-digit branch code.');
+        $this->options->set('commerce_bank_details', json_encode($details, JSON_THROW_ON_ERROR), $actorUserId);
+    }
+
     public function platformName(): string
     {
         return $this->options->find('platform_name') ?? Env::string('APP_NAME', 'Catto Learning');

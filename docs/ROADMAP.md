@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.7  
-**Date time:** 2026/09/12 SAST  
-**Current stage:** v0.7 released 2026/09/12 — Symfony 8.1 in place of Fat-Free and PHP-DI, the REAL/SEED split removed, and the interface work that followed. 0.5.8.3 remains the accepted VPS version. Commerce next.
+**Current LMS version:** 0.8
+**Date time:** 2026/09/13 SAST
+**Current stage:** v0.8 adds individual commerce (Dummy/EFT checkout, invoices, access timing and bank settings). Continue the remaining stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
 
 Only the project owner decides future release numbers.
 

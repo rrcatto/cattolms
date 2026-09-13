@@ -80,6 +80,11 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendContactMessage($name, $email, $subject, $message);
     }
 
+    public function sendInvoice(string $email, string $number, string $pdf): void
+    {
+        $this->mailer->sendInvoice($this->router->deliveryAddress($email), $number, $pdf);
+    }
+
     public function sendTestMessage(string $email): void
     {
         $this->mailer->sendTestMessage($this->router->deliveryAddress($email));

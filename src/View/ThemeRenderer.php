@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.7';
+    private const PLATFORM_ASSET_VERSION = '0.8';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -82,7 +82,8 @@ final class ThemeRenderer
         private readonly RuntimeSettings $settings,
         private readonly AdministrationSectionRegistry $adminSections,
         private readonly AccountSectionRegistry $accountSections,
-        private readonly CompanySectionRegistry $companySections
+        private readonly CompanySectionRegistry $companySections,
+        private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null
     ) {
     }
 
@@ -226,7 +227,7 @@ final class ThemeRenderer
      */
     public function viewModel(string $page, array $data, string $themeKey, bool $previewActive): array
     {
-        $model = [];
+        $model = ['cart_summary'=>$this->carts?->summary() ?? ['items'=>[], 'count'=>0, 'total_label'=>'R 0.00']];
 
         foreach ([
             'title' => '', 'page_title' => '', 'page_kicker' => '', 'active_nav' => '', 'body_class' => '',
@@ -589,6 +590,8 @@ final class ThemeRenderer
             // can see the dashboard, and the second item otherwise.
             $accountChildren = [$child('account-all','All sections','/account','all')];
             $profileChildren = [];
+            $coursesChildren = [];
+            if ($this->can($data, 'COMMERCE.ORDER.VIEW')) $coursesChildren[] = $child('account-orders','My Orders','/account/orders','requests');
             $dashboardChild = null;
             $remainingChildren = [];
 
@@ -597,6 +600,10 @@ final class ThemeRenderer
                 $entry = $child('account-'.$section['key'],$section['label'],$section['route'],$section['icon']);
                 if (in_array($section['key'], $profileSectionKeys, true)) {
                     $profileChildren[] = $entry;
+                    continue;
+                }
+                if ($section['key'] === 'learning') {
+                    $coursesChildren[] = $child('account-learning','My Courses','/account/courses','learning');
                     continue;
                 }
                 if ($section['key'] === 'dashboard') {
@@ -612,6 +619,7 @@ final class ThemeRenderer
             if ($profileChildren !== []) {
                 $accountChildren[] = $child('account-profile-group','Profile','/account/profile','profile',$profileChildren);
             }
+            if ($coursesChildren !== []) $accountChildren[] = $child('account-courses-group','COURSES','/account/courses','learning',$coursesChildren);
             foreach ($remainingChildren as $entry) {
                 $accountChildren[] = $entry;
             }
@@ -811,7 +819,7 @@ final class ThemeRenderer
         }
 
         if ($active === 'learning') {
-            $appendLink($crumbs, 'My Course Library', '/account/library');
+            $appendLink($crumbs, 'My Courses', '/account/courses');
             if (str_starts_with($path, '/learn/')) {
                 $course = is_array($data['course'] ?? null) ? $data['course'] : [];
                 $courseTitle = trim((string) ($course['title'] ?? 'Course'));

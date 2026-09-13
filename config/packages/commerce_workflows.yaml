@@ -1,0 +1,49 @@
+framework:
+    workflows:
+        commerce_order:
+            type: state_machine
+            supports: [CattoLearning\Commerce\Domain\Lifecycle]
+            marking_store: {type: method, property: state}
+            initial_marking: placed
+            places: [placed, awaiting_payment, paid, fulfilled, cancelled, manual_review, partially_refunded, refunded]
+            transitions:
+                await_payment: {from: placed, to: awaiting_payment}
+                confirm_paid: {from: awaiting_payment, to: paid}
+                fulfil: {from: paid, to: fulfilled}
+                cancel: {from: [placed, awaiting_payment], to: cancelled}
+                hold_for_review: {from: [awaiting_payment, paid, cancelled], to: manual_review}
+                release_review_paid: {from: manual_review, to: paid}
+                reactivate: {from: cancelled, to: awaiting_payment}
+                mark_partially_refunded: {from: [paid, fulfilled, partially_refunded], to: partially_refunded}
+                mark_refunded: {from: [paid, fulfilled, partially_refunded], to: refunded}
+        commerce_payment:
+            type: state_machine
+            supports: [CattoLearning\Commerce\Domain\Lifecycle]
+            marking_store: {type: method, property: state}
+            initial_marking: created
+            places: [created, pending, paid, failed, cancelled, disputed, reversed, partially_refunded, refunded]
+            transitions:
+                submit: {from: created, to: pending}
+                confirm: {from: [created, pending], to: paid}
+                fail: {from: [created, pending], to: failed}
+                cancel: {from: [created, pending], to: cancelled}
+                dispute: {from: paid, to: disputed}
+                resolve_dispute_paid: {from: disputed, to: paid}
+                reverse: {from: [paid, disputed], to: reversed}
+                partially_refund: {from: [paid, partially_refunded], to: partially_refunded}
+                refund: {from: [paid, partially_refunded], to: refunded}
+        commerce_entitlement:
+            type: state_machine
+            supports: [CattoLearning\Commerce\Domain\Lifecycle]
+            marking_store: {type: method, property: state}
+            initial_marking: awaiting_activation
+            places: [awaiting_activation, active, suspended, expired, revoked]
+            transitions:
+                activate: {from: awaiting_activation, to: active}
+                auto_activate: {from: awaiting_activation, to: active}
+                expire: {from: active, to: expired}
+                suspend: {from: [awaiting_activation, active], to: suspended}
+                restore_waiting: {from: suspended, to: awaiting_activation}
+                restore_active: {from: suspended, to: active}
+                revoke: {from: [awaiting_activation, active, suspended, expired], to: revoked}
+                reopen: {from: expired, to: active}

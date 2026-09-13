@@ -30,6 +30,7 @@ namespace CattoLearning\Course;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\Slug;
+use CattoLearning\Commerce\Application\AccessService;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -39,7 +40,8 @@ final class AssessmentService
         private readonly TransactionManager $transactions,
         private readonly CourseRepository $courses,
         private readonly AssessmentRepository $assessments,
-        private readonly AuditRepository $audit
+        private readonly AuditRepository $audit,
+        private readonly ?AccessService $commerceAccess = null
     ) {
     }
 
@@ -110,6 +112,7 @@ final class AssessmentService
     public function session(int $userId, string $publicId): array
     {
         $session = $this->requireSession($userId, $publicId);
+        if ($session['status']==='in_progress') $this->commerceAccess?->assertAccess((int)$session['enrolment_id']);
         if ((string) $session['status'] === 'in_progress' && $this->remainingSeconds($session) <= 0) {
             return $this->finalise($session, true);
         }
@@ -132,6 +135,7 @@ final class AssessmentService
     public function respond(int $userId, string $publicId, int $questionId, ?int $optionId, bool $skip): array
     {
         $session = $this->requireSession($userId, $publicId);
+        if ($session['status']==='in_progress') $this->commerceAccess?->assertAccess((int)$session['enrolment_id']);
         if ((string) $session['status'] !== 'in_progress') {
             return $this->result($userId, $publicId);
         }
@@ -163,6 +167,7 @@ final class AssessmentService
     public function finish(int $userId, string $publicId): array
     {
         $session = $this->requireSession($userId, $publicId);
+        if ($session['status']==='in_progress') $this->commerceAccess?->assertAccess((int)$session['enrolment_id']);
         if ((string) $session['status'] !== 'in_progress') {
             return $this->result($userId, $publicId);
         }
@@ -543,6 +548,7 @@ final class AssessmentService
         if ($enrolment === null) {
             throw new InvalidArgumentException($preview ? 'Start a course preview first.' : 'This course is not in your library.');
         }
+        $this->commerceAccess?->assertAccess((int)$enrolment['id']);
         if (empty($enrolment['started_at'])) {
             throw new InvalidArgumentException('Click Start course before attempting an assessment.');
         }

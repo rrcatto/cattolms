@@ -130,7 +130,7 @@
 						{% endfor %}
 					</nav>
 				</div>
-				{% if breadcrumbs|length > 1 %}
+				{% if breadcrumbs|length > 0 %}
 					<div class="gn-breadcrumb-bar" data-theme-breadcrumb>
 						<div class="gn-breadcrumb-inner">
 							<nav class="gn-breadcrumbs" aria-label="Breadcrumb">
@@ -142,6 +142,7 @@
 									{% endif %}
 								{% endfor %}
 							</nav>
+{% include '@platform/partials/cart-summary.html.twig' %}
 						</div>
 					</div>
 				{% endif %}

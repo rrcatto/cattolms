@@ -1,0 +1,12 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_kicker = document.kind|capitalize %}{% set ph_title = document.number %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="container cl-medium py-5"><div class="card"><div class="card-body">
+        <p>Issued {{ document.issued_at|date('d M Y H:i') }}</p>
+        <h2 class="h5">Billed to</h2><p>{{ document.details.billing_name }}<br>{{ document.details.billing_address|nl2br }}</p>
+        {% for item in document.details.items %}<p>{{ item.course_title }} · {{ item.access_period_seconds / 86400 }} days · {{ item.price_label }}</p>{% endfor %}
+        <p class="h4">Total: {{ total_label }}</p><p>Tax charged: 0.00. This is a development transaction; no real payment was collected.</p>
+        <p><a href="/commerce/orders/{{ document.order_id }}">Back to order</a></p>
+    </div></div></section>
+{% endblock %}

@@ -40,6 +40,8 @@ declare(strict_types=1);
 namespace CattoLearning\Support;
 
 use NumberFormatter;
+use InvalidArgumentException;
+use OverflowException;
 
 final class Money
 {
@@ -85,6 +87,15 @@ final class Money
         return new self(0, self::normaliseCurrency($currency));
     }
 
+    /** Strict financial boundary; legacy form factories retain their historical normalization. */
+    public static function strictMinorUnits(int $amount, string $currency): self
+    {
+        if ($amount < 0 || preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
+            throw new InvalidArgumentException('Invalid monetary amount or currency.');
+        }
+        return new self($amount, $currency);
+    }
+
     public function isFree(): bool
     {
         return $this->minorUnits === 0;
@@ -92,18 +103,27 @@ final class Money
 
     public function plus(self $other): self
     {
+        if ($this->currency !== $other->currency) {
+            throw new InvalidArgumentException('Cannot combine different currencies.');
+        }
+        if ($other->minorUnits > PHP_INT_MAX - $this->minorUnits) {
+            throw new OverflowException('Monetary total is too large.');
+        }
         return new self($this->minorUnits + $other->minorUnits, $this->currency);
     }
 
     public function times(int $quantity): self
     {
+        if ($quantity > 0 && $this->minorUnits > intdiv(PHP_INT_MAX, $quantity)) {
+            throw new OverflowException('Monetary total is too large.');
+        }
         return new self($this->minorUnits * max(0, $quantity), $this->currency);
     }
 
     /** The amount as a plain decimal string, for a form field or an export. */
     public function toMajorUnits(): string
     {
-        return number_format($this->minorUnits / 100, 2, '.', '');
+        return intdiv($this->minorUnits, 100) . '.' . str_pad((string) ($this->minorUnits % 100), 2, '0', STR_PAD_LEFT);
     }
 
     /**

@@ -646,11 +646,24 @@ final class AdminController extends BaseController
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
-        $this->platformAdministration->saveSettings($_POST, $user->id);
-        $this->flash('success', 'Platform settings were saved.');
-        $this->redirect('/admin/settings');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->saveSettings($_POST, $user->id);
+            $this->flash('success', 'Platform settings were saved.');
+            $this->redirect('/admin/settings?section=identity#settings-identity');
+        }, '/admin/settings?section=identity#settings-identity');
     }
 
+    #[Route('/admin/settings/bank', name: 'admin_save_bank_details', methods: ['POST'])]
+    public function saveBankDetails(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->saveBankDetails($_POST, $user->id);
+            $this->flash('success', 'Bank details were saved. EFT orders now display these details.');
+            $this->redirect('/admin/settings?section=bank#settings-bank');
+        }, '/admin/settings?section=bank#settings-bank');
+    }
 
     #[Route('/admin/settings/platform-name/reset', name: 'admin_reset_platform_name', methods: ['POST'])]
     public function resetPlatformName(): Response
@@ -659,7 +672,7 @@ final class AdminController extends BaseController
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         $this->platformAdministration->resetPlatformName($user->id);
         $this->flash('success', 'Platform name now follows APP_NAME from .env.');
-        $this->redirect('/admin/settings');
+        $this->redirect('/admin/settings?section=identity#settings-identity');
     }
 
 
@@ -689,8 +702,8 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->platformAdministration->saveMailSettings($_POST, $user->id);
             $this->flash('success', 'SMTP settings were saved as database overrides.');
-            $this->redirect('/admin/settings');
-        }, '/admin/settings');
+            $this->redirect('/admin/settings?section=mail#settings-mail');
+        }, '/admin/settings?section=mail#settings-mail');
     }
 
 
@@ -701,7 +714,7 @@ final class AdminController extends BaseController
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         $this->platformAdministration->resetMailSettings($user->id);
         $this->flash('success', 'Mail settings now follow the MAIL_* values in .env.');
-        $this->redirect('/admin/settings');
+        $this->redirect('/admin/settings?section=mail#settings-mail');
     }
 
 
@@ -715,7 +728,7 @@ final class AdminController extends BaseController
             'Removed %d expired login links, %d expired authentication sessions and %d expired web sessions.',
             $result['login_tokens'], $result['auth_sessions'], $result['web_sessions']
         ));
-        $this->redirect('/admin/settings');
+        $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
     }
 
 
@@ -727,8 +740,8 @@ final class AdminController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->mailer->sendTestMessage($user->primaryEmail);
             $this->flash('success', 'A test email was sent to ' . $user->primaryEmail . '.');
-            $this->redirect('/admin/settings');
-        }, '/admin/settings');
+            $this->redirect('/admin/settings?section=mail#settings-mail');
+        }, '/admin/settings?section=mail#settings-mail');
     }
 
 
@@ -825,6 +838,7 @@ final class AdminController extends BaseController
         }
         if (in_array('settings', $sectionKeys, true)) {
             $data['maintenance'] = $this->maintenance->pending();
+            $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
         }
         if (in_array('roles', $sectionKeys, true)) {
             $data['roles_acl'] = $this->roleAdministration->roles();

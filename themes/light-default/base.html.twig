@@ -44,7 +44,7 @@
 		<div class="ld-stage">
 			<div class="ld-shell">
 				<div class="ld-frame">
-					<div class="ld-frame-chrome">
+					<div class="ld-frame-chrome" data-theme-breadcrumb>
 						<svg class="ld-ico ld-chrome-ico" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ theme.asset_url }}/img/icons.svg#ld-location"></use></svg>
 						{% if breadcrumbs|length > 0 %}
 							<nav class="ld-crumbs" aria-label="Breadcrumb">
@@ -59,7 +59,8 @@
 						{% else %}
 							<span class="ld-crumbs"><span class="ld-crumb ld-crumb-current">{{ page.title }}</span></span>
 						{% endif %}
-						{% if theme_preview_active %}
+						{% include '@platform/partials/cart-summary.html.twig' %}
+{% if theme_preview_active %}
 							<span class="ld-chrome-flag">Theme preview</span>
 						{% endif %}
 					</div>

@@ -63,7 +63,7 @@
 				</nav>
 			</aside>
 			<div class="main fs-main">
-				<header class="topbar fs-topbar">
+				<header class="topbar fs-topbar" data-theme-breadcrumb>
 					<div class="fs-topbar-left">
 						<button class="icon-btn mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
 						<nav class="fs-breadcrumbs" aria-label="Breadcrumb">
@@ -87,6 +87,7 @@
 							<a class="btn btn-primary btn-sm" href="/login">Register / Sign in</a>
 						{% endif %}
 					</div>
+{% include '@platform/partials/cart-summary.html.twig' %}
 				</header>
 				<main class="content fs-content">
 					{% include '@theme/partials/flash.html.twig' %}

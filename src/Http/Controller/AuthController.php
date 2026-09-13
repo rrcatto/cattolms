@@ -34,7 +34,7 @@ final class AuthController extends BaseController
     public function loginForm(): Response
     {
         if ($this->currentUser() !== null) {
-            $this->redirect('/account/library');
+            $this->redirect($this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')));
         }
         return $this->render('login', [
             'title' => 'Sign in',

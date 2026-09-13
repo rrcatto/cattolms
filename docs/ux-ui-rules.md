@@ -564,3 +564,15 @@ UI change works.
 - Created. Records every interface rule the owner has given through 2026/09/10, including the
   slanted texture definition, the table column-width rule, the row-action stacking rule, the course
   card contract, the profile submenu and the company type inference.
+
+## Commerce checkout (owner instruction, 2026/09/13)
+
+- “Add to cart” stays on the course; “Buy now” adds the selection and opens checkout. Guests can build a cart before signing in.
+- Put the count-bearing cart icon and hover summary on the right of the breadcrumb bar, with “Proceed to checkout now” and Checkout to its left. Keep the disclosure usable by keyboard and touch.
+- Use My Cart (`/cart`). Account → COURSES contains My Orders (`/account/orders`) and My Courses (`/account/courses`); do not add a Purchases navigation item.
+- Checkout collects sign-in, profile details, payment method and invoice-email preference before review and “Place my order”. Orders retain downloadable PDF invoices.
+- A failed payment offers another method or paying later. Unpaid orders cancel after seven days; EFT uses the unique order number as its reference.
+
+- Cart colours, opaque dropdown surfaces and button treatments belong to each theme. Core cart CSS owns geometry and interaction only. Gilded Noir uses its existing gold primary-button treatment and dark navigation surface, including buttons outside the main content area.
+
+- Administration → Settings uses one shared-pattern accordion per section. Each editable section has its own save action; keep the saved section open. Bank details belong in `app_options`, never `.env`, and EFT orders display the current details and unique order reference.

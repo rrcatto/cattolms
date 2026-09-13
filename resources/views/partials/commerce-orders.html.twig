@@ -1,0 +1,5 @@
+{% include '@platform/partials/pagination.html.twig' with {'pg': orders_pagination} %}
+{% for row in rows %}
+    <div class="border-bottom py-3"><a href="/account/orders/{{ row.id }}">Order {{ row.id }}</a> · {{ row.placed_at|date('d M Y H:i') }} · {{ row.total_label }} · {{ row.state|replace({'_':' '})|capitalize }}</div>
+{% else %}<p>You have not placed any orders yet.</p>{% endfor %}
+{% include '@platform/partials/pagination.html.twig' with {'pg': orders_pagination} %}

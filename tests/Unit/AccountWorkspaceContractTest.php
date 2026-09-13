@@ -52,7 +52,7 @@ final class AccountWorkspaceContractTest extends TestCase
         $sections = (new AccountSectionRegistry())->all();
         self::assertSame(['dashboard','profile','emails','social','learning','sessions','activity'], array_column($sections, 'key'));
         self::assertSame(
-            ['/account/dashboard','/account/profile','/account/emails','/account/social','/account/library','/account/sessions','/account/activity'],
+            ['/account/dashboard','/account/profile','/account/emails','/account/social','/account/courses','/account/sessions','/account/activity'],
             array_column($sections, 'route')
         );
         foreach ($sections as $section) self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
@@ -67,7 +67,7 @@ final class AccountWorkspaceContractTest extends TestCase
         self::assertStringContainsString("render('account-control-centre'", $controller);
         $library = array_values(array_filter(
             RouteTable::all(),
-            static fn(array $r): bool => $r['method'] === 'GET' && $r['path'] === '/account/library'
+            static fn(array $r): bool => $r['method'] === 'GET' && $r['path'] === '/account/courses'
         ));
         self::assertCount(1, $library, 'The library route is declared exactly once.');
         self::assertSame('learning', $library[0]['action'], 'My Course Library is served by AccountController::learning().');
