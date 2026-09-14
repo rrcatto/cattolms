@@ -11,7 +11,7 @@ Description:
   caller-supplied markup, and it must never be given a path that would make it so.
 
   The category is shown as its full path, outermost first, and every step is a link back to the
-  category page with that category open. Tags link to the tag page.
+  canonical category destination. Tags link to the tag page.
 
   What is deliberately NOT shown is the access period. A card reading "1 year" beside a price reads
   as the length of the course rather than the length of the licence, so it belongs on the course's
@@ -65,7 +65,7 @@ Changelog:
 			<nav class="cl-course-crumbs" aria-label="Category">
 				{% for step in course.category_path %}
 					{% if not loop.first %}<span class="cl-course-crumb-sep" aria-hidden="true">/</span>{% endif %}
-					<a href="/courses?open={{ step.slug }}#category-{{ step.slug }}">{{ step.name }}</a>
+					<a href="/courses/category/{{ step.slug }}">{{ step.name }}</a>
 				{% endfor %}
 			</nav>
 		{% endif %}
@@ -78,7 +78,7 @@ Changelog:
 			<div class="cl-course-card-tags">
 				<span class="cl-course-card-tags-label">Tags</span>
 				{% for course_tag in course.tags|slice(0, 4) %}
-					<a class="cl-tag-chip" href="/courses/tag/{{ course_tag.slug }}">{{ course_tag.name }}</a>
+					{{ ui('tag-chip', {tag: course_tag, compact: true}) }}
 				{% endfor %}
 			</div>
 		{% endif %}

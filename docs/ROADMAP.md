@@ -342,9 +342,13 @@ Implement one coherent commerce domain:
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
-## 3b. Course taxonomy and discovery — in progress
+## 3b. Course taxonomy and discovery
 
-**The schema is implemented in v0.6. The surfaces are not.**
+**Current public architecture:** the platform component library owns the persistent Tier 1 grid,
+flat Tier 2/Tier 3 workspace, complete tag browser and shared 24-card course results. Ordinary
+category browsing uses direct membership; keyword search includes descendants. The older stage
+records below describe how repository filtering developed, not a requirement for recursive public
+UI. `ux-ui-rules.md` sections 1.2a and 8 are the current implementation contract.
 
 Built: `course_categories` carries `parent_id` and `level` with a three-level cap enforced by a
 CHECK constraint and a trigger, unique `name` and `slug`, and `ON DELETE RESTRICT` on the parent so
@@ -433,9 +437,8 @@ Category
 
 A course belongs to **one category path** and may be attached at level 1, 2 or 3.
 
-Browsing a level includes every descendant. Given `Technology > Linux > Linux Administration`,
-browsing `Technology` returns courses in all three; browsing `Technology > Linux` narrows it; level
-3 is the narrowest scope. Do not implement unlimited depth in the first version — the depth cap is
+Ordinary browsing lists direct courses at the active category. A keyword search scoped to
+`Technology` includes `Technology > Linux > Linux Administration`; Tier 3 is the narrowest scope. Do not implement unlimited depth in the first version — the depth cap is
 what keeps the descendant query bounded and the breadcrumb honest.
 
 A draft may temporarily have no category. Publication should eventually require a valid active one.
@@ -618,8 +621,8 @@ filtered to the reader's universe, which is the same trap categories already car
 
 The owner wants one page styled with Symfony UX before deciding whether it earns a place in the
 platform. `/courses/tags` is the trial: an animated tag cloud driven by a Stimulus controller over
-TagCloud.js, with a chosen tag listing its courses beneath it as cards, five across and up to five
-rows to a page.
+TagCloud.js, with a chosen tag listing its courses in the canonical 24-card workspace. The current
+component and progressive-enhancement contracts are recorded in `ux-ui-rules.md` section 8.
 
 The page is deliberately chosen. It is public, it is not on any critical path, and it has a real
 interaction to judge - if UX cannot make a tag cloud pleasant it will not earn the rest of the LMS.

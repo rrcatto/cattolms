@@ -1,0 +1,4 @@
+<a class="cl-filter-pill{% if item.is_active %} is-active{% endif %}" href="{{ item.href }}"
+   {% if item.is_active %}aria-current="true"{% endif %}
+   hx-get="{{ item.href }}" hx-target="#catalogue-region" hx-select="#catalogue-results"
+   hx-select-oob="#catalogue-categories,#catalogue-search" hx-swap="innerHTML" hx-push-url="true">{{ item.name }}</a>

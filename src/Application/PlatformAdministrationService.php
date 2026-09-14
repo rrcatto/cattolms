@@ -871,7 +871,7 @@ final class PlatformAdministrationService
             'size_param' => $sizeParam,
             'base' => $base,
             'label' => $label,
-            'page_sizes' => Pagination::PAGE_SIZES,
+            'page_sizes' => $pagination->pageSize === 24 ? [24] : Pagination::PAGE_SIZES,
             'filters' => $filters,
             'query' => $filters === [] ? '' : http_build_query($filters) . '&',
             'region' => $dataset . '-region',

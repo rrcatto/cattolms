@@ -71,6 +71,18 @@ something new."*
 shared implementation and use it from the first caller onwards. If the shared control genuinely
 cannot serve a case, say so and ask — do not fork it.
 
+**1.2a Reusable CattoLMS UI structures have one canonical platform implementation.** Pages assemble
+shared components and must not reproduce their markup. When a new reusable pattern is needed, add
+or extend a platform UI component and its contract test instead of coding a page-local variant.
+
+`src/View/Ui/PlatformUi.php` exposes explicit named components through Twig's `ui` function.
+Properties are allowlisted; arbitrary structural classes and controller-supplied HTML are forbidden.
+Templates in `resources/views/ui/` own surfaces, section headings, empty states, category tiles and
+grids, filter rails and pills, the course grid, catalogue workspace, tag browser and tag chips.
+A surface is composed through a Twig block, not a raw HTML parameter. Existing page head, dataset
+search, pagination, course card, favourite and entity lookup partials remain canonical.
+→ Enforced by `UiComponentContractTest`, `SharedControlContractTest` and `CoreStyleNamespaceContractTest`.
+
 **1.3 A change to a shared control changes every surface.** Check them all, and say which were
 checked when reporting the work.
 
@@ -305,7 +317,7 @@ on one page fight each other, and the owner chose this one for this theme.
 **6.2 Course card.** A course card carries, in this order: the course icon or image, the course name,
 the description, the category breadcrumb with every ancestor category clickable, the tags under a
 "Tags" label, the price, the level, the number of modules, the favourite star, and a "View course"
-button. It does **not** show the access period. Cards lay out five across, up to five rows per page.
+button. It does **not** show the access period. Public catalogue cards use one canonical grid: four columns on large desktops, three on smaller desktops, two on tablets and one on phones. Public results paginate in pages of 24.
 → Enforced by `CourseCardContractTest`.
 
 **6.3 Row menu.** The stacked action panel described in section 3.
@@ -389,11 +401,11 @@ Learning: rounded border on the container body, and a rounded footer spanning th
 
 **7.6 Anything user-visible that names the platform reads it from settings.** Never a literal.
 
-**7.7 A theme does not define a rule in the `cl-` namespace.** That namespace is core's. Factory
-Reset and Radiant Learning each carried a `.cl-footer` rule — dead code targeting a class nothing
-emitted, until core introduced the site footer, at which point both woke up, matched core's own
-selector at equal specificity, loaded afterwards, and painted the new footer dark grey with
-invisible icons.
+**7.7 Core owns the `cl-` component namespace.** A theme may decorate canonical selectors,
+qualified by its own theme root, but must not introduce competing structures or override functional
+layout. Unqualified component rules can unexpectedly restyle newly introduced core elements; the
+old footer defect came from theme rules targeting markup that did not yet exist. Palette variables
+are the preferred boundary for shared surfaces.
 
 **7.8 The palette is applied before the page paints, not after.** The reader's choice is rendered
 into the markup as body classes from a cookie, so the first paint is already the chosen palette.
@@ -418,14 +430,46 @@ Candy, Coastal Blue and Forest & Sand.
 
 **8.1 The catalogue shows the data that exists.** There is one kind of data and no universe switch.
 
-**8.2 `/courses` lists categories, not every course.** The course list belongs behind a category or
-a tag.
+**8.2 `/courses` keeps the Tier 1 category grid visible.** Page head, shared catalogue search,
+all available top-level categories, then one dynamic workspace. Tiles form four desktop, three
+tablet and two mobile columns, with generated category icons between 64 and 96 pixels. The initial
+workspace shows at most twelve featured/default courses. It never preloads the whole catalogue.
 
-**8.3 `/courses/tags` is an animated three-dimensional tag cloud.** Clicking a tag shows that tag's
-courses as paginated course cards, five across, up to five rows per page.
+Selecting a Tier 1 tile reveals its Tier 2 children as a flat rail. Selecting Tier 2 retains that
+rail and reveals Tier 3 immediately below it. Selecting Tier 3 retains both rails and marks the
+active root and branch. The service supplies this non-recursive navigation model; Twig does not
+reconstruct the hierarchy. Ordinary category results show courses filed directly in that category.
+Search includes the active category and all descendants; clearing search returns to direct browsing.
+Category links and card breadcrumbs use `/courses/category/{slug}`. Recursive public accordions,
+lazy-open fragments and the old `open` query parameter are obsolete.
+
+**8.3 `/courses/tags` exposes the complete tag vocabulary as server-rendered links.** An optional
+TagCloud.js sphere animates at most 80 labels beside the vocabulary on desktop; the two areas stack
+on narrower screens. The vocabulary is a visible, keyboard-scrollable pane, never a disclosure.
+Reduced motion disables the animation, and script failure leaves every real tag link usable.
+Selecting `/courses/tag/{slug}` marks that tag, retains the browser and scopes search to the tag.
+Tag chips on cards and in the browser use the same canonical component.
 
 **8.4 Public pages render for a signed-out visitor.** A catalogue or tag page must not report the
 visitor as logged out or refuse to render because there is no session.
+
+**8.5 One workspace and one course grid serve category, tag and search results.** The canonical
+course grid loops over the existing course-card partial. Shared pagination appears above and below
+paged results. The public catalogue policy is fixed at 24 cards; unrelated administration/company
+page-size policies stay unchanged.
+
+**8.6 Progressive enhancement preserves ordinary GET navigation.** Categories, tags, search,
+pagination and course cards all have real URLs or GET forms. The durable `catalogue-workspace`
+contains `catalogue-region`, whose inner `catalogue-results` is swapped by htmx. Category links
+request server-rendered out-of-band updates to the persistent category grid and shared search form,
+keeping active state and scope correct. Search and pagination push meaningful URLs; full GET,
+reload and browser history reproduce the same state.
+
+**8.7 Core owns component geometry and behaviour.** Functional dimensions, touch targets, state
+classes, overflow, responsive grids, htmx IDs and semantics live in core templates and
+`public_html/css/catto-platform.css`. Themes may tint and decorate the canonical selectors through
+palette, typography, borders, radii and shadows. They must not replace functional catalogue markup
+or redefine the component layout. Factory Reset and the principal bundled themes share the same DOM.
 
 ---
 

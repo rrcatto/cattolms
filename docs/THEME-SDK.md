@@ -16,6 +16,19 @@ Themes are immutable **presentation** packages.
 
 Never reimplement permissions, keep a second hard-coded route catalogue, replace core controls, or make a workflow depend on theme JS.
 
+### Platform UI components
+
+Reusable functional structures are owned once by core under `resources/views/ui/`, exposed by the
+presentation-only `PlatformUi` service. Catalogue/category/tag pages compose those components and
+the existing shared search, pagination, course-card and favourite controls. A theme must not supply
+alternative category, tag or course-results DOM.
+
+Core CSS owns the category grid's 4/3/2 responsive columns, 64–96px category icons, flat Tier 2/Tier 3
+rails, course grid's 4/3/2/1 reflow, 24-card public pagination, touch dimensions and required overflow.
+Themes style palette, fonts, borders, radii, shadows and decoration without replacing these
+functional rules, behaviour hooks, htmx targets or accessibility attributes. Use the canonical
+selectors; every component remains usable under Factory Reset without theme-specific markup.
+
 ## 2. Package
 
 Minimum standalone theme:

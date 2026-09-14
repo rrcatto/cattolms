@@ -207,6 +207,12 @@ final class Pagination
         );
     }
 
+    /** Public catalogue results always use a bounded 24-card page; other datasets keep their policy. */
+    public static function catalogue(mixed $page, int $total): self
+    {
+        return new self(self::normalisePage($page), 24, max(0, $total));
+    }
+
     /**
      * Builds a fixed-size pagination state for surfaces that deliberately expose no page-size
      * selector, such as the bounded consolidated workspace previews.

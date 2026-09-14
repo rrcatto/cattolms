@@ -199,6 +199,17 @@ final class PaginationUiContractTest extends TestCase
         self::assertStringContainsString('for size in pg.page_sizes', self::read('resources/views/partials/pagination.html.twig'));
     }
 
+    public function testPublicCatalogueHasAFixed24CardPolicyWithoutChangingOtherDatasets(): void
+    {
+        $page = Pagination::catalogue('2', 49);
+        self::assertSame(24, $page->pageSize);
+        self::assertSame(24, $page->offset);
+        self::assertSame(3, $page->totalPages);
+        $payload = \CattoLearning\Application\PlatformAdministrationService::paginationPayload('catalogue', $page, '/courses', 'Courses');
+        self::assertSame([24], $payload['page_sizes']);
+        self::assertSame(25, Pagination::create(null, null, 49)->pageSize);
+    }
+
     public function testChangingPageSizeReturnsToPageOne(): void
     {
         self::assertStringContainsString(

@@ -145,7 +145,7 @@ final class SharedControlContractTest extends TestCase
         $root = dirname(__DIR__, 2);
         $templates = [];
 
-        foreach (['resources/views/pages', 'resources/views/partials'] as $directory) {
+        foreach (['resources/views', 'themes'] as $directory) {
             $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root . '/' . $directory));
             foreach ($files as $file) {
                 if (!$file->isFile() || $file->getExtension() !== 'twig') {

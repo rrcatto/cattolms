@@ -57,8 +57,6 @@ use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Application\PlatformAdministrationService;
-use CattoLearning\Support\Pagination;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Env;
@@ -67,10 +65,11 @@ use CattoLearning\Commerce\Application\AccessService;
 use InvalidArgumentException;
 use RuntimeException;
 
+/** Coordinates course application operations and builds presentation data without rendering HTML. */
 final class CourseService
 {
     /**
-     * The taxonomy, per universe, for the life of one request.
+     * The taxonomy for the life of one request.
      *
      * A page of cards asks for the ancestors of every course's category. The categories are one
      * small table, so it is read once instead of per card or per row.
@@ -98,7 +97,7 @@ final class CourseService
      *
      * @return list<array<string,mixed>>
      */
-    public function catalogue(CatalogueFilter $filter, int $limit = 25, int $offset = 0): array
+    public function catalogue(CatalogueFilter $filter, int $limit = 24, int $offset = 0): array
     {
         $courses = $this->decorateCatalogue($this->courses->publishedCourses($filter, $limit, $offset));
 
@@ -296,6 +295,38 @@ final class CourseService
     public function browsableCategory(string $slug): ?array
     {
         return $slug === '' ? null : $this->courses->browsableCategory($slug);
+    }
+
+    /**
+     * Non-recursive navigation for the three-level public taxonomy. No course rows are loaded.
+     * Each rail is one bounded repository read; ancestors orient copied category URLs.
+     *
+     * @param array<string,mixed>|null $category
+     * @return array<string,mixed>
+     */
+    public function catalogueNavigation(?array $category): array
+    {
+        $trail = $category === null ? [] : $this->courses->categoryAncestry((int) $category['id']);
+        $activeRoot = $trail[0] ?? null;
+        $activeTier2 = $trail[1] ?? null;
+        $activeTier3 = $trail[2] ?? null;
+        $items = static function (array $rows, ?array $active): array {
+            return array_map(static fn(array $row): array => $row + [
+                'href' => '/courses/category/' . (string) $row['slug'],
+                'is_active' => $active !== null && (int) $row['id'] === (int) $active['id'],
+                'icon_svg' => '',
+            ], $rows);
+        };
+
+        return [
+            'roots' => $items($this->courses->browsableChildCategories(null), $activeRoot),
+            'active_root' => $activeRoot,
+            'tier_2' => $activeRoot === null ? [] : $items($this->courses->browsableChildCategories((int) $activeRoot['id']), $activeTier2),
+            'active_tier_2' => $activeTier2,
+            'tier_3' => $activeTier2 === null ? [] : $items($this->courses->browsableChildCategories((int) $activeTier2['id']), $activeTier3),
+            'active_tier_3' => $activeTier3,
+            'trail' => $items($trail, $category),
+        ];
     }
 
     /**
@@ -516,75 +547,6 @@ final class CourseService
         return true;
     }
 
-    /**
-     * The taxonomy, in tree order, with course counts scoped to the reader's universe.
-     *
-     * @return list<array<string,mixed>>
-     */
-    /**
-     * The catalogue's category browser: the branches that actually hold something, nested.
-     *
-     * A category is worth showing when a course exists somewhere beneath it. Only a course can do
-     * that - an empty branch, however many sub-categories it contains, is still empty - and the
-     * branch count already answers exactly that question, so the rule is one comparison rather than
-     * a recursive walk. Keeping a category because its branch is non-empty also keeps every
-     * ancestor of every non-empty category, because an ancestor's branch contains its descendants'
-     * courses by definition. That is the whole of "render it, and all its parent categories".
-     *
-     * Each node carries the number of courses filed directly in it, which is what its own table
-     * will hold, and the branch total, which is what its heading reports. They differ wherever a
-     * parent holds nothing itself, and showing only the branch total would promise a table that
-     * turns out to be empty.
-     *
-     * @return list<array<string,mixed>> Roots, each with a `children` list of the same shape.
-     */
-    public function categoryBrowser(): array
-    {
-        // Two queries for the whole browser, whatever the taxonomy holds: the categories and every
-        // category's total. The courses themselves are not fetched here - see the note on the
-        // browser page about why an accordion loads its own contents.
-        $totals = $this->courses->categoryCourseTotals();
-
-        $index = [];
-        foreach ($this->courses->categories() as $row) {
-            if ((int) ($row['descendant_course_count'] ?? 0) < 1) {
-                continue;
-            }
-            $id = (int) $row['id'];
-            $row['course_count'] = $totals[$id] ?? 0;
-            $index[$id] = $row;
-        }
-
-        $tree = [];
-        foreach (array_keys($index) as $id) {
-            $parentId = (int) ($index[$id]['parent_id'] ?? 0);
-            if ($parentId > 0 && isset($index[$parentId])) {
-                continue;
-            }
-            $tree[] = $this->categoryBranch($id, $index);
-        }
-
-        return $tree;
-    }
-
-    /**
-     * @param array<int,array<string,mixed>> $index
-     * @return array<string,mixed>
-     */
-    private function categoryBranch(int $id, array $index): array
-    {
-        $node = $index[$id];
-        $children = [];
-        foreach ($index as $childId => $child) {
-            if ((int) ($child['parent_id'] ?? 0) === $id) {
-                $children[] = $this->categoryBranch($childId, $index);
-            }
-        }
-        $node['children'] = $children;
-
-        return $node;
-    }
-
     /** One category's published-course total. */
     public function categoryCourseTotal(int $categoryId): int
     {
@@ -598,46 +560,9 @@ final class CourseService
     }
 
     /**
-     * The shared pagination payload for one category's accordion.
-     *
-     * Built for every category, paged or not: an accordion showing its first page still has to say
-     * how many pages there are, or a reader cannot tell a complete list from a truncated one.
-     * Paging is on the public `page` / `page_size` names the catalogue already uses, with the
-     * category carried as a filter so every link says which accordion it belongs to.
-     *
-     * @return array<string,mixed>
-     */
-    /**
-     * @param array<string,mixed> $preserved query state the page's other links also carry
-     * @return array<string,mixed>
-     */
-    public function categoryPagination(string $slug, string $base, string $dataset, int $total, mixed $page, mixed $pageSize, array $preserved = []): array
-    {
-        return PlatformAdministrationService::paginationPayload(
-            'category-' . $slug,
-            Pagination::create($page, $pageSize, $total),
-            $base,
-            'Courses in this category',
-            ['open' => $slug] + $preserved,
-            PlatformAdministrationService::pageParam($dataset),
-            PlatformAdministrationService::sizeParam($dataset)
-        );
-    }
-
-    /**
-     * One page of the courses filed directly in a category.
-     *
-     * Only the accordion being paged calls this. Every other one already holds its first page from
-     * the browser's single windowed read, which is what keeps a page of a few hundred categories to
-     * three queries and one more.
-     *
-     * @param array<string,mixed> $pagination
-     * @return list<array<string,mixed>>
-     */
-    /**
      * The ancestors of a category, outermost first, including the category itself.
      *
-     * Built from the category list rather than a recursive query, and memoised per universe: a
+     * Built from the category list rather than a recursive query, and memoised for the request: a
      * page of cards asks for the path of every course's category, and the taxonomy is one small
      * table that is already being read.
      *

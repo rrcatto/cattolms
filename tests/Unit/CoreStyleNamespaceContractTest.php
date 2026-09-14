@@ -53,7 +53,6 @@ final class CoreStyleNamespaceContractTest extends TestCase
      */
     private const BEHAVIOUR_HOOKS = [
         'cl-admin-standalone-section',
-        'cl-category-lazy',
         'cl-company-picker',
         'cl-company-section',
         'cl-course-head',
