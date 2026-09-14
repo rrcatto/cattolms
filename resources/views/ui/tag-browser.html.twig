@@ -1,0 +1,16 @@
+{% embed '@platform/ui/surface.html.twig' %}
+	{% block surface_body %}
+		{{ ui('section-head', {heading: 'Browse tags', summary: 'Choose a label to see its courses.'}) }}
+		{% if selected_slug %}<a class="btn btn-soft btn-sm" href="/courses/tags">Clear tag</a>{% endif %}
+		{% if tags %}
+			<div class="cl-tag-browser cl-tag-cloud-shell" data-controller="tag-cloud" data-tag-cloud-limit-value="80">
+				<div class="cl-tag-cloud-canvas" data-tag-cloud-target="canvas" aria-hidden="true"></div>
+				<nav class="cl-tag-cloud" data-tag-cloud-target="source" aria-label="All tags" tabindex="0">
+					{% for tag in tags %}{{ ui('tag-chip', {tag: tag, selected: tag.slug == selected_slug}) }}{% endfor %}
+				</nav>
+			</div>
+		{% else %}
+			{{ ui('empty-state', {heading: 'No tags have been created yet', summary: 'Browse by category to find a course.'}) }}
+		{% endif %}
+	{% endblock %}
+{% endembed %}

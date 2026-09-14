@@ -73,6 +73,8 @@ services:
     CattoLearning\View\Artwork\:
         resource: '../src/View/Artwork/'
 
+    CattoLearning\View\Ui\PlatformUi: ~
+
     # The Twig theme layer.
     CattoLearning\View\Twig\:
         resource: '../src/View/Twig/'

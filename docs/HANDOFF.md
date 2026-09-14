@@ -10,6 +10,20 @@ Run additive migrations against v0.7, publish the modified core/theme assets, an
 
 The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures.
 
+## Current catalogue component architecture
+
+The public catalogue now composes canonical platform UI templates through `PlatformUi`. It keeps
+all Tier 1 categories above a flat Tier 2/Tier 3 workspace; ordinary browsing lists direct courses,
+and scoped keyword search includes descendants. Category, tag and search results use the same
+24-card grid and existing course-card/search/pagination partials. The initial catalogue is bounded
+to twelve cards. Tag discovery retains the complete linked vocabulary beside an optional bounded
+sphere, with reduced-motion handling. Category htmx navigation updates grid state and search scope
+from server-rendered out-of-band fragments; every destination also works as a normal GET.
+
+Historical references below to descendant-inclusive *ordinary browsing*, recursive category
+accordions, `open` query state, five-column grids and 25-card public pages are superseded by
+`ux-ui-rules.md` section 8. They are not alternative implementations or current requirements.
+
 ## Historical v0.7 handoff
 
 ### Catto Learning 0.7 — Development Handoff

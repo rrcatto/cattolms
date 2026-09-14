@@ -1,0 +1,10 @@
+<div id="catalogue-categories">
+	{% embed '@platform/ui/surface.html.twig' %}
+		{% block surface_body %}
+			{{ ui('section-head', {heading: 'Choose a category', summary: 'Explore a subject, then choose a subcategory to narrow your browse.'}) }}
+			<nav class="cl-category-grid" aria-label="Top-level categories">
+				{% for item in navigation.roots %}{{ ui('category-tile', {item: item}) }}{% endfor %}
+			</nav>
+		{% endblock %}
+	{% endembed %}
+</div>

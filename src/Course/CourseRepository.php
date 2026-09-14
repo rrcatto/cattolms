@@ -633,9 +633,8 @@ final class CourseRepository
      * Courses filed anywhere in one category's branch: the category itself, its children and its
      * grandchildren.
      *
-     * Browsing a level includes everything below it - browsing Technology returns courses in
-     * Technology, in Linux and in Linux Administration - and the three-level cap is what lets that
-     * be two nested lookups instead of a recursive walk.
+     * Scoped search includes the selected category and descendants. The three-level cap permits
+     * two nested lookups. Ordinary category browsing uses the direct-category query instead.
      *
      * Stated once and shared by the taxonomy counts, the browse count and the browse rows, because
      * a faceted count that disagrees with its own list is indistinguishable from missing data. Both
@@ -711,9 +710,8 @@ final class CourseRepository
     /**
      * One page of the courses filed directly in one category, for the catalogue's category browser.
      *
-     * Directly, not the branch. Each category in the browser is its own accordion and its
-     * sub-categories are accordions inside it, so counting a child's courses here would show every
-     * course twice - once under the child and once under its parent.
+     * Ordinary browsing shows exact category membership. Descendant-inclusive keyword search
+     * continues to use the shared CatalogueFilter predicate.
      *
      * The cover comes back with the row because the browser draws a card per course. It is the one
      * list projection that selects cover_svg, which is why the column can sit on the table without
@@ -901,16 +899,15 @@ final class CourseRepository
     /**
      * The active categories directly beneath one parent, or the roots when given null.
      *
-     * This is the "narrow it further" list on a browse page, so each row carries the count of what
-     * choosing it would show - the whole branch beneath it, not just what is filed at that exact
-     * level. A child offering "12 courses" that turns out to hold three is worse than no figure.
+     * The branch aggregate describes search scope, not direct browsing membership. The public
+     * navigation omits counts rather than presenting a branch count as a direct-course count.
      *
      * @return list<array<string,mixed>>
      */
     public function browsableChildCategories(?int $parentId): array
     {
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT cc.id, cc.name, cc.slug, cc.level, cc.description,
+            "SELECT cc.id, cc.name, cc.slug, cc.level, cc.description, cc.icon_svg,
                     (SELECT COUNT(*)::int FROM courses dc
                       WHERE dc.status = 'published' AND " . self::inBranchOf('dc', 'cc.id')
                         . '' . ") AS descendant_course_count
@@ -1293,17 +1290,8 @@ final class CourseRepository
      */
     public function tagIndex(): array
     {
-        // Only tags a reader can actually follow.
-        //
-        // A tag exists because a course needed it - nothing creates one on its own - but a tag whose
-        // courses are all drafts has nothing to show a visitor, and it was being listed at zero. The
-        // owner's report was that empty tags existed; what existed was tags that were empty *to the
-        // public*, which from the catalogue is the same thing and is worse, because following one
-        // leads to a page saying nothing carries it.
-        //
-        // The count and the filter are the same predicate, so a tag can never be listed with a
-        // number the page it leads to disagrees with. Administration lists tags through its own
-        // query and still sees every one of them, which is where an unused tag should be visible.
+        // Discovery exposes the complete vocabulary, including labels with no published courses.
+        // Counts and result queries still share the published-only membership rule.
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT t.id, t.name, t.slug, t.icon_svg, x.course_count
              FROM tags t
@@ -1312,7 +1300,7 @@ final class CourseRepository
                    FROM course_tags ct
                    JOIN courses c ON c.id = ct.course_id
                   WHERE ct.tag_id = t.id AND c.status = 'published'
-             ) x ON x.course_count > 0
+             ) x ON TRUE
              ORDER BY t.name, t.id"
         ));
     }

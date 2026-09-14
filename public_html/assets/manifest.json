@@ -3,7 +3,7 @@
     "@symfony\/stimulus-bundle\/loader.js": "\/assets\/@symfony\/stimulus-bundle\/loader-IOzBDLu.js",
     "app.js": "\/assets\/app-we5Kv_X.js",
     "controllers\/profile_image_controller.js": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",
-    "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-RpK1pjD.js",
+    "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-yi-Ny1Y.js",
     "vendor\/@hotwired\/stimulus\/stimulus.index.js": "\/assets\/vendor\/@hotwired\/stimulus\/stimulus.index-ryewcoo.js",
     "vendor\/TagCloud\/TagCloud.index.js": "\/assets\/vendor\/TagCloud\/TagCloud.index-r_BOY6F.js"
 }

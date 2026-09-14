@@ -1,0 +1,6 @@
+<a class="cl-tag-chip{% if compact|default(false) %} cl-tag-chip-compact{% else %} cl-tag-weight-{{ tag.weight|default(1) }}{% endif %}{% if selected|default(false) %} is-selected{% endif %}"
+   href="/courses/tag/{{ tag.slug }}" title="{{ tag.name }}" data-tag-label="{{ tag.name }}"
+   {% if selected|default(false) %}aria-current="page"{% endif %}>
+	{% if not compact|default(false) and tag.icon_svg|default('') %}<span class="cl-tag-icon" aria-hidden="true">{{ tag.icon_svg|raw }}</span>{% endif %}<span>{{ tag.name }}</span>
+	{% if not compact|default(false) and tag.course_count is defined %}<span class="cl-category-count">{{ tag.course_count }}</span>{% endif %}
+</a>

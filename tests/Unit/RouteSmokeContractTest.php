@@ -54,6 +54,9 @@ final class RouteSmokeContractTest extends TestCase
         foreach ([
             'GET /' => 'HomeController::index',
             'GET /courses' => 'CourseController::catalogue',
+            'GET /courses/category/{slug}' => 'CourseController::catalogue',
+            'GET /courses/tags' => 'CourseTagController::index',
+            'GET /courses/tag/{slug}' => 'CourseTagController::tag',
             'GET /login' => 'AuthController::loginForm',
             'GET /account/library' => 'AccountController::learning',
             'GET /account' => 'AccountController::index',

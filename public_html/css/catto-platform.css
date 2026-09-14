@@ -212,9 +212,6 @@
 .cl-breadcrumb a:hover{text-decoration:underline;opacity:1}
 .cl-breadcrumb a[aria-current="page"]{font-weight:800;opacity:1;text-decoration:none;cursor:default}
 .cl-breadcrumb-sep{opacity:.4}
-.cl-category-rail{display:flex;flex-wrap:wrap;gap:.5rem}
-.cl-category-chip{display:inline-flex;align-items:center;gap:.45rem;padding:.35rem .7rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;color:inherit;text-decoration:none;font-size:.85rem;font-weight:600}
-.cl-category-chip:hover{border-color:currentColor}
 .cl-category-count{font-size:.75rem;font-weight:700;opacity:.55}
 /* v0.6 tags. A tag is a link into the catalogue wherever it appears, so it looks and behaves the
    same on a card, on a rail and beside a course. The administration row is a form per tag: an edit
@@ -223,10 +220,6 @@
 .cl-tag-chip:hover{border-color:currentColor}
 .cl-tag-chip.is-selected{border-color:currentColor;font-weight:800;box-shadow:inset 0 0 0 1px currentColor}
 .cl-tag-chip.is-selected .cl-category-count{opacity:.85}
-/* A facet carries a label and its controls, so it is text and needs a surface like the rest. */
-.cl-facet{display:grid;gap:.5rem;padding:1rem 1.1rem;border:1px solid var(--cl-border,var(--line,#dfe4ea));border-radius:var(--cl-radius,var(--r,12px));background:var(--cl-page-surface,#fff)}
-.cl-facet-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
-.cl-facet-label{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.55}
 .cl-tag-cloud{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem}
 .cl-tag-weight-0{font-size:.78rem;opacity:.45}
 .cl-tag-weight-1{font-size:.85rem}
@@ -446,34 +439,6 @@
 .cl-flex-fill{flex:1}
 .cl-wrap-anywhere{white-space:pre-wrap;overflow-wrap:anywhere}
 
-/* v0.7 the catalogue's category browser.
-   Core owns it because it is functional navigation of the taxonomy, not decoration: a theme that
-   has never heard of this page must still render a usable tree. Themes tint it through --cl-*. */
-.cl-category-tree{display:grid;gap:.75rem}
-.cl-category-branch{border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}
-.cl-category-summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:1rem;padding:.9rem 1.1rem;cursor:pointer;list-style:none}
-.cl-category-summary::-webkit-details-marker{display:none}
-.cl-category-summary:hover{background:var(--cl-page-muted,rgba(127,127,127,.07))}
-.cl-category-summary:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
-.cl-category-icon{display:block;width:40px;height:40px;flex:0 0 auto}
-.cl-category-icon svg{display:block;width:100%;height:100%;border-radius:9px}
-.cl-category-heading{display:grid;gap:.15rem;min-width:0}
-.cl-category-name{font-weight:800;font-size:1.02rem}
-.cl-category-blurb{font-size:.85rem;opacity:.72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cl-category-counts{display:flex;gap:.35rem;flex-wrap:wrap;justify-content:flex-end}
-.cl-category-count-branch{opacity:.7}
-.cl-category-body{padding:.25rem 1.1rem 1.1rem;border-top:1px solid var(--cl-border,#dfe4ea);display:grid;gap:.75rem}
-
-/* A sub-category is indented and quieter, so the tree reads as one thing containing another rather
-   than as three sizes of the same card. */
-.cl-category-branch .cl-category-branch{margin-left:1.25rem;border-radius:10px}
-.cl-category-branch .cl-category-branch .cl-category-summary{padding:.7rem .9rem}
-.cl-category-branch .cl-category-branch .cl-category-icon{width:32px;height:32px}
-.cl-category-branch .cl-category-branch .cl-category-name{font-size:.95rem}
-
-/* The cards a category's own courses are shown as. Auto-fill rather than a fixed column count:
-   a sub-category is narrower than a root, and a fixed three would squeeze at depth three. */
-.cl-course-cards{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(clamp(15rem,26vw,20rem),1fr))}
 .cl-course-cover-generated{display:block;line-height:0}
 .cl-course-cover-generated svg{display:block;width:100%;height:auto}
 .cl-tag-chip svg,.cl-tag-icon svg{display:inline-block;width:18px;height:18px;vertical-align:-3px;margin-right:.35rem}
@@ -756,14 +721,8 @@ summary.btn::marker{content:""}
 .row-menu-panel .btn:hover{filter:brightness(.93)}
 .row-menu-panel .btn-danger,.row-menu-panel .btn-danger:hover{border-color:rgba(0,0,0,.28)}
 
-/* v0.7 the course card, to the owner's specification, and five to a row.
-
-   Five columns is stated rather than derived: auto-fill with a minimum width gave a different
-   number of cards per row on every screen, and the request was five. It steps down at narrower
-   widths because five 20%-wide cards below about 1400px are too narrow to read, and a card that
-   cannot be read is not a card. */
-.cl-course-cards{display:grid;gap:1rem;grid-template-columns:repeat(5,minmax(0,1fr))}
-@media(max-width:1500px){.cl-course-cards{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* One canonical public course grid: four, three, two and one columns. */
+.cl-course-cards{display:grid;gap:1rem;grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:1200px){.cl-course-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.cl-course-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.cl-course-cards{grid-template-columns:minmax(0,1fr)}}
@@ -775,15 +734,14 @@ summary.btn::marker{content:""}
 .cl-course-card-title{font-size:1rem;line-height:1.3;margin:0}
 .cl-course-card-title a{color:inherit;text-decoration:none}
 .cl-course-card-title a:hover{text-decoration:underline}
-/* The description is clamped rather than left to run: five cards to a row means a long summary
-   would set the height of the whole row. */
+/* Bound long descriptions so one card does not dominate the entire row. */
 .cl-course-card-summary{margin:0;font-size:.82rem;line-height:1.45;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .cl-course-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .3rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;opacity:.7;min-width:0}
 .cl-course-crumbs a{color:inherit;text-decoration:none}
 .cl-course-crumbs a:hover{text-decoration:underline}
 .cl-course-crumb-sep{opacity:.5}
 .cl-course-card-tags{display:flex;flex-wrap:wrap;gap:.3rem}
-.cl-course-card-tags .cl-tag-chip{font-size:.7rem;padding:.12rem .45rem}
+.cl-tag-chip-compact{font-size:.7rem;padding:.12rem .45rem}
 /* The facts are a definition list so the label is readable to a screen reader as a label, and a
    grid so Level, Modules and Price line up across every card in the row. */
 .cl-course-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(4rem,1fr));gap:.35rem;margin:0;font-size:.72rem}
@@ -799,32 +757,45 @@ summary.btn::marker{content:""}
 .cl-favourite.is-on{color:#c8971b;border-color:currentColor}
 .cl-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 
-/* v0.7 the animated tag cloud, and the list it is drawn over.
-
-   Two renderings of the same vocabulary. The list is what the server sends and what a reader
-   without JavaScript keeps; the canvas is what the Stimulus controller fills, and the controller
-   hides the list only once it has something to show in its place. Neither is styled to assume the
-   other ran: with no controller the page is a list of chips, which is a usable page. */
+/* Platform components own layout and usability; themes tint through their existing variables. */
+.cl-ui-surface{padding:clamp(.75rem,2vw,1.25rem);min-width:0;background:var(--cl-page-surface,#fff);color:var(--cl-page-text,inherit)}
+.cl-ui-section-head{margin-bottom:1rem}
+.cl-ui-section-head h2{margin:0;font-size:1.3rem}
+.cl-ui-section-head p{margin:.5rem 0 0}
+.cl-ui-empty-state{padding:1rem;text-align:center}
+.cl-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
+.cl-category-tile{display:flex;flex-direction:column;align-items:center;gap:.6rem;padding:1rem;min-width:0;text-align:center;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;color:inherit;text-decoration:none}
+.cl-category-tile-icon{display:block;width:clamp(64px,6vw,96px);height:clamp(64px,6vw,96px);flex-shrink:0}
+.cl-category-tile-icon svg{display:block;width:100%;height:100%}
+.cl-category-tile-name{font-weight:700;overflow-wrap:anywhere}
+.cl-category-tile-description{font-size:.85rem;line-height:1.4}
+.cl-category-tile.is-active,.cl-filter-pill.is-active{border-color:currentColor;box-shadow:inset 0 0 0 2px currentColor}
+.cl-category-tile:hover,.cl-filter-pill:hover{background:var(--cl-page-muted,rgba(127,127,127,.08));color:inherit}
+.cl-category-tile:focus-visible,.cl-filter-pill:focus-visible,.cl-tag-chip:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+.cl-filter-rail{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
+.cl-filter-rail-label{flex-basis:100%;font-weight:700}
+.cl-filter-pill{display:inline-flex;align-items:center;min-height:44px;padding:.45rem .85rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;text-decoration:none;color:inherit}
+.cl-tag-chip{min-height:44px;max-width:100%;overflow-wrap:anywhere}
+.cl-tag-chip-compact{min-height:32px}
+.cl-tag-browser{display:grid;gap:1.5rem;align-items:start}
 .cl-tag-cloud-shell{position:relative;min-width:0}
-.cl-tag-cloud-canvas{display:none}
-.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:block;min-height:clamp(22rem,48vw,38rem);text-align:center}
-/* Without a controller the disclosure would hide the list behind a click for no reason, so it opens
-   by default and the controller folds it once it has a sphere to show in its place. */
-.cl-tag-cloud-all{margin-top:.6rem}
-.cl-tag-cloud-all>summary{cursor:pointer;font-size:.8rem;font-weight:600;letter-spacing:.03em;opacity:.75;padding:.3rem 0;list-style:none}
-.cl-tag-cloud-all>summary::-webkit-details-marker{display:none}
-.cl-tag-cloud-all>summary::before{content:"\25B8";display:inline-block;margin-right:.4rem;transition:transform .15s}
-.cl-tag-cloud-all[open]>summary::before{transform:rotate(90deg)}
-.cl-tag-cloud-shell:not(.is-animated) .cl-tag-cloud-all>summary{display:none}
-/* The library positions each word absolutely and sets its own font-size and opacity for depth, so
-   what core states here is only what it does not: the colour, the cursor and the hit feedback. */
+.cl-tag-cloud-canvas{display:none;min-width:0;text-align:center}
+.cl-tag-cloud-shell.is-animated{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)}
+.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:block}
+.cl-tag-cloud{min-width:0;max-height:36rem;overflow-y:auto;padding:.3rem}
+.cl-tag-cloud:focus-visible{outline:3px solid currentColor;outline-offset:3px}
 .cl-tag-cloud-shell .tagcloud{display:inline-block;font-weight:700;color:inherit}
 .cl-tag-cloud-shell .tagcloud--item{cursor:pointer;padding:.1rem .25rem;border-radius:6px;color:inherit}
 .cl-tag-cloud-shell .tagcloud--item:hover{background:color-mix(in srgb,currentColor 14%,transparent)}
+@media(max-width:1000px){.cl-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){
+ .cl-category-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+ .cl-category-tile{padding:.65rem}
+ .cl-tag-cloud-shell.is-animated{grid-template-columns:minmax(0,1fr)}
+}
 @media(prefers-reduced-motion:reduce){
-	/* The sphere spins continuously, so a reader who asked for less motion gets the list instead. */
-	.cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:none}
-	.cl-tag-cloud-shell.is-animated [data-tag-cloud-target="source"]{display:block!important}
+ .cl-tag-cloud-shell.is-animated{grid-template-columns:minmax(0,1fr)}
+ .cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:none}
 }
 
 /* v0.7 the navigation sprite is drawn, not filled.

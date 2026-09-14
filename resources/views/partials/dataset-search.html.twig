@@ -81,6 +81,7 @@ Changelog:
 		<input type="search" id="{{ ds_name }}-search" name="{{ ds_name }}_q" value="{{ ds_value }}" placeholder="Type to search" autocomplete="off" maxlength="120"
 		       hx-get="{{ ds_action }}"
 		       hx-trigger="input changed delay:300ms, search"
+		       {% if ds_push_url|default(false) %}hx-push-url="true"{% endif %}
 		       hx-target="#{{ ds_name }}-region"
 		       hx-select="#{{ ds_name }}-results"
 		       hx-swap="innerHTML"
