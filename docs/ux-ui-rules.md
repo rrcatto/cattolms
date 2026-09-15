@@ -74,6 +74,9 @@ add its canonical implementation and migrate its callers. Do not fork it.
 **1.2a Reusable CattoLMS UI structures have one canonical platform implementation.** Pages assemble
 shared components and must not reproduce their markup. When a new reusable pattern is needed, add
 or extend a platform UI component and its contract test instead of coding a page-local variant.
+This is specifically a guard against page-by-page LLM vibe coding: independently recreated views
+drift in spacing, responsive behavior, accessibility and progressive enhancement even when they
+serve the same job.
 
 `src/View/Ui/PlatformUi.php` is the fixed registry for namespaced layout, action, form, data,
 feedback, overlay and catalogue components plus the sprite icon helper. `ui()` renders scalar or

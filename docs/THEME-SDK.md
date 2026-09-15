@@ -99,6 +99,9 @@ canonical accordions and controls; a theme styles them instead of rebuilding the
 
 [UI-COMPONENTS.md](UI-COMPONENTS.md) lists the complete namespaced registry and Twig slots. Components
 live under `resources/views/ui/{layout,actions,forms,data,feedback,overlay,helpers,catalogue}`.
+The registry exists to prevent page-by-page LLM-generated markup from drifting: equivalent controls
+must share one implementation so spacing, responsive behavior, accessibility and progressive
+enhancement remain consistent.
 `ui()` renders structured presentation properties; `ui_template()` and `ui_props()` compose authored
 slots. Unknown names and properties are errors. No raw-HTML, arbitrary class/style, dynamic template
 path, deprecated name or compatibility alias is supported.

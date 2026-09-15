@@ -4,6 +4,11 @@ CattoLMS reusable UI structures are platform components. A page may not independ
 job already represented by a canonical component. Extend the component and its contract test
 instead of forking markup.
 
+The purpose is to prevent UI drift from page-by-page LLM generation. Recreating equivalent controls
+from scratch had produced subtle differences in markup, spacing, responsive behavior,
+accessibility and no-JavaScript fallbacks. This registry makes one implementation authoritative;
+the ownership contracts fail the build when a duplicate structure appears.
+
 ## Ownership and API
 
 `src/View/Ui/PlatformUi.php` is the sole allowlist of logical names, template paths, property names
