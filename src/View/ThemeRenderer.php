@@ -232,7 +232,7 @@ final class ThemeRenderer
         foreach ([
             'title' => '', 'page_title' => '', 'page_kicker' => '', 'active_nav' => '', 'body_class' => '',
             'is_authenticated' => false, 'is_platform_admin' => false, 'is_company_admin' => false,
-            'is_course_editor' => false, 'is_course_owner' => false, 'user_email' => '', 'user_name' => '',
+            'is_course_editor' => false, 'is_course_owner' => false, 'user_email' => '', 'authenticated_email' => '', 'user_name' => '',
             'load_ckeditor' => false, 'load_question_editor' => false, 'load_assessment_timer' => false,
             'course_content_mode' => false, 'flash_messages' => [], 'permissions' => [],
         ] as $key => $value) {
@@ -629,7 +629,8 @@ final class ThemeRenderer
             // identity beside it on a single line. Owner's instruction, 2026/09/12.
             $items[] = $item('signout','Logout','/logout','signout',false,'POST',$csrf);
         } else {
-            $items[] = $item('signin','Register / Sign in','/login','signin',$active==='login');
+            $items[] = $item('signin','Sign in','/login','signin',$active==='login');
+            $items[] = $item('register','Register','/register','register',$active==='register');
         }
         return $items;
     }
@@ -926,7 +927,7 @@ final class ThemeRenderer
         if (str_starts_with($page, 'assessment-')) return 'assessment';
         return match ($page) {
             'home' => 'home', 'courses' => 'catalogue', 'course-detail' => 'course-detail',
-            'login','login-sent','company-register' => 'auth', 'profile','sessions','account-control-centre','account-section','account-dashboard','account-activity' => 'account',
+            'login','login-sent','register','company-register' => 'auth', 'profile','sessions','account-control-centre','account-section','account-dashboard','account-activity' => 'account',
             'library' => 'library', 'learn-course','learn-module' => 'course-player',
             'certificate' => 'certificate', 'company-control-centre','company-section' => 'company', 'error' => 'error',
             default => 'content',

@@ -220,6 +220,7 @@ abstract class BaseController
         $data['is_course_owner'] = $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_OWNER);
         $data['is_course_editor'] = $currentUser !== null && $currentUser->hasRole(RoleCatalog::COURSE_EDITOR);
         $data['user_email'] = $currentUser === null ? '' : $currentUser->primaryEmail;
+        $data['authenticated_email'] = $currentUser === null ? '' : $currentUser->authenticatedEmail;
         $data['user_name'] = $currentUser === null ? '' : $currentUser->displayName;
 
         // The identity band under the page head, on every page rather than only in Account. A
@@ -228,7 +229,7 @@ abstract class BaseController
         if ($currentUser !== null) {
             $card = $this->auth->identityCard($currentUser->id);
             $data['identity_name'] = $card['name'] !== '' ? $card['name'] : $currentUser->displayName;
-            $data['identity_email'] = $card['email'] !== '' ? $card['email'] : $currentUser->primaryEmail;
+            $data['identity_email'] = $currentUser->authenticatedEmail !== '' ? $currentUser->authenticatedEmail : ($card['email'] !== '' ? $card['email'] : $currentUser->primaryEmail);
             $data['identity_status'] = $card['status'];
             // No fingerprint in the address: this is rendered on every page, and computing one
             // would mean loading the stored bytes on every page to hash them. The route already

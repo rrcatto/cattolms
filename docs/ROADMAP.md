@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.8.2
+**Current LMS version:** 0.8.3
 **Date time:** 2026/09/15 SAST
-**Current stage:** v0.8.2 remediates and documents the canonical UI component registry. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
+**Current stage:** v0.8.3 completes the canonical UI/account correction and passwordless registration workflows. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
 
 Only the project owner decides future release numbers.
 

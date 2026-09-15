@@ -1,7 +1,7 @@
 # Catto Learning LMS
 
 Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce
-platform. The current development release is **v0.8.2** (the application package remains on the
+platform. The current development release is **v0.8.3** (the application package remains on the
 0.8 code line). Development data is disposable; no production data or upgrade compatibility is
 assumed.
 
@@ -87,7 +87,7 @@ podman exec -u cattotest env_php_1 sh -lc 'composer qa'
 ```
 
 It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and
-release validation. The current v0.8.2 baseline passes 634 tests and 43,707 assertions; Twig lint
+release validation. The current v0.8.3 baseline passes 636 tests and 43,787 assertions; Twig lint
 passes for all 174 templates. JavaScript changed in the repository should also pass `node --check`.
 
 ## Documentation

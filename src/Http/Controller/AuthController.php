@@ -25,6 +25,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Auth\UnknownLoginEmailException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -39,7 +40,28 @@ final class AuthController extends BaseController
         return $this->render('login', [
             'title' => 'Sign in',
             'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/library')),
+            'email' => (string) ($_GET['email'] ?? ''),
         ]);
+    }
+
+    #[Route('/register', name: 'auth_register_form', methods: ['GET'])]
+    public function registerForm(): Response
+    {
+        if ($this->currentUser() !== null) $this->redirect('/account');
+        return $this->render('register', ['title' => 'Register', 'email' => (string) ($_GET['email'] ?? ''), 'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/library'))]);
+    }
+
+    #[Route('/register', name: 'auth_register', methods: ['POST'])]
+    public function register(): Response
+    {
+        $this->requireCsrf();
+        try {
+            $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/library')));
+            $this->redirect('/login/sent');
+        } catch (\Throwable $e) {
+            $this->flash('danger', $e->getMessage());
+            $this->redirect('/register?email=' . rawurlencode((string) ($_POST['email'] ?? '')));
+        }
     }
 
 
@@ -52,6 +74,8 @@ final class AuthController extends BaseController
         try {
             $this->auth->requestLogin($email, $returnPath);
             $this->redirect('/login/sent');
+        } catch (UnknownLoginEmailException $e) {
+            $this->redirect('/register?email=' . rawurlencode($e->email) . '&return=' . rawurlencode($returnPath));
         } catch (\InvalidArgumentException|\RuntimeException $e) {
             error_log('Magic-link request failed: ' . $e->getMessage());
             $this->flash('danger', $e->getMessage());
@@ -85,7 +109,8 @@ final class AuthController extends BaseController
     {
         $token = (string) ($_GET['token'] ?? '');
         return $this->handle(function () use ($token): void {
-            $returnPath = $this->auth->consumeLogin($token);
+            try { $returnPath = $this->auth->consumeLogin($token); }
+            catch (\RuntimeException $loginError) { $returnPath = $this->auth->consumeRegistration($token); }
             session_regenerate_id(true);
             $this->flash('success', 'You are signed in.');
             $this->redirect($returnPath);

@@ -36,7 +36,7 @@ final class AuthSessionRepository
     ) {
     }
 
-    public function create(int $userId, string $tokenHash, int $ttlSeconds, string $ipHash, string $agent): string
+    public function create(int $userId, string $tokenHash, int $ttlSeconds, string $ipHash, string $agent, ?string $authenticatedEmail = null): string
     {
         $publicId = Uuid::v4();
         $now = gmdate('Y-m-d H:i:sP');
@@ -45,10 +45,10 @@ final class AuthSessionRepository
         // precisely so a signed-in seed identity has a session the cleanup can remove.
         $this->db->executeStatement(
             'INSERT INTO auth_sessions
-                (public_id, user_id, token_hash, ip_hash, user_agent,
+                (public_id, user_id, token_hash, ip_hash, user_agent, authenticated_email,
                  created_at, last_seen_at, expires_at)
              VALUES
-                (:public_id, :user_id, :token_hash, :ip_hash, :user_agent,
+                (:public_id, :user_id, :token_hash, :ip_hash, :user_agent, :authenticated_email,
                  :created_at, :last_seen_at, :expires_at)',
             [
                 'public_id' => $publicId,
@@ -56,6 +56,7 @@ final class AuthSessionRepository
                 'token_hash' => $tokenHash,
                 'ip_hash' => $ipHash,
                 'user_agent' => $agent,
+                'authenticated_email' => $authenticatedEmail ?? '',
                 'created_at' => $now,
                 'last_seen_at' => $now,
                 'expires_at' => gmdate('Y-m-d H:i:sP', time() + $ttlSeconds),

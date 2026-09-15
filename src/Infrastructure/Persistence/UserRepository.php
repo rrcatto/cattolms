@@ -278,6 +278,30 @@ final class UserRepository
         );
     }
 
+    public function promoteSecondaryEmail(int $userId, int $emailId): void
+    {
+        $this->db->executeStatement('SELECT id FROM users WHERE id = :id FOR UPDATE', ['id' => $userId]);
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT id,email,is_primary FROM user_emails WHERE user_id=:user_id ORDER BY is_primary DESC, id FOR UPDATE',
+            ['user_id' => $userId]
+        );
+        $primary = null; $secondary = null;
+        foreach ($rows as $row) {
+            if ($this->databaseBoolean($row['is_primary'] ?? false)) $primary = $row;
+            if ((int) $row['id'] === $emailId && !$this->databaseBoolean($row['is_primary'] ?? false)) $secondary = $row;
+        }
+        if ($primary === null || $secondary === null) throw new RuntimeException('Select a verified secondary email address.');
+        // The old secondary is removed before the two replacement rows are written. The caller
+        // wraps this sequence in one transaction, so readers see either state, never an in-between swap.
+        $this->db->executeStatement('DELETE FROM user_emails WHERE id=:id', ['id' => $emailId]);
+        $this->db->executeStatement('UPDATE user_emails SET is_primary=FALSE WHERE id=:id', ['id' => (int)$primary['id']]);
+        // Keep the previous primary row as the sole secondary address, then add the promoted row.
+        $this->db->executeStatement(
+            'INSERT INTO user_emails (user_id,email,is_primary,verified_at,created_at) VALUES (:user_id,:email,TRUE,NOW(),NOW())',
+            ['user_id' => $userId, 'email' => (string)$secondary['email']]
+        );
+    }
+
     public function replacePrimaryEmail(int $userId, string $email): void
     {
         $rows = $this->db->fetchAllAssociative(

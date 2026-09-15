@@ -38,6 +38,7 @@ use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Company\CompanyService;
 use CattoLearning\Support\ClientFingerprint;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
@@ -70,7 +71,8 @@ final class AuthService
         private readonly AuditRepository $audit,
         private readonly MailerInterface $mailer,
         private readonly EventDispatcher $events,
-        private readonly UserProfileRepository $profiles
+        private readonly UserProfileRepository $profiles,
+        private readonly ?CompanyService $companies = null
     ) {
     }
 
@@ -98,6 +100,11 @@ final class AuthService
     public function requestLogin(string $inputEmail, string $returnPath = '/account/library'): void
     {
         $email = EmailAddress::normalize($inputEmail);
+        $known = $this->users->findByVerifiedEmail($email);
+        $admin = strtolower(trim(Env::string('APP_ADMIN_EMAIL')));
+        if ($known === null && ($admin === '' || strtolower($email) !== $admin)) {
+            throw new UnknownLoginEmailException($email);
+        }
         if (!$this->withinRateLimits($email)) {
             throw new RuntimeException('Too many sign-in requests. Please wait before trying again.');
         }
@@ -140,11 +147,15 @@ final class AuthService
             $email = (string) $row['email'];
             $user = $this->users->findByVerifiedEmail($email);
             if ($user === null) {
+                if (strtolower($email) !== strtolower(trim(Env::string('APP_ADMIN_EMAIL')))) {
+                    throw new RuntimeException('This email is not registered. Please complete registration first.');
+                }
                 $user = $this->users->createWithPrimaryEmail($email);
                 $this->roles->assign((int) $user['id'], RoleCatalog::STUDENT);
                 $this->audit->record((int) $user['id'], 'user.created');
                 $created = true;
             }
+            $this->roles->assign((int) $user['id'], RoleCatalog::STUDENT);
 
             $this->roles->bootstrapAdministrator(
                 (int) $user['id'],
@@ -170,7 +181,8 @@ final class AuthService
                 Token::hash($sessionToken),
                 Env::int('AUTH_SESSION_TTL', 86400),
                 ClientFingerprint::ipHash(),
-                ClientFingerprint::userAgent()
+                ClientFingerprint::userAgent(),
+                $email
             );
             $context = json_decode((string) ($row['context'] ?? '{}'), true);
 
@@ -238,6 +250,7 @@ final class AuthService
 
         $userId = (int) $session['user_id'];
         $primaryEmail = (string) $session['primary_email'];
+        $authenticatedEmail = (string) ($session['authenticated_email'] ?? $primaryEmail);
         try {
             $roles = $this->roles->roles($userId);
         } catch (\Throwable) {
@@ -248,7 +261,7 @@ final class AuthService
         // hard-coded ADMIN role and the repository will recreate the row when
         // bootstrap next runs successfully.
         $configuredAdmin = strtolower(trim(Env::string('APP_ADMIN_EMAIL')));
-        if ($configuredAdmin !== '' && strtolower($primaryEmail) === $configuredAdmin && !in_array('ADMIN', $roles, true)) {
+        if ($configuredAdmin !== '' && strtolower($authenticatedEmail) === $configuredAdmin && !in_array('ADMIN', $roles, true)) {
             $roles[] = 'ADMIN';
         }
         $roles = array_values(array_unique(array_map('strtoupper', $roles)));
@@ -277,7 +290,8 @@ final class AuthService
             $displayName,
             $roles,
             $permissions,
-            (string) $session['public_id']
+            (string) $session['public_id'],
+            $authenticatedEmail
         );
         return $this->currentUser;
     }
@@ -407,6 +421,58 @@ final class AuthService
     {
         $this->users->removeSecondaryEmail($userId, $emailId);
         $this->audit->record($userId, 'user.secondary_email_removed', ['email_id' => $emailId]);
+    }
+
+    public function promoteSecondaryEmail(int $userId, int $emailId): void
+    {
+        $this->transactions->run(function () use ($userId, $emailId): void {
+            $this->users->promoteSecondaryEmail($userId, $emailId);
+        });
+        $this->audit->record($userId, 'user.secondary_email_promoted', ['email_id' => $emailId]);
+    }
+
+    /** @param array<string,string> $data */
+    public function requestRegistration(array $data, string $returnPath = '/account/library'): void
+    {
+        $email = EmailAddress::normalize((string) ($data['email'] ?? ''));
+        if ($this->users->findByVerifiedEmail($email) !== null) throw new RuntimeException('That email already has an account. Sign in instead.');
+        $type = (string) ($data['account_type'] ?? 'individual');
+        if (!in_array($type, ['individual', 'company'], true)) throw new RuntimeException('Choose an account type.');
+        $first = trim((string) ($data['first_name'] ?? '')); $last = trim((string) ($data['last_name'] ?? ''));
+        if ($first === '' || $last === '') throw new RuntimeException('Enter your first and last name.');
+        $company = trim((string) ($data['company_name'] ?? ''));
+        if ($type === 'company' && $company === '') throw new RuntimeException('Enter your company name.');
+        $context = ['return_path' => $this->safeReturnPath($returnPath), 'registration' => ['account_type'=>$type,'first_name'=>$first,'middle_names'=>trim((string)($data['middle_names'] ?? '')),'last_name'=>$last,'company_name'=>$company]];
+        $raw = Token::generate(); $hash = Token::hash($raw);
+        $this->tokens->create($hash, $email, 'registration', null, $context, Env::int('AUTH_MAGIC_LINK_TTL', 1800), ClientFingerprint::ipHash());
+        $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($raw);
+        try { $this->mailer->sendMagicLink($email, $url, Env::int('AUTH_MAGIC_LINK_TTL', 1800)); }
+        catch (\Throwable $e) { $this->tokens->deleteByHash($hash); throw new RuntimeException('The registration email could not be sent.', 0, $e); }
+    }
+
+    public function consumeRegistration(string $rawToken): string
+    {
+        $state = $this->transactions->run(function () use ($rawToken): array {
+            $row = $this->tokens->findUsableForUpdate(Token::hash($rawToken), 'registration');
+            if ($row === null) throw new RuntimeException('The registration link is invalid or has expired.');
+            $email = (string) $row['email'];
+            if ($this->users->findByVerifiedEmail($email) !== null) throw new RuntimeException('That email already has an account.');
+            $context = json_decode((string) $row['context'], true); $reg = is_array($context['registration'] ?? null) ? $context['registration'] : [];
+            $user = $this->users->createWithPrimaryEmail($email);
+            $this->users->updateProfile((int)$user['id'], $reg);
+            $this->roles->assign((int)$user['id'], RoleCatalog::STUDENT);
+            if (($reg['account_type'] ?? 'individual') === 'company') {
+                if ($this->companies === null) throw new RuntimeException('Company registration is unavailable.');
+                $this->companies->register((int)$user['id'], $email, (string)$reg['company_name'], EmailAddress::domain($email));
+            }
+            $this->tokens->markUsed((int)$row['id']); $this->users->markLogin((int)$user['id']);
+            $sessionToken = Token::generate();
+            $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), Env::int('AUTH_SESSION_TTL',86400), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
+            return ['user'=>$user,'token'=>$sessionToken,'session'=>$sessionId,'return'=>$this->safeReturnPath((string)($context['return_path'] ?? '/account/library'))];
+        });
+        $this->setSessionCookie((string)$state['token']);
+        $this->events->dispatch('auth.logged_in', ['user_id'=>(int)$state['user']['id'],'session_id'=>(string)$state['session']]);
+        return (string)$state['return'];
     }
 
     /**

@@ -1,16 +1,16 @@
-# Catto Learning 0.8.2 — Development Handoff
+# Catto Learning 0.8.3 — Development Handoff
 
 **Date:** 2026/09/15 SAST
-**Update:** v0.8.2 platform UI remediation and documentation
-**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1` and `v0.8.2`
+**Update:** v0.8.3 final UI and account correction
+**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1`, `v0.8.2` and `v0.8.3`
 
-The v0.8.1 update standardises the platform UI around the canonical component registry. The
+The v0.8.3 update completes the canonical platform UI and account workflows. The
 individual purchase flow remains implemented: guest carts, staged checkout, profile capture,
 Omnipay Dummy simulations, manual EFT instructions, payment retries, immutable orders/invoices, PDF
 downloads, optional invoice email and access timing. Settings now have independent accordion forms,
 with bank details stored in `app_options`; cart colours and surfaces belong to the active theme.
 
-Run additive migrations against v0.7, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The current v0.8.1 Podman QA gate passes 634 tests and 43,707 assertions, with PHPStan and all validators green; Profile Image and both question-editor modes were checked in Chromium across all bundled themes at desktop and mobile sizes, including native fallbacks.
+Run additive migrations, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The current v0.8.3 Podman QA gate passes 636 tests and 43,787 assertions, with PHPStan and all validators green. Passwordless registration, authenticated-email sessions and secondary-email promotion are covered by integration tests; public login, registration, catalogue, reports and the UI gallery were smoke-checked in Chromium at desktop and mobile widths.
 
 The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. Current QA is 634 tests and 43,707 assertions, with all quality gates passing.
 

@@ -34,7 +34,8 @@ final readonly class CurrentUser
         public string $displayName,
         public array $roles,
         public array $permissions,
-        public string $sessionPublicId
+        public string $sessionPublicId,
+        public string $authenticatedEmail = ''
     ) {
     }
 

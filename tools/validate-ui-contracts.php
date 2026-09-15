@@ -196,7 +196,7 @@ $need(
 foreach (['Course history','Active sessions','Account activity'] as $token) $need(!str_contains($profile, $token), 'Personal Particulars must not contain dashboard/session/activity content: ' . $token);
 
 $profileEmails = $read($root . '/resources/views/partials/account/emails.html.twig');
-foreach (['Email Addresses','cannot be changed','/account/email/secondary','/account/email/remove'] as $token) $need(str_contains($profileEmails, $token), 'Email Addresses missing: ' . $token);
+foreach (['Email Addresses','cannot be removed','/account/email/secondary','/account/email/promote','/account/email/remove'] as $token) $need(str_contains($profileEmails, $token), 'Email Addresses missing: ' . $token);
 
 $profileSocial = $read($root . '/resources/views/partials/account/social.html.twig');
 foreach (['Social Media','social_links','name="social['] as $token) $need(str_contains($profileSocial, $token), 'Social Media missing: ' . $token);

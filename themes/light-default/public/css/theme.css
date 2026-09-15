@@ -870,7 +870,6 @@ body.ld-body{
 .ld-main .cl-ui-surface.border-success{border-color:#bfe3ce}
 .ld-main .shadow-sm{box-shadow:var(--ld-shadow-card)!important}
 
-.ld-main .admin-reports-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.ld-main .cl-ui-stat-card{
   background:var(--ld-soft-2);
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);

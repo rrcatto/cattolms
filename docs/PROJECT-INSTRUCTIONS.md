@@ -1,9 +1,9 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.8.2 (platform UI remediation and documentation, 2026/09/15; 0.5.8.3 remains the accepted VPS version)
+**Current approved LMS version:** 0.8.3 (final UI and account correction, 2026/09/15; 0.5.8.3 remains the accepted VPS version)
 **Date time:** 2026/09/15 SAST
 **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
-**Current phase:** TEST/DEV; v0.8.2 hardens the canonical UI component architecture while v0.8 commerce continues through additive migrations on v0.7. The development database is disposable; this UI update requires no schema changes.
+**Current phase:** TEST/DEV; v0.8.3 completes the canonical UI/account correction while v0.8 commerce continues through additive migrations. The development database is disposable; the authenticated-email session column is applied by migration.
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 

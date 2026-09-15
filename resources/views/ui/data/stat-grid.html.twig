@@ -1,1 +1,1 @@
-<div class="cl-ui-stat-grid cl-ui-spaced">{% block body %}{% endblock %}</div>
+<div class="cl-ui-stat-grid cl-ui-spaced"{% if props.columns is defined and props.columns != 'auto' %} data-columns="{{ props.columns }}"{% endif %}>{% block body %}{% endblock %}</div>

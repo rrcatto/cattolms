@@ -309,6 +309,18 @@ final class AccountController extends BaseController
         $this->redirect('/account/profile#emails');
     }
 
+    #[Route('/account/email/promote', name: 'account_promote_secondary_email', methods: ['POST'])]
+    public function promoteSecondaryEmail(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.EMAIL.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->auth->promoteSecondaryEmail($user->id, (int) ($_POST['email_id'] ?? 0));
+            $this->flash('success', 'The secondary email address is now primary.');
+            $this->redirect('/account/profile#emails');
+        }, '/account/profile#emails');
+    }
+
     /** @return array<string,mixed> */
     private function dashboardData(int $userId): array
     {
