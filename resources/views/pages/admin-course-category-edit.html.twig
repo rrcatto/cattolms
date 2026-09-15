@@ -21,14 +21,14 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'field-admin-course-category-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input class="form-control" name="name" value="{{ category.name }}" maxlength="120" required id="field-admin-course-category-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+						<input class="form-control" name="name" value="{{ category.name }}" maxlength="120" required id="field-admin-course-category-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'field-admin-course-category-edit-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Currently at level ' ~ (category.level) ~ ' of 3. A category cannot be moved under itself or under one of its own sub-categories.'})} %}
 {% block control %}
 
-						<select class="form-select" name="parent_id" id="field-admin-course-category-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}><option value="0">None — a top-level category</option>
+						<select class="form-select" name="parent_id" id="field-admin-course-category-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="0">None — a top-level category</option>
 						{% for parent_option in parent_options %}
 							<option value="{{ parent_option.id }}" {{ category.parent_id==parent_option.id ? 'selected' : '' }}>{{ parent_option.parent_name ? parent_option.parent_name ~ ' › ' : '' }}{{ parent_option.name }}</option>
 						{% endfor %}
@@ -39,14 +39,14 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', full_width: false, for: 'field-admin-course-category-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input class="form-control" name="slug" value="{{ category.slug }}" required id="field-admin-course-category-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+						<input class="form-control" name="slug" value="{{ category.slug }}" required id="field-admin-course-category-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: false, for: 'field-admin-course-category-edit-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-						<textarea class="form-control" name="description" rows="4" id="field-admin-course-category-edit-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ category.description }}</textarea>
+						<textarea class="form-control" name="description" rows="4" id="field-admin-course-category-edit-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ category.description }}</textarea>
 
 {% endblock %}
 {% endembed %}
@@ -83,7 +83,7 @@
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replacement category', for: 'field-admin-course-category-edit', required: true})} %}
 {% block control %}
-<select id="field-admin-course-category-edit" class="form-select mb-3" name="replacement_category_id" required><option value="">Choose replacement…</option>
+<select id="field-admin-course-category-edit" class="form-select mb-3" name="replacement_category_id" required {{ ui_field_attrs(props) }}><option value="">Choose replacement…</option>
 							{% for replacement in replacement_categories %}
 								<option value="{{ replacement.id }}">{{ replacement.name }}</option>
 							{% endfor %}

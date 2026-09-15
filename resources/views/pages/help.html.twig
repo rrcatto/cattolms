@@ -1,185 +1,85 @@
 {% extends layout %}
 {% block page_body %}
-	{% set ph_kicker = 'Support' %}
-	{% set ph_title = 'Help' %}
-	{% set ph_lead = 'How the platform works, and where to get answers.' %}
-	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container cl-medium py-5">
-		<div class="cl-help-accordion" data-help-accordion>
-			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Getting around', summary: 'Where things are, and what each area is for', open: true})} %}
-{% block body %}
+    {% set ph_kicker = 'Help' %}
+    {% set ph_title = 'How CattoLMS works' %}
+    {% set ph_lead = 'A practical guide to finding a course, getting access and learning at your own pace.' %}
+    {% include '@platform/partials/page-head.html.twig' %}
 
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'The main areas'})} %}
-{% block body %}
+    <section class="container cl-medium py-5">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+            {% block surface_body %}
+                <p class="lead">CattoLMS is a library of self-paced courses. You can browse the public catalogue without signing in, choose a course, and decide whether it is right for you before you buy access.</p>
+                <p>Use the links below to jump to a topic. The information is kept visible on the page so it is easy to scan, print, search with your browser, and read with JavaScript disabled.</p>
+                <nav aria-label="Help topics">
+                    <p>
+                        <a href="#find-a-course">Find a course</a> ·
+                        <a href="#buy-access">Buy access</a> ·
+                        <a href="#course-structure">Course structure</a> ·
+                        <a href="#learn">Learn and track progress</a> ·
+                        <a href="#sign-in">Sign in and your account</a>
+                    </p>
+                </nav>
+            {% endblock %}
+        {% endembed %}
 
-							<p>
-								<strong>My Course Library</strong> holds the courses you are taking, have completed, have marked as favourites or have requested.
-							</p>
-							<p>
-								<strong>Profile</strong> contains your personal particulars, email addresses and active sessions.
-							</p>
-							<p>
-								<strong>Administration</strong> is where platform administrators manage courses, people, companies, enrolments, credits, activity, reports, themes and settings.
-							</p>
+        {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
+            {% block body %}
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'find-a-course'})} %}
+                    {% block surface_body %}
+                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '01', heading: 'Find a course', summary: 'Browse the catalogue and compare courses before you choose.'})} %}{% endembed %}
+                        <p>Open <a href="/courses">Courses</a> to see the public catalogue. The first row shows the top-level categories. Select a category to open its related areas and subjects, then choose a subject to see the courses in that branch.</p>
+                        <p>You can also search by keyword or browse <a href="/courses/tags">tags</a>. A course can appear under more than one tag, so tags are useful when you know the topic or outcome you want but not the category name.</p>
+                        <p>Select a course card to read its description, estimated time, level, included material and available prices. The course page is where you decide whether to continue.</p>
+                    {% endblock %}
+                {% endembed %}
 
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Signing in'})} %}
-{% block body %}
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'buy-access'})} %}
+                    {% block surface_body %}
+                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '02', heading: 'Buy access', summary: 'Choose a price and complete checkout securely.'})} %}{% endembed %}
+                        <ol>
+                            <li>On a course page, choose the price and access period that suit you.</li>
+                            <li>Select <strong>Buy now</strong> to go straight to checkout, or add the course to your cart if you want to continue browsing.</li>
+                            <li>Review your course, price, access period and email address before placing the order.</li>
+                            <li>Choose the payment method offered at checkout. Card payments in this environment show their result immediately; an EFT order displays payment instructions and an order reference.</li>
+                        </ol>
+                        <p>After a successful payment, your course appears in <strong>My Course Library</strong>. EFT access starts after the payment has been confirmed. Keep the order email and reference if you need to ask about a payment.</p>
+                    {% endblock %}
+                {% endembed %}
 
-							<p>
-								There is no password. You give an email address, the platform sends a single-use link, and opening it signs you in on that device.
-							</p>
-							<p>
-								A link is good once and expires. Requesting a new one invalidates the last, so the most recent email is always the one to use.
-							</p>
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'course-structure'})} %}
+                    {% block surface_body %}
+                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '03', heading: 'What a course contains', summary: 'Courses are organised into a sequence of learning steps.'})} %}{% endembed %}
+                        <p>A course is made up of modules. Each module contains the material for one part of the subject, such as written explanations, images, video, downloads or other practical resources.</p>
+                        <p>Some modules finish with a module assessment. A course may also include a diagnostic at the beginning and a final assessment at the end. The course page explains which assessments are included and when they become available.</p>
+                        <p>When a course offers a certificate, completing its required learning and assessments makes the certificate available according to the course rules.</p>
+                    {% endblock %}
+                {% endembed %}
 
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Real and generated data'})} %}
-{% block body %}
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'learn'})} %}
+                    {% block surface_body %}
+                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '04', heading: 'Learn and track progress', summary: 'Pause and return whenever you are ready.'})} %}{% endembed %}
+                        <p>Open a purchased course from <strong>My Course Library</strong> and select <strong>Start</strong> or <strong>Continue</strong>. Work through the modules in order unless the course says that another path is available.</p>
+                        <p>Your completed material and assessment results are saved as you go. You can leave and return later; the library shows your current progress and completed courses.</p>
+                        <p>Read each module's instructions before starting an assessment. Submit your answers when you are ready and follow the result page for the next available step.</p>
+                    {% endblock %}
+                {% endembed %}
 
-							<p>
-								Administrators can see two separate populations: the genuine one, and generated sets used to exercise the platform. The switch above a list says which you are looking at, and it appears only where you may choose.
-							</p>
-							<p>
-								Nothing crosses between them. A generated learner cannot be enrolled on a genuine course, and the database refuses it independently of the application.
-							</p>
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'sign-in'})} %}
+                    {% block surface_body %}
+                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '05', heading: 'Sign in and your account', summary: 'Access your courses without a password.'})} %}{% endembed %}
+                        <p>CattoLMS uses a one-time sign-in link. Enter your email address on the <a href="/login">sign-in page</a>; the latest email contains the link for that sign-in attempt. A link expires and can only be used once.</p>
+                        <p>Once signed in, your account area contains your course library, profile details, email addresses and active sessions. Keep your email address current so you can receive sign-in links and order messages.</p>
+                    {% endblock %}
+                {% endembed %}
 
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'People, companies and access', summary: 'Who may do what, and on whose behalf'})} %}
-{% block body %}
-
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Roles'})} %}
-{% block body %}
-
-							<p>
-								Platform Administrators can open any person and edit their complete profile, company and roles. Course Owners control the courses they own; Course Editors edit the courses assigned to them; Learners take courses.
-							</p>
-							<p>
-								A role is a bundle of permissions, and a permission is what is actually checked. Changing a role takes effect on the next request without anyone signing out.
-							</p>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Companies'})} %}
-{% block body %}
-
-							<p>
-								The permanent System Company represents the organisation hosting the platform. People who do not belong to a third-party company belong to it.
-							</p>
-							<p>
-								A company reserves one email domain. Its administrator and learners use addresses at that exact domain.
-							</p>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Course credits'})} %}
-{% block body %}
-
-							<p>
-								A company buys credits against a course and assigns them to its people. A credit is consumed when the learner starts the course, not when it is assigned, so an unstarted assignment can still be withdrawn and given to someone else.
-							</p>
-							<p>
-								Once a course is started the credit is spent and cannot be returned.
-							</p>
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Courses', summary: 'Authoring, publishing and what learners see'})} %}
-{% block body %}
-
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Publishing'})} %}
-{% block body %}
-
-							<p>
-								A course must carry at least one price option before it can be published. Publishing stamps the date once: unpublishing and republishing does not move it.
-							</p>
-							<p>
-								A published course stays editable in place. Editing it does not create a second course, and learners already on it keep their progress.
-							</p>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Categories and tags'})} %}
-{% block body %}
-
-							<p>
-								A course sits in one category, three levels deep at most. Tags are cross-cutting labels and a course may carry as many as it needs.
-							</p>
-							<p>
-								Both are shared vocabulary rather than per-population data, so a generated course and a genuine one can sit under the same category. What is counted under a label is still filtered to the population you are looking at.
-							</p>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Reset and deletion'})} %}
-{% block body %}
-
-							<p>
-								<strong>Reset</strong> removes course content and learner test data but keeps the course shell for re-import.
-							</p>
-							<p>
-								<strong>Delete</strong> permanently removes the course together with the access, progress, results and certificates that belong to it.
-							</p>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Assessments and diagnostics'})} %}
-{% block body %}
-
-							<p>
-								A module assessment is taken after its module; the final assessment unlocks when the required modules are assessed. Diagnostics sit before Module 1 and are recorded separately from module and final grades.
-							</p>
-							<p>
-								A diagnostic can be configured to complete the course when its threshold is met, which is how a course allows a learner to prove they already know the material.
-							</p>
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Themes', summary: 'Installing a release, and writing one'})} %}
-{% block body %}
-
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Installing and switching', id: 'theme-sdk'})} %}
-{% block body %}
-
-							<p>
-								Themes are Theme Package 4.0 ZIP releases described by <span class="mono">theme.json</span>. Administration can validate and install a release, preview it, activate it, or uninstall it while it is inactive.
-							</p>
-							<p>
-								Theme source is not edited or exported by the platform. A child theme names one exact parent by name and version, and supplies at least its own <span class="mono">public/css/theme.css</span>.
-							</p>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Writing a theme'})} %}
-{% block body %}
-
-							<p>
-								A minimal standalone theme needs a manifest, <span class="mono">base.html.twig</span> and a non-empty <span class="mono">public/css/theme.css</span>. A full theme can add page-family wrappers, partials, browser JavaScript, assets and declared HTTPS CDN resources.
-							</p>
-							<p>
-								The base declares where the page renders; a page-family wrapper extends the base and wraps that same block. A theme supplies presentation only - it never executes server code and never replaces the platform's security or business rules.
-							</p>
-							<p>
-								Developer documentation is in <span class="mono">docs/THEME-SDK.md</span>, including the navigation and component styling contracts a theme has to honour.
-							</p>
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-		</div>
-	</section>
+                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'answers'})} %}
+                    {% block surface_body %}
+                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '06', heading: 'Still need an answer?', summary: 'We can help with questions about courses or access.'})} %}{% endembed %}
+                        <p>Read the course description and checkout review first; they contain the specific access period, included material and payment details for that course.</p>
+                        <p>If something is unclear or an order does not look right, <a href="/contact">contact the CattoLMS team</a> and include the email address on the account and your order reference where applicable.</p>
+                    {% endblock %}
+                {% endembed %}
+            {% endblock %}
+        {% endembed %}
+    </section>
 {% endblock %}

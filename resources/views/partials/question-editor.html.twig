@@ -1,0 +1,12 @@
+{# Saved questions and inert prototypes share the same canonical component composition. #}
+<div id="question-editor">
+    {% for qi, question in editor_questions ?: [{}] %}
+        {% include '@platform/partials/question-editor-question.html.twig' %}
+    {% endfor %}
+</div>
+<template id="question-editor-question-template">
+    {% include '@platform/partials/question-editor-question.html.twig' with {qi: '__q__', question: {}} %}
+</template>
+<template id="question-editor-option-template">
+    {% include '@platform/partials/question-editor-option.html.twig' with {qi: '__q__', oi: '__o__', option: {}} %}
+</template>

@@ -48,7 +48,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Alternative email address', full_width: false, for: 'secondary-email', required: true, help: 'A verification link is sent to the address. It is added to your account only once you follow that link.'})} %}
 {% block control %}
 
-				<input type="email" id="secondary-email" name="email" required{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+				<input type="email" id="secondary-email" name="email" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

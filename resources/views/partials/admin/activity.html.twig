@@ -20,21 +20,21 @@
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'field-activity-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-			<input type="date" name="from" value="{{ activity_filters.from }}" id="field-activity-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+			<input type="date" name="from" value="{{ activity_filters.from }}" id="field-activity-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'field-activity-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-			<input type="date" name="to" value="{{ activity_filters.to }}" id="field-activity-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+			<input type="date" name="to" value="{{ activity_filters.to }}" id="field-activity-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Activity type', full_width: false, for: 'field-activity-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-			<select name="family" id="field-activity-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="">All types</option>
+			<select name="family" id="field-activity-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="">All types</option>
 			{% for family in activity_families %}
 				<option value="{{ family }}" {{ activity_filters.family==family ? 'selected' : '' }}>{{ family|replace({'_': ' '})|ucfirst }}</option>
 			{% endfor %}
@@ -47,7 +47,7 @@
 {% block control %}
 
 			<div class="cl-row-inline">
-				<input name="q" value="{{ activity_filters.q }}" placeholder="Event, person, ID or metadata" class="cl-flex-fill" id="field-activity-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="q" value="{{ activity_filters.q }}" placeholder="Event, person, ID or metadata" class="cl-flex-fill" id="field-activity-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 				{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/activity'}) }}
 			</div>
 

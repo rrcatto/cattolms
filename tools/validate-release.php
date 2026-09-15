@@ -291,7 +291,10 @@ $need($forbidden === [], 'Release contains patch residue: ' . implode(', ', $for
 $pages = glob($root . '/resources/views/pages/*.html.twig') ?: [];
 $need(count($pages) >= 35, 'Expected at least 35 platform-owned page templates.');
 $help = $read($root . '/resources/views/pages/help.html.twig');
-$need(str_contains($help, 'data-help-accordion'), 'Help accordion structure must be preserved.');
+$need(!str_contains($help, 'data-help-accordion') && !str_contains($help, 'overlay.accordion-section'), 'Public Help must remain visible rather than using nested accordions.');
+foreach (['find-a-course', 'buy-access', 'course-structure', 'learn', 'sign-in', 'answers'] as $helpSection) {
+    $need(str_contains($help, "id: '" . $helpSection . "'"), 'Public Help is missing section: ' . $helpSection);
+}
 
 require_once $root . '/src/View/ThemePackageValidator.php';
 if (class_exists(ZipArchive::class) && count($bundled) === 1) {

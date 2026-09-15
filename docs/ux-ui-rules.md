@@ -635,3 +635,12 @@ native disclosures; workspace expansion can fetch the same server-rendered secti
 
 **13.4 Dataset composition delegates to the existing shared search and pagination.** Paired pagers
 have unique control IDs, stable results targets and ordinary GET URLs. No page invents its own pager.
+
+
+### Remediation contracts
+
+Use `ui_field_attrs(props)` in every `form.field` native-control slot. Dynamic question controls
+must clone the server-rendered canonical prototypes; JavaScript may reindex controls but must not
+create a competing UI. Themes must not redefine canonical display, grids, overflow, positioning,
+visibility or touch dimensions. Notice headings have a dedicated hook, separate from prose emphasis.
+See `UI-COMPONENTS.md` for the helper, native action contracts and ownership enforcement.

@@ -113,6 +113,12 @@ final class RenderHarness
         return self::$twig;
     }
 
+    /** @param array<string,mixed> $context */
+    public static function renderSource(string $source, array $context = []): string
+    {
+        return self::twig()->createTemplate($source)->render($context);
+    }
+
     private static function loader(): FilesystemLoader
     {
         return self::$loader ??= TwigFactory::loader(self::root());

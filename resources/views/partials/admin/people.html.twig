@@ -115,28 +115,28 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-									<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-									<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-									<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Initial role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The person is initially added to the System Company. Open their full profile afterwards only if they belong to another company.'})} %}
 {% block control %}
 
-									<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+									<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 									{% for role in roles %}
 										<option value="{{ role.role_key }}">{{ role.role_name }}</option>
 									{% endfor %}

@@ -20,27 +20,27 @@
 
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'first-name', required: true})} %}
 {% block control %}
-<input id="first-name" name="first_name" autocomplete="given-name" value="{{ profile.first_name }}" maxlength="120" required>
+<input id="first-name" name="first_name" autocomplete="given-name" value="{{ profile.first_name }}" maxlength="120" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'last-name', required: true})} %}
 {% block control %}
-<input id="last-name" name="last_name" autocomplete="family-name" value="{{ profile.last_name }}" maxlength="120" required>
+<input id="last-name" name="last_name" autocomplete="family-name" value="{{ profile.last_name }}" maxlength="120" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cell number', full_width: false, for: 'mobile-number', required: true})} %}
 {% block control %}
-<input id="mobile-number" name="mobile_number" type="tel" autocomplete="tel" value="{{ profile.mobile_number }}" maxlength="60" required>
+<input id="mobile-number" name="mobile_number" type="tel" autocomplete="tel" value="{{ profile.mobile_number }}" maxlength="60" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'RSA ID number', full_width: false, for: 'rsa-id', required: true})} %}
 {% block control %}
-<input id="rsa-id" name="identification_number" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" value="{{ profile.identification_number }}" required>
+<input id="rsa-id" name="identification_number" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" value="{{ profile.identification_number }}" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Billing address', full_width: true, for: 'billing-address', required: true})} %}
 {% block control %}
-<textarea id="billing-address" name="billing_address" autocomplete="street-address" maxlength="2000" rows="3" required>{{ profile.billing_address }}</textarea>
+<textarea id="billing-address" name="billing_address" autocomplete="street-address" maxlength="2000" rows="3" required {{ ui_field_attrs(props) }}>{{ profile.billing_address }}</textarea>
 {% endblock %}
 {% endembed %}
 

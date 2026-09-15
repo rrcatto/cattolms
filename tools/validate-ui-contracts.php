@@ -247,6 +247,19 @@ $reports = $read($root . '/resources/views/partials/admin/reports.html.twig');
 $manager = $read($root . '/src/View/ThemeManager.php');
 foreach (['discoverInstalledThemes','filesystem_key','$row = $registry[$key] ?? null;','resyncRegistry'] as $token) $need(str_contains($manager, $token), 'Filesystem theme recovery missing: ' . $token);
 
+require_once $root . '/src/View/Ui/UiOwnershipAudit.php';
+foreach (['public_html/js', 'assets/controllers'] as $directory) {
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/' . $directory, FilesystemIterator::SKIP_DOTS)) as $file) {
+        if ($file->getExtension() === 'js') $errors = array_merge($errors, \CattoLearning\View\Ui\UiOwnershipAudit::javascript((string) file_get_contents($file->getPathname()), $file->getPathname()));
+    }
+}
+foreach (glob($root . '/themes/*/public/css/*.css') ?: [] as $file) {
+    $errors = array_merge($errors, \CattoLearning\View\Ui\UiOwnershipAudit::themeGeometry((string) file_get_contents($file), $file));
+}
+foreach ($viewFiles as $file) {
+    if ($file->getExtension() === 'twig') $errors = array_merge($errors, \CattoLearning\View\Ui\UiOwnershipAudit::stimulusActions((string) file_get_contents($file->getPathname()), $file->getPathname()));
+}
+
 if ($errors !== []) {
     fwrite(STDERR, "UI contract validation failed:\n- " . implode("\n- ", $errors) . "\n");
     exit(1);

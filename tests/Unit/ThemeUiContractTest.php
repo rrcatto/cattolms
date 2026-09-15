@@ -7,7 +7,7 @@ Date time: 2026/08/25 14:29 SAST
 Version: 0.5.8.3
 
 Description:
-Regression tests for the Catto Learning 0.5.8 Theme SDK 3.0 contract: filesystem-only themes, platform-owned functional pages, immutable releases, direct-parent child inheritance and Factory Reset as the shipped default rather than a universal fallback.
+Regression tests for the Catto Learning 0.5.8 Theme Package 4.0 / Template API 2.0 contract: filesystem-only themes, platform-owned functional pages, immutable releases, direct-parent child inheritance and Factory Reset as the shipped default rather than a universal fallback.
 
 Changelog:
 

@@ -31,7 +31,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate title', full_width: false, for: 'certificate-title'})} %}
 {% block control %}
 
-							<input class="form-control" id="certificate-title" name="certificate_title" maxlength="240" value="{{ course.certificate_title }}">
+							<input class="form-control" id="certificate-title" name="certificate_title" maxlength="240" value="{{ course.certificate_title }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% block help_content %}
@@ -43,7 +43,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate body text', full_width: false, for: 'certificate-body'})} %}
 {% block control %}
 
-							<input class="form-control" id="certificate-body" name="certificate_body_text" maxlength="500" value="{{ course.certificate_body_text }}">
+							<input class="form-control" id="certificate-body" name="certificate_body_text" maxlength="500" value="{{ course.certificate_body_text }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% block help_content %}
@@ -55,7 +55,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate footer', full_width: false, for: 'certificate-footer'})} %}
 {% block control %}
 
-							<input class="form-control" id="certificate-footer" name="certificate_footer_text" maxlength="500" value="{{ course.certificate_footer_text }}">
+							<input class="form-control" id="certificate-footer" name="certificate_footer_text" maxlength="500" value="{{ course.certificate_footer_text }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% block help_content %}
@@ -70,14 +70,14 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signatory name', full_width: false, for: 'signatory-name'})} %}
 {% block control %}
 
-								<input class="form-control" id="signatory-name" name="certificate_signatory_name" maxlength="160" value="{{ course.certificate_signatory_name }}">
+								<input class="form-control" id="signatory-name" name="certificate_signatory_name" maxlength="160" value="{{ course.certificate_signatory_name }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signatory title', full_width: false, for: 'signatory-title'})} %}
 {% block control %}
 
-								<input class="form-control" id="signatory-title" name="certificate_signatory_title" maxlength="160" value="{{ course.certificate_signatory_title }}">
+								<input class="form-control" id="signatory-title" name="certificate_signatory_title" maxlength="160" value="{{ course.certificate_signatory_title }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -90,14 +90,14 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate HTML', full_width: false, for: 'certificate-html', required: true})} %}
 {% block control %}
 
-									<textarea class="form-control cl-rich-editor" id="certificate-html" name="certificate_template_html" rows="18" required>{{ course.certificate_template_html }}</textarea>
+									<textarea class="form-control cl-rich-editor" id="certificate-html" name="certificate_template_html" rows="18" required {{ ui_field_attrs(props) }}>{{ course.certificate_template_html }}</textarea>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate CSS', full_width: false, for: 'certificate-css'})} %}
 {% block control %}
 
-									<textarea class="form-control font-monospace" id="certificate-css" name="certificate_template_css" rows="12">{{ course.certificate_template_css }}</textarea>
+									<textarea class="form-control font-monospace" id="certificate-css" name="certificate_template_css" rows="12" {{ ui_field_attrs(props) }}>{{ course.certificate_template_css }}</textarea>
 
 {% endblock %}
 {% endembed %}

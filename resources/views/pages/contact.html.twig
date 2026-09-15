@@ -31,28 +31,28 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'contact-name', required: true})} %}
 {% block control %}
 
-							<input id="contact-name" type="text" name="name" maxlength="120" autocomplete="name" required>
+							<input id="contact-name" type="text" name="name" maxlength="120" autocomplete="name" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: false, for: 'contact-email', required: true})} %}
 {% block control %}
 
-							<input id="contact-email" type="email" name="email" maxlength="254" autocomplete="email" required>
+							<input id="contact-email" type="email" name="email" maxlength="254" autocomplete="email" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subject', full_width: true, for: 'contact-subject', required: true})} %}
 {% block control %}
 
-							<input id="contact-subject" type="text" name="subject" maxlength="160" required>
+							<input id="contact-subject" type="text" name="subject" maxlength="160" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Message', full_width: true, for: 'contact-message', required: true})} %}
 {% block control %}
 
-							<textarea id="contact-message" name="message" rows="8" maxlength="5000" required></textarea>
+							<textarea id="contact-message" name="message" rows="8" maxlength="5000" required {{ ui_field_attrs(props) }}></textarea>
 
 {% endblock %}
 {% endembed %}

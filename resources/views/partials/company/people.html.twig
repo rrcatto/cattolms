@@ -29,28 +29,28 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+						<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+						<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-						<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+						<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="STUDENT">Student</option><option value="COURSE_EDITOR">CourseEditor</option><option value="COURSE_OWNER">CourseOwner</option><option value="COMPANY_ADMIN">CompanyAdministrator</option></select>
+						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="STUDENT">Student</option><option value="COURSE_EDITOR">CourseEditor</option><option value="COURSE_OWNER">CourseOwner</option><option value="COMPANY_ADMIN">CompanyAdministrator</option></select>
 
 {% endblock %}
 {% endembed %}
@@ -146,35 +146,35 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input name="first_name" value="{{ person.first_name }}" id="field-people-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input name="first_name" value="{{ person.first_name }}" id="field-people-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', full_width: false, for: 'field-people-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input name="middle_names" maxlength="160" value="{{ person.middle_names }}" id="field-people-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input name="middle_names" maxlength="160" value="{{ person.middle_names }}" id="field-people-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input name="last_name" value="{{ person.last_name }}" id="field-people-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input name="last_name" value="{{ person.last_name }}" id="field-people-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate name', full_width: true, for: 'field-people-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The name printed on certificates. Left blank, the person\'s ordinary name is used.'})} %}
 {% block control %}
 
-									<input name="certificate_name" value="{{ person.certificate_name }}" id="field-people-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+									<input name="certificate_name" value="{{ person.certificate_name }}" id="field-people-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', full_width: true, for: 'field-people-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input name="mobile_number" value="{{ person.mobile_number }}" id="field-people-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input name="mobile_number" value="{{ person.mobile_number }}" id="field-people-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

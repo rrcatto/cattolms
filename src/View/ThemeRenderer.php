@@ -7,7 +7,7 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 3.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
+Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
 2026/09/09 02:10 SAST

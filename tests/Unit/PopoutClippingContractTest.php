@@ -162,11 +162,14 @@ final class PopoutClippingContractTest extends TestCase
     public function testCoreOwnsTheRowMenuOutrightRatherThanInheritingIt(): void
     {
         $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
+        // Canonical theme geometry is forbidden by UiOwnershipAudit. These functional core
+        // declarations therefore need no cascade escalation; keep checking their actual values.
+        self::assertMatchesRegularExpression('/\.cl-ui-row-panel[^{}]*\{[^{}]*position:absolute(?:;|!important)/', $core);
+        self::assertMatchesRegularExpression('/\.cl-ui-row-panel[^{}]*\{[^{}]*display:grid(?:;|!important)/', $core);
+
 
         foreach ([
             ['overflow', '.cl-ui-row-menu'],
-            ['position', '.cl-ui-row-panel'],
-            ['display', '.cl-ui-row-panel'],
             ['padding', '.cl-ui-row-panel'],
         ] as [$property, $needle]) {
             $rules = array_filter(

@@ -4,7 +4,7 @@ Gilded Noir is a complete standalone Catto Learning LMS theme. It keeps the ligh
 
 ## Package contract
 
-This ZIP is self-contained. A theme generator/designer needs this README plus the separately supplied **Catto Learning LMS Theme SDK 3.1**; the Catto Learning application source tree is not required.
+This ZIP is self-contained. A theme generator/designer needs this README plus the separately supplied **Catto Learning LMS Theme SDK (Package 4.0 / Template API 2.0)**; the Catto Learning application source tree is not required.
 
 The package supplies `base.html`, `public/css/theme.css`, presentation-only JavaScript, SVG icon sprite, artwork, partials, and all 14 supported page-family wrappers. Every wrapper preserves `{{ @content | raw }}` so the LMS retains ownership of functional markup and business controls.
 

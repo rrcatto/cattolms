@@ -1,0 +1,17 @@
+<div data-option data-option-index="{{ oi }}">
+    {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+        {% block body %}
+            {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Option text', for: 'question-' ~ qi ~ '-option-' ~ oi, required: true})} %}
+                {% block control %}<input id="{{ props.for }}" name="option_html[{{ qi }}][{{ oi }}]" value="{{ option.option_html|default('') }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+            {% endembed %}
+            {% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+                {% block body %}
+                    {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Correct option'})} %}
+                        {% block control %}<input type="radio" name="correct_option[{{ qi }}]" value="{{ oi }}" {{ option.is_correct|default(false) ? 'checked' : '' }}>{% endblock %}
+                    {% endembed %}
+                    {{ ui('action.button', {label: 'Remove option', icon: 'action-remove', variant: 'danger', size: 'small', type: 'button', name: 'question_action', value: 'remove-option'}) }}
+                {% endblock %}
+            {% endembed %}
+        {% endblock %}
+    {% endembed %}
+</div>

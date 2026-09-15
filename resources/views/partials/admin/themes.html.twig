@@ -4,9 +4,9 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Theme Manager', eyebrow: 'Themes', summary: 'Install immutable Theme Package 3.0 ZIP releases, preview them, switch the live theme, or uninstall an inactive theme.'})} %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Theme Manager', eyebrow: 'Themes', summary: 'Install immutable Theme Package 4.0 ZIP releases, preview them, switch the live theme, or uninstall an inactive theme.'})} %}
 {% block section_actions %}
-{{ ui('action.link', {label: 'Theme SDK help', variant: 'quiet', size: 'small', href: '/help#theme-sdk'}) }}
+<p>Theme authors: see <code>docs/THEME-SDK.md</code> in the source package for schema 4.0 and Template API 2.0.</p>
 {% endblock %}
 {% endembed %}
 		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
@@ -48,10 +48,10 @@
 {% block surface_body %}
 
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Theme Package 3.0 ZIP', full_width: false, for: 'field-themes-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'The package is validated and inspected before installation. A repaired theme may reuse the same name and version after the defective installed copy has been uninstalled.'})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Theme Package 4.0 ZIP', full_width: false, for: 'field-themes-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'The package is validated and inspected before installation. A repaired theme may reuse the same name and version after the defective installed copy has been uninstalled.'})} %}
 {% block control %}
 
-							<input type="file" name="theme_file" accept=".zip,application/zip" required id="field-themes-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+							<input type="file" name="theme_file" accept=".zip,application/zip" required id="field-themes-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

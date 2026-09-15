@@ -82,7 +82,7 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
   attribute maps. `action.row` is for record actions; `action.group` is for page/section actions.
 - Fields own labels, required markers, help/error text and full-width placement. The control slot
   holds native inputs/selects/textareas. Match `for` with the control ID and associate help/error
-  IDs using aria-describedby; errors also mark the control aria-invalid. Choice fields wrap native
+  IDs exclusively through `ui_field_attrs(props)`; errors also mark the control aria-invalid. Choice fields wrap native
   checkbox/radio controls. `form.actions` owns one save row and its secondary-action region;
   `form.compact-action` is only for an immediate one-value operation. Modal footers are not nested
   inside form action rows.
@@ -129,3 +129,42 @@ structures. Form, modal, feedback, data and gallery contracts exercise escaping,
 semantics, paired pagination IDs and ACL registration. Existing search/pagination, table width/row,
 action parity, clipping, flash, namespace, attribute and served HTML contracts remain in the QA gate.
 Run `composer qa` before handoff; browser checks supplement the automated contracts.
+
+## Field accessibility and dynamic authoring
+
+`ui_field_attrs(props)` accepts only the bounded `form.field` property contract. It returns escaped
+`aria-describedby` and `aria-invalid` attributes derived from the same `for`, `help` and `error`
+properties that render the label and messages. It cannot output classes, styles, event handlers or
+arbitrary attributes. Required remains a native control attribute and a component label marker.
+
+```twig
+{% embed ui_template('form.field') with {props: ui_props('form.field', {
+    label: 'Name', for: 'name', help: 'Use your full name.', required: true
+})} %}
+    {% block control %}
+        <input id="{{ props.for }}" name="name" required {{ ui_field_attrs(props) }}>
+    {% endblock %}
+{% endembed %}
+```
+
+The component captures `help_content` before rendering the control, so a custom help slot has the
+same ID relationship as plain help text. Do not repeat accessibility conditionals in callers.
+For a choice nested inside a field, preserve the outer field properties under an explicit local
+name when the choice introduces its own `props`.
+
+The assessment and diagnostic editors include `partials/question-editor.html.twig`. Saved questions
+and inert question/option `<template>` prototypes use the same two specialised partials, composed
+from platform surfaces, toolbars, form grids, fields, choices and actions. JavaScript clones the
+prototypes and updates names, IDs, labels, description references and radio values. It never authors
+component HTML. Empty editors render an initial question on the server; native form submission and
+editing existing questions work without JavaScript. Add/remove controls are enhancements.
+
+Links reject button-only properties such as `disabled`, `form`, `name`, `value`, `close_modal` and
+`stimulus_action`. Buttons reject `href`, `new_window`, `rel` and `navigation_key`. Unknown-property
+exceptions name the component and offending properties. Common htmx and modal-open hooks remain.
+
+`UiOwnershipAudit` runs in unit tests and `tools/validate-ui-contracts.php`. It examines JavaScript
+markup literals and class-producing operations in `public_html/js` and `assets/controllers`, plus
+canonical theme geometry and malformed Stimulus attributes. Comments and selector-only references
+do not count as generated UI. There are no file exemptions. Notice headings use
+`cl-ui-notice-heading`; inline emphasis in notice prose must stay inline.

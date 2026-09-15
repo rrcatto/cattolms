@@ -11,14 +11,14 @@
 {% block control %}
 
 				<input id="seed-volume" name="volume" type="number" value="{{ seed_volume.default }}"
-				       min="{{ seed_volume.minimum }}" max="{{ seed_volume.maximum }}" required{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+				       min="{{ seed_volume.minimum }}" max="{{ seed_volume.maximum }}" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What this set is for', full_width: false, for: 'seed-description', help: 'Recorded in the activity log so a later reader knows why the data appeared.'})} %}
 {% block control %}
 
-				<input id="seed-description" name="description" type="text" maxlength="500" placeholder="Catalogue screenshots"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+				<input id="seed-description" name="description" type="text" maxlength="500" placeholder="Catalogue screenshots" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

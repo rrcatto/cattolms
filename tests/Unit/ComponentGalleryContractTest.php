@@ -15,6 +15,11 @@ final class ComponentGalleryContractTest extends TestCase
         $html = RenderHarness::render('partials/admin/ui-components', ['gallery_pagination' => \CattoLearning\Application\PlatformAdministrationService::paginationPayload('gallery', \CattoLearning\Support\Pagination::create(2, 25, 75), '/admin/system/ui-components', 'Sample records')]);
         foreach (['cl-ui-surface', 'cl-ui-section-head', 'cl-ui-action', 'cl-ui-badge', 'cl-ui-notice', 'cl-ui-field', 'cl-ui-form-actions', 'cl-ui-toolbar', 'cl-ui-table', 'cl-ui-empty-state', 'cl-ui-stat-card', 'cl-ui-list', 'cl-ui-progress', 'cl-ui-modal', 'cl-ui-accordion-section', 'cl-ui-breadcrumb', 'cl-category-grid', 'cl-course-card', 'cl-tag-browser'] as $class) self::assertStringContainsString($class, $html);
         foreach (['neutral', 'info', 'success', 'warning', 'danger', 'permanent'] as $tone) self::assertStringContainsString('cl-ui-badge--' . $tone, $html);
+        $document = new \DOMDocument();
+        @$document->loadHTML($html);
+        $xpath = new \DOMXPath($document);
+        self::assertSame(1.0, $xpath->evaluate('count(//form/div[@class="cl-ui-compact-action"])'));
+        self::assertSame(0.0, $xpath->evaluate('count(//*[@class="cl-ui-compact-action"]//*[@class="cl-ui-compact-action"])'));
         self::assertSame(2, substr_count($html, 'data-pagination="gallery"'));
         self::assertStringContainsString('aria-valuenow="0"', $html);
         self::assertStringContainsString('aria-valuenow="45"', $html);

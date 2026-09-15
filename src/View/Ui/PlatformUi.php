@@ -18,8 +18,8 @@ final class PlatformUi
         'layout.section-head' => ['template' => 'layout/section-head', 'defaults' => ['eyebrow' => '', 'heading' => null, 'summary' => '', 'heading_level' => 2]],
         'layout.toolbar' => ['template' => 'layout/toolbar', 'defaults' => []],
         'layout.breadcrumb' => ['template' => 'layout/breadcrumb', 'defaults' => ['items' => null, 'aria_label' => 'Breadcrumb']],
-        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'href' => null]],
-        'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit']],
+        'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
+        'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit']],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
         'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false]],
         'form.grid' => ['template' => 'forms/form-grid', 'defaults' => ['columns' => 'auto']],
@@ -51,6 +51,26 @@ final class PlatformUi
         'catalogue.tag-chip' => ['template' => 'catalogue/tag-chip', 'defaults' => ['tag' => [], 'selected' => false, 'compact' => false]],
     ];
 
+    /**
+     * Only control-side relationships owned by form.field; never an arbitrary attribute bag.
+     * @param array<string,mixed> $properties
+     */
+    public function fieldAttributes(array $properties): Markup
+    {
+        $field = $this->properties('form.field', $properties);
+        if (!is_string($field['for']) || preg_match('/\s/u', $field['for'])) {
+            throw new InvalidArgumentException('form.field.for must be a single control ID.');
+        }
+        $ids = [];
+        if ($field['for'] !== '') {
+            if ($field['help']) $ids[] = $field['for'] . '-help';
+            if ($field['error']) $ids[] = $field['for'] . '-error';
+        }
+        $attributes = $ids === [] ? '' : 'aria-describedby="' . htmlspecialchars(implode(' ', $ids), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        if ($field['error']) $attributes .= ($attributes === '' ? '' : ' ') . 'aria-invalid="true"';
+        return new Markup($attributes, 'UTF-8');
+    }
+
     /** Resolve only an explicitly registered component; safe for Twig embed slots. */
     public function template(string $component): string
     {
@@ -67,7 +87,7 @@ final class PlatformUi
         $this->template($component);
         $defaults = self::COMPONENTS[$component]['defaults'];
         if (array_diff_key($properties, $defaults) !== []) {
-            throw new InvalidArgumentException('Unknown UI property for ' . $component);
+            throw new InvalidArgumentException('Unknown UI property for ' . $component . ': ' . implode(', ', array_keys(array_diff_key($properties, $defaults))));
         }
         array_walk_recursive($properties, static function (mixed $value): void {
             if (is_object($value) || is_resource($value)) {

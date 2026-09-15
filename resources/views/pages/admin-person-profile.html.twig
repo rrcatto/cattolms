@@ -52,89 +52,89 @@
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-admin-person-profile-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="first_name" maxlength="120" value="{{ profile.first_name }}" id="field-admin-person-profile-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="first_name" maxlength="120" value="{{ profile.first_name }}" id="field-admin-person-profile-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', full_width: false, for: 'field-admin-person-profile-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between the first name and the surname" id="field-admin-person-profile-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between the first name and the surname" id="field-admin-person-profile-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-admin-person-profile-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="last_name" maxlength="120" value="{{ profile.last_name }}" id="field-admin-person-profile-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="last_name" maxlength="120" value="{{ profile.last_name }}" id="field-admin-person-profile-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Identification number', full_width: false, for: 'field-admin-person-profile-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-admin-person-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-admin-person-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Birthdate', full_width: false, for: 'field-admin-person-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-admin-person-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-admin-person-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Gender', full_width: false, for: 'field-admin-person-profile-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<select name="gender" id="field-admin-person-profile-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
+					<select name="gender" id="field-admin-person-profile-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', full_width: false, for: 'field-admin-person-profile-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" id="field-admin-person-profile-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" id="field-admin-person-profile-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Display name', full_width: true, for: 'field-admin-person-profile-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="display_name" maxlength="160" value="{{ profile.display_name }}" id="field-admin-person-profile-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="display_name" maxlength="160" value="{{ profile.display_name }}" id="field-admin-person-profile-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name on certificates', full_width: true, for: 'field-admin-person-profile-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-					<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}" id="field-admin-person-profile-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+					<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}" id="field-admin-person-profile-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Primary email', full_width: true, for: 'field-admin-person-profile-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Administrator changes take effect immediately.'})} %}
 {% block control %}
 
-					<input type="email" name="primary_email" value="{{ primary_email }}" required id="field-admin-person-profile-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+					<input type="email" name="primary_email" value="{{ primary_email }}" required id="field-admin-person-profile-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Secondary email', full_width: true, for: 'field-admin-person-profile-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Leave blank to remove it. An address entered by a Platform Administrator is treated as verified.'})} %}
 {% block control %}
 
-					<input type="email" name="secondary_email" value="{{ secondary_email }}" id="field-admin-person-profile-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+					<input type="email" name="secondary_email" value="{{ secondary_email }}" id="field-admin-person-profile-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 				{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: selected_company, lk_required: 1, lk_empty: 'Search for the company'} %}
-				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Roles', full_width: true, for: 'field-admin-person-profile-12-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.'})} %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Roles', full_width: true, for: 'profile-role-0', help: 'The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.'})} %}
 {% block control %}
 
 					<div class="role-checkbox-grid">
 						{% for roleOption in role_options %}
-							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (roleOption.role_name) ~ (roleOption.role_key)})} %}
+							{% embed ui_template('form.choice') with {role_field: props, props: ui_props('form.choice', {label: (roleOption.role_name) ~ (roleOption.role_key)})} %}
 {% block control %}
-<input type="checkbox" name="roles[]" value="{{ roleOption.role_key }}" {{ roleOption.selected ? 'checked' : '' }} id="field-admin-person-profile-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+<input type="checkbox" name="roles[]" value="{{ roleOption.role_key }}" {{ roleOption.selected ? 'checked' : '' }} id="profile-role-{{ loop.index0 }}" {{ ui_field_attrs(role_field) }}>
 {% endblock %}
 {% endembed %}
 						{% endfor %}

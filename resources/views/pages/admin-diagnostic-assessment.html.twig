@@ -22,14 +22,14 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title', full_width: false, for: 'field-admin-diagnostic-assessment-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-									<input class="form-control" name="assessment_title" value="{{ assessment.title }}" required id="field-admin-diagnostic-assessment-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input class="form-control" name="assessment_title" value="{{ assessment.title }}" required id="field-admin-diagnostic-assessment-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Diagnostic key', full_width: false, for: 'field-admin-diagnostic-assessment-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-									<input class="form-control" name="assessment_key" value="{{ assessment.assessment_key }}" pattern="[a-z0-9-]+" required id="field-admin-diagnostic-assessment-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input class="form-control" name="assessment_key" value="{{ assessment.assessment_key }}" pattern="[a-z0-9-]+" required id="field-admin-diagnostic-assessment-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% block help_content %}
@@ -41,7 +41,7 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Instructions', full_width: true, for: 'field-admin-diagnostic-assessment-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<textarea class="form-control cl-rich-editor" name="instructions_html" rows="4" id="field-admin-diagnostic-assessment-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ assessment.instructions_html }}</textarea>
+									<textarea class="form-control cl-rich-editor" name="instructions_html" rows="4" id="field-admin-diagnostic-assessment-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ assessment.instructions_html }}</textarea>
 
 {% endblock %}
 {% endembed %}
@@ -49,7 +49,7 @@
 {% block control %}
 
 									<div class="input-group">
-										<input class="form-control" type="number" min="0" max="100" step="0.01" name="pass_mark" value="{{ assessment.pass_mark }}" required id="field-admin-diagnostic-assessment-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+										<input class="form-control" type="number" min="0" max="100" step="0.01" name="pass_mark" value="{{ assessment.pass_mark }}" required id="field-admin-diagnostic-assessment-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 										<span class="input-group-text">%</span>
 									</div>
 
@@ -58,7 +58,7 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Maximum attempts', full_width: false, for: 'field-admin-diagnostic-assessment-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<input class="form-control" type="number" min="1" name="maximum_attempts" value="{{ assessment.maximum_attempts }}" placeholder="Unlimited" id="field-admin-diagnostic-assessment-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+									<input class="form-control" type="number" min="1" name="maximum_attempts" value="{{ assessment.maximum_attempts }}" placeholder="Unlimited" id="field-admin-diagnostic-assessment-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -66,7 +66,7 @@
 {% block control %}
 
 									<div class="input-group">
-										<input class="form-control" type="number" min="1" name="time_limit_seconds" value="{{ assessment.time_limit_seconds ?: 3600 }}" required id="field-admin-diagnostic-assessment-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+										<input class="form-control" type="number" min="1" name="time_limit_seconds" value="{{ assessment.time_limit_seconds ?: 3600 }}" required id="field-admin-diagnostic-assessment-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 										<span class="input-group-text">seconds</span>
 									</div>
 
@@ -75,7 +75,7 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Passing action', full_width: false, for: 'field-admin-diagnostic-assessment-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<select class="form-select" name="diagnostic_pass_action" id="field-admin-diagnostic-assessment-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="guidance_only" {{ assessment.diagnostic_pass_action == 'guidance_only' ? 'selected' : '' }}>Guidance only</option><option value="complete_course" {{ assessment.diagnostic_pass_action == 'complete_course' ? 'selected' : '' }}>Complete course enrolment</option></select>
+									<select class="form-select" name="diagnostic_pass_action" id="field-admin-diagnostic-assessment-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="guidance_only" {{ assessment.diagnostic_pass_action == 'guidance_only' ? 'selected' : '' }}>Guidance only</option><option value="complete_course" {{ assessment.diagnostic_pass_action == 'complete_course' ? 'selected' : '' }}>Complete course enrolment</option></select>
 
 {% endblock %}
 {% endembed %}
@@ -111,14 +111,14 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Threshold met', full_width: false, for: 'field-admin-diagnostic-assessment-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<textarea class="form-control cl-rich-editor" name="result_pass_html" rows="5" id="field-admin-diagnostic-assessment-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ assessment.result_pass_html }}</textarea>
+									<textarea class="form-control cl-rich-editor" name="result_pass_html" rows="5" id="field-admin-diagnostic-assessment-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ assessment.result_pass_html }}</textarea>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Below threshold', full_width: false, for: 'field-admin-diagnostic-assessment-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<textarea class="form-control cl-rich-editor" name="result_fail_html" rows="5" id="field-admin-diagnostic-assessment-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ assessment.result_fail_html }}</textarea>
+									<textarea class="form-control cl-rich-editor" name="result_fail_html" rows="5" id="field-admin-diagnostic-assessment-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ assessment.result_fail_html }}</textarea>
 
 {% endblock %}
 {% endembed %}
@@ -133,75 +133,7 @@
 
 						{{ ui('layout.section-head', {heading: 'Questions', heading_level: 2, summary: 'All diagnostic questions are non-graded. For each question you may link modules that should be suggested when the learner answers incorrectly.'}) }}
 
-							<template id="diagnostic-remediation-options">
-								{% for module in modules %}
-									<option value="{{ module.module_key }}">{{ module.position }}. {{ module.title }}</option>
-								{% endfor %}
-							</template>
-							<div id="question-editor">
-								{% for qi, question in editor_questions %}
-									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Question', full_width: false, for: 'field-admin-diagnostic-assessment-13-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-										<div class="d-flex justify-content-between align-items-center gap-3">
-											<h3 class="h5 mb-0">
-												Question <span data-question-number>{{ qi + 1 }}</span>
-											</h3>
-											{{ ui('action.button', {label: 'Remove', variant: 'danger', size: 'small', type: 'button', icon: 'action-remove'}) }}
-										</div>
-
-										<textarea class="form-control mb-3" name="question_html[{{ qi }}]" required id="field-admin-diagnostic-assessment-13-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ question.question_html }}</textarea>
-										{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
-											{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Points', full_width: false, for: 'field-admin-diagnostic-assessment-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-												<input class="form-control" type="number" min="1" name="question_points[{{ qi }}]" value="{{ question.points ?: 1 }}" id="field-admin-diagnostic-assessment-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
-
-{% endblock %}
-{% endembed %}
-											{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Explanation', full_width: false, for: 'field-admin-diagnostic-assessment-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-												<textarea class="form-control" name="question_explanation[{{ qi }}]" id="field-admin-diagnostic-assessment-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ question.explanation_html }}</textarea>
-
-{% endblock %}
-{% endembed %}
-											{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Suggest modules when incorrect', full_width: false, for: 'field-admin-diagnostic-assessment-12-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-												<select class="form-select" name="remediation_module_keys[{{ qi }}][]" multiple size="4" id="field-admin-diagnostic-assessment-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
-												{% for module in modules %}
-													<option value="{{ module.module_key }}" {{ module.module_key in question.remediation_module_keys ? 'selected' : '' }}>{{ module.position }}. {{ module.title }}</option>
-												{% endfor %}
-												</select>
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-										<input type="hidden" name="question_difficulty[{{ qi }}]" value="standard">
-										<input type="hidden" name="practice_eligible[{{ qi }}]" value="1">
-										<input type="hidden" name="incorrect_points[{{ qi }}]" value="0">
-										<div class="cl-option-editor mt-3" data-options>
-											{% for oi, option in question.options %}
-												<div class="input-group mb-2" data-option>
-													<span class="input-group-text">
-													<input type="radio" name="correct_option[{{ qi }}]" value="{{ oi }}" {{ option.is_correct ? 'checked' : '' }} aria-label="Correct option">
-													</span>
-													<input class="form-control" name="option_html[{{ qi }}][{{ oi }}]" value="{{ option.option_html }}" required>
-													{{ ui('action.button', {label: '×', variant: 'danger', size: 'normal', type: 'button', aria_label: 'Remove option', icon: 'action-remove'}) }}
-												</div>
-											{% endfor %}
-										</div>
-										{{ ui('action.button', {label: 'Add option', variant: 'secondary', size: 'small', type: 'button', icon: 'action-add'}) }}
-
-{% endblock %}
-{% endembed %}
-								{% endfor %}
-							</div>
+							{% include '@platform/partials/question-editor.html.twig' with {diagnostic: true} %}
 							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 

@@ -14,7 +14,7 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: false, for: 'email', required: true})} %}
 {% block control %}
 
-						<input class="form-control form-control-lg" type="email" id="email" name="email" autocomplete="email" required>
+						<input class="form-control form-control-lg" type="email" id="email" name="email" autocomplete="email" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

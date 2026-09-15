@@ -23,8 +23,8 @@ textured canvas, with palette-coloured heading bands throughout.
 - Full pagination styling for `.pagination-row` and for `.pagination` /
   `.page-link`.
 
-- **Package format** Theme Package 3.0
-- **Template API** 1.0
+- **Package format** Theme Package 4.0
+- **Template API** 2.0
 - **Type** Standalone (no parent)
 - **Reference LMS** 0.5.7.5.1
 

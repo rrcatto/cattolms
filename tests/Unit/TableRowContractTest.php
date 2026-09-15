@@ -10,18 +10,9 @@ Version: 0.6
 Description:
 A table row is one line, it fits, and nothing in it stacks.
 
-This exists because the rule was written once, asserted nowhere, and was wrong on every screen. Core
-said `.cl-ui-row-actions{flex-wrap:nowrap}` at specificity (0,1,0); every theme says
-`.gn-main .cl-ui-row-actions{flex-wrap:wrap}` at (0,2,0) and loads afterwards. The core rule lost on every
-page, the buttons stacked anyway, and the passing build said nothing - because nothing was asked.
-
-Three separate failures produced the same symptom and each is checked separately:
-
-  - a theme overriding the core rule, which is why core now says it with !important;
-  - a cell laying its content out with a container core never sees, such as a hand-written
-    `d-flex flex-wrap` instead of `.cl-ui-row-actions`;
-  - a table using a wrapper class core does not style, such as Bootstrap's `table-responsive`, so
-    none of the rules reach it at all.
+Core owns row geometry and clipping. UiOwnershipAudit rejects canonical component layout in
+bundled themes. These checks retain defensive core table declarations and reject parallel row
+markup in callers; broad theme element rules still require some cascade protection.
 
 Changelog:
 2026/09/08 10:00 SAST
@@ -62,8 +53,8 @@ final class TableRowContractTest extends TestCase
     /**
      * The core rules are stated so a theme cannot quietly undo them.
      *
-     * Not a style preference. Themes load after core and every one of them sets its own row-action
-     * layout at a higher specificity, so without this the rule is decorative.
+     * Broad theme element rules load after core. Retain defensive table declarations while the
+     * separate ownership audit prevents themes from redefining canonical row-action geometry.
      */
     public function testTheOneRowRulesOutrankTheThemes(): void
     {

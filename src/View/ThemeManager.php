@@ -7,7 +7,7 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Manages filesystem-authoritative Catto Learning Theme Package 3.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
+Manages filesystem-authoritative Catto Learning Theme Package 4.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
 
 Changelog:
 2026/09/09 07:30 SAST
@@ -45,7 +45,7 @@ use ZipArchive;
 
 /**
  * Owns installation, discovery, publication and runtime metadata for immutable
- * filesystem Theme Package 3.0 releases. Palette-enabled themes opt into the
+ * filesystem Theme Package 4.0 / Template API 2.0 releases. Palette-enabled themes opt into the
  * platform-managed automatic colour system; one palette is applied silently,
  * two or more expose the core switcher, and themes without palettes retain full
  * control of their own colour CSS.
@@ -908,10 +908,7 @@ body[data-cl-palette-managed="1"] [data-theme-nav],body[data-cl-palette-managed=
 body[data-cl-palette-managed="1"] [data-theme-nav] a,body[data-cl-palette-managed="1"] [data-theme-nav] button,body[data-cl-palette-managed="1"] .sidebar a,body[data-cl-palette-managed="1"] .sidebar button,body[data-cl-palette-managed="1"] .rl-header a,body[data-cl-palette-managed="1"] .rl-header button{color:var(--cl-on-color-1)}
 body[data-cl-palette-managed="1"] [data-nav-item].active,body[data-cl-palette-managed="1"] .nav-link.active,body[data-cl-palette-managed="1"] .rl-nav>a.active{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 3px 0 var(--cl-accent)}
 body[data-cl-palette-managed="1"] [data-nav-item].active>summary{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 0 -3px var(--cl-accent)}
-body[data-cl-palette-managed="1"] .btn-primary,body[data-cl-palette-managed="1"] button.btn-primary{background:var(--cl-button-bg)!important;border:1px solid var(--cl-button-border)!important;color:var(--cl-on-color-3)!important}
-body[data-cl-palette-managed="1"] .btn-primary:hover,body[data-cl-palette-managed="1"] button.btn-primary:hover{background:var(--cl-dark)!important;color:var(--cl-on-color-2)!important}
 body[data-cl-palette-managed="1"] .hero,body[data-cl-palette-managed="1"] .cl-feature-band,body[data-cl-palette-managed="1"] [data-theme-block="dark"]{background-color:var(--cl-large-block-bg)!important;color:var(--cl-on-color-1)!important}
-body[data-cl-palette-managed="1"] .card,body[data-cl-palette-managed="1"] .stat-card,body[data-cl-palette-managed="1"] .modal-card{border-color:var(--cl-border)}
 /* A dropdown panel is inside the navigation element but is not part of it.
 
    The rule above paints every link inside [data-theme-nav] with the colour that reads on the

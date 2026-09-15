@@ -23,7 +23,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Platform name ' ~ (ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info'})), full_width: true, for: 'field-settings-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="platform_name" value="{{ platform_name }}" id="field-settings-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="platform_name" value="{{ platform_name }}" id="field-settings-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% block help_content %}
@@ -35,14 +35,14 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'System Company name', full_width: true, for: 'field-settings-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The permanent host organisation. It cannot be deleted, but its name is yours to control.'})} %}
 {% block control %}
 
-				<input name="system_company_name" value="{{ system_company_name }}" id="field-settings-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+				<input name="system_company_name" value="{{ system_company_name }}" id="field-settings-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'System Company domain', full_width: true, for: 'field-settings-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-				<input name="system_company_domain" value="{{ system_company_domain }}" required id="field-settings-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="system_company_domain" value="{{ system_company_domain }}" required id="field-settings-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% block help_content %}
@@ -89,35 +89,35 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Connection type', full_width: false, for: 'field-settings-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="smtp_scheme" id="field-settings-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="smtp" {{ mail_settings.smtp_scheme=='smtp' ? 'selected' : '' }}>SMTP / STARTTLS</option><option value="smtps" {{ mail_settings.smtp_scheme=='smtps' ? 'selected' : '' }}>SMTP over TLS</option></select>
+				<select name="smtp_scheme" id="field-settings-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="smtp" {{ mail_settings.smtp_scheme=='smtp' ? 'selected' : '' }}>SMTP / STARTTLS</option><option value="smtps" {{ mail_settings.smtp_scheme=='smtps' ? 'selected' : '' }}>SMTP over TLS</option></select>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP port', full_width: false, for: 'field-settings-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-				<input type="number" min="1" max="65535" name="smtp_port" value="{{ mail_settings.smtp_port }}" required id="field-settings-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input type="number" min="1" max="65535" name="smtp_port" value="{{ mail_settings.smtp_port }}" required id="field-settings-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP server', full_width: true, for: 'field-settings-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-				<input name="smtp_host" value="{{ mail_settings.smtp_host }}" placeholder="smtp.example.com" required id="field-settings-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="smtp_host" value="{{ mail_settings.smtp_host }}" placeholder="smtp.example.com" required id="field-settings-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP username', full_width: true, for: 'field-settings-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="smtp_username" value="{{ mail_settings.smtp_username }}" autocomplete="off" id="field-settings-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="smtp_username" value="{{ mail_settings.smtp_username }}" autocomplete="off" id="field-settings-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP password', full_width: true, for: 'field-settings-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<div class="cl-password-control"><input type="password" name="smtp_password" value="" autocomplete="new-password" id="field-settings-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ ui('action.button', {label: 'Show', type: 'button', variant: 'quiet', id: 'smtp-password-toggle', disabled: true, hidden: true}) }}</div>
+				<div class="cl-password-control"><input type="password" name="smtp_password" value="" autocomplete="new-password" id="field-settings-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ ui('action.button', {label: 'Show', type: 'button', variant: 'quiet', id: 'smtp-password-toggle', disabled: true, hidden: true}) }}</div>
 
 {% endblock %}
 {% block help_content %}
@@ -129,21 +129,21 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From address', full_width: true, for: 'field-settings-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-				<input type="email" name="mail_from_address" value="{{ mail_settings.mail_from_address }}" required id="field-settings-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input type="email" name="mail_from_address" value="{{ mail_settings.mail_from_address }}" required id="field-settings-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From name', full_width: true, for: 'field-settings-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Leave blank to use the effective Platform name.'})} %}
 {% block control %}
 
-				<input name="mail_from_name" value="{{ mail_settings.mail_from_name }}" id="field-settings-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+				<input name="mail_from_name" value="{{ mail_settings.mail_from_name }}" id="field-settings-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reply-to address', full_width: true, for: 'field-settings-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Optional. Leave blank to receive replies at the From address.'})} %}
 {% block control %}
 
-				<input type="email" name="mail_reply_to" value="{{ mail_settings.mail_reply_to }}" id="field-settings-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+				<input type="email" name="mail_reply_to" value="{{ mail_settings.mail_reply_to }}" id="field-settings-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -151,7 +151,7 @@
 {% block body %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Query options', for: 'smtp-query', help: 'Normally leave this unchanged. Optional Symfony Mailer DSN query parameters.'})} %}
 {% block control %}
-<input id="smtp-query" name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+<input id="smtp-query" name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true" {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
 {% endblock %}
@@ -196,22 +196,22 @@ Add bank details before accepting EFT payments.
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bank name', full_width: false, for: 'bank-name', required: true})} %}
 {% block control %}
-<input id="bank-name" name="bank_name" value="{{ bank_details.bank_name }}" maxlength="160" required>
+<input id="bank-name" name="bank_name" value="{{ bank_details.bank_name }}" maxlength="160" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account name', full_width: false, for: 'bank-account-name', required: true})} %}
 {% block control %}
-<input id="bank-account-name" name="account_name" value="{{ bank_details.account_name }}" maxlength="160" required>
+<input id="bank-account-name" name="account_name" value="{{ bank_details.account_name }}" maxlength="160" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account number', full_width: false, for: 'bank-account-number', required: true})} %}
 {% block control %}
-<input id="bank-account-number" name="account_number" value="{{ bank_details.account_number }}" inputmode="numeric" pattern="[0-9]{1,34}" maxlength="34" required>
+<input id="bank-account-number" name="account_number" value="{{ bank_details.account_number }}" inputmode="numeric" pattern="[0-9]{1,34}" maxlength="34" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Branch code', full_width: false, for: 'bank-branch-code', required: true})} %}
 {% block control %}
-<input id="bank-branch-code" name="branch_code" value="{{ bank_details.branch_code }}" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+<input id="bank-branch-code" name="branch_code" value="{{ bank_details.branch_code }}" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}

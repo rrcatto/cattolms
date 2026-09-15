@@ -23,21 +23,21 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role key', full_width: false, for: 'field-admin-role-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: (role_acl.is_builtin_role ? 'Built-in role keys are permanent.' : 'Use uppercase snake notation. Prefix SEED_ only for a seed-only role.')})} %}
 {% block control %}
 
-						<input name="role_key" value="{{ role_acl.role_key }}" {{ role_acl.is_builtin_role ? 'readonly' : '' }} id="field-admin-role-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+						<input name="role_key" value="{{ role_acl.role_key }}" {{ role_acl.is_builtin_role ? 'readonly' : '' }} id="field-admin-role-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role name', full_width: false, for: 'field-admin-role-edit-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'CamelCase, for example CompanyManager.'})} %}
 {% block control %}
 
-						<input name="role_name" value="{{ role_acl.role_name }}" pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example CompanyManager" id="field-admin-role-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+						<input name="role_name" value="{{ role_acl.role_name }}" pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example CompanyManager" id="field-admin-role-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: true, for: 'field-admin-role-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-						<textarea name="role_description" rows="4" id="field-admin-role-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ role_acl.role_description }}</textarea>
+						<textarea name="role_description" rows="4" id="field-admin-role-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ role_acl.role_description }}</textarea>
 
 {% endblock %}
 {% endembed %}
