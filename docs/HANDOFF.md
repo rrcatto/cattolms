@@ -1,8 +1,8 @@
-# Catto Learning 0.8.1 — Development Handoff
+# Catto Learning 0.8.2 — Development Handoff
 
 **Date:** 2026/09/15 SAST
-**Update:** v0.8.1 platform UI component system
-**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8` and `v0.8.1`
+**Update:** v0.8.2 platform UI remediation and documentation
+**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1` and `v0.8.2`
 
 The v0.8.1 update standardises the platform UI around the canonical component registry. The
 individual purchase flow remains implemented: guest carts, staged checkout, profile capture,
