@@ -24,7 +24,7 @@ final class CompanyWorkspaceContractTest extends TestCase
     {
         $sections = (new CompanySectionRegistry())->all();
         // Company Courses and Training Courses are two sections since v0.6: what the company owns
-        // and sells, and what it has bought for its staff. They are opposites, and one list holding
+        // and sells, and what it has bought for its staff. They are opposites, and one cl-ui-list holding
         // both could answer neither question - ROADMAP section 3d.
         // Performance joined them in v0.6: the platform course-performance report answers a question
         // about every learner on the platform, which is not a company administrator's to ask or to
@@ -70,13 +70,13 @@ final class CompanyWorkspaceContractTest extends TestCase
         foreach (['companies', 'company_creators'] as $dataset) {
             $file = $dataset === 'companies' ? 'companies.html.twig' : 'company-creators.html.twig';
             $partial = (string) file_get_contents($root . '/resources/views/partials/admin/' . $file);
-            self::assertStringContainsString('<table>', $partial);
+            self::assertStringContainsString("ui_template('data.table')", $partial);
             self::assertStringNotContainsString('grid grid-3', $partial);
             // Exactly one pagination control, the shared one. Companies' own hand-built nav
             // survived the move to the shared control and rendered directly above it, and its links
             // used a bare `page` parameter that AdminController::sectionRequest() never reads, so
             // every one of them returned page 1.
-            self::assertStringContainsString('with {pg: ' . $dataset . '_pagination}', $partial);
+            self::assertStringContainsString('pagination: ' . $dataset . '_pagination', $partial);
             self::assertStringNotContainsString('/admin/companies?page=', $partial);
             self::assertStringNotContainsString('@' . $dataset . '_total_pages', $partial);
             // The row count is the shared control's own summary now. It used to be printed again in
@@ -98,7 +98,7 @@ final class CompanyWorkspaceContractTest extends TestCase
      * The create and edit dialogs are shared by both halves of Companies.
      *
      * They live in one partial because both screens create and edit the same record through the
-     * same routes; a second copy is a second thing to keep in step, and the company type field has
+     * same routes; a second copy is a second thing to keep in step, and the company type cl-ui-field has
      * a rule attached that must not exist in only one of them.
      */
     public function testCompanyCreateAndEditControlsUseUsableCoreModals(): void
@@ -107,13 +107,13 @@ final class CompanyWorkspaceContractTest extends TestCase
         $modals = (string) file_get_contents($root . '/resources/views/partials/admin/company-modals.html.twig');
         $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
         $js = (string) file_get_contents($root . '/public_html/js/platform-overrides.js');
-        self::assertStringContainsString('data-open-modal="company-add"', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
+        self::assertStringContainsString("modal: 'company-add'", (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
         // The heading is named by the dialog's aria-labelledby, so the id and the label both have
         // to be there. Which line each sits on is formatting, not contract.
-        self::assertMatchesRegularExpression('/id="company-add-title"\s*>\s*Add Company\s*<\/h3>/', $modals);
-        self::assertStringContainsString('Create Company</button>', $modals);
-        self::assertStringContainsString('data-open-modal="company-edit-', (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
-        self::assertStringContainsString('id="company-edit-', $modals);
+        self::assertStringContainsString("id: 'company-add', title: 'Add Company'", $modals);
+        self::assertStringContainsString("label: 'Create Company'", $modals);
+        self::assertStringContainsString("modal: 'company-edit-'", (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
+        self::assertStringContainsString("id: 'company-edit-'", $modals);
         foreach (['companies.html.twig', 'company-creators.html.twig'] as $file) {
             self::assertStringContainsString(
                 'partials/admin/company-modals.html.twig',

@@ -60,7 +60,7 @@
 						<div class="public-links">
 							{% for nav in navigation %}
 								{% if nav.method != 'POST' %}
-									<a class="btn {{ nav.key=='signin' ? 'btn-primary' : 'btn-ghost' }}" href="{{ nav.href }}" data-nav-item="{{ nav.key }}">{{ nav.label }}</a>
+									{{ ui('action.link', {label: (nav.label), variant: nav.key=='signin' ? 'primary' : 'quiet', size: 'normal', href: (nav.href), navigation_key: (nav.key)}) }}
 								{% endif %}
 							{% endfor %}
 						</div>

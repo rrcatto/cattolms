@@ -25,9 +25,9 @@ is styled by core CSS or by the bundled Factory Reset theme. Factory Reset is th
 ships inside the code root, so the pair is the floor below which no installation can fall - an
 externally installed theme may restyle any of it, but nothing may be left to chance.
 
-The exception list is for classes that deliberately carry no styling: htmx and JavaScript targets,
+The exception cl-ui-list is for classes that deliberately carry no styling: htmx and JavaScript targets,
 and wrapper hooks a theme may opt into. Adding to it is a decision to be stated, which is the point
-of it being a literal list rather than a pattern.
+of it being a literal cl-ui-list rather than a pattern.
 
 Changelog:
 2026/09/09 14:01 SAST

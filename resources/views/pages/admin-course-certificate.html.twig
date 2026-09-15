@@ -6,93 +6,135 @@
 	{% set ph_title = course.title %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-5">
-		<div class="row g-4">
-			<div class="col-xl-6">
-				<form class="card" action="/admin/courses/{{ course.id }}/certificate" method="post">
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
+{% block body %}
+
+			<div>
+				<form action="/admin/courses/{{ course.id }}/certificate" method="post">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div class="card-body p-4">
+
 						<h2 class="h4">
 							Basic certificate settings
 						</h2>
 						<p class="text-body-secondary">
 							These fields control the ordinary certificate data. You do not need to edit HTML or CSS to change the wording or signatory.
 						</p>
-						<div class="form-check form-switch mb-4">
-							<input class="form-check-input" type="checkbox" role="switch" id="certificate-enabled" name="certificate_enabled" value="1" {{ course.certificate_enabled ? 'checked' : '' }}>
-							<label class="form-check-label" for="certificate-enabled">Issue a certificate after a passing overall result</label>
-						</div>
-						<div class="mb-3">
-							<label class="form-label" for="certificate-title">Certificate title</label>
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Issue a certificate after a passing overall result'})} %}
+{% block control %}
+
+							<input type="checkbox" role="switch" id="certificate-enabled" name="certificate_enabled" value="1" {{ course.certificate_enabled ? 'checked' : '' }}>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate title', full_width: false, for: 'certificate-title'})} %}
+{% block control %}
+
 							<input class="form-control" id="certificate-title" name="certificate_title" maxlength="240" value="{{ course.certificate_title }}">
-							<div class="form-text">
+
+{% endblock %}
+{% block help_content %}
+
 								Used by <code>&#123;&#123;certificate_title&#125;&#125;</code>.
-							</div>
-						</div>
-						<div class="mb-3">
-							<label class="form-label" for="certificate-body">Certificate body text</label>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate body text', full_width: false, for: 'certificate-body'})} %}
+{% block control %}
+
 							<input class="form-control" id="certificate-body" name="certificate_body_text" maxlength="500" value="{{ course.certificate_body_text }}">
-							<div class="form-text">
+
+{% endblock %}
+{% block help_content %}
+
 								Used by <code>&#123;&#123;certificate_body&#125;&#125;</code>.
-							</div>
-						</div>
-						<div class="mb-3">
-							<label class="form-label" for="certificate-footer">Certificate footer</label>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate footer', full_width: false, for: 'certificate-footer'})} %}
+{% block control %}
+
 							<input class="form-control" id="certificate-footer" name="certificate_footer_text" maxlength="500" value="{{ course.certificate_footer_text }}">
-							<div class="form-text">
+
+{% endblock %}
+{% block help_content %}
+
 								Optional. Used by <code>&#123;&#123;certificate_footer&#125;&#125;</code>.
-							</div>
-						</div>
-						<div class="row g-3 mb-3">
-							<div class="col-md-6">
-								<label class="form-label" for="signatory-name">Signatory name</label>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signatory name', full_width: false, for: 'signatory-name'})} %}
+{% block control %}
+
 								<input class="form-control" id="signatory-name" name="certificate_signatory_name" maxlength="160" value="{{ course.certificate_signatory_name }}">
-							</div>
-							<div class="col-md-6">
-								<label class="form-label" for="signatory-title">Signatory title</label>
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signatory title', full_width: false, for: 'signatory-title'})} %}
+{% block control %}
+
 								<input class="form-control" id="signatory-title" name="certificate_signatory_title" maxlength="160" value="{{ course.certificate_signatory_title }}">
-							</div>
-						</div>
-						<details class="advanced-theme-editor mt-4">
-							<summary>
-								<strong>Advanced certificate template</strong><span>HTML and CSS</span>
-							</summary>
-							<div class="advanced-theme-body p-3">
-								<div class="mb-3">
-									<label class="form-label" for="certificate-html">Certificate HTML</label>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Advanced certificate template HTML and CSS'})} %}
+{% block body %}
+
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate HTML', full_width: false, for: 'certificate-html', required: true})} %}
+{% block control %}
+
 									<textarea class="form-control cl-rich-editor" id="certificate-html" name="certificate_template_html" rows="18" required>{{ course.certificate_template_html }}</textarea>
-								</div>
-								<div class="mb-3">
-									<label class="form-label" for="certificate-css">Certificate CSS</label>
+
+{% endblock %}
+{% endembed %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate CSS', full_width: false, for: 'certificate-css'})} %}
+{% block control %}
+
 									<textarea class="form-control font-monospace" id="certificate-css" name="certificate_template_css" rows="12">{{ course.certificate_template_css }}</textarea>
-								</div>
-							</div>
-						</details>
-						<div class="cl-form-actions">
-							<button class="btn btn-primary" type="submit">Save certificate settings</button>
-						</div>
-					</div>
-				</form>
-				<div class="card mt-4">
-					<div class="card-body p-4">
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+							{{ ui('action.button', {label: 'Save certificate settings', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 						<h2 class="h4">
 							Certificate placeholders
 						</h2>
 						<p class="text-body-secondary">
 							Issued certificates snapshot the rendered certificate and its important course/result data so later course edits do not rewrite an existing certificate.
 						</p>
-						<div class="table-wrap">
-							<table class="table align-middle small">
-								<thead>
+
+							{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 									<tr>
-										<th style="width:32%">
-											Placeholder
-										</th>
-										<th style="width:68%">
-											Meaning and control
-										</th>
+										{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 32, label: 'Placeholder'}} %}
+										{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 68, label: 'Meaning and control'}} %}
 									</tr>
-								</thead>
-								<tbody>
+
+{% endblock %}
+{% block body %}
+
 									<tr>
 										<td>
 											<code>&#123;&#123;student_name&#125;&#125;</code>
@@ -197,13 +239,14 @@
 											Optional footer text controlled by the Certificate footer field above.
 										</td>
 									</tr>
-								</tbody>
-							</table>
-						</div>
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 			</div>
-			<div class="col-xl-6">
+			<div>
 				<div class="d-flex justify-content-between align-items-center mb-3">
 					<h2 class="h4 mb-0">
 						Live sample
@@ -217,6 +260,8 @@
 					The sample uses the current saved values. Save the form to refresh the preview.
 				</p>
 			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

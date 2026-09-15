@@ -103,6 +103,7 @@ final class BankSettingsIntegrationTest extends TestCase
         $files = new FilesystemLoader();
         $files->addPath(dirname(__DIR__,2).'/resources/views', 'platform');
         $twig = new Environment(new ChainLoader([new ArrayLoader(['test-layout'=>'{% block page_body %}{% endblock %}']),$files]), ['strict_variables'=>true]);
+        $twig->addExtension(new \CattoLearning\View\Twig\PlatformUiExtension(new \CattoLearning\View\Ui\PlatformUi()));
         return $twig->render('@platform/pages/commerce-order.html.twig', [
             'layout'=>'test-layout', 'platform'=>['icon_sprite'=>'/icons.svg'], 'app'=>['name'=>'Test LMS'], 'order'=>['id'=>123,'state'=>'awaiting_payment','payment_due_at'=>'2026-09-20', 'details'=>['items'=>[],'payment_method'=>'eft'],'documents'=>[],'payments'=>[]],
             'total_label'=>'R 100.00','can_pay'=>true,'payment_method'=>'eft','change_method'=>false,'bank_details'=>$this->settings->bankDetails(),

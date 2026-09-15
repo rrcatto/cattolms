@@ -1,6 +1,6 @@
 <section class="hero">
 	<div class="hero-content">
-		<div class="eyebrow" style="color:var(--highlight)">
+		<div class="cl-ui-eyebrow" style="color:var(--highlight)">
 			Administration
 		</div>
 		<h1>
@@ -9,102 +9,79 @@
 		<p>
 			See the health of the learning platform, deal with work that needs attention and move directly to detailed administration.
 		</p>
-		<div class="hero-actions">
-			<a class="btn btn-light" href="/admin/courses">Manage courses</a><a class="btn btn-accent" href="/admin/activity">View activity</a>
-		</div>
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+
+			{{ ui('action.link', {label: 'Manage courses', variant: 'secondary', size: 'normal', href: '/admin/courses'}) }}{{ ui('action.link', {label: 'View activity', variant: 'secondary', size: 'normal', href: '/admin/activity'}) }}
+
+{% endblock %}
+{% endembed %}
 	</div>
 </section>
-<div class="grid grid-4 section">
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ overview.people }}
-		</div>
-		<div class="stat-label">
-			People
-		</div>
-		<div class="stat-note">
-			Active platform accounts
-		</div>
-	</div>
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ overview.published_courses }}
-		</div>
-		<div class="stat-label">
-			Published courses
-		</div>
-		<div class="stat-note">
-			{{ overview.draft_courses }} drafts
-		</div>
-	</div>
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ overview.enrolments }}
-		</div>
-		<div class="stat-label">
-			Enrolments
-		</div>
-		<div class="stat-note">
-			Assigned, active or completed
-		</div>
-	</div>
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ overview.completion_rate }}%
-		</div>
-		<div class="stat-label">
-			Completion rate
-		</div>
-		<div class="stat-note">
-			Across learner enrolments
-		</div>
-	</div>
-</div>
-<div class="grid grid-2 section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<h2>
-					Needs attention
-				</h2>
-				<p>
-					Administrative work waiting for action.
-				</p>
-			</div>
-		</div>
-		<div class="list">
-			<div class="list-item">
-				<div>
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+{% block body %}
+
+	{{ ui('data.stat-card', {value: (overview.people), label: 'People', note: 'Active platform accounts'}) }}
+	{{ ui('data.stat-card', {value: (overview.published_courses), label: 'Published courses', note: (overview.draft_courses) ~ ' drafts'}) }}
+	{{ ui('data.stat-card', {value: (overview.enrolments), label: 'Enrolments', note: 'Assigned, active or completed'}) }}
+	{{ ui('data.stat-card', {value: (overview.completion_rate) ~ '%', label: 'Completion rate', note: 'Across learner enrolments'}) }}
+
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Needs attention', summary: 'Administrative work waiting for action.'}) }}
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>{{ overview.pending_requests }} pending course requests</strong>
 					<p>
 						Approve or reject learner requests and allocate matching credits where available.
 					</p>
-				</div>
-				<a class="btn btn-primary btn-sm" href="/admin/course/enrolments">Review</a>
-			</div>
-			<div class="list-item">
-				<div>
+
+{% endblock %}
+{% block actions %}
+
+				{{ ui('action.link', {label: 'Review', variant: 'primary', size: 'small', href: '/admin/course/enrolments'}) }}
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>{{ overview.draft_courses }} course drafts</strong>
 					<p>
 						Review course content, ownership and publication readiness.
 					</p>
-				</div>
-				<a class="btn btn-primary btn-sm" href="/admin/courses">Review</a>
-			</div>
-		</div>
-	</div>
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<h2>
-					Recent activity
-				</h2>
-				<p>
-					The latest audited actions across the site.
-				</p>
-			</div>
-			<a class="btn btn-soft btn-sm" href="/admin/activity">View all</a>
-		</div>
+
+{% endblock %}
+{% block actions %}
+
+				{{ ui('action.link', {label: 'Review', variant: 'primary', size: 'small', href: '/admin/courses'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Recent activity', summary: 'The latest audited actions across the site.'})} %}
+{% block section_actions %}
+{{ ui('action.link', {label: 'View all', variant: 'secondary', size: 'small', href: '/admin/activity'}) }}
+{% endblock %}
+{% endembed %}
 		<div class="timeline">
 			{% for event in recent_activity_events %}
 				<div class="timeline-item">
@@ -119,5 +96,9 @@
 				</div>
 			{% endfor %}
 		</div>
-	</div>
-</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}

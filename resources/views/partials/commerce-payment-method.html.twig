@@ -1,16 +1,21 @@
-<div class="field">
-    <label for="payment-method">Payment method</label>
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Payment method', full_width: false, for: 'payment-method', required: true})} %}
+{% block control %}
+
     <select id="payment-method" name="payment_method" required>
         <option value="dummy" {{ selected_method == 'dummy' ? 'selected' : '' }}>Card (simulated)</option>
         <option value="eft" {{ selected_method == 'eft' ? 'selected' : '' }}>EFT / bank transfer</option>
     </select>
-</div>
-<div class="field mt-3">
-    <label for="method-token">Simulated card outcome</label>
-    <select id="method-token" name="method_token">
+
+{% endblock %}
+{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For card testing only. No money is charged. This option does not apply to EFT.'})} %}
+{% block control %}
+
+    <select id="method-token" name="method_token"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
         <option value="demo_success">Successful payment</option>
         <option value="demo_failure">Declined payment</option>
     </select>
-    <p class="small text-body-secondary">For card testing only. No money is charged. This option does not apply to EFT.</p>
-</div>
+
+{% endblock %}
+{% endembed %}
 <p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>

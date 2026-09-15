@@ -6,7 +6,9 @@
 	{% set ph_title = 'Inspect theme package' %}
 	{% set ph_lead = 'The Theme Package 3.0 ZIP has been validated but has not yet been installed.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<div class="notice">
+	{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 		<span>✓</span>
 		<div>
 			<strong>{{ inspection.summary.name }}</strong> · version {{ inspection.summary.version }}
@@ -17,9 +19,15 @@
 				<span class="small muted">Child of {{ inspection.summary.parent_name }} {{ inspection.summary.parent_version }}</span>
 			{% endif %}
 		</div>
-	</div>
-	<section class="card section">
-		<div class="form-grid">
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
+{% block body %}
+
 			<div>
 				<strong>Install identity</strong>
 				<div class="mono">
@@ -55,7 +63,7 @@
 				<div>
 					{{ inspection.summary.palettes }}
 					{% if inspection.summary.palettes > 5 %}
-						· <span class="badge warn">High palette count</span>
+						· {{ ui('feedback.badge', {label: 'High palette count', tone: 'warning'}) }}
 					{% endif %}
 				</div>
 			</div>
@@ -65,17 +73,25 @@
 					Theme Package 3.0 · Template API 1.0
 				</div>
 			</div>
-		</div>
-	</section>
-	<div class="notice section">
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: true})} %}
+{% block body %}
+
 		<span>i</span>
 		<div>
 			The installed theme is immutable to the LMS. A future version installs alongside this release rather than replacing it.
 		</div>
-	</div>
+
+{% endblock %}
+{% endembed %}
 	<form action="/admin/themes/import/confirm" method="post" class="section">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		<input type="hidden" name="token" value="{{ inspection.token }}">
-		<button class="btn btn-primary">Install theme package</button>
+		{{ ui('action.button', {label: 'Install theme package', variant: 'primary', size: 'normal'}) }}
 	</form>
 {% endblock %}

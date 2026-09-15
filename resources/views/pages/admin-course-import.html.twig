@@ -7,8 +7,9 @@
 	{% set ph_lead = 'Both formats are analysed and previewed before PostgreSQL is changed.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container py-5 cl-medium">
-		<div class="card">
-			<div class="card-body p-4 p-lg-5">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				<h2 class="h3">
 					Select course file
 				</h2>
@@ -17,19 +18,31 @@
 				</p>
 				<form action="/admin/courses/import" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<label class="form-label" for="course-file">HTML or JSON course file</label>
-					<input class="form-control form-control-lg mb-4" id="course-file" type="file" name="course_file" accept=".html,.htm,.json,text/html,application/json" required>
-					<div class="cl-form-actions">
-					<button class="btn btn-outline-primary btn-lg" type="submit">Analyse course</button>
-					</div>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'HTML or JSON course file', for: 'course-file', required: true})} %}
+{% block control %}
+<input class="form-control form-control-lg mb-4" id="course-file" type="file" name="course_file" accept=".html,.htm,.json,text/html,application/json" required>
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+					{{ ui('action.button', {label: 'Analyse course', variant: 'secondary', size: 'large', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
 				</form>
-			</div>
-		</div>
-		<div class="cl-callout mt-4">
+
+{% endblock %}
+{% endembed %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: true})} %}
+{% block body %}
+
 			<strong>JSON is the canonical course interchange format.</strong>
 			<p class="mb-0 mt-2">
 				It preserves modules, ordered content blocks, accordions, assessment settings, question pools, grade bands and certificate templates. HTML remains supported for existing courses.
 			</p>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

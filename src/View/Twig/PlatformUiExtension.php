@@ -18,7 +18,9 @@ final class PlatformUiExtension extends AbstractExtension
     /** @return list<TwigFunction> */
     public function getFunctions(): array
     {
-        return [new TwigFunction('ui', $this->ui->render(...), [
+        return [new TwigFunction('ui_template', $this->ui->template(...)),
+            new TwigFunction('ui_props', $this->ui->properties(...)),
+            new TwigFunction('ui', $this->ui->render(...), [
             'needs_environment' => true,
             'needs_context' => true,
         ])];

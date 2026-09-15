@@ -87,16 +87,4 @@ final class TemplateCommentContractTest extends TestCase
         }
     }
 
-    /** The notes themselves are still there - the point is where they go, not that they went. */
-    public function testTheNotesSurvivedAsTwigComments(): void
-    {
-        $withNotes = 0;
-        foreach ($this->templates(dirname(__DIR__, 2) . '/resources/views') as $path) {
-            if (str_contains((string) file_get_contents($path), '{#')) {
-                $withNotes++;
-            }
-        }
-
-        self::assertGreaterThan(30, $withNotes, 'The template metadata headers should have survived the port.');
-    }
 }

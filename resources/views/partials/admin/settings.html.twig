@@ -1,240 +1,331 @@
 {# Each settings form saves independently; presentation uses the shared accordion pattern. #}
-<div class="grid section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<div class="eyebrow">
-					Settings
-				</div>
-				<h2>
-					Platform settings
-				</h2>
-				<p>
-					Open a section to change its settings, then use that section’s save button.
-				</p>
-			</div>
-		</div>
-	</div>
-</div>
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Platform settings', eyebrow: 'Settings', summary: 'Open a section to change its settings, then use that section’s save button.'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 <div class="cl-admin-workspace">
-    <details class="cl-admin-section" id="settings-identity" {% if settings_open_section|default('') == 'identity' %}open{% endif %}>
-        <summary class="cl-admin-section-summary">
-            <span class="cl-admin-section-title">Platform identity</span>
-            <span class="cl-admin-section-description">Platform name and host organisation.</span>
-            <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-        </summary>
-        <div class="cl-admin-section-content">
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'Platform name and host organisation.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
+{% block body %}
 
+		<form action="/admin/settings" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
 
-		<form action="/admin/settings" method="post" class="form-grid">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			<div class="field full">
-				<label>Platform name <span class="badge info">{{ platform_name_source=='database' ? 'Database override' : '.env default' }}</span></label>
-				<input name="platform_name" value="{{ platform_name }}">
-				<div class="help">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Platform name ' ~ (ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info'})), full_width: true, for: 'field-settings-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input name="platform_name" value="{{ platform_name }}" id="field-settings-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% block help_content %}
+
 					Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
-				</div>
-			</div>
-			<div class="field full">
-				<label>System Company name</label>
-				<input name="system_company_name" value="{{ system_company_name }}">
-				<div class="help">
-					The permanent host organisation. It cannot be deleted, but its name is yours to control.
-				</div>
-			</div>
-			<div class="field full">
-				<label>System Company domain</label>
-				<input name="system_company_domain" value="{{ system_company_domain }}" required>
-				<div class="help">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'System Company name', full_width: true, for: 'field-settings-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The permanent host organisation. It cannot be deleted, but its name is yours to control.'})} %}
+{% block control %}
+
+				<input name="system_company_name" value="{{ system_company_name }}" id="field-settings-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'System Company domain', full_width: true, for: 'field-settings-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+				<input name="system_company_domain" value="{{ system_company_domain }}" required id="field-settings-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% block help_content %}
+
 					Initially defaults from <span class="mono">APP_DOMAIN</span>. Enter only the domain, for example <span class="mono">prettythings.capetown</span>.
-				</div>
-			</div>
-			<div class="cl-form-actions field full">
-				<button class="btn btn-primary" type="submit">Save platform identity</button>
-			</div>
-		</form>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+				{{ ui('action.button', {label: 'Save platform identity', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
 		{% if platform_name_source=='database' %}
 			<form action="/admin/settings/platform-name/reset" method="post" class="cl-mt-2">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				<button class="btn btn-ghost btn-sm" type="submit">Use APP_NAME from .env</button>
+				{{ ui('action.button', {label: 'Use APP_NAME from .env', variant: 'quiet', size: 'small', type: 'submit'}) }}
 			</form>
 		{% endif %}
-        </div>
-    </details>
-    <details class="cl-admin-section" id="settings-mail" {% if settings_open_section|default('') == 'mail' %}open{% endif %}>
-        <summary class="cl-admin-section-summary">
-            <span class="cl-admin-section-title">SMTP / outgoing email</span>
-            <span class="cl-admin-section-description">Mail server and sender details.</span>
-            <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-        </summary>
-        <div class="cl-admin-section-content">
 
+{% endblock %}
+{% endembed %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'SMTP / outgoing email', summary: 'Mail server and sender details.', id: 'settings-mail', open: settings_open_section|default('') == 'mail'})} %}
+{% block body %}
 
 		{% if mail_settings.mail_configuration_error %}
-			<div class="alert alert-warning">
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
+{% block body %}
+
 				<strong>Mail configuration needs attention.</strong> {{ mail_settings.mail_configuration_error }}
-			</div>
+
+{% endblock %}
+{% endembed %}
 		{% endif %}
-		<form action="/admin/settings/mail" method="post" class="form-grid">
+		<form action="/admin/settings/mail" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			<div class="field">
-				<label>Connection type</label><select name="smtp_scheme"><option value="smtp" {{ mail_settings.smtp_scheme=='smtp' ? 'selected' : '' }}>SMTP / STARTTLS</option><option value="smtps" {{ mail_settings.smtp_scheme=='smtps' ? 'selected' : '' }}>SMTP over TLS</option></select>
-			</div>
-			<div class="field">
-				<label>SMTP port</label>
-				<input type="number" min="1" max="65535" name="smtp_port" value="{{ mail_settings.smtp_port }}" required>
-			</div>
-			<div class="field full">
-				<label>SMTP server</label>
-				<input name="smtp_host" value="{{ mail_settings.smtp_host }}" placeholder="smtp.example.com" required>
-			</div>
-			<div class="field full">
-				<label>SMTP username</label>
-				<input name="smtp_username" value="{{ mail_settings.smtp_username }}" autocomplete="off">
-			</div>
-			<div class="field full">
-				<label>SMTP password</label>
-				<input type="password" name="smtp_password" value="" autocomplete="new-password">
-				<div class="help">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Connection type', full_width: false, for: 'field-settings-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<select name="smtp_scheme" id="field-settings-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="smtp" {{ mail_settings.smtp_scheme=='smtp' ? 'selected' : '' }}>SMTP / STARTTLS</option><option value="smtps" {{ mail_settings.smtp_scheme=='smtps' ? 'selected' : '' }}>SMTP over TLS</option></select>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP port', full_width: false, for: 'field-settings-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+				<input type="number" min="1" max="65535" name="smtp_port" value="{{ mail_settings.smtp_port }}" required id="field-settings-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP server', full_width: true, for: 'field-settings-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+				<input name="smtp_host" value="{{ mail_settings.smtp_host }}" placeholder="smtp.example.com" required id="field-settings-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP username', full_width: true, for: 'field-settings-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input name="smtp_username" value="{{ mail_settings.smtp_username }}" autocomplete="off" id="field-settings-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP password', full_width: true, for: 'field-settings-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<div class="cl-password-control"><input type="password" name="smtp_password" value="" autocomplete="new-password" id="field-settings-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ ui('action.button', {label: 'Show', type: 'button', variant: 'quiet', id: 'smtp-password-toggle', disabled: true, hidden: true}) }}</div>
+
+{% endblock %}
+{% block help_content %}
+
 					{{ mail_settings.smtp_password_configured ? 'A password is configured. Leave this blank to keep it.' : 'No SMTP password is currently configured.' }} Passwords saved here are encrypted using <span class="mono">APP_KEY</span>.
-				</div>
-			</div>
-			<div class="field full">
-				<label>From address</label>
-				<input type="email" name="mail_from_address" value="{{ mail_settings.mail_from_address }}" required>
-			</div>
-			<div class="field full">
-				<label>From name</label>
-				<input name="mail_from_name" value="{{ mail_settings.mail_from_name }}">
-				<div class="help">
-					Leave blank to use the effective Platform name.
-				</div>
-			</div>
-			<div class="field full">
-				<label>Reply-to address</label>
-				<input type="email" name="mail_reply_to" value="{{ mail_settings.mail_reply_to }}">
-				<div class="help">
-					Optional. Leave blank to receive replies at the From address.
-				</div>
-			</div>
-			<details class="field full">
-				<summary>
-					<strong>Advanced SMTP DSN options</strong>
-				</summary>
-				<label class="cl-mt-2">Query options</label>
-				<input name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true">
-				<div class="help">
-					Normally leave this unchanged. This preserves optional Symfony Mailer DSN query parameters.
-				</div>
-			</details>
-			<div class="cl-form-actions field full">
-				<button class="btn btn-primary" type="submit">Save SMTP settings</button>
-			</div>
-		</form>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From address', full_width: true, for: 'field-settings-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+				<input type="email" name="mail_from_address" value="{{ mail_settings.mail_from_address }}" required id="field-settings-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From name', full_width: true, for: 'field-settings-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Leave blank to use the effective Platform name.'})} %}
+{% block control %}
+
+				<input name="mail_from_name" value="{{ mail_settings.mail_from_name }}" id="field-settings-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reply-to address', full_width: true, for: 'field-settings-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Optional. Leave blank to receive replies at the From address.'})} %}
+{% block control %}
+
+				<input type="email" name="mail_reply_to" value="{{ mail_settings.mail_reply_to }}" id="field-settings-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Advanced SMTP DSN options'})} %}
+{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Query options', for: 'smtp-query', help: 'Normally leave this unchanged. Optional Symfony Mailer DSN query parameters.'})} %}
+{% block control %}
+<input id="smtp-query" name="smtp_query" value="{{ mail_settings.smtp_query }}" placeholder="require_tls=true"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+				{{ ui('action.button', {label: 'Save SMTP settings', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
 		<div class="cl-row-wrap cl-mt-2">
 			<form action="/admin/mail/test" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				<button class="btn btn-ghost btn-sm">Send test email</button>
+				{{ ui('action.button', {label: 'Send test email', variant: 'quiet', size: 'small'}) }}
 			</form>
 			{% if mail_settings.mail_override_active %}
 				<form action="/admin/settings/mail/reset" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<button class="btn btn-danger btn-sm" data-confirm="Discard the database mail override and return to .env mail settings?">Reset mail settings to .env</button>
+					{{ ui('action.button', {label: 'Reset mail settings to .env', variant: 'danger', size: 'small', confirm: 'Discard the database mail override and return to .env mail settings?', icon: 'action-remove'}) }}
 				</form>
 			{% endif %}
 		</div>
-        </div>
-    </details>
-    <details class="cl-admin-section" id="settings-bank" {% if settings_open_section|default('') == 'bank' %}open{% endif %}>
-        <summary class="cl-admin-section-summary">
-            <span class="cl-admin-section-title">Bank details</span>
-            <span class="cl-admin-section-description">The bank account customers use for EFT payments.</span>
-            <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-        </summary>
-        <div class="cl-admin-section-content">
+
+{% endblock %}
+{% endembed %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Bank details', summary: 'The bank account customers use for EFT payments.', id: 'settings-bank', open: settings_open_section|default('') == 'bank'})} %}
+{% block body %}
+
             <p>Customers paying by EFT see these details on their orders. Updates apply to existing orders as well as new orders.</p>
-            {% if not bank_details.configured %}<p class="alert alert-warning">Add bank details before accepting EFT payments.</p>{% endif %}
-            <form action="/admin/settings/bank" method="post" class="form-grid">
+            {% if not bank_details.configured %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}
+{% block body %}
+Add bank details before accepting EFT payments.
+{% endblock %}
+{% endembed %}{% endif %}
+            <form action="/admin/settings/bank" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
                 <input type="hidden" name="csrf" value="{{ csrf }}">
-                <div class="field"><label for="bank-name">Bank name</label><input id="bank-name" name="bank_name" value="{{ bank_details.bank_name }}" maxlength="160" required></div>
-                <div class="field"><label for="bank-account-name">Account name</label><input id="bank-account-name" name="account_name" value="{{ bank_details.account_name }}" maxlength="160" required></div>
-                <div class="field"><label for="bank-account-number">Account number</label><input id="bank-account-number" name="account_number" value="{{ bank_details.account_number }}" inputmode="numeric" pattern="[0-9]{1,34}" maxlength="34" required></div>
-                <div class="field"><label for="bank-branch-code">Branch code</label><input id="bank-branch-code" name="branch_code" value="{{ bank_details.branch_code }}" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></div>
-                <div class="cl-form-actions field full"><button class="btn btn-primary" type="submit">Save bank details</button></div>
-            </form>
-        </div>
-    </details>
-    <details class="cl-admin-section" id="settings-configuration" {% if settings_open_section|default('') == 'configuration' %}open{% endif %}>
-        <summary class="cl-admin-section-summary">
-            <span class="cl-admin-section-title">Configuration model</span>
-            <span class="cl-admin-section-description">How platform configuration is stored.</span>
-            <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-        </summary>
-        <div class="cl-admin-section-content">
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bank name', full_width: false, for: 'bank-name', required: true})} %}
+{% block control %}
+<input id="bank-name" name="bank_name" value="{{ bank_details.bank_name }}" maxlength="160" required>
+{% endblock %}
+{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account name', full_width: false, for: 'bank-account-name', required: true})} %}
+{% block control %}
+<input id="bank-account-name" name="account_name" value="{{ bank_details.account_name }}" maxlength="160" required>
+{% endblock %}
+{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account number', full_width: false, for: 'bank-account-number', required: true})} %}
+{% block control %}
+<input id="bank-account-number" name="account_number" value="{{ bank_details.account_number }}" inputmode="numeric" pattern="[0-9]{1,34}" maxlength="34" required>
+{% endblock %}
+{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Branch code', full_width: false, for: 'bank-branch-code', required: true})} %}
+{% block control %}
+<input id="bank-branch-code" name="branch_code" value="{{ bank_details.branch_code }}" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+{% endblock %}
+{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Save bank details', variant: 'primary', size: 'normal', type: 'submit'}) }}
+{% endblock %}
+{% endembed %}
 
+{% endblock %}
+{% endembed %}</form>
 
-		<div class="list">
-			<div class="list-item">
-				<div>
+{% endblock %}
+{% endembed %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Configuration model', summary: 'How platform configuration is stored.', id: 'settings-configuration', open: settings_open_section|default('') == 'configuration'})} %}
+{% block body %}
+
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>Platform name and outgoing mail</strong>
 					<p>
 						Platform name and outgoing mail may be changed here. Removing an override returns that setting to its <span class="mono">.env</span> default.
 					</p>
-				</div>
-			</div>
-			<div class="list-item">
-				<div>
+
+{% endblock %}
+{% block actions %}
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>Infrastructure remains in .env</strong>
 					<p>
 						Database credentials, <span class="mono">APP_KEY</span>, application URL/domain, cookie/security settings and filesystem/deployment configuration are not exposed in the web UI.
 					</p>
-				</div>
-			</div>
-		</div><p>Bank details are saved in the database and managed here. They have no environment-file fallback.</p>
-        </div>
-    </details>
-    <details class="cl-admin-section" id="settings-maintenance" {% if settings_open_section|default('') == 'maintenance' %}open{% endif %}>
-        <summary class="cl-admin-section-summary">
-            <span class="cl-admin-section-title">Maintenance</span>
-            <span class="cl-admin-section-description">Clean up expired login and session records.</span>
-            <span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-        </summary>
-        <div class="cl-admin-section-content">
 
+{% endblock %}
+{% block actions %}
 
-		<div class="list">
-			<div class="list-item">
-				<div>
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}<p>Bank details are saved in the database and managed here. They have no environment-file fallback.</p>
+
+{% endblock %}
+{% endembed %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Maintenance', summary: 'Clean up expired login and session records.', id: 'settings-maintenance', open: settings_open_section|default('') == 'maintenance'})} %}
+{% block body %}
+
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>Expired login links</strong>
 					<p>
 						{{ maintenance.login_tokens }} passwordless login links are past their validity period.
 					</p>
-				</div>
-				<span class="badge info">{{ maintenance.login_tokens }}</span>
-			</div>
-			<div class="list-item">
-				<div>
+
+{% endblock %}
+{% block actions %}
+
+				{{ ui('feedback.badge', {label: (maintenance.login_tokens), tone: 'info'}) }}
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>Expired authentication sessions</strong>
 					<p>
 						{{ maintenance.auth_sessions }} authentication sessions can no longer be used.
 					</p>
-				</div>
-				<span class="badge info">{{ maintenance.auth_sessions }}</span>
-			</div>
-			<div class="list-item">
-				<div>
+
+{% endblock %}
+{% block actions %}
+
+				{{ ui('feedback.badge', {label: (maintenance.auth_sessions), tone: 'info'}) }}
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<strong>Expired web sessions</strong>
 					<p>
 						{{ maintenance.web_sessions }} browser sessions have expired.
 					</p>
-				</div>
-				<span class="badge info">{{ maintenance.web_sessions }}</span>
-			</div>
-		</div>
-		<form action="/admin/database/prune" method="post" class="cl-form-actions">
+
+{% endblock %}
+{% block actions %}
+
+				{{ ui('feedback.badge', {label: (maintenance.web_sessions), tone: 'info'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+		<form action="/admin/database/prune" method="post">{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			<button class="btn btn-danger" data-confirm="Remove the expired login and session records listed above?">Clean expired records</button>
-		</form>
-        </div>
-    </details>
+			{{ ui('action.button', {label: 'Clean expired records', variant: 'danger', size: 'normal', confirm: 'Remove the expired login and session records listed above?', icon: 'action-remove'}) }}
+
+{% endblock %}
+{% endembed %}</form>
+
+{% endblock %}
+{% endembed %}
 </div>

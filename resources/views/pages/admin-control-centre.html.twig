@@ -1,42 +1,38 @@
 {% extends layout %}
 {% block page_body %}
+{{ importmap() }}
 	{% set ph_kicker = 'Administration' %}
 	{% set ph_title = 'Platform administration' %}
 	{% set ph_lead = 'Every top-level Administration area is available in one workspace. Open only the sections you need.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{# Every workspace opens on a card, as its sections do. #}
-	<div class="grid section">
-		<div class="card">
-			<div class="section-head">
-				<div>
-					<div class="eyebrow">
-						All sections
-					</div>
-					<h2>
-						Platform administration
-					</h2>
-					<p>
-						Every administration section in one place. Each one also has a page of its own.
-					</p>
-				</div>
-			</div>
-		</div>
-	</div>
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+			{{ ui('layout.section-head', {heading: 'Platform administration', eyebrow: 'All sections', summary: 'Every administration section in one place. Each one also has a page of its own.'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 	<section class="cl-admin-workspace section" data-admin-workspace>
 		{% for section in admin_sections %}
-			<details class="cl-admin-section" data-admin-section="{{ section.key }}" {{ section.key=='dashboard' ? 'open' : '' }}>
-				<summary class="cl-admin-section-summary">
-					<span class="cl-admin-section-title">{{ section.label }}</span>
-					<span class="cl-admin-section-description">{{ section.description }}</span>
-					<span class="cl-admin-section-toggle" aria-hidden="true">⌄</span>
-				</summary>
-				<div class="cl-admin-section-content">
-					<div class="cl-admin-section-actions">
-						<a class="cl-admin-section-link" href="{{ section.route }}">Open as standalone page</a>
-					</div>
+			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: (section.label), summary: (section.description), open: section.key == 'dashboard', workspace: 'admin', section_key: (section.key)})} %}
+{% block body %}
+
 					{{ section.content|raw }}
-				</div>
-			</details>
+
+{% endblock %}
+{% block actions %}
+
+						<a class="cl-ui-accordion-link" href="{{ section.route }}">Open as standalone page</a>
+
+{% endblock %}
+{% endembed %}
 		{% endfor %}
 	</section>
 {% endblock %}

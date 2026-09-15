@@ -1,5 +1,15 @@
-{% include '@platform/partials/pagination.html.twig' with {'pg': orders_pagination} %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'orders', pagination: orders_pagination})} %}
+{% block results %}
+{% if rows %}
+{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
 {% for row in rows %}
-    <div class="border-bottom py-3"><a href="/account/orders/{{ row.id }}">Order {{ row.id }}</a> · {{ row.placed_at|date('d M Y H:i') }} · {{ row.total_label }} · {{ row.state|replace({'_':' '})|capitalize }}</div>
-{% else %}<p>You have not placed any orders yet.</p>{% endfor %}
-{% include '@platform/partials/pagination.html.twig' with {'pg': orders_pagination} %}
+{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}<a href="/account/orders/{{ row.id }}">Order {{ row.id }}</a> · {{ row.placed_at|date('d M Y H:i') }} · {{ row.total_label }} · {{ row.state|replace({'_':' '})|capitalize }}{% endblock %}
+{% endembed %}
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}{{ ui('feedback.empty', {summary: 'You have not placed any orders yet.'}) }}{% endif %}
+{% endblock %}
+{% endembed %}

@@ -1,0 +1,18 @@
+{% set tags = props.tags %}
+{% set selected_slug = props.selected_slug %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
+	{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Browse tags', summary: 'Choose a label to see its courses.'}) }}
+		{% if selected_slug %}{{ ui('action.link', {href: '/courses/tags', label: 'Clear tag', variant: 'secondary', size: 'small'}) }}{% endif %}
+		{% if tags %}
+			<div class="cl-tag-browser cl-tag-cloud-shell" data-controller="tag-cloud" data-tag-cloud-limit-value="80">
+				<div class="cl-tag-cloud-canvas" data-tag-cloud-target="canvas" aria-hidden="true"></div>
+				<nav class="cl-tag-cloud" data-tag-cloud-target="source" aria-label="All tags" tabindex="0">
+					{% for tag in tags %}{{ ui('catalogue.tag-chip', {tag: tag, selected: tag.slug == selected_slug}) }}{% endfor %}
+				</nav>
+			</div>
+		{% else %}
+			{{ ui('feedback.empty', {heading: 'No tags have been created yet', summary: 'Browse by category to find a course.'}) }}
+		{% endif %}
+	{% endblock %}
+{% endembed %}

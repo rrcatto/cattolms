@@ -5,7 +5,7 @@
    lines, so a new control is appended as its own block rather than edited into an existing one.
    Changelog:
 2026/09/09 16:05 SAST
-- Form spacing is now core's guarantee rather than the active theme's. A .card with no .card-body had no padding in Gilded Noir or Light Default and 28 core templates use that shape; a .field had no gap in Gilded Noir and gap:0 in Light Default, so a label, its control and its help text touched in every form built without the two-column grid.
+- Form spacing is now core's guarantee rather than the active theme's. A .cl-ui-surface with no .cl-course-card-body had no padding in Gilded Noir or Light Default and 28 core templates use that shape; a .cl-ui-field had no gap in Gilded Noir and gap:0 in Light Default, so a label, its control and its help text touched in every form built without the two-column grid.
 2026/09/09 14:01 SAST
 - Defined the rest of core's own cl- namespace. Core emitted .cl-narrow, .cl-medium, .cl-page-head-row, .cl-filter-chip(s), .cl-question-editor and .cl-option-editor from core-owned page bodies without defining any of them, so each rendered only as well as the active theme happened to cover it: three themes gave the auth and content pages no width at all, and no theme styled the page-head row or the status filter.
 2026/09/07 13:00 SAST
@@ -29,36 +29,34 @@
      2026/08/23 04:19 SAST - Added the genuine-administrator data-universe control.
      2026/08/21 11:04 SAST - Added the shared pagination control and bounded entity lookups. */
 .cl-options{margin-left:0!important;display:grid;gap:.65rem}.cl-option{display:grid!important;grid-template-columns:1.25rem minmax(0,1fr);align-items:start!important;justify-content:start!important;gap:.7rem;width:100%;text-align:left!important}.cl-option input[type="radio"]{width:1rem!important;height:1rem!important;min-width:1rem;max-width:1rem;margin:.28rem 0 0!important;padding:0!important;justify-self:start}.cl-option>span{display:block;min-width:0;text-align:left!important}
-.tab-panel{display:none}.tab-panel.active{display:block}.cl-admin-workspace{display:grid;gap:1rem}.cl-admin-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}.cl-admin-section-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-admin-section-summary::-webkit-details-marker{display:none}.cl-admin-section-title{font-weight:800}.cl-admin-section-description{font-size:.875rem;opacity:.72}.cl-admin-section-toggle{justify-self:end}.cl-admin-section-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-admin-section-link{white-space:nowrap}.cl-admin-section-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-admin-section-summary{grid-template-columns:1fr;gap:.35rem}.cl-admin-section-link{justify-self:start}}.modal-backdrop,.modal-backdrop[hidden],.modal-backdrop[aria-hidden="true"]{display:none!important}.modal-backdrop.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
+
+.cl-admin-workspace{display:grid;gap:1rem}.cl-ui-accordion-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}.cl-ui-accordion-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:800}.cl-ui-accordion-description{font-size:.875rem;opacity:.72}.cl-ui-accordion-toggle{justify-self:end}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-ui-accordion-link{white-space:nowrap}.cl-ui-accordion-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-ui-accordion-summary{grid-template-columns:1fr;gap:.35rem}.cl-ui-accordion-link{justify-self:start}}.cl-ui-modal[hidden],.cl-ui-modal[aria-hidden="true"]{display:none!important}.cl-ui-modal.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.cl-ui-modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
 .account-menu,.rl-account-menu{position:relative}.account-menu>summary,.rl-account-menu>summary{list-style:none;cursor:pointer}.account-menu>summary::-webkit-details-marker,.rl-account-menu>summary::-webkit-details-marker{display:none}.account-menu-panel,.rl-account-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:1040;min-width:190px;padding:7px;background:#fff;border:1px solid var(--cl-border,var(--line,#dfe4ea));border-radius:10px;box-shadow:0 14px 38px rgba(23,33,43,.16);display:grid}.account-menu-panel a,.rl-account-panel a{padding:9px 11px;border-radius:7px;color:var(--ink,#18212b);font-weight:700;white-space:nowrap}.account-menu-panel a:hover,.rl-account-panel a:hover{background:color-mix(in srgb,var(--cl-accent,#274b63) 10%,white);color:var(--cl-darkest,var(--primary,#274b63))}
 .cl-password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.cl-password-control input{min-width:0}.cl-password-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;min-height:42px}.cl-password-toggle svg{width:18px;height:18px;fill:currentColor;display:block}.cl-password-toggle:disabled{opacity:.55;cursor:wait}
-.cl-palette-switcher{position:fixed;right:18px;bottom:18px;z-index:1100;width:min(310px,calc(100vw - 36px));padding:12px;border:1px solid var(--cl-border,#dfe4ea);border-radius:14px;background:#fff;color:#18212b;box-shadow:0 18px 48px rgba(15,23,42,.20)}.cl-palette-switcher[hidden]{display:none!important}.cl-palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.cl-palette-head strong{font-size:.84rem}.cl-palette-hide,.cl-palette-show{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:6px 9px;font:inherit;font-weight:700}.cl-palette-show{position:fixed;right:18px;bottom:18px;z-index:1100;box-shadow:0 8px 24px rgba(15,23,42,.14)}.cl-palette-show[hidden]{display:none!important}.cl-palette-options{display:grid;gap:6px;max-height:min(52vh,430px);overflow:auto;padding-right:2px}.cl-palette-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;border:1px solid #dbe2ea;border-radius:9px;padding:8px 9px;background:#fff;color:#18212b;text-align:left;font:inherit}.cl-palette-option.active{border-color:var(--cl-accent,#64748b);box-shadow:inset 3px 0 var(--cl-accent,#64748b)}.cl-palette-name{font-size:.78rem;font-weight:800}.cl-palette-swatches{display:flex}.cl-palette-swatch{width:17px;height:17px;border:1px solid rgba(0,0,0,.13)}.cl-palette-swatch:first-child{border-radius:5px 0 0 5px}.cl-palette-swatch:last-child{border-radius:0 5px 5px 0}
+.cl-palette-switcher{position:fixed;right:18px;bottom:18px;z-index:1100;width:min(310px,calc(100vw - 36px));padding:12px;border:1px solid var(--cl-border,#dfe4ea);border-radius:14px;background:#fff;color:#18212b;box-shadow:0 18px 48px rgba(15,23,42,.20)}.cl-palette-switcher[hidden]{display:none!important}.cl-palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.cl-palette-head strong{font-size:.84rem}.cl-palette-hide,.cl-palette-show{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:6px 9px;font:inherit;font-weight:700}.cl-palette-show{position:fixed;right:18px;bottom:18px;z-index:1100;box-shadow:0 8px 24px rgba(15,23,42,.14)}.cl-palette-show[hidden]{display:none!important}.cl-palette-options{display:grid;gap:6px;max-height:min(52vh,430px);overflow:auto;padding-right:2px}.cl-palette-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;border:1px solid #dbe2ea;border-radius:9px;padding:8px 9px;background:#fff;color:#18212b;text-align:left;font:inherit}.cl-palette-option.active{border-color:var(--cl-accent,#64748b);box-shadow:inset 3px 0 var(--cl-accent,#64748b)}.cl-palette-name{font-size:.78rem;font-weight:800}.cl-palette-swatches{display:flex}.cl-palette-swatch{width:17px;height:17px;border:1px solid rgba(0,0,0,.13)}.cl-palette-swatch:first-child{border-radius:5px 0 0 5px}.cl-palette-swatch:last-child{border-radius:0 5px 5px 0}/* v0.5.7.5.1 scalable administration/account workspace layout primitives. */
 
-/* v0.5.7.5.1 scalable administration/account workspace layout primitives. */
-.activity-filters{width:100%;max-width:none!important}.activity-filters .form-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));width:100%}.pagination-row{display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap}.acl-groups{display:grid;gap:.75rem}.acl-group{min-width:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);overflow:hidden}.acl-group-summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;cursor:pointer;list-style:none;font-weight:800}.acl-group-summary::-webkit-details-marker{display:none}.acl-group-summary::after{content:"⌄";font-size:1rem;line-height:1;transition:transform .15s ease}.acl-group[open]>.acl-group-summary::after{transform:rotate(180deg)}.acl-group-content{padding:0 1rem 1rem;border-top:1px solid var(--cl-border,#dfe4ea)}.acl-table-wrap{margin-top:1rem}.acl-permission-table{width:100%;min-width:760px}.acl-permission-table th,.acl-permission-table td{vertical-align:top}.acl-permission-table .acl-permission-check{width:5rem;text-align:center}.acl-permission-table input[type="checkbox"]{width:1rem;height:1rem;margin:.15rem 0 0}.acl-permission-table code{white-space:nowrap}.cl-account-workspace,.cl-company-workspace{display:grid;gap:1rem}/* The v0.5.7.6 scroll-and-min-width pair is gone. It is what the fixed-layout table system below replaced, and leaving it here meant two contradictory descriptions of the same box. */
+.activity-filters{width:100%;max-width:none!important}.activity-filters .cl-ui-form-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));width:100%}.pagination-row{display:flex;align-items:center;justify-content:center;gap:.75rem;flex-wrap:wrap}.acl-groups{display:grid;gap:.75rem}
 
-
-/* Contact anti-bot honeypot is core-owned functional markup. It must remain
+.cl-account-workspace,.cl-company-workspace{display:grid;gap:1rem}/* The v0.5.7.6 scroll-and-min-width pair is gone. It is what the fixed-layout table system below replaced, and leaving it here meant two contradictory descriptions of the same box. *//* Contact anti-bot honeypot is core-owned functional markup. It must remain
    available to automated form fillers while being invisible/non-interactive
    to human visitors regardless of the active theme. */
-.cl-honeypot{position:absolute!important;left:-10000px!important;top:auto!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important}
-/* v0.5.7.6 pagination controls and bounded entity lookups.
+
+.cl-honeypot{position:absolute!important;left:-10000px!important;top:auto!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important}/* v0.5.7.6 pagination controls and bounded entity lookups.
    Functional layout only: themes supply colour and typography through the ordinary
    platform button/form classes, so neither control needs theme-specific CSS. */
+
 .pagination-row{margin-top:1rem;justify-content:space-between}.pagination-summary{display:flex;flex-direction:column;gap:.15rem;font-size:.9rem}.pagination-pages{opacity:.75}.pagination-controls{display:flex;align-items:center;gap:.5rem}.pagination-page-size{display:flex;align-items:center;gap:.5rem;margin:0}.pagination-page-size label{margin:0;font-size:.9rem;white-space:nowrap}.pagination-page-size select{width:auto;min-width:5rem}.pagination-row .is-disabled{opacity:.45;pointer-events:none}
 .entity-lookup{position:relative}.lookup-search{width:100%}.lookup-selected{margin:.25rem 0 .5rem}.lookup-results-panel{margin-top:.35rem}.lookup-results{list-style:none;margin:0;padding:0;max-height:16rem;overflow-y:auto;border:1px solid var(--cl-border,#dfe4ea);border-radius:8px}.lookup-results:empty{border:0}.lookup-results li+li{border-top:1px solid var(--cl-border,#dfe4ea)}.lookup-result{display:flex;flex-direction:column;gap:.1rem;width:100%;padding:.5rem .75rem;text-align:left;background:none;border:0;cursor:pointer;font:inherit;color:inherit}.lookup-result:hover,.lookup-result:focus-visible{background:rgba(127,127,127,.14)}.lookup-result-detail{font-size:.85rem;opacity:.7}.lookup-hint{margin:.25rem 0 0;font-size:.85rem}
-@media (max-width:640px){.pagination-row{flex-direction:column;align-items:stretch}.pagination-controls,.pagination-page-size{justify-content:space-between}}
-
-/* v0.5.8 genuine-administrator data-universe control.
+@media (max-width:640px){.pagination-row{flex-direction:column;align-items:stretch}.pagination-controls,.pagination-page-size{justify-content:space-between}}/* v0.5.8 genuine-administrator data-universe control.
    Core-owned functional markup: the selector must remain usable and legible under every
    compliant theme, including one that has never heard of it, so the active state is drawn
    here rather than left to a theme to supply. No JavaScript: these are ordinary links. */
+
 .universe-switch{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin:0 0 1rem;padding:.6rem .85rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff)}.universe-switch-summary{margin:0;display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;font-size:.9rem}.universe-switch-noun{font-weight:600}.universe-switch-split{opacity:.75}.universe-switch-links{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}.universe-switch-legend{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;opacity:.7;margin-right:.15rem}.universe-switch-link{display:inline-block;padding:.3rem .7rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.85rem;line-height:1.4;text-decoration:none;color:inherit;background:transparent}.universe-switch-link:hover{border-color:currentColor}.universe-switch-link:focus-visible{outline:2px solid currentColor;outline-offset:2px}.universe-switch-link.active{font-weight:700;border-color:currentColor;background:var(--cl-page-muted,rgba(0,0,0,.07))}
-@media (max-width:640px){.universe-switch{flex-direction:column;align-items:stretch}.universe-switch-links{justify-content:space-between}}
-/* Company context switcher (v0.5.8.3 Stage D). Core-owned, complete on its own: Gilded Noir has no .company-context rules, so this must not depend on a theme. */
-/* A surface, not a tint. The translucent black this used to carry was invisible against a plain
+@media (max-width:640px){.universe-switch{flex-direction:column;align-items:stretch}.universe-switch-links{justify-content:space-between}}/* Company context switcher (v0.5.8.3 Stage D). Core-owned, complete on its own: Gilded Noir has no .company-context rules, so this must not depend on a theme. *//* A surface, not a tint. The translucent black this used to carry was invisible against a plain
    page and turned into a grey wash once the canvas became a texture, which is the one thing the
    band must not be: it says which company everything below it belongs to. */
+
 .company-context{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem 1rem;padding:.85rem 1rem;margin:0 0 1rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,var(--r,12px));background:var(--cl-page-surface,#fff)}
 .company-context-current{display:flex;flex-direction:column;gap:.15rem;min-width:14rem;flex:1 1 14rem}
 .company-context-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;opacity:.7}
@@ -66,57 +64,57 @@
 .company-context-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;flex:2 1 22rem;margin:0}
 .company-context-form .entity-lookup{flex:1 1 16rem;margin:0}
 .company-context-reset{margin:0}
-@media (max-width:640px){.company-context{flex-direction:column;align-items:stretch}.company-context-form{flex-direction:column;align-items:stretch}}
-/* Company context banner actions, the Switch Company picker and the shared dataset search bar.
+@media (max-width:640px){.company-context{flex-direction:column;align-items:stretch}.company-context-form{flex-direction:column;align-items:stretch}}/* Company context banner actions, the Switch Company picker and the shared dataset search bar.
    Appended as its own block: this file is minified and validate-ui-contracts.php matches literal
    byte substrings inside lines, so an existing line must not be re-wrapped to add a rule. */
-.company-context-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-left:auto}
-/* The banner carried the section-head class and therefore every theme's page-heading treatment,
+
+.company-context-actions{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-left:auto}/* The banner carried the section-head class and therefore every theme's page-heading treatment,
    which is how one banner rendered dark on a standalone section and light on the workspace. It
    is core-owned now in full, so its own typography lives here rather than being inherited. */
+
 .company-context h2{font-size:1.02rem;line-height:1.3;margin:0}
 .company-context p{margin:.15rem 0 0;font-size:.82rem;opacity:.75}
 .company-context-current{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
-.modal-card-wide{max-width:60rem;width:100%}
+.cl-ui-modal-card--wide{max-width:60rem;width:100%}
 .company-picker-results{margin-top:.75rem}
-.company-picker-results .table-wrap{max-height:26rem;overflow-y:auto}
+.company-picker-results .cl-ui-table{max-height:26rem;overflow-y:auto}
 .company-picker-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;margin:0}
 .company-picker-search label{display:block;width:100%}
 .company-picker-search input[type=search]{flex:1 1 18rem;min-width:0}
 .dataset-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem}
-.dataset-search .field{flex:1 1 20rem;min-width:0;margin:0}
+.dataset-search .cl-ui-field{flex:1 1 20rem;min-width:0;margin:0}
 .dataset-search input[type=search]{width:100%}
 .dataset-search-actions{display:flex;gap:.5rem;align-items:center}
 .dataset-search .help{flex:1 1 100%;margin:.25rem 0 0}
-@media (max-width:640px){.dataset-search,.company-picker-search{flex-direction:column;align-items:stretch}.company-context-actions{margin-left:0}}
-/* Live dataset search: the status text is the loading indicator. htmx toggles the request class
+@media (max-width:640px){.dataset-search,.company-picker-search{flex-direction:column;align-items:stretch}.company-context-actions{margin-left:0}}/* Live dataset search: the status text is the loading indicator. htmx toggles the request class
    on the form, so the message is hidden except while a search is actually in flight. Appended as
    its own block because this file is minified and the UI validator matches literal substrings. */
+
 .dataset-search-status{opacity:0;transition:opacity .15s ease;font-size:.85rem;white-space:nowrap}
 .dataset-search.htmx-request .dataset-search-status{opacity:1}
-.dataset-search .field{position:relative}
+.dataset-search .cl-ui-field{position:relative}
 [id$="-region"]{position:relative}
-[id$="-region"].htmx-swapping{opacity:.55;transition:opacity .1s ease}
-/* Consolidated workspace sections load their table when first opened, so each one arrives fully
+[id$="-region"].htmx-swapping{opacity:.55;transition:opacity .1s ease}/* Consolidated workspace sections load their table when first opened, so each one arrives fully
    paginated and searchable instead of as a preview that could not be paged. */
-.cl-admin-section-loading{opacity:.7}
-.cl-admin-section-lazy.htmx-request .cl-admin-section-loading{opacity:1}
-/* Navigation icons come from the platform sprite, so core supplies a baseline size. An inline SVG
+
+.cl-ui-accordion-loading{opacity:.7}
+.cl-ui-accordion-lazy.htmx-request .cl-ui-accordion-loading{opacity:1}/* Navigation icons come from the platform sprite, so core supplies a baseline size. An inline SVG
    with no dimensions renders at 300x150; every theme's own icon class still overrides these. */
+
 .nav-icon{width:1.15em;height:1.15em;flex:0 0 auto;vertical-align:-.15em}
-.nav-icon use{pointer-events:none}
-/* Metric strip. Core owns the layout because the number of figures on a dashboard changes with
+.nav-icon use{pointer-events:none}/* Metric strip. Core owns the layout because the number of figures on a dashboard changes with
    the LMS, not with the theme: the Company dashboard went from four figures to five and no theme
    defines a five-column grid, so a fixed grid-N class would have broken every skin. Auto-fit lets
    any count lay out sensibly. Card styling stays the theme's. */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px}
-/* v0.6 Pagination 2.0. Core owns the numbered control because it is functional navigation, not
+
+.cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px}/* v0.6 Pagination 2.0. Core owns the numbered control because it is functional navigation, not
    decoration: the page a reader is on must be distinguishable under a theme that has never heard
    of this control, and an ellipsis must never be mistaken for a page that can be clicked. Themes
    still supply colour and typography through the ordinary platform button classes.
    The numbered pages are a list so assistive technology announces how many there are; the marker
    is removed because the numbers are the content. Tabular figures keep the row from reflowing as
    the reader pages from 9 to 10 to 100. */
+
 .pagination-controls{flex-wrap:wrap;justify-content:center}
 .pagination-pages-list{display:flex;align-items:center;gap:.25rem;list-style:none;margin:0;padding:0;flex-wrap:wrap}
 .pagination-pages-list>li{display:flex;margin:0;padding:0}
@@ -126,30 +124,29 @@
 .pagination-jump{display:flex;align-items:center;gap:.5rem;margin:0}
 .pagination-jump label{margin:0;font-size:.9rem;white-space:nowrap}
 .pagination-jump input[type="number"]{width:5.5rem;min-width:0;text-align:center;font-variant-numeric:tabular-nums}
-.pagination-jump .help{margin:0;font-size:.85rem;white-space:nowrap;opacity:.75}
-/* htmx busy state. The control stays in place and dims rather than being replaced by a spinner,
+.pagination-jump .help{margin:0;font-size:.85rem;white-space:nowrap;opacity:.75}/* htmx busy state. The control stays in place and dims rather than being replaced by a spinner,
    because the rows underneath it are still the previous page and removing the control would move
    the page under the pointer mid-request. */
+
 .pagination-row.htmx-request{opacity:.6;pointer-events:none}
-@media (max-width:640px){.pagination-jump{justify-content:space-between}.pagination-edge{display:none}}
-/* v0.6 course taxonomy. Depth is shown by indentation and a guide line, because a three-level tree
+@media (max-width:640px){.pagination-jump{justify-content:space-between}.pagination-edge{display:none}}/* v0.6 course taxonomy. Depth is shown by indentation and a guide line, because a three-level tree
    rendered flat is unreadable and the level is the one thing an administrator must see before
    choosing a parent. Core owns it: the hierarchy is functional structure, not decoration a theme
    may drop, and a theme that ignored it would leave 369 categories looking like one flat list.
    The guide is a border rather than a character so it lines up whatever the row height. */
+
 .cl-category-depth{display:block;position:relative}
 .cl-category-depth-1{font-weight:700}
 .cl-category-depth-2{margin-left:1.5rem;padding-left:.85rem;border-left:2px solid var(--cl-border,#dfe4ea)}
 .cl-category-depth-3{margin-left:3rem;padding-left:.85rem;border-left:2px solid var(--cl-border,#dfe4ea);opacity:.9}
 .cl-category-depth-2::before,.cl-category-depth-3::before{content:"";position:absolute;left:0;top:.7em;width:.6rem;height:2px;background:var(--cl-border,#dfe4ea)}
-.cl-category-level{display:inline-block;min-width:1.5rem;margin-right:.4rem;font-size:.75rem;font-weight:700;opacity:.5;font-variant-numeric:tabular-nums}
-/* v0.6 in-page group navigation. Courses, Course Categories and Enrolments belong together and the
+.cl-category-level{display:inline-block;min-width:1.5rem;margin-right:.4rem;font-size:.75rem;font-weight:700;opacity:.5;font-variant-numeric:tabular-nums}/* v0.6 in-page group navigation. Courses, Course Categories and Enrolments belong together and the
    main menu cannot say so without a third level, which would be a Theme API change. */
+
 .cl-group-nav{display:flex;flex-wrap:wrap;gap:.25rem;margin:0 0 1.25rem;border-bottom:1px solid var(--cl-border,#dfe4ea)}
 .cl-group-tab{display:inline-flex;align-items:center;padding:.55rem .9rem;margin-bottom:-1px;border:1px solid transparent;border-bottom-color:var(--cl-border,#dfe4ea);border-radius:8px 8px 0 0;color:inherit;text-decoration:none;font-size:.88rem;font-weight:600;opacity:.7;white-space:nowrap}
 .cl-group-tab:hover{opacity:1;background:color-mix(in srgb,currentColor 6%,transparent)}
-.cl-group-tab.is-current{opacity:1;font-weight:800;background:var(--cl-page-surface,#fff);border-color:var(--cl-border,#dfe4ea);border-bottom-color:transparent}
-/* v0.6 third navigation level. Administration is grouped rather than flat, so a menu child may
+.cl-group-tab.is-current{opacity:1;font-weight:800;background:var(--cl-page-surface,#fff);border-color:var(--cl-border,#dfe4ea);border-bottom-color:transparent}/* v0.6 third navigation level. Administration is grouped rather than flat, so a menu child may
    itself hold children. Core draws the grouping because it is functional structure: a theme that
    ignored it would render twelve sections as one undifferentiated list, which is the problem the
    grouping exists to solve. Themes still own colour and typography.
@@ -163,20 +160,21 @@
    The panel carries its own background and text colour rather than inheriting, because it is
    positioned over page content and a theme's dark menu panel would otherwise hand it the light
    page's ink and render the heading invisible against itself. */
+
 .nav-group{position:relative;display:grid;gap:2px}
 .nav-group+.nav-group{margin-top:5px;padding-top:6px;border-top:1px solid var(--cl-border,rgba(127,127,127,.26))}
 .nav-group-label{display:flex;align-items:center;gap:.5rem;width:100%;margin:0;padding:.4rem .6rem;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.04em;line-height:1.35;text-transform:uppercase;text-align:left;opacity:.62;cursor:default}
 .nav-group-caret{margin-left:auto;flex:0 0 auto;font-size:1.1em;line-height:1;opacity:.75;transition:transform .15s ease}
 .nav-subpanel{display:none;position:absolute;top:-7px;left:100%;z-index:1070;min-width:13.5rem;padding:7px;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)}
 .nav-group:hover>.nav-subpanel,.nav-group:focus-within>.nav-subpanel{display:grid;gap:2px}
-.nav-group:hover>.nav-group-label,.nav-group:focus-within>.nav-group-label{opacity:1}
-/* The group holding the page being read.
+.nav-group:hover>.nav-group-label,.nav-group:focus-within>.nav-group-label{opacity:1}/* The group holding the page being read.
 
    Marked on the heading, never on the group itself. A group is a container of several links, and
    the palette paints anything carrying data-nav-item and `active` as a solid pill - which is right
    for a link and turns a whole group into a slab of colour. So the group says it is current under
    its own class, and what changes is the heading: full strength rather than the dimmed default,
    with a rule down its leading edge. */
+
 .nav-group-current>.nav-group-label{opacity:1;box-shadow:inset 2px 0 currentColor}
 .nav-group:hover>.nav-group-label .nav-group-caret,.nav-group:focus-within>.nav-group-label .nav-group-caret{transform:translateX(3px)}
 .nav-flyout-left>.nav-subpanel{left:auto;right:100%}
@@ -189,8 +187,7 @@
 .nav-sublink{display:flex;align-items:center;gap:.5rem;white-space:nowrap}
 /* Narrow viewports have nowhere to fly out to, and a hover target is not a thing a finger has, so
    the members return to the indented list the group replaced. */
-@media(max-width:1080px){.nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}.nav-group-caret{display:none}.nav-group-label{opacity:.62}}
-/* Inside a scrolling sidebar the third level nests rather than flying out.
+@media(max-width:1080px){.nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}.nav-group-caret{display:none}.nav-group-label{opacity:.62}}/* Inside a scrolling sidebar the third level nests rather than flying out.
 
    A flyout is `position:absolute; left:100%`, so it is drawn outside its parent - and a sidebar
    that scrolls cannot let it. `overflow-y:auto` forces the other axis to compute as `auto` too:
@@ -201,21 +198,22 @@
    Nesting is the answer rather than a fight: an indented sub-list is what sidebar navigation does,
    it needs no JavaScript, and it cannot be clipped because it takes part in the flow. Themes whose
    navigation is a top bar - Gilded Noir, Light Default - are unaffected and keep the flyout. */
+
 .sidebar .nav-group>.nav-subpanel,.side-nav .nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}
 .sidebar .nav-group-caret,.side-nav .nav-group-caret{transform:rotate(90deg)}
-.sidebar .nav-group>.nav-group-label,.side-nav .nav-group>.nav-group-label{opacity:.62}
-/* v0.6 category browsing. Core owns the breadcrumb and the narrowing rail because both are
+.sidebar .nav-group>.nav-group-label,.side-nav .nav-group>.nav-group-label{opacity:.62}/* v0.6 category browsing. Core owns the breadcrumb and the narrowing rail because both are
    navigation: a reader who has browsed three levels down needs a way back up that does not depend
    on which theme is installed, and a branch offering a count has to show that count legibly. */
+
 .cl-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0 0 .75rem;font-size:.85rem}
 .cl-breadcrumb a{color:inherit;text-decoration:none;opacity:.72}
 .cl-breadcrumb a:hover{text-decoration:underline;opacity:1}
 .cl-breadcrumb a[aria-current="page"]{font-weight:800;opacity:1;text-decoration:none;cursor:default}
 .cl-breadcrumb-sep{opacity:.4}
-.cl-category-count{font-size:.75rem;font-weight:700;opacity:.55}
-/* v0.6 tags. A tag is a link into the catalogue wherever it appears, so it looks and behaves the
+.cl-category-count{font-size:.75rem;font-weight:700;opacity:.55}/* v0.6 tags. A tag is a link into the catalogue wherever it appears, so it looks and behaves the
    same on a card, on a rail and beside a course. The administration row is a form per tag: an edit
    surface with one field is not worth a second screen. */
+
 .cl-tag-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.2rem .6rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;color:inherit;text-decoration:none;font-size:.78rem;font-weight:600}
 .cl-tag-chip:hover{border-color:currentColor}
 .cl-tag-chip.is-selected{border-color:currentColor;font-weight:800;box-shadow:inset 0 0 0 1px currentColor}
@@ -234,19 +232,18 @@
 .cl-tag-name{flex:0 1 12rem;min-width:0}
 .cl-tag-description{flex:1 1 auto;min-width:0}
 .cl-tag-active{display:inline-flex;align-items:center;gap:.3rem;white-space:nowrap;font-size:.78rem}
-.cl-tag-active input{width:auto}
-/* v0.6 distribution chart. Core owns it because it is a reading of platform data rather than
+.cl-tag-active input{width:auto}/* v0.6 distribution chart. Core owns it because it is a reading of platform data rather than
    decoration, and because a chart nobody can read under a theme that has never heard of it is worse
    than a table. No library: a bar is a div with a width, the figures are text beside it, and the
    whole thing renders server-side with no script. */
+
 .cl-chart{display:grid;gap:.4rem}
 .cl-chart-row{display:grid;grid-template-columns:minmax(7rem,14rem) minmax(4rem,1fr) auto;align-items:center;gap:.75rem}
 .cl-chart-label{font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cl-chart-track{display:block;height:.7rem;border-radius:999px;background:color-mix(in srgb,currentColor 10%,transparent)}
 .cl-chart-bar{display:block;height:100%;min-width:2px;border-radius:999px;background:currentColor;opacity:.55}
 .cl-chart-value{font-size:.82rem;font-weight:800;font-variant-numeric:tabular-nums;min-width:3ch;text-align:right}
-@media(max-width:700px){.cl-chart-row{grid-template-columns:minmax(5rem,1fr) auto;}.cl-chart-track{grid-column:1 / -1;order:3}}
-/* v0.6 the table system. One row is one line, the table is exactly as wide as its container, and
+@media(max-width:700px){.cl-chart-row{grid-template-columns:minmax(5rem,1fr) auto;}.cl-chart-track{grid-column:1 / -1;order:3}}/* v0.6 the table system. One row is one line, the table is exactly as wide as its container, and
    each column gets the share of that width its content actually needs.
 
    The mechanism is `table-layout: fixed` plus a percentage width declared per column. That is the
@@ -259,50 +256,50 @@
    Widths are declared once per table in the header model the service builds, so the proportions sit
    beside the column labels rather than in nine CSS rules kept in step with them by hand.
 
-   `.table-wrap` no longer hides its overflow. It did, to stop horizontal scrolling - and it also
+   `.cl-ui-table` no longer hides its overflow. It did, to stop horizontal scrolling - and it also
    clipped anything a row opened, which is why the row actions menu appeared to do nothing at all.
    Fixed layout is what prevents scrolling now, so the wrapper can let a menu out again.
 
    These are stated with !important because themes load after core and each redeclares table padding,
    row-action wrapping and cell sizing at a higher specificity. Functional layout belongs to the LMS.
 */
+
 :root{--cl-danger-soft:color-mix(in srgb,var(--cl-danger,#a8452f) 12%,white);--cl-table-pad-y:6px;--cl-table-pad-x:9px;--cl-table-font:.78rem;--cl-table-head-font:.66rem;--cl-table-btn-font:.7rem}
-/* !important, and the reason matters. Gilded Noir declares `.gn-main .table-wrap{overflow:auto}`
-   at specificity (0,2,0) and loads after core, so a bare `.table-wrap` rule loses to it. The
+/* !important, and the reason matters. Gilded Noir declares `.gn-main .cl-ui-table{overflow:auto}`
+   at specificity (0,2,0) and loads after core, so a bare `.cl-ui-table` rule loses to it. The
    wrapper then clips, and the row menu - which is absolutely positioned and has to escape the cell
    - is drawn outside it and never appears. That is why the actions menu did nothing in Gilded Noir
    and worked in the default theme, and it is the same cascade failure the row-action rules below
    were already marked for. Nothing overflows horizontally any more: `table-layout: fixed` is what
    keeps the table inside its box, so the scroll affordance this replaces has nothing to scroll. */
-.table-wrap{width:100%;overflow:visible!important}
-.table-wrap table,.table-wrap .table{width:100%!important;min-width:0!important;table-layout:fixed!important;font-size:var(--cl-table-font)!important}
-.table-wrap th,.table-wrap td,.table-wrap tbody td,.table-wrap thead th{padding:var(--cl-table-pad-y) var(--cl-table-pad-x)!important;font-size:var(--cl-table-font)!important;line-height:1.35!important;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis}
-.table-wrap th,.table-wrap thead th{font-size:var(--cl-table-head-font)!important;letter-spacing:.03em}
-/* Compact controls, because a row is a row and not a toolbar. */
-.table-wrap td .btn{padding:.2rem .45rem!important;font-size:var(--cl-table-btn-font)!important;line-height:1.25!important;border-radius:6px;white-space:nowrap}
-.table-wrap td .badge{padding:.12rem .4rem!important;font-size:.68rem!important;white-space:nowrap}
-.table-wrap td .avatar{width:22px!important;height:22px!important;font-size:.6rem!important;flex:0 0 auto}
-.table-wrap td .small,.table-wrap td .muted{font-size:.72rem!important}
-.table-wrap td input,.table-wrap td select{padding:.2rem .4rem!important;font-size:var(--cl-table-btn-font)!important;min-height:0!important}
-/* Nothing inside a row stacks: not the actions, not a secondary line, not a hand-written flex box. */
-.row-actions,.table-wrap .row-actions,.table-wrap td .row-actions{display:inline-flex!important;flex-wrap:nowrap!important;align-items:center;gap:.3rem;white-space:nowrap}
-.row-actions form,.table-wrap td form{display:inline-flex!important;margin:0!important}
-.table-wrap td .d-flex{flex-wrap:nowrap!important}
-.table-wrap td>div,.table-wrap td>p,.table-wrap td>span.muted,.table-wrap td>.small{display:inline!important;margin:0}
-.table-wrap td>div.muted::before,.table-wrap td>.small.muted::before{content:"·";margin:0 .4rem;opacity:.5}
-.table-wrap td .person{display:flex!important;align-items:center;gap:.4rem;max-width:100%;min-width:0;overflow:hidden}
-/* The name is never the thing that gets cut.
+.cl-ui-table{width:100%;overflow:visible!important}
+.cl-ui-table table{width:100%!important;min-width:0!important;table-layout:fixed!important;font-size:var(--cl-table-font)!important}
+.cl-ui-table th,.cl-ui-table td,.cl-ui-table tbody td,.cl-ui-table thead th{padding:var(--cl-table-pad-y) var(--cl-table-pad-x)!important;font-size:var(--cl-table-font)!important;line-height:1.35!important;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis}
+.cl-ui-table th,.cl-ui-table thead th{font-size:var(--cl-table-head-font)!important;letter-spacing:.03em}/* Compact controls, because a row is a row and not a toolbar. */
+
+.cl-ui-table td .cl-ui-action{padding:.2rem .45rem!important;font-size:var(--cl-table-btn-font)!important;line-height:1.25!important;border-radius:6px;white-space:nowrap}
+.cl-ui-table td .cl-ui-badge{padding:.12rem .4rem!important;font-size:.68rem!important;white-space:nowrap}
+.cl-ui-table td .avatar{width:22px!important;height:22px!important;font-size:.6rem!important;flex:0 0 auto}
+.cl-ui-table td .small,.cl-ui-table td .muted{font-size:.72rem!important}
+.cl-ui-table td input,.cl-ui-table td select{padding:.2rem .4rem!important;font-size:var(--cl-table-btn-font)!important;min-height:0!important}/* Nothing inside a row stacks: not the actions, not a secondary line, not a hand-written flex box. */
+
+.cl-ui-row-actions,.cl-ui-table .cl-ui-row-actions,.cl-ui-table td .cl-ui-row-actions{display:inline-flex!important;flex-wrap:nowrap!important;align-items:center;gap:.3rem;white-space:nowrap}
+.cl-ui-row-actions form,.cl-ui-table td form{display:inline-flex!important;margin:0!important}
+.cl-ui-table td .d-flex{flex-wrap:nowrap!important}
+.cl-ui-table td>div,.cl-ui-table td>p,.cl-ui-table td>span.muted,.cl-ui-table td>.small{display:inline!important;margin:0}
+.cl-ui-table td>div.muted::before,.cl-ui-table td>.small.muted::before{content:"·";margin:0 .4rem;opacity:.5}
+.cl-ui-table td .person{display:flex!important;align-items:center;gap:.4rem;max-width:100%;min-width:0;overflow:hidden}/* The name is never the thing that gets cut.
 
    Name and address share one line, and laid out as plain inline text they shrank together: a
    generated address ran to a hundred characters, so it ate the column and the person's name was
    truncated to make room for the tail of an email nobody reads. The name now takes the width it
    needs and the address takes whatever is left, ellipsised. That is the priority the reader has. */
-.table-wrap td .person>div{display:flex!important;align-items:baseline;gap:.4rem;min-width:0;max-width:100%;overflow:hidden}
-.table-wrap td .person>div>strong{flex:0 0 auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.table-wrap td .person>div>:not(strong){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.table-wrap td .person>div>:not(strong)::before{content:"·";margin-right:.4rem;opacity:.5}
-.table-wrap td .role-list{display:inline-flex!important;flex-wrap:nowrap!important;gap:.25rem;overflow:hidden}
-/* Two or more actions in a row is a menu, not a row of buttons.
+
+.cl-ui-table td .person>div{display:flex!important;align-items:baseline;gap:.4rem;min-width:0;max-width:100%;overflow:hidden}
+.cl-ui-table td .person>div>strong{flex:0 0 auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-ui-table td .person>div>:not(strong){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-ui-table td .person>div>:not(strong)::before{content:"·";margin-right:.4rem;opacity:.5}
+.cl-ui-table td .role-list{display:inline-flex!important;flex-wrap:nowrap!important;gap:.25rem;overflow:hidden}/* Two or more actions in a row is a menu, not a row of buttons.
 
    A row of buttons in a table cell is a promise the column cannot keep: five actions need about
    400px, and a column carrying them takes that space away from the course title next to it, which
@@ -311,26 +308,25 @@
 
    The cell itself must not clip, or the panel is drawn outside the cell and simply is not shown -
    which is what made the first attempt at this look like a button that did nothing. */
-.table-wrap td.cell-actions,.table-wrap th.cell-actions{overflow:visible!important}
-/* The menu is core-owned and must not depend on a theme knowing what it is. Themes style `details`
+
+.cl-ui-table td.cell-actions,.cl-ui-table th.cell-actions{overflow:visible!important}/* The menu is core-owned and must not depend on a theme knowing what it is. Themes style `details`
    as a bordered accordion panel - Gilded Noir gives every one a border, a paper background, 18px of
    padding on its body and `overflow:hidden` - and all of that is wrong for a control that is one
    button and a floating panel. Restated here rather than fought selector by selector in five
    themes. */
-.row-menu,.table-wrap .row-menu{position:relative!important;display:inline-block!important;overflow:visible!important;border:0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:0!important}
-.row-menu>summary.row-menu-trigger{display:inline-flex!important;align-items:center;gap:.25rem;list-style:none;cursor:pointer}
-.row-menu>summary.row-menu-trigger::-webkit-details-marker{display:none}
-.row-menu>summary.row-menu-trigger::marker{content:""}
-.row-menu>summary.row-menu-trigger::after{content:none!important}
-.row-menu[open]>summary.row-menu-trigger{outline:1px solid var(--cl-border,#dfe4ea)}
-.row-menu>.row-menu-panel{padding:6px!important;margin:0!important}
 
-/* A row menu can open again now the wrapper does not clip. */
-.row-menu>summary{list-style:none;cursor:pointer}
-.row-menu>summary::-webkit-details-marker{display:none}
-.row-menu-panel,.table-wrap .row-menu-panel{position:absolute!important;right:0;top:calc(100% + 4px);z-index:1050;display:grid!important;gap:2px;min-width:11rem;width:max-content;padding:6px!important;border:1px solid var(--cl-border,#dfe4ea)!important;border-radius:10px!important;background:var(--cl-page-surface,#fff)!important;color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)!important;text-align:left;white-space:nowrap}
-/* Actions in a menu stack, one per line, always.
-   
+.cl-ui-row-menu,.cl-ui-table .cl-ui-row-menu{position:relative!important;display:inline-block!important;overflow:visible!important;border:0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:0!important}
+.cl-ui-row-menu>summary.cl-ui-row-trigger{display:inline-flex!important;align-items:center;gap:.25rem;list-style:none;cursor:pointer}
+.cl-ui-row-menu>summary.cl-ui-row-trigger::-webkit-details-marker{display:none}
+.cl-ui-row-menu>summary.cl-ui-row-trigger::marker{content:""}
+.cl-ui-row-menu>summary.cl-ui-row-trigger::after{content:none!important}
+.cl-ui-row-menu[open]>summary.cl-ui-row-trigger{outline:1px solid var(--cl-border,#dfe4ea)}
+.cl-ui-row-menu>.cl-ui-row-panel{padding:6px!important;margin:0!important}/* A row menu can open again now the wrapper does not clip. */
+
+.cl-ui-row-menu>summary{list-style:none;cursor:pointer}
+.cl-ui-row-menu>summary::-webkit-details-marker{display:none}
+.cl-ui-row-panel,.cl-ui-table .cl-ui-row-panel{position:absolute!important;right:0;top:calc(100% + 4px);z-index:1050;display:grid!important;gap:2px;min-width:11rem;width:max-content;padding:6px!important;border:1px solid var(--cl-border,#dfe4ea)!important;border-radius:10px!important;background:var(--cl-page-surface,#fff)!important;color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)!important;text-align:left;white-space:nowrap}/* Actions in a menu stack, one per line, always.
+
    A form is a grid too, not just a block: Approve and Reject live inside one form element, so
    making only the form full-width left the two buttons inline next to each other inside it. Every
    control in the panel is a block-level, full-width row whatever nests it.
@@ -339,8 +335,9 @@
    text, and changes on hover so it is obvious which one the pointer is on. The colours come from
    the palette variables every theme sets, so a theme with a colour switcher restyles these along
    with everything else instead of needing its own rules. */
-.row-menu-panel form,.row-menu-panel form[class]{display:grid!important;gap:2px;width:100%!important;margin:0!important}
-.row-menu-panel .btn,.row-menu-panel form .btn,.table-wrap .row-menu-panel .btn{
+
+.cl-ui-row-panel form,.cl-ui-row-panel form[class]{display:grid!important;gap:2px;width:100%!important;margin:0!important}
+.cl-ui-row-panel .cl-ui-action,.cl-ui-row-panel form .cl-ui-action,.cl-ui-table .cl-ui-row-panel .cl-ui-action{
   display:block!important;width:100%!important;box-sizing:border-box;
   justify-content:flex-start;text-align:left;
   padding:.34rem .55rem!important;border-radius:6px;
@@ -348,89 +345,61 @@
   background:var(--cl-page-surface,#fff);
   color:var(--cl-ink,var(--ink,#18212b));
   transition:background .12s ease,border-color .12s ease,color .12s ease}
-.row-menu-panel .btn:hover,.row-menu-panel form .btn:hover{
+.cl-ui-row-panel .cl-ui-action:hover,.cl-ui-row-panel form .cl-ui-action:hover{
   background:var(--cl-primary-soft,var(--cl-accent-soft,#eef2f8));
   border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))!important;
   color:var(--cl-primary-dark,var(--cl-primary,#24405f))}
-.row-menu-panel .btn:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}
-/* The primary action of the row reads as the primary action. */
-.row-menu-panel .btn-primary{
+.cl-ui-row-panel .cl-ui-action:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}/* The primary action of the row reads as the primary action. */
+
+.cl-ui-row-panel .cl-ui-action--primary{
   background:var(--cl-primary,var(--cl-accent,#2f4a7c));
   border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))!important;
   color:var(--cl-on-color-1,#fff)}
-.row-menu-panel .btn-primary:hover{
+.cl-ui-row-panel .cl-ui-action--primary:hover{
   background:var(--cl-primary-dark,#24405f);
   border-color:var(--cl-primary-dark,#24405f)!important;
-  color:var(--cl-on-color-1,#fff)}
-/* Anything destructive is red before it is read, not after. */
-.row-menu-panel .btn-danger,.row-menu-panel .btn-outline-danger,
-.row-menu-panel form .btn-danger,.row-menu-panel form .btn-outline-danger{
+  color:var(--cl-on-color-1,#fff)}/* Anything destructive is red before it is read, not after. */
+
+.cl-ui-row-panel .cl-ui-action--danger,
+.cl-ui-row-panel form .cl-ui-action--danger{
   background:var(--cl-danger-soft,#fdecea);
   border-color:var(--cl-danger,#a8452f)!important;
   color:var(--cl-danger,#a8452f)}
-.row-menu-panel .btn-danger:hover,.row-menu-panel .btn-outline-danger:hover,
-.row-menu-panel form .btn-danger:hover,.row-menu-panel form .btn-outline-danger:hover{
+.cl-ui-row-panel .cl-ui-action--danger:hover,
+.cl-ui-row-panel form .cl-ui-action--danger:hover{
   background:var(--cl-danger,#a8452f);
   border-color:var(--cl-danger,#a8452f)!important;
-  color:#fff}
-/* A separator only where two groups of actions meet, never a border on every item. */
-.row-menu-panel form + form,.row-menu-panel form + .btn,.row-menu-panel .btn + form{margin-top:2px!important}
+  color:#fff}/* A separator only where two groups of actions meet, never a border on every item. */
 
-/* v0.6 sortable column headings. Core owns them because sorting is functional navigation: the
+.cl-ui-row-panel form + form,.cl-ui-row-panel form + .cl-ui-action,.cl-ui-row-panel .cl-ui-action + form{margin-top:2px!important}/* v0.6 sortable column headings. Core owns them because sorting is functional navigation: the
    direction indicator has to be legible under a theme that has never heard of this control, and a
    heading that does not look clickable is one nobody clicks. */
+
 .sortable-header a{display:inline-flex;align-items:center;gap:.35rem;color:inherit;text-decoration:none;white-space:nowrap}
 .sortable-header a:hover{text-decoration:underline}
 .sortable-header.is-sorted{font-weight:800}
 .sortable-indicator{font-size:.7em;opacity:.4}
-.sortable-header.is-sorted .sortable-indicator{opacity:1}
-
-/* v0.7 Help Centre accordions. Core owns the structure for the same reason it owns the sortable
+.sortable-header.is-sorted .sortable-indicator{opacity:1}/* v0.7 Help Centre accordions. Core owns the structure for the same reason it owns the sortable
    headings: a disclosure control that does not look like one is a control nobody opens, and a theme
    that has never heard of this page must still render it usably. Themes tint it through the
    --cl-* palette; nothing here fixes a colour a theme cannot change. */
-.cl-help-accordion{display:grid;gap:.75rem}
-.cl-help-group{border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}
-.cl-help-group>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem 1rem;padding:1rem 1.15rem;cursor:pointer;list-style:none;font-weight:800}
-.cl-help-group>summary::-webkit-details-marker{display:none}
-.cl-help-group>summary::after{content:"⌄";margin-left:auto;font-size:1.1rem;line-height:1;transition:transform .15s ease}
-.cl-help-group[open]>summary::after{transform:rotate(180deg)}
-.cl-help-group>summary:hover{background:var(--cl-page-muted,rgba(127,127,127,.07))}
-.cl-help-group>summary:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
-.cl-help-group-title{font-size:1.05rem}
-.cl-help-group-hint{font-size:.875rem;font-weight:400;opacity:.72}
-.cl-help-group-body{padding:.35rem 1.15rem 1.1rem;border-top:1px solid var(--cl-border,#dfe4ea)}
 
-/* The nested level is deliberately quieter: a rule down the left rather than a second box, so the
-   eye reads one group containing topics instead of two kinds of card. */
-.cl-help-item{padding-left:.9rem;border-left:2px solid var(--cl-border,#dfe4ea)}
-.cl-help-item+.cl-help-item{margin-top:.15rem}
-.cl-help-item>summary{padding:.6rem 0;cursor:pointer;list-style:none;font-weight:600}
-.cl-help-item>summary::-webkit-details-marker{display:none}
-.cl-help-item>summary::before{content:"›";display:inline-block;width:1rem;opacity:.55;transition:transform .15s ease}
-.cl-help-item[open]>summary::before{transform:rotate(90deg)}
-.cl-help-item>summary:focus-visible{outline:2px solid currentColor;outline-offset:2px}
-.cl-help-item[open]{border-left-color:currentColor}
-.cl-help-body{padding:0 0 .85rem 1rem;max-width:68ch}
-.cl-help-body p{margin:0 0 .6rem}
-.cl-help-body p:last-child{margin-bottom:0}
-
-/* v0.7 form actions. A submit button hard against the last field reads as part of the field, and
+.cl-help-accordion{display:grid;gap:.75rem}/* The nested level is deliberately quieter: a rule down the left rather than a second box, so the
+   eye reads one group containing topics instead of two kinds of card. *//* v0.7 form actions. A submit button hard against the last field reads as part of the field, and
    under Factory Reset the contact form's button was touching the textarea. Core owns the spacing
-   because it is the same mistake on every form, not a matter of taste per theme. */
-/* Where a form ends and its actions begin. Separated by a hairline, because a reader looking for
+   because it is the same mistake on every form, not a matter of taste per theme. *//* Where a form ends and its actions begin. Separated by a hairline, because a reader looking for
    "how do I save this" should find one place on every form rather than scanning for whichever
    button happens to be primary-coloured. */
-.cl-form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid color-mix(in srgb,currentColor 14%,transparent)}
-/* Anything after the first action is secondary and sits away from it, so Save and Remove are never
-   two equal-looking buttons side by side. */
-.cl-form-actions>.cl-form-actions-secondary{margin-left:auto}
 
-/* v0.7 the small handful of layout utilities the page bodies actually used inline.
+.cl-ui-form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid color-mix(in srgb,currentColor 14%,transparent)}/* Anything after the first action is secondary and sits away from it, so Save and Remove are never
+   two equal-looking buttons side by side. */
+
+.cl-ui-form-actions>.cl-ui-form-actions-secondary{margin-left:auto}/* v0.7 the small handful of layout utilities the page bodies actually used inline.
    Twenty-two inline style attributes said one of eight things, and an inline style is the one
    declaration a theme cannot override - which is the opposite of what a theme is for. The
    remaining inline styles are per-table column widths and computed values (a progress bar's
    width, a hero's image), which are genuinely local and stay where they are. */
+
 .cl-mt-2{margin-top:.625rem}
 .cl-mt-3{margin-top:1rem}
 .cl-row-between{display:flex;justify-content:space-between;gap:.75rem}
@@ -441,30 +410,24 @@
 
 .cl-course-cover-generated{display:block;line-height:0}
 .cl-course-cover-generated svg{display:block;width:100%;height:auto}
-.cl-tag-chip svg,.cl-tag-icon svg{display:inline-block;width:18px;height:18px;vertical-align:-3px;margin-right:.35rem}
-
-/* v0.7 the form grid, which core markup uses everywhere and only some themes styled.
+.cl-tag-chip svg,.cl-tag-icon svg{display:inline-block;width:18px;height:18px;vertical-align:-3px;margin-right:.35rem}/* v0.7 the form grid, which core markup uses everywhere and only some themes styled.
 
    Light Default and Factory Reset Sidebar defined no gap at all, so every form built from this
    grid had its fields touching - the contact page was simply where it was noticed. A theme is
    free to restyle it: every theme rule is written as a descendant of its own root and so outranks
    these. What core must not do is leave the layout of its own markup to chance. */
-.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;min-width:0}
-.form-grid .field{display:grid;gap:.4rem;min-width:0}
-.form-grid .field-wide{grid-column:1/-1}
-/* `field full` means the same thing and is what forty-two fields across eleven templates actually
-   say. Core defined only .field-wide, and .full existed in exactly one of the five themes - so in
+
+.cl-ui-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;min-width:0}
+.cl-ui-form-grid .cl-ui-field{display:grid;gap:.4rem;min-width:0}
+.cl-ui-form-grid .cl-ui-field--full{grid-column:1/-1}/* `field full` means the same thing and is what forty-two fields across eleven templates actually
+   say. Core defined only .cl-ui-field--full, and .full existed in exactly one of the five themes - so in
    every other theme, this platform's own included, a field marked full width rendered at half width
    inside a two-column form. One alias rather than forty-two template edits: the markup is not wrong,
    the stylesheet was incomplete. */
-.form-grid .field.full{grid-column:1/-1}
-@media(max-width:720px){.form-grid{grid-template-columns:minmax(0,1fr)}}
 
-/* Bootstrap's card-body padding is 1rem, which is thin for a page whose whole content is one form.
-   A theme that states its own padding is more specific than this and keeps it. */
-.contact-card>.card-body{padding:clamp(1.25rem,2.5vw,2rem)}
-
-/* v0.7 the rest of core's own cl- namespace that core never defined.
+.cl-ui-form-grid .cl-ui-field--full{grid-column:1/-1}
+@media(max-width:720px){.cl-ui-form-grid{grid-template-columns:minmax(0,1fr)}}/* Bootstrap's card-body padding is 1rem, which is thin for a page whose whole content is one form.
+   A theme that states its own padding is more specific than this and keeps it. *//* v0.7 the rest of core's own cl- namespace that core never defined.
 
    Core emits these classes from core-owned page bodies, so a theme is free to restyle them but
    must not be required to define them. Every rule here is a single class, and core loads before
@@ -481,6 +444,7 @@
      links and the selected filter was distinguishable only by aria-current.
    - .cl-question-editor / .cl-option-editor were carded in four themes and bare in Light Default,
      where every question and answer option in the assessment editor ran together. */
+
 /* Compounded with .container deliberately. Every use of these sits on a Bootstrap container, and
    Factory Reset and Radiant Learning each redeclare a bare `.container{max-width:1320px}` in their
    own sheet - same specificity as a bare `.cl-narrow`, loaded afterwards, so the width constraint
@@ -491,8 +455,7 @@
 .cl-medium{max-width:54rem;margin-inline:auto}
 .container.cl-narrow{max-width:38rem}
 .container.cl-medium{max-width:54rem}
-.cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
-/* Controls sitting in a row line up with each other.
+.cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}/* Controls sitting in a row line up with each other.
 
    A row of actions is rarely all one element: a plain button, a button inside a form because it
    posts, and a summary styled as a button because it opens a panel. A summary is a list-item box
@@ -501,11 +464,10 @@
 
    The wrappers are given no height of their own and the summary is made the same kind of box as the
    button, so the row aligns whatever mix of controls it happens to hold. */
-.row-actions,.cl-form-actions,.toolbar>.row-actions{align-items:center}
-.row-actions>form,.row-actions>details,.toolbar>form,.toolbar>details{display:flex;align-items:center;margin:0}
-summary.btn{display:inline-flex;align-items:center;justify-content:center;list-style:none}
-summary.btn::-webkit-details-marker{display:none}
-summary.btn::marker{content:""}
+
+.cl-ui-row-actions,.cl-ui-form-actions,.cl-ui-toolbar>.cl-ui-row-actions{align-items:center}
+.cl-ui-row-actions>form,.cl-ui-row-actions>details,.cl-ui-toolbar>form,.cl-ui-toolbar>details{display:flex;align-items:center;margin:0}
+
 /* Nothing reads directly off the page canvas.
 
    The canvas is a texture, so any block of text that is not on a surface sits on stripes. Most of
@@ -520,37 +482,38 @@ summary.btn::marker{content:""}
    its content in - and styling it is exactly what CoreStyleNamespaceContractTest forbids, because
    a behaviour hook that also carries layout cannot be moved without moving the layout with it.
    The same classes inside a card are already on a surface, and a second one would draw a box in a
-   box, which is what the negation excludes. */
-.toolbar:not(.card *):not(.cl-footer *),
-.section-head:not(.card *),
-.notice:not(.card *),
-/* The search control carries a label, a status and a line of help, all of which are text. It is
+   box, which is what the negation excludes. *//* The search control carries a label, a status and a line of help, all of which are text. It is
    rendered above the results region on every paginated list, so outside a card it was the other
    block of words left standing on the texture. */
-.dataset-search:not(.card *){
+
+.cl-ui-toolbar:not(.cl-ui-surface *):not(.cl-footer *),
+.cl-ui-section-head:not(.cl-ui-surface *),
+.cl-ui-notice:not(.cl-ui-surface *),
+
+.dataset-search:not(.cl-ui-surface *){
   padding:1rem 1.1rem;
   border:1px solid var(--cl-border,var(--line,#dfe4ea));
   border-radius:var(--cl-radius,var(--r,12px));
   background:var(--cl-page-surface,#fff);
-  color:var(--cl-ink,var(--ink,#18212b))}
-/* Pagination sits on a surface of its own.
+  color:var(--cl-ink,var(--ink,#18212b))}/* Pagination sits on a surface of its own.
 
    The control is rendered inside the results region, above and below the table, and a results
    region has no background - so once the page canvas became a texture the row count, the page
    numbers and the rows-per-page control were the one piece of text still standing on it. It is
    given the card's surface rather than the card itself, because it is a control belonging to the
    list beneath it and not a section of the page. */
+
 .pagination-row{
   padding:.7rem .9rem;
   border:1px solid var(--cl-border,var(--line,#dfe4ea));
   border-radius:var(--cl-radius,var(--r,12px));
   background:var(--cl-page-surface,#fff);
-  color:var(--cl-ink,var(--ink,#18212b))}
-/* The site footer: a section on its own surface, like every other block on the page.
+  color:var(--cl-ink,var(--ink,#18212b))}/* The site footer: a section on its own surface, like every other block on the page.
 
    It used to be a bare rule and some text, so once the page canvas became a texture the footer was
    the one thing standing on it with nothing behind it. The surface is a light tone taken from the
    palette rather than a fixed colour, so it belongs to whichever palette is active. */
+
 .cl-footer{
   margin:1.25rem auto 2rem;max-width:1320px;
   /* Heavier than the hairline the cards use, because the footer is a band at the end of the page
@@ -577,15 +540,14 @@ summary.btn::marker{content:""}
   border-radius:50%;color:var(--cl-darkest,#22303f);
   background:#fff;border:2px solid var(--cl-darkest,#22303f)}
 .cl-footer-social a:hover{background:var(--cl-lightest,#f5f9fc)}
-.cl-footer-social a:focus-visible{outline:2px solid currentColor;outline-offset:2px}
-/* No address configured yet, so it is not a link - but it still has to be visible, because the row
+.cl-footer-social a:focus-visible{outline:2px solid currentColor;outline-offset:2px}/* No address configured yet, so it is not a link - but it still has to be visible, because the row
    is part of the footer rather than something that appears once a form is filled in. Dimmed just
    enough to read as inactive, never so far that it disappears. */
-.cl-footer-social>li>span{opacity:.72}
-.cl-footer-social-icon{width:22px;height:22px;display:block;stroke-width:1.9}
-/* The rounded table's top corners.
 
-   A theme gives .table-wrap a border-radius, but core forces overflow:visible on it so the row
+.cl-footer-social>li>span{opacity:.72}
+.cl-footer-social-icon{width:22px;height:22px;display:block;stroke-width:1.9}/* The rounded table's top corners.
+
+   A theme gives .cl-ui-table a border-radius, but core forces overflow:visible on it so the row
    actions menu can be drawn outside the wrapper - and a border-radius only clips children while
    overflow is not visible. The header cells carry a background, so their square top corners sat
    over the curve and left a notch in each one. The body rows have no background of their own, so
@@ -593,9 +555,9 @@ summary.btn::marker{content:""}
 
    Clipping is not available here and must not be reintroduced: that is what PopoutClippingContract
    Test exists to prevent. So the two corner cells are rounded to match the wrapper instead. */
-.table-wrap>table>thead>tr:first-child>th:first-child{border-start-start-radius:var(--cl-radius,var(--r,12px))}
-.table-wrap>table>thead>tr:first-child>th:last-child{border-start-end-radius:var(--cl-radius,var(--r,12px))}
-/* The identity head, and the joint between it and the page head above it.
+
+.cl-ui-table>table>thead>tr:first-child>th:first-child{border-start-start-radius:var(--cl-radius,var(--r,12px))}
+.cl-ui-table>table>thead>tr:first-child>th:last-child{border-start-end-radius:var(--cl-radius,var(--r,12px))}/* The identity head, and the joint between it and the page head above it.
 
    Core owns both because core emits both. The identity used to be a card inside Personal
    Particulars, so it was styled by whichever theme happened to define .profile-head - two of the
@@ -606,6 +568,7 @@ summary.btn::marker{content:""}
    bottom corners, and the edge where they meet is square. The join is expressed with :has() so
    nothing changes on the pages that have a page head and no identity head - which is every page
    outside the Account workspace. */
+
 .cl-page-head:has(+ .cl-identity-head){
   border-start-start-radius:var(--cl-radius,1rem);border-start-end-radius:var(--cl-radius,1rem);
   border-end-start-radius:0;border-end-end-radius:0;
@@ -617,56 +580,53 @@ summary.btn::marker{content:""}
   background:var(--cl-page-surface,#fff);
   color:var(--cl-ink,var(--ink,#18212b));
   border-bottom:1px solid var(--cl-border,#dfe4ea)}
-.cl-identity-head-inner{display:flex;align-items:center;flex-wrap:wrap;gap:.9rem;padding-block:1rem}
-/* The signed-out mark. A symbol rather than an initial, because there is no name to take one
+.cl-identity-head-inner{display:flex;align-items:center;flex-wrap:wrap;gap:.9rem;padding-block:1rem}/* The signed-out mark. A symbol rather than an initial, because there is no name to take one
    from, and the band has to keep its height whoever is reading. */
+
 .cl-identity-head-anonymous{display:grid;place-items:center;color:var(--cl-ink,var(--ink,#18212b));opacity:.55}
 .cl-identity-head-anonymous svg{fill:none;stroke:currentColor;stroke-width:1.9}
 .cl-identity-head-meta{min-width:0}
 .cl-identity-head-meta h2{margin:0;font-size:1.15rem;line-height:1.25}
 .cl-identity-head-meta p{margin:.15rem 0 0;font-size:.85rem;opacity:.75}
 .cl-filter-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
-.cl-filter-chip{display:inline-flex;align-items:center;padding:.3rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.8rem;line-height:1.4;text-decoration:none;color:inherit}
-/* The selected state keeps the inherited text colour and tints the ground with a share of it, so
+.cl-filter-chip{display:inline-flex;align-items:center;padding:.3rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.8rem;line-height:1.4;text-decoration:none;color:inherit}/* The selected state keeps the inherited text colour and tints the ground with a share of it, so
    it cannot fail contrast in a theme core knows nothing about - a filled chip in a fixed brand
    colour would, on whichever theme sets that colour light. */
+
 .cl-filter-chip.is-current{font-weight:600;border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
 .cl-question-editor{padding:1.25rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:1rem;margin-bottom:1.25rem}
 .cl-question-editor+.cl-question-editor{margin-top:1.25rem}
 .cl-option-editor{padding:.8rem;border:1px dashed var(--cl-border,#dfe4ea);border-radius:.7rem}
-.cl-option-editor+.cl-option-editor{margin-top:.6rem}
-
-/* v0.7 form spacing, made a property of the platform rather than of whichever theme is active.
+.cl-option-editor+.cl-option-editor{margin-top:.6rem}/* v0.7 form spacing, made a property of the platform rather than of whichever theme is active.
 
    Every form on the LMS is built from the same few pieces, and the spacing of those pieces was
    left to the themes. Resolved against all five installed themes, the vocabulary came out like
    this - the accepted contact page was correct only because it happens to use the one shape two
    themes had covered:
 
-     .card with no .card-body      no padding at all in Gilded Noir and Light Default. 28 core
+     .cl-ui-surface with no .cl-course-card-body      no padding at all in Gilded Noir and Light Default. 28 core
                                    templates use this shape, which is why the Account profile's
                                    email card had its input flush against the border.
-     .field in a plain form        no gap in Gilded Noir, and gap:0 in Light Default, so the
+     .cl-ui-field in a plain form        no gap in Gilded Noir, and gap:0 in Light Default, so the
                                    label, the control and the help text touched.
-     .field inside .form-grid      gap:0 in Light Default even after core defined the grid.
+     .cl-ui-field inside .cl-ui-form-grid      gap:0 in Light Default even after core defined the grid.
 
    Two rules, and both are written to disturb as little as possible.
 
-   The card rule is wrapped in :where() so it carries the specificity of a bare .card and nothing
-   more: a theme that states its own .card padding - Factory Reset at 18px, Radiant at 20px - loads
+   The card rule is wrapped in :where() so it carries the specificity of a bare .cl-ui-surface and nothing
+   more: a theme that states its own .cl-ui-surface padding - Factory Reset at 18px, Radiant at 20px - loads
    afterwards and still wins. It only reaches the cards nobody had padded. The :has() guard is what
-   keeps a card that does wrap its content in a .card-body from being padded twice. */
-.card:where(:not(:has(> .card-body))){padding:clamp(1rem,2vw,1.4rem)}
+   keeps a card that does wrap its content in a .cl-course-card-body from being padded twice. */
 
-/* The field rule needs !important, for the same reason the table-wrap block above does: Light
-   Default states gap:0 at .ld-main .field, which outranks any bare .field core can write and loads
+.cl-ui-surface:where(:not(:has(> .cl-course-card-body))){padding:clamp(1rem,2vw,1.4rem)}/* The field rule needs !important, for the same reason the table-wrap block above does: Light
+   Default states gap:0 at .ld-main .cl-ui-field, which outranks any bare .cl-ui-field core can write and loads
    after it. The gap between a label and its control is not a matter of taste a theme should be
    able to set to nothing, so core states it and means it. Only the gap is forced - a theme keeps
    full control of the field's display, margins, type and colour, and Light Default's own
    flex-direction:column continues to apply. If that theme drops gap:0 when it is next versioned,
    the !important here can go with it. */
-.field{display:grid;gap:.4rem!important;min-width:0}
-/* Air between one field and the next, and before whatever ends the form. Light Default is the only
+
+.cl-ui-field{display:grid;gap:.4rem!important;min-width:0}/* Air between one field and the next, and before whatever ends the form. Light Default is the only
    theme that spaced consecutive fields, and it did it with a margin on every field including the
    last one inside a grid cell.
 
@@ -675,9 +635,9 @@ summary.btn::marker{content:""}
    on every field except the first. In a two-column form that put the right-hand field of each row
    one rem lower than the left-hand one, which is why Middle names never lined up with First name.
    Fields laid out by a container take the container's spacing and nothing else. */
-.field+.field{margin-top:1rem}
-.form-grid>.field+.field,.form-grid .field+.field,.cl-field-row>.field+.field,.field-row>.field+.field{margin-top:0}
-/* The general sibling combinator, not the adjacent one, and the difference is a real defect.
+
+.cl-ui-field+.cl-ui-field{margin-top:1rem}
+.cl-ui-form-grid>.cl-ui-field+.cl-ui-field,.cl-ui-form-grid .cl-ui-field+.cl-ui-field,.cl-field-row>.cl-ui-field+.cl-ui-field,.field-row>.cl-ui-field+.cl-ui-field{margin-top:0}/* The general sibling combinator, not the adjacent one, and the difference is a real defect.
 
    The profile image form is: a field, then the editor panel, then the submit. The editor is hidden
    until a picture is chosen, and a hidden element still counts as the sibling in between - so the
@@ -687,77 +647,67 @@ summary.btn::marker{content:""}
    was no save button; what there was, was a save button nobody could pick out.
 
    `~` matches however many elements sit between, hidden or not. */
-.field~.btn,.field~button,.field~.cl-form-actions{margin-top:1rem}
 
-/* v0.7 the two Help accordion levels are laid out the same way.
+.cl-ui-field~.cl-ui-action,.cl-ui-field~button,.cl-ui-field~.cl-ui-form-actions{margin-top:1rem}/* v0.7 the two Help accordion levels are laid out the same way.
 
    The group summary was a flex row with its disclosure marker hidden; the item summary underneath
    it was left as a default list-item, so it still drew a marker, sat on a different left edge and
    did not share the group's baseline. Both are now the same control at two sizes, both explicitly
-   left aligned, so no theme's own text-align can reach them. */
-.cl-help-item>summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem 1rem}
-.cl-help-group>summary,.cl-help-item>summary{text-align:left;justify-content:flex-start}
-.cl-help-item>summary::-webkit-details-marker{display:none}
-.cl-help-item>summary::after{content:"⌄";margin-left:auto;font-size:1rem;line-height:1;opacity:.6;transition:transform .15s ease}
-.cl-help-item[open]>summary::after{transform:rotate(180deg)}
-
-/* v0.7 row action menus stack, which is what a menu is.
+   left aligned, so no theme's own text-align can reach them. *//* v0.7 row action menus stack, which is what a menu is.
 
    The panel and its forms were already told to be a grid, and the actions still drew side by side.
-   The reason is a rule from the one-row-per-table-row work: `.table-wrap td form` sets
+   The reason is a rule from the one-row-per-table-row work: `.cl-ui-table td form` sets
    display:inline-flex!important so a form sitting directly in a cell keeps its buttons on the row.
-   That selector is (0,1,2) and `.row-menu-panel form` is (0,1,1), so the cell rule won on
+   That selector is (0,1,2) and `.cl-ui-row-panel form` is (0,1,1), so the cell rule won on
    specificity and no amount of source order would have changed it - two !important declarations
    are still decided by specificity first.
 
    Both intents are real, so both are kept and the more specific one names the case it means: a
    form loose in a cell stays inline, a form inside an action menu stacks. */
-.table-wrap td .row-menu-panel form,.row-menu-panel form{display:grid!important;gap:.35rem;width:100%!important;margin:0!important}
-.table-wrap td .row-menu-panel .btn,.row-menu-panel .btn{display:flex!important;width:100%!important;justify-content:flex-start;text-align:left;white-space:nowrap}
-/* Every action carries a visible edge and changes on hover. brightness() rather than a stated
+
+.cl-ui-table td .cl-ui-row-panel form,.cl-ui-row-panel form{display:grid!important;gap:.35rem;width:100%!important;margin:0!important}
+.cl-ui-table td .cl-ui-row-panel .cl-ui-action,.cl-ui-row-panel .cl-ui-action{display:flex!important;width:100%!important;justify-content:flex-start;text-align:left;white-space:nowrap}/* Every action carries a visible edge and changes on hover. brightness() rather than a stated
    colour, because core does not know what any theme painted the button and must not overwrite it -
    a palette-driven theme keeps its own colour and still gets the feedback. */
-.row-menu-panel .btn{border:1px solid rgba(0,0,0,.18)}
-.row-menu-panel .btn:hover{filter:brightness(.93)}
-.row-menu-panel .btn-danger,.row-menu-panel .btn-danger:hover{border-color:rgba(0,0,0,.28)}
 
-/* One canonical public course grid: four, three, two and one columns. */
+.cl-ui-row-panel .cl-ui-action{border:1px solid rgba(0,0,0,.18)}
+.cl-ui-row-panel .cl-ui-action:hover{filter:brightness(.93)}
+.cl-ui-row-panel .cl-ui-action--danger,.cl-ui-row-panel .cl-ui-action--danger:hover{border-color:rgba(0,0,0,.28)}/* One canonical public course grid: four, three, two and one columns. */
+
 .cl-course-cards{display:grid;gap:1rem;grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:1200px){.cl-course-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.cl-course-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.cl-course-cards{grid-template-columns:minmax(0,1fr)}}
-
-/* The body is a column so the foot can be pushed to the bottom of every card in the row: cards in
+@media(max-width:600px){.cl-course-cards{grid-template-columns:minmax(0,1fr)}}/* The body is a column so the foot can be pushed to the bottom of every card in the row: cards in
    a grid row are the same height, and without this the action sits directly under the text and no
    two cards in a row agree where it is. */
+
 .cl-course-card-body{display:flex;flex-direction:column;gap:.6rem;padding:clamp(.85rem,1.2vw,1.1rem);min-width:0}
 .cl-course-card-title{font-size:1rem;line-height:1.3;margin:0}
 .cl-course-card-title a{color:inherit;text-decoration:none}
-.cl-course-card-title a:hover{text-decoration:underline}
-/* Bound long descriptions so one card does not dominate the entire row. */
+.cl-course-card-title a:hover{text-decoration:underline}/* Bound long descriptions so one card does not dominate the entire row. */
+
 .cl-course-card-summary{margin:0;font-size:.82rem;line-height:1.45;opacity:.8;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.cl-course-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .3rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;opacity:.7;min-width:0}
-.cl-course-crumbs a{color:inherit;text-decoration:none}
-.cl-course-crumbs a:hover{text-decoration:underline}
+.cl-course-card .cl-ui-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem .3rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;opacity:.7;min-width:0}
+.cl-course-card .cl-ui-breadcrumb a{color:inherit;text-decoration:none}
+.cl-course-card .cl-ui-breadcrumb a:hover{text-decoration:underline}
 .cl-course-crumb-sep{opacity:.5}
 .cl-course-card-tags{display:flex;flex-wrap:wrap;gap:.3rem}
-.cl-tag-chip-compact{font-size:.7rem;padding:.12rem .45rem}
-/* The facts are a definition list so the label is readable to a screen reader as a label, and a
+.cl-tag-chip-compact{font-size:.7rem;padding:.12rem .45rem}/* The facts are a definition list so the label is readable to a screen reader as a label, and a
    grid so Level, Modules and Price line up across every card in the row. */
-.cl-course-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(4rem,1fr));gap:.35rem;margin:0;font-size:.72rem}
-.cl-course-facts>div{display:grid;gap:.05rem;min-width:0}
-.cl-course-facts dt{text-transform:uppercase;letter-spacing:.04em;opacity:.6;font-size:.62rem}
-.cl-course-facts dd{margin:0;font-weight:700}
+
+.cl-course-card .cl-ui-key-value-list{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.15rem .5rem;margin:0;font-size:.72rem}
+.cl-course-card .cl-ui-key-value-list>div{display:grid;gap:.05rem;min-width:0}
+.cl-course-card .cl-ui-key-value-list dt{text-transform:uppercase;letter-spacing:.04em;opacity:.6;font-size:.62rem}
+.cl-course-card .cl-ui-key-value-list dd{margin:0;font-weight:700}
 .cl-course-card-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-top:auto;padding-top:.6rem;border-top:1px solid var(--cl-border,#dfe4ea)}
-.cl-course-card-foot form{margin:0}
-/* The star is a control, so it gets a hit area and a focus ring rather than being bare text. */
+.cl-course-card-foot form{margin:0}/* The star is a control, so it gets a hit area and a focus ring rather than being bare text. */
+
 .cl-favourite{display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;padding:0;font-size:1.1rem;line-height:1;color:inherit;background:transparent;border:1px solid var(--cl-border,#dfe4ea);border-radius:8px;cursor:pointer}
 .cl-favourite:hover{filter:brightness(.93)}
 .cl-favourite:focus-visible{outline:2px solid currentColor;outline-offset:1px}
 .cl-favourite.is-on{color:#c8971b;border-color:currentColor}
-.cl-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.cl-visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}/* Platform components own layout and usability; themes tint through their existing variables. */
 
-/* Platform components own layout and usability; themes tint through their existing variables. */
 .cl-ui-surface{padding:clamp(.75rem,2vw,1.25rem);min-width:0;background:var(--cl-page-surface,#fff);color:var(--cl-page-text,inherit)}
 .cl-ui-section-head{margin-bottom:1rem}
 .cl-ui-section-head h2{margin:0;font-size:1.3rem}
@@ -796,9 +746,7 @@ summary.btn::marker{content:""}
 @media(prefers-reduced-motion:reduce){
  .cl-tag-cloud-shell.is-animated{grid-template-columns:minmax(0,1fr)}
  .cl-tag-cloud-shell.is-animated .cl-tag-cloud-canvas{display:none}
-}
-
-/* v0.7 the navigation sprite is drawn, not filled.
+}/* v0.7 the navigation sprite is drawn, not filled.
 
    Every symbol in public_html/img/nav-icons.svg is an outline: open paths, no fill attribute and no
    stroke attribute. The sprite's own header says they are drawn with stroke:currentColor, but
@@ -808,11 +756,11 @@ summary.btn::marker{content:""}
 
    Core owns the sprite, so core states how it is drawn. A theme still sets the colour, because
    currentColor is whatever the theme painted the text. */
-.nav-icon{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-/* The tag row says what it is. A row of chips under a description is otherwise decoration. */
+
+.nav-icon{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}/* The tag row says what it is. A row of chips under a description is otherwise decoration. */
+
 .cl-course-card-tags{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem}
-.cl-course-card-tags-label{font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-right:.1rem}
-/* Slanted texture: a named platform UI element.
+.cl-course-card-tags-label{font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-right:.1rem}/* Slanted texture: a named platform UI element.
 
    The owner's definition, 2026/09/10: bands slanting at 45 degrees from top left to bottom right,
    two band rows each about 10px thick, alternating in colour, a light grey with a darker grey.
@@ -825,11 +773,12 @@ summary.btn::marker{content:""}
    Painted through a ::before rather than on the element itself: a background set directly is the
    one thing a theme's own background rule silently overwrites, and the texture is meant to sit
    under whatever the element already paints. */
+
 :root{--cl-texture-light:#f5f7f9;--cl-texture-dark:#edf0f3;--cl-texture-band:10px;--cl-texture-angle:45deg}
 .cl-slanted-texture{position:relative;isolation:isolate}
 .cl-slanted-texture>*{position:relative;z-index:1}
-.cl-slanted-texture::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2))}
-/* Where the texture is the element's own surface rather than a layer beneath its children. */
+.cl-slanted-texture::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2))}/* Where the texture is the element's own surface rather than a layer beneath its children. */
+
 .cl-slanted-texture-flat{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2))}
 /* The page canvas. ThemeRenderer puts this on every body, so the texture is the platform's
    background rather than one theme's.
@@ -838,31 +787,31 @@ summary.btn::marker{content:""}
    that rule is a single element selector, and this is an element plus a class. Attached rather
    than scrolling, so the bands stay put instead of sliding under a long page - the texture is the
    surface the page sits on, not part of its content. */
-body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2)) fixed}
-/* The profile image, on the header and on its own panel.
+body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2)) fixed}/* The profile image, on the header and on its own panel.
 
    Sized in the markup as well as here, so the page does not reflow between the layout arriving and
    the image arriving - a 128px hole that becomes a 128px picture, rather than nothing that becomes
    something and pushes the form down as it does. */
+
 .cl-profile-avatar{width:72px;height:72px;border-radius:14px;object-fit:cover;flex:0 0 auto;display:block}
 .cl-profile-avatar-empty{width:72px;height:72px;border-radius:14px;flex:0 0 auto}
 .cl-profile-image-panel{display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-start}
 .cl-profile-image-preview{width:128px;height:128px;border-radius:18px;object-fit:cover;flex:0 0 auto;display:block;border:1px solid color-mix(in srgb,currentColor 16%,transparent)}
 .cl-profile-image-empty{display:grid;place-items:center;font-size:2.6rem;font-weight:700;opacity:.45;background:color-mix(in srgb,currentColor 8%,transparent)}
-.cl-profile-image-actions{flex:1 1 16rem;min-width:0}
-/* A fact the interface shows rather than a control it offers. Styled like a label so it sits in the
+.cl-profile-image-actions{flex:1 1 16rem;min-width:0}/* A fact the interface shows rather than a control it offers. Styled like a label so it sits in the
    form's rhythm, but it is not a label - there is no field for it to name. */
-.cl-inferred-label{font-size:.78rem;font-weight:600;letter-spacing:.01em;opacity:.85}
-/* The profile image editor.
+
+.cl-inferred-label{font-size:.78rem;font-weight:600;letter-spacing:.01em;opacity:.85}/* The profile image editor.
 
    Shown only once the Stimulus controller has a picture to edit; without JavaScript the panel is
    never revealed and the file input beside it is the whole control, which is the platform's rule
    for every enhancement. */
+
 .cl-profile-image-current{display:grid;gap:.4rem;justify-items:center;flex:0 0 auto}
 .cl-image-editor{display:flex;flex-wrap:wrap;gap:1.25rem;align-items:flex-start;margin:.9rem 0 1rem}
-.cl-image-editor-stage{position:relative;flex:0 0 auto;line-height:0}
-/* The frame is the crop. Everything drawn outside it is dimmed rather than hidden, so the reader
+.cl-image-editor-stage{position:relative;flex:0 0 auto;line-height:0}/* The frame is the crop. Everything drawn outside it is dimmed rather than hidden, so the reader
    can see what is being left out while they drag - a hard edge shows the result but not the choice. */
+
 .cl-image-editor-canvas{display:block;width:min(320px,60vw);height:auto;aspect-ratio:1;border-radius:14px;background:color-mix(in srgb,currentColor 8%,transparent);cursor:grab;touch-action:none}
 .cl-image-editor-canvas:active{cursor:grabbing}
 .cl-image-editor-mask{position:absolute;inset:0;border-radius:14px;pointer-events:none;box-shadow:inset 0 0 0 2px color-mix(in srgb,currentColor 30%,transparent)}
@@ -870,13 +819,13 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-image-editor-buttons{display:flex;flex-wrap:wrap;gap:.4rem}
 .cl-image-editor-controls input[type="range"]{width:100%}
 .cl-image-editor-preview{display:grid;gap:.3rem;justify-items:start}
-.cl-image-editor-preview canvas{width:96px;height:96px;border-radius:14px;background:color-mix(in srgb,currentColor 8%,transparent);border:1px solid color-mix(in srgb,currentColor 16%,transparent)}
-/* The course card header: the course name and the favourite star, over the artwork.
+.cl-image-editor-preview canvas{width:96px;height:96px;border-radius:14px;background:color-mix(in srgb,currentColor 8%,transparent);border:1px solid color-mix(in srgb,currentColor 16%,transparent)}/* The course card header: the course name and the favourite star, over the artwork.
 
    The artwork is a background layer rather than content, and the scrim over it is what keeps a
    white title legible whatever colours the generated cover happens to draw. Both are behind the
    headline in the stacking order, and neither takes pointer events, so the title stays a link and
    the star stays a button. */
+
 .cl-course-card-header{position:relative;isolation:isolate;display:flex;align-items:flex-end;min-height:8.5rem;overflow:hidden}
 .cl-course-card-art{position:absolute;inset:0;z-index:0;line-height:0;pointer-events:none}
 .cl-course-card-art svg,.cl-course-card-art img{display:block;width:100%;height:100%;object-fit:cover}
@@ -886,38 +835,37 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-course-card-headline .cl-course-card-title{flex:1 1 auto;min-width:0;margin:0;font-size:.98rem;line-height:1.25;text-wrap:balance}
 .cl-course-card-headline .cl-course-card-title a{color:#fff;text-decoration:none;text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .cl-course-card-headline .cl-course-card-title a:hover{text-decoration:underline}
-.cl-favourite-form{flex:0 0 auto;margin:0;line-height:0}
-/* The star reads on the artwork whichever way it sits, so it carries its own disc rather than
+.cl-favourite-form{flex:0 0 auto;margin:0;line-height:0}/* The star reads on the artwork whichever way it sits, so it carries its own disc rather than
    relying on the scrim behind it. */
+
 .cl-course-card-headline .cl-favourite{display:grid;place-items:center;width:2rem;height:2rem;padding:0;border:0;border-radius:50%;cursor:pointer;font-size:1.15rem;line-height:1;color:#fff;background:rgba(12,20,28,.45);backdrop-filter:blur(2px);transition:transform .12s,background .12s,color .12s}
 .cl-course-card-headline .cl-favourite:hover{background:rgba(12,20,28,.7);transform:scale(1.08)}
 .cl-course-card-headline .cl-favourite.is-on{color:#ffd54a}
-.cl-course-card-headline .cl-favourite:focus-visible{outline:2px solid #fff;outline-offset:2px}
-/* The course detail headline: the course title and the same favourite star the card carries.
+.cl-course-card-headline .cl-favourite:focus-visible{outline:2px solid #fff;outline-offset:2px}/* The course detail headline: the course title and the same favourite star the card carries.
 
    Only the row is stated here. The star sits on the page background rather than on cover artwork,
    so it keeps the ordinary bordered .cl-favourite form and needs no scrim treatment of its own. */
-.cl-course-detail-headline{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
-.cl-course-detail-headline>h1{flex:1 1 auto;min-width:0;margin:0;text-wrap:balance}
-/* Space below a section heading, stated by core because the markup is core's.
 
-   .section-head is emitted by the platform on card after card, and core said nothing at all about
+.cl-course-detail-headline{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+.cl-course-detail-headline>h1{flex:1 1 auto;min-width:0;margin:0;text-wrap:balance}/* Space below a section heading, stated by core because the markup is core's.
+
+   .cl-ui-section-head is emitted by the platform on card after card, and core said nothing at all about
    the space beneath it - so whether a heading touched the thing it introduces depended entirely on
    which theme was installed. One of the five set a bottom margin. On the other four, every card
    header sat flush against its own content, which is what the owner kept reporting as "no white
    space between UI elements".
 
-   This is the same failure as .field having no gap and .field full having no width: core owning the
+   This is the same failure as .cl-ui-field having no gap and .cl-ui-field full having no width: core owning the
    markup and leaving its spacing to the theme. A theme may still space it differently - theme CSS
    loads after this - but it can no longer be the only thing standing between a heading and legible
    spacing. */
-.section-head{margin-bottom:1rem}
-.section-head>div{min-width:0}
-.section-head+*{margin-top:0}
-/* The panel a section head introduces keeps its own air even where a theme collapses the heading. */
-.cl-profile-image-panel{margin-top:.25rem}
 
-/* Shared breadcrumb cart: mouse hover, keyboard focus and touch disclosure. */
+.cl-ui-section-head{margin-bottom:1rem}
+.cl-ui-section-head>div{min-width:0}
+.cl-ui-section-head+*{margin-top:0}/* The panel a section head introduces keeps its own air even where a theme collapses the heading. */
+
+.cl-profile-image-panel{margin-top:.25rem}/* Shared breadcrumb cart: mouse hover, keyboard focus and touch disclosure. */
+
 .cl-cart-chrome { margin-inline-start:auto; display:flex; align-items:center; justify-content:flex-end; gap:.65rem; flex-shrink:0; }
 .cl-cart-prompt { font-size:.8rem; white-space:nowrap; }
 .cl-cart-menu { position:relative; }
@@ -935,4 +883,65 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-checkout-steps { display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
 .cl-checkout-steps [aria-current] { font-weight:700; text-decoration:underline; }
 .cl-public-cart-bar { display:flex; align-items:center; max-width:1200px; margin:auto; padding:.75rem 1rem; }
-@media (max-width:700px) { .cl-cart-prompt { display:none; } }
+@media (max-width:700px) { .cl-cart-prompt { display:none; } }/* Platform UI: canonical functional geometry; themes own its visual treatment. */
+
+.cl-ui-surface{min-width:0;padding:clamp(1rem,2vw,1.4rem);background:var(--cl-surface,#fff);color:var(--cl-ink,inherit);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}
+.cl-ui-surface--compact{padding:.8rem}.cl-ui-spaced{margin-block:1.25rem}.cl-ui-sticky{position:sticky;top:1rem}
+.cl-ui-section-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,25rem),1fr));gap:1.25rem;min-width:0}
+.cl-ui-section-grid[data-columns="1"]{grid-template-columns:minmax(0,1fr)}
+.cl-ui-section-grid[data-columns="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+.cl-ui-section-grid[data-columns="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cl-ui-section-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
+.cl-ui-section-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.cl-ui-section-head h2,.cl-ui-section-head h3{margin:0}.cl-ui-section-head p{margin:.5rem 0 0}.cl-ui-eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.cl-ui-section-actions,.cl-ui-action-group,.cl-ui-row-actions,.cl-ui-list-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.cl-ui-toolbar{display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;gap:1rem;padding:.75rem}
+.cl-ui-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.25rem;min-width:0}
+.cl-ui-form-grid[data-columns="1"]{grid-template-columns:minmax(0,1fr)}
+.cl-ui-field--full,.cl-ui-form-actions{grid-column:1/-1}.cl-ui-form-grid>.cl-ui-field+.cl-ui-field{margin-top:0}
+.cl-ui-field-label{font-weight:600}.cl-ui-field-help{font-size:.875rem;opacity:.8}.cl-ui-field-error{color:#a31525}.cl-ui-required{color:inherit}
+.cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice input{width:auto;flex:0 0 auto}.cl-ui-choice{min-width:0}
+.cl-ui-compact-action{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}.cl-ui-compact-action input,.cl-ui-compact-action select{width:auto;max-width:100%}
+.cl-ui-table{max-width:100%;overflow-x:auto}.cl-ui-table table{width:100%;border-collapse:collapse}.cl-ui-table[data-density="compact"] th,.cl-ui-table[data-density="compact"] td{padding:.4rem}
+.cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}.cl-ui-stat-card{padding:1.2rem;min-width:0;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}.cl-ui-stat-value{font-size:1.8rem;font-weight:700}.cl-ui-stat-label{font-weight:600}.cl-ui-stat-note{font-size:.85rem}
+.cl-ui-list{display:grid;gap:.75rem}.cl-ui-list-item{display:flex;align-items:start;justify-content:space-between;gap:1rem;min-width:0}.cl-ui-list-item>div{min-width:0}
+.cl-ui-key-value-list{display:grid;grid-template-columns:minmax(6rem,1fr) minmax(0,2fr);gap:.5rem 1rem}.cl-ui-key-value-list dt{font-weight:600}.cl-ui-key-value-list dd{margin:0;overflow-wrap:anywhere}
+.cl-ui-badge{display:inline-flex;align-items:center;max-width:100%;border-radius:99px;padding:.25em .65em;font-size:.8rem;line-height:1.4;font-weight:600;white-space:normal;background:#edf0f4;color:#273343}.cl-ui-badge--small{font-size:.7rem}
+.cl-ui-badge--success{background:#e0f4e8;color:#18582c}.cl-ui-badge--warning{background:#fff0cb;color:#684b09}.cl-ui-badge--danger{background:#ffe3e6;color:#832030}.cl-ui-badge--info{background:#e0eefb;color:#214c70}.cl-ui-badge--permanent{background:#ede2fc;color:#503073}
+.cl-ui-notice{display:flex;align-items:start;justify-content:space-between;gap:.75rem;padding:1rem;border:1px solid currentColor;border-radius:.6rem;background:#e0eefb;color:#214c70}.cl-ui-notice--success{background:#e0f4e8;color:#18582c}.cl-ui-notice--warning{background:#fff0cb;color:#684b09}.cl-ui-notice--danger{background:#ffe3e6;color:#832030}
+.cl-ui-empty-state{padding:1.25rem;text-align:center}.cl-ui-empty-state h3{margin-top:0}
+.cl-ui-progress-group{margin-block:.75rem}.cl-ui-progress{height:.6rem;border-radius:99px;overflow:hidden;background:color-mix(in srgb,currentColor 15%,transparent)}.cl-ui-progress--large{height:1rem}.cl-ui-progress-bar{height:100%;background:var(--cl-accent,#386c8b)}
+.cl-ui-action{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:var(--cl-action-padding-y,.5rem) var(--cl-action-padding-x,.85rem);min-height:2.5rem;border:1px solid currentColor;border-radius:.4rem;font:inherit;text-decoration:none;cursor:pointer;line-height:1.3;background:transparent;color:inherit}.cl-ui-action--small{font-size:var(--cl-action-font-size,.85rem);padding:var(--cl-action-padding-y,.35rem) var(--cl-action-padding-x,.6rem)}.cl-ui-action--large{padding:var(--cl-action-padding-y,.75rem) var(--cl-action-padding-x,1rem);font-size:var(--cl-action-font-size,1.1rem)}.cl-ui-action--full{width:100%}.cl-ui-action--normal{font-size:inherit}.cl-ui-action--primary{background:#294c67;color:#fff}.cl-ui-action--secondary{background:#edf0f4;color:#273343}.cl-ui-action--quiet{border-color:transparent}.cl-ui-action--danger{background:#962436;color:#fff}.cl-ui-action:disabled{opacity:.55;cursor:not-allowed}
+.cl-ui-icon{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8}.cl-ui-icon--small{width:.85em;height:.85em}.cl-ui-icon--large{width:1.5em;height:1.5em}
+.cl-ui-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}.cl-ui-breadcrumb-separator{opacity:.6}
+.cl-ui-close{border:0;background:transparent;color:inherit;font-size:1.5rem;cursor:pointer;min-width:2.5rem;min-height:2.5rem}
+.cl-ui-modal[hidden]{display:none}.cl-ui-modal{position:fixed;inset:0;z-index:10000;background:#0009;overflow:auto;padding:2rem 1rem}.cl-ui-modal-card{max-width:42rem;margin:auto;background:var(--cl-surface,#fff);color:var(--cl-ink,#222);border-radius:.75rem}.cl-ui-modal-card--wide{max-width:60rem}.cl-ui-modal-head,.cl-ui-modal-foot{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:1rem}.cl-ui-modal-body{padding:1rem}.cl-ui-modal-foot{border-top:1px solid color-mix(in srgb,currentColor 15%,transparent);flex-wrap:wrap}
+.cl-ui-accordion-section{border:1px solid var(--cl-line,#ddd);border-radius:.6rem;margin-block:.75rem;background:var(--cl-surface,#fff)}.cl-ui-accordion-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;cursor:pointer;padding:1rem;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:700}.cl-ui-accordion-description{flex:1 1 16rem;font-size:.9rem}.cl-ui-accordion-toggle{margin-left:auto}.cl-ui-accordion-section[open]>.cl-ui-accordion-summary .cl-ui-accordion-toggle{transform:rotate(180deg)}.cl-ui-accordion-content{padding:1rem}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}
+.cl-ui-action:focus-visible,.cl-ui-close:focus-visible,.cl-ui-accordion-summary:focus-visible,.cl-ui-breadcrumb a:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+@media(max-width:700px){.cl-ui-section-grid[data-columns],.cl-ui-form-grid{grid-template-columns:minmax(0,1fr)}.cl-ui-sticky{position:static}.cl-ui-list-item{flex-wrap:wrap}.cl-ui-modal{padding:.5rem}}/* Without script a modal is an ordinary, accessible section containing the same working forms. */
+
+.cl-ui-modal:not(.open):not([hidden]){display:block;position:static;background:transparent;padding:1rem 0;z-index:auto}
+.cl-ui-modal:not(.open):not([hidden]) .cl-ui-modal-card{max-height:none;margin:0}
+.cl-ui-modal:not(.open) [data-close-modal]{display:none}
+.cl-ui-action[hidden]{display:none!important}
+.cl-ui-row-menu{position:relative;display:inline-block}.cl-ui-row-trigger{display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;list-style:none;padding:.4rem .7rem;border:1px solid currentColor;border-radius:.4rem}.cl-ui-row-trigger::-webkit-details-marker{display:none}
+.cl-ui-row-panel{display:grid;gap:.35rem;min-width:10rem;padding:.5rem;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:.4rem}
+.cl-ui-row-panel .cl-ui-action{width:100%;justify-content:flex-start}.cl-ui-row-panel form{margin:0}
+.pagination-state{display:inline-flex;align-items:center;padding:.35rem .6rem;border:1px solid currentColor;border-radius:.4rem;font-size:.85rem}.pagination-state[aria-current]{font-weight:700}.pagination-state[aria-disabled]{opacity:.5}
+.cl-course-card{display:flex;flex-direction:column;min-width:0;border:1px solid var(--cl-line,#ddd);border-radius:.75rem;overflow:hidden;background:var(--cl-surface,#fff)}
+
+/* Shared controls retain their intrinsic height when a narrow theme stacks its search form. */
+@media(max-width:900px){.dataset-search .cl-ui-field{flex:1 1 auto;width:100%;align-content:start}.pagination-jump,.pagination-page-size{flex-wrap:wrap}.pagination-pages-list{flex-wrap:wrap;justify-content:center}.cl-ui-section-actions{min-width:0;max-width:100%}}
+.cl-ui-table .cl-ui-row-menu{max-width:100%}.cl-ui-table .cl-ui-row-trigger{max-width:100%;box-sizing:border-box;font-size:var(--cl-table-btn-font);padding:.2rem .3rem;white-space:normal}
+.cl-ui-table .cl-ui-row-trigger span[aria-hidden]{display:none}
+.cl-ui-row-menu:not([open])>.cl-ui-row-panel{display:none!important}
+.cl-ui-table td.cell-actions>.cl-ui-action{max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis}/* Semantic surface tones and compact table density are shared, bounded variants. */
+
+section.cl-ui-surface[data-tone="info"]{border-color:var(--cl-info,#3a6d91)}
+section.cl-ui-surface[data-tone="success"]{border-color:var(--cl-success,#347649)}
+section.cl-ui-surface[data-tone="warning"]{border-color:var(--cl-warning,#ae791e)}
+section.cl-ui-surface[data-tone="danger"]{border-color:var(--cl-danger,#963747)}
+section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528c)}
+.cl-ui-table[data-density="compact"]{--cl-table-pad-y:4px;--cl-table-pad-x:7px}
+
+@media(max-width:700px){.cl-ui-table .cl-ui-row-label{display:none}.cl-ui-table .cl-ui-row-trigger{gap:0}}

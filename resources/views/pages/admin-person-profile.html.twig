@@ -6,22 +6,14 @@
 	{% set ph_title = 'Person profile' %}
 	{% set ph_lead = 'Particulars, company, roles, access and sessions.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<div class="section-head admin-person-head">
-		<div>
-			<a class="back-link" href="/admin/people">← People</a>
-			<div class="eyebrow cl-mt-2">
-				Platform administration
-			</div>
-			<h2 style="font-size:1.75rem;margin:7px 0 0">
-				{{ profile.full_name }}
-			</h2>
-			<p>
-				Complete profile, company, roles, learning access and sessions in one place.
-			</p>
-		</div>
-		<span class="badge {{ profile.status=='active' ? 'good' : 'danger' }}">{{ profile.status }}</span>
-	</div>
-	<div class="card admin-person-summary">
+	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: (profile.full_name), eyebrow: 'Platform administration', summary: 'Complete profile, company, roles, learning access and sessions in one place.'})} %}
+{% block section_actions %}
+{{ ui('feedback.badge', {label: (profile.status), tone: profile.status=='active' ? 'success' : 'danger'}) }}
+{% endblock %}
+{% endembed %}
+	<div class="admin-person-summary">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 		<div class="profile-head">
 			<div class="avatar">
 				U
@@ -38,242 +30,318 @@
 				</p>
 				<div class="chip-row cl-mt-2">
 					{% for role in roles %}
-						<span class="badge info">{{ role }}</span>
+						{{ ui('feedback.badge', {label: (role), tone: 'info'}) }}
 					{% endfor %}
 				</div>
 			</div>
 		</div>
-	</div>
-	<div class="grid grid-2 section admin-person-layout">
-		<div class="card">
-			<div class="section-head">
-				<div>
-					<h2>
-						Complete profile
-					</h2>
-					<p>
-						Platform Administrators can edit the same profile information that the person can edit themselves, plus company and roles.
-					</p>
-				</div>
-			</div>
-			<form action="/admin/people/{{ target_user_id }}" method="post" class="form-grid">
+
+{% endblock %}
+{% endembed %}</div>
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
+{% block body %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+			{{ ui('layout.section-head', {heading: 'Complete profile', summary: 'Platform Administrators can edit the same profile information that the person can edit themselves, plus company and roles.'}) }}
+			<form action="/admin/people/{{ target_user_id }}" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				<div class="field">
-					<label>First name</label>
-					<input name="first_name" maxlength="120" value="{{ profile.first_name }}">
-				</div>
-				<div class="field">
-					<label>Middle names</label>
-					<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between the first name and the surname">
-				</div>
-				<div class="field">
-					<label>Last name</label>
-					<input name="last_name" maxlength="120" value="{{ profile.last_name }}">
-				</div>
-				<div class="field">
-					<label>Identification number</label>
-					<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}">
-				</div>
-				<div class="field">
-					<label>Birthdate</label>
-					<input type="date" name="birthdate" value="{{ profile.birthdate }}">
-				</div>
-				<div class="field">
-					<label>Gender</label><select name="gender"><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
-				</div>
-				<div class="field">
-					<label>Mobile number</label>
-					<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}">
-				</div>
-				<div class="field full">
-					<label>Display name</label>
-					<input name="display_name" maxlength="160" value="{{ profile.display_name }}">
-				</div>
-				<div class="field full">
-					<label>Name on certificates</label>
-					<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}">
-				</div>
-				<div class="field full">
-					<label>Primary email</label>
-					<input type="email" name="primary_email" value="{{ primary_email }}" required>
-					<div class="help">
-						Administrator changes take effect immediately.
-					</div>
-				</div>
-				<div class="field full">
-					<label>Secondary email</label>
-					<input type="email" name="secondary_email" value="{{ secondary_email }}">
-					<div class="help">
-						Leave blank to remove it. An address entered by a Platform Administrator is treated as verified.
-					</div>
-				</div>
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-admin-person-profile-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="first_name" maxlength="120" value="{{ profile.first_name }}" id="field-admin-person-profile-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', full_width: false, for: 'field-admin-person-profile-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between the first name and the surname" id="field-admin-person-profile-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-admin-person-profile-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="last_name" maxlength="120" value="{{ profile.last_name }}" id="field-admin-person-profile-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Identification number', full_width: false, for: 'field-admin-person-profile-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-admin-person-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Birthdate', full_width: false, for: 'field-admin-person-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-admin-person-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Gender', full_width: false, for: 'field-admin-person-profile-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<select name="gender" id="field-admin-person-profile-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', full_width: false, for: 'field-admin-person-profile-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" id="field-admin-person-profile-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Display name', full_width: true, for: 'field-admin-person-profile-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="display_name" maxlength="160" value="{{ profile.display_name }}" id="field-admin-person-profile-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name on certificates', full_width: true, for: 'field-admin-person-profile-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}" id="field-admin-person-profile-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Primary email', full_width: true, for: 'field-admin-person-profile-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Administrator changes take effect immediately.'})} %}
+{% block control %}
+
+					<input type="email" name="primary_email" value="{{ primary_email }}" required id="field-admin-person-profile-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Secondary email', full_width: true, for: 'field-admin-person-profile-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Leave blank to remove it. An address entered by a Platform Administrator is treated as verified.'})} %}
+{% block control %}
+
+					<input type="email" name="secondary_email" value="{{ secondary_email }}" id="field-admin-person-profile-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
 				{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: selected_company, lk_required: 1, lk_empty: 'Search for the company'} %}
-				<div class="field full">
-					<label>Roles</label>
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Roles', full_width: true, for: 'field-admin-person-profile-12-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.'})} %}
+{% block control %}
+
 					<div class="role-checkbox-grid">
 						{% for roleOption in role_options %}
-							<label class="role-check">
-							<input type="checkbox" name="roles[]" value="{{ roleOption.role_key }}" {{ roleOption.selected ? 'checked' : '' }}>
-							<span><strong>{{ roleOption.role_name }}</strong><small>{{ roleOption.role_key }}</small></span></label>
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (roleOption.role_name) ~ (roleOption.role_key)})} %}
+{% block control %}
+<input type="checkbox" name="roles[]" value="{{ roleOption.role_key }}" {{ roleOption.selected ? 'checked' : '' }} id="field-admin-person-profile-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+{% endblock %}
+{% endembed %}
 						{% endfor %}
 					</div>
-					<div class="help">
-						The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.
-					</div>
-				</div>
-				<div class="field-wide cl-form-actions">
-					<button class="btn btn-primary" type="submit">Save complete profile</button>
-				</div>
-			</form>
-		</div>
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+					{{ ui('action.button', {label: 'Save complete profile', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+
+{% endblock %}
+{% endembed %}
 		<div class="admin-person-side">
-			<div class="card">
-				<div class="section-head">
-					<div>
-						<h2>
-							Account status
-						</h2>
-						<p>
-							Created {{ profile.created_at }} · Last login {{ profile.last_login_at ?: 'Never' }}
-						</p>
-					</div>
-				</div>
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+				{{ ui('layout.section-head', {heading: 'Account status', summary: 'Created ' ~ (profile.created_at) ~ ' · Last login ' ~ (profile.last_login_at ?: 'Never')}) }}
 				<form action="/admin/people/{{ target_user_id }}/status" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<input type="hidden" name="status" value="{{ profile.status=='active' ? 'disabled' : 'active' }}">
-					<button class="btn {{ profile.status=='active' ? 'btn-danger' : 'btn-primary' }}" type="submit" data-confirm="{{ profile.status=='active' ? 'Disable this account?' : 'Enable this account?' }}">{{ profile.status=='active' ? 'Disable account' : 'Enable account' }}</button>
+					{{ ui('action.button', {label: (profile.status=='active' ? 'Disable account' : 'Enable account'), variant: profile.status=='active' ? 'danger' : 'primary', size: 'normal', type: 'submit', confirm: (profile.status=='active' ? 'Disable this account?' : 'Enable this account?')}) }}
 				</form>
-			</div>
-			<div class="card section">
-				<div class="section-head">
-					<div>
-						<h2>
-							Active sessions
-						</h2>
-						<p>
-							Revoke individual login sessions.
-						</p>
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
+				{{ ui('layout.section-head', {heading: 'Active sessions', summary: 'Revoke individual login sessions.'}) }}
 				{% if sessions %}
-					<div class="list">
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 						{% for session in sessions %}
-							<div class="list-item">
-								<div>
+							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 									<strong>{{ session.user_agent }}</strong>
 									<p>
 										Last used {{ session.last_seen_at }}
 									</p>
-								</div>
-								<div class="row-actions">
+
+{% endblock %}
+{% block actions %}
+
+								{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+
 									{% if session.is_current %}
-										<span class="badge good">Current</span>
+										{{ ui('feedback.badge', {label: 'Current', tone: 'success'}) }}
 									{% endif %}
 									<form action="/admin/people/{{ target_user_id }}/sessions/revoke" method="post">
 										<input type="hidden" name="csrf" value="{{ csrf }}">
 										<input type="hidden" name="session_id" value="{{ session.public_id }}">
-										<button class="btn btn-danger btn-sm" type="submit" data-confirm="Revoke this session?">Revoke</button>
+										{{ ui('action.button', {label: 'Revoke', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this session?', icon: 'action-remove'}) }}
 									</form>
-								</div>
-							</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 						{% endfor %}
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% else %}
-					<div class="empty">
+					{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
 						No active sessions.
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
-			</div>
+
+{% endblock %}
+{% endembed %}
 		</div>
-	</div>
-	<div class="grid grid-3 section admin-person-records">
-		<div class="card">
-			<div class="section-head">
-				<div>
-					<h2>
-						Courses in library
-					</h2>
-					<p>
-						Current learner access.
-					</p>
-				</div>
-			</div>
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 3, section_spacing: true})} %}
+{% block body %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+			{{ ui('layout.section-head', {heading: 'Courses in library', summary: 'Current learner access.'}) }}
 			{% if library_courses %}
-				<div class="list">
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 					{% for course in library_courses %}
-						<div class="list-item">
-							<div>
+						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 								<strong>{{ course.title }}</strong>
 								<p>
 									{{ course.status }} · {{ course.progress_percentage }}% progress
 								</p>
-							</div>
-							<a class="btn btn-soft btn-sm" href="/admin/course/enrolments">Manage</a>
-						</div>
+
+{% endblock %}
+{% block actions %}
+
+							{{ ui('action.link', {label: 'Manage', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
+
+{% endblock %}
+{% endembed %}
 					{% endfor %}
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% else %}
-				<div class="empty">
+				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
 					No courses in this library.
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% endif %}
-		</div>
-		<div class="card">
-			<div class="section-head">
-				<div>
-					<h2>
-						Favourites
-					</h2>
-					<p>
-						Courses saved for later.
-					</p>
-				</div>
-			</div>
+
+{% endblock %}
+{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+			{{ ui('layout.section-head', {heading: 'Favourites', summary: 'Courses saved for later.'}) }}
 			{% if favourites %}
-				<div class="list">
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 					{% for course in favourites %}
-						<div class="list-item">
-							<div>
+						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 								<strong>{{ course.title }}</strong>
-							</div>
-						</div>
+
+{% endblock %}
+{% block actions %}
+
+{% endblock %}
+{% endembed %}
 					{% endfor %}
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% else %}
-				<div class="empty">
+				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
 					No favourites.
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% endif %}
-		</div>
-		<div class="card">
-			<div class="section-head">
-				<div>
-					<h2>
-						Course requests
-					</h2>
-					<p>
-						Current and previous requests.
-					</p>
-				</div>
-			</div>
+
+{% endblock %}
+{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+			{{ ui('layout.section-head', {heading: 'Course requests', summary: 'Current and previous requests.'}) }}
 			{% if requests %}
-				<div class="list">
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 					{% for request in requests %}
-						<div class="list-item">
-							<div>
+						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 								<strong>{{ request.course_title }}</strong>
 								<p>
 									{{ request.status }}
 								</p>
-							</div>
-						</div>
+
+{% endblock %}
+{% block actions %}
+
+{% endblock %}
+{% endembed %}
 					{% endfor %}
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% else %}
-				<div class="empty">
+				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
 					No course requests.
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% endif %}
-		</div>
-	</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 {% endblock %}

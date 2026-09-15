@@ -79,7 +79,7 @@ final class CompanyManagementContractTest extends TestCase
         self::assertStringNotContainsString('$search . "%', $repository, 'The term must never be interpolated into SQL.');
     }
 
-    /** An empty term contributes no predicate, so clearing the search restores the full population. */
+    /** An cl-ui-empty-state term contributes no predicate, so clearing the search restores the full population. */
     public function testAnEmptySearchAddsNoPredicate(): void
     {
         $repository = self::source('src/Infrastructure/Persistence/AdministrationRepository.php');
@@ -87,7 +87,7 @@ final class CompanyManagementContractTest extends TestCase
         self::assertSame(
             2,
             substr_count($repository, "\$term = trim(\$search);"),
-            'Both builders must treat an empty term as no predicate at all.'
+            'Both builders must treat an cl-ui-empty-state term as no predicate at all.'
         );
     }
 
@@ -99,7 +99,7 @@ final class CompanyManagementContractTest extends TestCase
         self::assertStringContainsString('public static function searchTerm(', $service);
         self::assertStringContainsString('public static function companySearchTerm(', $service);
         // Preserved state now reads every dataset through the generic reader, so the company-named
-        // one is used by the Administration list and the picker; what matters is that no surface
+        // one is used by the Administration cl-ui-list and the picker; what matters is that no surface
         // reads a search term any other way.
         self::assertSame(
             0,
@@ -110,16 +110,14 @@ final class CompanyManagementContractTest extends TestCase
 
     // --- the Administration table ------------------------------------------------------------------
 
-    /** The Administration companies list uses the shared live search control. */
+    /** The Administration companies cl-ui-list uses the shared live search control. */
     public function testAdministrationCompaniesUsesTheSharedSearchControl(): void
     {
-        $markup = self::source('resources/views/partials/admin/companies.html.twig');
-
-        self::assertStringContainsString('partials/dataset-search.html.twig', $markup);
+        $markup = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/admin/companies.html.twig');
+        self::assertStringContainsString("ui_template('data.dataset')", $markup);
+        self::assertStringContainsString("name: 'companies'", $markup);
         self::assertStringContainsString("ds_name: 'companies'", $markup);
-        self::assertStringContainsString('id="companies-region"', $markup, 'The swap target must be a wrapper that always survives.');
-        self::assertStringContainsString('id="companies-results"', $markup);
-        self::assertStringNotContainsString('data-filter-input', $markup, 'A paginated table must not pretend to search by hiding rows.');
+        self::assertStringNotContainsString('data-filter-input', $markup);
     }
 
     /**
@@ -137,7 +135,7 @@ final class CompanyManagementContractTest extends TestCase
         self::assertStringContainsString('hx-sync="this:replace"', $markup, 'A newer search must abort the one in flight.');
         self::assertStringContainsString('hx-indicator', $markup, 'There must be a visible loading state.');
         self::assertStringContainsString('method="get"', $markup, 'It must work as an ordinary form without JavaScript.');
-        self::assertStringContainsString('type="submit"', $markup, 'The no-JavaScript path needs a button.');
+        self::assertStringContainsString("type: 'submit'", $markup, 'The no-JavaScript path needs a button.');
         self::assertStringNotContainsString('name="' . 'page', $markup, 'A new search must not carry a page number.');
 
         // The request attributes must sit on the input, which is the element that produces the

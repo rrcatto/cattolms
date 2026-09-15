@@ -17,45 +17,33 @@
 		other Courses page and appeared to jump when moving between them.
 	#}
 	<section class="section">
-		<div class="grid section">
-			<div class="card">
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				{% include '@platform/partials/admin/course-group-nav.html.twig' %}
-				<div class="section-head">
-					<div>
-						<div class="eyebrow">
-							Course Categories
-						</div>
-						<h2>
-							The catalogue taxonomy
-						</h2>
-						<p>
-							The categories a course can be filed under. A course is named after its category and tagged with the branch it belongs to.
-						</p>
-					</div>
-					<button class="btn btn-primary" type="button" data-open-modal="createCategoryModal">＋ Create category</button>
-				</div>
-				<div class="table-wrap">
-					<table class="table table-hover align-middle mb-0">
-						<thead>
+				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'The catalogue taxonomy', eyebrow: 'Course Categories', summary: 'The categories a course can be filed under. A course is named after its category and tagged with the branch it belongs to.'})} %}
+{% block section_actions %}
+{{ ui('action.button', {label: '＋ Create category', variant: 'primary', size: 'normal', type: 'button', modal: 'createCategoryModal', icon: 'action-add'}) }}
+{% endblock %}
+{% endembed %}
+
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 							<tr>
-								<th style="width:52%">
-									Category
-								</th>
-								<th style="width:8%">
-									Courses
-								</th>
-								<th style="width:14%">
-									With sub-categories
-								</th>
-								<th style="width:12%">
-									Order
-								</th>
-								<th class="cell-actions" style="width:14%">
-									Actions
-								</th>
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Category'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'With sub-categories'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Order'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
 							</tr>
-						</thead>
-						<tbody>
+
+{% endblock %}
+{% block body %}
+
 							{% for category_index, category in categories %}
 								<tr data-category-row>
 									<td>
@@ -83,79 +71,86 @@
 										{% endif %}
 									</td>
 									<td class="cell-actions">
-										<div class="row-actions">
+										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+
 											<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="direction" value="up">
-												<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index==0 ? 'disabled' : '' }}>↑</button>
+												{{ ui('action.button', {label: '↑', variant: 'secondary', size: 'small', type: 'submit', disabled: category_index==0}) }}
 											</form>
 											<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="direction" value="down">
-												<button class="btn btn-sm btn-outline-secondary" type="submit" {{ category_index+1==categories|length ? 'disabled' : '' }}>↓</button>
+												{{ ui('action.button', {label: '↓', variant: 'secondary', size: 'small', type: 'submit', disabled: category_index+1==categories|length}) }}
 											</form>
-										</div>
+
+{% endblock %}
+{% endembed %}
 									</td>
 									<td class="cell-actions">
-										<a class="btn btn-sm btn-primary" href="/admin/courses/categories/{{ category.id }}">Manage</a>
+										{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/categories/' ~ (category.id)}) }}
 									</td>
 								</tr>
 							{% endfor %}
-						</tbody>
-					</table>
-				</div>
-			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 	</section>
-	<div class="modal-backdrop" id="createCategoryModal" role="dialog" aria-modal="true" aria-labelledby="createCategoryTitle" aria-hidden="true" hidden>
-		<div class="modal-card">
-			<div class="modal-head">
-				<div>
-					<div class="eyebrow">
-						Course metadata
-					</div>
-					<h3 id="createCategoryTitle">
-						Create category
-					</h3>
-				</div>
-				<button class="close-btn" type="button" data-close-modal aria-label="Close">×</button>
-			</div>
-			<form action="/admin/courses/categories" method="post">
-				<div class="modal-body">
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createCategoryModal', title: 'Create category', action: '/admin/courses/categories', method: 'post'})} %}
+{% block modal_body %}
+
 					<p class="text-body-secondary">
 						The slug is generated from the name unless you supply one.
 					</p>
 					<div class="vstack gap-3">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<div>
-							<label class="form-label">Name</label>
-							<input class="form-control" name="name" maxlength="120" required>
-						</div>
-						<div>
-							<label class="form-label">Parent category</label><select class="form-select" name="parent_id"><option value="0">None — a top-level category</option>
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'field-admin-course-categories-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+							<input class="form-control" name="name" maxlength="120" required id="field-admin-course-categories-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'field-admin-course-categories-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Categories go three levels deep, so a sub-sub-category cannot hold children of its own.'})} %}
+{% block control %}
+
+							<select class="form-select" name="parent_id" id="field-admin-course-categories-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}><option value="0">None — a top-level category</option>
 							{% for parent_option in parent_options %}
 								<option value="{{ parent_option.id }}">{{ parent_option.parent_name ? parent_option.parent_name ~ ' › ' : '' }}{{ parent_option.name }}</option>
 							{% endfor %}
 							</select>
-							<div class="form-text">
-								Categories go three levels deep, so a sub-sub-category cannot hold children of its own.
-							</div>
-						</div>
-						<div>
-							<label class="form-label">Slug <small class="text-body-secondary">optional</small></label>
-							<input class="form-control" name="slug" placeholder="generated-from-name">
-						</div>
-						<div>
-							<label class="form-label">Description</label>
-							<textarea class="form-control" name="description" rows="4"></textarea>
-						</div>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug optional', full_width: false, for: 'field-admin-course-categories-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+							<input class="form-control" name="slug" placeholder="generated-from-name" id="field-admin-course-categories-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: false, for: 'field-admin-course-categories-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+							<textarea class="form-control" name="description" rows="4" id="field-admin-course-categories-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}"></textarea>
+
+{% endblock %}
+{% endembed %}
 					</div>
-				</div>
-				<div class="modal-foot">
-					<button class="btn btn-ghost" type="button" data-close-modal>Cancel</button>
-					<button class="btn btn-primary" type="submit">Create category</button>
-				</div>
-			</form>
-		</div>
-	</div>
+
+{% endblock %}
+{% block modal_actions %}
+
+					{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true}) }}
+					{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+
+{% endblock %}
+{% endembed %}
 {% endblock %}

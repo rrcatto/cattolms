@@ -59,9 +59,9 @@
     const closeModal = modal => {
       if (!(modal instanceof Element)) return;
       modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
+      modal.setAttribute('aria-hidden', 'true'); modal.setAttribute('aria-modal', 'false');
       modal.hidden = true;
-      if (!document.querySelector('.modal-backdrop.open')) {
+      if (!document.querySelector('.cl-ui-modal.open')) {
         document.body.classList.remove('modal-open');
         const trigger = modalTrigger; modalTrigger = null;
         if (trigger && typeof trigger.focus === 'function') setTimeout(() => trigger.focus(), 10);
@@ -69,14 +69,22 @@
     };
     const openModal = (id, trigger = null) => {
       const modal = document.getElementById(id || ''); if (!modal) return;
-      document.querySelectorAll('.modal-backdrop.open').forEach(closeModal);
+      document.querySelectorAll('.cl-ui-modal.open').forEach(closeModal);
       modalTrigger = trigger || document.activeElement;
       modal.hidden = false;
-      modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); document.body.classList.add('modal-open');
+      modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false'); modal.setAttribute('aria-modal', 'true'); document.body.classList.add('modal-open');
       const focusTarget = modal.querySelector('input:not([type="hidden"]),select,textarea,button,a');
-      if (focusTarget) setTimeout(() => focusTarget.focus(), 10);
+      if (focusTarget) focusTarget.focus();
     };
-    document.querySelectorAll('.modal-backdrop').forEach(modal => { if (!modal.classList.contains('open')) { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); } });
+    const initialiseModals = () => document.querySelectorAll('.cl-ui-modal').forEach(modal => {
+      if (!modal.classList.contains('open')) {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.setAttribute('aria-modal', 'false');
+      }
+    });
+    initialiseModals();
+    document.addEventListener('htmx:afterSwap', initialiseModals);
 
     /* Delegated from document rather than bound per element, so a trigger or a close button that
        arrives in an htmx swap works without rebinding. The Switch Company picker replaces its own
@@ -87,16 +95,27 @@
       const opener = event.target.closest('[data-open-modal]');
       if (opener) { event.preventDefault(); openModal(opener.dataset.openModal, opener); return; }
       const closer = event.target.closest('[data-close-modal]');
-      if (closer) { closeModal(closer.closest('.modal-backdrop')); return; }
-      if (event.target.classList.contains('modal-backdrop')) closeModal(event.target);
+      if (closer) { closeModal(closer.closest('.cl-ui-modal')); return; }
+      if (event.target.classList.contains('cl-ui-modal')) closeModal(event.target);
     });
 
     /* Escape closes the top-most open modal. Without this a keyboard user who opens the company
        picker has no way out of it except a mouse. */
     document.addEventListener('keydown', event => {
-      if (event.key !== 'Escape') return;
-      const open = document.querySelector('.modal-backdrop.open');
-      if (open) { event.preventDefault(); closeModal(open); }
+      const open = document.querySelector('.cl-ui-modal.open');
+      if (!open) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeModal(open); }
+      if (event.key === 'Tab') {
+        const controls = [...open.querySelectorAll('a[href],button:not(:disabled),input:not(:disabled):not([type="hidden"]),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]')]
+          .filter(element => element.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (!first) { event.preventDefault(); return; }
+        if (event.shiftKey && (document.activeElement === first || !open.contains(document.activeElement))) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !open.contains(document.activeElement))) {
+          event.preventDefault(); first.focus();
+        }
+      }
     });
 
     document.querySelectorAll('[data-tab-target]').forEach(button => button.addEventListener('click', () => {
@@ -121,7 +140,7 @@
       if (menu && menu.open) closeDropdowns(menu);
     }, true);
     document.addEventListener('click', event => { const target = event.target instanceof Element ? event.target : null; if (!target || !target.closest(dropdownSelector)) closeDropdowns(); });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDropdowns(); document.querySelectorAll('.modal-backdrop.open').forEach(closeModal); } });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDropdowns(); document.querySelectorAll('.cl-ui-modal.open').forEach(closeModal); } });
 
     const mobileMenu = document.getElementById('mobileMenu'); const sidebar = document.getElementById('sidebar');
     if (mobileMenu && sidebar) mobileMenu.addEventListener('click', () => sidebar.classList.toggle('open'));
@@ -175,34 +194,8 @@
       create.addEventListener('click',async()=>{ const categoryName=name.value.trim(); if(!categoryName){if(error){error.textContent='Enter a category name.';error.classList.remove('d-none');}name.focus();return;} create.disabled=true; const form=new FormData(); form.append('csrf',panel.dataset.csrf||''); form.append('category_name',categoryName); form.append('category_description',description?description.value.trim():''); form.append('is_active','1'); try{const response=await fetch(panel.dataset.createUrl||'/admin/courses/categories/inline',{method:'POST',body:form,credentials:'same-origin',headers:{Accept:'application/json'}});const data=await response.json().catch(()=>({}));if(!response.ok||!data.category)throw new Error(data.error||'The category could not be created.');const option=document.createElement('option');option.value=String(data.category.id);option.textContent=String(data.category.name);option.selected=true;select.append(option);name.value='';if(description)description.value='';setOpen(false);}catch(exception){if(error){error.textContent=exception instanceof Error?exception.message:'The category could not be created.';error.classList.remove('d-none');}}finally{create.disabled=false;} });
     });
 
-    /* Activity live feed.
-
-       The table is looked up on every tick rather than captured once. Activity is a paginated
-       list, and a page swap replaces the table element, so a reference captured at load goes on
-       appending rows to a node that is no longer in the document - nothing on screen changes,
-       which is the worst kind of broken.
-
-       It also polls only while the reader is looking at the first page. New events belong at the
-       top of the newest page; prepending them onto page four would be inventing rows that do not
-       belong there and would push that page's real last row out of view. */
-    {
-      const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
-      const poll=async()=>{
-        if(document.hidden)return;
-        const activityTable=document.querySelector('[data-activity-table]');
-        const activityFeed=activityTable?.querySelector('[data-activity-feed]');
-        if(!activityTable||!activityFeed)return;
-        if((activityTable.dataset.activityPage||'1')!=='1')return;
-        const url=new URL('/admin/activity/feed',location.origin),current=new URL(location.href);
-        ['from','to','family','actor_id','course_id','company_id','q'].forEach(key=>{const value=current.searchParams.get(key);if(value)url.searchParams.set(key,value);});
-        url.searchParams.set('after_id',activityTable.dataset.lastEventId||'0');
-        try{const response=await fetch(url,{headers:{Accept:'application/json'},credentials:'same-origin'});if(!response.ok)return;const data=await response.json();const events=Array.isArray(data.events)?data.events:[];events.slice().reverse().forEach(event=>activityFeed.insertAdjacentHTML('afterbegin',`<tr data-activity-id="${Number(event.id)||0}"><td class="small">${escapeHtml(event.created_at)}</td><td>${escapeHtml(event.actor_name)}</td><td>${escapeHtml(event.company_name||'—')}</td><td><strong>${escapeHtml(event.event_label)}</strong><div class="small muted">${escapeHtml(event.family_label)}</div></td><td>${escapeHtml(event.subject)}</td><td>${escapeHtml(event.result)}</td><td class="small">${escapeHtml(event.ip_address||'—')}</td><td class="small">${escapeHtml(event.geo_location||'—')}</td><td><span class="badge info">${escapeHtml(event.source_label)}</span></td><td><a class="btn btn-ghost btn-sm" href="/admin/activity/${Number(event.id)||0}">Details</a></td></tr>`));if(events.length){activityTable.dataset.lastEventId=String(Math.max(...events.map(event=>Number(event.id)||0),Number(activityTable.dataset.lastEventId)||0));activityTable.querySelector('[data-activity-empty]')?.setAttribute('hidden','hidden');}}catch(_){}
-      };
-      setInterval(poll,15000);
-    }
-
     const passwordInput=document.querySelector('form[action="/admin/settings/mail"] input[name="smtp_password"]');
-    if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const control=document.createElement('div');control.className='cl-password-control';passwordInput.parentNode.insertBefore(control,passwordInput);control.appendChild(passwordInput);const toggle=document.createElement('button');toggle.type='button';toggle.className='btn btn-ghost cl-password-toggle';toggle.disabled=true;toggle.textContent='Show';control.appendChild(toggle);toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
+    if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const toggle=document.getElementById('smtp-password-toggle');if(!(toggle instanceof HTMLButtonElement))return;toggle.hidden=false;toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.querySelector('span').textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
 
     /* Entity lookup selection.
        htmx fetches and swaps the results fragment; this only handles the click that commits a
@@ -249,7 +242,7 @@
        Runs again after every htmx swap, because a page turn replaces the rows. */
     const applyCellTooltips = root => {
       const scope = root instanceof Element ? root : document;
-      scope.querySelectorAll('.table-wrap td, .table-wrap th').forEach(cell => {
+      scope.querySelectorAll('.cl-ui-table td, .cl-ui-table th').forEach(cell => {
         if (cell.hasAttribute('title')) {
           if (cell.dataset.clAutoTitle !== '1') return;
         }

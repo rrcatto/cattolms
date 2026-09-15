@@ -6,7 +6,7 @@
 		<div id="catalogue-search">
 			{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}
 		</div>
-		{{ ui('category-grid', {navigation: catalogue_navigation}) }}
-		{{ ui('catalogue-workspace', {workspace: workspace, navigation: catalogue_navigation, courses: courses, catalogue_pagination: catalogue_pagination}) }}
+		{{ ui('catalogue.category-grid', {navigation: catalogue_navigation}) }}
+		{{ ui('catalogue.workspace', {workspace: workspace, navigation: catalogue_navigation, courses: courses, catalogue_pagination: catalogue_pagination}) }}
 	</section>
 {% endblock %}

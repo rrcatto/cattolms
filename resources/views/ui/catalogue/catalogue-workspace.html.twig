@@ -1,0 +1,29 @@
+{% set workspace = props.workspace %}
+{% set navigation = props.navigation %}
+{% set courses = props.courses %}
+{% set catalogue_pagination = props.catalogue_pagination %}
+<div id="catalogue-workspace">
+	<div id="catalogue-region" data-server-search-target>
+		<div id="catalogue-results">
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
+				{% block surface_body %}
+					{{ ui('layout.section-head', {heading: workspace.heading, summary: workspace.summary}) }}
+					{% if navigation.trail|default([]) %}
+						{% set path_items = [{label: 'All categories', href: '/courses', current: false}] %}
+{% for crumb in navigation.trail %}{% set path_items = path_items|merge([{label: crumb.name, href: crumb.href, current: loop.last}]) %}{% endfor %}
+{{ ui('layout.breadcrumb', {items: path_items, aria_label: 'Category path'}) }}
+					{% endif %}
+					{{ ui('catalogue.filter-rail', {label: 'Subcategories', items: navigation.tier_2|default([])}) }}
+					{{ ui('catalogue.filter-rail', {label: 'Topics', items: navigation.tier_3|default([])}) }}
+					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
+					{% if courses %}
+						{{ ui('catalogue.course-grid', {courses: courses}) }}
+					{% else %}
+						{{ ui('feedback.empty', {heading: workspace.empty_heading, summary: workspace.empty_summary}) }}
+					{% endif %}
+					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'bottom'} %}{% endif %}
+				{% endblock %}
+			{% endembed %}
+		</div>
+	</div>
+</div>

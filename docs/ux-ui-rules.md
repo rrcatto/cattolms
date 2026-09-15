@@ -1,8 +1,8 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.7 (in development)  
-**Date time:** 2026/09/10 02:25 SAST  
-**Status:** permanent. This document accumulates; rules are amended or superseded here, never dropped.
+**LMS:** 0.8 (development)
+**Date time:** 2026/09/10 02:25 SAST
+**Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written
 down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a
@@ -31,13 +31,13 @@ stopped the spacing rule matching, and the button below it in a separate form di
 the eye landed on *Remove image* and read that as the card's action. Everything about that is
 invisible in the HTML and obvious on the screen.
 
-**0.2 Every form you fill in and save ends in one action row.** `.cl-form-actions`, separated from
+**0.2 Every form you fill in and save ends in one action row.** `.cl-ui-form-actions`, separated from
 the fields by a hairline. A reader asking "how do I save this" should find the answer in the same
 place on every form rather than scanning for whichever button happens to be primary-coloured. The
-primary action comes first; a destructive one is `.cl-form-actions-secondary` and is pushed to the
+primary action comes first; a destructive one is `.cl-ui-form-actions-secondary` and is pushed to the
 far end, so Save and Remove are never a pair of equal-looking buttons.
 
-A **modal** already has one: `.modal-foot` is the same rule wearing the modal's own name, with
+A **modal** already has one: `.cl-ui-modal-foot` is the same rule wearing the modal's own name, with
 Cancel beside the primary action. Do not nest an action row inside it.
 
 Three shapes are **not** forms in this sense, and a separator would break each of them:
@@ -67,21 +67,23 @@ and do not invent a variant because the new surface feels slightly different. Th
 something new."*
 → Enforced by `SharedControlContractTest`, `PaginationUiContractTest`, `tools/validate-ui-contracts.php`.
 
-**1.2 Before building any UI element, find the existing one and reuse it.** If none exists, build one
-shared implementation and use it from the first caller onwards. If the shared control genuinely
-cannot serve a case, say so and ask — do not fork it.
+**1.2 Before building any UI element, find the existing component and reuse it.** If the shared
+component needs a supported semantic variant, extend it and its contract tests. If the job is new,
+add its canonical implementation and migrate its callers. Do not fork it.
 
 **1.2a Reusable CattoLMS UI structures have one canonical platform implementation.** Pages assemble
 shared components and must not reproduce their markup. When a new reusable pattern is needed, add
 or extend a platform UI component and its contract test instead of coding a page-local variant.
 
-`src/View/Ui/PlatformUi.php` exposes explicit named components through Twig's `ui` function.
-Properties are allowlisted; arbitrary structural classes and controller-supplied HTML are forbidden.
-Templates in `resources/views/ui/` own surfaces, section headings, empty states, category tiles and
-grids, filter rails and pills, the course grid, catalogue workspace, tag browser and tag chips.
-A surface is composed through a Twig block, not a raw HTML parameter. Existing page head, dataset
-search, pagination, course card, favourite and entity lookup partials remain canonical.
-→ Enforced by `UiComponentContractTest`, `SharedControlContractTest` and `CoreStyleNamespaceContractTest`.
+`src/View/Ui/PlatformUi.php` is the fixed registry for namespaced layout, action, form, data,
+feedback, overlay and catalogue components plus the sprite icon helper. `ui()` renders scalar or
+structured properties. `ui_template()` and `ui_props()` compose authored Twig block slots. No raw HTML
+property, arbitrary structural class/style, dynamic template path, deprecated name or compatibility
+alias is accepted. See [UI-COMPONENTS.md](UI-COMPONENTS.md) for the complete API and slot inventory.
+The existing page head, search, pagination, course card, favourite, sortable header and entity lookup
+remain canonical shared controls. Pages and themes consume them; they never fork their structure.
+→ Enforced by the component family contracts, `UiComponentContractTest`, `SharedControlContractTest`
+and `CoreStyleNamespaceContractTest`.
 
 **1.3 A change to a shared control changes every surface.** Check them all, and say which were
 checked when reporting the work.
@@ -103,30 +105,24 @@ or below the one beside it breaks the interface — the owner's words: *"This ty
 UI elements breaks a UI."* Watch the rows that mix element kinds, which is where it happens: a plain
 button, a button inside a form because it posts, and a `<summary>` styled as a button because it
 opens a panel. A `<summary>` is a list-item box rather than an inline-flex one, and a form is a
-block, so left alone the three sit at three different heights. Core normalises this on `.row-actions`
-and `summary.btn`; a new row of controls should need nothing further, and if it does, fix it in core
+block, so left alone the three sit at three different heights. Core normalises this on `.cl-ui-row-actions`
+and the canonical row-menu summary; a new row of controls should need nothing further, and if it does, fix it in core
 rather than on the page.
 
-**1.6b Gilded Noir is insulated from cross-theme UI work.** It is a designed theme rather than a
-variation on the others, and a change rolled out across themes does not automatically apply to it.
-Roll UI change into the other themes and leave Gilded Noir alone unless the owner says to include
-it. **Navigation is the exception**: menus, their contents and their behaviour stay the same across
-every theme unless the owner says otherwise. Owner's instruction, 2026/09/12, after a cross-theme
-pass replaced its footer, doubled its background texture and put a band in its page body that did
-not fit.
-
-Where core introduces a platform-wide default that does not suit it, Gilded Noir overrides that
-default in its own stylesheet and says which core behaviour it is replacing and why — see section 20
-of its theme CSS.
+**1.6b Preserve theme individuality within the shared functional component system.** Gilded Noir
+consumes the same components as every theme. Its engraved canvas, gold actions, typography, navigation
+identity chip and individual footer remain theme-owned. Themes decorate canonical selectors; they
+must not replace component DOM, required spacing, GET/POST semantics, behaviour hooks or accessibility.
 
 **1.7 Every page is built the same way.** Page head, then the identity band, then the body on cards:
 
-```
-<section class="cl-page-head">      the title band
-<section class="cl-identity-head">  who is reading, joined to the head above it
-<div class="grid … section">        the columns the body uses
-  <div class="card">                the surface
-    <div class="section-head">      eyebrow, h2, description
+```text
+page-head partial
+identity partial (where the theme presents it)
+layout.section-grid
+  layout.surface
+    layout.section-head
+    composed form/data/feedback components
 ```
 
 The eyebrow names the section and comes from the section registry, so the card, the menu entry and
@@ -137,7 +133,7 @@ card, not the grid.
 **1.8 Nothing renders on the page canvas.** The canvas is the slanted texture, and text read
 directly off a texture is hard work. Every block of words sits on a surface — a card, a table
 wrapper, a notice, the pagination control, the footer. Core gives a surface to the containers that
-are otherwise bare (`.toolbar`, `.section-head`, `.notice`, `.dataset-search`) when they are not
+are otherwise bare (`.cl-ui-toolbar`, `.cl-ui-section-head`, `.cl-ui-notice`, `.dataset-search`) when they are not
 already inside a card, so this holds without each template having to remember it.
 
 The check is the delivered HTML, not the template: walk every text node's ancestors and look for one
@@ -164,7 +160,7 @@ text and gets the most width; a numeric column gets what its digits need and no 
 column gets what its control needs. Sizing every column the same is the defect this rule exists to
 prevent.
 
-**2.3 No horizontal scrolling on a table that fits.** `.table-wrap` provides `overflow-x:auto` as a
+**2.3 No horizontal scrolling on a table that fits.** `.cl-ui-table` provides `overflow-x:auto` as a
 last resort for genuinely wide data; it is not a substitute for sizing the columns. If a table
 scrolls sideways at a normal desktop width, its widths are wrong.
 
@@ -193,14 +189,14 @@ Themes, a course's own modules — are exempt from pagination, because a control
 
 **3.1 Row actions stack vertically. They are never laid out side by side.** This applies in the row
 menu panel, on every table, in every theme.
-→ Enforced by the `.row-menu-panel` grid rules in `catto-platform.css` and by
+→ Enforced by the `.cl-ui-row-panel` grid rules in `catto-platform.css` and by
 `tools/validate-ui-contracts.php`.
 
 **3.2 Button labels are short.** "Manage", "Edit", "Remove" — not "Manage this company's people".
 The context is the row.
 
-**3.3 Every button carries an SVG icon to the left of its label.** The icon comes from the core
-sprite; the theme styles it.
+**3.3 Actions may carry an optional sprite icon beside their label.** The canonical action calls
+the `icon` helper. Decorative icons are hidden from assistive technology; meaningful icons need a label.
 
 ---
 
@@ -213,16 +209,15 @@ not anything between them is hidden — see 0.3.
 **4.2 Fields on the same row align vertically.** Labels sit on a common baseline and inputs on a
 common top edge, whatever the label's length or whether one field carries help text. First name and
 Middle names side by side must line up exactly.
-→ Enforced by the `.field` / `.field-row` rules in `catto-platform.css` and `FormSpacingContractTest`.
+→ Enforced by the `form.field` / `form.grid` rules in `catto-platform.css` and `FormSpacingContractTest`.
 
 **4.3 A form works without JavaScript.** htmx is progressive enhancement: every control degrades to
 an ordinary form submission.
 
-**4.4 A field marked full width is full width.** Both spellings work: `field-wide` and `field full`.
-Core states both, because forty-two fields across eleven templates use the second and only one theme
-out of five ever defined it — so a field the markup declared as full width rendered at half width
-everywhere else.
-→ Enforced by `FormSpacingContractTest`.
+**4.4 Full width has one semantic API.** Pass `full_width: true` to `form.field` or `form.choice`.
+The canonical component emits `cl-ui-field--full`. Old field-wide/full spellings and their CSS are
+removed; callers may not construct field wrappers directly.
+→ Enforced by `FormSpacingContractTest` and `FormComponentContractTest`.
 
 **4.5 A label without a value is not rendered.** A section header, a field label or a card heading
 that would render blank is omitted entirely rather than emitted empty.
@@ -620,3 +615,20 @@ UI change works.
 - Cart colours, opaque dropdown surfaces and button treatments belong to each theme. Core cart CSS owns geometry and interaction only. Gilded Noir uses its existing gold primary-button treatment and dark navigation surface, including buttons outside the main content area.
 
 - Administration → Settings uses one shared-pattern accordion per section. Each editable section has its own save action; keep the saved section open. Bank details belong in `app_options`, never `.env`, and EFT orders display the current details and unique order reference.
+
+## 13. Platform design system enforcement
+
+**13.1 CattoLMS reusable UI structures are platform components. A page may not independently implement
+a job already represented by a canonical component. Extend the component and its contract test
+instead of forking markup.**
+
+**13.2 The gallery is Administration → System → UI Components**, at `/admin/system/ui-components`,
+protected by the existing System settings view permission. It demonstrates every component family
+and supported visual/state variant using static data.
+
+**13.3 A modal has one canonical footer.** Without scripts its same forms are accessible inline.
+Core enhances it with visibility, focus trapping/restoration and Escape dismissal. Accordions are
+native disclosures; workspace expansion can fetch the same server-rendered section progressively.
+
+**13.4 Dataset composition delegates to the existing shared search and pagination.** Paired pagers
+have unique control IDs, stable results targets and ordinary GET URLs. No page invents its own pager.

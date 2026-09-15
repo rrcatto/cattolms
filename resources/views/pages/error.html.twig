@@ -1,8 +1,9 @@
 {% extends layout %}
 {% block page_body %}
 	<section class="container cl-narrow py-5">
-		<div class="card border-danger">
-			<div class="card-body p-5 text-center">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'danger'})} %}
+{% block surface_body %}
+
 				<div class="display-4 fw-bold text-danger">
 					{{ status }}
 				</div>
@@ -12,8 +13,9 @@
 				<p>
 					{{ message }}
 				</p>
-				<a class="btn btn-primary" href="/">Return home</a>
-			</div>
-		</div>
+				{{ ui('action.link', {label: 'Return home', variant: 'primary', size: 'normal', href: '/'}) }}
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

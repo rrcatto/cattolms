@@ -6,7 +6,9 @@
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container cl-medium py-5">
 		{# Prose belongs on a surface like every other block of text on the platform. #}
-		<div class="card">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 		<p>
 			Catto Learning is designed to collect only information needed to provide accounts, learning access, transactions, support and explicitly authorised research or marketing.
 		</p>
@@ -30,9 +32,15 @@
 				Operational disclosures to payment, mail and hosting providers will be described accurately in the production privacy notice.
 			</li>
 		</ul>
-		<div class="alert alert-warning">
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
+{% block body %}
+
 			This Stage 1 page is a product-design statement, not the final legal privacy notice.
-		</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

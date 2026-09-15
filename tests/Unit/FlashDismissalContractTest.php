@@ -10,13 +10,13 @@ Version: 0.7
 Description:
 Protects what a dismissed flash message takes with it.
 
-A success notice hides itself after 4.5 seconds. It was removing the message and leaving the
-`.flash-stack` around it in the document, and that stack is not an inert empty element: every theme
+A success cl-ui-notice hides itself after 4.5 seconds. It was removing the message and leaving the
+`.flash-stack` around it in the document, and that stack is not an inert cl-ui-empty-state element: every theme
 gives it a bottom margin - 24px in Gilded Noir - so the gap the message had occupied stayed above
 the page head after the message had gone. On Administration Settings that read as the header
 refusing to return to the top of its container, with nothing on screen to explain why.
 
-The sweep cannot be expressed in CSS. `:empty` does not match the emptied stack, because the
+The sweep cannot be expressed in CSS. `:cl-ui-empty-state` does not match the emptied stack, because the
 whitespace text nodes between the messages survive their removal, so the rule would be one that
 silently never applies - worse than none. It belongs in the dismissal, which is what this asserts.
 
@@ -70,15 +70,13 @@ final class FlashDismissalContractTest extends TestCase
      */
     public function testEveryFlashPartialCarriesTheHooksTheDismissalNeeds(): void
     {
+        $root = dirname(__DIR__, 2);
         foreach (self::THEMES_WITH_FLASH_PARTIALS as $theme) {
-            $partial = dirname(__DIR__, 2) . '/themes/' . $theme . '/partials/flash.html.twig';
-            self::assertFileExists($partial, $theme . ' has lost its flash partial.');
-            $markup = (string) file_get_contents($partial);
-
-            self::assertStringContainsString('flash-stack', $markup, $theme . ' must wrap its messages in .flash-stack.');
-            self::assertStringContainsString('data-flash-message', $markup, $theme . ' must mark each message.');
-            self::assertStringContainsString('data-flash-close', $markup, $theme . ' must offer a close control.');
+            self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/' . $theme . '/partials/flash.html.twig'));
         }
+        self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/radiant-learning/base.html.twig'));
+        $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/flash-messages', ['flash_messages' => [['type' => 'success', 'message' => 'Saved']]]);
+        foreach (['flash-stack', 'data-flash-message', 'data-flash-close', 'data-flash-type="success"'] as $hook) self::assertStringContainsString($hook, $html);
     }
 
     private function platformScript(): string

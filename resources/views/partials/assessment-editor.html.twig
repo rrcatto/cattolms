@@ -1,122 +1,208 @@
-<div class="row g-3 mb-4">
-	<div class="col-md-8">
-		<label class="form-label">Assessment title</label>
-		<input class="form-control" name="assessment_title" value="{{ assessment.title }}" required>
-	</div>
-	<div class="col-md-4">
-		<label class="form-label">Pass mark</label>
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Assessment title', full_width: false, for: 'field-assessment-editor-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+		<input class="form-control" name="assessment_title" value="{{ assessment.title }}" required id="field-assessment-editor-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Pass mark', full_width: false, for: 'field-assessment-editor-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
 		<div class="input-group">
-			<input class="form-control" type="number" min="0" max="100" step="0.01" name="pass_mark" value="{{ assessment.pass_mark ?: 50 }}">
+			<input class="form-control" type="number" min="0" max="100" step="0.01" name="pass_mark" value="{{ assessment.pass_mark ?: 50 }}" id="field-assessment-editor-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
 			<span class="input-group-text">%</span>
 		</div>
-	</div>
-	<div class="col-12">
-		<label class="form-label">Instructions</label>
-		<textarea class="form-control cl-rich-editor" name="instructions_html" rows="4">{{ assessment.instructions_html }}</textarea>
-	</div>
-</div>
-<div class="card bg-body-tertiary border-0 mb-4">
-	<div class="card-body">
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Instructions', full_width: true, for: 'field-assessment-editor-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+		<textarea class="form-control cl-rich-editor" name="instructions_html" rows="4" id="field-assessment-editor-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ assessment.instructions_html }}</textarea>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 		<h3 class="h5">
 			Attempt and question-selection rules
 		</h3>
-		<div class="row g-3">
-			<div class="col-md-3">
-				<label class="form-label">Graded questions drawn</label>
-				<input class="form-control" type="number" min="1" name="graded_question_count" value="{{ assessment.graded_question_count ?: editor_question_count }}">
-			</div>
-			<div class="col-md-3">
-				<label class="form-label">Maximum graded attempts</label>
-				<input class="form-control" type="number" min="1" name="maximum_attempts" value="{{ assessment.maximum_attempts }}" placeholder="Unlimited">
-			</div>
-			<div class="col-md-3">
-				<label class="form-label">Time limit (seconds)</label>
-				<input class="form-control" type="number" min="1" name="time_limit_seconds" value="{{ assessment.time_limit_seconds ?: 1800 }}">
-			</div>
-			<div class="col-md-3">
-				<label class="form-label">Recorded result</label><select class="form-select" name="score_policy"><option value="highest" {{ assessment.score_policy == 'highest' ? 'selected' : '' }}>Highest score</option><option value="average" {{ assessment.score_policy == 'average' ? 'selected' : '' }}>Average score</option><option value="latest" {{ assessment.score_policy == 'latest' ? 'selected' : '' }}>Latest score</option></select>
-			</div>
-			<div class="col-md-4">
-				<label class="form-label">Introductory questions</label>
-				<input class="form-control" type="number" min="0" name="difficulty_introductory" value="{{ assessment.difficulty_introductory ?: 0 }}">
-			</div>
-			<div class="col-md-4">
-				<label class="form-label">Standard questions</label>
-				<input class="form-control" type="number" min="0" name="difficulty_standard" value="{{ assessment.difficulty_standard ?: 0 }}">
-			</div>
-			<div class="col-md-4">
-				<label class="form-label">Advanced questions</label>
-				<input class="form-control" type="number" min="0" name="difficulty_advanced" value="{{ assessment.difficulty_advanced ?: 0 }}">
-			</div>
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Graded questions drawn', full_width: false, for: 'field-assessment-editor-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="1" name="graded_question_count" value="{{ assessment.graded_question_count ?: editor_question_count }}" id="field-assessment-editor-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Maximum graded attempts', full_width: false, for: 'field-assessment-editor-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="1" name="maximum_attempts" value="{{ assessment.maximum_attempts }}" placeholder="Unlimited" id="field-assessment-editor-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time limit (seconds)', full_width: false, for: 'field-assessment-editor-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="1" name="time_limit_seconds" value="{{ assessment.time_limit_seconds ?: 1800 }}" id="field-assessment-editor-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Recorded result', full_width: false, for: 'field-assessment-editor-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<select class="form-select" name="score_policy" id="field-assessment-editor-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="highest" {{ assessment.score_policy == 'highest' ? 'selected' : '' }}>Highest score</option><option value="average" {{ assessment.score_policy == 'average' ? 'selected' : '' }}>Average score</option><option value="latest" {{ assessment.score_policy == 'latest' ? 'selected' : '' }}>Latest score</option></select>
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Introductory questions', full_width: false, for: 'field-assessment-editor-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="0" name="difficulty_introductory" value="{{ assessment.difficulty_introductory ?: 0 }}" id="field-assessment-editor-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Standard questions', full_width: false, for: 'field-assessment-editor-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="0" name="difficulty_standard" value="{{ assessment.difficulty_standard ?: 0 }}" id="field-assessment-editor-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Advanced questions', full_width: false, for: 'field-assessment-editor-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="0" name="difficulty_advanced" value="{{ assessment.difficulty_advanced ?: 0 }}" id="field-assessment-editor-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
 			<div class="col-12 d-flex flex-wrap gap-4">
-				<label class="form-check">
-				<input class="form-check-input" type="checkbox" name="randomise_questions" value="1" {{ assessment.randomise_questions ? 'checked' : '' }}>
-				<span class="form-check-label">Randomise questions</span></label><label class="form-check">
-				<input class="form-check-input" type="checkbox" name="randomise_options" value="1" {{ assessment.randomise_options ? 'checked' : '' }}>
-				<span class="form-check-label">Randomise answers</span></label><label class="form-check">
-				<input class="form-check-input" type="checkbox" name="negative_marking" value="1" {{ assessment.negative_marking ? 'checked' : '' }}>
-				<span class="form-check-label">Use negative marking</span></label>
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Randomise questions'})} %}
+{% block control %}
+<input class="form-check-input" type="checkbox" name="randomise_questions" value="1" {{ assessment.randomise_questions ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Randomise answers'})} %}
+{% block control %}
+<input class="form-check-input" type="checkbox" name="randomise_options" value="1" {{ assessment.randomise_options ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Use negative marking'})} %}
+{% block control %}
+<input class="form-check-input" type="checkbox" name="negative_marking" value="1" {{ assessment.negative_marking ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}
 			</div>
-		</div>
-	</div>
-</div>
-<div class="card bg-body-tertiary border-0 mb-4">
-	<div class="card-body">
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 		<h3 class="h5">
 			Practice assessment
 		</h3>
-		<div class="row g-3">
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
 			<div class="col-md-3">
-				<div class="form-check mt-4">
-					<input class="form-check-input" id="practice-enabled" type="checkbox" name="practice_enabled" value="1" {{ assessment.practice_enabled ? 'checked' : '' }}>
-					<label class="form-check-label" for="practice-enabled">Enable unlimited practice</label>
-				</div>
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Enable unlimited practice'})} %}
+{% block control %}
+
+					<input id="practice-enabled" type="checkbox" name="practice_enabled" value="1" {{ assessment.practice_enabled ? 'checked' : '' }}>
+
+{% endblock %}
+{% endembed %}
 			</div>
-			<div class="col-md-3">
-				<label class="form-label">Practice questions drawn</label>
-				<input class="form-control" type="number" min="1" name="practice_question_count" value="{{ assessment.practice_question_count ?: 5 }}">
-			</div>
-			<div class="col-md-6">
-				<label class="form-label">Practice pool</label><select class="form-select" name="practice_pool_mode"><option value="separate" {{ assessment.practice_pool_mode == 'separate' ? 'selected' : '' }}>Separate practice-only questions</option><option value="graded" {{ assessment.practice_pool_mode == 'graded' ? 'selected' : '' }}>Reuse graded questions</option><option value="both" {{ assessment.practice_pool_mode == 'both' ? 'selected' : '' }}>Both practice and graded eligible questions</option></select>
-			</div>
-		</div>
-	</div>
-</div>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Practice questions drawn', full_width: false, for: 'field-assessment-editor-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<input class="form-control" type="number" min="1" name="practice_question_count" value="{{ assessment.practice_question_count ?: 5 }}" id="field-assessment-editor-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Practice pool', full_width: false, for: 'field-assessment-editor-12-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+				<select class="form-select" name="practice_pool_mode" id="field-assessment-editor-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="separate" {{ assessment.practice_pool_mode == 'separate' ? 'selected' : '' }}>Separate practice-only questions</option><option value="graded" {{ assessment.practice_pool_mode == 'graded' ? 'selected' : '' }}>Reuse graded questions</option><option value="both" {{ assessment.practice_pool_mode == 'both' ? 'selected' : '' }}>Both practice and graded eligible questions</option></select>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 <div id="question-editor">
 	{% for qi, question in editor_questions %}
-		<div class="cl-question-editor" data-question>
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Question', full_width: false, for: 'field-assessment-editor-17-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
 			<div class="d-flex justify-content-between align-items-center gap-3">
 				<h3 class="h5 mb-0">
 					Question <span data-question-number>{{ qi + 1 }}</span>
 				</h3>
-				<button class="btn btn-sm btn-outline-danger" type="button" data-remove-question>Remove</button>
+				{{ ui('action.button', {label: 'Remove', variant: 'danger', size: 'small', type: 'button', icon: 'action-remove'}) }}
 			</div>
-			<label class="form-label mt-3">Question</label>
-			<textarea class="form-control mb-3" name="question_html[{{ qi }}]" required>{{ question.question_html }}</textarea>
-			<div class="row g-3">
-				<div class="col-md-2">
-					<label class="form-label">Points</label>
-					<input class="form-control" type="number" min="1" name="question_points[{{ qi }}]" value="{{ question.points ?: 1 }}">
-				</div>
-				<div class="col-md-3">
-					<label class="form-label">Difficulty</label><select class="form-select" name="question_difficulty[{{ qi }}]"><option value="introductory" {{ question.difficulty == 'introductory' ? 'selected' : '' }}>Introductory</option><option value="standard" {{ question.difficulty == 'standard' ? 'selected' : '' }}>Standard</option><option value="advanced" {{ question.difficulty == 'advanced' ? 'selected' : '' }}>Advanced</option></select>
-				</div>
-				<div class="col-md-2">
-					<label class="form-label">Wrong points</label>
-					<input class="form-control" type="number" max="0" step="0.25" name="incorrect_points[{{ qi }}]" value="{{ question.incorrect_points ?: 0 }}">
-				</div>
-				<div class="col-md-5">
-					<label class="form-label">Explanation</label>
-					<textarea class="form-control" name="question_explanation[{{ qi }}]">{{ question.explanation_html }}</textarea>
-				</div>
+
+			<textarea class="form-control mb-3" name="question_html[{{ qi }}]" required id="field-assessment-editor-17-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ question.question_html }}</textarea>
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Points', full_width: false, for: 'field-assessment-editor-13-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input class="form-control" type="number" min="1" name="question_points[{{ qi }}]" value="{{ question.points ?: 1 }}" id="field-assessment-editor-13-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Difficulty', full_width: false, for: 'field-assessment-editor-14-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<select class="form-select" name="question_difficulty[{{ qi }}]" id="field-assessment-editor-14-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="introductory" {{ question.difficulty == 'introductory' ? 'selected' : '' }}>Introductory</option><option value="standard" {{ question.difficulty == 'standard' ? 'selected' : '' }}>Standard</option><option value="advanced" {{ question.difficulty == 'advanced' ? 'selected' : '' }}>Advanced</option></select>
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Wrong points', full_width: false, for: 'field-assessment-editor-15-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<input class="form-control" type="number" max="0" step="0.25" name="incorrect_points[{{ qi }}]" value="{{ question.incorrect_points ?: 0 }}" id="field-assessment-editor-15-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Explanation', full_width: false, for: 'field-assessment-editor-16-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+					<textarea class="form-control" name="question_explanation[{{ qi }}]" id="field-assessment-editor-16-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ question.explanation_html }}</textarea>
+
+{% endblock %}
+{% endembed %}
 				<div class="col-12 d-flex gap-4">
-					<label class="form-check">
-					<input class="form-check-input" type="checkbox" name="practice_eligible[{{ qi }}]" value="1" {{ question.practice_eligible ? 'checked' : '' }}>
-					<span class="form-check-label">Practice eligible</span></label><label class="form-check">
-					<input class="form-check-input" type="checkbox" name="graded_eligible[{{ qi }}]" value="1" {{ question.graded_eligible ? 'checked' : '' }}>
-					<span class="form-check-label">Graded eligible</span></label>
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Practice eligible'})} %}
+{% block control %}
+<input class="form-check-input" type="checkbox" name="practice_eligible[{{ qi }}]" value="1" {{ question.practice_eligible ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Graded eligible'})} %}
+{% block control %}
+<input class="form-check-input" type="checkbox" name="graded_eligible[{{ qi }}]" value="1" {{ question.graded_eligible ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}
 				</div>
-			</div>
+
+{% endblock %}
+{% endembed %}
 			<div class="cl-option-editor mt-3" data-options>
 				{% for oi, option in question.options %}
 					<div class="input-group mb-2" data-option>
@@ -124,14 +210,20 @@
 						<input type="radio" name="correct_option[{{ qi }}]" value="{{ oi }}" {{ option.is_correct ? 'checked' : '' }} aria-label="Correct option">
 						</span>
 						<input class="form-control" name="option_html[{{ qi }}][{{ oi }}]" value="{{ option.option_html }}" required>
-						<button class="btn btn-outline-danger" type="button" data-remove-option aria-label="Remove option">×</button>
+						{{ ui('action.button', {label: '×', variant: 'danger', size: 'normal', type: 'button', aria_label: 'Remove option', icon: 'action-remove'}) }}
 					</div>
 				{% endfor %}
 			</div>
-			<button class="btn btn-sm btn-outline-secondary" type="button" data-add-option>Add option</button>
-		</div>
+			{{ ui('action.button', {label: 'Add option', variant: 'secondary', size: 'small', type: 'button', icon: 'action-add'}) }}
+
+{% endblock %}
+{% endembed %}
 	{% endfor %}
 </div>
-<div class="d-flex flex-wrap gap-2 mt-4">
-	<button class="btn btn-outline-primary" type="button" id="add-question">Add question</button><button class="btn btn-primary" type="submit">Save assessment</button>
-</div>
+{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+
+	{{ ui('action.button', {label: 'Add question', variant: 'secondary', size: 'normal', type: 'button', id: 'add-question', icon: 'action-add'}) }}{{ ui('action.button', {label: 'Save assessment', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}

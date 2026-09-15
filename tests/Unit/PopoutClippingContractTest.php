@@ -18,7 +18,7 @@ button that does nothing.
 
 It has now happened twice, in two different themes, for the same reason:
 
-  - Gilded Noir declares `.gn-main .table-wrap { overflow: auto }`. Core's `.table-wrap` rule was
+  - Gilded Noir declares `.gn-main .cl-ui-table { overflow: auto }`. Core's `.cl-ui-table` rule was
     not marked important and has lower specificity, and the theme stylesheet loads after core, so
     the theme won: the actions menu was drawn outside the wrapper and clipped away. It worked in
     the default theme, which made it look like a Gilded Noir bug rather than a core one.
@@ -129,11 +129,11 @@ final class PopoutClippingContractTest extends TestCase
     public function testCoreKeepsTheTableWrapperFromClippingInEveryTheme(): void
     {
         $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
-        $ours = self::declarations($core, 'overflow', '.table-wrap');
+        $ours = self::declarations($core, 'overflow', '.cl-ui-table');
 
         $winner = null;
         foreach ($ours as $rule) {
-            if ($rule['selector'] === '.table-wrap') {
+            if ($rule['selector'] === '.cl-ui-table') {
                 $winner = $rule;
             }
         }
@@ -148,7 +148,7 @@ final class PopoutClippingContractTest extends TestCase
         self::assertNotSame([], $sheets, 'No theme stylesheets were found, so this proves nothing.');
 
         foreach ($sheets as $sheet) {
-            foreach (self::declarations((string) file_get_contents($sheet), 'overflow', '.table-wrap') as $rule) {
+            foreach (self::declarations((string) file_get_contents($sheet), 'overflow', '.cl-ui-table') as $rule) {
                 self::assertFalse(
                     $rule['important'],
                     basename(dirname($sheet, 3)) . ' marks "' . $rule['selector'] . '" important, which '
@@ -164,10 +164,10 @@ final class PopoutClippingContractTest extends TestCase
         $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
 
         foreach ([
-            ['overflow', '.row-menu'],
-            ['position', '.row-menu-panel'],
-            ['display', '.row-menu-panel'],
-            ['padding', '.row-menu-panel'],
+            ['overflow', '.cl-ui-row-menu'],
+            ['position', '.cl-ui-row-panel'],
+            ['display', '.cl-ui-row-panel'],
+            ['padding', '.cl-ui-row-panel'],
         ] as [$property, $needle]) {
             $rules = array_filter(
                 self::declarations($core, $property, $needle),

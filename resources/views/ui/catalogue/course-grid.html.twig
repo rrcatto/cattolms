@@ -1,3 +1,4 @@
+{% set courses = props.courses %}
 <div class="cl-course-cards">
 	{% for course in courses %}
 		{% include '@platform/partials/course-card.html.twig' with {course: course} %}

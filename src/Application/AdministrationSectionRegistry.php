@@ -58,6 +58,7 @@ final class AdministrationSectionRegistry
             $this->section('themes', 'Themes', 'themes', '/admin/themes', 'partials/admin/themes.html.twig', 'Install, inspect, activate and reconcile themes.'),
             $this->section('roles', 'Roles & ACL', 'roles', '/admin/roles', 'partials/admin/roles.html.twig', 'Roles, permissions and access-control assignments.'),
             $this->section('seed', 'Seed Database', 'seed', '/admin/seed', 'partials/admin/seed.html.twig', 'Generate a set of data so the platform can be seen with something in it.'),
+            $this->section('ui_components', 'UI Components', 'themes', '/admin/system/ui-components', 'partials/admin/ui-components.html.twig', 'Canonical platform components and semantic states, using sample data.'),
             $this->section('settings', 'Settings', 'settings', '/admin/settings', 'partials/admin/settings.html.twig', 'Platform identity, outgoing mail, bank details and maintenance.'),
         ];
     }

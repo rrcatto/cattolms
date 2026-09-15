@@ -9,22 +9,18 @@
 	<section class="container-fluid cl-container-wide py-5">
 		<div class="row justify-content-center">
 			<div class="col-xl-10">
-				<div class="card">
-					<div class="card-header bg-white p-4">
-						<h2 class="h4 mb-1">
-							Assessment details and question pool
-						</h2>
-						<p class="text-body-secondary mb-0">
-							Learners see one randomly selected question at a time.
-						</p>
-					</div>
-					<div class="card-body p-4">
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+					{{ ui('layout.section-head', {heading: 'Assessment details and question pool', heading_level: 2, summary: 'Learners see one randomly selected question at a time.'}) }}
+
 						<form action="/admin/courses/{{ course.id }}/final-assessment" method="post" id="question-editor-form">
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							{% include '@platform/partials/assessment-editor.html.twig' %}
 						</form>
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
 			</div>
 		</div>
 	</section>

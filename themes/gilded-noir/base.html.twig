@@ -133,15 +133,7 @@
 				{% if breadcrumbs|length > 0 %}
 					<div class="gn-breadcrumb-bar" data-theme-breadcrumb>
 						<div class="gn-breadcrumb-inner">
-							<nav class="gn-breadcrumbs" aria-label="Breadcrumb">
-								{% for crumb in breadcrumbs %}
-									{% if crumb.current %}
-										<span class="gn-crumb current" aria-current="page">{{ crumb.label }}</span>
-									{% else %}
-										<a class="gn-crumb" href="{{ crumb.href }}">{{ crumb.label }}</a><span class="gn-crumb-sep" aria-hidden="true">/</span>
-									{% endif %}
-								{% endfor %}
-							</nav>
+							{{ ui('layout.breadcrumb', {items: breadcrumbs}) }}
 {% include '@platform/partials/cart-summary.html.twig' %}
 						</div>
 					</div>

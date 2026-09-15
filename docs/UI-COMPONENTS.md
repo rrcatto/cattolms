@@ -1,0 +1,126 @@
+# Platform UI component guide
+
+CattoLMS reusable UI structures are platform components. A page may not independently implement a
+job already represented by a canonical component. Extend the component and its contract test
+instead of forking markup.
+
+## Ownership and API
+
+`src/View/Ui/PlatformUi.php` is the sole allowlist of logical names, template paths, property names
+and defaults. `PlatformUiExtension` exposes three Twig functions:
+
+```twig
+{{ ui('feedback.badge', {label: 'Active', tone: 'success'}) }}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact'})} %}
+    {% block surface_body %}
+        {{ ui('layout.section-head', {heading: 'Example'}) }}
+    {% endblock %}
+{% endembed %}
+```
+
+`ui()` and `ui_props()` share validation. Unknown names/properties and unsupported semantic variants
+throw. Objects, rendered Markup and resources are rejected. Values are escaped by the same strict
+Twig environment as runtime. Variable HTML belongs in authored Twig blocks, never controller-built
+HTML or a generic content property. No component accepts class, wrapper_class, style, css or an
+arbitrary template path. There are no flat-name aliases.
+
+## Component inventory
+
+Paths are relative to `resources/views/ui/`. Slots in this table are the only variable markup areas.
+
+| Logical name | Canonical template | Slots |
+|---|---|---|
+| `layout.surface` | `layout/surface.html.twig` | `surface_body` |
+| `layout.section-grid` | `layout/section-grid.html.twig` | `body` |
+| `layout.section-head` | `layout/section-head.html.twig` | `section_actions` |
+| `layout.toolbar` | `layout/toolbar.html.twig` | `toolbar_primary`, `toolbar_actions` |
+| `layout.breadcrumb` | `layout/breadcrumb.html.twig` | — |
+| `action.link` | `actions/link.html.twig` | — |
+| `action.button` | `actions/button.html.twig` | — |
+| `action.group` | `actions/group.html.twig` | `body` |
+| `action.row` | `actions/row-actions.html.twig` | `body` |
+| `form.grid` | `forms/form-grid.html.twig` | `body` |
+| `form.field` | `forms/field.html.twig` | `control`, `help_content` |
+| `form.actions` | `forms/form-actions.html.twig` | `primary_actions`, `secondary_actions` |
+| `form.choice` | `forms/choice-field.html.twig` | `control` |
+| `form.compact-action` | `forms/compact-action.html.twig` | `body` |
+| `data.table` | `data/data-table.html.twig` | `columns`, `header`, `body`, `footer`, `empty` |
+| `data.dataset` | `data/dataset-layout.html.twig` | `toolbar`, `results`, `preview` |
+| `data.stat-grid` | `data/stat-grid.html.twig` | `body` |
+| `data.stat-card` | `data/stat-card.html.twig` | — |
+| `data.list` | `data/item-list.html.twig` | `body` |
+| `data.list-item` | `data/list-item.html.twig` | `body`, `actions` |
+| `data.key-value-list` | `data/key-value-list.html.twig` | — |
+| `feedback.badge` | `feedback/badge.html.twig` | — |
+| `feedback.notice` | `feedback/notice.html.twig` | `body` |
+| `feedback.empty` | `feedback/empty-state.html.twig` | `body`, `actions` |
+| `feedback.progress` | `feedback/progress.html.twig` | — |
+| `overlay.modal` | `overlay/modal.html.twig` | `modal_body`, `modal_actions`, `additional_forms` |
+| `overlay.accordion-section` | `overlay/accordion-section.html.twig` | `actions`, `body` |
+| `icon` | `helpers/icon.html.twig` | — |
+| `catalogue.category-grid` | `catalogue/category-grid.html.twig` | `surface_body` |
+| `catalogue.category-tile` | `catalogue/category-tile.html.twig` | — |
+| `catalogue.filter-rail` | `catalogue/filter-rail.html.twig` | — |
+| `catalogue.filter-pill` | `catalogue/filter-pill.html.twig` | — |
+| `catalogue.course-grid` | `catalogue/course-grid.html.twig` | — |
+| `catalogue.workspace` | `catalogue/catalogue-workspace.html.twig` | `surface_body` |
+| `catalogue.tag-browser` | `catalogue/tag-browser.html.twig` | `surface_body` |
+| `catalogue.tag-chip` | `catalogue/tag-chip.html.twig` | — |
+
+## Semantic contracts
+
+- Surfaces: standard or compact; optional section spacing, stable ID, sticky placement and semantic
+  tone. Section grids: auto or one to four columns; form grids: auto, one or two. Headings: h2 or h3.
+- Actions: primary, secondary, quiet or danger; small, normal or large; optional sprite icon. Links
+  retain href; buttons retain native type, form, name/value and disabled state. Explicit behaviour
+  properties support the existing htmx, confirmation, modal and Stimulus hooks without arbitrary
+  attribute maps. `action.row` is for record actions; `action.group` is for page/section actions.
+- Fields own labels, required markers, help/error text and full-width placement. The control slot
+  holds native inputs/selects/textareas. Match `for` with the control ID and associate help/error
+  IDs using aria-describedby; errors also mark the control aria-invalid. Choice fields wrap native
+  checkbox/radio controls. `form.actions` owns one save row and its secondary-action region;
+  `form.compact-action` is only for an immediate one-value operation. Modal footers are not nested
+  inside form action rows.
+- Tables own the wrapper, table, head and body. Rows/cells remain authored slots and column headers
+  delegate to sortable-header. Datasets own the stable region/results IDs and delegate search and
+  paired pagers to existing partials. A preview slot supports bounded workspace previews.
+- Badges: neutral, info, success, warning, danger or permanent; small or normal. Notices: info,
+  success, warning or danger, with heading/body and optional canonical flash dismissal. Empty states
+  support heading, summary, body and actions. Progress validates finite min/max/value, rejects an
+  invalid range, clamps value, and derives the only inline width from that validated number.
+- Modals: normal or wide, one title/body/footer and optional native form. Without JavaScript the
+  same content is inline; core adds visibility, focus trapping/restoration and Escape dismissal.
+  Accordions are native details/summary. Explicit workspace semantics retain existing lazy section
+  GET navigation and server-rendered content.
+- Icons use the platform SVG sprite. Decorative icons are hidden from assistive technology;
+  meaningful icons require a label. Catalogue icon artwork remains trusted data from the existing
+  icon service, not a general-purpose HTML property.
+
+The registry defaults are the authoritative property reference. Add a property there only when a
+concrete caller needs a reusable semantic or existing behaviour contract, and test it.
+
+## Existing canonical controls
+
+Page head, dataset search, pagination, sortable header, entity lookup, course card, favourite,
+identity, site footer and cart chrome remain shared partials. Components delegate to them rather
+than replacing them. Category and tag pages still share the persistent/flat catalogue workspace,
+24-card results policy, bounded initial twelve courses and progressive GET/htmx navigation.
+
+## Themes and review
+
+Themes own palette, typography, borders, radii, shadows and decorative chrome. Core owns component
+structure, required spacing, responsive geometry, htmx targets, focus and native form/navigation
+semantics. Gilded Noir retains its canvas, gold treatment, navigation identity and individual footer.
+Theme templates cannot implement another card/table/field/modal for the same job.
+
+Review `/admin/system/ui-components` (Administration → System → UI Components), guarded by
+`SYSTEM.SETTING.VIEW`, and real account/admin/company/catalogue/checkout/learning pages at desktop,
+tablet and mobile widths. The gallery uses static sample data and no sample mutation endpoints.
+
+## Enforcement
+
+`UiComponentContractTest` scans core and bundled theme templates for canonical ownership and obsolete
+structures. Form, modal, feedback, data and gallery contracts exercise escaping, variants, native
+semantics, paired pagination IDs and ACL registration. Existing search/pagination, table width/row,
+action parity, clipping, flash, namespace, attribute and served HTML contracts remain in the QA gate.
+Run `composer qa` before handoff; browser checks supplement the automated contracts.

@@ -1,40 +1,25 @@
-<div class="grid section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<div class="eyebrow">
-					Activity
-				</div>
-				<h2>
-					Account activity
-				</h2>
-				<p>
-					Recent actions recorded for this account. Login sessions are managed separately under Sessions.
-				</p>
-			</div>
-		</div>
-		<div class="table-wrap">
-			<table>
-				<thead>
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Account activity', eyebrow: 'Activity', summary: 'Recent actions recorded for this account. Login sessions are managed separately under Sessions.'}) }}
+
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 					<tr>
-						<th style="width:13%">
-							Time
-						</th>
-						<th style="width:31%">
-							Activity
-						</th>
-						<th style="width:30%">
-							Subject
-						</th>
-						<th style="width:13%">
-							IP
-						</th>
-						<th style="width:13%">
-							Location
-						</th>
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Time'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 31, label: 'Activity'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Subject'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'IP'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Location'}} %}
 					</tr>
-				</thead>
-				<tbody>
+
+{% endblock %}
+{% block body %}
+
 					{% for event in account_activity %}
 						<tr>
 							<td class="small">
@@ -57,13 +42,21 @@
 							</td>
 						</tr>
 					{% endfor %}
-				</tbody>
-			</table>
+
+{% endblock %}
+{% endembed %}
 			{% if not account_activity %}
-				<div class="empty">
+				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
 					No account activity has been recorded yet.
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% endif %}
-		</div>
-	</div>
-</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}

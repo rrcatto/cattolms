@@ -134,7 +134,9 @@ final class UserRepository
         ] as $field) {
             if (array_key_exists($field, $data)) {
                 $value = trim((string) $data[$field]);
-                $values[$field] = $field === 'billing_address' ? $value : ($value !== '' ? $value : null);
+                $values[$field] = in_array($field, ['middle_names', 'billing_address'], true)
+                    ? $value
+                    : ($value !== '' ? $value : null);
             }
         }
         if (array_key_exists('birthdate', $data)) {

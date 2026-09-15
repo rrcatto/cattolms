@@ -1,103 +1,48 @@
-<div class="grid section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<div class="eyebrow">
-					Dashboard
-				</div>
-				<h2>
-					Your learning at a glance
-				</h2>
-				<p>
-					Learning progress, course history and account statistics.
-				</p>
-			</div>
-		</div>
-	</div>
-</div>
-<div class="grid grid-4 section">
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ account_stats.current_courses }}
-		</div>
-		<div class="stat-label">
-			Current courses
-		</div>
-		<div class="stat-note">
-			Assigned or in progress
-		</div>
-	</div>
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ account_stats.completed_courses }}
-		</div>
-		<div class="stat-label">
-			Completed
-		</div>
-		<div class="stat-note">
-			Courses completed
-		</div>
-	</div>
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ account_stats.certificates }}
-		</div>
-		<div class="stat-label">
-			Certificates
-		</div>
-		<div class="stat-note">
-			Issued certificates
-		</div>
-	</div>
-	<div class="stat-card">
-		<div class="stat-value">
-			{{ account_stats.average_progress }}%
-		</div>
-		<div class="stat-label">
-			Current progress
-		</div>
-		<div class="stat-note">
-			Average active-course progress
-		</div>
-	</div>
-</div>
-<div class="grid section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<div class="eyebrow">
-					Course History
-				</div>
-				<h2>
-					Course history
-				</h2>
-				<p>
-					Every course assigned to this account, including completion result and certificate status.
-				</p>
-			</div>
-		</div>
-		<div class="table-wrap">
-			<table>
-				<thead>
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Your learning at a glance', eyebrow: 'Dashboard', summary: 'Learning progress, course history and account statistics.'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+{% block body %}
+
+	{{ ui('data.stat-card', {value: (account_stats.current_courses), label: 'Current courses', note: 'Assigned or in progress'}) }}
+	{{ ui('data.stat-card', {value: (account_stats.completed_courses), label: 'Completed', note: 'Courses completed'}) }}
+	{{ ui('data.stat-card', {value: (account_stats.certificates), label: 'Certificates', note: 'Issued certificates'}) }}
+	{{ ui('data.stat-card', {value: (account_stats.average_progress) ~ '%', label: 'Current progress', note: 'Average active-course progress'}) }}
+
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Course history', eyebrow: 'Course History', summary: 'Every course assigned to this account, including completion result and certificate status.'}) }}
+
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 					<tr>
-						<th style="width:50%">
-							Course
-						</th>
-						<th style="width:12%">
-							Status
-						</th>
-						<th style="width:12%">
-							Progress
-						</th>
-						<th style="width:12%">
-							Grade
-						</th>
-						<th style="width:14%">
-							Certificate
-						</th>
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Course'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Grade'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Certificate'}} %}
 					</tr>
-				</thead>
-				<tbody>
+
+{% endblock %}
+{% block body %}
+
 					{% for course in account_courses %}
 						<tr>
 							<td>
@@ -117,20 +62,28 @@
 							</td>
 							<td>
 								{% if course.certificate_public_id %}
-									<span class="badge good">Issued</span> <a class="btn btn-soft btn-sm" href="/certificates/{{ course.certificate_public_id }}">View</a>
+									{{ ui('feedback.badge', {label: 'Issued', tone: 'success'}) }} {{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/certificates/' ~ (course.certificate_public_id)}) }}
 								{% else %}
 									<span class="muted">Not issued</span>
 								{% endif %}
 							</td>
 						</tr>
 					{% endfor %}
-				</tbody>
-			</table>
+
+{% endblock %}
+{% endembed %}
 			{% if not account_courses %}
-				<div class="empty">
+				{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {})} %}
+{% block body %}
+
 					No courses have been assigned yet.
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% endif %}
-		</div>
-	</div>
-</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}

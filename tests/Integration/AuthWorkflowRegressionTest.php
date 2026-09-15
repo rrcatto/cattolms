@@ -107,6 +107,32 @@ final class AuthWorkflowRegressionTest extends TestCase
         }
     }
 
+    public function testProfileUpdateAllowsAnEmptyMiddleNamesField(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var Database $db */
+        $db = $container->get(Database::class);
+        $fixture = new DevelopmentFixture($db);
+        try {
+            /** @var UserRepository $users */
+            $users = $container->get(UserRepository::class);
+            $user = $users->createManagedUser('qa-profile-' . $fixture->suffix() . '@example.test', [
+                'first_name' => 'Profile',
+                'last_name' => 'Update',
+            ]);
+            $userId = (int) $user['id'];
+            $fixture->rememberUser($userId);
+            $users->updateProfile($userId, [
+                'first_name' => 'Profile',
+                'middle_names' => '',
+                'last_name' => 'Browser',
+            ]);
+            self::assertSame('', (string) $db->fetchOne('SELECT middle_names FROM users WHERE id=:id', ['id' => $userId]));
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
     public function testMagicLinkConsumptionCreatesStudentAndActiveSession(): void
     {
         $container = CliBootstrap::boot()['container'];

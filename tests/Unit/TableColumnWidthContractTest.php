@@ -101,7 +101,7 @@ final class TableColumnWidthContractTest extends TestCase
         // free text - a name, a title, a description - and never a count, a date or the action
         // menu, all of which have a known, small maximum size. Sizing them generously is precisely
         // how the person and company columns ended up too narrow.
-        $fixed = ['actions', 'status', 'progress', 'created', 'updated', 'started', 'completed',
+        $fixed = ['actions', 'status', 'cl-ui-progress', 'created', 'updated', 'started', 'completed',
                   'last_login', 'courses', 'learners', 'people', 'enrolments', 'completion',
                   'available', 'assigned', 'consumed', 'total', 'period', 'ip', 'average'];
 
@@ -136,14 +136,14 @@ final class TableColumnWidthContractTest extends TestCase
         self::assertGreaterThanOrEqual(
             3,
             count($tables),
-            'No hand-written header rows were parsed. The markup changed and this test is examining nothing.'
+            'No Twig-authored header rows were parsed. The markup changed and this test is examining nothing.'
         );
 
         foreach ($tables as $where => $widths) {
             self::assertSame(
                 100,
                 array_sum($widths),
-                'The hand-written column widths in ' . $where . ' total ' . array_sum($widths) . ', not 100.'
+                'The Twig-authored column widths in ' . $where . ' total ' . array_sum($widths) . ', not 100.'
             );
         }
     }
@@ -162,9 +162,9 @@ final class TableColumnWidthContractTest extends TestCase
         $rows = [];
         foreach (self::templateFiles() as $file) {
             $source = str_replace("\r\n", "\n", (string) file_get_contents($file));
-            preg_match_all('/<thead\b.*?<\/thead>/s', $source, $heads, PREG_OFFSET_CAPTURE);
+            preg_match_all("/{% block header %}(.*?){% endblock %}/s", $source, $heads, PREG_OFFSET_CAPTURE);
             foreach ($heads[0] as [$head, $offset]) {
-                preg_match_all('/<th\b[^>]*?style="width:(\d+)%"/s', $head, $found);
+                preg_match_all('/width:\s*(\d+)/', $head, $found);
                 if ($found[1] === []) {
                     continue;
                 }

@@ -226,7 +226,7 @@ foreach ([
     'resources/views/partials/admin/roles.html.twig','resources/views/partials/admin/companies.html.twig','resources/views/partials/admin/activity.html.twig',
 ] as $path) $need(is_file($root . '/' . $path), 'Missing platform-owned UI: ' . $path);
 $companies = $read($root . '/resources/views/partials/admin/companies.html.twig');
-$need(str_contains($companies, '<table>') && !str_contains($companies, 'grid grid-3'), 'Companies Administration must use a paginated table, not per-company cards.');
+$need(str_contains($companies, "ui_template('data.table')") && !str_contains($companies, 'grid grid-3'), 'Companies Administration must use a paginated table, not per-company cards.');
 $activity = $read($root . '/resources/views/partials/admin/activity.html.twig');
 foreach (['event.ip_address','event.geo_location','activity_pagination','activity-filters'] as $token) $need(str_contains($activity, $token), 'Activity UI missing: ' . $token);
 $roleEdit = $read($root . '/resources/views/pages/admin-role-edit.html.twig');

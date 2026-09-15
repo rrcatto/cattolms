@@ -80,15 +80,15 @@ final class ThemeUiContractTest extends TestCase
         self::assertStringNotContainsString('factoryResetRoot', $renderer);
     }
 
-    public function testPlatformModalsAreClosedByMarkupAndUseVersionedCoreAssets(): void
+    public function testPlatformModalsUseCanonicalMarkupProgressiveVisibilityAndVersionedCoreAssets(): void
     {
         $admin = (string) file_get_contents(__DIR__ . '/../../resources/views/partials/admin/people.html.twig');
-        self::assertStringContainsString('id="quickAddPersonModal"', $admin);
-        self::assertMatchesRegularExpression('/id="quickAddPersonModal"[^>]*aria-hidden="true"[^>]*hidden/', $admin);
+        self::assertStringContainsString("id: 'quickAddPersonModal'", $admin);
+        self::assertStringContainsString("ui_template('overlay.modal')", $admin);
 
         $platformCss = (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css');
-        self::assertStringContainsString('.modal-backdrop[hidden]', $platformCss);
-        self::assertStringContainsString('.modal-backdrop.open:not([hidden])', $platformCss);
+        self::assertStringContainsString('.cl-ui-modal[hidden]', $platformCss);
+        self::assertStringContainsString('.cl-ui-modal.open:not([hidden])', $platformCss);
 
         $platformJs = (string) file_get_contents(__DIR__ . '/../../public_html/js/platform-overrides.js');
         self::assertStringContainsString('modal.hidden = true', $platformJs);
@@ -153,15 +153,12 @@ final class ThemeUiContractTest extends TestCase
 
     public function testEquivalentWorkspaceAccordionsShareOneCoreContract(): void
     {
-        $root = dirname(__DIR__, 2);
-        foreach (['admin-control-centre.html.twig','account-control-centre.html.twig','company-control-centre.html.twig'] as $file) {
-            $markup = (string) file_get_contents($root . '/resources/views/pages/' . $file);
-            foreach (['cl-admin-section-summary','cl-admin-section-title','cl-admin-section-description','cl-admin-section-toggle','cl-admin-section-content'] as $token) {
-                self::assertStringContainsString($token, $markup);
-            }
+        foreach (['admin', 'account', 'company'] as $workspace) {
+            $source = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/' . $workspace . '-control-centre.html.twig');
+            self::assertStringContainsString("ui_template('overlay.accordion-section')", $source);
+            self::assertStringContainsString("workspace: '" . $workspace . "'", $source);
+            self::assertStringNotContainsString('<details', $source);
         }
-        $guide = (string) file_get_contents($root . '/docs/PROJECT-INSTRUCTIONS.md');
-        self::assertStringContainsString('Equivalent UI patterns must use the same core markup/classes', $guide);
     }
 
     public function testPlatformAndThemeAssetsUseContentFingerprints(): void

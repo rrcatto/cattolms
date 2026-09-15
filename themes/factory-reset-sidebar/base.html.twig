@@ -66,25 +66,17 @@
 				<header class="topbar fs-topbar" data-theme-breadcrumb>
 					<div class="fs-topbar-left">
 						<button class="icon-btn mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
-						<nav class="fs-breadcrumbs" aria-label="Breadcrumb">
-							{% for crumb in breadcrumbs %}
-								{% if crumb.current %}
-									<span class="fs-breadcrumb-current" aria-current="page">{{ crumb.label }}</span>
-								{% else %}
-									<a href="{{ crumb.href }}">{{ crumb.label }}</a><span class="fs-breadcrumb-separator" aria-hidden="true">/</span>
-								{% endif %}
-							{% endfor %}
-						</nav>
+						{{ ui('layout.breadcrumb', {items: breadcrumbs}) }}
 					</div>
 					<div class="fs-account-actions">
 						{% if is_authenticated %}
 							<a class="fs-profile-link" href="/account/profile">Profile</a>
 							<form action="/logout" method="post">
 								<input type="hidden" name="csrf" value="{{ csrf }}">
-								<button class="btn btn-soft btn-sm" type="submit">Logout</button>
+								{{ ui('action.button', {label: 'Logout', variant: 'secondary', size: 'small', type: 'submit'}) }}
 							</form>
 						{% else %}
-							<a class="btn btn-primary btn-sm" href="/login">Register / Sign in</a>
+							{{ ui('action.link', {label: 'Register / Sign in', variant: 'primary', size: 'small', href: '/login'}) }}
 						{% endif %}
 					</div>
 {% include '@platform/partials/cart-summary.html.twig' %}

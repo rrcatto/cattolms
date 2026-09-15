@@ -1,26 +1,22 @@
-<div class="grid section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<div class="eyebrow">
-					Sessions
-				</div>
-				<h2>
-					Active sessions
-				</h2>
-				<p>
-					Login sessions and device access are separate from account activity.
-				</p>
-			</div>
-		</div>
-		<div class="list-group shadow-sm">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Active sessions', eyebrow: 'Sessions', summary: 'Login sessions and device access are separate from account activity.'}) }}
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 			{% for session in sessions %}
-				<div class="list-group-item p-4">
+				{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 					<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
 						<div>
 							<strong>{{ session.user_agent }}</strong>
 							{% if session.is_current %}
-								<span class="badge text-bg-success ms-2">Current</span>
+								{{ ui('feedback.badge', {label: 'Current', tone: 'success'}) }}
 							{% endif %}
 							<div class="small text-secondary mt-2">
 								Created {{ session.created_at }} · Last active {{ session.last_seen_at }} · Expires {{ session.expires_at }}
@@ -35,12 +31,20 @@
 							<form action="/account/sessions/revoke" method="post">
 								<input type="hidden" name="csrf" value="{{ csrf }}">
 								<input type="hidden" name="session_id" value="{{ session.public_id }}">
-								<button class="btn btn-outline-danger" type="submit">Revoke</button>
+								{{ ui('action.button', {label: 'Revoke', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-remove'}) }}
 							</form>
 						{% endif %}
 					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
 			{% endfor %}
-		</div>
-	</div>
-</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}

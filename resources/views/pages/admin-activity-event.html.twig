@@ -7,24 +7,23 @@
 	{% set ph_lead = 'One recorded event, in full.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-5">
-		<div class="card mt-4">
-			<div class="card-header bg-white p-4">
-				<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: (event.event_label), heading_level: 2, summary: 'Event #' ~ (event.id) ~ ' · ' ~ (event.created_at) ~ ' · ' ~ (event.source_label)})} %}
+{% block section_actions %}
+<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
 					<div>
 						<span class="cl-kicker">{{ event.family_label }}</span>
-						<h2 class="h3 mt-2 mb-1">
-							{{ event.event_label }}
-						</h2>
-						<p class="text-body-secondary mb-0">
-							Event #{{ event.id }} · {{ event.created_at }} · {{ event.source_label }}
-						</p>
+
 					</div>
 					{% if event.result and event.result != '—' %}
-						<span class="badge text-bg-light align-self-start">{{ event.result }}</span>
+						{{ ui('feedback.badge', {label: (event.result), tone: 'neutral'}) }}
 					{% endif %}
 				</div>
-			</div>
-			<div class="card-body p-4">
+{% endblock %}
+{% endembed %}
+
 				<div class="row g-4 mb-4">
 					<div class="col-md-4">
 						<strong>Actor</strong>
@@ -58,17 +57,22 @@
 					</div>
 				</div>
 				{% if event.related_links %}
-					<div class="d-flex flex-wrap gap-2 mb-4">
+					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+
 						{% for link in event.related_links %}
-							<a class="btn btn-outline-primary btn-sm" href="{{ link.url }}">{{ link.label }}</a>
+							{{ ui('action.link', {label: (link.label), variant: 'secondary', size: 'small', href: (link.url)}) }}
 						{% endfor %}
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
 				<h2 class="h5">
 					Structured metadata
 				</h2>
 				<pre class="p-3 bg-body-tertiary border rounded mb-0 cl-wrap-anywhere">{{ event.metadata_text }}</pre>
-			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

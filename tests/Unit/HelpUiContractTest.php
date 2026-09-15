@@ -29,20 +29,16 @@ final class HelpUiContractTest extends TestCase
      */
     public function testHelpUsesNativeAccordionsTwoLevelsDeep(): void
     {
-        $html = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/help.html.twig');
+        $html = \CattoLearning\Tests\Support\RenderHarness::render('pages/help', \CattoLearning\Tests\Support\RenderHarness::hiveWith([]));
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html);
+        $xpath = new \DOMXPath($dom);
+        self::assertGreaterThanOrEqual(3, $xpath->query('//*[@data-help-accordion]/details')->length);
+        self::assertGreaterThanOrEqual(8, $xpath->query('//*[@data-help-accordion]/details//details')->length);
+        self::assertSame(0, $xpath->query('//*[@data-help-accordion]/details//details//details')->length);
+        self::assertSame(substr_count($html, '<details '), substr_count($html, '</details>'));
+        self::assertStringContainsString('cl-ui-accordion-section', $html);
 
-        self::assertStringContainsString('data-help-accordion', $html);
-        self::assertGreaterThanOrEqual(3, substr_count($html, '<details class="cl-help-group"'), 'The topics are grouped.');
-        self::assertGreaterThanOrEqual(8, substr_count($html, '<details class="cl-help-item"'), 'Each group holds topics.');
-        self::assertSame(0, substr_count($html, 'cl-help-subitem'), 'Two levels is the limit.');
-
-        // An unbalanced accordion swallows the rest of the page into the last open element, so
-        // every details element opened is closed exactly once.
-        self::assertSame(
-            substr_count($html, '<details '),
-            substr_count($html, '</details>'),
-            'Every details element is closed exactly once.'
-        );
     }
 
     /** The theme topics describe the package format the platform actually installs. */

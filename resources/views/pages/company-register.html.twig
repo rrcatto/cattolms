@@ -5,32 +5,45 @@
 	{% set ph_lead = 'The domain is reserved to the company account, and the administrator must hold an email address at that domain.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container cl-narrow py-5">
-		<div class="card shadow-sm border-0">
-			<div class="card-body p-4 p-lg-5">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				<p>
 					No CIPC registration or DNS verification is required in the MVP. The domain is reserved to the company account, and the administrator and future students must use email addresses at that exact domain.
 				</p>
-				<div class="alert alert-secondary">
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 					Your current primary email is <strong>{{ user_email }}</strong>. The entered domain must match the part after <strong>@</strong>.
-				</div>
+
+{% endblock %}
+{% endembed %}
 				<form action="/company/register" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div class="mb-3">
-						<label class="form-label" for="name">Company or organisation name</label>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company or organisation name', full_width: false, for: 'name', required: true})} %}
+{% block control %}
+
 						<input class="form-control" id="name" name="name" maxlength="160" required>
-					</div>
-					<div class="mb-3">
-						<label class="form-label" for="domain">Company email domain</label>
-						<input class="form-control" id="domain" name="domain" placeholder="example.co.za" required>
-						<div class="form-text">
-							Enter the domain only. Public webmail domains are not accepted.
-						</div>
-					</div>
-					<div class="cl-form-actions">
-					<button class="btn btn-primary btn-lg" type="submit">Create company account</button>
-					</div>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email domain', full_width: false, for: 'domain', required: true, help: 'Enter the domain only. Public webmail domains are not accepted.'})} %}
+{% block control %}
+
+						<input class="form-control" id="domain" name="domain" placeholder="example.co.za" required{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+					{{ ui('action.button', {label: 'Create company account', variant: 'primary', size: 'large', type: 'submit', icon: 'action-add'}) }}
+
+{% endblock %}
+{% endembed %}
 				</form>
-			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

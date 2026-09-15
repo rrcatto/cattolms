@@ -5,23 +5,32 @@
 	{% set ph_lead = 'Enter your email address. A one-time sign-in link will be sent to you and will expire after 30 minutes.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container cl-narrow py-5">
-		<div class="card shadow-sm border-0">
-			<div class="card-body p-4 p-lg-5">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				<form action="/login" method="post" novalidate>
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<input type="hidden" name="return_path" value="{{ return_path }}">
-					<div class="mb-3">
-						<label class="form-label" for="email">Email address</label>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', full_width: false, for: 'email', required: true})} %}
+{% block control %}
+
 						<input class="form-control form-control-lg" type="email" id="email" name="email" autocomplete="email" required>
-					</div>
-					<div class="cl-form-actions">
-					<button class="btn btn-primary btn-lg w-100" type="submit">Email my secure link</button>
-					</div>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+					{{ ui('action.button', {label: 'Email my secure link', variant: 'primary', size: 'large', full_width: true, type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
 				</form>
 				<p class="small text-secondary mt-3 mb-0">
 					An account is created only after a valid sign-in link is opened.
 				</p>
-			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

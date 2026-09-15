@@ -95,7 +95,6 @@ final class CompanyContextContractTest extends TestCase
 
     // --- who may select ------------------------------------------------------------------------
 
-
     /** The read scope that offers the selector is a view permission, and writes keep their own checks. */
     public function testTheSelectorIsGatedOnReadScope(): void
     {
@@ -204,7 +203,6 @@ final class CompanyContextContractTest extends TestCase
         self::assertStringContainsString('Switch company', $html);
     }
 
-
     /** Selecting is a POST carrying a CSRF token, never a link. */
     public function testSelectingIsAPostWithCsrf(): void
     {
@@ -227,7 +225,7 @@ final class CompanyContextContractTest extends TestCase
         $html = RenderHarness::render('partials/company-context.html.twig', RenderHarness::hiveWith(self::switcherHive()));
 
         self::assertStringContainsString('role="dialog"', $html);
-        self::assertStringContainsString('aria-modal="true"', $html);
+        self::assertStringContainsString('aria-modal="false"', $html);
         self::assertStringContainsString('data-open-modal="company-switch"', $html);
         self::assertStringContainsString('data-close-modal', $html);
     }

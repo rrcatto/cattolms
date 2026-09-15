@@ -10,9 +10,13 @@
 			<div>
 				<strong>Administrator preview</strong> — no learner progress or results are recorded.
 			</div>
-			<div class="d-flex gap-2">
-				<a class="btn btn-sm btn-light" href="/admin/courses/{{ course.id }}/preview">Course preview</a><a class="btn btn-sm btn-light" href="/admin/courses/{{ course.id }}/modules/{{ module.id }}">Edit module</a>
-			</div>
+			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+
+				{{ ui('action.link', {label: 'Course preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/preview'}) }}{{ ui('action.link', {label: 'Edit module', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/modules/' ~ (module.id)}) }}
+
+{% endblock %}
+{% endembed %}
 		</div>
 	</section>
 	{% if course.presentation_css %}
@@ -34,7 +38,7 @@
 			<div class="cl-course-presentation">
 				{% if module.learning_outcomes_html %}
 					<section class="cl-outcomes outcomes">
-						<span class="cl-kicker text-primary eyebrow">Learning outcomes</span>{{ module.learning_outcomes_html|raw }}
+						<span class="cl-kicker text-primary cl-ui-eyebrow">Learning outcomes</span>{{ module.learning_outcomes_html|raw }}
 					</section>
 				{% endif %}
 				<div class="cl-course-content">
@@ -63,44 +67,58 @@
 						Correct answers are highlighted for administrator quality assurance. Answers cannot be submitted from this preview.
 					</p>
 					{% for question_index, question in assessment.questions %}
-						<div class="card mb-3">
-							<div class="card-body">
+						{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 								<h3 class="h6">
 									Question {{ question_index + 1 }}
 								</h3>
 								{{ question.question_html|raw }}
-								<div class="list-group mt-3">
+								{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 									{% for option in question.options %}
-										<div class="list-group-item d-flex justify-content-between align-items-start gap-3 {{ option.is_correct ? 'border-success bg-success-subtle' : '' }}">
+										{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 											<div>
 												{{ option.option_html|raw }}
 											</div>
 											{% if option.is_correct %}
-												<span class="badge text-bg-success flex-shrink-0">✓ Correct answer</span>
+												{{ ui('feedback.badge', {label: '✓ Correct answer', tone: 'success'}) }}
 											{% endif %}
-										</div>
+										{% if option.is_correct %}{{ ui('feedback.badge', {label: 'Correct', tone: 'success'}) }}{% endif %}
+{% endblock %}
+{% endembed %}
 									{% endfor %}
-								</div>
+
+{% endblock %}
+{% endembed %}
 								{% if question.explanation_html %}
-									<div class="alert alert-light border mt-3 mb-0">
+									{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 										<strong>Answer explanation</strong>
 										<div class="mt-1">
 											{{ question.explanation_html|raw }}
 										</div>
-									</div>
+
+{% endblock %}
+{% endembed %}
 								{% endif %}
-							</div>
-						</div>
+
+{% endblock %}
+{% endembed %}
 					{% endfor %}
 				</section>
 			{% endif %}
 			<div class="cl-module-actions">
 				{% if previous_module %}
-					<a class="btn btn-outline-primary" href="/admin/courses/{{ course.id }}/preview/modules/{{ previous_module.id }}">← Previous</a>
+					{{ ui('action.link', {label: '← Previous', variant: 'secondary', size: 'normal', href: '/admin/courses/' ~ (course.id) ~ '/preview/modules/' ~ (previous_module.id)}) }}
 				{% endif %}
-				<a class="btn btn-outline-secondary" href="/admin/courses/{{ course.id }}/preview">Course overview</a>
+				{{ ui('action.link', {label: 'Course overview', variant: 'secondary', size: 'normal', href: '/admin/courses/' ~ (course.id) ~ '/preview'}) }}
 				{% if next_module %}
-					<a class="btn btn-primary ms-auto" href="/admin/courses/{{ course.id }}/preview/modules/{{ next_module.id }}">Next module →</a>
+					{{ ui('action.link', {label: 'Next module →', variant: 'primary', size: 'normal', href: '/admin/courses/' ~ (course.id) ~ '/preview/modules/' ~ (next_module.id)}) }}
 				{% endif %}
 			</div>
 		</article>
