@@ -1,7 +1,32 @@
 # Changelog
 
-**LMS version:** 0.8.1
+**LMS version:** 0.8.2
 **Date time:** 2026/09/15 SAST
+
+## 2026-09-15 SAST — v0.8.2 Platform UI remediation and documentation
+
+This release documents and hardens the canonical UI component system introduced in v0.8.1. The
+purpose is to prevent the markup, spacing, accessibility and progressive-enhancement drift that
+occurs when each view is independently generated.
+
+- Repair both malformed Profile Image Stimulus actions and add rendered Symfony/Twig regression
+  coverage for the file chooser, zoom control, editor targets and native upload fallback.
+- Centralise `form.field` help/error accessibility relationships in the bounded `ui_field_attrs()`
+  helper and migrate current form callers.
+- Render standard and diagnostic question editors from shared Twig question/option components and
+  server-side `<template>` prototypes; JavaScript now clones and reindexes them without constructing
+  a parallel Bootstrap-style UI.
+- Enforce canonical ownership in JavaScript and bundled theme CSS, remove obsolete palette selectors,
+  and keep functional component geometry in core while preserving theme visual identity.
+- Tighten link/button property contracts, correct notice heading semantics and component gallery
+  composition, and update current Theme Package schema 4.0 / Template API 2.0 references.
+- Synchronise README, handoff, roadmap, project instructions and UI design documentation with the
+  current implementation.
+
+Validation: 634 tests, 43,707 assertions, PHPStan, architecture, runtime, UI-contract and release
+gates passed; 174 Twig templates lint cleanly. Chromium verified all five bundled themes, Profile
+Image editing, standard/diagnostic question editing and no-JavaScript fallbacks. Published as
+annotated tag `v0.8.2`.
 
 ## 2026-09-15 SAST — v0.8.1 Platform UI component system
 
