@@ -11,12 +11,14 @@
 
 {% endblock %}
 {% endembed %}
-<div class="admin-reports-grid">
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
+{% block body %}
 	{{ ui('data.stat-card', {value: (report_summary.enrolments), label: 'Total enrolments', note: (report_summary.active) ~ ' active · ' ~ (report_summary.completed) ~ ' completed'}) }}
 	{{ ui('data.stat-card', {value: (report_summary.graded_assessments), label: 'Graded assessments', note: 'Completed learner attempts'}) }}
 	{{ ui('data.stat-card', {value: (report_summary.assessment_pass_rate) ~ '%', label: 'Assessment pass rate', note: 'Average score ' ~ (report_summary.assessment_average) ~ '%'}) }}
 	{{ ui('data.stat-card', {value: (report_summary.certificates), label: 'Certificates', note: 'Currently valid certificates'}) }}
-</div>
+{% endblock %}
+{% endembed %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 

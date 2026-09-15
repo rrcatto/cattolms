@@ -10,7 +10,7 @@
 	    {% if sh.active %}aria-sort="{{ sh.direction == 'desc' ? 'descending' : 'ascending' }}"{% endif %}>
 		<a href="{{ sh.href }}"
 			   hx-get="{{ sh.href }}" hx-target="#{{ sort_region }}" hx-select="#{{ sort_results }}"
-			   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .table-wrap">
+			   hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .cl-ui-table">
 		{{ sh.label }}<span class="sortable-indicator" aria-hidden="true">{{ sh.active ? (sh.direction == 'desc' ? '▼' : '▲') : '↕' }}</span>
 		</a>
 	</th>

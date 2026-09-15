@@ -93,7 +93,7 @@ final class AccountWorkspaceContractTest extends TestCase
         // subject, and this is the assertion that stops them drifting back together.
         foreach (['Email Addresses','/account/email/secondary','Course history','Active sessions'] as $token) self::assertStringNotContainsString($token, $particulars);
 
-        foreach (['Email Addresses','cannot be changed','/account/email/secondary','/account/email/remove'] as $token) self::assertStringContainsString($token, $emails);
+        foreach (['Email Addresses','cannot be removed','/account/email/secondary','/account/email/promote','/account/email/remove'] as $token) self::assertStringContainsString($token, $emails);
         foreach (['Personal Particulars','Profile image'] as $token) self::assertStringNotContainsString($token, $emails);
 
         foreach (['Social Media','/account/social','social_links'] as $token) self::assertStringContainsString($token, $social);
@@ -102,18 +102,16 @@ final class AccountWorkspaceContractTest extends TestCase
 
     public function testTheSignedInAddressIsShownAndNeverOfferedAsAField(): void
     {
-        // The owner's rule, 2026/09/10: a user cannot change the address they signed in with. The
-        // guarantee is that no route edits it, and this asserts the interface says so rather than
-        // leaving the reader to discover it by finding no control.
+        // The primary account address cannot be removed; a verified secondary may be promoted.
         $emails = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/account/emails.html.twig');
-        self::assertStringContainsString('cannot be changed', $emails);
+        self::assertStringContainsString('cannot be removed', $emails);
 
         $editing = array_values(array_filter(
             RouteTable::all(),
             static fn(array $r): bool => $r['method'] === 'POST' && str_contains($r['path'], '/account/email/')
         ));
         self::assertSame(
-            ['/account/email/secondary', '/account/email/remove'],
+            ['/account/email/secondary', '/account/email/remove', '/account/email/promote'],
             array_column($editing, 'path'),
             'The only writes are adding an alternative address and removing one. Nothing edits the primary.'
         );

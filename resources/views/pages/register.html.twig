@@ -1,0 +1,27 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_kicker = 'Passwordless access' %}
+    {% set ph_title = 'Register' %}
+    {% set ph_lead = 'Create your learner or company account. We only create it after you confirm the email link.' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="container cl-narrow py-5">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+        {% block surface_body %}
+            <form action="/register" method="post" novalidate>
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account type', for: 'account-type', required: true})} %}{% block control %}
+                    <select id="account-type" name="account_type" required data-registration-type><option value="individual">Individual learner</option><option value="company">Company account</option></select>
+                {% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'first-name', required: true})} %}{% block control %}<input id="first-name" name="first_name" required>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'middle-names'})} %}{% block control %}<input id="middle-names" name="middle_names">{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'last-name', required: true})} %}{% block control %}<input id="last-name" name="last_name" required>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', for: 'company-name', help: 'Required for a company account.'})} %}{% block control %}<input id="company-name" name="company_name" data-registration-company>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'registration-email', required: true})} %}{% block control %}<input type="email" id="registration-email" name="email" value="{{ email|default('') }}" autocomplete="email" required>{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send registration link', variant: 'primary', size: 'large', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+            <p class="small text-secondary mt-3 mb-0">Already have an account? <a href="/login">Sign in</a>.</p>
+        {% endblock %}
+        {% endembed %}
+    </section>
+    <script>const rt=document.querySelector('[data-registration-type]');if(rt){const sync=()=>{const f=document.querySelector('[data-registration-company]');if(f){f.required=rt.value==='company';f.closest('.cl-ui-field')?.toggleAttribute('hidden',rt.value!=='company');}};rt.addEventListener('change',sync);sync();}</script>
+{% endblock %}

@@ -58,6 +58,7 @@ final class AuthWorkflowRegressionTest extends TestCase
 
         try {
             $auth = $this->authService($container, new FakeMailer(true));
+            $container->get(UserRepository::class)->createManagedUser($email);
 
             try {
                 $auth->requestLogin($email, '/account/library');
@@ -146,6 +147,7 @@ final class AuthWorkflowRegressionTest extends TestCase
 
         try {
             $auth = $this->authService($container, $mailer);
+            $container->get(UserRepository::class)->createManagedUser($email);
             $auth->requestLogin($email, 'https://invalid.example/escape');
 
             self::assertCount(1, $mailer->messages);
@@ -199,6 +201,7 @@ final class AuthWorkflowRegressionTest extends TestCase
         $fixture->rememberEmail($email);
 
         try {
+            $container->get(UserRepository::class)->createManagedUser($email);
             $failedAuth = $this->authService($container, new FakeMailer(true));
             try {
                 $failedAuth->requestLogin($email, '/account/library');
@@ -219,6 +222,37 @@ final class AuthWorkflowRegressionTest extends TestCase
         } finally {
             $fixture->cleanup();
         }
+    }
+
+    public function testRegistrationCreatesNoAccountBeforeVerificationAndSignsInAfterConsumption(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        $db = $container->get(Database::class);
+        $fixture = new DevelopmentFixture($db);
+        $email = 'qa-registration-' . $fixture->suffix() . '@example.test';
+        $mailer = new FakeMailer();
+        try {
+            $auth = $this->authService($container, $mailer);
+            $auth->requestRegistration(['account_type'=>'individual','first_name'=>'Reg','middle_names'=>'','last_name'=>'Tester','email'=>$email]);
+            self::assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email', ['email'=>$email]));
+            parse_str((string)parse_url((string)$mailer->messages[0]['url'], PHP_URL_QUERY), $query);
+            $auth->consumeRegistration((string)$query['token']);
+            self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email AND is_primary=TRUE', ['email'=>$email]));
+            $fixture->rememberEmail($email);
+        } finally { unset($_COOKIE['catto_learning_session']); $fixture->cleanup(); }
+    }
+
+    public function testSecondaryEmailPromotionSwapsPrimaryAndSecondaryAtomically(): void
+    {
+        $container = CliBootstrap::boot()['container']; $db = $container->get(Database::class); $fixture = new DevelopmentFixture($db);
+        $primary = 'qa-primary-' . $fixture->suffix() . '@example.test'; $secondary = 'qa-secondary-' . $fixture->suffix() . '@example.test';
+        try {
+            $users = $container->get(UserRepository::class); $user = $users->createManagedUser($primary); $id=(int)$user['id']; $fixture->rememberUser($id);
+            $users->addVerifiedSecondaryEmail($id, $secondary);
+            $this->authService($container, new FakeMailer())->promoteSecondaryEmail($id, (int)$db->fetchOne('SELECT id FROM user_emails WHERE email=:email', ['email'=>$secondary]));
+            self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE user_id=:id AND is_primary=TRUE AND email=:email', ['id'=>$id,'email'=>$secondary]));
+            self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE user_id=:id AND is_primary=FALSE AND email=:email', ['id'=>$id,'email'=>$primary]));
+        } finally { $fixture->cleanup(); }
     }
 
     private function authService(ContainerInterface $container, FakeMailer $mailer): AuthService

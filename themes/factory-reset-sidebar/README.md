@@ -6,7 +6,7 @@ Features:
 - dark left sidebar
 - Account and Administration submenus
 - route-aware breadcrumb utility header
-- Profile + Logout controls, or Register / Sign in when logged out
+- Profile + Logout controls, or separate Sign in and Register controls when logged out
 - full footer with social icons and Contact link
 - four palettes from the approved light-theme mockup
 - automatic Catto Learning palette deployment

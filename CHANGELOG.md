@@ -1,7 +1,18 @@
 # Changelog
 
-**LMS version:** 0.8.2
+**LMS version:** 0.8.3
 **Date time:** 2026/09/15 SAST
+
+## 2026-09-15 SAST — v0.8.3 Final UI and account correction
+
+- Restore core-owned section-heading alignment, Reports stat-grid geometry, compact pagination and sortable-table indicators.
+- Store the normalized email used for each passwordless session while retaining the account primary email; display the authenticated address in the identity header.
+- Add transactional secondary-email promotion, making the previous primary a removable secondary address.
+- Add distinct deferred passwordless registration for individual and company accounts; unknown non-admin login addresses now open registration prefilled instead of creating bare accounts.
+- Preserve APP_ADMIN first-login bootstrap and existing verified primary/secondary magic-link sign-in.
+- Remove obsolete theme-owned Reports and pagination geometry, correct guest links, and add registration/promotion regression coverage.
+
+Validation: 636 tests, 43,787 assertions, PHPStan, architecture, runtime, UI-contract and release gates passed. Desktop/mobile Playwright smoke checks passed for login, registration, catalogue, reports and the UI component gallery.
 
 ## 2026-09-15 SAST — v0.8.2 Platform UI remediation and documentation
 

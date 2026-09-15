@@ -63,7 +63,7 @@ services:
 
     CattoLearning\Auth\:
         resource: '../src/Auth/'
-        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,Security/WebUser.php}'
+        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,Security/WebUser.php,*Exception.php}'
 
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'

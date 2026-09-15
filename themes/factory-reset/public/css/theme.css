@@ -366,7 +366,6 @@ h1,h2,h3,h4,h5,h6,.page-title,.cl-ui-stat-value{font-weight:700;letter-spacing:-
 .sidebar-bottom{border-top-color:color-mix(in srgb,var(--on-primary) 20%,transparent)}
 .admin-workspace{width:100%;min-width:0;max-width:none;display:block}.admin-panel-wide{width:100%;max-width:none;min-width:0}
 .admin-panel-wide{width:100%}
-.admin-reports-grid{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:18px;width:100%;min-width:0}
 .admin-settings-layout{display:grid;grid-template-columns:minmax(420px,1fr) minmax(420px,1fr);gap:18px;width:100%;min-width:0;align-items:start}
 
 .cl-ui-badge--info{background:color-mix(in srgb,var(--primary) 14%,white)!important;color:var(--ink)!important;border-color:color-mix(in srgb,var(--primary) 42%,white)!important}
@@ -382,8 +381,6 @@ h1,h2,h3,h4,h5,h6,.page-title,.cl-ui-stat-value{font-weight:700;letter-spacing:-
 [data-flash-close]:hover{background:rgba(0,0,0,.07)}.flash-hiding{opacity:0;transform:translateY(-4px)}
 .role-checkbox-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.role-check{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--line);border-radius:11px;padding:11px;background:#fff}.role-check input{width:auto;margin-top:3px}.role-check span{display:grid;gap:2px}.role-check small{font-weight:400;color:var(--muted)}
 .admin-person-layout{align-items:start}.admin-person-side{min-width:0}.back-link{color:var(--primary);font-weight:600}
-@media(max-width:1300px){.admin-reports-grid{grid-template-columns:repeat(2,minmax(220px,1fr))}.admin-settings-layout{grid-template-columns:1fr}.theme-explainer-grid{grid-template-columns:1fr}}
-@media(max-width:860px){.admin-reports-grid{grid-template-columns:1fr}.admin-settings-layout{grid-template-columns:1fr}.role-checkbox-grid{grid-template-columns:1fr}
 }
 .public-nav{background:var(--primary);color:var(--on-primary);border-bottom-color:color-mix(in srgb,var(--on-primary) 20%,transparent)}
 .public-nav .brand{color:var(--on-primary)!important}.public-nav .brand small{color:color-mix(in srgb,var(--on-primary) 70%,transparent)!important}

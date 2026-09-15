@@ -29,7 +29,7 @@ final class PlatformUi
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
-        'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => []],
+        'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => ['columns' => 'auto'], 'props' => ['columns' => ['auto', 1, 2, 3, 4]]],
         'data.stat-card' => ['template' => 'data/stat-card', 'defaults' => ['value' => null, 'label' => null, 'note' => '']],
         'data.list' => ['template' => 'data/item-list', 'defaults' => []],
         'data.list-item' => ['template' => 'data/list-item', 'defaults' => []],

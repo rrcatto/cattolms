@@ -23,7 +23,7 @@
 						{% if is_authenticated %}
 							{{ ui('action.link', {label: 'Open my library', variant: 'secondary', size: 'large', href: '/account/library'}) }}
 						{% else %}
-							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/login', icon: 'action-add'}) }}
+							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/register', icon: 'action-add'}) }}
 						{% endif %}
 
 {% endblock %}

@@ -76,7 +76,7 @@
 								{{ ui('action.button', {label: 'Logout', variant: 'secondary', size: 'small', type: 'submit'}) }}
 							</form>
 						{% else %}
-							{{ ui('action.link', {label: 'Register / Sign in', variant: 'primary', size: 'small', href: '/login'}) }}
+							{{ ui('action.link', {label: 'Sign in', variant: 'primary', size: 'small', href: '/login'}) }} {{ ui('action.link', {label: 'Register', variant: 'secondary', size: 'small', href: '/register'}) }}
 						{% endif %}
 					</div>
 {% include '@platform/partials/cart-summary.html.twig' %}
@@ -119,7 +119,7 @@
 						<a href="/privacy">Privacy</a>
 						<a href="/contact">Contact us</a>
 						{% if not is_authenticated %}
-						<a href="/login">Register / Sign in</a>
+						<a href="/login">Sign in</a><a href="/register">Register</a>
 						{% endif %}
 					</section>
 					<section>

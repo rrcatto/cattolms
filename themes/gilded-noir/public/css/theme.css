@@ -1967,7 +1967,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
 .gn-main .admin-workspace { min-width: 0; } .gn-main .admin-panel-wide { min-width: 0; }
 
-.gn-main .admin-reports-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
 .gn-main .admin-settings-layout, .gn-main .admin-person-layout {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -2599,12 +2598,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 .gn-main .cl-ui-table + .pagination-row,
 .gn-main .cl-ui-surface + .pagination-row { margin-top: 1rem; }
 
-.gn-main .pagination-summary {
-  font-family: var(--gn-font-ui);
-  font-size: .82rem;
-  letter-spacing: .01em;
-  color: var(--gn-ink);
-}
 
 .gn-main .pagination-pages {
   font-size: .76rem;

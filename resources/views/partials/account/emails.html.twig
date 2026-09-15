@@ -14,7 +14,7 @@
 
 						<strong>{{ email.email }}</strong>
 						<p>
-							{{ email.is_primary ? 'Primary address. This is the one you signed in with, and it cannot be changed.' : 'Alternative address. Verified, and it signs you in exactly as the primary does.' }}
+                            {{ email.is_primary ? 'Primary account address. It cannot be removed.' : 'Verified secondary address. It can also be used to sign in.' }}
 						</p>
 
 {% endblock %}
@@ -23,6 +23,7 @@
 					{% if email.is_primary %}
 						{{ ui('feedback.badge', {label: 'Primary', tone: 'permanent'}) }}
 					{% else %}
+						<form action="/account/email/promote" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="email_id" value="{{ email.id }}">{{ ui('action.button', {label: 'Make primary', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
 						<form action="/account/email/remove" method="post">
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							<input type="hidden" name="email_id" value="{{ email.id }}">
