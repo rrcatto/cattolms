@@ -7,7 +7,7 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Checks high-risk Catto Learning runtime contracts, with special guards for filesystem-authoritative Theme Package 3.0 with rebuildable registry, platform-owned page bodies, exact-parent child themes and Factory Reset isolation.
+Checks high-risk Catto Learning runtime contracts, with special guards for filesystem-authoritative Theme Package 4.0 / Template API 2.0 with rebuildable registry, platform-owned page bodies, exact-parent child themes and Factory Reset isolation.
 
 Changelog:
 2026/09/09 02:10 SAST
@@ -25,7 +25,7 @@ $need = static function(bool $ok, string $message) use (&$errors): void { if (!$
 $read = static function(string $path) use ($need): string { $need(is_file($path), 'Missing: ' . $path); return is_file($path) ? (string)file_get_contents($path) : ''; };
 
 $manager = $read($root . '/src/View/ThemeManager.php');
-foreach (['assertInstallableManifest','findByNameVersion','themeLayers','public/css/theme.css','Theme Package 3.0','resyncRegistry','registryOutOfSync'] as $token) $need(str_contains($manager,$token),'ThemeManager runtime guard missing: '.$token);
+foreach (['assertInstallableManifest','findByNameVersion','themeLayers','public/css/theme.css','Theme Package 4.0','resyncRegistry','registryOutOfSync'] as $token) $need(str_contains($manager,$token),'ThemeManager runtime guard missing: '.$token);
 foreach (['ThemeRepository','resolveChain','versionSatisfies','theme.upgraded','materialise'] as $token) $need(!str_contains($manager,$token),'Obsolete theme runtime token remains: '.$token);
 
 $validator = $read($root . '/src/View/ThemePackageValidator.php');

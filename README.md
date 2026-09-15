@@ -240,7 +240,7 @@ The following six files under `docs/` form the required core briefing set. Addit
 1. `PROJECT-INSTRUCTIONS.md` — developer rules and architecture boundaries.
 2. `HANDOFF.md` — current implementation state and next acceptance work.
 3. `ROADMAP.md` — future feature sequence.
-4. `THEME-SDK.md` — self-contained Theme SDK 3.1 for external theme authors/generators.
+4. `docs/THEME-SDK.md` — self-contained Theme Package 4.0 / Template API 2.0 guide for external theme authors/generators.
 5. `COURSE-SPECIFICATION.md` — current HTML course authoring/import format.
 6. `OPERATIONS.md` — installation, reset, Seed Database operation, GeoIP and QA commands.
 

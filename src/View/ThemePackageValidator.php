@@ -7,7 +7,7 @@ Date time: 2026/09/09 02:10 SAST
 Version: 0.7
 
 Description:
-Validates Catto Learning Theme Package 3.0 ZIP files and installed filesystem themes. Theme source remains filesystem-only; standalone themes require base.html, every theme requires non-empty public/css/theme.css, and children identify one exact parent name and version.
+Validates Catto Learning Theme Package 4.0 ZIP files and installed filesystem themes. Theme source remains filesystem-only; standalone themes require base.html, every theme requires non-empty public/css/theme.css, and children identify one exact parent name and version.
 
 Changelog:
 2026/09/09 02:10 SAST

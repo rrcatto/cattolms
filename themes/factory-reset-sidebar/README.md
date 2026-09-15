@@ -11,5 +11,5 @@ Features:
 - four palettes from the approved light-theme mockup
 - automatic Catto Learning palette deployment
 
-Requires the revised Catto Learning Theme Package 3.0 palette contract that permits one or more palettes.
+Requires the revised Catto Learning Theme Package 4.0 palette contract that permits one or more palettes.
 It will not install on the original v0.5.7 validator, which still requires exactly three palettes.

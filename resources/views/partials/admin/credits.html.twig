@@ -14,28 +14,28 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', full_width: false, for: 'field-credits-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="access_period_seconds" id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="15552000">6 months</option><option value="31536000" selected>12 months</option></select>
+				<select name="access_period_seconds" id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="15552000">6 months</option><option value="31536000" selected>12 months</option></select>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Quantity', full_width: false, for: 'field-credits-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input type="number" name="quantity" min="1" value="1" id="field-credits-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input type="number" name="quantity" min="1" value="1" id="field-credits-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason', full_width: false, for: 'field-credits-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="reason" id="field-credits-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="administrator">Manual grant</option><option value="replacement">Replacement credit</option><option value="correction">Correction</option></select>
+				<select name="reason" id="field-credits-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="administrator">Manual grant</option><option value="replacement">Replacement credit</option><option value="correction">Correction</option></select>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Audit note', full_width: true, for: 'field-credits-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<textarea name="note" id="field-credits-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}"></textarea>
+				<textarea name="note" id="field-credits-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}></textarea>
 
 {% endblock %}
 {% endembed %}

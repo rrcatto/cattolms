@@ -88,21 +88,21 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role key', full_width: true, for: 'field-roles-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Uppercase snake notation. Prefix SEED_ only when the role is reserved for seed identities.'})} %}
 {% block control %}
 
-									<input name="role_key" required pattern="[A-Z][A-Z0-9_]+" placeholder="TRAINING_MANAGER" id="field-roles-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+									<input name="role_key" required pattern="[A-Z][A-Z0-9_]+" placeholder="TRAINING_MANAGER" id="field-roles-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role name', full_width: true, for: 'field-roles-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'CamelCase without spaces.'})} %}
 {% block control %}
 
-									<input name="role_name" required pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example TrainingManager" placeholder="TrainingManager" id="field-roles-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+									<input name="role_name" required pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example TrainingManager" placeholder="TrainingManager" id="field-roles-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: true, for: 'field-roles-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-									<textarea name="role_description" rows="3" id="field-roles-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}"></textarea>
+									<textarea name="role_description" rows="3" id="field-roles-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}></textarea>
 
 {% endblock %}
 {% endembed %}

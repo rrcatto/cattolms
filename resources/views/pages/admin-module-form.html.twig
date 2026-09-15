@@ -22,49 +22,49 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Position', full_width: false, for: 'field-admin-module-form-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input class="form-control" type="number" min="1" name="position" value="{{ module.position }}" required id="field-admin-module-form-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" type="number" min="1" name="position" value="{{ module.position }}" required id="field-admin-module-form-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Module key', full_width: false, for: 'field-admin-module-form-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input class="form-control" name="module_key" value="{{ module.module_key }}" required id="field-admin-module-form-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" name="module_key" value="{{ module.module_key }}" required id="field-admin-module-form-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title', full_width: false, for: 'field-admin-module-form-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input class="form-control" name="title" value="{{ module.title }}" required id="field-admin-module-form-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" name="title" value="{{ module.title }}" required id="field-admin-module-form-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subtitle', full_width: true, for: 'field-admin-module-form-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-								<input class="form-control" name="subtitle" value="{{ module.subtitle }}" id="field-admin-module-form-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" name="subtitle" value="{{ module.subtitle }}" id="field-admin-module-form-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Learning outcomes', full_width: true, for: 'field-admin-module-form-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-								<textarea class="form-control cl-rich-editor" name="learning_outcomes_html" rows="6" id="field-admin-module-form-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ module.learning_outcomes_html }}</textarea>
+								<textarea class="form-control cl-rich-editor" name="learning_outcomes_html" rows="6" id="field-admin-module-form-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ module.learning_outcomes_html }}</textarea>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Main module content', full_width: true, for: 'field-admin-module-form-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Saving this field updates the main HTML block while retaining imported accordions and other structured blocks.'})} %}
 {% block control %}
 
-								<textarea class="form-control cl-rich-editor" name="content_html" rows="20" id="field-admin-module-form-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>{{ module.content_html }}</textarea>
+								<textarea class="form-control cl-rich-editor" name="content_html" rows="20" id="field-admin-module-form-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ module.content_html }}</textarea>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Module summary', full_width: true, for: 'field-admin-module-form-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-								<textarea class="form-control cl-rich-editor" name="summary_html" rows="8" id="field-admin-module-form-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ module.summary_html }}</textarea>
+								<textarea class="form-control cl-rich-editor" name="summary_html" rows="8" id="field-admin-module-form-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ module.summary_html }}</textarea>
 
 {% endblock %}
 {% endembed %}

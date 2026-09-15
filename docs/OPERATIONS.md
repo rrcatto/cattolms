@@ -317,6 +317,10 @@ At minimum review:
 
 Also validate the accepted external theme at desktop and mobile widths.
 
+`/help` is a public route and must return the learner-facing guide without an authentication
+cookie. Keep its instructions focused on finding courses, buying access, course structure and
+learning; do not turn it into an administration manual.
+
 ## Application logging and browser asset cache
 
 The HTTP bootstrap writes PHP errors and one lightweight request line to:

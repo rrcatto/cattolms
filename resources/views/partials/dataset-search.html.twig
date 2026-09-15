@@ -28,7 +28,7 @@
 		       hx-swap="innerHTML"
 		       hx-include="closest form"
 		       hx-sync="this:replace"
-		       hx-indicator="closest .dataset-search">
+		       hx-indicator="closest .dataset-search" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

@@ -8,7 +8,7 @@ Date time: 2026/08/15 19:16 SAST
 Version: 0.5.7.5.1
 
 Description:
-Regression tests for Theme Package 3.0 automatic palette opt-in, luminance ordering and generated public palette CSS.
+Regression tests for Theme Package 4.0 automatic palette opt-in, luminance ordering and generated public palette CSS.
 
 Changelog:
 2026/08/15 19:16 SAST
@@ -72,6 +72,7 @@ final class ThemePaletteTest extends TestCase
         self::assertStringContainsString('--cl-darkest:var(--cl-color-1)', $contents);
         self::assertStringContainsString('--cl-page-bg:var(--cl-color-5)', $contents);
         self::assertStringContainsString('--cl-button-border:var(--cl-color-2)', $contents);
+        self::assertDoesNotMatchRegularExpression('/\\.(?:btn-primary|card|stat-card|modal-card)\\b/', $contents);
     }
 
     public function testSinglePaletteIsAutoAppliedWithoutSwitcher(): void

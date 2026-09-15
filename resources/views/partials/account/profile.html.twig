@@ -16,63 +16,63 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-profile-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="first_name" maxlength="120" value="{{ profile.first_name }}" id="field-profile-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="first_name" maxlength="120" value="{{ profile.first_name }}" id="field-profile-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', full_width: false, for: 'field-profile-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between your first name and surname" id="field-profile-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="middle_names" maxlength="160" value="{{ profile.middle_names }}" placeholder="Any names between your first name and surname" id="field-profile-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-profile-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="last_name" maxlength="120" value="{{ profile.last_name }}" id="field-profile-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="last_name" maxlength="120" value="{{ profile.last_name }}" id="field-profile-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Identification number', full_width: false, for: 'field-profile-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="identification_number" maxlength="120" value="{{ profile.identification_number }}" id="field-profile-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Birthdate', full_width: false, for: 'field-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Gender', full_width: false, for: 'field-profile-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="gender" id="field-profile-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
+				<select name="gender" id="field-profile-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="">Select</option><option {{ profile.gender=='Male' ? 'selected' : '' }}>Male</option><option {{ profile.gender=='Female' ? 'selected' : '' }}>Female</option><option {{ profile.gender=='Non-binary' ? 'selected' : '' }}>Non-binary</option><option {{ profile.gender=='Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option></select>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', full_width: false, for: 'field-profile-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" id="field-profile-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="mobile_number" maxlength="60" value="{{ profile.mobile_number }}" id="field-profile-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Display name', full_width: false, for: 'field-profile-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="display_name" maxlength="160" value="{{ profile.display_name }}" id="field-profile-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="display_name" maxlength="160" value="{{ profile.display_name }}" id="field-profile-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name to print on certificates', full_width: true, for: 'field-profile-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}" id="field-profile-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+				<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}" id="field-profile-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -124,7 +124,7 @@
 {% block control %}
 
 						<input type="file" id="profile-image-file" name="image" accept="image/png,image/jpeg,image/webp" required
-						       {{ stimulus_target('profile-image', 'file') }} data-action="change-{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>profile-image#choose">
+						       {{ stimulus_target('profile-image', 'file') }} data-action="change->profile-image#choose" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -152,7 +152,7 @@
 {% block control %}
 
 								<input type="range" id="profile-image-zoom" min="1" max="4" step="0.02" value="1"
-								       {{ stimulus_target('profile-image', 'zoom') }} data-action="input-{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>profile-image#zoom">
+								       {{ stimulus_target('profile-image', 'zoom') }} data-action="input->profile-image#zoom" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

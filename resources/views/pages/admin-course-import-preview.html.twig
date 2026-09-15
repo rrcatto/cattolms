@@ -233,7 +233,7 @@
 {% block control %}
 
 								<div class="input-group">
-									<select class="form-select" name="category_id" data-category-select id="field-admin-course-import-preview-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="0">Uncategorised</option>
+									<select class="form-select" name="category_id" data-category-select id="field-admin-course-import-preview-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="0">Uncategorised</option>
 									{% for category in categories %}
 										<option value="{{ category.id }}">{{ category.name }}</option>
 									{% endfor %}
@@ -245,8 +245,8 @@
 								{% if can_manage_categories %}
 									<div class="border rounded p-3 mt-2 d-none" data-category-create-panel data-create-url="/admin/courses/categories/inline" data-csrf="{{ csrf }}">
 										<strong class="d-block mb-2">Create category without leaving this import</strong>
-										<input class="form-control mb-2" data-category-name maxlength="120" placeholder="Category name">
-										<textarea class="form-control mb-2" data-category-description rows="2" placeholder="Description (optional)"></textarea>
+										<input class="form-control mb-2" data-category-name maxlength="120" placeholder="Category name" {{ ui_field_attrs(props) }}>
+										<textarea class="form-control mb-2" data-category-description rows="2" placeholder="Description (optional)" {{ ui_field_attrs(props) }}></textarea>
 										<div class="small text-danger mb-2 d-none" data-category-error>
 										</div>
 										{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
@@ -263,7 +263,7 @@
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', for: 'field-admin-course-import-preview', required: false})} %}
 {% block control %}
-<select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id"><option value="0">Create a new course</option>
+<select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
 							{% for existing in replaceable_courses %}
 								<option value="{{ existing.id }}">{{ existing.title }}</option>
 							{% endfor %}

@@ -82,7 +82,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'tag-name', required: true})} %}
 {% block control %}
 
-							<input id="tag-name" name="name" maxlength="80" required>
+							<input id="tag-name" name="name" maxlength="80" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

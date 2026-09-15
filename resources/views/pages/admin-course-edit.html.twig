@@ -54,7 +54,7 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', full_width: false, for: 'field-admin-course-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Newly imported courses default to the System Company.'})} %}
 {% block control %}
 
-									<select name="owner_company_id" required id="field-admin-course-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+									<select name="owner_company_id" required id="field-admin-course-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 									{% for ownerCompany in owner_companies %}
 										<option value="{{ ownerCompany.id }}" {{ ownerCompany.id==course.owner_company_id ? 'selected' : '' }}>{{ ownerCompany.name }}</option>
 									{% endfor %}
@@ -65,7 +65,7 @@
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning person', full_width: false, for: 'field-admin-course-edit-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Newly imported courses default to the administrator who performed the import.'})} %}
 {% block control %}
 
-									<select name="owner_user_id" required id="field-admin-course-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+									<select name="owner_user_id" required id="field-admin-course-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 									{% for ownerPerson in owner_people %}
 										<option value="{{ ownerPerson.id }}" {{ ownerPerson.id==course.owner_user_id ? 'selected' : '' }}>{{ ownerPerson.name }} · {{ ownerPerson.email }}</option>
 									{% endfor %}
@@ -133,35 +133,35 @@
 												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'field-admin-course-edit-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-													<input class="form-control" type="number" min="1" name="access_period_value" value="{{ price.access_period_value }}" required id="field-admin-course-edit-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+													<input class="form-control" type="number" min="1" name="access_period_value" value="{{ price.access_period_value }}" required id="field-admin-course-edit-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', full_width: false, for: 'field-admin-course-edit-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-													<select class="form-select" name="access_period_unit" id="field-admin-course-edit-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="days" {{ price.access_period_unit=='days' ? 'selected' : '' }}>Days</option><option value="weeks" {{ price.access_period_unit=='weeks' ? 'selected' : '' }}>Weeks</option><option value="months" {{ price.access_period_unit=='months' ? 'selected' : '' }}>Months</option><option value="years" {{ price.access_period_unit=='years' ? 'selected' : '' }}>Years</option></select>
+													<select class="form-select" name="access_period_unit" id="field-admin-course-edit-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="days" {{ price.access_period_unit=='days' ? 'selected' : '' }}>Days</option><option value="weeks" {{ price.access_period_unit=='weeks' ? 'selected' : '' }}>Weeks</option><option value="months" {{ price.access_period_unit=='months' ? 'selected' : '' }}>Months</option><option value="years" {{ price.access_period_unit=='years' ? 'selected' : '' }}>Years</option></select>
 
 {% endblock %}
 {% endembed %}
 												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', full_width: false, for: 'field-admin-course-edit-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-													<input class="form-control" name="price" value="{{ price.price_input }}" inputmode="decimal" required id="field-admin-course-edit-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+													<input class="form-control" name="price" value="{{ price.price_input }}" inputmode="decimal" required id="field-admin-course-edit-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', full_width: false, for: 'field-admin-course-edit-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-													<input class="form-control text-uppercase" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required id="field-admin-course-edit-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+													<input class="form-control text-uppercase" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required id="field-admin-course-edit-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', full_width: false, for: 'field-admin-course-edit-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-													<input class="form-control" name="label" value="{{ price.label }}" maxlength="120" id="field-admin-course-edit-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+													<input class="form-control" name="label" value="{{ price.label }}" maxlength="120" id="field-admin-course-edit-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -215,35 +215,35 @@
 									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'field-admin-course-edit-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-										<input class="form-control" type="number" min="1" name="access_period_value" value="12" required id="field-admin-course-edit-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+										<input class="form-control" type="number" min="1" name="access_period_value" value="12" required id="field-admin-course-edit-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', full_width: false, for: 'field-admin-course-edit-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-										<select class="form-select" name="access_period_unit" id="field-admin-course-edit-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="months" selected>Months</option><option value="days">Days</option><option value="weeks">Weeks</option><option value="years">Years</option></select>
+										<select class="form-select" name="access_period_unit" id="field-admin-course-edit-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="months" selected>Months</option><option value="days">Days</option><option value="weeks">Weeks</option><option value="years">Years</option></select>
 
 {% endblock %}
 {% endembed %}
 									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', full_width: false, for: 'field-admin-course-edit-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-										<input class="form-control" name="price" placeholder="5000.00" inputmode="decimal" required id="field-admin-course-edit-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+										<input class="form-control" name="price" placeholder="5000.00" inputmode="decimal" required id="field-admin-course-edit-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', full_width: false, for: 'field-admin-course-edit-12-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-										<input class="form-control text-uppercase" name="currency_code" value="ZAR" maxlength="3" required id="field-admin-course-edit-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+										<input class="form-control text-uppercase" name="currency_code" value="ZAR" maxlength="3" required id="field-admin-course-edit-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', full_width: false, for: 'field-admin-course-edit-13-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-										<input class="form-control" name="label" placeholder="12-month access" maxlength="120" id="field-admin-course-edit-13-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+										<input class="form-control" name="label" placeholder="12-month access" maxlength="120" id="field-admin-course-edit-13-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -354,7 +354,7 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Original HTML course file', full_width: false, for: 'field-admin-course-edit-14-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input class="form-control" type="file" name="course_html" accept=".html,.htm,text/html" required id="field-admin-course-edit-14-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" type="file" name="course_html" accept=".html,.htm,text/html" required id="field-admin-course-edit-14-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -438,21 +438,21 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'File', full_width: false, for: 'field-admin-course-edit-15-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input class="form-control" type="file" name="media_file" required id="field-admin-course-edit-15-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" type="file" name="media_file" required id="field-admin-course-edit-15-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role', full_width: false, for: 'field-admin-course-edit-16-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-								<select class="form-select" name="media_role" id="field-admin-course-edit-16-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="cover">Course cover</option><option value="content">Course content</option><option value="download">Download</option></select>
+								<select class="form-select" name="media_role" id="field-admin-course-edit-16-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="cover">Course cover</option><option value="content">Course content</option><option value="download">Download</option></select>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Alternative text', full_width: false, for: 'field-admin-course-edit-17-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-								<input class="form-control" name="alt_text" id="field-admin-course-edit-17-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input class="form-control" name="alt_text" id="field-admin-course-edit-17-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

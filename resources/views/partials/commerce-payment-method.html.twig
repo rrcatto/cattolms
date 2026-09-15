@@ -1,7 +1,7 @@
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Payment method', full_width: false, for: 'payment-method', required: true})} %}
 {% block control %}
 
-    <select id="payment-method" name="payment_method" required>
+    <select id="payment-method" name="payment_method" required {{ ui_field_attrs(props) }}>
         <option value="dummy" {{ selected_method == 'dummy' ? 'selected' : '' }}>Card (simulated)</option>
         <option value="eft" {{ selected_method == 'eft' ? 'selected' : '' }}>EFT / bank transfer</option>
     </select>
@@ -11,7 +11,7 @@
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For card testing only. No money is charged. This option does not apply to EFT.'})} %}
 {% block control %}
 
-    <select id="method-token" name="method_token"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+    <select id="method-token" name="method_token" {{ ui_field_attrs(props) }}>
         <option value="demo_success">Successful payment</option>
         <option value="demo_failure">Declined payment</option>
     </select>

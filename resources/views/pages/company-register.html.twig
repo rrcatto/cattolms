@@ -23,14 +23,14 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company or organisation name', full_width: false, for: 'name', required: true})} %}
 {% block control %}
 
-						<input class="form-control" id="name" name="name" maxlength="160" required>
+						<input class="form-control" id="name" name="name" maxlength="160" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email domain', full_width: false, for: 'domain', required: true, help: 'Enter the domain only. Public webmail domains are not accepted.'})} %}
 {% block control %}
 
-						<input class="form-control" id="domain" name="domain" placeholder="example.co.za" required{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+						<input class="form-control" id="domain" name="domain" placeholder="example.co.za" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

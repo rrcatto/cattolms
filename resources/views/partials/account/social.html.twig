@@ -14,7 +14,7 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: (link.label), full_width: false, for: 'social-' ~ (link.key)})} %}
 {% block control %}
 
-						<input type="url" id="social-{{ link.key }}" name="social[{{ link.key }}]" maxlength="500" value="{{ link.url }}" placeholder="{{ link.placeholder }}">
+						<input type="url" id="social-{{ link.key }}" name="social[{{ link.key }}]" maxlength="500" value="{{ link.url }}" placeholder="{{ link.placeholder }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

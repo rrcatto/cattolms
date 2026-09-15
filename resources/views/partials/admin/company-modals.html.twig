@@ -10,14 +10,14 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', full_width: true, for: 'field-company-modals-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-							<input name="name" required id="field-company-modals-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+							<input name="name" required id="field-company-modals-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Registered email domain', full_width: true, for: 'field-company-modals-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-							<input name="domain" placeholder="example.co.za" required id="field-company-modals-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+							<input name="domain" placeholder="example.co.za" required id="field-company-modals-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -50,14 +50,14 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', full_width: true, for: 'field-company-modals-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input name="name" value="{{ company.name }}" required id="field-company-modals-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input name="name" value="{{ company.name }}" required id="field-company-modals-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Domain', full_width: true, for: 'field-company-modals-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
-								<input name="domain" value="{{ company.domain }}" required id="field-company-modals-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+								<input name="domain" value="{{ company.domain }}" required id="field-company-modals-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

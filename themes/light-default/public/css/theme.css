@@ -433,24 +433,14 @@ body.ld-body{
   background:#eef1f4;
   border-bottom:1px solid #d7dde5;
 }
-.ld-chrome-ico{width:13px;height:13px;color:var(--ld-muted);flex:0 0 13px}
-
-.ld-frame-chrome .cl-ui-breadcrumb{
-  flex:1;
-  min-width:0;
-  display:flex;
-  align-items:center;
-  flex-wrap:wrap;
+.ld-chrome-ico{width:13px;height:13px;color:var(--ld-muted);flex:0 0 13px}.ld-frame-chrome .cl-ui-breadcrumb{
   gap:0 5px;
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:5px;
-  min-height:22px;
   padding:2px 9px;
   font-size:.7rem;
-  color:var(--ld-muted);
-}
-.ld-frame-chrome .cl-ui-breadcrumb a{color:var(--ld-muted);text-decoration:none;white-space:nowrap}
+  color:var(--ld-muted)}.ld-frame-chrome .cl-ui-breadcrumb a{color:var(--ld-muted);text-decoration:none}
 .ld-frame-chrome .cl-ui-breadcrumb a:hover{color:var(--ld-accent);text-decoration:underline}
 .ld-frame-chrome .cl-ui-breadcrumb [aria-current]{color:var(--ld-text);font-weight:700}
 .ld-frame-chrome .cl-ui-breadcrumb-separator{opacity:.5}
@@ -495,7 +485,6 @@ body.ld-body{
 .ld-page>.cl-ui-toolbar,
 .ld-page>.cl-ui-list,
 .ld-page>.cl-ui-table,
-.ld-page>.cl-help-accordion,
 .ld-page>.cl-admin-workspace,
 .ld-page>.cl-account-workspace,
 .ld-page>.cl-company-workspace{
@@ -629,14 +618,9 @@ body.ld-body{
 [data-flash-message].cl-ui-notice--danger{background:var(--ld-danger-bg);border-color:var(--ld-danger-line);color:#8f1c12}
 [data-flash-message].cl-ui-notice--danger .ld-flash-dot{background:var(--ld-danger)}/* --------------------------------------------------------------------------
    6. Buttons and action states
-   -------------------------------------------------------------------------- */
-
-.ld-main .cl-ui-action{
+   -------------------------------------------------------------------------- */.ld-main .cl-ui-action{
   --bs-btn-padding-y:0;
   --bs-btn-padding-x:0;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
   gap:7px;
   border:1px solid var(--ld-line-2);
   background:#fff;
@@ -648,9 +632,7 @@ body.ld-body{
   font-weight:680;
   line-height:1.25;
   text-decoration:none;
-  white-space:nowrap;
-  transition:background-color .14s ease,border-color .14s ease,color .14s ease;
-}
+  transition:background-color .14s ease,border-color .14s ease,color .14s ease}
 .ld-main .cl-ui-action:hover{background:var(--ld-soft);border-color:#aeb8c4;color:var(--ld-text)}
 .ld-main .cl-ui-action:disabled,.ld-main .cl-ui-action.disabled,.ld-main .cl-ui-action[aria-disabled="true"]{
   opacity:.55;
@@ -659,7 +641,6 @@ body.ld-body{
 }
 .ld-main .cl-ui-action--small{padding:6px 10px;font-size:.79rem;border-radius:7px}
 .ld-main .cl-ui-action--large{padding:11px 18px;font-size:.94rem;border-radius:var(--ld-radius-md)}
-.ld-main .cl-ui-action.w-100{width:100%}
 
 .ld-main .cl-ui-action--primary,.ld-body .cl-cart-chrome .cl-ui-action--primary{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
 .ld-main .cl-ui-action--primary:hover,.ld-body .cl-cart-chrome .cl-ui-action--primary:hover{background:var(--ld-accent-dark);border-color:var(--ld-accent-dark);color:var(--ld-on-accent)}
@@ -679,27 +660,21 @@ body.ld-body{
 .ld-main .cl-ui-action--quiet:hover{background:var(--ld-soft);border-color:var(--ld-line);color:var(--ld-text)}
 
 .ld-main .cl-ui-action--danger{background:var(--ld-danger);border-color:var(--ld-danger);color:#fff}
-.ld-main .cl-ui-action--danger:hover{background:#94180f;border-color:#94180f;color:#fff}/* Dark bands supply light outline buttons. */
-
-.ld-main .cl-ui-row-actions,.ld-main .toolbar-actions,.ld-main .cl-module-actions{
+.ld-main .cl-ui-action--danger:hover{background:#94180f;border-color:#94180f;color:#fff}/* Dark bands supply light outline buttons. */.ld-main .toolbar-actions,.ld-main .cl-module-actions{
   display:flex;
   align-items:center;
   gap:7px;
   flex-wrap:wrap;
-}
-.ld-main .cl-ui-row-actions form{margin:0}
-
-.ld-main .cl-ui-close{
+}.ld-main .cl-ui-row-actions{
+  gap:7px}
+.ld-main .cl-ui-row-actions form{margin:0}.ld-main .cl-ui-close{
   border:1px solid transparent;
   background:transparent;
   color:var(--ld-muted);
-  width:30px;
-  height:30px;
   border-radius:7px;
   font-size:1.2rem;
   line-height:1;
-  cursor:pointer;
-}
+  cursor:pointer}
 .ld-main .cl-ui-close:hover{background:var(--ld-soft);border-color:var(--ld-line);color:var(--ld-text)}
 
 .ld-main .back-link,.ld-main .cl-back-link{
@@ -713,15 +688,17 @@ body.ld-body{
 }
 .ld-main .back-link:hover,.ld-main .cl-back-link:hover{color:var(--ld-accent)}/* --------------------------------------------------------------------------
    7. Forms, validation and dense controls
-   -------------------------------------------------------------------------- */
-
-.ld-main label,.ld-main .cl-ui-field-label,.ld-main .cl-ui-field>label,.ld-main legend{
+   -------------------------------------------------------------------------- */.ld-main label,.ld-main legend{
   display:block;
   font-size:.8rem;
   font-weight:700;
   color:var(--ld-text);
   margin-bottom:5px;
-}
+}.ld-main .cl-ui-field-label,.ld-main .cl-ui-field>label{
+  font-size:.8rem;
+  font-weight:700;
+  color:var(--ld-text);
+  margin-bottom:5px}
 .ld-main legend{font-size:.9rem;font-weight:760;margin-bottom:8px;float:none;width:auto;padding:0}
 .ld-main fieldset{border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);padding:14px;margin:0 0 14px;min-width:0}
 
@@ -779,29 +756,29 @@ body.ld-body{
 .ld-main input[type="color"]{padding:3px;min-height:38px;cursor:pointer}
 .ld-main input[type="file"]{padding:7px 10px;background:var(--ld-soft-2);cursor:pointer}
 
-.ld-main .cl-ui-field{margin-bottom:12px}
-.ld-main .cl-ui-form-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:12px 14px;
-}
-.ld-main .cl-ui-form-grid .cl-ui-field{margin-bottom:0}
-.ld-main .cl-ui-field--full,.ld-main .cl-ui-form-grid .full{grid-column:1/-1}
-
-.ld-main .form-text,.ld-main .help,.ld-main .cl-ui-field .help{
+.ld-main .cl-ui-field{margin-bottom:12px}.ld-main .cl-ui-form-grid{
+  gap:12px 14px}
+.ld-main .cl-ui-form-grid .cl-ui-field{margin-bottom:0}.ld-main .form-text,.ld-main .help{
   display:block;
   font-size:.78rem;
   color:var(--ld-muted);
   margin-top:5px;
   line-height:1.45;
-}
-.ld-main .invalid-feedback,.ld-main .cl-ui-field .error{
+}.ld-main .cl-ui-field .help{
+  font-size:.78rem;
+  color:var(--ld-muted);
+  margin-top:5px;
+  line-height:1.45}.ld-main .invalid-feedback{
   display:block;
   font-size:.78rem;
   font-weight:640;
   color:var(--ld-danger);
   margin-top:5px;
-}
+}.ld-main .cl-ui-field .error{
+  font-size:.78rem;
+  font-weight:640;
+  color:var(--ld-danger);
+  margin-top:5px}
 .ld-main .is-invalid,.ld-main input[aria-invalid="true"]{border-color:var(--ld-danger)}
 .ld-main .is-invalid:focus{box-shadow:0 0 0 3px var(--ld-danger-bg)}
 
@@ -822,16 +799,9 @@ body.ld-body{
 }
 
 .ld-main .cl-password-toggle{min-height:38px;border:1px solid var(--ld-line-2);background:#fff;border-radius:var(--ld-radius-sm)}
-.ld-main .cl-password-toggle:hover{border-color:var(--ld-accent);color:var(--ld-accent)}
-
-.ld-main .cl-ui-toolbar{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
+.ld-main .cl-password-toggle:hover{border-color:var(--ld-accent);color:var(--ld-accent)}.ld-main .cl-ui-toolbar{
   gap:10px;
-  flex-wrap:wrap;
-  margin-bottom:12px;
-}
+  margin-bottom:12px}
 .ld-main .search-wrap{position:relative;flex:1;min-width:220px;max-width:460px}
 .ld-main .search-wrap input{padding-left:32px}
 .ld-main .search-icon{
@@ -864,42 +834,32 @@ body.ld-body{
 .ld-main .cl-rich-editor{border:1px solid var(--ld-line-2);border-radius:var(--ld-radius-sm);overflow:hidden;background:#fff}
 .ld-main .ck-editor__editable{min-height:260px}/* --------------------------------------------------------------------------
    8. Section heads, cards, panels, lists, metrics and empty states
-   -------------------------------------------------------------------------- */
-
-.ld-main .cl-ui-section-head{
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
+   -------------------------------------------------------------------------- */.ld-main .cl-ui-section-head{
   gap:14px;
-  flex-wrap:wrap;
   padding:18px 0 14px;
   border-bottom:1px solid var(--ld-line);
-  margin-bottom:16px;
-}
-.ld-main .cl-ui-section-head>div{min-width:0}
-.ld-main .cl-ui-section-head h1,.ld-main .cl-ui-section-head h2,.ld-main .cl-ui-section-head h3{margin:5px 0 4px}
-.ld-main .cl-ui-section-head p{margin:0;color:var(--ld-muted);font-size:.88rem;max-width:78ch}
-
-.ld-main .cl-ui-eyebrow,.ld-main .cl-kicker,.ld-main .sec-label{
+  margin-bottom:16px}
+.ld-main .cl-ui-section-head h1,.ld-main .cl-ui-section-head h2,.ld-main .cl-ui-section-head h3{margin:5px 0 4px}.ld-main .cl-ui-section-head p{margin:0;color:var(--ld-muted);font-size:.88rem}.ld-main .cl-kicker,.ld-main .sec-label{
   display:inline-block;
   font-size:.71rem;
   font-weight:800;
   letter-spacing:.09em;
   text-transform:uppercase;
   color:var(--ld-muted);
-}
+}.ld-main .cl-ui-eyebrow{
+  font-size:.71rem;
+  font-weight:800;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--ld-muted)}
 .ld-main .cl-kicker.text-primary,.ld-main .cl-ui-eyebrow.text-primary{color:var(--ld-accent)!important}
 
 .ld-main .section{margin-top:18px}
-.ld-main .sub,.ld-main .sub-inner{color:var(--ld-muted);font-size:.86rem}
-
-.ld-main .cl-ui-surface{
+.ld-main .sub,.ld-main .sub-inner{color:var(--ld-muted);font-size:.86rem}.ld-main .cl-ui-surface{
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
-  box-shadow:var(--ld-shadow-card);
-  overflow:hidden;
-}
+  box-shadow:var(--ld-shadow-card)}
 .ld-main .cl-course-card-body{padding:14px}
 .ld-main .cl-course-card-body.p-4,.ld-main .cl-course-card-body.p-lg-5{padding:18px}
 
@@ -910,29 +870,17 @@ body.ld-body{
 .ld-main .cl-ui-surface.border-success{border-color:#bfe3ce}
 .ld-main .shadow-sm{box-shadow:var(--ld-shadow-card)!important}
 
-.ld-main .admin-reports-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-
-.ld-main .cl-ui-stat-card{
+.ld-main .admin-reports-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.ld-main .cl-ui-stat-card{
   background:var(--ld-soft-2);
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
-  padding:13px 14px;
-  min-width:0;
-}
+  padding:13px 14px}
 .ld-main .cl-ui-stat-value{font-size:1.6rem;font-weight:800;line-height:1.1;color:var(--ld-accent);letter-spacing:-.02em}
 .ld-main .cl-ui-stat-label{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-muted);margin-top:5px}
-.ld-main .cl-ui-stat-note{font-size:.79rem;color:var(--ld-muted);margin-top:4px;line-height:1.4}
-
-.ld-main .cl-ui-list{display:grid;gap:0;border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);background:#fff;overflow:hidden}
-.ld-main .cl-ui-list-item{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
+.ld-main .cl-ui-stat-note{font-size:.79rem;color:var(--ld-muted);margin-top:4px;line-height:1.4}.ld-main .cl-ui-list{gap:0;border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);background:#fff}.ld-main .cl-ui-list-item{
   gap:12px;
-  flex-wrap:wrap;
   padding:11px 13px;
-  border-bottom:1px solid var(--ld-line-3);
-}
+  border-bottom:1px solid var(--ld-line-3)}
 .ld-main .cl-ui-list-item:last-child{border-bottom:0}
 .ld-main .cl-ui-list-item:hover{background:var(--ld-soft-2)}
 .ld-main .cl-ui-list-item strong{font-size:.9rem;font-weight:720}
@@ -959,9 +907,7 @@ body.ld-body{
   color:var(--ld-accent);
   font-weight:800;
   margin-bottom:10px;
-}
-
-.ld-main .cl-ui-notice,.ld-main .cl-callout{
+}.ld-main .cl-callout{
   display:flex;
   align-items:flex-start;
   gap:10px;
@@ -973,7 +919,16 @@ body.ld-body{
   font-size:.85rem;
   line-height:1.5;
   margin-bottom:12px;
-}
+}.ld-main .cl-ui-notice{
+  gap:10px;
+  padding:11px 13px;
+  border-radius:var(--ld-radius-md);
+  background:var(--ld-accent-soft);
+  border:1px solid var(--ld-accent-line);
+  color:var(--ld-text);
+  font-size:.85rem;
+  line-height:1.5;
+  margin-bottom:12px}
 .ld-main .cl-ui-notice>span:first-child{color:var(--ld-accent);font-size:1rem;line-height:1.3}
 
 .ld-main .cl-warning-panel{
@@ -1029,11 +984,7 @@ body.ld-body{
 .ld-main .admin-person-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);gap:16px}
 .ld-main .admin-settings-layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}/* --------------------------------------------------------------------------
    9. Badges, alerts and progress
-   -------------------------------------------------------------------------- */
-
-.ld-main .cl-ui-badge{
-  display:inline-flex;
-  align-items:center;
+   -------------------------------------------------------------------------- */.ld-main .cl-ui-badge{
   gap:5px;
   padding:3px 8px;
   border-radius:999px;
@@ -1043,9 +994,7 @@ body.ld-body{
   font-weight:800;
   letter-spacing:.06em;
   text-transform:uppercase;
-  line-height:1.5;
-  white-space:nowrap;
-}
+  line-height:1.5}
 .ld-main .cl-ui-badge--info,.ld-main .cl-ui-badge.cl-ui-badge--info,.ld-main .cl-ui-badge.cl-ui-badge--neutral{
   background:var(--ld-accent-chip);color:var(--ld-accent)
 }
@@ -1068,24 +1017,13 @@ body.ld-body{
 .ld-main .cl-ui-notice--warning{background:var(--ld-warn-bg);border-color:#f0d5a6;color:#7d4a00}
 .ld-main .cl-ui-notice--danger{background:var(--ld-danger-bg);border-color:var(--ld-danger-line);color:#8f1c12}
 .ld-main .cl-ui-notice--info{background:var(--ld-accent-soft);border-color:var(--ld-accent-line);color:var(--ld-accent)}
-.ld-main .cl-ui-notice h1,.ld-main .cl-ui-notice h2,.ld-main .cl-ui-notice h3,.ld-main .cl-ui-notice h4{color:inherit;font-size:.95rem}
-
-.ld-main .cl-ui-progress{
-  display:block;
-  height:8px;
+.ld-main .cl-ui-notice h1,.ld-main .cl-ui-notice h2,.ld-main .cl-ui-notice h3,.ld-main .cl-ui-notice h4{color:inherit;font-size:.95rem}.ld-main .cl-ui-progress{
   background:var(--ld-line-3);
   border-radius:999px;
-  overflow:hidden;
-  border:1px solid var(--ld-line);
-}
-.ld-main .cl-ui-progress>span,.ld-main .cl-ui-progress-bar{
-  display:block;
-  height:100%;
+  border:1px solid var(--ld-line)}.ld-main .cl-ui-progress>span,.ld-main .cl-ui-progress-bar{
   background:var(--ld-accent);
   border-radius:999px;
-  transition:width .3s ease;
-}
-.ld-main .cl-ui-progress--large{height:13px}
+  transition:width .3s ease}
 .ld-main .cl-countdown{
   display:inline-flex;
   align-items:center;
@@ -1103,14 +1041,15 @@ body.ld-body{
 .ld-main .warn,.ld-main .warning{background:var(--ld-warn-bg);color:var(--ld-warn)}
 .ld-main .fail{background:var(--ld-danger-bg);color:var(--ld-danger)}/* --------------------------------------------------------------------------
    10. Tables, filters and pagination
-   -------------------------------------------------------------------------- */
-
-.ld-main .cl-ui-table,.ld-main .table-responsive{
+   -------------------------------------------------------------------------- */.ld-main .table-responsive{
   overflow-x:auto;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   background:#fff;
-}
+}.ld-main .cl-ui-table{
+  border:1px solid var(--ld-line);
+  border-radius:var(--ld-radius-md);
+  background:#fff}
 .ld-main table{
   width:100%;
   border-collapse:collapse;
@@ -1220,7 +1159,6 @@ body.ld-body{
    platform head is de-emphasised rather than repeated at full weight. */
 
 .ld-main .ld-panel>.cl-ui-section-head:first-of-type{padding-top:0;border-bottom:0;margin-bottom:10px}
-.ld-main .ld-panel>.cl-ui-section-head:first-of-type .cl-ui-eyebrow{display:none}
 .ld-main .ld-panel>.cl-ui-section-head:first-of-type h1,
 .ld-main .ld-panel>.cl-ui-section-head:first-of-type h2{font-size:1rem;color:var(--ld-muted);font-weight:700}
 
@@ -1230,28 +1168,20 @@ body.ld-body{
    Chevrons: the platform supplies its own indicator for administration
    sections and the ACL groups, so the theme styles those instead of adding a
    second marker. Help items have no core indicator and receive one here.
-   -------------------------------------------------------------------------- */
-.ld-main details.cl-ui-accordion-section{
+   -------------------------------------------------------------------------- */.ld-main details.cl-ui-accordion-section{
   border:1px solid var(--ld-line);
   background:#fff;
   border-radius:var(--ld-radius-lg);
-  overflow:hidden;
-  margin-bottom:10px;
-}
-.ld-main details.cl-ui-accordion-section>summary{
-  display:flex;
-  align-items:center;
+  margin-bottom:10px}.ld-main details.cl-ui-accordion-section>summary{
   gap:10px;
   padding:13px 15px;
-  min-height:46px;
   background:#fff;
   color:var(--ld-text);
   font-size:.9rem;
   font-weight:740;
   cursor:pointer;
   list-style:none;
-  text-align:left;
-}
+  text-align:left}
 .ld-main details>summary::-webkit-details-marker{display:none}
 .ld-main details.cl-ui-accordion-section>summary:hover{background:var(--ld-soft-2)}
 .ld-main details[open]>summary{border-bottom:1px solid var(--ld-line)}/* Theme-drawn indicator, Help items only. *//* Platform-supplied indicators. */
@@ -1263,25 +1193,14 @@ body.ld-body{
   line-height:1;
   transition:transform .18s ease;
 }
-.ld-main details.cl-ui-accordion-section[open] .cl-ui-accordion-toggle{transform:rotate(180deg)}
-
-.ld-main .cl-ui-accordion-summary{
-  display:grid;
-  grid-template-columns:minmax(9rem,.8fr) minmax(11rem,1.4fr) auto;
-  align-items:center;
-  gap:12px;
-}
-.ld-main .cl-ui-accordion-title{font-weight:780;min-width:0}
-.ld-main .cl-ui-accordion-description{font-size:.83rem;color:var(--ld-muted);font-weight:400;min-width:0}
+.ld-main details.cl-ui-accordion-section[open] .cl-ui-accordion-toggle{transform:rotate(180deg)}.ld-main .cl-ui-accordion-summary{
+  gap:12px}.ld-main .cl-ui-accordion-title{font-weight:780}.ld-main .cl-ui-accordion-description{font-size:.83rem;color:var(--ld-muted);font-weight:400}
 .ld-main .cl-ui-accordion-content{
   padding:15px;
   border-top:0;
   font-size:.88rem;
   line-height:1.6;
-}
-
-.ld-main .cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:11px}
-.ld-main .cl-ui-accordion-link{
+}.ld-main .cl-ui-accordion-actions{margin-bottom:11px}.ld-main .cl-ui-accordion-link{
   font-size:.79rem;
   font-weight:700;
   color:var(--ld-accent);
@@ -1289,9 +1208,7 @@ body.ld-body{
   border:1px solid var(--ld-accent-line);
   background:var(--ld-accent-soft);
   padding:5px 10px;
-  border-radius:7px;
-  white-space:nowrap;
-}
+  border-radius:7px}
 .ld-main .cl-ui-accordion-link:hover{background:var(--ld-accent-tint)}/* Roles & ACL editor */
 
 .ld-main .acl-groups{display:grid;gap:10px}
@@ -1308,47 +1225,27 @@ body.ld-body{
   font-size:.85rem;
 }/* --------------------------------------------------------------------------
    13. Modals — presentation only; core owns open/close/Escape/focus
-   -------------------------------------------------------------------------- */
-
-.ld-body .cl-ui-modal{
-  align-items:flex-start;
-  justify-content:center;
+   -------------------------------------------------------------------------- */.ld-body .cl-ui-modal{
   padding:20px 14px;
   background:rgba(15,23,42,.55);
   -webkit-backdrop-filter:blur(2px);
-  backdrop-filter:blur(2px);
-  z-index:1050;
-}
-.ld-body .cl-ui-modal-card{
-  width:min(680px,100%);
+  backdrop-filter:blur(2px)}.ld-body .cl-ui-modal-card{
   margin:auto;
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:14px;
   box-shadow:0 24px 60px rgba(15,23,42,.28);
-  color:var(--ld-text);
-}
-.ld-body .cl-ui-modal-card form{margin:0}
-.ld-body .cl-ui-modal-head{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
+  color:var(--ld-text)}
+.ld-body .cl-ui-modal-card form{margin:0}.ld-body .cl-ui-modal-head{
   gap:12px;
   padding:15px 17px;
-  border-bottom:1px solid var(--ld-line);
-}
+  border-bottom:1px solid var(--ld-line)}
 .ld-body .cl-ui-modal-head h1,.ld-body .cl-ui-modal-head h2,.ld-body .cl-ui-modal-head h3{margin:0;font-size:1.05rem}
-.ld-body .cl-ui-modal-body{padding:17px}
-.ld-body .cl-ui-modal-foot{
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
+.ld-body .cl-ui-modal-body{padding:17px}.ld-body .cl-ui-modal-foot{
   gap:8px;
-  flex-wrap:wrap;
   padding:13px 17px;
   border-top:1px solid var(--ld-line);
-  background:var(--ld-soft);
-}
+  background:var(--ld-soft)}
 .ld-body .cl-ui-modal-foot:last-child{border-radius:0 0 14px 14px}/* --------------------------------------------------------------------------
    14. Catalogue, course detail and course cards
    -------------------------------------------------------------------------- */
@@ -1771,10 +1668,8 @@ body.ld-body{
   }
   .ld-caret{margin-left:auto}
 
-  .ld-stage{padding:12px 10px 24px}
-  .ld-main .cl-ui-section-head{align-items:flex-start;flex-direction:column;gap:10px}
-  .ld-main .ld-panel-head{align-items:flex-start;flex-direction:column;gap:10px}
-  .ld-main .cl-ui-accordion-summary{grid-template-columns:1fr;gap:5px}
+  .ld-stage{padding:12px 10px 24px}.ld-main .cl-ui-section-head{gap:10px}
+  .ld-main .ld-panel-head{align-items:flex-start;flex-direction:column;gap:10px}.ld-main .cl-ui-accordion-summary{gap:5px}
   .ld-main .ld-panel{padding:14px}
   .ld-footer-grid{grid-template-columns:1fr;gap:16px}
 }
@@ -1786,8 +1681,7 @@ body.ld-body{
   .ld-frame-chrome .cl-ui-breadcrumb{font-size:.68rem}
   .ld-main .cl-ui-action{padding:8px 11px}
   .ld-main .cl-ui-stat-value{font-size:1.35rem}
-  .ld-main .cl-certificate{padding:20px}
-  .ld-main .cl-ui-list-item{align-items:flex-start;flex-direction:column;gap:8px}
+  .ld-main .cl-certificate{padding:20px}.ld-main .cl-ui-list-item{gap:8px}
 }/* Long labels must never collide with an accordion or menu indicator. */
 
 .ld-main summary>span,.ld-main .tab-btn>span,.ld-nav-link>span,.ld-menu-link>span{
@@ -1816,8 +1710,7 @@ body.ld-body{
   .ld-frame{border:0;box-shadow:none;border-radius:0}
 
   .ld-main .cl-ui-surface,.ld-main .ld-deck,.ld-main .cl-certificate{box-shadow:none;border-color:#bbb;break-inside:avoid}
-  .ld-main .cl-certificate:before{border-color:#bbb}
-  .ld-main .cl-ui-action,.ld-main .cl-ui-row-actions,.ld-main .ld-panel-link{display:none!important}
+  .ld-main .cl-certificate:before{border-color:#bbb}.ld-main .ld-panel-link{display:none!important}
   .ld-main a{text-decoration:none;color:#000}
   .ld-main thead th{position:static}
 }
@@ -1873,27 +1766,15 @@ body.ld-body{
 .ld-main .cl-page-head .cl-back-link,.ld-main .cl-page-head .back-link{color:var(--ld-band-ink-2)}
 .ld-main .cl-page-head .cl-back-link:hover{color:var(--ld-band-ink)}
 .ld-main .cl-page-head .text-body-secondary,.ld-main .cl-page-head .text-primary{color:var(--ld-band-ink-2)!important}/* Section heads: the other heading surface the platform uses, including the
-   page-opening head on Catalogue, Help and every Administration section. */
-
-.ld-main .cl-ui-section-head{
-  position:relative;
-  overflow:hidden;
+   page-opening head on Catalogue, Help and every Administration section. */.ld-main .cl-ui-section-head{
   background:var(--ld-band-soft);
   border:1px solid var(--ld-band-line);
   border-radius:var(--ld-radius-lg);
   padding:15px 18px 15px 21px;
   margin-bottom:16px;
-  color:var(--ld-band-ink);
-}
-.ld-main .cl-ui-section-head::before{
+  color:var(--ld-band-ink)}.ld-main .cl-ui-section-head::before{
   content:"";
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:4px;
-  background:var(--ld-accent);
-}
+  background:var(--ld-accent)}
 .ld-main .cl-ui-section-head h1,.ld-main .cl-ui-section-head h2,.ld-main .cl-ui-section-head h3{color:inherit;margin:5px 0 4px}
 .ld-main .cl-ui-section-head p{color:var(--ld-band-ink-2)}
 .ld-main .cl-ui-section-head .cl-ui-eyebrow,.ld-main .cl-ui-section-head .cl-kicker{color:var(--ld-accent)}
@@ -1930,8 +1811,7 @@ body.ld-body{
   border-radius:0;
   padding:0;
   margin-bottom:10px;
-}
-.ld-main .ld-panel>.cl-ui-section-head:first-of-type::before{display:none}/* -- Accordions ------------------------------------------------------------ */
+}/* -- Accordions ------------------------------------------------------------ */
 .ld-main details.cl-ui-accordion-section{border-color:var(--ld-band-line)}
 .ld-main details.cl-ui-accordion-section>summary{
   background:var(--ld-band-soft);

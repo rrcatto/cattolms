@@ -325,7 +325,7 @@
 
 .cl-ui-row-menu>summary{list-style:none;cursor:pointer}
 .cl-ui-row-menu>summary::-webkit-details-marker{display:none}
-.cl-ui-row-panel,.cl-ui-table .cl-ui-row-panel{position:absolute!important;right:0;top:calc(100% + 4px);z-index:1050;display:grid!important;gap:2px;min-width:11rem;width:max-content;padding:6px!important;border:1px solid var(--cl-border,#dfe4ea)!important;border-radius:10px!important;background:var(--cl-page-surface,#fff)!important;color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)!important;text-align:left;white-space:nowrap}/* Actions in a menu stack, one per line, always.
+.cl-ui-row-panel,.cl-ui-table .cl-ui-row-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:1050;display:grid;gap:2px;min-width:11rem;width:max-content;padding:6px!important;border:1px solid var(--cl-border,#dfe4ea)!important;border-radius:10px!important;background:var(--cl-page-surface,#fff)!important;color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)!important;text-align:left;white-space:nowrap}/* Actions in a menu stack, one per line, always.
 
    A form is a grid too, not just a block: Approve and Reject live inside one form element, so
    making only the form full-width left the two buttons inline next to each other inside it. Every
@@ -384,8 +384,7 @@
    that has never heard of this page must still render it usably. Themes tint it through the
    --cl-* palette; nothing here fixes a colour a theme cannot change. */
 
-.cl-help-accordion{display:grid;gap:.75rem}/* The nested level is deliberately quieter: a rule down the left rather than a second box, so the
-   eye reads one group containing topics instead of two kinds of card. *//* v0.7 form actions. A submit button hard against the last field reads as part of the field, and
+/* v0.7 form actions. A submit button hard against the last field reads as part of the field, and
    under Factory Reset the contact form's button was touching the textarea. Core owns the spacing
    because it is the same mistake on every form, not a matter of taste per theme. *//* Where a form ends and its actions begin. Separated by a hairline, because a reader looking for
    "how do I save this" should find one place on every form rather than scanning for whichever
@@ -593,11 +592,7 @@
    it cannot fail contrast in a theme core knows nothing about - a filled chip in a fixed brand
    colour would, on whichever theme sets that colour light. */
 
-.cl-filter-chip.is-current{font-weight:600;border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
-.cl-question-editor{padding:1.25rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:1rem;margin-bottom:1.25rem}
-.cl-question-editor+.cl-question-editor{margin-top:1.25rem}
-.cl-option-editor{padding:.8rem;border:1px dashed var(--cl-border,#dfe4ea);border-radius:.7rem}
-.cl-option-editor+.cl-option-editor{margin-top:.6rem}/* v0.7 form spacing, made a property of the platform rather than of whichever theme is active.
+.cl-filter-chip.is-current{font-weight:600;border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}/* v0.7 form spacing, made a property of the platform rather than of whichever theme is active.
 
    Every form on the LMS is built from the same few pieces, and the spacing of those pieces was
    left to the themes. Resolved against all five installed themes, the vocabulary came out like
@@ -900,7 +895,7 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-ui-form-grid[data-columns="1"]{grid-template-columns:minmax(0,1fr)}
 .cl-ui-field--full,.cl-ui-form-actions{grid-column:1/-1}.cl-ui-form-grid>.cl-ui-field+.cl-ui-field{margin-top:0}
 .cl-ui-field-label{font-weight:600}.cl-ui-field-help{font-size:.875rem;opacity:.8}.cl-ui-field-error{color:#a31525}.cl-ui-required{color:inherit}
-.cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice input{width:auto;flex:0 0 auto}.cl-ui-choice{min-width:0}
+body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice input{width:auto;flex:0 0 auto}.cl-ui-choice{min-width:0}
 .cl-ui-compact-action{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}.cl-ui-compact-action input,.cl-ui-compact-action select{width:auto;max-width:100%}
 .cl-ui-table{max-width:100%;overflow-x:auto}.cl-ui-table table{width:100%;border-collapse:collapse}.cl-ui-table[data-density="compact"] th,.cl-ui-table[data-density="compact"] td{padding:.4rem}
 .cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}.cl-ui-stat-card{padding:1.2rem;min-width:0;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}.cl-ui-stat-value{font-size:1.8rem;font-weight:700}.cl-ui-stat-label{font-weight:600}.cl-ui-stat-note{font-size:.85rem}
@@ -945,3 +940,12 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-ui-table[data-density="compact"]{--cl-table-pad-y:4px;--cl-table-pad-x:7px}
 
 @media(max-width:700px){.cl-ui-table .cl-ui-row-label{display:none}.cl-ui-table .cl-ui-row-trigger{gap:0}}
+
+/* Notice headings are structural; emphasis inside notice prose stays inline. */
+.cl-ui-notice-heading{display:block;margin-bottom:.3rem}
+
+/* Native fields keep their natural height alongside multiline controls. */
+.cl-ui-form-grid>.cl-ui-field{align-content:start}
+/* Question/option composition is shared by saved records and Twig prototypes. */
+#question-editor [data-options]{margin-block:1rem}
+#question-editor [data-option]+[data-option]{margin-top:1rem}

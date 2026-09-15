@@ -115,6 +115,9 @@ cards and favourites remain canonical.
 
 Core owns responsive columns, stable IDs/htmx targets, minimum functional spacing, native GET/POST,
 required overflow and accessible states. Themes own colours, typography, borders, radii and shadows.
+`UiOwnershipAudit` rejects canonical component display/flex/grid, dimensions, overflow, positioning
+and visibility declarations in theme CSS, including responsive rules. Use `cl-ui-notice-heading`
+for notice headings; a broad notice `strong` selector would also restyle inline prose emphasis.
 In particular, Gilded Noir keeps its engraved canvas, paper surfaces, gold actions and navigation
 identity chip while consuming the same components.
 

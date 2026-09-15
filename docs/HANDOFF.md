@@ -10,9 +10,9 @@ Omnipay Dummy simulations, manual EFT instructions, payment retries, immutable o
 downloads, optional invoice email and access timing. Settings now have independent accordion forms,
 with bank details stored in `app_options`; cart colours and surfaces belong to the active theme.
 
-Run additive migrations against v0.7, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The current v0.8.1 Podman QA gate passes 626 tests and 44,510 assertions, with PHPStan and all validators green; guest cart, settings and component layouts were checked in Chromium at desktop and mobile sizes.
+Run additive migrations against v0.7, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The current v0.8.1 Podman QA gate passes 634 tests and 43,707 assertions, with PHPStan and all validators green; Profile Image and both question-editor modes were checked in Chromium across all bundled themes at desktop and mobile sizes, including native fallbacks.
 
-The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. Current QA is 626 tests and 44,510 assertions, with all quality gates passing.
+The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. Current QA is 634 tests and 43,707 assertions, with all quality gates passing.
 
 ## Current platform UI architecture
 

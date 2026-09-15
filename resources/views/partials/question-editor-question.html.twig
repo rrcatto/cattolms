@@ -1,0 +1,58 @@
+<div data-question data-question-index="{{ qi }}">
+    {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+        {% block surface_body %}
+            {% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
+                {% block toolbar_primary %}<h3>Question <span data-question-number>{{ qi == '__q__' ? '' : qi + 1 }}</span></h3>{% endblock %}
+                {% block toolbar_actions %}{{ ui('action.button', {label: 'Remove question', icon: 'action-remove', variant: 'danger', size: 'small', type: 'button', name: 'question_action', value: 'remove-question'}) }}{% endblock %}
+            {% endembed %}
+            {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+                {% block body %}
+                    {% set fields = [
+                        {key: 'question_html', label: 'Question', type: 'textarea', value: question.question_html|default(''), required: true},
+                        {key: 'question_points', label: 'Points', type: 'number', value: question.points|default(1), required: true},
+                        {key: 'question_explanation', label: 'Explanation', type: 'textarea', value: question.explanation_html|default(''), required: false}
+                    ] %}
+                    {% if not diagnostic %}
+                        {% set fields = fields|merge([
+                            {key: 'question_difficulty', label: 'Difficulty', type: 'difficulty', value: question.difficulty|default('standard'), required: false},
+                            {key: 'incorrect_points', label: 'Wrong points', type: 'number', value: question.incorrect_points|default(0), required: false}
+                        ]) %}
+                    {% endif %}
+                    {% for field in fields %}
+                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: 'question-' ~ qi ~ '-' ~ field.key, required: field.required, full_width: field.key == 'question_html'})} %}
+                            {% block control %}
+                                {% if field.type == 'textarea' %}
+                                    <textarea id="{{ props.for }}" name="{{ field.key }}[{{ qi }}]" {{ field.required ? 'required' : '' }} {{ ui_field_attrs(props) }}>{{ field.value }}</textarea>
+                                {% elseif field.type == 'difficulty' %}
+                                    <select id="{{ props.for }}" name="question_difficulty[{{ qi }}]" {{ ui_field_attrs(props) }}>{% for value, label in {introductory: 'Introductory', standard: 'Standard', advanced: 'Advanced'} %}<option value="{{ value }}" {{ field.value == value ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>
+                                {% else %}
+                                    <input id="{{ props.for }}" type="number" name="{{ field.key }}[{{ qi }}]" value="{{ field.value }}" {% if field.key == 'incorrect_points' %}max="0" step="0.25"{% else %}min="1" required{% endif %} {{ ui_field_attrs(props) }}>
+                                {% endif %}
+                            {% endblock %}
+                        {% endembed %}
+                    {% endfor %}
+                    {% if diagnostic %}
+                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Suggest modules when incorrect', for: 'question-' ~ qi ~ '-remediation', help: 'Select the modules to suggest after an incorrect answer.'})} %}
+                            {% block control %}<select id="{{ props.for }}" name="remediation_module_keys[{{ qi }}][]" multiple size="4" {{ ui_field_attrs(props) }}>{% for module in modules %}<option value="{{ module.module_key }}" {{ module.module_key in question.remediation_module_keys|default([]) ? 'selected' : '' }}>{{ module.position }}. {{ module.title }}</option>{% endfor %}</select>{% endblock %}
+                        {% endembed %}
+                        <input type="hidden" name="question_difficulty[{{ qi }}]" value="standard">
+                        <input type="hidden" name="practice_eligible[{{ qi }}]" value="1">
+                        <input type="hidden" name="incorrect_points[{{ qi }}]" value="0">
+                    {% else %}
+                        {% for key, label in {practice_eligible: 'Practice eligible', graded_eligible: 'Graded eligible'} %}
+                            {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: label})} %}
+                                {% block control %}<input type="checkbox" name="{{ key }}[{{ qi }}]" value="1" {{ (question[key] ?? true) ? 'checked' : '' }}>{% endblock %}
+                            {% endembed %}
+                        {% endfor %}
+                    {% endif %}
+                {% endblock %}
+            {% endembed %}
+            <div data-options>
+                {% for oi, option in question.options|default([{}, {}, {}, {}]) %}
+                    {% include '@platform/partials/question-editor-option.html.twig' %}
+                {% endfor %}
+            </div>
+            {{ ui('action.button', {label: 'Add option', icon: 'action-add', type: 'button', name: 'question_action', value: 'add-option'}) }}
+        {% endblock %}
+    {% endembed %}
+</div>

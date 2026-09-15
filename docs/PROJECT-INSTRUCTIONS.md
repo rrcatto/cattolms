@@ -191,7 +191,7 @@ Core supplies permission-filtered `navigation` and `footer_navigation` arrays. T
 
 ## 7. Theme architecture
 
-- Theme Package schema 3.0; Template API 1.0; Theme SDK 3.1.
+- Theme Package schema 4.0; Template API 2.0.
 - Themes are filesystem-authoritative immutable presentation packages. `theme_registry` is a rebuildable database index, not the source of truth.
 - Every standalone installed theme defines its own `base.html`; it never falls back to Factory Reset.
 - A child theme may inherit from exactly one installed standalone parent name+version; child-of-child inheritance is unsupported.
