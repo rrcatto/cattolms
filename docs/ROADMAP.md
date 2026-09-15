@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.8
-**Date time:** 2026/09/13 SAST
-**Current stage:** v0.8 adds individual commerce (Dummy/EFT checkout, invoices, access timing and bank settings). Continue the remaining stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
+**Current LMS version:** 0.8.1
+**Date time:** 2026/09/15 SAST
+**Current stage:** v0.8.1 standardises recurring UI through the canonical component registry. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
 
 Only the project owner decides future release numbers.
 
@@ -20,6 +20,11 @@ company, catalogue, commerce and learning into the canonical component registry.
 family/ownership contracts are part of the normal QA gate. Extend this system for future UI work;
 do not restore historical raw wrappers, flat component names or compatibility CSS. See
 [UI-COMPONENTS.md](UI-COMPONENTS.md). This does not change the remaining commerce roadmap.
+
+The purpose is consistency: independently vibe-coded LLM views had allowed equivalent controls to
+drift in markup, spacing, responsive behavior, accessibility and progressive enhancement. New views
+must compose the registry and extend its contract tests only when a reusable job is not already
+represented.
 
 ## 1. v0.5.7.5.1 ACL foundation
 

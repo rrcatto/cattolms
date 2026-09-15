@@ -1,7 +1,31 @@
 # Changelog
 
-**LMS version:** 0.8
-**Date time:** 2026/09/13 SAST
+**LMS version:** 0.8.1
+**Date time:** 2026/09/15 SAST
+
+## 2026-09-15 SAST — v0.8.1 Platform UI component system
+
+The platform now has one canonical UI implementation for each reusable interface job. This
+standardises the markup that views use instead of asking an LLM to recreate each screen from
+scratch, which had allowed spacing, responsive behavior, accessibility and progressive-enhancement
+details to drift between pages and themes.
+
+- Add the `PlatformUi` registry with explicit namespaced layout, action, form, data, feedback,
+  overlay, icon and catalogue components, bounded semantic properties and authored Twig slots.
+- Migrate account, administration, company, commerce, learning, assessment, catalogue and tag
+  surfaces to the canonical components while retaining shared search, pagination, course-card,
+  entity-lookup, navigation and footer controls.
+- Rebuild the public category browser around the persistent Tier 1 grid and flat Tier 2/Tier 3
+  workspace; make tag browsing use the same course-results components.
+- Add the Administration → System → UI Components gallery and contract tests that reject duplicate
+  component implementations, obsolete structures and theme-generated functional controls.
+- Keep all themes on the same functional DOM while preserving their visual identity, including
+  Gilded Noir's canvas, palette, artwork and navigation identity chip.
+- Preserve full no-JavaScript GET/POST behavior; htmx, Stimulus and theme scripts remain progressive
+  enhancements only.
+
+Validation: 626 tests, 44,510 assertions, PHPStan, architecture, runtime, UI-contract and release
+gates passed; 171 Twig templates lint cleanly. Published as annotated tag `v0.8.1`.
 
 ## 2026-09-13 SAST — v0.8 Adding commerce to the LMS
 

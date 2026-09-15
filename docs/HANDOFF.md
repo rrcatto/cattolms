@@ -1,14 +1,18 @@
-# Catto Learning 0.8 — Development Handoff
+# Catto Learning 0.8.1 — Development Handoff
 
-**Date:** 2026/09/13 SAST
-**Update:** Adding commerce to the LMS
-**Git publication:** `main`, `dev-v0.8`, annotated tag `v0.8`
+**Date:** 2026/09/15 SAST
+**Update:** v0.8.1 platform UI component system
+**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8` and `v0.8.1`
 
-The individual purchase flow is implemented: guest carts, staged checkout, profile capture, Omnipay Dummy simulations, manual EFT instructions, payment retries, immutable orders/invoices, PDF downloads, optional invoice email and access timing. Settings now have independent accordion forms, with bank details stored in `app_options`. Cart colours and surfaces belong to the active theme.
+The v0.8.1 update standardises the platform UI around the canonical component registry. The
+individual purchase flow remains implemented: guest carts, staged checkout, profile capture,
+Omnipay Dummy simulations, manual EFT instructions, payment retries, immutable orders/invoices, PDF
+downloads, optional invoice email and access timing. Settings now have independent accordion forms,
+with bank details stored in `app_options`; cart colours and surfaces belong to the active theme.
 
-Run additive migrations against v0.7, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. Local Podman QA passed 590 tests and 9,172 assertions, PHPStan and all validators; guest cart and settings layouts were checked in Chromium at desktop and mobile sizes.
+Run additive migrations against v0.7, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The current v0.8.1 Podman QA gate passes 626 tests and 44,510 assertions, with PHPStan and all validators green; guest cart, settings and component layouts were checked in Chromium at desktop and mobile sizes.
 
-The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures.
+The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. Current QA is 626 tests and 44,510 assertions, with all quality gates passing.
 
 ## Current platform UI architecture
 
@@ -20,6 +24,11 @@ The component gallery is `/admin/system/ui-components` under the existing System
 No compatibility component names or old structural CSS aliases remain. Gilded Noir keeps its own
 visual design and uses the shared structure. Earlier historical UI instructions below are records,
 not current implementation requirements; use the component guide and UX rules for changes.
+
+This standardisation exists to stop page-by-page LLM generation from recreating the same UI job
+with subtly different markup. A new view must compose an existing component, or extend the registry
+and its contract tests when the job is genuinely new. The resulting structure keeps spacing,
+responsive behavior, accessibility and no-JavaScript fallbacks consistent across themes.
 
 ## Current catalogue component architecture
 

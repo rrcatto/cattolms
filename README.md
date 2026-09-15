@@ -1,9 +1,34 @@
-# Catto Learning LMS 0.8
+# Catto Learning LMS 0.8.1
 
-**LMS version:** 0.8
-**Date time:** 2026/09/13 SAST
+**LMS version:** 0.8.1
+**Date time:** 2026/09/15 SAST
 
 Catto Learning is a PHP/Symfony/PostgreSQL learning-management and course-commerce platform targeting **PHP 8.5.9 or later in the 8.5 series**. The VPS runs PHP 8.5.10 and PostgreSQL 16.15 as of 2026/09/03; it is updated regularly, so the supported floor rather than the day's build is what the code targets.
+
+## v0.8.1 — Standardising the platform UI
+
+The latest update introduces a canonical platform UI component system so views are assembled from
+tested, reusable structures instead of being vibe-coded independently by an LLM. Independent
+page-by-page implementations had begun to drift in markup, spacing, responsive behavior,
+accessibility and progressive enhancement. The `PlatformUi` registry now defines the allowed
+components, semantic properties and Twig slot boundaries; contract tests fail when a recurring
+structure is duplicated or an obsolete implementation returns.
+
+The namespaced families cover layout, actions, forms, data, feedback, overlays, icons and catalogue
+surfaces. Account, administration, company, commerce, learning, assessment and public catalogue/tag
+pages now consume those canonical components. Search, pagination, course cards, entity lookup,
+navigation and footer controls remain shared platform implementations. The component gallery is
+available at `/admin/system/ui-components`, and [docs/UI-COMPONENTS.md](docs/UI-COMPONENTS.md) is the
+complete registry and slot reference. All bundled themes consume the same functional structure while
+retaining their own visual identity, including Gilded Noir.
+
+This release keeps server-rendered GET/POST navigation as the baseline. htmx, Stimulus and theme
+JavaScript enhance the experience but do not own essential behavior. Run `composer qa` before adding
+or changing a view, and extend a component plus its contract test when a reusable UI job is new.
+
+Validation in the local Podman environment: 626 tests, 44,510 assertions, all PHPStan, architecture,
+runtime, UI-contract and release gates passed; all 171 Twig templates lint cleanly. The update is
+published as annotated tag `v0.8.1`.
 
 ## v0.8 — Adding commerce to the LMS
 
@@ -15,7 +40,8 @@ Upgrade an existing v0.7 database with the additive migrations; do not reset it.
 
 This is the initial individual-purchase implementation. Real payment processors, bank-payment confirmation administration, company credit purchases, wallets, gifts and refund workflows remain future work in the [commerce plan](docs/COMMERCE-IMPLEMENTATION-PLAN.md). Dummy payments are enabled only in development and tests.
 
-Validation in the local Podman environment: 590 tests, 9,172 assertions, PHPStan and all repository quality gates passed. The repository refs for this update are `main`, `dev-v0.8` and annotated tag `v0.8`.
+The commerce baseline was validated before the v0.8.1 component expansion. See the v0.8.1 section
+above for the current test and quality-gate results.
 
 ## Inherited v0.7 foundation
 
