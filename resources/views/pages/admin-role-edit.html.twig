@@ -7,43 +7,58 @@
 	{% set ph_lead = role_acl.role_description %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container py-4">
-		<div class="grid grid-2 section">
-			<div class="card">
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
+{% block body %}
+
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				<h2>
 					Role details
 				</h2>
-				<form action="/admin/roles/{{ role_acl.id }}" method="post" class="form-grid">
+				<form action="/admin/roles/{{ role_acl.id }}" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div class="field">
-						<label>Role key</label>
-						<input name="role_key" value="{{ role_acl.role_key }}" {{ role_acl.is_builtin_role ? 'readonly' : '' }}>
-						<div class="help">
-							{{ role_acl.is_builtin_role ? 'Built-in role keys are permanent.' : 'Use uppercase snake notation. Prefix SEED_ only for a seed-only role.' }}
-						</div>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role key', full_width: false, for: 'field-admin-role-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: (role_acl.is_builtin_role ? 'Built-in role keys are permanent.' : 'Use uppercase snake notation. Prefix SEED_ only for a seed-only role.')})} %}
+{% block control %}
+
+						<input name="role_key" value="{{ role_acl.role_key }}" {{ role_acl.is_builtin_role ? 'readonly' : '' }} id="field-admin-role-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role name', full_width: false, for: 'field-admin-role-edit-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'CamelCase, for example CompanyManager.'})} %}
+{% block control %}
+
+						<input name="role_name" value="{{ role_acl.role_name }}" pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example CompanyManager" id="field-admin-role-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: true, for: 'field-admin-role-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+						<textarea name="role_description" rows="4" id="field-admin-role-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ role_acl.role_description }}</textarea>
+
+{% endblock %}
+{% endembed %}
+					<div class="cl-ui-field--full">
+						{{ ui('action.button', {label: 'Save role', variant: 'primary', size: 'normal', disabled: not can_manage_roles}) }}
 					</div>
-					<div class="field">
-						<label>Role name</label>
-						<input name="role_name" value="{{ role_acl.role_name }}" pattern="[A-Z][A-Za-z0-9]*" title="CamelCase without spaces, for example CompanyManager">
-						<div class="help">
-							CamelCase, for example CompanyManager.
-						</div>
-					</div>
-					<div class="field full">
-						<label>Description</label>
-						<textarea name="role_description" rows="4">{{ role_acl.role_description }}</textarea>
-					</div>
-					<div class="field full">
-						<button class="btn btn-primary" {{ not can_manage_roles ? 'disabled' : '' }}>Save role</button>
-					</div>
-				</form>
+
+{% endblock %}
+{% endembed %}</form>
 				{% if can_manage_roles and not role_acl.is_builtin_role and role_acl.user_count==0 %}
 					<form class="section" action="/admin/roles/{{ role_acl.id }}/delete" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<button class="btn btn-danger" data-confirm="Delete this role?">Delete role</button>
+						{{ ui('action.button', {label: 'Delete role', variant: 'danger', size: 'normal', confirm: 'Delete this role?', icon: 'action-remove'}) }}
 					</form>
 				{% endif %}
-			</div>
-			<div class="card">
+
+{% endblock %}
+{% endembed %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				<h2>
 					Assignment summary
 				</h2>
@@ -57,54 +72,46 @@
 					Role family controls which identities may receive the role. It does not select a separate permission namespace.
 				</p>
 				{% if role_acl.is_admin_role %}
-					<div class="notice">
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 						<span>i</span>
 						<div>
 							ADMIN always receives every business and SYSTEM permission. Its permission checkboxes are read-only and cannot be reduced.
 						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
-			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 		<form action="/admin/roles/{{ role_acl.id }}/permissions" method="post" class="section">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			<div class="section-head">
-				<div>
-					<h2>
-						Permissions
-					</h2>
-					<p>
-						Check the capabilities this role should receive, then save once. Normal and SEED_* roles share these business permission keys; data visibility is enforced separately.
-					</p>
-				</div>
-				<button class="btn btn-primary" type="submit" {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>Save permissions</button>
-			</div>
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Permissions', summary: 'Check the capabilities this role should receive, then save once. Normal and SEED_* roles share these business permission keys; data visibility is enforced separately.'})} %}
+
+{% endembed %}
 			<div class="acl-groups">
 				{% for groupName, groupPermissions in role_acl.permission_groups %}
-					<details class="acl-group">
-						<summary class="acl-group-summary">
-							{{ groupName }}
-						</summary>
-						<div class="acl-group-content">
-							<div class="table-wrap acl-table-wrap">
-								<table class="acl-permission-table">
-									<thead>
+					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: (groupName)})} %}
+{% block body %}
+
+								{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 										<tr>
-											<th style="width:7%">
-												Assign
-											</th>
-											<th style="width:24%">
-												Permission
-											</th>
-											<th style="width:27%">
-												Internal key
-											</th>
-											<th style="width:42%">
-												Description
-											</th>
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 7, label: 'Assign'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Permission'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 27, label: 'Internal key'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'Description'}} %}
 										</tr>
-									</thead>
-									<tbody>
+
+{% endblock %}
+{% block body %}
+
 										{% for permission in groupPermissions %}
 											<tr>
 												<td class="acl-permission-check">
@@ -121,16 +128,18 @@
 												</td>
 											</tr>
 										{% endfor %}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					</details>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 				{% endfor %}
 			</div>
-			<div class="toolbar section">
-				<span class="muted">Changes take effect on the next request after Save.</span><button class="btn btn-primary" type="submit" {{ (role_acl.is_admin_role or not can_manage_roles) ? 'disabled' : '' }}>Save permissions</button>
-			</div>
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save permissions', variant: 'primary', disabled: (role_acl.is_admin_role or not can_manage_roles)}) }}{% endblock %}
+{% block secondary_actions %}<span class="muted">Changes take effect on the next request after Save.</span>{% endblock %}
+{% endembed %}
 		</form>
 	</section>
 {% endblock %}

@@ -16,14 +16,18 @@
 					<p class="lead mt-4">
 						Structured modules, meaningful assessments and a course library that remembers your progress securely.
 					</p>
-					<div class="d-flex flex-wrap gap-3 mt-4">
-						<a class="btn btn-primary btn-lg" href="/courses">Browse courses</a>
+					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+
+						{{ ui('action.link', {label: 'Browse courses', variant: 'primary', size: 'large', href: '/courses'}) }}
 						{% if is_authenticated %}
-							<a class="btn btn-outline-light btn-lg" href="/account/library">Open my library</a>
+							{{ ui('action.link', {label: 'Open my library', variant: 'secondary', size: 'large', href: '/account/library'}) }}
 						{% else %}
-							<a class="btn btn-outline-light btn-lg" href="/login">Create an account</a>
+							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/login', icon: 'action-add'}) }}
 						{% endif %}
-					</div>
+
+{% endblock %}
+{% endembed %}
 				</div>
 				<div class="col-lg-5 d-none d-lg-block">
 					<div class="cl-hero-panel">
@@ -52,7 +56,9 @@
 	</section>
 	<section class="container py-5 py-lg-6">
 		{# The catalogue introduction is text, so it sits on a surface like every other block. #}
-		<div class="card mb-4">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 		<div class="row align-items-end">
 			<div class="col-lg-8">
 				<span class="cl-kicker text-primary">Course catalogue</span>
@@ -64,24 +70,24 @@
 				</p>
 			</div>
 			<div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-				<a class="btn btn-outline-primary" href="/courses">View all courses</a>
+				{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'normal', href: '/courses'}) }}
 			</div>
 		</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
 		{% if published_course_count > 0 %}
 			{% include '@platform/partials/course-showcase.html.twig' %}
 		{% else %}
-			<div class="cl-empty-state">
+			{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'Courses are being prepared', summary: 'Published courses will appear here as soon as they are ready.'})} %}
+{% block actions %}
+
 				<div class="cl-empty-icon">
 					01
 				</div>
-				<h3>
-					Courses are being prepared
-				</h3>
-				<p class="mb-0">
-					Published courses will appear here as soon as they are ready.
-				</p>
-			</div>
+
+{% endblock %}
+{% endembed %}
 		{% endif %}
 	</section>
 	<section class="cl-feature-band py-5 py-lg-6">

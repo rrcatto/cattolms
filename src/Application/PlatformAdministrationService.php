@@ -12,12 +12,6 @@ Implements Catto Learning business and application logic for platform administra
 
 Changelog:
 
-
-
-
-
-
-
 2026/09/08 11:30 SAST
 
 - Timestamps in lists are trimmed to the minute; they were printed to the microsecond with an offset and were the widest column on several screens.
@@ -172,11 +166,11 @@ final class PlatformAdministrationService
      * @var array<string,array{label:string,tone:string}>
      */
     public const REQUEST_STATUS_LABELS = [
-        'pending' => ['label' => 'Pending', 'tone' => 'warn'],
+        'pending' => ['label' => 'Pending', 'tone' => 'warning'],
         'approved' => ['label' => 'Approved — awaiting payment', 'tone' => 'info'],
-        'fulfilled' => ['label' => 'Enrolled', 'tone' => 'good'],
+        'fulfilled' => ['label' => 'Enrolled', 'tone' => 'success'],
         'rejected' => ['label' => 'Rejected', 'tone' => 'danger'],
-        'cancelled' => ['label' => 'Cancelled', 'tone' => 'muted'],
+        'cancelled' => ['label' => 'Cancelled', 'tone' => 'neutral'],
     ];
 
     /**
@@ -385,7 +379,6 @@ final class PlatformAdministrationService
         'course_categories' => '/admin/courses/categories',
         'course_tags' => '/admin/courses/tags',
     ];
-
 
     /**
      * The noun each counts strip uses, so the reader is told what is being counted rather than
@@ -657,9 +650,6 @@ final class PlatformAdministrationService
      * @param array<string,mixed> $request Raw request state, keyed with dataset prefixes.
      */
 
-
-
-
     /**
      * The selector itself.
      *
@@ -671,7 +661,6 @@ final class PlatformAdministrationService
      * @param array<string,mixed> $preserved
      * @return array{selected:string,label:string,options:list<array{value:string,label:string,short_label:string,href:string,active:bool}>}
      */
-
 
     /**
      * Pagination state for one dataset, from the raw request and the true total.
@@ -967,7 +956,7 @@ final class PlatformAdministrationService
         };
 
         return match ($section) {
-            'dashboard', 'themes', 'settings', 'reports', 'company_report' => $this->sectionDataValues($section, $actorUserId, [], $capabilities),
+            'dashboard', 'themes', 'settings', 'reports', 'company_report', 'ui_components' => $this->sectionDataValues($section, $actorUserId, [], $capabilities),
             'people' => $bounded(
                 'people',
                 fn(int $l, int $o): array => $this->administration->people($l, $o),
@@ -1353,6 +1342,7 @@ final class PlatformAdministrationService
                 return $data;
             })(),
             'themes' => [],
+            'ui_components' => ['can_favourite' => false, 'gallery_pagination' => self::paginationPayload('gallery', Pagination::create(2, 25, 75), '/admin/system/ui-components', 'Sample records')],
             'settings' => (function () use ($actorUserId): array {
                 $systemCompany = $this->systemCompanyContext($actorUserId);
 
@@ -2200,7 +2190,6 @@ final class PlatformAdministrationService
         $this->audit->record($actorUserId, 'enrolment.access_restored', ['enrolment_id' => $enrolmentId]);
     }
 
-
     /** @param array<string,mixed> $input */
     public function addCredit(array $input, int $actorUserId): int
     {
@@ -2377,8 +2366,6 @@ final class PlatformAdministrationService
         $this->audit->record($actorUserId, 'platform.setting_reset', ['setting' => 'platform_name', 'source' => '.env']);
     }
 
-
-
     /** @return array{password:string,source:string} */
     public function mailPasswordForAdmin(): array
     {
@@ -2529,7 +2516,6 @@ final class PlatformAdministrationService
     {
         return $this->roles->all();
     }
-
 
     private function validateCompanyInput(string $name, string $domain): void
     {

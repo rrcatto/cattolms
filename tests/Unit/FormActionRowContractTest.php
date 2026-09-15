@@ -18,15 +18,15 @@ answer everywhere, which is what this asserts.
 Three shapes are deliberately exempt, and the exemption is the interesting part of this test rather
 than a loophole in it:
 
-- a **modal** already has an action area. `.modal-foot` is this rule under the modal's own name,
+- a **modal** already has an action area. `.cl-ui-modal-foot` is this rule under the modal's own name,
   with Cancel beside the primary action, and nesting a second one inside it would draw two
   separators;
 - an **inline row control** is a button occupying the last cell of a row of fields - the grade-band
   and price rows on the course editor. The button is aligned with the fields on purpose and a
   separator above it would break the row;
 - a **compact act control** is one select or input with its button against it - Change status,
-  Reassign courses and delete - and a **list control** is pagination, search or a filter sitting in
-  a toolbar. Neither is a form; both are one control.
+  Reassign courses and delete - and a **cl-ui-list control** is pagination, search or a filter sitting in
+  a cl-ui-toolbar. Neither is a form; both are one control.
 
 The test is what the reader is doing: filling several things in and then committing them is a form,
 picking one value and acting immediately is a control.
@@ -58,7 +58,7 @@ final class FormActionRowContractTest extends TestCase
 
         $missing = [];
         foreach ($forms as $where => $form) {
-            if (!str_contains($form, 'cl-form-actions')) {
+            if (!str_contains($form, "ui_template('form.actions')")) {
                 $missing[] = $where;
             }
         }
@@ -83,9 +83,9 @@ final class FormActionRowContractTest extends TestCase
             (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css')
         );
 
-        self::assertMatchesRegularExpression('/\.cl-form-actions\{[^}]*border-top:/', $css, 'An action row is separated from the fields.');
-        self::assertMatchesRegularExpression('/\.cl-form-actions\{[^}]*display:flex/', $css, 'An action row lays its actions out in a row.');
-        self::assertStringContainsString('.cl-form-actions-secondary{margin-left:auto}', $css, 'A destructive action is pushed away from the primary one.');
+        self::assertMatchesRegularExpression('/\.cl-ui-form-actions\{[^}]*border-top:/', $css, 'An action row is separated from the fields.');
+        self::assertMatchesRegularExpression('/\.cl-ui-form-actions\{[^}]*display:flex/', $css, 'An action row lays its actions out in a row.');
+        self::assertStringContainsString('.cl-ui-form-actions-secondary{margin-left:auto}', $css, 'A destructive action is pushed away from the primary one.');
     }
 
     /**
@@ -99,7 +99,7 @@ final class FormActionRowContractTest extends TestCase
         foreach (self::templates() as $path) {
             $source = (string) preg_replace('/\{#.*?#\}/s', '', (string) file_get_contents($path));
             foreach (self::matchForms($source) as $form) {
-                if (!str_contains($form, 'type="submit"')) {
+                if (!str_contains($form, "ui('action.button'")) {
                     continue;
                 }
                 // A form with nothing to fill in is a single-button action - a row menu entry, a
@@ -121,19 +121,19 @@ final class FormActionRowContractTest extends TestCase
     private static function isControlRatherThanForm(string $form): bool
     {
         // A modal states its actions in the footer the modal contract already gives it.
-        if (str_contains($form, 'modal-foot')) {
+        if (str_contains($form, 'modal_actions') || str_contains($form, "ui_template('form.compact-action')")) {
             return true;
         }
-        // A list control: pagination, search, a filter. It reads rather than writes.
-        if (str_contains($form, 'method="get"') || preg_match('/class="[^"]*(pagination|dataset-search|toolbar)/', $form) === 1) {
+        // A cl-ui-list control: pagination, search, a filter. It reads rather than writes.
+        if (str_contains($form, 'method="get"') || preg_match('/class="[^"]*(pagination|dataset-search|cl-ui-toolbar)/', $form) === 1) {
             return true;
         }
-        // A compact act control: one field with its button against it, no whitespace between.
+        // A compact act control: one cl-ui-field with its button against it, no whitespace between.
         if (preg_match('#</(?:select|input)>?<button[^>]*type="submit"#', $form) === 1) {
             return true;
         }
         // An inline row control: the button is the last cell of a row of fields.
-        $submit = strrpos($form, 'type="submit"');
+        $submit = strrpos($form, "type: 'submit'");
 
         return $submit !== false && preg_match('/class="col-[^"]*"[^>]*>\s*<button[^>]*$/', substr($form, 0, $submit)) === 1;
     }

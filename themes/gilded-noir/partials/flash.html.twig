@@ -1,11 +1,1 @@
-{% if flash_messages %}
-	<div class="flash-stack gn-flash-stack" aria-live="polite">
-		{% for flash in flash_messages %}
-			<div class="flash flash-{{ flash.type }}" data-flash-message data-flash-type="{{ flash.type }}">
-				<span class="flash-mark" aria-hidden="true"></span>
-				<span class="flash-text">{{ flash.message }}</span>
-				<button class="flash-close" type="button" data-flash-close aria-label="Dismiss message">&times;</button>
-			</div>
-		{% endfor %}
-	</div>
-{% endif %}
+{% include '@platform/partials/flash-messages.html.twig' %}

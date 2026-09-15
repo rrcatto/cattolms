@@ -5,13 +5,15 @@
 	{% set ph_lead = 'The sign-in link is on its way.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container cl-narrow py-5">
-		<div class="card shadow-sm border-0">
-			<div class="card-body p-4 p-lg-5 text-center">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 				<p>
 					If the address can receive email, a secure one-time link has been sent. Opening that link completes registration or signs you in.
 				</p>
-				<a class="btn btn-outline-primary" href="/login">Send another link</a>
-			</div>
-		</div>
+				{{ ui('action.link', {label: 'Send another link', variant: 'secondary', size: 'normal', href: '/login'}) }}
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

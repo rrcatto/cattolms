@@ -2,24 +2,21 @@
 {% block page_body %}
     {% set ph_kicker = 'My Orders' %}{% set ph_title = 'Order CL-' ~ '%08d'|format(order.id) %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="container cl-medium py-5"><div class="card"><div class="card-body">
+    <section class="container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
         <p><a href="/account/orders">My Orders</a> · <a href="/account/courses">My Courses</a></p>
         <p>Status: <strong>{{ order.state|replace({'_':' '})|capitalize }}</strong></p>
         {% for item in order.details.items %}<p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.price_label }}</p>{% endfor %}
         <p class="h4">Total: {{ total_label }}</p>
         {% for document in order.documents %}
-            <p><a class="btn btn-outline-primary" href="/account/orders/{{ order.id }}/documents/{{ document.id }}" target="_blank" rel="noopener">View {{ document.kind }}</a> <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
+            <p>{{ ui('action.link', {label: 'View ' ~ (document.kind), variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
         {% endfor %}
         {% if payment_method == 'eft' or order.details.payment_method|default('') == 'eft' %}
             <h2 class="h5 mt-4">EFT bank account details</h2>
             <p>Use your unique order number as the payment reference: <strong>CL-{{ '%08d'|format(order.id) }}</strong>.</p>
             {% if bank_details.configured %}
-                <dl>
-                    <dt>Bank name</dt><dd>{{ bank_details.bank_name }}</dd>
-                    <dt>Account name</dt><dd>{{ bank_details.account_name }}</dd>
-                    <dt>Account number</dt><dd>{{ bank_details.account_number }}</dd>
-                    <dt>Branch code</dt><dd>{{ bank_details.branch_code }}</dd>
-                </dl>
+                {{ ui('data.key-value-list', {items: [{label: 'Bank name', value: (bank_details.bank_name)}, {label: 'Account name', value: (bank_details.account_name)}, {label: 'Account number', value: (bank_details.account_number)}, {label: 'Branch code', value: (bank_details.branch_code)}]}) }}
             {% else %}
                 <p>Bank account details have not been added yet. Please check this order again for the bank details before making your EFT payment.</p>
             {% endif %}
@@ -29,20 +26,34 @@
             {% if payment_method == 'eft' %}
                 <p>Your courses will be available once your payment is confirmed.</p>
             {% elseif order.payments and (order.payments|last).state == 'failed' %}
-                <div class="alert alert-warning" role="alert"><strong>Your payment was declined.</strong> Would you like to try again, change your payment method, or sort it out later?</div>
+                {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
+{% block body %}
+<strong>Your payment was declined.</strong> Would you like to try again, change your payment method, or sort it out later?
+{% endblock %}
+{% endembed %}
             {% endif %}
             {% if change_method or payment_method != 'eft' %}
                 <form action="/account/orders/{{ order.id }}/pay" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="payment_key" value="{{ payment_key }}">
                     {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method} %}
-                    <div class="cl-form-actions"><button class="btn btn-primary" type="submit">Use this payment method</button><a class="btn btn-outline-secondary" href="/account/orders">I’ll sort it out later</a></div>
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Use this payment method', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'I’ll sort it out later', variant: 'secondary', size: 'normal', href: '/account/orders'}) }}
+{% endblock %}
+{% endembed %}
                 </form>
             {% else %}
-                <div class="cl-form-actions"><a class="btn btn-outline-primary" href="/account/orders/{{ order.id }}?payment=change">Change payment method</a><a href="/account/orders">I’ll sort it out later</a></div>
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.link', {label: 'Change payment method', variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '?payment=change'}) }}<a href="/account/orders">I’ll sort it out later</a>
+{% endblock %}
+{% endembed %}
             {% endif %}
         {% elseif order.state == 'fulfilled' %}<p>Your courses are ready in <a href="/account/courses">My Courses</a>.</p>
         {% elseif order.state == 'manual_review' %}<p>Your payment has been recorded and needs an administrator’s review.</p>
         {% elseif order.state == 'cancelled' %}<p>The payment window has ended and this order has been cancelled. Your invoice remains available for your records.</p>
         {% else %}<p>Your payment is being processed. Check this order again before making another payment. <a href="/account/orders">I’ll check later</a>.</p>{% endif %}
-    </div></div></section>
+
+{% endblock %}
+{% endembed %}</section>
 {% endblock %}

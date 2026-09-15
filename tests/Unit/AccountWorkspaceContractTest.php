@@ -13,7 +13,7 @@ Protects the consolidated Account dashboard/profile/learning/sessions/activity a
 Changelog:
 2026/08/23 04:19 SAST
 - Discover the single baseline migration by glob instead of naming it, so a rebased baseline does not require editing every call site.
-- Added the Changelog field this header was missing.
+- Added the Changelog cl-ui-field this header was missing.
 2026/08/19 02:04 SAST
 - Created to protect the consolidated Account workspace architecture.
 */
@@ -85,9 +85,9 @@ final class AccountWorkspaceContractTest extends TestCase
         $emails = self::markupOf($root . 'emails.html.twig');
         $social = self::markupOf($root . 'social.html.twig');
 
-        // Each page names its own subject in the section head's eyebrow, which carries the section
+        // Each page names its own subject in the section head's cl-ui-eyebrow, which carries the section
         // label from AccountSectionRegistry. The headings below it are free to be a sentence; the
-        // eyebrow is the identity, so that is what these assert.
+        // cl-ui-eyebrow is the identity, so that is what these assert.
         foreach (['Personal Particulars','Profile image','/account/profile/image'] as $token) self::assertStringContainsString($token, $particulars);
         // The three used to be one screen of three unrelated forms. Each page now holds its own
         // subject, and this is the assertion that stops them drifting back together.
@@ -142,7 +142,6 @@ final class AccountWorkspaceContractTest extends TestCase
         foreach (['account_sections','account_section',"\$account['sections']", "\$account['section']"] as $token) self::assertStringContainsString($token, $renderer);
     }
 
-
     public function testAccountAllowsExactlyOnePrimaryAndOneOptionalSecondaryEmail(): void
     {
         $root = dirname(__DIR__, 2);
@@ -164,10 +163,11 @@ final class AccountWorkspaceContractTest extends TestCase
     }
     public function testAccountWorkspaceUsesCanonicalAdministrationAccordionMarkup(): void
     {
-        $workspace = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/account-control-centre.html.twig');
-        foreach (['cl-admin-section-summary','cl-admin-section-title','cl-admin-section-description','cl-admin-section-toggle','cl-admin-section-actions','cl-admin-section-link'] as $token) {
-            self::assertStringContainsString($token, $workspace);
-        }
+        $source = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/account-control-centre.html.twig');
+        self::assertStringContainsString("ui_template('overlay.accordion-section')", $source);
+        self::assertStringContainsString("workspace: 'account'", $source);
+        self::assertStringContainsString('section.content|raw', $source);
+        self::assertStringNotContainsString('<details', $source);
     }
 
     private function methodSource(string $file, string $method): string

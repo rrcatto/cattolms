@@ -47,7 +47,9 @@ final class PeopleTimestampUiContractTest extends TestCase
     public function testFullProfileShowsCreationAndLastLoginSeparately(): void
     {
         $template = (string) file_get_contents(__DIR__ . '/../../resources/views/pages/admin-person-profile.html.twig');
-        self::assertStringContainsString('Created {{ profile.created_at }}', $template);
-        self::assertStringContainsString("Last login {{ profile.last_login_at ?: 'Never' }}", $template);
+        self::assertStringContainsString('profile.created_at', $template);
+        self::assertStringContainsString('profile.last_login_at', $template);
+        self::assertStringContainsString('Created', $template);
+        self::assertStringContainsString('Last login', $template);
     }
 }

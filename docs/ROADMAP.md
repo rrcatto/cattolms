@@ -13,6 +13,14 @@ in v0.7** and none of it describes the platform now — `PROJECT-INSTRUCTIONS.md
 current statement, and it is deliberately short. The stage records are kept because how a decision
 was reached stays useful after the decision is reversed, not because they are still in force.
 
+## Current UI design system
+
+The v0.8 platform UI expansion migrates recurring structures across account, administration,
+company, catalogue, commerce and learning into the canonical component registry. The gallery and
+family/ownership contracts are part of the normal QA gate. Extend this system for future UI work;
+do not restore historical raw wrappers, flat component names or compatibility CSS. See
+[UI-COMPONENTS.md](UI-COMPONENTS.md). This does not change the remaining commerce roadmap.
+
 ## 1. v0.5.7.5.1 ACL foundation
 
 The accepted ACL architecture is deliberately smaller than the first 0.5.7.5 design:
@@ -66,7 +74,7 @@ Accepted before Seed Database on purpose: **make the UI tell the truth about lar
 - the Administration course list is scoped to the courses the actor may actually manage;
 - no schema change, no migration and no database reset.
 
-Deferred from this stage: Gilded Noir has no `.acl-*` rules and no `.universe-switch` rules, so the Roles and ACL editor and the data-universe control both fall back to core CSS in the dark skin. Core styles each one completely, including its active state and focus ring, so neither depends on a theme update to work. Enhancing the theme needs a version number from the project owner.
+Historical styling deferral is superseded by the current platform component system; all bundled themes consume its canonical ACL tables and accordions.
 
 ## 1c. v0.5.8 Seed Database — implemented, pending acceptance
 

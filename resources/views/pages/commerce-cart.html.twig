@@ -2,7 +2,9 @@
 {% block page_body %}
     {% set ph_title = 'My Cart' %}{% set ph_kicker = '' %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="container cl-medium py-5"><div class="card"><div class="card-body">
+    <section class="container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
         <p><a href="/courses">Continue shopping</a></p>
         {% for item in cart.items %}
             <div class="border-bottom py-3">
@@ -10,13 +12,19 @@
                 <p>{{ item.days }} days of access · {{ item.price_label }}</p>
                 <form action="/cart/remove" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.id }}">
-                    <button class="btn btn-sm btn-outline-secondary" type="submit">Remove</button>
+                    {{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit'}) }}
                 </form>
             </div>
         {% else %}<p>Your cart is empty. <a href="/courses">Browse courses</a>.</p>{% endfor %}
         {% if cart.items %}
             <p class="h4 mt-4">Total: {{ cart.total_label }}</p>
-            <div class="cl-form-actions"><a class="btn btn-primary" href="/checkout">Checkout</a></div>
+            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'normal', href: '/checkout'}) }}
+{% endblock %}
+{% endembed %}
         {% endif %}
-    </div></div></section>
+
+{% endblock %}
+{% endembed %}</section>
 {% endblock %}

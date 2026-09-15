@@ -496,6 +496,7 @@ final class ThemeRenderer
             'themes' => ['system', 'SYSTEM.THEME.VIEW'],
             'roles' => ['system', 'SYSTEM.ROLE.VIEW'],
             'settings' => ['system', 'SYSTEM.SETTING.VIEW'],
+            'ui_components' => ['system', 'SYSTEM.SETTING.VIEW'],
             'seed' => ['system', 'SYSTEM.SEED.MANAGE'],
         ];
 
@@ -509,7 +510,7 @@ final class ThemeRenderer
             // keep, and the two arrive together with commerce.
             'commerce' => ['label' => 'Credits', 'icon' => 'credits', 'sections' => ['credits']],
             'insights' => ['label' => 'Insights', 'icon' => 'reports', 'sections' => ['activity', 'reports', 'company_report']],
-            'system' => ['label' => 'System', 'icon' => 'settings', 'sections' => ['themes', 'roles', 'seed', 'settings']],
+            'system' => ['label' => 'System', 'icon' => 'settings', 'sections' => ['themes', 'roles', 'seed', 'settings', 'ui_components']],
         ];
 
         $visibleSections = [];

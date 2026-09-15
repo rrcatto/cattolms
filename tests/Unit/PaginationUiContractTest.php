@@ -21,11 +21,11 @@ Changelog:
   contract and the plain GET fallback, and replaced the inline URL-concatenation assertions
   with the one builder every link now comes from.
 2026/09/03 00:08 SAST
-- Moved GET /admin/courses onto AdminController::courses so the Courses list uses the shared section renderer; its own request array had listed page and page size only, so the search term was never read.
+- Moved GET /admin/courses onto AdminController::courses so the Courses cl-ui-list uses the shared section renderer; its own request array had listed page and page size only, so the search term was never read.
 2026/08/23 04:19 SAST
 - Realigned the pinned call signatures with the v0.5.8 universe parameter. The contracts are unchanged; only the literal text they assert moved.
 2026/08/21 04:31 SAST
-- Added source contracts for the /admin/courses 500: every Administration section render must take its payload from the section loader, the course list must be scoped, bounded and counted, and the consolidated workspace must apply its view defaults once.
+- Added source contracts for the /admin/courses 500: every Administration section render must take its payload from the section loader, the course cl-ui-list must be scoped, bounded and counted, and the consolidated workspace must apply its view defaults once.
 2026/08/21 01:00 SAST
 - Replaced the @dataProvider annotation with the #[DataProvider] attribute; PHPUnit 12 no longer reads doc-comment metadata.
 2026/08/20 20:02 SAST
@@ -70,15 +70,15 @@ final class PaginationUiContractTest extends TestCase
 
     /**
      * Pagination 2.0. Every one of these is a control a reader operates, so each is asserted
-     * individually: a control that quietly stops rendering leaves a list that still looks
+     * individually: a control that quietly stops rendering leaves a cl-ui-list that still looks
      * complete and can no longer be navigated.
      */
     public function testSharedControlOffersBothEndsTheNumberedWindowAndAJump(): void
     {
         $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('{{ pg.first_href }}', $markup, 'First page must be reachable in one action.');
-        self::assertStringContainsString('{{ pg.last_href }}', $markup, 'Last page must be reachable in one action.');
+        self::assertStringContainsString('(pg.first_href)', $markup, 'First page must be reachable in one action.');
+        self::assertStringContainsString('(pg.last_href)', $markup, 'Last page must be reachable in one action.');
         self::assertStringContainsString('for pg_item in pg.pages', $markup, 'The numbered pages come from the Pagination window.');
         self::assertStringContainsString('{% if pg_item.is_gap %}', $markup, 'An elided range must render as a gap, never as a page.');
         self::assertStringContainsString('aria-current="page"', $markup, 'The current page must be announced as the current page.');
@@ -87,7 +87,7 @@ final class PaginationUiContractTest extends TestCase
     }
 
     /**
-     * A list that fits on one page shows its row count and no navigation, and every list carries
+     * A cl-ui-list that fits on one page shows its row count and no navigation, and every cl-ui-list carries
      * the control above the table as well as below it.
      */
     public function testTheControlHidesWhenThereIsNowhereToGoAndAppearsAtBothEnds(): void
@@ -104,8 +104,8 @@ final class PaginationUiContractTest extends TestCase
 
         foreach (self::paginatedPartials() as [$partial, $dataset]) {
             self::assertSame(
-                2,
-                substr_count(self::read($partial), 'with {pg: ' . $dataset . '_pagination}'),
+                1,
+                substr_count(self::read($partial), 'pagination: ' . $dataset . '_pagination'),
                 $partial . ' must carry the control above and below its table.'
             );
         }
@@ -143,8 +143,8 @@ final class PaginationUiContractTest extends TestCase
 
         // Progressive enhancement: the links carry a real href and the forms a real method and
         // action, so the whole control works with no JavaScript at all.
-        self::assertStringContainsString('href="{{ pg.first_href }}"', $markup);
-        self::assertStringContainsString('href="{{ pg_item.href }}"', $markup);
+        self::assertStringContainsString('href: (pg.first_href)', $markup);
+        self::assertStringContainsString('href: (pg_item.href)', $markup);
         self::assertSame(
             2,
             substr_count($markup, 'method="get" action="{{ pg.base }}"'),
@@ -172,7 +172,7 @@ final class PaginationUiContractTest extends TestCase
     }
 
     /**
-     * The search term, the data universe and every list filter reach the builder as ordinary
+     * The search term, the data universe and every cl-ui-list filter reach the builder as ordinary
      * filters, and the two forms re-emit them as hidden fields so a submit cannot drop them.
      */
     public function testPagingPreservesSearchFiltersAndUniverse(): void
@@ -194,7 +194,7 @@ final class PaginationUiContractTest extends TestCase
     public function testPageSizeSelectorOffersExactlyTheApprovedSizes(): void
     {
         // The selector renders from the array the service supplies, so the contract is that
-        // the constant itself is the approved set rather than a hard-coded list in markup.
+        // the constant itself is the approved set rather than a hard-coded cl-ui-list in markup.
         self::assertSame([25, 50, 100, 150, 250], Pagination::PAGE_SIZES);
         self::assertStringContainsString('for size in pg.page_sizes', self::read('resources/views/partials/pagination.html.twig'));
     }
@@ -240,7 +240,7 @@ final class PaginationUiContractTest extends TestCase
     public function testEveryListPartialIncludesTheSharedControl(string $partial, string $dataset): void
     {
         self::assertStringContainsString(
-            'with {pg: ' . $dataset . '_pagination}',
+            'pagination: ' . $dataset . '_pagination',
             self::read($partial),
             $partial . ' must reuse the one shared pagination control.'
         );
@@ -262,33 +262,13 @@ final class PaginationUiContractTest extends TestCase
      */
     public function testEveryPaginatedDatasetDeclaresItsHtmxRegion(): void
     {
-        $views = self::root() . '/resources/views';
-        $markup = '';
-        $datasets = [];
-
-        $directory = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($views));
-        foreach ($directory as $file) {
-            if ($file->isDir() || $file->getExtension() !== 'twig') continue;
-            $contents = (string) file_get_contents($file->getPathname());
-            $markup .= $contents;
-            if (preg_match_all('/with \{pg: ([a-z_]+)_pagination\}/', $contents, $matches) > 0) {
-                foreach ($matches[1] as $dataset) $datasets[$dataset] = true;
-            }
-        }
-
-        self::assertGreaterThanOrEqual(10, count($datasets), 'The scan must actually be finding the paginated lists.');
-
-        foreach (array_keys($datasets) as $dataset) {
-            self::assertStringContainsString(
-                'id="' . $dataset . '-region"',
-                $markup,
-                $dataset . ' renders the shared pagination control, so it must declare the region the control swaps.'
-            );
-            self::assertStringContainsString(
-                'id="' . $dataset . '-results"',
-                $markup,
-                $dataset . ' must declare the results element the control replaces inside that region.'
-            );
+        $component = self::read('resources/views/ui/data/dataset-layout.html.twig');
+        self::assertStringContainsString('id="{{ props.name }}-region"', $component);
+        self::assertStringContainsString('id="{{ props.name }}-results"', $component);
+        self::assertSame(2, substr_count($component, 'partials/pagination.html.twig'));
+        foreach (self::paginatedPartials() as [$partial, $dataset]) {
+            self::assertStringContainsString("name: '" . $dataset . "'", self::read($partial));
+            self::assertStringContainsString('pagination: ' . $dataset . '_pagination', self::read($partial));
         }
     }
 
@@ -303,11 +283,11 @@ final class PaginationUiContractTest extends TestCase
     public function testEnrolmentsAndRequestsPaginateIndependently(): void
     {
         self::assertStringContainsString(
-            'with {pg: enrolments_pagination}',
+            'pagination: enrolments_pagination',
             self::read('resources/views/partials/admin/enrolments.html.twig')
         );
         self::assertStringContainsString(
-            'with {pg: requests_pagination}',
+            'pagination: requests_pagination',
             self::read('resources/views/partials/admin/requests.html.twig')
         );
         self::assertStringNotContainsString(
@@ -321,8 +301,8 @@ final class PaginationUiContractTest extends TestCase
     {
         $markup = self::read('resources/views/partials/admin/courses.html.twig');
 
-        self::assertStringContainsString('class="table-wrap"', $markup);
-        // Only .table-wrap is defined in core CSS. Gilded Noir happens to style the Bootstrap
+        self::assertStringContainsString("ui_template('data.table')", $markup);
+        // Only .cl-ui-table is defined in core CSS. Gilded Noir happens to style the Bootstrap
         // class as well, which is exactly why this defect survived visual review.
         self::assertStringNotContainsString('class="table-responsive"', $markup);
     }
@@ -334,8 +314,8 @@ final class PaginationUiContractTest extends TestCase
         // The wrapper no longer scrolls. `table-layout: fixed` keeps the table inside its box, so
         // there is nothing to scroll, and a scrolling wrapper clips the row menu that has to escape
         // its cell - which is what made the actions menu invisible under Gilded Noir.
-        self::assertStringContainsString('.table-wrap{width:100%;overflow:visible!important}', $css);
-        self::assertStringNotContainsString('.table-wrap{overflow-x:auto}', $css);
+        self::assertStringContainsString('.cl-ui-table{width:100%;overflow:visible!important}', $css);
+        self::assertStringNotContainsString('.cl-ui-table{overflow-x:auto}', $css);
         self::assertStringContainsString('.pagination-row{display:flex', $css);
         foreach (['.pagination-summary', '.pagination-page-size', '.lookup-results'] as $rule) {
             self::assertStringContainsString($rule, $css);
@@ -398,7 +378,7 @@ final class PaginationUiContractTest extends TestCase
     }
 
     /**
-     * The Administration list partials are shared between the consolidated workspace and the
+     * The Administration cl-ui-list partials are shared between the consolidated workspace and the
      * standalone routes, so they read the complete paginated view contract. A controller that
      * assembles its own payload leaves part of that contract unset, and F3 turns an undefined
      * template variable into a 500 for the whole page — which is exactly how /admin/courses
@@ -427,7 +407,7 @@ final class PaginationUiContractTest extends TestCase
     }
 
     /**
-     * The standalone Courses list goes through the same renderer as every other Administration
+     * The standalone Courses cl-ui-list goes through the same renderer as every other Administration
      * section.
      *
      * It used to be served by AdminCourseController with a request array written out by hand, and
@@ -435,7 +415,7 @@ final class PaginationUiContractTest extends TestCase
      * a term nothing read. This test previously asserted that hand-written array was present,
      * which pinned the defect in place: the check passed precisely because the broken line existed.
      *
-     * What matters is that no Administration list assembles its own request. The shared renderer
+     * What matters is that no Administration cl-ui-list assembles its own request. The shared renderer
      * reads the search declaration, so a route that uses it cannot drop a term.
      */
     public function testStandaloneCourseAdministrationUsesTheSharedSectionRenderer(): void
@@ -446,11 +426,11 @@ final class PaginationUiContractTest extends TestCase
             RouteTable::all(),
             static fn(array $r): bool => $r['method'] === 'GET' && $r['path'] === '/admin/courses'
         ));
-        self::assertCount(1, $courses, 'The Courses list is declared exactly once.');
+        self::assertCount(1, $courses, 'The Courses cl-ui-list is declared exactly once.');
         self::assertStringEndsWith(
             'AdminController',
             $courses[0]['class'],
-            'The Courses list must be served by the shared Administration controller.'
+            'The Courses cl-ui-list must be served by the shared Administration controller.'
         );
         self::assertStringContainsString(
             "renderAdministrationSection('courses')",
@@ -483,7 +463,7 @@ final class PaginationUiContractTest extends TestCase
         self::assertStringNotContainsString("'courses' => \$this->courses->allCourses(", $service);
     }
 
-    /** A scoped course list must be bounded and counted by the same membership rule as its rows. */
+    /** A scoped course cl-ui-list must be bounded and counted by the same membership rule as its rows. */
     public function testManageableCourseListIsBoundedAndCountedByOneMembershipRule(): void
     {
         $repository = self::read('src/Course/CourseRepository.php');
@@ -533,11 +513,11 @@ final class PaginationUiContractTest extends TestCase
      *
      * This is the check that was missing. Sorting was built, wired to Administration People, listed
      * as "extend it to the other lists" and then not extended - and nothing failed, because no test
-     * asked whether a list that pages can also be sorted. A reader on Administration Companies found
+     * asked whether a cl-ui-list that pages can also be sorted. A reader on Administration Companies found
      * a paginated table whose headings did nothing.
      *
      * Asserted from the templates rather than from the service, because the template is where the
-     * reader's evidence is: a list that draws the shared pagination control is a paginated table, and
+     * reader's evidence is: a cl-ui-list that draws the shared pagination control is a paginated table, and
      * a paginated table must draw its headings from the shared sort model.
      */
     public function testEveryPaginatedTableOffersSortableHeadings(): void

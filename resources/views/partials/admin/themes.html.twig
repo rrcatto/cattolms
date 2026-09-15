@@ -1,90 +1,111 @@
-<div class="grid section">
-	<div class="card">
-		<div class="section-head">
-			<div>
-				<div class="eyebrow">
-					Themes
-				</div>
-				<h2>
-					Theme Manager
-				</h2>
-				<p>
-					Install immutable Theme Package 3.0 ZIP releases, preview them, switch the live theme, or uninstall an inactive theme.
-				</p>
-			</div>
-			<a class="btn btn-ghost btn-sm" href="/help#theme-sdk">Theme SDK help</a>
-		</div>
-		<div class="notice">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Theme Manager', eyebrow: 'Themes', summary: 'Install immutable Theme Package 3.0 ZIP releases, preview them, switch the live theme, or uninstall an inactive theme.'})} %}
+{% block section_actions %}
+{{ ui('action.link', {label: 'Theme SDK help', variant: 'quiet', size: 'small', href: '/help#theme-sdk'}) }}
+{% endblock %}
+{% endembed %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 			<span>i</span>
 			<div>
 				<strong>The LMS does not edit or export themes.</strong>
 				<br>
 				Theme authors maintain source externally and publish each update as a new version. Installed name + version releases remain side-by-side. Factory Reset is the default theme, not a fallback for unrelated themes.
 			</div>
-		</div>
-		<div class="toolbar section">
-			<div>
+
+{% endblock %}
+{% endembed %}
+		{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
+{% block toolbar_primary %}
+
 				<h3 style="margin:0">
 					Installed themes
 				</h3>
 				<p class="muted small">
 					The filesystem is authoritative. PostgreSQL keeps a rebuildable metadata registry so parent/child relationships and theme status can be presented clearly.
 				</p>
-			</div>
-			<div class="row-actions">
+
+{% endblock %}
+{% block toolbar_actions %}
+
+			{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+
 				<form action="/admin/themes/resync" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<button class="btn btn-soft" type="submit">Re-sync themes</button>
+					{{ ui('action.button', {label: 'Re-sync themes', variant: 'secondary', size: 'normal', type: 'submit'}) }}
 				</form>
-				<details>
-					<summary class="btn btn-primary">
-						Import theme ZIP
-					</summary>
-					<form action="/admin/themes/import" method="post" enctype="multipart/form-data" class="card theme-popover-form">
+				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Import theme ZIP'})} %}
+{% block body %}
+
+					<form class="theme-popover-form" action="/admin/themes/import" method="post" enctype="multipart/form-data">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<div class="field">
-							<label>Theme Package 3.0 ZIP</label>
-							<input type="file" name="theme_file" accept=".zip,application/zip" required>
-							<div class="help">
-								The package is validated and inspected before installation. A repaired theme may reuse the same name and version after the defective installed copy has been uninstalled.
-							</div>
-						</div>
-						<button class="btn btn-primary cl-mt-2">Inspect package</button>
-					</form>
-				</details>
-			</div>
-		</div>
-	</div>
-</div>
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Theme Package 3.0 ZIP', full_width: false, for: 'field-themes-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'The package is validated and inspected before installation. A repaired theme may reuse the same name and version after the defective installed copy has been uninstalled.'})} %}
+{% block control %}
+
+							<input type="file" name="theme_file" accept=".zip,application/zip" required id="field-themes-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Inspect package', variant: 'primary', size: 'normal'}) }}
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 {% if theme_registry_out_of_sync %}
-	<div class="notice warning section">
+	{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: true})} %}
+{% block body %}
+
 		<span>!</span>
 		<div>
 			<strong>Theme registry is out of sync.</strong>
 			<br>
 			The filesystem remains authoritative. Use Re-sync themes to rebuild the PostgreSQL metadata index.
 		</div>
-	</div>
+
+{% endblock %}
+{% endembed %}
 {% endif %}
-<div class="table-wrap section">
-	<table>
-		<thead>
+
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 			<tr>
-				<th style="width:50%">
-					Theme
-				</th>
-				<th style="width:11%">
-					Version
-				</th>
-				<th style="width:10%">
-					Status
-				</th>
-				<th class="cell-actions" style="width:29%">
-					Actions
-				</th>
+				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Theme'}} %}
+				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Version'}} %}
+				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Status'}} %}
+				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Actions'}} %}
 			</tr>
-		</thead>
-		<tbody>
+
+{% endblock %}
+{% block body %}
+
 			{% for themeItem in themes %}
 				<tr>
 					<td>
@@ -94,13 +115,13 @@
 							{% endif %}
 							<strong>{{ themeItem.label }}</strong>
 							{% if themeItem.is_parent %}
-								<span class="badge">parent</span>
+								{{ ui('feedback.badge', {label: 'parent', tone: 'neutral'}) }}
 							{% endif %}
 							{% if themeItem.is_child %}
-								<span class="badge">child</span>
+								{{ ui('feedback.badge', {label: 'child', tone: 'neutral'}) }}
 							{% endif %}
 							{% if not themeItem.registry_synced %}
-								<span class="badge warn">registry</span>
+								{{ ui('feedback.badge', {label: 'registry', tone: 'warning'}) }}
 							{% endif %}
 							<div class="small muted">
 								{{ themeItem.description }}
@@ -117,7 +138,7 @@
 							{% endif %}
 							{% if themeItem.palette_warning %}
 								<div class="small">
-									<span class="badge warn">{{ themeItem.palette_count }} palettes</span> <span class="muted">3–5 recommended</span>
+									{{ ui('feedback.badge', {label: (themeItem.palette_count) ~ ' palettes', tone: 'warning'}) }} <span class="muted">3–5 recommended</span>
 								</div>
 							{% endif %}
 						</div>
@@ -127,34 +148,43 @@
 					</td>
 					<td>
 						{% if themeItem.active %}
-							<span class="badge active-theme">LIVE</span>
+							{{ ui('feedback.badge', {label: 'LIVE', tone: 'success'}) }}
 						{% else %}
-							<span class="badge">installed</span>
+							{{ ui('feedback.badge', {label: 'installed', tone: 'neutral'}) }}
 						{% endif %}
 					</td>
 					<td class="cell-actions" data-no-row-menu="the control that recovers from a broken theme must not itself depend on that theme rendering a menu">
-						<div class="row-actions">
-							<a class="btn btn-soft btn-sm" href="/?theme_preview={{ themeItem.key|urlencode }}" target="_blank" rel="noopener">Preview</a>
+						{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+
+							{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/?theme_preview=' ~ (themeItem.key|urlencode), new_window: true}) }}
 							{% if not themeItem.active %}
 								<form action="/admin/themes/activate" method="post">
 									<input type="hidden" name="csrf" value="{{ csrf }}">
 									<input type="hidden" name="theme" value="{{ themeItem.key }}">
-									<button class="btn btn-primary btn-sm">Activate</button>
+									{{ ui('action.button', {label: 'Activate', variant: 'primary', size: 'small'}) }}
 								</form>
 							{% endif %}
 							{% if not themeItem.is_default and not themeItem.active %}
 								<form action="/admin/themes/{{ themeItem.key }}/delete" method="post">
 									<input type="hidden" name="csrf" value="{{ csrf }}">
-									<button class="btn btn-danger btn-sm" data-confirm="Uninstall this theme release and remove its files?">Uninstall</button>
+									{{ ui('action.button', {label: 'Uninstall', variant: 'danger', size: 'small', confirm: 'Uninstall this theme release and remove its files?', icon: 'action-remove'}) }}
 								</form>
 							{% endif %}
-						</div>
+
+{% endblock %}
+{% endembed %}
 					</td>
 				</tr>
 			{% endfor %}
-		</tbody>
-	</table>
-</div>
-<p class="small muted notice">
+
+{% endblock %}
+{% endembed %}
+
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 	Theme source is stored on the filesystem. Catto Learning keeps only the selected active-theme identifier in application settings.
-</p>
+
+{% endblock %}
+{% endembed %}

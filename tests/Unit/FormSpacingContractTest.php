@@ -10,15 +10,15 @@ Version: 0.7
 Description:
 Form spacing is the platform's guarantee, not the active theme's.
 
-Every form on the LMS is built from the same few pieces - a card, fields holding a label, a control
+Every form on the LMS is built from the same few pieces - a cl-ui-surface, fields holding a label, a control
 and its help text, and the two-column grid. The spacing of those pieces was left to whichever theme
-was installed, and resolved across the five installed themes it came out uneven: a card with no
-.card-body had no padding at all in two of them, and a .field had no gap in one and gap:0 in
+was installed, and resolved across the five installed themes it came out uneven: a cl-ui-surface with no
+.cl-course-card-body had no padding at all in two of them, and a .cl-ui-field had no gap in one and gap:0 in
 another, so the label, the control and the help text touched. Twenty-eight core templates use the
-unpadded card shape, which is why this surfaced as one screen at a time rather than as one bug.
+unpadded cl-ui-surface shape, which is why this surfaced as one screen at a time rather than as one bug.
 
 The fix belongs in core because the markup is core's, so this asserts the guarantee is still there:
-core states a non-zero gap for a field and padding for a card that does not wrap its own content.
+core states a non-zero gap for a cl-ui-field and padding for a cl-ui-surface that does not wrap its own content.
 
 It deliberately does not assert what any theme does. Themes are instance state, outside this code
 root, and the point of the contract is that a form is spaced correctly whether or not a theme
@@ -87,48 +87,41 @@ final class FormSpacingContractTest extends TestCase
     /** A label, its control and its help text are never allowed to touch. */
     public function testAFieldStatesANonZeroGap(): void
     {
-        $field = self::declarations('.field');
+        $field = self::declarations('.cl-ui-field');
 
-        self::assertArrayHasKey('gap', $field, 'Core no longer states a gap for .field.');
-        self::assertRealLength($field['gap'], '.field', 'gap');
+        self::assertArrayHasKey('gap', $field, 'Core no longer states a gap for .cl-ui-field.');
+        self::assertRealLength($field['gap'], '.cl-ui-field', 'gap');
 
         // The gap is forced because a theme states gap:0 at a specificity core cannot outrank.
         // If that is ever removed, this assertion is the reminder to remove the !important too.
         self::assertStringContainsString(
             '!important',
             $field['gap'],
-            'The .field gap is no longer forced; confirm no installed theme still sets gap:0 before removing this.'
+            'The .cl-ui-field gap is no longer forced; confirm no installed theme still sets gap:0 before removing this.'
         );
     }
 
     /** Consecutive fields, and whatever ends the form, are separated. */
     public function testConsecutiveFieldsAreSeparated(): void
     {
-        $spacing = self::declarations('.field+.field');
+        $spacing = self::declarations('.cl-ui-field+.cl-ui-field');
 
-        self::assertArrayHasKey('margin-top', $spacing, 'Core no longer separates one field from the next.');
-        self::assertRealLength($spacing['margin-top'], '.field+.field', 'margin-top');
+        self::assertArrayHasKey('margin-top', $spacing, 'Core no longer separates one cl-ui-field from the next.');
+        self::assertRealLength($spacing['margin-top'], '.cl-ui-field+.cl-ui-field', 'margin-top');
     }
 
     /**
-     * A card that does not wrap its content in a .card-body is still padded.
+     * A cl-ui-surface that does not wrap its content in a .cl-course-card-body is still padded.
      *
      * The selector is asserted whole, because both halves carry the meaning: :where() keeps it at
-     * the specificity of a bare .card so a theme's own card padding still wins, and :has() is what
-     * stops a card that does wrap its content from being padded twice.
+     * the specificity of a bare .cl-ui-surface so a theme's own cl-ui-surface padding still wins, and :has() is what
+     * stops a cl-ui-surface that does wrap its content from being padded twice.
      */
     public function testAnUnwrappedCardIsPadded(): void
     {
-        $selector = '.card:where(:not(:has(> .card-body)))';
-        $card = self::declarations($selector);
-
-        self::assertArrayHasKey('padding', $card, sprintf(
-            'Core no longer pads %s. Twenty-eight core templates use a card with no .card-body, and '
-            . 'two installed themes pad only .card > .card-body, so removing this leaves their '
-            . 'content flush against the border.',
-            $selector
-        ));
-        self::assertRealLength($card['padding'], $selector, 'padding');
+        $surface = self::declarations('.cl-ui-surface');
+        self::assertArrayHasKey('padding', $surface);
+        self::assertRealLength($surface['padding'], '.cl-ui-surface', 'padding');
     }
 
     /** The markup half: a class attribute written twice loses everything in the second one. */
@@ -155,44 +148,37 @@ final class FormSpacingContractTest extends TestCase
 
     public function testFieldsLaidOutByAContainerTakeOnlyTheContainerSpacing(): void
     {
-        // The owner, 2026/09/10: "Middle names field is not aligned vertically with First name
-        // field". Both are .field in a two-column .form-grid, and .field+.field added a top margin
-        // to every field but the first - so the right-hand field of each row sat one rem lower than
+        // The owner, 2026/09/10: "Middle names cl-ui-field is not aligned vertically with First name
+        // cl-ui-field". Both are .cl-ui-field in a two-column .cl-ui-form-grid, and .cl-ui-field+.cl-ui-field added a top margin
+        // to every cl-ui-field but the first - so the right-hand cl-ui-field of each row sat one rem lower than
         // the left-hand one. The grid already states the space between rows as a gap; the margin on
         // top of it is not extra air, it is a misalignment.
         $css = self::stylesheet();
 
         self::assertStringContainsString(
-            '.field+.field{margin-top:1rem}',
+            '.cl-ui-field+.cl-ui-field{margin-top:1rem}',
             $css,
             'Consecutive fields in ordinary flow still need air between them.'
         );
 
         self::assertMatchesRegularExpression(
-            '/\.form-grid[^{]*\.field\+\.field[^{]*\{[^}]*margin-top:0/',
+            '/\.cl-ui-form-grid[^{]*\.cl-ui-field\+\.cl-ui-field[^{]*\{[^}]*margin-top:0/',
             $css,
-            'A field inside .form-grid must take the grid gap and nothing else, or every field in '
+            'A cl-ui-field inside .cl-ui-form-grid must take the grid gap and nothing else, or every cl-ui-field in '
             . 'the second column is pushed below the one beside it.'
         );
     }
 
     public function testAFullWidthFieldIsFullWidthWhicheverSpellingTheMarkupUses(): void
     {
-        // Two spellings are in use - `field-wide` and `field full` - and core defined only the
-        // first. `.full` existed in one theme out of five, so in every other theme a field the
-        // markup declares as full width rendered at half width inside a two-column form. Forty-two
-        // fields across eleven templates use the second spelling, so core states both.
-        $css = self::stylesheet();
-
-        foreach (['.form-grid .field-wide{grid-column:1/-1}', '.form-grid .field.full{grid-column:1/-1}'] as $rule) {
-            self::assertStringContainsString($rule, $css, 'Core must state ' . $rule);
-        }
+        self::assertStringContainsString('.cl-ui-field--full,.cl-ui-form-actions{grid-column:1/-1}', self::stylesheet());
+        self::assertStringNotContainsString('.cl-ui-field.full', self::stylesheet());
     }
 
     public function testCoreStatesTheSpaceBeneathASectionHeading(): void
     {
-        // .section-head is core markup on card after card, and core said nothing about the space
-        // under it. One theme out of five set a bottom margin; on the other four every card header
+        // .cl-ui-section-head is core markup on cl-ui-surface after cl-ui-surface, and core said nothing about the space
+        // under it. One theme out of five set a bottom margin; on the other four every cl-ui-surface header
         // touched its own content. The owner reported it three times as missing white space, and
         // each time it looked like a one-screen bug because it was one screen at a time.
         //
@@ -200,7 +186,7 @@ final class FormSpacingContractTest extends TestCase
         // can still restyle it - theme CSS loads afterwards - but a missing theme rule can no
         // longer be the difference between readable and flush.
         self::assertMatchesRegularExpression(
-            '/\.section-head\{[^}]*margin-bottom:[^0][^}]*\}/',
+            '/\.cl-ui-section-head\{[^}]*margin-bottom:[^0][^}]*\}/',
             self::stylesheet(),
             'Core must state a non-zero space beneath a section heading.'
         );

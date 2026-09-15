@@ -14,11 +14,11 @@ Changelog:
 2026/09/09 01:20 SAST
 - Reads the section keys from pageFamilyObjects()'s return value rather than out of the F3 hive.
 2026/08/23 04:19 SAST
-- Added the Seed Database section to the expected Administration section list.
+- Added the Seed Database section to the expected Administration section cl-ui-list.
 2026/08/21 15:04 SAST
 - Removed this test's compensating restore_error_handler()/restore_exception_handler() calls. They existed only because this test happened to be the first in a full run to construct F3, which installs global handlers; tests/bootstrap.php now performs that construction once before any test runs, so the compensation was popping handlers this test did not own.
 2026/08/20 07:01 SAST
-- Added regression coverage requiring permission categories to render as accordion groups containing tabular permission rows rather than card grids.
+- Added regression coverage requiring permission categories to render as accordion groups containing tabular permission rows rather than cl-ui-surface grids.
 2026/08/20 06:31 SAST
 - Added regression coverage requiring the Roles & ACL section to render from @roles_acl without clobbering the separate @roles collection used by the People section.
 2026/08/17 23:56 SAST
@@ -50,7 +50,7 @@ final class AdministrationSectionContractTest extends TestCase
             // shared /admin/course/enrolments behind in-page tab buttons, so neither could be linked to,
             // bookmarked or reloaded on its own. Companies and Reports split for the same reason plus
             // one more: each half asks a different question and carried the other's empty columns.
-            ['dashboard','courses','people','companies','company_creators','requests','enrolments','credits','activity','reports','company_report','themes','roles','seed','settings'],
+            ['dashboard','courses','people','companies','company_creators','requests','enrolments','credits','activity','reports','company_report','themes','roles','seed','ui_components','settings'],
             array_column($sections, 'key')
         );
         foreach ($sections as $section) {
@@ -60,7 +60,6 @@ final class AdministrationSectionContractTest extends TestCase
             self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
         }
     }
-
 
     public function testRegistryRoutesAreRegisteredAndDriveAdministrationNavigation(): void
     {
@@ -100,20 +99,19 @@ final class AdministrationSectionContractTest extends TestCase
         $roleEdit = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/pages/admin-role-edit.html.twig');
 
         self::assertStringContainsString('role_acl.permission_groups', $roleEdit);
-        self::assertStringContainsString('<details class="acl-group">', $roleEdit);
-        self::assertStringContainsString('class="acl-group-summary"', $roleEdit);
-        self::assertStringContainsString('class="acl-permission-table"', $roleEdit);
+        self::assertStringContainsString("ui_template('overlay.accordion-section')", $roleEdit);
+        self::assertStringContainsString('heading: (groupName)', $roleEdit);
+        self::assertStringContainsString("ui_template('data.table')", $roleEdit);
         // The four columns, each now declaring its share of the width: the description is the only
         // one carrying prose and was being given a quarter of the table like the checkbox beside it.
         // Column headings, whatever whitespace the template puts around them.
         foreach (['Assign', 'Permission', 'Internal key', 'Description'] as $column) {
-            self::assertMatchesRegularExpression('/<th[^>]*>\s*' . preg_quote($column, '/') . '\s*<\/th>/', $roleEdit);
+            self::assertStringContainsString("label: '" . $column . "'", $roleEdit);
         }
         self::assertStringContainsString('name="permissions[]"', $roleEdit);
         self::assertStringNotContainsString('class="acl-grid"', $roleEdit);
-        self::assertStringNotContainsString('<fieldset class="card acl-group">', $roleEdit);
+        self::assertStringNotContainsString('<fieldset class="cl-ui-surface acl-group">', $roleEdit);
     }
-
 
     public function testThemeRendererExposesRenderedAdministrationSectionApi(): void
     {
@@ -122,7 +120,6 @@ final class AdministrationSectionContractTest extends TestCase
             self::assertStringContainsString($token, $renderer);
         }
     }
-
 
     public function testAdministrationThemeObjectAlwaysHasStablePluralAndSingularSectionKeys(): void
     {

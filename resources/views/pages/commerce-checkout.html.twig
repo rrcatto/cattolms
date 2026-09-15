@@ -2,7 +2,9 @@
 {% block page_body %}
     {% set ph_title = 'Checkout' %}{% set ph_kicker = '' %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="container cl-medium py-5"><div class="card"><div class="card-body">
+    <section class="container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
         <nav aria-label="Checkout progress" class="cl-checkout-steps">
             <span>1. Signed in</span>
             <a href="/checkout/profile" {% if step == 'profile' %}aria-current="step"{% endif %}>2. My details</a>
@@ -13,23 +15,59 @@
             <h2 class="h4">My details</h2><p>Signed in as {{ user_email }}. These details are saved to your profile.</p>
             <form action="/checkout/profile" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
-                <div class="form-grid">
-                    <div class="field"><label for="first-name">First name</label><input id="first-name" name="first_name" autocomplete="given-name" value="{{ profile.first_name }}" maxlength="120" required></div>
-                    <div class="field"><label for="last-name">Last name</label><input id="last-name" name="last_name" autocomplete="family-name" value="{{ profile.last_name }}" maxlength="120" required></div>
-                    <div class="field"><label for="mobile-number">Cell number</label><input id="mobile-number" name="mobile_number" type="tel" autocomplete="tel" value="{{ profile.mobile_number }}" maxlength="60" required></div>
-                    <div class="field"><label for="rsa-id">RSA ID number</label><input id="rsa-id" name="identification_number" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" value="{{ profile.identification_number }}" required></div>
-                    <div class="field field-wide"><label for="billing-address">Billing address</label><textarea id="billing-address" name="billing_address" autocomplete="street-address" maxlength="2000" rows="3" required>{{ profile.billing_address }}</textarea></div>
-                </div>
-                <div class="cl-form-actions"><button class="btn btn-primary" type="submit">Continue to payment</button><a href="/cart">Back to My Cart</a></div>
+                {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'first-name', required: true})} %}
+{% block control %}
+<input id="first-name" name="first_name" autocomplete="given-name" value="{{ profile.first_name }}" maxlength="120" required>
+{% endblock %}
+{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'last-name', required: true})} %}
+{% block control %}
+<input id="last-name" name="last_name" autocomplete="family-name" value="{{ profile.last_name }}" maxlength="120" required>
+{% endblock %}
+{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cell number', full_width: false, for: 'mobile-number', required: true})} %}
+{% block control %}
+<input id="mobile-number" name="mobile_number" type="tel" autocomplete="tel" value="{{ profile.mobile_number }}" maxlength="60" required>
+{% endblock %}
+{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'RSA ID number', full_width: false, for: 'rsa-id', required: true})} %}
+{% block control %}
+<input id="rsa-id" name="identification_number" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" value="{{ profile.identification_number }}" required>
+{% endblock %}
+{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Billing address', full_width: true, for: 'billing-address', required: true})} %}
+{% block control %}
+<textarea id="billing-address" name="billing_address" autocomplete="street-address" maxlength="2000" rows="3" required>{{ profile.billing_address }}</textarea>
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Continue to payment', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Back to My Cart</a>
+{% endblock %}
+{% endembed %}
             </form>
         {% elseif step == 'payment' %}
             <h2 class="h4">Payment and invoice</h2>
             <form action="/checkout/payment" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: checkout.payment_method|default('dummy')} %}
-                <label><input type="checkbox" name="invoice_email" value="yes" {{ checkout.invoice_email|default(false) ? 'checked' : '' }}> Email my invoice to {{ user_email }}</label>
+                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email my invoice to ' ~ (user_email)})} %}
+{% block control %}
+<input type="checkbox" name="invoice_email" value="yes" {{ checkout.invoice_email|default(false) ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}
                 <p class="mt-3">Your PDF invoice will also be available in Account → COURSES → My Orders.</p>
-                <div class="cl-form-actions"><button class="btn btn-primary" type="submit">Review my order</button><a href="/checkout/profile">Back to my details</a></div>
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Review my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/checkout/profile">Back to my details</a>
+{% endblock %}
+{% endembed %}
             </form>
         {% else %}
             <h2 class="h4">Review my order</h2>
@@ -42,9 +80,19 @@
                 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">
                 <p>Unpaid orders are automatically cancelled after 7 days. Paid course access starts when you begin, or automatically 90 days after payment. Free course access starts immediately. The selected access period then runs to expiry.</p>
                 <p>Tax is not charged. For cancellation or refund assistance, <a href="/contact">contact us</a>. <a href="/privacy">Privacy information</a>.</p>
-                <label><input type="checkbox" name="accept_terms" value="yes" required> I have reviewed my order and accept these purchase terms.</label>
-                <div class="cl-form-actions"><button class="btn btn-primary" type="submit">Place my order</button><a href="/cart">Edit My Cart</a></div>
+                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I have reviewed my order and accept these purchase terms.'})} %}
+{% block control %}
+<input type="checkbox" name="accept_terms" value="yes" required>
+{% endblock %}
+{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Place my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Edit My Cart</a>
+{% endblock %}
+{% endembed %}
             </form>
         {% endif %}
-    </div></div></section>
+
+{% endblock %}
+{% endembed %}</section>
 {% endblock %}

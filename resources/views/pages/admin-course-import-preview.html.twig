@@ -7,53 +7,39 @@
 	{% set ph_lead = analysis.course.summary %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-5">
-		<div class="row g-4">
-			<div class="col-xl-8">
-				<div class="row g-3 mb-4">
-					<div class="col-md-4 col-xl-2">
-						<div class="cl-stat h-100">
-							<span>Modules</span><strong>{{ analysis.display_module_count }}</strong>
-						</div>
-					</div>
-					<div class="col-md-4 col-xl-2">
-						<div class="cl-stat h-100">
-							<span>Module assessments</span><strong>{{ analysis.display_module_assessment_count }}</strong><small class="d-block text-body-secondary">{{ analysis.display_module_question_count }} questions</small>
-						</div>
-					</div>
-					<div class="col-md-4 col-xl-2">
-						<div class="cl-stat h-100">
-							<span>Diagnostics</span><strong>{{ analysis.display_diagnostic_count }}</strong><small class="d-block text-body-secondary">{{ analysis.display_diagnostic_question_count }} questions</small>
-						</div>
-					</div>
-					<div class="col-md-4 col-xl-2">
-						<div class="cl-stat h-100">
-							<span>Final assessment</span><strong>{{ analysis.display_final_assessment_count }}</strong><small class="d-block text-body-secondary">{{ analysis.display_final_question_count }} questions</small>
-						</div>
-					</div>
-					<div class="col-md-4 col-xl-2">
-						<div class="cl-stat h-100">
-							<span>Total questions</span><strong>{{ analysis.display_question_count }}</strong>
-						</div>
-					</div>
-					<div class="col-md-4 col-xl-2">
-						<div class="cl-stat h-100">
-							<span>Format</span><strong>{{ analysis.display_format }}</strong>
-						</div>
-					</div>
-				</div>
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
+{% block body %}
+
+			<div>
+				{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+{% block body %}
+
+						{{ ui('data.stat-card', {label: 'Modules', value: (analysis.display_module_count)}) }}
+
+						{{ ui('data.stat-card', {label: 'Module assessments', value: (analysis.display_module_assessment_count), note: (analysis.display_module_question_count) ~ ' questions'}) }}
+
+						{{ ui('data.stat-card', {label: 'Diagnostics', value: (analysis.display_diagnostic_count), note: (analysis.display_diagnostic_question_count) ~ ' questions'}) }}
+
+						{{ ui('data.stat-card', {label: 'Final assessment', value: (analysis.display_final_assessment_count), note: (analysis.display_final_question_count) ~ ' questions'}) }}
+
+						{{ ui('data.stat-card', {label: 'Total questions', value: (analysis.display_question_count)}) }}
+
+						{{ ui('data.stat-card', {label: 'Format', value: (analysis.display_format)}) }}
+
+{% endblock %}
+{% endembed %}
 				{% if analysis.diagnostic_assessments %}
-					<div class="card border-info mb-4">
-						<div class="card-header bg-white p-4">
-							<h2 class="h4 mb-1">
-								Course-level diagnostics
-							</h2>
-							<p class="text-body-secondary mb-0">
-								These are imported as optional, recorded assessments before Module 1. They do not contribute to normal module/final grades or certificate eligibility. A source-defined diagnostic pass-out may complete the course enrolment.
-							</p>
-						</div>
-						<div class="list-group list-group-flush">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'info'})} %}
+{% block surface_body %}
+
+						{{ ui('layout.section-head', {heading: 'Course-level diagnostics', heading_level: 2, summary: 'These are imported as optional, recorded assessments before Module 1. They do not contribute to normal module/final grades or certificate eligibility. A source-defined diagnostic pass-out may complete the course enrolment.'}) }}
+						{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 							{% for diagnostic in analysis.diagnostic_assessments %}
-								<div class="list-group-item p-4">
+								{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 									<div class="d-flex flex-wrap justify-content-between gap-3">
 										<div>
 											<strong>{{ diagnostic.title }}</strong>
@@ -62,28 +48,29 @@
 											</div>
 										</div>
 										<div class="text-end">
-											<span class="badge text-bg-info">Suggested threshold {{ diagnostic.pass_mark }}%</span>
+											{{ ui('feedback.badge', {label: 'Suggested threshold ' ~ (diagnostic.pass_mark) ~ '%', tone: 'info'}) }}
 											{% if diagnostic.diagnostic_pass_action == 'complete_course' %}
 												<small class="d-block text-success mt-1">Passing completes course</small>
 											{% endif %}
 										</div>
 									</div>
-								</div>
+
+{% endblock %}
+{% endembed %}
 							{% endfor %}
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
 				{% if analysis.final_assessment %}
-					<div class="card border-primary mb-4">
-						<div class="card-header bg-white p-4">
-							<h2 class="h4 mb-1">
-								Final assessment detected
-							</h2>
-							<p class="text-body-secondary mb-0">
-								This assessment will be imported separately from the module assessments.
-							</p>
-						</div>
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'info'})} %}
+{% block surface_body %}
+
+						{{ ui('layout.section-head', {heading: 'Final assessment detected', heading_level: 2, summary: 'This assessment will be imported separately from the module assessments.'}) }}
+
 							<div class="d-flex flex-wrap justify-content-between gap-3">
 								<div>
 									<strong>{{ analysis.final_assessment.title }}</strong>
@@ -92,35 +79,40 @@
 									</div>
 								</div>
 								<div class="text-end">
-									<span class="badge text-bg-primary">Pass mark {{ analysis.final_assessment.pass_mark }}%</span>
+									{{ ui('feedback.badge', {label: 'Pass mark ' ~ (analysis.final_assessment.pass_mark) ~ '%', tone: 'info'}) }}
 									{% if analysis.final_assessment.required %}
 										<small class="d-block text-body-secondary mt-1">Required final assessment</small>
 									{% endif %}
 								</div>
 							</div>
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% else %}
-					<div class="card border-warning mb-4">
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'warning'})} %}
+{% block surface_body %}
+
 							<h2 class="h4">
 								No final assessment detected
 							</h2>
 							<p class="mb-0">
 								No separate final assessment will be created by this import. Confirm that this is intentional before committing the course.
 							</p>
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
-				<div class="card">
-					<div class="card-header bg-white p-4">
-						<h2 class="h4 mb-0">
-							Detected modules and blocks
-						</h2>
-					</div>
-					<div class="list-group list-group-flush">
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+					{{ ui('layout.section-head', {heading: 'Detected modules and blocks', heading_level: 2}) }}
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 						{% for module in analysis.modules %}
-							<div class="list-group-item p-4">
+							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+
 								<div class="d-flex gap-3">
 									<span class="cl-module-number">{{ module.position }}</span>
 									<div>
@@ -128,25 +120,32 @@
 										{% if module.subtitle %}
 											<small class="d-block text-body-secondary">{{ module.subtitle }}</small>
 										{% endif %}
-										<span class="badge text-bg-light mt-2">{{ module.block_count }} content blocks</span>
+										{{ ui('feedback.badge', {label: (module.block_count) ~ ' content blocks', tone: 'neutral'}) }}
 										{% if module.assessment %}
-											<span class="badge cl-badge-soft mt-2">{{ module.question_count }} assessment questions</span>
+											{{ ui('feedback.badge', {label: (module.question_count) ~ ' assessment questions', tone: 'neutral'}) }}
 										{% endif %}
 										{% if module.is_review %}
-											<span class="badge text-bg-light mt-2">Review module</span>
+											{{ ui('feedback.badge', {label: 'Review module', tone: 'neutral'}) }}
 										{% endif %}
 										{% if not module.assessment_required %}
-											<span class="badge text-bg-secondary mt-2">Assessment not required</span>
+											{{ ui('feedback.badge', {label: 'Assessment not required', tone: 'neutral'}) }}
 										{% endif %}
 									</div>
 								</div>
-							</div>
+
+{% endblock %}
+{% endembed %}
 						{% endfor %}
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
 				{% if analysis.parser_compatibility_count or analysis.parser_structural_count %}
-					<div class="card mt-4 {{ analysis.parser_structural_count ? 'border-warning' : 'border-secondary' }}">
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 							<h2 class="h4">
 								HTML parser report
 							</h2>
@@ -170,30 +169,38 @@
 									{% endfor %}
 								</ul>
 							{% else %}
-								<div class="alert alert-success mb-0">
+								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', section_spacing: false})} %}
+{% block body %}
+
 									No structural HTML parser warnings were detected.
-								</div>
+
+{% endblock %}
+{% endembed %}
 							{% endif %}
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
 			</div>
-			<aside class="col-xl-4">
+			<aside>
 				{% if analysis.display_presentation_css_bytes %}
-					<div class="card border-success mb-4">
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'success'})} %}
+{% block surface_body %}
+
 							<h2 class="h4">
 								Course presentation detected
 							</h2>
 							<p class="mb-0">
 								The source stylesheet was isolated for this course and will be stored with it in PostgreSQL. {{ analysis.display_presentation_css_bytes }} CSS bytes will be imported.
 							</p>
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
 				{% if analysis.warnings %}
-					<div class="card border-warning mb-4">
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'warning'})} %}
+{% block surface_body %}
+
 							<h2 class="h4">
 								Import warnings
 							</h2>
@@ -204,30 +211,35 @@
 									</li>
 								{% endfor %}
 							</ul>
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
-				<div class="card">
-					<div class="card-body p-4">
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 						<h2 class="h4">
 							Commit import
 						</h2>
 						<p>
 							Create a new draft, or replace a resettable course shell.
 						</p>
-						<form action="/admin/courses/import/commit" method="post">
+						<form action="/admin/courses/import/commit" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							<input type="hidden" name="import_key" value="{{ analysis.import_key }}">
-							<div class="mb-3" data-category-picker>
-								<label class="form-label">Category</label>
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Category', full_width: false, for: 'field-admin-course-import-preview-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
 								<div class="input-group">
-									<select class="form-select" name="category_id" data-category-select><option value="0">Uncategorised</option>
+									<select class="form-select" name="category_id" data-category-select id="field-admin-course-import-preview-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}"><option value="0">Uncategorised</option>
 									{% for category in categories %}
 										<option value="{{ category.id }}">{{ category.name }}</option>
 									{% endfor %}
 									</select>
 									{% if can_manage_categories %}
-										<button class="btn btn-outline-secondary" type="button" data-category-create-toggle>+ New</button>
+										{{ ui('action.button', {label: '+ New', variant: 'secondary', size: 'normal', type: 'button'}) }}
 									{% endif %}
 								</div>
 								{% if can_manage_categories %}
@@ -237,21 +249,40 @@
 										<textarea class="form-control mb-2" data-category-description rows="2" placeholder="Description (optional)"></textarea>
 										<div class="small text-danger mb-2 d-none" data-category-error>
 										</div>
-										<div class="d-flex gap-2">
-											<button class="btn btn-sm btn-primary" type="button" data-category-create>Create category</button><button class="btn btn-sm btn-outline-secondary" type="button" data-category-create-cancel>Cancel</button>
-										</div>
+										{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+
+											{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add'}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button'}) }}
+
+{% endblock %}
+{% endembed %}
 									</div>
 								{% endif %}
-							</div>
-							<label class="form-label">Replace existing course shell (optional)</label><select class="form-select mb-3" name="replace_course_id"><option value="0">Create a new course</option>
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', for: 'field-admin-course-import-preview', required: false})} %}
+{% block control %}
+<select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id"><option value="0">Create a new course</option>
 							{% for existing in replaceable_courses %}
 								<option value="{{ existing.id }}">{{ existing.title }}</option>
 							{% endfor %}
-							</select><button class="btn btn-primary w-100" type="submit">Import into PostgreSQL</button>
-						</form>
-					</div>
-				</div>
+							</select>
+{% endblock %}
+{% endembed %}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Import into PostgreSQL', variant: 'primary', size: 'normal', full_width: true, type: 'submit'}) }}
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+
+{% endblock %}
+{% endembed %}
 			</aside>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

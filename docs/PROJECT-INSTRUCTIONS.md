@@ -3,7 +3,7 @@
 **Current approved LMS version:** 0.8 (commerce update, 2026/09/13; 0.5.8.3 remains the accepted VPS version)
 **Date time:** 2026/09/13 SAST
 **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
-**Current phase:** TEST/DEV; v0.8 adds individual commerce through additive migrations on v0.7. Preserve existing records when applying this update.
+**Current phase:** TEST/DEV; v0.8 adds individual commerce through additive migrations on v0.7. The development database is disposable; this UI update requires no schema changes.
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -20,7 +20,7 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 - If a release is requested, build from the latest approved source and canonical documentation; never reuse a stale ZIP/installer.
 - The database is currently disposable TEST/DEV data. Destructive reset/reseed is acceptable until the project owner explicitly declares production.
 - Individual commerce is implemented in v0.8. Continue the remaining commerce stages from `COMMERCE-IMPLEMENTATION-PLAN.md` without treating initial Dummy/EFT checkout as a complete payment platform.
-- Equivalent UI patterns must use the same core markup/classes and established theme treatment. Do not create page-specific variants unless explicitly requested.
+- Reusable UI structures are platform components. Extend the canonical registry and its contracts; never fork markup or add compatibility aliases. See `UI-COMPONENTS.md` and `ux-ui-rules.md`. All themes, including Gilded Noir, consume the same functional structure while retaining their own visual treatment.
 - Never change an accepted design style merely for variety. Make only the requested visual changes.
 
 ## 3. Runtime and composition architecture

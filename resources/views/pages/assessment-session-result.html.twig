@@ -14,8 +14,9 @@
 	<section class="container py-5">
 		<div class="row g-4">
 			<div class="col-lg-8">
-				<div class="card mb-4">
-					<div class="card-body p-4 p-lg-5">
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 						<div class="cl-result-score">
 							<strong>{{ session.percentage }}%</strong><span>{{ session.is_diagnostic ? (session.diagnostic_passed ? 'Ready' : 'Review') : session.grade_code }}</span>
 						</div>
@@ -25,30 +26,23 @@
 						<p class="text-body-secondary mb-4">
 							<strong>Total time:</strong> {{ session.elapsed_label }}
 						</p>
-						<div class="row g-3">
-							<div class="col-6 col-md-3">
-								<div class="cl-stat">
-									<span>Correct</span><strong>{{ session.counts.correct }}</strong>
-								</div>
-							</div>
-							<div class="col-6 col-md-3">
-								<div class="cl-stat">
-									<span>Incorrect</span><strong>{{ session.counts.incorrect }}</strong>
-								</div>
-							</div>
-							<div class="col-6 col-md-3">
-								<div class="cl-stat">
-									<span>Skipped</span><strong>{{ session.counts.skipped }}</strong>
-								</div>
-							</div>
-							<div class="col-6 col-md-3">
-								<div class="cl-stat">
-									<span>Unanswered</span><strong>{{ session.counts.unanswered }}</strong>
-								</div>
-							</div>
-						</div>
+						{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+{% block body %}
+
+								{{ ui('data.stat-card', {label: 'Correct', value: (session.counts.correct)}) }}
+
+								{{ ui('data.stat-card', {label: 'Incorrect', value: (session.counts.incorrect)}) }}
+
+								{{ ui('data.stat-card', {label: 'Skipped', value: (session.counts.skipped)}) }}
+
+								{{ ui('data.stat-card', {label: 'Unanswered', value: (session.counts.unanswered)}) }}
+
+{% endblock %}
+{% endembed %}
 						{% if session.is_diagnostic %}
-							<div class="alert {{ session.diagnostic_passed ? 'alert-success' : 'alert-warning' }} mt-4">
+							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: session.diagnostic_passed ? 'success' : 'warning'})} %}
+{% block body %}
+
 								{{ session.diagnostic_message_html|raw }}
 								{% if session.diagnostic_course_completed %}
 									<p class="mb-0">
@@ -59,100 +53,86 @@
 										<strong>This diagnostic does not affect your course grade, progress or certificate.</strong>
 									</p>
 								{% endif %}
-							</div>
+
+{% endblock %}
+{% endembed %}
 							{% if session.diagnostic_remediation_modules %}
 								<div class="mt-4">
 									<h2 class="h5">
 										Suggested modules to review
 									</h2>
-									<div class="list-group">
+									{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+
 										{% for module in session.diagnostic_remediation_modules %}
-											<a class="list-group-item list-group-item-action" href="/learn/{{ session.slug }}/module/{{ module.position }}{{ is_preview ? '?preview=1' : '' }}"><strong>{{ module.title }}</strong>
+											{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+<a href="/learn/{{ session.slug }}/module/{{ module.position }}{{ is_preview ? '?preview=1' : '' }}"><strong>{{ module.title }}</strong>
 											{% if module.subtitle %}
 												<small class="d-block text-body-secondary">{{ module.subtitle }}</small>
 											{% endif %}
 											</a>
+{% endblock %}
+{% endembed %}
 										{% endfor %}
-									</div>
+
+{% endblock %}
+{% endembed %}
 								</div>
 							{% endif %}
 						{% else %}
 							{% if session.attempt_mode == 'practice' %}
-								<div class="alert alert-info mt-4 mb-0">
+								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+{% block body %}
+
 									Practice results do not affect your course grade.
-								</div>
+
+{% endblock %}
+{% endembed %}
 							{% endif %}
 						{% endif %}
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
 				<h2 class="h3">
 					Question report
 				</h2>
 				<div class="vstack gap-3">
 					{% for response in session.responses %}
 						{% set response_number = loop.index %}
-						<div class="card">
-							<div class="card-body p-4">
+						{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
 								<div class="d-flex flex-wrap justify-content-between gap-2">
-									<strong>Question {{ response_number }}</strong><span class="badge {{ response.is_correct ? 'text-bg-success' : (response.response_status == 'answered' ? 'text-bg-danger' : 'text-bg-secondary') }}">{{ response.response_status|ucfirst }}</span>
+									<strong>Question {{ response_number }}</strong>{{ ui('feedback.badge', {label: (response.response_status|ucfirst), tone: response.is_correct ? 'success' : (response.response_status == 'answered' ? 'danger' : 'neutral')}) }}
 								</div>
 								<div class="mt-3">
 									{{ response.question_html|raw }}
 								</div>
-								<dl class="cl-data-list mt-3">
-									<div>
-										<dt>
-											Your answer
-										</dt>
-										<dd>
-											{{ response.selected_option_html ?: 'No answer' }}
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Correct answer
-										</dt>
-										<dd>
-											{{ response.correct_option_html }}
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Points
-										</dt>
-										<dd>
-											{{ response.points_awarded }} / {{ response.points }}
-										</dd>
-									</div>
-									<div>
-										<dt>
-											Response time
-										</dt>
-										<dd>
-											{% if response.has_response_seconds %}
-												{{ response.response_seconds }} seconds
-											{% else %}
-												Not answered
-											{% endif %}
-										</dd>
-									</div>
-								</dl>
+								{{ ui('data.key-value-list', {items: [{label: 'Your answer', value: response.selected_option_html ?: 'No answer'}, {label: 'Correct answer', value: response.correct_option_html}, {label: 'Points', value: response.points_awarded ~ ' / ' ~ response.points}, {label: 'Response time', value: response.has_response_seconds ? response.response_seconds ~ ' seconds' : 'Not answered'}]}) }}
 								{% if response.explanation_html %}
-									<div class="cl-callout mt-3">
+									{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: true})} %}
+{% block body %}
+
 										{{ response.explanation_html|raw }}
-									</div>
+
+{% endblock %}
+{% endembed %}
 								{% endif %}
-							</div>
-						</div>
+
+{% endblock %}
+{% endembed %}
 					{% endfor %}
 				</div>
 			</div>
 			<aside class="col-lg-4">
-				<div class="card cl-sticky-card">
-					<div class="card-body p-4">
-						<a class="btn btn-primary w-100 mb-2" href="{{ retake_url }}">{{ session.is_diagnostic ? 'Take diagnostic again' : 'Assessment options' }}</a><a class="btn btn-outline-secondary w-100" href="{{ course_url }}">Course overview</a>
-					</div>
-				</div>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
+{% block surface_body %}
+
+						{{ ui('action.link', {label: (session.is_diagnostic ? 'Take diagnostic again' : 'Assessment options'), variant: 'primary', size: 'normal', full_width: true, href: (retake_url)}) }}{{ ui('action.link', {label: 'Course overview', variant: 'secondary', size: 'normal', full_width: true, href: (course_url)}) }}
+
+{% endblock %}
+{% endembed %}
 			</aside>
 		</div>
 	</section>

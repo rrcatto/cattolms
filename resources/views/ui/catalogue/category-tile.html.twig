@@ -1,3 +1,4 @@
+{% set item = props.item %}
 <a class="cl-category-tile{% if item.is_active %} is-active{% endif %}" href="{{ item.href }}"
    {% if item.is_active %}aria-current="true"{% endif %}
    hx-get="{{ item.href }}" hx-target="#catalogue-region" hx-select="#catalogue-results"

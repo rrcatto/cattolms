@@ -1,0 +1,11 @@
+{% set navigation = props.navigation %}
+<div id="catalogue-categories">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
+		{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Choose a category', summary: 'Explore a subject, then choose a subcategory to narrow your browse.'}) }}
+			<nav class="cl-category-grid" aria-label="Top-level categories">
+				{% for item in navigation.roots %}{{ ui('catalogue.category-tile', {item: item}) }}{% endfor %}
+			</nav>
+		{% endblock %}
+	{% endembed %}
+</div>

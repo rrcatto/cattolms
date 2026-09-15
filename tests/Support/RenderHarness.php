@@ -333,7 +333,7 @@ final class RenderHarness
                 'decision_note' => '', 'access_period_seconds' => 31536000, 'course_id' => 1,
                 'user_id' => 1, 'company_id' => 1,
                 // The readable status, as PlatformAdministrationService::normaliseRequests() adds it.
-                'status_label' => 'Pending', 'status_tone' => 'warn', 'awaiting_payment' => false,
+                'status_label' => 'Pending', 'status_tone' => 'warning', 'awaiting_payment' => false,
             ]],
             'credits' => [[
                 'id' => 1, 'public_id' => 'cr1', 'holder_name' => 'C', 'course_title' => 'T',

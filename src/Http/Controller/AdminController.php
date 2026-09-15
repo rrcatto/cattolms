@@ -75,7 +75,6 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
-
 use CattoLearning\Course\LearningService;
 
 use CattoLearning\Maintenance\MaintenanceService;
@@ -91,7 +90,6 @@ use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
-
 
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -188,7 +186,6 @@ final class AdminController extends BaseController
         return $this->renderAdministrationSection('courses');
     }
 
-
     #[Route('/admin/people', name: 'admin_people', methods: ['GET'])]
     public function people(): Response
     {
@@ -278,6 +275,13 @@ final class AdminController extends BaseController
         return $this->renderAdministrationSection('themes');
     }
 
+    /** Renders the platform component reference using static, non-sensitive examples. */
+    #[Route('/admin/system/ui-components', name: 'admin_ui_components', methods: ['GET'])]
+    public function uiComponents(): Response
+    {
+        return $this->renderAdministrationSection('ui_components');
+    }
+
     /** Renders the standalone Settings Administration section. */
     #[Route('/admin/settings', name: 'admin_settings', methods: ['GET'])]
     public function settings(): Response
@@ -308,7 +312,6 @@ final class AdminController extends BaseController
         }, '/admin/roles');
     }
 
-
     #[Route('/admin/roles', name: 'admin_create_role', methods: ['POST'])]
     public function createRole(): Response
     {
@@ -320,7 +323,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/roles/' . $roleId);
         }, '/admin/roles');
     }
-
 
     #[Route('/admin/roles/{id}', name: 'admin_update_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function updateRole(): Response
@@ -334,7 +336,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/roles/' . $roleId);
         }, '/admin/roles/' . $roleId);
     }
-
 
     #[Route('/admin/roles/{id}/permissions', name: 'admin_save_role_permissions', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function saveRolePermissions(): Response
@@ -350,7 +351,6 @@ final class AdminController extends BaseController
         }, '/admin/roles/' . $roleId);
     }
 
-
     #[Route('/admin/roles/{id}/delete', name: 'admin_delete_role', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function deleteRole(): Response
     {
@@ -363,7 +363,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/roles');
         }, '/admin/roles');
     }
-
 
     #[Route('/admin/activity/feed', name: 'admin_activity_feed', methods: ['GET'])]
     public function activityFeed(): Response
@@ -387,7 +386,6 @@ final class AdminController extends BaseController
         exit;
     }
 
-
     #[Route('/admin/activity/{id}', name: 'admin_activity_event', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function activityEvent(): Response
     {
@@ -403,7 +401,6 @@ final class AdminController extends BaseController
             'event' => $event,
         ]);
     }
-
 
     #[Route('/admin/people/{id}', name: 'admin_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function person(): Response
@@ -427,7 +424,6 @@ final class AdminController extends BaseController
         ]);
     }
 
-
     #[Route('/admin/people', name: 'admin_create_person', methods: ['POST'])]
     public function createPerson(): Response
     {
@@ -439,7 +435,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/people');
         }, '/admin/people');
     }
-
 
     #[Route('/admin/people/{id}', name: 'admin_update_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function updatePerson(): Response
@@ -454,7 +449,6 @@ final class AdminController extends BaseController
         }, '/admin/people/' . $target);
     }
 
-
     #[Route('/admin/people/{id}/status', name: 'admin_change_person_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function changePersonStatus(): Response
     {
@@ -468,7 +462,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/people/' . $target);
         }, '/admin/people/' . $target);
     }
-
 
     #[Route('/admin/people/{id}/sessions/revoke', name: 'admin_revoke_person_session', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function revokePersonSession(): Response
@@ -488,7 +481,6 @@ final class AdminController extends BaseController
         }, '/admin/people/' . $target);
     }
 
-
     #[Route('/admin/companies', name: 'admin_create_company', methods: ['POST'])]
     public function createCompany(): Response
     {
@@ -500,7 +492,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/companies');
         }, '/admin/companies');
     }
-
 
     #[Route('/admin/companies/{id}', name: 'admin_update_company', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function updateCompany(): Response
@@ -515,7 +506,6 @@ final class AdminController extends BaseController
         }, '/admin/companies');
     }
 
-
     #[Route('/admin/companies/{id}/status', name: 'admin_change_company_status', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function changeCompanyStatus(): Response
     {
@@ -529,7 +519,6 @@ final class AdminController extends BaseController
         }, '/admin/companies');
     }
 
-
     #[Route('/admin/course/enrolments/{id}/remove', name: 'admin_remove_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function removeEnrolment(): Response
     {
@@ -540,7 +529,6 @@ final class AdminController extends BaseController
         $this->flash('success', 'Course access was removed. Progress and results were retained.');
         $this->redirect('/admin/course/enrolments');
     }
-
 
     #[Route('/admin/course/enrolments/{id}/restore', name: 'admin_restore_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function restoreEnrolment(): Response
@@ -553,9 +541,6 @@ final class AdminController extends BaseController
         $this->redirect('/admin/course/enrolments');
     }
 
-
-
-
     #[Route('/admin/course/credits', name: 'admin_add_credit', methods: ['POST'])]
     public function addCredit(): Response
     {
@@ -567,7 +552,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/course/credits');
         }, '/admin/course/credits');
     }
-
 
     #[Route('/admin/course/requests/{id}/decision', name: 'admin_decide_request', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function decideRequest(): Response
@@ -583,7 +567,6 @@ final class AdminController extends BaseController
         }, '/admin/course/enrolments');
     }
 
-
     #[Route('/admin/themes/resync', name: 'admin_resync_themes', methods: ['POST'])]
     public function resyncThemes(): Response
     {
@@ -593,7 +576,6 @@ final class AdminController extends BaseController
         $this->flash('success', 'The theme registry was rebuilt from the filesystem.');
         $this->redirect('/admin/themes');
     }
-
 
     #[Route('/admin/themes/activate', name: 'admin_activate_theme', methods: ['POST'])]
     public function activateTheme(): Response
@@ -606,7 +588,6 @@ final class AdminController extends BaseController
         $this->redirect('/admin/themes');
     }
 
-
     #[Route('/admin/themes/{slug}/delete', name: 'admin_delete_theme', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['POST'])]
     public function deleteTheme(): Response
     {
@@ -615,7 +596,6 @@ final class AdminController extends BaseController
         $this->flash('success', 'The theme was uninstalled.');
         $this->redirect('/admin/themes');
     }
-
 
     #[Route('/admin/themes/import', name: 'admin_import_theme', methods: ['POST'])]
     public function importTheme(): Response
@@ -628,7 +608,6 @@ final class AdminController extends BaseController
         }, '/admin/themes');
     }
 
-
     #[Route('/admin/themes/import/confirm', name: 'admin_confirm_theme_import', methods: ['POST'])]
     public function confirmThemeImport(): Response
     {
@@ -639,7 +618,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/themes');
         }, '/admin/themes');
     }
-
 
     #[Route('/admin/settings', name: 'admin_save_settings', methods: ['POST'])]
     public function saveSettings(): Response
@@ -675,11 +653,6 @@ final class AdminController extends BaseController
         $this->redirect('/admin/settings?section=identity#settings-identity');
     }
 
-
-
-
-
-
     #[Route('/admin/settings/mail/password', name: 'admin_mail_password', methods: ['POST'])]
     public function mailPassword(): Response
     {
@@ -693,7 +666,6 @@ final class AdminController extends BaseController
         exit;
     }
 
-
     #[Route('/admin/settings/mail', name: 'admin_save_mail_settings', methods: ['POST'])]
     public function saveMailSettings(): Response
     {
@@ -706,7 +678,6 @@ final class AdminController extends BaseController
         }, '/admin/settings?section=mail#settings-mail');
     }
 
-
     #[Route('/admin/settings/mail/reset', name: 'admin_reset_mail_settings', methods: ['POST'])]
     public function resetMailSettings(): Response
     {
@@ -716,7 +687,6 @@ final class AdminController extends BaseController
         $this->flash('success', 'Mail settings now follow the MAIL_* values in .env.');
         $this->redirect('/admin/settings?section=mail#settings-mail');
     }
-
 
     #[Route('/admin/database/prune', name: 'admin_prune_database', methods: ['POST'])]
     public function pruneDatabase(): Response
@@ -731,7 +701,6 @@ final class AdminController extends BaseController
         $this->redirect('/admin/settings?section=maintenance#settings-maintenance');
     }
 
-
     #[Route('/admin/mail/test', name: 'admin_test_mail', methods: ['POST'])]
     public function testMail(): Response
     {
@@ -743,7 +712,6 @@ final class AdminController extends BaseController
             $this->redirect('/admin/settings?section=mail#settings-mail');
         }, '/admin/settings?section=mail#settings-mail');
     }
-
 
     /**
      * Renders one Administration section through the same section definition
@@ -846,7 +814,6 @@ final class AdminController extends BaseController
         }
         if (in_array('seed', $sectionKeys, true)) {
 
-
             $data['seed_cleanup_preview'] = null;
         }
         if (in_array('companies', $sectionKeys, true) || in_array('company_creators', $sectionKeys, true)) {
@@ -890,7 +857,7 @@ final class AdminController extends BaseController
             'activity' => 'PLATFORM.ACTIVITY.VIEW',
             'reports' => 'PLATFORM.REPORT.VIEW',
             'themes' => 'SYSTEM.THEME.VIEW',
-            'settings' => 'SYSTEM.SETTING.VIEW',
+            'settings', 'ui_components' => 'SYSTEM.SETTING.VIEW',
             'roles' => 'SYSTEM.ROLE.VIEW',
             'seed' => 'SYSTEM.SEED.VIEW',
             default => 'PLATFORM.DASHBOARD.VIEW',
@@ -979,6 +946,5 @@ final class AdminController extends BaseController
             'q' => trim((string) ($_GET['q'] ?? '')),
         ];
     }
-
 
 }

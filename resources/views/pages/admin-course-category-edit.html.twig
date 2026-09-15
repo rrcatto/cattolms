@@ -10,43 +10,60 @@
 		{% include '@platform/partials/admin/course-group-nav.html.twig' %}
 	</div>
 	<section class="container py-5 cl-medium">
-		<div class="card mb-4">
-			<div class="card-body p-4 p-lg-5">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 				<h2 class="h4">
 					Category details
 				</h2>
 				<form action="/admin/courses/categories/{{ category.id }}" method="post" class="vstack gap-3">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div>
-						<label class="form-label">Name</label>
-						<input class="form-control" name="name" value="{{ category.name }}" maxlength="120" required>
-					</div>
-					<div>
-						<label class="form-label">Parent category</label><select class="form-select" name="parent_id"><option value="0">None — a top-level category</option>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'field-admin-course-category-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+						<input class="form-control" name="name" value="{{ category.name }}" maxlength="120" required id="field-admin-course-category-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'field-admin-course-category-edit-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Currently at level ' ~ (category.level) ~ ' of 3. A category cannot be moved under itself or under one of its own sub-categories.'})} %}
+{% block control %}
+
+						<select class="form-select" name="parent_id" id="field-admin-course-category-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}><option value="0">None — a top-level category</option>
 						{% for parent_option in parent_options %}
 							<option value="{{ parent_option.id }}" {{ category.parent_id==parent_option.id ? 'selected' : '' }}>{{ parent_option.parent_name ? parent_option.parent_name ~ ' › ' : '' }}{{ parent_option.name }}</option>
 						{% endfor %}
 						</select>
-						<div class="form-text">
-							Currently at level {{ category.level }} of 3. A category cannot be moved under itself or under one of its own sub-categories.
-						</div>
-					</div>
-					<div>
-						<label class="form-label">Slug</label>
-						<input class="form-control" name="slug" value="{{ category.slug }}" required>
-					</div>
-					<div>
-						<label class="form-label">Description</label>
-						<textarea class="form-control" name="description" rows="4">{{ category.description }}</textarea>
-					</div>
-					<div class="cl-form-actions">
-					<button class="btn btn-primary" type="submit">Save category</button>
-					</div>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', full_width: false, for: 'field-admin-course-category-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+						<input class="form-control" name="slug" value="{{ category.slug }}" required id="field-admin-course-category-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: false, for: 'field-admin-course-category-edit-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+						<textarea class="form-control" name="description" rows="4" id="field-admin-course-category-edit-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ category.description }}</textarea>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+					{{ ui('action.button', {label: 'Save category', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
 				</form>
-			</div>
-		</div>
-		<div class="card border-danger">
-			<div class="card-body p-4 p-lg-5">
+
+{% endblock %}
+{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'danger'})} %}
+{% block surface_body %}
+
 				<h2 class="h4">
 					Delete category
 				</h2>
@@ -54,31 +71,40 @@
 					<p>
 						This category has {{ category.child_count }} sub-categor{{ category.child_count==1 ? 'y' : 'ies' }} beneath it. Move or delete those first — deleting a branch would take its whole subtree with it, which is never what anybody means to do.
 					</p>
-					<a class="btn btn-outline-secondary" href="/admin/courses/categories">Back to categories</a>
+					{{ ui('action.link', {label: 'Back to categories', variant: 'secondary', size: 'normal', href: '/admin/courses/categories'}) }}
 				{% else %}
 					{% if category.course_count %}
 						<p>
 							This category is in use. Choose another category and all {{ category.course_count }} course{{ category.course_count==1 ? '' : 's' }} will be reassigned before deletion.
 						</p>
-						<form action="/admin/courses/categories/{{ category.id }}/delete" method="post">
+						<form action="/admin/courses/categories/{{ category.id }}/delete" method="post">{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
+{% block body %}
+
 							<input type="hidden" name="csrf" value="{{ csrf }}">
-							<label class="form-label">Replacement category</label><select class="form-select mb-3" name="replacement_category_id" required><option value="">Choose replacement…</option>
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replacement category', for: 'field-admin-course-category-edit', required: true})} %}
+{% block control %}
+<select id="field-admin-course-category-edit" class="form-select mb-3" name="replacement_category_id" required><option value="">Choose replacement…</option>
 							{% for replacement in replacement_categories %}
 								<option value="{{ replacement.id }}">{{ replacement.name }}</option>
 							{% endfor %}
-							</select><button class="btn btn-danger" type="submit" data-confirm="Reassign the affected courses and permanently delete this category?">Reassign courses and delete</button>
-						</form>
+							</select>
+{% endblock %}
+{% endembed %}{{ ui('action.button', {label: 'Reassign courses and delete', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reassign the affected courses and permanently delete this category?', icon: 'action-remove'}) }}
+
+{% endblock %}
+{% endembed %}</form>
 					{% else %}
 						<p>
 							No courses use this category, so it can be removed directly.
 						</p>
 						<form action="/admin/courses/categories/{{ category.id }}/delete" method="post">
 							<input type="hidden" name="csrf" value="{{ csrf }}">
-							<button class="btn btn-danger" type="submit" data-confirm="Permanently delete this unused course category?">Delete category</button>
+							{{ ui('action.button', {label: 'Delete category', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this unused course category?', icon: 'action-remove'}) }}
 						</form>
 					{% endif %}
 				{% endif %}
-			</div>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

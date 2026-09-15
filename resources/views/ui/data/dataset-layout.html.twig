@@ -1,0 +1,8 @@
+{% if props.heading %}{{ ui('layout.section-head', {heading: props.heading, summary: props.summary}) }}{% endif %}
+{% if props.search %}{% include '@platform/partials/dataset-search.html.twig' with props.search %}{% endif %}
+{% block toolbar %}{% endblock %}
+<div id="{{ props.name }}-region" data-server-search-target><div id="{{ props.name }}-results">
+{% if props.pagination %}{% include '@platform/partials/pagination.html.twig' with {pg: props.pagination, pg_position: 'top'} %}{% endif %}
+{% block results %}{% endblock %}
+{% if props.pagination %}{% include '@platform/partials/pagination.html.twig' with {pg: props.pagination, pg_position: 'bottom'} %}{% else %}{% block preview %}{% endblock %}{% endif %}
+</div></div>

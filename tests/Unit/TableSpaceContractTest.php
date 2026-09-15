@@ -158,7 +158,7 @@ final class TableSpaceContractTest extends TestCase
             preg_match_all('/<td\b(?![^>]*data-no-row-menu)[^>]*>(.*?)<\/td>/s', $markup, $cells);
 
             foreach ($cells[1] as $cell) {
-                if (str_contains($cell, 'row-menu')) continue;
+                if (str_contains($cell, 'cl-ui-row-menu')) continue;
                 // Ordering arrows are one control in two halves, not two actions.
                 if (str_contains($cell, "name=\"direction\"")) continue;
                 // A check's two branches are exclusive, so only one of them is ever on screen.

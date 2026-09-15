@@ -5,10 +5,10 @@
 			<div class="container-fluid cl-container-wide d-flex flex-wrap align-items-center justify-content-between gap-2">
 				<strong>Student-view preview</strong><span>Progress and scores are stored only in your preview record.</span>
 				<div class="d-flex gap-2">
-					<a class="btn btn-sm btn-light" href="/admin/courses/{{ course.id }}">Exit preview</a>
+					{{ ui('action.link', {label: 'Exit preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id)}) }}
 					<form action="/admin/courses/{{ course.id }}/preview/reset" method="post">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						<button class="btn btn-sm btn-outline-light" type="submit">Reset preview</button>
+						{{ ui('action.button', {label: 'Reset preview', variant: 'secondary', size: 'small', type: 'submit'}) }}
 					</form>
 				</div>
 			</div>
@@ -23,9 +23,10 @@
 		{% if not course.enrolment.started_at %}
 			<div class="row justify-content-center">
 				<div class="col-lg-8">
-					<div class="card cl-start-card">
-						<div class="card-body p-4 p-lg-5">
-							<span class="cl-step-badge">Ready to begin</span>
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+							{{ ui('feedback.badge', {label: 'Ready to begin', tone: 'info'}) }}
 							<h2 class="display-6 fw-bold mt-3">
 								Start when you are ready
 							</h2>
@@ -40,10 +41,11 @@
 							</div>
 							<form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post" class="mt-4">
 								<input type="hidden" name="csrf" value="{{ csrf }}">
-								<button class="btn btn-primary btn-lg" type="submit">Start course</button>
+								{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit'}) }}
 							</form>
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				</div>
 			</div>
 		{% else %}
@@ -60,8 +62,9 @@
 							</p>
 							<div class="vstack gap-3">
 								{% for diagnostic in course.diagnostic_assessments %}
-									<div class="card border-info">
-										<div class="card-body p-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+									{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info'})} %}
+{% block surface_body %}
+
 											<div>
 												<strong>{{ diagnostic.title }}</strong>
 												<div class="text-body-secondary">
@@ -71,9 +74,10 @@
 													<small class="text-success">Passing this diagnostic completes the course.</small>
 												{% endif %}
 											</div>
-											<a class="btn btn-outline-info" href="/learn/{{ course.slug }}/diagnostic/{{ diagnostic.assessment_key }}{{ preview_query }}">Open diagnostic</a>
-										</div>
-									</div>
+											{{ ui('action.link', {label: 'Open diagnostic', variant: 'secondary', size: 'normal', href: '/learn/' ~ (course.slug) ~ '/diagnostic/' ~ (diagnostic.assessment_key) ~ (preview_query)}) }}
+
+{% endblock %}
+{% endembed %}
 								{% endfor %}
 							</div>
 						</div>
@@ -87,11 +91,7 @@
 						</div>
 						<strong>{{ course.progress.assessed_count }} of {{ course.progress.module_count }} assessed</strong>
 					</div>
-					<div class="progress cl-progress-lg mb-4" role="progressbar" aria-label="Course progress" aria-valuenow="{{ course.progress.percentage }}" aria-valuemin="0" aria-valuemax="100">
-						<div class="progress-bar" style="width:{{ course.progress.percentage }}%">
-							{{ course.progress.percentage }}%
-						</div>
-					</div>
+					{{ ui('feedback.progress', {value: course.progress.percentage, label: 'Course progress', size: 'large'}) }}
 					<div class="cl-module-list">
 						{% for module in course.modules %}
 							<a class="cl-module-row cl-module-link" href="/learn/{{ course.slug }}/module/{{ module.position }}{{ preview_query }}"><span class="cl-module-number">{{ module.position }}</span>
@@ -103,20 +103,21 @@
 							</div>
 							<span class="ms-auto d-flex gap-1">
 							{% if module.is_review %}
-								<span class="badge text-bg-light">Review</span>
+								{{ ui('feedback.badge', {label: 'Review', tone: 'neutral'}) }}
 							{% endif %}
 							{% if not module.assessment_required %}
-								<span class="badge text-bg-light">No assessment required</span>
+								{{ ui('feedback.badge', {label: 'No assessment required', tone: 'neutral'}) }}
 							{% endif %}
 							{% if module.question_count > 0 %}
-								<span class="badge cl-badge-soft">{{ module.question_count }} questions</span>
+								{{ ui('feedback.badge', {label: (module.question_count) ~ ' questions', tone: 'neutral'}) }}
 							{% endif %}
 							</span></a>
 						{% endfor %}
 					</div>
 					{% if course.final_unlocked %}
-						<div class="card mt-4 border-primary">
-							<div class="card-body p-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+						{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'info'})} %}
+{% block surface_body %}
+
 								<div>
 									<span class="cl-kicker text-primary">Final assessment</span>
 									<h3 class="h4 mb-1">
@@ -126,48 +127,26 @@
 										Open the assessment page to review its rules before starting.
 									</p>
 								</div>
-								<a class="btn btn-primary" href="/learn/{{ course.slug }}/final/assessment{{ preview_query }}">Open final assessment</a>
-							</div>
-						</div>
+								{{ ui('action.link', {label: 'Open final assessment', variant: 'primary', size: 'normal', href: '/learn/' ~ (course.slug) ~ '/final/assessment' ~ (preview_query)}) }}
+
+{% endblock %}
+{% endembed %}
 					{% endif %}
 				</div>
 				<aside class="col-lg-4">
-					<div class="card cl-sticky-card">
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
+{% block surface_body %}
+
 							<h2 class="h4">
 								Course access
 							</h2>
-							<dl class="cl-data-list">
-								<div>
-									<dt>
-										Started
-									</dt>
-									<dd>
-										{{ course.enrolment.started_at }}
-									</dd>
-								</div>
-								<div>
-									<dt>
-										Expires
-									</dt>
-									<dd>
-										{{ course.enrolment.expires_at ?: 'No preview expiry' }}
-									</dd>
-								</div>
-								<div>
-									<dt>
-										Status
-									</dt>
-									<dd>
-										{{ course.enrolment.status }}
-									</dd>
-								</div>
-							</dl>
+							{{ ui('data.key-value-list', {items: [{label: 'Started', value: (course.enrolment.started_at)}, {label: 'Expires', value: (course.enrolment.expires_at ?: 'No preview expiry')}, {label: 'Status', value: (course.enrolment.status)}]}) }}
 							{% if course.certificate %}
-								<a class="btn btn-outline-primary w-100" href="/certificates/{{ course.certificate.public_id }}">{{ is_preview ? 'View preview certificate' : 'View certificate' }}</a>
+								{{ ui('action.link', {label: (is_preview ? 'View preview certificate' : 'View certificate'), variant: 'secondary', size: 'normal', full_width: true, href: '/certificates/' ~ (course.certificate.public_id)}) }}
 							{% endif %}
-						</div>
-					</div>
+
+{% endblock %}
+{% endembed %}
 				</aside>
 			</div>
 		{% endif %}

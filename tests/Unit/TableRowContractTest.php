@@ -11,15 +11,15 @@ Description:
 A table row is one line, it fits, and nothing in it stacks.
 
 This exists because the rule was written once, asserted nowhere, and was wrong on every screen. Core
-said `.row-actions{flex-wrap:nowrap}` at specificity (0,1,0); every theme says
-`.gn-main .row-actions{flex-wrap:wrap}` at (0,2,0) and loads afterwards. The core rule lost on every
+said `.cl-ui-row-actions{flex-wrap:nowrap}` at specificity (0,1,0); every theme says
+`.gn-main .cl-ui-row-actions{flex-wrap:wrap}` at (0,2,0) and loads afterwards. The core rule lost on every
 page, the buttons stacked anyway, and the passing build said nothing - because nothing was asked.
 
 Three separate failures produced the same symptom and each is checked separately:
 
   - a theme overriding the core rule, which is why core now says it with !important;
   - a cell laying its content out with a container core never sees, such as a hand-written
-    `d-flex flex-wrap` instead of `.row-actions`;
+    `d-flex flex-wrap` instead of `.cl-ui-row-actions`;
   - a table using a wrapper class core does not style, such as Bootstrap's `table-responsive`, so
     none of the rules reach it at all.
 
@@ -82,10 +82,10 @@ final class TableRowContractTest extends TestCase
         }
 
         // And the wrapper must not reintroduce the scrollbar the fixed layout removes the need for.
-        // !important, because the theme loads after core and declares `.gn-main .table-wrap
+        // !important, because the theme loads after core and declares `.gn-main .cl-ui-table
         // {overflow:auto}` at higher specificity. Without it the wrapper clips and the row menu -
         // absolutely positioned, and required to escape its cell - is never drawn.
-        self::assertStringContainsString('.table-wrap{width:100%;overflow:visible!important}', $css);
+        self::assertStringContainsString('.cl-ui-table{width:100%;overflow:visible!important}', $css);
 
         // Truncation is what makes "no wrapping and no scrolling" possible at all: content wider
         // than its column has to be shortened, because the other two options are the ones banned.
@@ -109,7 +109,7 @@ final class TableRowContractTest extends TestCase
         self::assertSame(
             [],
             array_values(array_unique($offenders)),
-            "A table row must lay its actions out with .row-actions, which core keeps on one line:\n  "
+            "A table row must lay its actions out with .cl-ui-row-actions, which core keeps on one line:\n  "
             . implode("\n  ", array_unique($offenders))
         );
     }
@@ -134,17 +134,17 @@ final class TableRowContractTest extends TestCase
         );
     }
 
-    /**
-     * Every table body row, as written in a template.
-     *
-     * @return list<string>
-     */
+    public function testRowScannerActuallyChecksMigratedTables(): void
+    {
+        $count = 0;
+        foreach (self::views() as $path) $count += count(self::rowsOf((string) file_get_contents($path)));
+        self::assertGreaterThan(50, $count);
+    }
+
+    /** @return list<string> */
     private static function rowsOf(string $markup): array
     {
-        if (preg_match('/<tbody>(.*?)<\/tbody>/s', $markup, $body) !== 1) {
-            return [];
-        }
-        preg_match_all('/<tr\b.*?<\/tr>/s', $body[1], $rows);
+        preg_match_all('/<tr\b.*?<\/tr>/s', $markup, $rows);
 
         return $rows[0];
     }
@@ -165,7 +165,7 @@ final class TableRowContractTest extends TestCase
         $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/js/platform-overrides.js');
 
         self::assertStringContainsString('const applyCellTooltips', $js);
-        self::assertStringContainsString(".table-wrap td, .table-wrap th", $js);
+        self::assertStringContainsString(".cl-ui-table td, .cl-ui-table th", $js);
         self::assertStringContainsString('cell.scrollWidth > cell.clientWidth', $js);
         // A page turn replaces the rows, so the pass has to run again on what htmx swapped in.
         self::assertStringContainsString("htmx:afterSwap", $js);

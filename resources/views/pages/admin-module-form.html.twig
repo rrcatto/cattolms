@@ -6,89 +6,119 @@
 	{% set ph_title = module.id ? 'Edit module' : 'Add module' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="container-fluid cl-container-wide py-5">
-		<div class="row g-4">
-			<div class="col-xl-8">
-				<form action="{{ form_action }}" method="post" class="card mb-4">
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
+{% block body %}
+
+			<div>
+				<form action="{{ form_action }}" method="post">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					<div class="card-header bg-white p-4">
-						<h2 class="h4 mb-0">
-							Module content
-						</h2>
-					</div>
-					<div class="card-body p-4">
-						<div class="row g-3">
-							<div class="col-md-3">
-								<label class="form-label">Position</label>
-								<input class="form-control" type="number" min="1" name="position" value="{{ module.position }}" required>
+					{{ ui('layout.section-head', {heading: 'Module content', heading_level: 2}) }}
+
+						{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Position', full_width: false, for: 'field-admin-module-form-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+								<input class="form-control" type="number" min="1" name="position" value="{{ module.position }}" required id="field-admin-module-form-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Module key', full_width: false, for: 'field-admin-module-form-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+								<input class="form-control" name="module_key" value="{{ module.module_key }}" required id="field-admin-module-form-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title', full_width: false, for: 'field-admin-module-form-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+								<input class="form-control" name="title" value="{{ module.title }}" required id="field-admin-module-form-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subtitle', full_width: true, for: 'field-admin-module-form-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+								<input class="form-control" name="subtitle" value="{{ module.subtitle }}" id="field-admin-module-form-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Learning outcomes', full_width: true, for: 'field-admin-module-form-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+								<textarea class="form-control cl-rich-editor" name="learning_outcomes_html" rows="6" id="field-admin-module-form-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ module.learning_outcomes_html }}</textarea>
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Main module content', full_width: true, for: 'field-admin-module-form-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Saving this field updates the main HTML block while retaining imported accordions and other structured blocks.'})} %}
+{% block control %}
+
+								<textarea class="form-control cl-rich-editor" name="content_html" rows="20" id="field-admin-module-form-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}"{% if props.help or props.error %} aria-describedby="{% if props.help %}{{ props.for }}-help{% endif %}{% if props.error %} {{ props.for }}-error{% endif %}"{% endif %}{% if props.error %} aria-invalid="true"{% endif %}>{{ module.content_html }}</textarea>
+
+{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Module summary', full_width: true, for: 'field-admin-module-form-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+								<textarea class="form-control cl-rich-editor" name="summary_html" rows="8" id="field-admin-module-form-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}">{{ module.summary_html }}</textarea>
+
+{% endblock %}
+{% endembed %}
+							<div>
+								{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'This is a review/revision module'})} %}
+{% block control %}
+
+									<input id="is-review" type="checkbox" name="is_review" value="1" {{ module.is_review ? 'checked' : '' }}>
+
+{% endblock %}
+{% endembed %}
 							</div>
-							<div class="col-md-3">
-								<label class="form-label">Module key</label>
-								<input class="form-control" name="module_key" value="{{ module.module_key }}" required>
-							</div>
-							<div class="col-md-6">
-								<label class="form-label">Title</label>
-								<input class="form-control" name="title" value="{{ module.title }}" required>
-							</div>
-							<div class="col-12">
-								<label class="form-label">Subtitle</label>
-								<input class="form-control" name="subtitle" value="{{ module.subtitle }}">
-							</div>
-							<div class="col-12">
-								<label class="form-label">Learning outcomes</label>
-								<textarea class="form-control cl-rich-editor" name="learning_outcomes_html" rows="6">{{ module.learning_outcomes_html }}</textarea>
-							</div>
-							<div class="col-12">
-								<label class="form-label">Main module content</label>
-								<textarea class="form-control cl-rich-editor" name="content_html" rows="20">{{ module.content_html }}</textarea>
-								<div class="form-text">
-									Saving this field updates the main HTML block while retaining imported accordions and other structured blocks.
-								</div>
-							</div>
-							<div class="col-12">
-								<label class="form-label">Module summary</label>
-								<textarea class="form-control cl-rich-editor" name="summary_html" rows="8">{{ module.summary_html }}</textarea>
-							</div>
-							<div class="col-12">
-								<div class="form-check">
-									<input class="form-check-input" id="is-review" type="checkbox" name="is_review" value="1" {{ module.is_review ? 'checked' : '' }}>
-									<label class="form-check-label" for="is-review">This is a review/revision module</label>
-								</div>
-							</div>
-							<div class="col-12">
-								<div class="form-check">
+							<div>
+								{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'This module requires an assessment and counts toward the course module grade'})} %}
+{% block control %}
+
 									<input type="hidden" name="assessment_required" value="0">
-									<input class="form-check-input" id="assessment-required" type="checkbox" name="assessment_required" value="1" {{ module.assessment_required ? 'checked' : '' }}>
-									<label class="form-check-label" for="assessment-required">This module requires an assessment and counts toward the course module grade</label>
-								</div>
+									<input id="assessment-required" type="checkbox" name="assessment_required" value="1" {{ module.assessment_required ? 'checked' : '' }}>
+
+{% endblock %}
+{% endembed %}
 							</div>
-						</div>
-						<div class="cl-form-actions">
-							<button class="btn btn-primary" type="submit">{{ module.id ? 'Save module' : 'Create module' }}</button>
-						</div>
-					</div>
-				</form>
+
+{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+							{{ ui('action.button', {label: (module.id ? 'Save module' : 'Create module'), variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
 				{% if module.id %}
-					<section class="card" id="assessment">
-						<div class="card-header bg-white p-4">
-							<h2 class="h4 mb-1">
-								Module assessment
-							</h2>
-							<p class="text-body-secondary mb-0">
-								Configure practice, question pools, timing, attempts, grading and individual questions.
-							</p>
-						</div>
-						<div class="card-body p-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'assessment'})} %}
+{% block surface_body %}
+
+						{{ ui('layout.section-head', {heading: 'Module assessment', heading_level: 2, summary: 'Configure practice, question pools, timing, attempts, grading and individual questions.'}) }}
+
 							<form action="/admin/courses/{{ course.id }}/modules/{{ module.id }}/assessment" method="post" id="question-editor-form">
 								<input type="hidden" name="csrf" value="{{ csrf }}">
 								{% include '@platform/partials/assessment-editor.html.twig' %}
 							</form>
-						</div>
-					</section>
+
+{% endblock %}
+{% endembed %}
 				{% endif %}
 			</div>
-			<aside class="col-xl-4">
-				<div class="card cl-sticky-card">
-					<div class="card-body p-4">
+			<aside>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
+{% block surface_body %}
+
 						<h2 class="h4">
 							Editing notes
 						</h2>
@@ -109,12 +139,15 @@
 						{% if module.id %}
 							<form action="/admin/courses/{{ course.id }}/modules/{{ module.id }}/delete" method="post" onsubmit="return confirm('Delete this module and its assessment?');">
 								<input type="hidden" name="csrf" value="{{ csrf }}">
-								<button class="btn btn-outline-danger w-100" type="submit">Delete module</button>
+								{{ ui('action.button', {label: 'Delete module', variant: 'danger', size: 'normal', full_width: true, type: 'submit', icon: 'action-remove'}) }}
 							</form>
 						{% endif %}
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
 			</aside>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

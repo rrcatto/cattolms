@@ -64,7 +64,7 @@
 								{% if nav.method == 'POST' %}
 									<form action="{{ nav.href }}" method="post" data-nav-item="{{ nav.key }}">
 										<input type="hidden" name="csrf" value="{{ nav.csrf }}">
-										<button class="btn btn-ghost btn-sm" type="submit">{{ nav.label }}</button>
+										{{ ui('action.button', {label: (nav.label), variant: 'quiet', size: 'small', type: 'submit'}) }}
 									</form>
 								{% endif %}
 							{% endfor %}
@@ -86,15 +86,7 @@
 						</div>
 					</div>
 					<div class="rl-content">
-						{% if flash|length %}
-							<div class="flash-stack">
-								{% for message in flash %}
-									<div class="flash flash-{{ message.type }}">
-										{{ message.message }}
-									</div>
-								{% endfor %}
-							</div>
-						{% endif %}
+						{% include '@platform/partials/flash-messages.html.twig' %}
 						{% block page_content %}
 							{% block page_body %}
 							{% endblock %}
@@ -114,20 +106,12 @@
 					<div class="public-nav-inner">
 						<a class="brand" href="/"><span class="brand-mark">CL</span><span><strong>{{ app.name }}</strong><small>Radiant Learning</small></span></a>
 						<div class="public-links">
-							<a class="btn btn-ghost" href="/" data-nav-item="home">Home</a><a class="btn btn-ghost" href="/courses" data-nav-item="catalogue">Catalogue</a><a class="btn btn-primary" href="/login">Register or sign in</a>
+							{{ ui('action.link', {label: 'Home', variant: 'quiet', size: 'normal', href: '/', navigation_key: 'home'}) }}{{ ui('action.link', {label: 'Catalogue', variant: 'quiet', size: 'normal', href: '/courses', navigation_key: 'catalogue'}) }}{{ ui('action.link', {label: 'Register or sign in', variant: 'primary', size: 'normal', href: '/login'}) }}
 						</div>
 					</div>
 				</nav>
 				<main class="public-main">
-					{% if flash|length %}
-						<div class="flash-stack">
-							{% for message in flash %}
-								<div class="flash flash-{{ message.type }}">
-									{{ message.message }}
-								</div>
-							{% endfor %}
-						</div>
-					{% endif %}
+					{% include '@platform/partials/flash-messages.html.twig' %}
 					{{ block('page_content') }}
 				</main>
 				{% include '@theme/partials/footer.html.twig' %}

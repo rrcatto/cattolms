@@ -1,6 +1,8 @@
+{% set label = props.label %}
+{% set items = props.items %}
 {% if items %}
 	<nav class="cl-filter-rail" aria-label="{{ label }}">
 		<span class="cl-filter-rail-label">{{ label }}</span>
-		{% for item in items %}{{ ui('filter-pill', {item: item}) }}{% endfor %}
+		{% for item in items %}{{ ui('catalogue.filter-pill', {item: item}) }}{% endfor %}
 	</nav>
 {% endif %}

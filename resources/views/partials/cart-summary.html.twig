@@ -1,5 +1,5 @@
 <div class="cl-cart-chrome">
-    {% if cart_summary.count > 0 %}<span class="cl-cart-prompt">Proceed to checkout now</span><a class="btn btn-sm btn-primary" href="/checkout">Checkout</a>{% endif %}
+    {% if cart_summary.count > 0 %}<span class="cl-cart-prompt">Proceed to checkout now</span>{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'small', href: '/checkout'}) }}{% endif %}
     <details class="cl-cart-menu">
         <summary aria-label="My Cart, {{ cart_summary.count }} items">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 3h3l3 13h11l3-10H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
@@ -9,7 +9,7 @@
             <a class="cl-cart-heading" href="/cart">My Cart</a>
             {% for item in cart_summary.items %}<div class="cl-cart-line"><a href="/courses/{{ item.slug }}">{{ item.title }}</a><span>{{ item.price_label }}</span></div>{% else %}<p>Your cart is empty.</p>{% endfor %}
             <p class="cl-cart-total"><strong>Total</strong><strong>{{ cart_summary.total_label }}</strong></p>
-            <div class="cl-cart-links"><a href="/cart">View My Cart</a>{% if cart_summary.count > 0 %}<a class="btn btn-sm btn-primary" href="/checkout">Checkout</a>{% endif %}</div>
+            <div class="cl-cart-links"><a href="/cart">View My Cart</a>{% if cart_summary.count > 0 %}{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'small', href: '/checkout'}) }}{% endif %}</div>
         </div>
     </details>
 </div>

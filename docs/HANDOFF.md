@@ -10,6 +10,17 @@ Run additive migrations against v0.7, publish the modified core/theme assets, an
 
 The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures.
 
+## Current platform UI architecture
+
+The design system expansion uses namespaced components in `resources/views/ui/`, with one
+`PlatformUi` registry and authored Twig slots. Layout, actions, fields, forms, datasets, tables,
+statistics, lists, metadata, notices, badges, empty states, progress, modals, accordions and icons
+serve the migrated platform pages. The complete API is in [UI-COMPONENTS.md](UI-COMPONENTS.md).
+The component gallery is `/admin/system/ui-components` under the existing System settings ACL.
+No compatibility component names or old structural CSS aliases remain. Gilded Noir keeps its own
+visual design and uses the shared structure. Earlier historical UI instructions below are records,
+not current implementation requirements; use the component guide and UX rules for changes.
+
 ## Current catalogue component architecture
 
 The public catalogue now composes canonical platform UI templates through `PlatformUi`. It keeps

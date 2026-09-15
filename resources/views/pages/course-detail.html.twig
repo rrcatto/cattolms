@@ -7,11 +7,11 @@
 					<div class="d-flex flex-wrap gap-2 mb-3">
 						{% if course.category_name %}
 							{% if course.category_name %}
-								<span class="badge cl-badge-soft">{{ course.category_name }}</span>
+								{{ ui('feedback.badge', {label: (course.category_name), tone: 'neutral'}) }}
 							{% endif %}
 						{% endif %}
 						{% if course.level %}
-							<span class="badge text-bg-light">{{ course.level }}</span>
+							{{ ui('feedback.badge', {label: (course.level), tone: 'neutral'}) }}
 						{% endif %}
 					</div>
 					<div class="cl-course-detail-headline">
@@ -38,24 +38,20 @@
 					</p>
 				</div>
 				<div class="col-lg-4">
-					<div class="cl-summary-card">
-						<div>
-							<span>Modules</span><strong>{{ course.module_count }}</strong>
-						</div>
-						<div>
-							<span>Questions</span><strong>{{ course.question_count }}</strong>
-						</div>
-						<div>
-							<span>Access starts</span><strong>When you start</strong>
-						</div>
-					</div>
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+{{ ui('data.key-value-list', {items: [{label: 'Modules', value: (course.module_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'When you start'}]}) }}
+{% endblock %}
+{% endembed %}
 				</div>
 			</div>
 		</div>
 	</section>
 	<section class="container py-5">
-		<div class="row g-5">
-			<div class="col-lg-8">
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
+{% block body %}
+
+			<div>
 				<div class="cl-prose mb-5">
 					{{ course.description_html|raw }}
 				</div>
@@ -83,22 +79,19 @@
 				<h2 class="h3 mt-5 mb-3">
 					Grading
 				</h2>
-				<div class="table-wrap">
-					<table class="table">
-						<thead>
+
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+
 							<tr>
-								<th style="width:40%">
-									Grade
-								</th>
-								<th style="width:30%">
-									Minimum
-								</th>
-								<th style="width:30%">
-									Result
-								</th>
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Grade'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Minimum'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Result'}} %}
 							</tr>
-						</thead>
-						<tbody>
+
+{% endblock %}
+{% block body %}
+
 							{% for band in course.grade_bands %}
 								<tr>
 									<td>
@@ -112,13 +105,15 @@
 									</td>
 								</tr>
 							{% endfor %}
-						</tbody>
-					</table>
-				</div>
+
+{% endblock %}
+{% endembed %}
+
 			</div>
-			<aside class="col-lg-4">
-				<div class="card cl-sticky-card">
-					<div class="card-body p-4">
+			<aside>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
+{% block surface_body %}
+
 						<h2 class="h4">
 							Course access
 						</h2>
@@ -126,7 +121,7 @@
 							<p>
 								This course is already in your library.
 							</p>
-							<a class="btn btn-primary w-100" href="/learn/{{ course.slug }}">Open course</a>
+							{{ ui('action.link', {label: 'Open course', variant: 'primary', size: 'normal', full_width: true, href: '/learn/' ~ (course.slug)}) }}
 						{% else %}
 							{% if course.price_variants %}
 								<form action="/cart/add" method="post">
@@ -134,38 +129,41 @@
 									<input type="hidden" name="course_id" value="{{ course.id }}">
 									<div class="vstack gap-2 mb-3">
 										{% for price_index, price in course.price_variants %}
-											<label class="border rounded p-3 d-flex align-items-start gap-3">
-											<input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.is_default ? 'checked' : '' }} required>
-											<span class="flex-grow-1"><strong>{{ price.price_label }}</strong>
-											<br>
-											<span>{{ price.access_period_label }} access</span>
-											{% if price.label %}
-												<small class="d-block text-body-secondary">{{ price.label }}</small>
-											{% endif %}
-											</span>
-											{% if price.is_default %}
-												<span class="badge text-bg-primary">Default</span>
-											{% endif %}
-											</label>
+											{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (price.price_label) ~ ' ' ~ (price.access_period_label) ~ ' access {% if price.label %} ' ~ (price.label) ~ ' {% endif %} {% if price.is_default %} ' ~ (ui('feedback.badge', {label: 'Default', tone: 'info'})) ~ ' {% endif %}'})} %}
+{% block control %}
+<input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.is_default ? 'checked' : '' }} required>
+{% endblock %}
+{% endembed %}
 										{% endfor %}
 									</div>
-                                    <div class="cl-form-actions">
-                                        <button class="btn btn-primary" type="submit" name="action" value="add">Add to cart</button>
-                                        <button class="btn btn-outline-primary" type="submit" name="action" value="buy_now">Buy now</button>
+                                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+                                        {{ ui('action.button', {label: 'Add to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-add'}) }}
+                                        {{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now'}) }}
                                         {% if is_authenticated and 'CATALOGUE.COURSE.REQUEST' in permissions %}
-                                            <button class="btn btn-outline-secondary" type="submit" name="action" value="request">Request from my company</button>
+                                            {{ ui('action.button', {label: 'Request from my company', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'request'}) }}
                                         {% endif %}
-                                    </div>
+
+{% endblock %}
+{% endembed %}
 								</form>
 							{% else %}
-								<div class="alert alert-warning mb-0">
+								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
+{% block body %}
+
 									This course does not currently have an active purchase price.
-								</div>
+
+{% endblock %}
+{% endembed %}
 							{% endif %}
 						{% endif %}
-					</div>
-				</div>
+
+{% endblock %}
+{% endembed %}
 			</aside>
-		</div>
+
+{% endblock %}
+{% endembed %}
 	</section>
 {% endblock %}

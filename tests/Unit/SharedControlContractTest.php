@@ -35,6 +35,18 @@ use PHPUnit\Framework\TestCase;
 
 final class SharedControlContractTest extends TestCase
 {
+    public function testThemesCannotGenerateTheirOwnDatasetControls(): void
+    {
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(dirname(__DIR__, 2) . '/themes'));
+        foreach ($files as $file) {
+            if (!$file->isFile() || $file->getExtension() !== 'js') continue;
+            $source = (string) file_get_contents($file->getPathname());
+            self::assertDoesNotMatchRegularExpression('/\.type\s*=\s*["\']search["\']/', $source, $file->getPathname());
+            self::assertStringNotContainsString('gn-table-search', $source);
+            self::assertDoesNotMatchRegularExpression('/createElement\(["\'](?:table|progress)["\']\)/', $source, $file->getPathname());
+        }
+    }
+
     /** The one search control. Everything else includes it. */
     private const SEARCH_CONTROL = 'resources/views/partials/dataset-search.html.twig';
 
@@ -133,7 +145,6 @@ final class SharedControlContractTest extends TestCase
 
         self::assertSame([], $offenders, implode("\n  ", $offenders));
     }
-
 
     /**
      * Every page and partial template, keyed by repository-relative path.

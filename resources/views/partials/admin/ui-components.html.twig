@@ -1,0 +1,217 @@
+{# The visual contract uses canonical components and static examples only. #}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Layout and headings'}) }}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}
+{% block body %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact'})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Compact surface', eyebrow: 'Example', summary: 'A semantic surface, styled by the current theme.', heading_level: 3}) }}
+{% endblock %}
+{% endembed %}{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Heading with actions', heading_level: 3})} %}
+{% block section_actions %}
+{{ ui('action.link', {label: 'View reference', href: '#gallery-actions'}) }}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}{{ ui('layout.breadcrumb', {items: [{label: 'Administration', href: '/admin', current: false}, {label: 'System', href: null, current: false}, {label: 'UI Components', href: null, current: true}]}) }}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Actions'}) }}
+<div id="gallery-actions"></div>{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+{% for variant in ['primary', 'secondary', 'quiet', 'danger'] %}{% for size in ['small', 'normal', 'large'] %}{{ ui('action.button', {label: variant ~ ' ' ~ size, type: 'button', variant: variant, size: size}) }}{% endfor %}{{ ui('action.link', {label: variant ~ ' link', href: '#gallery-actions', variant: variant}) }}{% endfor %}{{ ui('action.button', {label: 'Disabled', disabled: true}) }}
+{% endblock %}
+{% endembed %}{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+{% block body %}
+{{ ui('action.link', {label: 'Inspect sample', href: '#gallery-actions'}) }}
+{% endblock %}
+{% endembed %}{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+{{ ui('action.button', {label: 'Row action', type: 'button'}) }}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Badges and notices'}) }}
+{% for tone in ['neutral', 'info', 'success', 'warning', 'danger', 'permanent'] %}{% for size in ['small', 'normal'] %}{{ ui('feedback.badge', {label: tone ~ ' ' ~ size, tone: tone, size: size}) }}{% endfor %}{% endfor %}{% for tone in ['info', 'success', 'warning', 'danger'] %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: tone, heading: tone|capitalize, section_spacing: true})} %}
+{% block body %}
+This is sample feedback with a <a href="#gallery-actions">real link</a>.
+{% endblock %}
+{% endembed %}{% endfor %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Forms'}) }}
+<form method="get" action="/admin/system/ui-components">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Normal field', for: 'gallery-normal'})} %}
+{% block control %}
+<input id="gallery-normal" name="example">
+{% endblock %}
+{% endembed %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Required with help', for: 'gallery-required', required: true, help: 'Help explains the expected value.'})} %}
+{% block control %}
+<input id="gallery-required" name="required_example" required aria-describedby="gallery-required-help">
+{% endblock %}
+{% endembed %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Error and full width', for: 'gallery-error', full_width: true, error: 'Enter a value to continue.'})} %}
+{% block control %}
+<input id="gallery-error" name="error_example" aria-invalid="true" aria-describedby="gallery-error-error">
+{% endblock %}
+{% endembed %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Checkbox choice'})} %}
+{% block control %}
+<input type="checkbox" name="choice">
+{% endblock %}
+{% endembed %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Radio choice'})} %}
+{% block control %}
+<input type="radio" name="radio_choice" value="sample">
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Save example', type: 'submit', variant: 'primary'}) }}
+{% endblock %}
+{% block secondary_actions %}
+{{ ui('action.button', {label: 'Reset example', type: 'reset', variant: 'danger'}) }}
+{% endblock %}
+{% endembed %}</form>{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
+{% block body %}
+<form method="get" action="/admin/system/ui-components">{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
+{% block body %}
+<label for="gallery-select">One immediate choice</label><select id="gallery-select" name="sample"><option>Example</option></select>{{ ui('action.button', {label: 'Apply'}) }}
+{% endblock %}
+{% endembed %}</form>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Datasets and tables'}) }}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'gallery', pagination: gallery_pagination, heading: 'Searchable dataset composition', search: {ds_name: 'gallery', ds_label: 'Search examples', ds_value: '', ds_action: '/admin/system/ui-components'}})} %}
+{% block toolbar %}
+{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
+{% block toolbar_primary %}
+A bounded example dataset.
+{% endblock %}
+{% block toolbar_actions %}
+{{ ui('action.button', {label: 'Example control', type: 'button'}) }}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% block results %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Static sample records'})} %}
+{% block header %}
+<tr>{% for column in [{label: 'Name', width: 60, sortable: false}, {label: 'State', width: 40, sortable: false}] %}{% include '@platform/partials/sortable-header.html.twig' with {sh: column} %}{% endfor %}</tr>
+{% endblock %}
+{% block body %}
+{% for record in 26..50 %}<tr><td>Example record {{ record }}</td><td>{{ ui('feedback.badge', {label: 'Active', tone: 'success'}) }}</td></tr>{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Statistics and lists'}) }}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+{% block body %}
+{{ ui('data.stat-card', {value: 24, label: 'With a note', note: 'Sample metric, no live data.'}) }}{{ ui('data.stat-card', {value: 12, label: 'Without a note'}) }}
+{% endblock %}
+{% endembed %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+<strong>Example email</strong><p>sample@example.invalid</p>
+{% endblock %}
+{% block actions %}
+{{ ui('action.link', {label: 'Inspect', href: '#gallery-actions'}) }}
+{% endblock %}
+{% endembed %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+Example list item without actions.
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}{{ ui('data.key-value-list', {items: [{label: 'Reference', value: 'EXAMPLE'}, {label: 'Source', value: 'Static gallery data'}]}) }}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Empty states and progress'}) }}
+{{ ui('feedback.empty', {summary: 'Compact text-only empty state.'}) }}{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'No sample records', summary: 'A full empty state can offer a next action.'})} %}
+{% block actions %}
+{{ ui('action.link', {label: 'See examples', href: '#gallery-actions'}) }}
+{% endblock %}
+{% endembed %}{% for size in ['normal', 'large'] %}{% for value in [0, 45, 100] %}{{ ui('feedback.progress', {value: value, label: 'Example ' ~ size ~ ' progress', show_value: true, size: size}) }}{% endfor %}{% endfor %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Modals and accordions'}) }}
+{% for size in ['normal', 'wide'] %}{{ ui('action.button', {label: 'Open ' ~ size ~ ' modal', type: 'button', modal: 'gallery-modal-' ~ size}) }}{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'gallery-modal-' ~ size, title: size|capitalize ~ ' sample modal', size: size})} %}
+{% block modal_body %}
+<p>This dialog uses the shared shell and focus behaviour.</p>
+{% endblock %}
+{% block modal_actions %}
+{{ ui('action.button', {label: 'Close', type: 'button', close_modal: true}) }}
+{% endblock %}
+{% endembed %}{% endfor %}{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Closed disclosure', summary: 'Works with keyboard and without JavaScript.'})} %}
+{% block body %}
+<p>Sample section content.</p>
+{% endblock %}
+{% block actions %}
+{{ ui('action.link', {label: 'Reference', href: '#gallery-actions'}) }}
+{% endblock %}
+{% endembed %}{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Open disclosure', open: true})} %}
+{% block body %}
+<p>Open on arrival.</p>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Sprite icons'}) }}
+{% for size in ['small', 'normal', 'large'] %}{{ ui('icon', {name: 'nav-settings', size: size, decorative: false, label: 'Settings ' ~ size}) }}{{ ui('icon', {name: 'action-save', size: size}) }}{% endfor %}
+{% endblock %}
+{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Catalogue'}) }}
+{% set sample_item = {name: 'Sample category', description: 'Static example', href: '#gallery-actions', is_active: true, icon_svg: ''} %}
+{% set sample_tag = {name: 'Sample tag', slug: 'sample', course_count: 1, weight: 3} %}
+{% set sample_course = {title: 'Example course', slug: 'example', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', module_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
+{% set sample_navigation = {roots: [sample_item], tier_2: [sample_item], tier_3: [], trail: []} %}
+
+{{ ui('catalogue.category-grid', {navigation: sample_navigation}) }}{{ ui('catalogue.category-tile', {item: sample_item}) }}{{ ui('catalogue.filter-rail', {label: 'Example filters', items: [sample_item]}) }}{{ ui('catalogue.filter-pill', {item: sample_item}) }}{{ ui('catalogue.tag-browser', {tags: [sample_tag], selected_slug: 'sample'}) }}{{ ui('catalogue.tag-chip', {tag: sample_tag}) }}{{ ui('catalogue.course-grid', {courses: [sample_course]}) }}{{ ui('catalogue.workspace', {navigation: {tier_2: [], tier_3: [], trail: []}, courses: [], workspace: {heading: 'Sample workspace', summary: 'The existing catalogue composition.', paginated: false, empty_heading: 'No sample courses', empty_summary: 'This is static reference content.'}}) }}
+{% endblock %}
+{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Layout variants'}) }}
+{% for columns in ['auto', 1, 2, 3, 4] %}
+{{ ui('layout.section-head', {heading: 'Section grid: ' ~ columns, heading_level: 3}) }}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: columns})} %}
+{% block body %}{% for sample in 1..4 %}{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact'})} %}{% block surface_body %}Sample {{ sample }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}
+{% endembed %}
+{% endfor %}
+{% for columns in ['auto', 1, 2] %}
+{{ ui('layout.section-head', {heading: 'Form grid: ' ~ columns, heading_level: 3}) }}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: columns})} %}
+{% block body %}{% for sample in 1..2 %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Example field', for: 'gallery-grid-' ~ columns ~ '-' ~ sample})} %}{% block control %}<input id="{{ props.for }}" value="Static example" readonly>{% endblock %}{% endembed %}{% endfor %}{% endblock %}
+{% endembed %}
+{% endfor %}
+{% for tone in ['neutral','info','success','warning','danger','permanent'] %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: tone, variant: 'compact', section_spacing: true})} %}{% block surface_body %}{{ tone|capitalize }} surface{% endblock %}{% endembed %}
+{% endfor %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: 'Compact empty table'})} %}{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {label: 'Example', sortable: false, width: 100}} %}</tr>{% endblock %}{% block empty %}{{ ui('feedback.empty', {summary: 'No sample rows'}) }}{% endblock %}{% endembed %}
+{% endblock %}
+{% endembed %}
