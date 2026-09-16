@@ -1,7 +1,24 @@
 # Changelog
 
-**LMS version:** 0.8.3
-**Date time:** 2026/09/15 SAST
+**LMS version:** 0.8.4
+**Date time:** 2026/09/16 SAST
+
+## 2026-09-16 SAST — v0.8.4 UI stabilisation
+
+- Repair section-head flex layout with an explicit content child; take Light Default decoration out
+  of flex flow and restore GN's positioned gold/silver heading nib.
+- Keep pagination and all internal groups on one horizontal line, scrolling at narrow widths;
+  restore automatic stat-grid sizing without changing Reports’ explicit four-column mode.
+- Resolve opaque company-context tints against the current theme/palette and use the core footer's
+  palette-calculated contrast colour; preserve GN and Sidebar footer markup and chrome.
+- Repair malformed theme blocks left by earlier geometry cleanup, remove obsolete pagination and
+  context selectors, and remove redundant theme-owned course-card geometry.
+- Add rendered browser measurements and mutation tests alongside strengthened ownership checks.
+
+Validation: 639 tests, 43,933 assertions and the complete `composer qa` gate passed; all 175 Twig
+files linted. Chromium passed 70 rendered checks across five themes at desktop/mobile widths,
+three defect mutations and non-JavaScript pagination navigation. A pre-existing blank mobile row
+in Factory Reset Sidebar's preserved shell is documented in `tests/Browser/README.md`.
 
 ## 2026-09-15 SAST — v0.8.3 Final UI and account correction
 

@@ -37,6 +37,8 @@
    ========================================================================= *//* == 01  Design tokens ==================================================== */@charset "UTF-8";
 
 .gn-body {
+  --cl-context-surface:color-mix(in srgb,var(--gn-gold) 28%,var(--gn-paper));
+  --cl-context-ink:var(--gn-ink);
   /* Core material */
   --gn-obsidian: #070708;
   --gn-black: #0f0f10;
@@ -627,6 +629,7 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
   background: linear-gradient(90deg, var(--gn-gold) 0 58%, rgba(139, 139, 139, .8) 58% 82%, transparent 82%);
 }.gn-main .cl-ui-section-head h2::after{
   content: "";
+  position:absolute;pointer-events:none;left:0;bottom:0;width:92px;height:5px;
   border-radius: var(--gn-radius-pill);
   background: linear-gradient(90deg, var(--gn-gold) 0 58%, rgba(139, 139, 139, .8) 58% 82%, transparent 82%)} .gn-main .cl-kicker, .gn-main .page-kicker{
   display: inline-block;
@@ -1238,10 +1241,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 .cl-ui-close:hover { color: var(--gn-ink); border-color: var(--gn-gold); background: #fff; }/* == 17  Catalogue and course detail ====================================== */
 
 .gn-main .course-card, .gn-main .cl-course-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
   background: var(--gn-paper);
   border: 1px solid var(--gn-line);
   border-radius: var(--gn-radius-lg);
@@ -2426,36 +2425,23 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 }
 .gn-family-home .gn-main .cl-hero-panel h2 { font-size: clamp(1.5rem,2vw,1.9rem); }
 .gn-family-home .gn-main .cl-hero-panel li { font-size: .94rem; line-height: 1.55; }/* Account, Company and Administration use the retained serpent only as a
-   restrained header texture, not as a dominant footer subject. */:is(.gn-family-admin,.gn-family-account,
-.gn-family-admin .gn-main > .cl-admin-section-page-head:first-child{
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  background: #151515;
-  color: #fff;
-  border-color: rgba(200,164,73,.4);
-}.gn-family-company) .gn-main > .cl-ui-section-head:first-child,
+   restrained header texture, not as a dominant footer subject. */:is(.gn-family-admin,.gn-family-account,.gn-family-company) .gn-main > .cl-ui-section-head:first-child,
 .gn-family-company .gn-main .cl-company-section > .cl-ui-section-head:first-child{
-  isolation: isolate;
-  background: #151515;
-  color: #fff;
-  border-color: rgba(200,164,73,.4)}:is(.gn-family-admin,.gn-family-account,
-.gn-family-admin .gn-main > .cl-admin-section-page-head:first-child::before{
-  content: ""; position: absolute; inset: 0; z-index: -2;
-  background: url("../img/section-serpent.jpg") 56% 43% / cover no-repeat;
-  opacity: .32; filter: saturate(.75) contrast(1.08);
-}.gn-family-company) .gn-main > .cl-ui-section-head:first-child::before,
+  isolation:isolate;
+  background:#151515;
+  color:#fff;
+  border-color:rgba(200,164,73,.4);
+}
+:is(.gn-family-admin,.gn-family-account,.gn-family-company) .gn-main > .cl-ui-section-head:first-child::before,
 .gn-family-company .gn-main .cl-company-section > .cl-ui-section-head:first-child::before{
-  content: "";
-  background: url("../img/section-serpent.jpg") 56% 43% / cover no-repeat;
-  opacity: .32; filter: saturate(.75) contrast(1.08)}:is(.gn-family-admin,.gn-family-account,
-.gn-family-admin .gn-main > .cl-admin-section-page-head:first-child::after{
-  content: ""; position: absolute; inset: 0; z-index: -1;
-  background: linear-gradient(90deg,rgba(10,10,10,.93),rgba(10,10,10,.62) 60%,rgba(10,10,10,.78));
-}.gn-family-company) .gn-main > .cl-ui-section-head:first-child::after,
+  content:"";position:absolute;pointer-events:none;inset:0;z-index:-2;border-radius:inherit;
+  background:url("../img/section-serpent.jpg") 56% 43% / cover no-repeat;opacity:.32;filter:saturate(.75) contrast(1.08);
+}
+:is(.gn-family-admin,.gn-family-account,.gn-family-company) .gn-main > .cl-ui-section-head:first-child::after,
 .gn-family-company .gn-main .cl-company-section > .cl-ui-section-head:first-child::after{
-  content: "";
-  background: linear-gradient(90deg,rgba(10,10,10,.93),rgba(10,10,10,.62) 60%,rgba(10,10,10,.78))}
+  content:"";position:absolute;pointer-events:none;inset:0;z-index:-1;border-radius:inherit;
+  background:linear-gradient(90deg,rgba(10,10,10,.93),rgba(10,10,10,.62) 60%,rgba(10,10,10,.78));
+}
 :is(.gn-family-admin,.gn-family-account,.gn-family-company) .cl-ui-section-head:first-child :is(h1,h2,p,.cl-ui-eyebrow),
 .gn-family-admin .cl-admin-section-page-head:first-child :is(h1,h2,p,.cl-ui-eyebrow),
 .gn-family-company .cl-company-section > .cl-ui-section-head:first-child :is(h1,h2,p,.cl-ui-eyebrow) { color: inherit; }/* One visible disclosure marker only. Core emits .cl-ui-accordion-toggle;
@@ -2598,7 +2584,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 .gn-main .cl-ui-table + .pagination-row,
 .gn-main .cl-ui-surface + .pagination-row { margin-top: 1rem; }
 
-
 .gn-main .pagination-pages {
   font-size: .76rem;
   letter-spacing: .08em;
@@ -2606,26 +2591,7 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
   color: var(--gn-muted);
 }
 
-.gn-main .pagination-controls { gap: .55rem; }/* Previous/Next are peers, so they get equal visual weight and a stable width
-   that stops the row shifting as the labels toggle between states. */
-.gn-main .pagination-controls .is-disabled{
-  min-width: 6.25rem;
-  justify-content: center;
-}/* The disabled edge state is a <span>, not a <button>, so it needs its own
-   treatment rather than inheriting :disabled. */
-
-.gn-main .pagination-row .is-disabled {
-  display: inline-flex;
-  align-items: center;
-  padding: .42rem .8rem;
-  border: 1px solid var(--gn-line);
-  border-radius: var(--gn-radius-sm);
-  background: transparent;
-  color: var(--gn-muted);
-  font-family: var(--gn-font-ui);
-  font-size: .78rem;
-  font-weight: 600;
-}
+.gn-main .pagination-controls { gap: .55rem; }
 
 .gn-main .pagination-page-size { gap: .55rem; }
 
@@ -2639,8 +2605,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 }
 
 .gn-main .pagination-page-size select {
-  width: auto;
-  min-width: 5.25rem;
   padding-top: .38rem;
   padding-bottom: .38rem;
   font-size: .82rem;
@@ -2705,8 +2669,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
 @media (max-width: 640px) {
   .gn-main .pagination-row { padding: .75rem .85rem; }
-  .gn-main .pagination-row .is-disabled{ flex: 1 1 0; min-width: 0; }
-  .gn-main .pagination-page-size { justify-content: space-between; width: 100%; }
 }/* --- Company management (core v0.5.8.3 Round A) -------------------------------
    Core owns the markup, the search semantics and the selection boundary. These
    rules are presentation only: they place the "Administering company" banner and
@@ -2714,29 +2676,15 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
    each control completely, so nothing here is required for them to work. */
 
 .gn-main .company-context {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 12px;
   padding: 14px 18px;
   margin: 0 0 18px;
   border: 1px solid var(--gn-line-strong);
   border-radius: var(--gn-radius-lg);
-  background: rgba(191, 167, 93, .08);
+  background:var(--cl-context-surface);
+  color:var(--cl-context-ink);
 }
-.gn-main .company-context-label {
-  font-family: var(--gn-font-ui);
-  font-size: .7rem;
-  font-weight: 600;
-  letter-spacing: .09em;
-  text-transform: uppercase;
-  opacity: .75;
-}
-.gn-main .company-context-name {
-  font-family: var(--gn-font-display);
-  font-size: 1.12rem;
-  line-height: 1.2;
-}
+
 .gn-main .dataset-search {
   padding: 14px 18px;
   margin: 0 0 18px;

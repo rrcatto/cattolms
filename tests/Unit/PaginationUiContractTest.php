@@ -60,7 +60,7 @@ final class PaginationUiContractTest extends TestCase
     {
         $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('Showing {{ pg.from }}-{{ pg.to }} of {{ pg.total }}', $markup);
+        self::assertStringContainsString('Showing {{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·', $markup);
         self::assertStringContainsString('Page {{ pg.page }} of {{ pg.total_pages }}', $markup);
         self::assertStringContainsString('>Previous<', $markup);
         self::assertStringContainsString('>Next<', $markup);
@@ -322,7 +322,7 @@ final class PaginationUiContractTest extends TestCase
         }
         // Pagination 2.0 is functional navigation, so the current page and the ellipsis must be
         // distinguishable under a theme that has never heard of this control.
-        foreach (['.pagination-pages-list', '.pagination-page.is-current', '.pagination-gap', '.pagination-jump'] as $rule) {
+        foreach (['.pagination-pages-list', '.pagination-state[aria-current]', '.pagination-gap', '.pagination-jump'] as $rule) {
             self::assertStringContainsString($rule, $css, 'Core must draw ' . $rule . ' itself.');
         }
     }

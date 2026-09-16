@@ -29,6 +29,21 @@ Twig environment as runtime. Variable HTML belongs in authored Twig blocks, neve
 HTML or a generic content property. No component accepts class, wrapper_class, style, css or an
 arbitrary template path. There are no flat-name aliases.
 
+## Shared layout contracts
+
+Edit `public_html/css/catto-platform.css`, the canonical Twig component and the offending bundled
+stylesheet directly. Do not introduce override sheets or page-specific patches. Section heads have
+an explicit first `.cl-ui-section-head-content` child with left-aligned content and right-aligned
+actions. Heading decoration must stay outside normal layout. Pagination and each internal group
+are horizontal and nowrap, with overflow contained in the bar. Company context resolves an opaque
+`--cl-context-surface` and readable `--cl-context-ink` against the current theme/palette.
+
+Theme ownership checks cover canonical components, course cards, pagination, company context and
+shared search. They reject broken CSS delimiters and functional geometry, with a bounded exception
+for absolute, non-interactive section-heading decoration. GN's heading nib, canvas and footer, and
+Sidebar's shell/footer retain their individual presentation. [Browser checks](../tests/Browser/README.md)
+measure actual geometry, contrast and native navigation across all bundled themes.
+
 ## Component inventory
 
 Paths are relative to `resources/views/ui/`. Slots in this table are the only variable markup areas.

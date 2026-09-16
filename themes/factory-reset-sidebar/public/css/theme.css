@@ -3,6 +3,11 @@
    Palette-enabled: Catto Learning supplies --cl-* variables after automatic
    darkest-to-lightest sorting. Layout and visual treatment remain theme-owned. */
 
+.company-context{
+  --cl-context-surface:color-mix(in srgb,var(--fs-accent) 45%,white);
+  --cl-context-ink:var(--fs-dark);
+}
+
 :root{
   --fs-sidebar-width:286px;
   --fs-page:#E1E5EE;

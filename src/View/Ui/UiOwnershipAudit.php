@@ -43,11 +43,39 @@ final class UiOwnershipAudit
     {
         $errors = [];
         $css = (string) preg_replace('~/\*.*?\*/~s', '', $css);
+        // Catch damaged blocks/selector functions before the browser silently discards them.
+        $syntax = (string) preg_replace('/"(?:\\\\.|[^"\\\\])*"|\x27(?:\\\\.|[^\x27\\\\])*\x27/s', '""', $css);
+        $stack = [];
+        foreach (str_split($syntax) as $character) {
+            if (in_array($character, ['{', '(', '['], true)) $stack[] = $character;
+            elseif (isset(['}' => '{', ')' => '(', ']' => '['][$character])) {
+                if (array_pop($stack) !== ['}' => '{', ')' => '(', ']' => '['][$character]) {
+                    $errors[] = $file . ': unbalanced CSS block or selector.';
+                    break;
+                }
+            }
+        }
+        if ($stack !== []) $errors[] = $file . ': unclosed CSS block or selector.';
         preg_match_all('/([^{}]+)\{([^{}]*)\}/', $css, $rules, PREG_SET_ORDER);
         foreach ($rules as $rule) {
-            if (!str_contains($rule[1], '.cl-ui-')) continue;
+            if (!preg_match('/\.(?:cl-ui-[\w-]+|cl-course-card|pagination-[\w-]+|company-context(?:-[\w-]+)?|dataset-search(?:-[\w-]+)?)(?![\w-])/', $rule[1])) continue;
+            // Split selector lists without splitting commas inside :is()/ :where(). Every
+            // branch must be decoration; a mixed list must not exempt a functional element.
+            $selectors = preg_split('/,(?![^(]*\))/', trim($rule[1])) ?: [];
+            $decoration = $selectors !== [];
+            foreach ($selectors as $selector) {
+                $decoration = $decoration && (bool) preg_match('/\.cl-ui-section-head(?::[\w()-]+)*(?: h[1-6])?::(?:before|after)\s*$/', $selector);
+            }
+            $decoration = $decoration && (bool) preg_match('/\bcontent\s*:\s*(?:""|\x27\x27)\s*(?:;|$)/', $rule[2]);
+            $absoluteDecoration = $decoration
+                && preg_match('/\bposition\s*:\s*absolute\s*(?:;|$)/', $rule[2])
+                && preg_match('/\bpointer-events\s*:\s*none\s*(?:;|$)/', $rule[2]);
+            if ($decoration && !$absoluteDecoration) {
+                $errors[] = $file . ': section-head decoration must be absolute and non-interactive, never a flex item.';
+            }
             foreach (explode(';', $rule[2]) as $declaration) {
                 $property = trim(explode(':', $declaration, 2)[0]);
+                if ($absoluteDecoration && preg_match('/^(?:position|inset(?:-.+)?|top|right|bottom|left|z-index|width|height)$/', $property)) continue;
                 if (preg_match('/^(display|position|inset(?:-.+)?|top|right|bottom|left|z-index|float|clear|overflow(?:-.+)?|flex(?:-.+)?|grid(?:-.+)?|align-.+|justify-.+|place-.+|order|width|min-width|max-width|height|min-height|max-height|visibility|white-space|box-sizing|touch-action)$/', $property)) {
                     $errors[] = $file . ': ' . trim($rule[1]) . ' sets core-owned ' . $property;
                 }
