@@ -1,3 +1,8 @@
+.company-context{
+  --cl-context-surface:color-mix(in srgb,var(--primary,#6a5acd) 22%,white);
+  --cl-context-ink:#18212b;
+}
+
 :root{
   --primary:#094074;--primary-rgb:9,64,116;--on-primary:#fff;
   --secondary:#3C6997;--on-secondary:#fff;--accent:#5ADBFF;--on-accent:#13283a;
@@ -394,7 +399,8 @@ h1,h2,h3,h4,h5,h6,.page-title,.cl-ui-stat-value{font-weight:700;letter-spacing:-
 .theme-mini-sidebar,.theme-mini-radiant-nav{background:var(--primary)!important;color:var(--on-primary)!important}.theme-mini-sidebar span,.theme-mini-radiant-nav span{color:color-mix(in srgb,var(--on-primary) 75%,transparent)!important}.theme-mini-sidebar span:first-of-type{background:var(--secondary)!important;color:var(--on-secondary)!important}
 .role-checkbox-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.role-check{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--line);border-radius:11px;padding:11px;background:#fff}.role-check input{width:auto;margin-top:3px}.role-check span{display:grid;gap:2px}.role-check small{font-weight:400;color:var(--muted)}
 .admin-person-layout{align-items:start}.admin-person-side{min-width:0}.back-link{color:var(--primary);font-weight:600}
-}
+@media(max-width:1300px){.admin-settings-layout{grid-template-columns:1fr}.theme-explainer-grid{grid-template-columns:1fr}}
+@media(max-width:860px){.admin-settings-layout{grid-template-columns:1fr}.role-checkbox-grid{grid-template-columns:1fr}}
 .public-nav{background:var(--primary);color:var(--on-primary);border-bottom-color:color-mix(in srgb,var(--on-primary) 20%,transparent)}
 .public-nav .brand{color:var(--on-primary)!important}.public-nav .brand small{color:color-mix(in srgb,var(--on-primary) 70%,transparent)!important}
 .public-nav .cl-ui-action--quiet{color:var(--on-primary);border-color:color-mix(in srgb,var(--on-primary) 38%,transparent)}.public-nav .cl-ui-action--quiet:hover{background:color-mix(in srgb,var(--on-primary) 12%,transparent)}/* Radiant Learning 2.1.2 — deliberately distinct database theme. No gradients. */

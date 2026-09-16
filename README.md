@@ -1,7 +1,7 @@
 # Catto Learning LMS
 
 Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce
-platform. The current development release is **v0.8.3** (the application package remains on the
+platform. The current development release is **v0.8.4** (the application package remains on the
 0.8 code line). Development data is disposable; no production data or upgrade compatibility is
 assumed.
 
@@ -34,14 +34,18 @@ feedback, overlays, icons and catalogue components.
 
 This prevents independently generated views from drifting in markup, spacing, accessibility,
 responsive behavior and progressive enhancement. Shared search, pagination, sortable headers,
-entity lookup, course cards, navigation and footer controls remain canonical partials. The component
+entity lookup, course cards and navigation remain canonical partials. Gilded Noir and Factory Reset
+Sidebar retain their own footer markup and shell treatment. The component
 gallery is available at `/admin/system/ui-components` for an administrator with the existing system
 settings permission.
 
 Form controls use the bounded `ui_field_attrs(props)` helper for help/error ARIA relationships.
 Assessment editors clone server-rendered Twig question and option prototypes; JavaScript only
 reindexes those controls. Themes consume the same functional DOM while retaining their own visual
-design, including Gilded Noir.
+design, including Gilded Noir. Section-heading content starts at the left with actions at the
+right. Pagination remains one horizontal row and scrolls on narrow screens. Company-context
+banners use opaque theme tints; the core footer pairs its palette surface with a contrasting
+foreground. These rendered contracts are exercised in the [browser regression suite](tests/Browser/README.md).
 
 ## Architecture
 
@@ -87,8 +91,9 @@ podman exec -u cattotest env_php_1 sh -lc 'composer qa'
 ```
 
 It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and
-release validation. The current v0.8.3 baseline passes 636 tests and 43,787 assertions; Twig lint
-passes for all 174 templates. JavaScript changed in the repository should also pass `node --check`.
+release validation. The v0.8.4 release passes 639 tests and 43,933 assertions; Twig lint
+passes for all 175 templates. The browser regression matrix passes 70 checks across all five themes,
+plus defect mutations and non-JavaScript pagination navigation. JavaScript changed in the repository should also pass `node --check`.
 
 ## Documentation
 

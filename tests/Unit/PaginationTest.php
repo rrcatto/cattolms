@@ -10,7 +10,7 @@ Version: 0.6
 Description:
 Contract tests for the shared Pagination value object. These protect the v0.5.7.6 rule that
 no arbitrary request value ever reaches SQL, that an over-range page clamps to the final
-valid page, and that an empty dataset still renders "Showing 0-0 of 0 / Page 1 of 1", plus the
+valid page, and that an empty dataset still renders "Page 1 of 1", plus the
 v0.6 rule that the adaptive numbered window always reaches both ends of the dataset and keeps
 a constant width wherever the reader is standing.
 

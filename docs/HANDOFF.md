@@ -1,18 +1,50 @@
-# Catto Learning 0.8.3 — Development Handoff
+# Catto Learning 0.8.4 — Development Handoff
 
-**Date:** 2026/09/15 SAST
-**Update:** v0.8.3 final UI and account correction
-**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1`, `v0.8.2` and `v0.8.3`
+**Date:** 2026/09/16 SAST
+**Update:** v0.8.4 UI stabilisation
+**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1`, `v0.8.2`, `v0.8.3` and `v0.8.4`
 
-The v0.8.3 update completes the canonical platform UI and account workflows. The
+The v0.8.4 update stabilises shared UI geometry and theme decoration while retaining the
+passwordless account workflows introduced in v0.8.3. The
 individual purchase flow remains implemented: guest carts, staged checkout, profile capture,
 Omnipay Dummy simulations, manual EFT instructions, payment retries, immutable orders/invoices, PDF
 downloads, optional invoice email and access timing. Settings now have independent accordion forms,
 with bank details stored in `app_options`; cart colours and surfaces belong to the active theme.
 
-Run additive migrations, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The current v0.8.3 Podman QA gate passes 636 tests and 43,787 assertions, with PHPStan and all validators green. Passwordless registration, authenticated-email sessions and secondary-email promotion are covered by integration tests; public login, registration, catalogue, reports and the UI gallery were smoke-checked in Chromium at desktop and mobile widths.
+Run additive migrations, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The published v0.8.3 baseline passed 636 tests and 43,787 assertions; v0.8.4 results are below. Passwordless registration, authenticated-email sessions and secondary-email promotion are covered by integration tests; public login, registration, catalogue, reports and the UI gallery were smoke-checked in Chromium at desktop and mobile widths.
 
-The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. Current QA is 634 tests and 43,707 assertions, with all quality gates passing.
+The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. The published v0.8.2 gate had 634 tests and 43,707 assertions; use the current validation below for v0.8.4.
+
+## v0.8.4 UI stabilisation
+
+Shared section headings now explicitly separate expanding left content from right actions.
+Pagination remains one horizontal row at every width and scrolls inside the bar. Company-context
+colours resolve against the actual theme/palette; core footers use the accent's calculated contrast
+foreground. GN's own footer/canvas and Sidebar's shell/footer remain intact. The geometry audit
+repairs malformed theme blocks, restores GN's gold/silver heading decoration and removes redundant
+course-card/pagination geometry. See [browser validation](../tests/Browser/README.md) for repeatable
+computed-style, bounding-box, contrast, mutation and non-JavaScript checks. The release is tagged v0.8.4; the application package remains on the 0.8 code line.
+No business or authentication behaviour changed.
+
+Known pre-existing visual limitation: Sidebar's narrow shell translates away a static sidebar but
+retains its grid row, leaving blank space above content. Its shell rules were deliberately preserved
+as required; see the browser README and mobile screenshots. Automatic Company/Account stat-grid
+sizing is fixed in core, separately from Reports' explicit four-column layout.
+
+Current validation (2026-09-16):
+
+- `vendor/bin/phpunit tests/Unit/UiStabilisationTest.php tests/Unit/UiRemediationContractTest.php tests/Unit/PaginationUiContractTest.php`: 45 tests, 294 assertions passed.
+- `php bin/console lint:twig resources/views themes`: all 175 templates passed.
+- `node --check tests/Browser/ui-stabilisation.cjs`: passed.
+- `CATTO_PLAYWRIGHT_MODULE=/home/rrcatto/.npm/_npx/e41f203b7505f1fb/node_modules/playwright node tests/Browser/ui-stabilisation.cjs`: 70 theme/page/viewport checks, three defect mutations and native Next/jump GET navigation passed. Gallery, Reports, People, Company, Account, Catalogue and Help were checked in all five bundled themes at 1440px and 390px. Zero document overflow; minimum measured base footer contrast 6.13:1 and banner contrast 10.42:1. Screenshots and measurements: `/tmp/catto-ui-stabilisation/` on the development host.
+- `composer qa`: 639 tests, 43,933 assertions; PHPStan, suite declarations, architecture, runtime hazards, UI contracts and release validation all passed.
+- `composer themes:package` and `composer themes:install -- --force`: all five packages rebuilt and published to the development instance. Core CSS was copied as the container application user to its served `public_html/css/` directory.
+- `git diff --check`: passed. Temporary browser identity, session and associated activity removed.
+
+Earlier browser runs exposed footer contrast and default stat-grid issues and were corrected before
+the final pass. The fixture cleanup initially referenced the wrong audit column; it now uses the
+actual `audit_log.user_id` and cleanup succeeded. No remaining test failures. The Sidebar shell
+limitation above remains outside the shared component changes.
 
 ## Current platform UI architecture
 

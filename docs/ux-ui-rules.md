@@ -131,13 +131,21 @@ layout.section-grid
 The eyebrow names the section and comes from the section registry, so the card, the menu entry and
 the page head cannot disagree about what a section is called. A page with several cards repeats the
 card, not the grid.
-→ Enforced by `tools/validate-ui-contracts.php` and the section contract tests.
+Section heads use the explicit `.cl-ui-section-head-content` child before the actions slot.
+The content starts physically left and expands; actions stay right, including when they wrap.
+Root decorative pseudo-elements must be absolutely positioned and non-interactive. Never fix a
+flex-item decoration by adding `text-align` alone.
+→ Enforced by `tools/validate-ui-contracts.php`, section tests and `tests/Browser/ui-stabilisation.cjs`.
 
 **1.8 Nothing renders on the page canvas.** The canvas is the slanted texture, and text read
 directly off a texture is hard work. Every block of words sits on a surface — a card, a table
 wrapper, a notice, the pagination control, the footer. Core gives a surface to the containers that
 are otherwise bare (`.cl-ui-toolbar`, `.cl-ui-section-head`, `.cl-ui-notice`, `.dataset-search`) when they are not
 already inside a card, so this holds without each template having to remember it.
+
+Company context is an opaque, visibly tinted banner, not an ordinary white card. Its colour follows
+the theme/palette while core retains its control layout. GN keeps `gn-footer`, Factory Reset Sidebar
+keeps `fs-footer`, and core footers use a surfaced palette colour with its contrasting foreground.
 
 The check is the delivered HTML, not the template: walk every text node's ancestors and look for one
 that paints a background. A partial can look carded in source and still render bare once a wrapper
@@ -184,7 +192,10 @@ defect.
 and `partials/dataset-search.html.twig`, always both, never a second implementation. Search is
 server-side over the whole dataset, never a filter over rendered rows. Bounded fixed lists — Roles,
 Themes, a course's own modules — are exempt from pagination, because a control that can only ever say
-"Page 1 of 1" is noise.
+"Page 1 of 1" is noise. When a paginated dataset has one page, its summary is `Page 1 of 1`;
+multiple pages use `Showing X–Y of N · Page P of T`. The pagination bar and every internal group
+remain a single horizontal line at every width. Overflow scrolls within the bar; themes must never
+wrap or stack it.
 
 ---
 

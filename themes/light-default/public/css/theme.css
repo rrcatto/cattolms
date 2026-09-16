@@ -7,7 +7,12 @@
    ---------------
    Catto Learning writes catto-palette.css after this stylesheet and defines
    --cl-color-1..5 (sorted darkest to lightest) plus --cl-on-color-1..5 on
-   <body>. The values declared at :root below are only a fallback so the theme
+   <body>. The values declared at .company-context{
+  --cl-context-surface:color-mix(in srgb,var(--ld-accent) 22%,white);
+  --cl-context-ink:var(--ld-band-ink);
+}
+
+:root below are only a fallback so the theme
    renders correctly if that generated stylesheet is ever unavailable; the
    platform still owns palette choice and persistence.
 
@@ -870,6 +875,7 @@ body.ld-body{
 .ld-main .cl-ui-surface.border-success{border-color:#bfe3ce}
 .ld-main .shadow-sm{box-shadow:var(--ld-shadow-card)!important}
 
+.ld-main .cl-ui-stat-card{
   background:var(--ld-soft-2);
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
@@ -1078,30 +1084,13 @@ body.ld-body{
 .ld-main .align-middle{vertical-align:middle}
 
 .ld-main .pagination-row{
-  display:flex;
-  align-items:center;
-  justify-content:center;
   gap:10px;
-  flex-wrap:wrap;
   padding:12px 0 2px;
   font-size:.83rem;
   color:var(--ld-muted);
 }
-.ld-main .pagination{display:flex;gap:4px;flex-wrap:wrap;list-style:none;padding:0;margin:0}
-.ld-main .page-link{
-  display:inline-flex;
-  align-items:center;
-  border:1px solid var(--ld-line-2);
-  background:#fff;
-  color:var(--ld-text);
-  padding:6px 10px;
-  border-radius:7px;
-  font-size:.8rem;
-  font-weight:680;
-  text-decoration:none;
-}
-.ld-main .page-item.active .page-link{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
-.ld-main .page-item.disabled .page-link{opacity:.5;pointer-events:none}/* --------------------------------------------------------------------------
+
+/* --------------------------------------------------------------------------
    11. Tab decks — the source design's tab strip and panel container
    -------------------------------------------------------------------------- *//* The section jump-nav wraps rather than scrolling.
 
@@ -1328,12 +1317,9 @@ body.ld-body{
 .ld-main .cl-feature p{opacity:.85;font-size:.87rem;margin:0}
 
 .ld-main .cl-course-card,.ld-main .course-card{
-  display:flex;
-  flex-direction:column;
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
-  overflow:hidden;
   box-shadow:var(--ld-shadow-card);
   transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
 }
@@ -1773,6 +1759,12 @@ body.ld-body{
   margin-bottom:16px;
   color:var(--ld-band-ink)}.ld-main .cl-ui-section-head::before{
   content:"";
+  position:absolute;
+  pointer-events:none;
+  top:12px;
+  bottom:12px;
+  left:0;
+  width:3px;
   background:var(--ld-accent)}
 .ld-main .cl-ui-section-head h1,.ld-main .cl-ui-section-head h2,.ld-main .cl-ui-section-head h3{color:inherit;margin:5px 0 4px}
 .ld-main .cl-ui-section-head p{color:var(--ld-band-ink-2)}
@@ -1856,13 +1848,7 @@ body.ld-body{
    list-based control inherits the same treatment. */
 
 .ld-main .pagination-row{
-  display:flex;
-  align-items:center;
-  justify-content:center;
   gap:10px;
-  flex-wrap:wrap;
-  width:fit-content;
-  max-width:100%;
   margin:16px auto 2px;
   padding:8px 10px;
   background:var(--ld-band-soft);
@@ -1889,33 +1875,8 @@ body.ld-body{
 }
 .ld-main .pagination-row .cl-ui-action:hover{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
 
-.ld-main .pagination{
-  display:flex;
-  gap:4px;
-  flex-wrap:wrap;
-  list-style:none;
-  padding:6px;
-  margin:16px auto 2px;
-  width:fit-content;
-  background:var(--ld-band-soft);
-  border:1px solid var(--ld-band-line);
-  border-radius:999px;
-}
-.ld-main .page-link{
-  border:1px solid transparent;
-  background:transparent;
-  color:var(--ld-band-ink);
-  min-width:30px;
-  justify-content:center;
-  border-radius:999px;
-  padding:5px 11px;
-}
-.ld-main .page-link:hover{background:#fff;border-color:var(--ld-band-line);color:var(--ld-accent)}
-.ld-main .page-item.active .page-link{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
-.ld-main .page-item.disabled .page-link{opacity:.45;pointer-events:none}
-
 @media (max-width:560px){
-  .ld-main .pagination-row{border-radius:var(--ld-radius-lg);width:100%}
+  .ld-main .pagination-row{border-radius:var(--ld-radius-lg)}
   .ld-main .cl-ui-section-head{padding:13px 14px 13px 17px}
 }/* Neutral --ld-muted grey does not reach 4.5:1 on the tinted band surfaces,
    so secondary copy inside a band switches to the band's own muted ink. */

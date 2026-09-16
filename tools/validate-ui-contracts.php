@@ -80,7 +80,7 @@ foreach (['activity-filters','event.ip_address','event.geo_location','activity_p
 // v0.5.7.6 large-data contracts. Every standalone list must be able to state its own size,
 // and no list partial may reintroduce a whole-table <select> or an undefined table wrapper.
 $pagination = $read($root . '/resources/views/partials/pagination.html.twig');
-foreach (['pagination-row','pagination-summary','pagination-page-size','Showing {{ pg.from }}-{{ pg.to }} of {{ pg.total }}','Page {{ pg.page }} of {{ pg.total_pages }}',"rel: 'prev'","rel: 'next'"] as $token) {
+foreach (['pagination-row','pagination-summary','pagination-page-size','Showing {{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·','Page {{ pg.page }} of {{ pg.total_pages }}',"rel: 'prev'","rel: 'next'"] as $token) {
     $need(str_contains($pagination, $token), 'Shared pagination control missing: ' . $token);
 }
 
@@ -264,4 +264,4 @@ if ($errors !== []) {
     fwrite(STDERR, "UI contract validation failed:\n- " . implode("\n- ", $errors) . "\n");
     exit(1);
 }
-echo "UI contract validation passed: ACL-aware workspaces, scalable administration, standard navigation/footer and Theme Package 4.0 interactions are core-owned.\n";
+echo "UI contract validation passed: core-owned workspaces, administration and navigation; preserved theme footer contracts; Theme Package 4.0 interactions.\n";

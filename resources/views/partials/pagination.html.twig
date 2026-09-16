@@ -1,7 +1,7 @@
 {% set pg_id = pg.prefix ~ '-' ~ pg_position|default('single') %}
 <nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}">
 	<div class="pagination-summary" aria-live="polite">
-		{% if pg.total_pages > 1 %}<span>Showing {{ pg.from }}-{{ pg.to }} of {{ pg.total }}</span>{% endif %}
+		{% if pg.total_pages > 1 %}<span>Showing {{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
 		<span class="pagination-pages">Page {{ pg.page }} of {{ pg.total_pages }}</span>
 	</div>
 	{% if pg.has_pages %}
