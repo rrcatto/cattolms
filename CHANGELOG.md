@@ -1,7 +1,18 @@
 # Changelog
 
-**LMS version:** 0.8.4.1
-**Date time:** 2026/09/17 SAST
+**LMS version:** 0.8.4.2
+**Date time:** 2026/09/18 SAST
+
+## 2026-09-18 SAST — v0.8.4.2 Passwordless success redirect correction
+
+- Move successful login and registration redirects outside the service-call exception handlers.
+  The controller no longer mistakes its own `HttpRedirect` for a mail-delivery failure.
+- Preserve passwordless authentication, token creation and genuine delivery-failure handling.
+- Add controller integration coverage for one sent message, the confirmation redirect and no
+  erroneous failure flash. The regression reproduces the defect against the previous controller.
+
+Validation: full `composer qa` passed with 643 tests / 43,978 assertions, PHPStan, architecture,
+runtime, UI-contract and release validation. Targeted authentication tests: 8 tests / 35 assertions.
 
 ## 2026-09-17 SAST — v0.8.4.1 Trusted owner-authored course content
 

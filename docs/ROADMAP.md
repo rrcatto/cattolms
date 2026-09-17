@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.8.4.1
-**Date time:** 2026/09/17 SAST
-**Current stage:** v0.8.4.1 preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical component geometry and theme presentation, with all-theme browser regression coverage. The passwordless account workflows are unchanged. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
+**Current LMS version:** 0.8.4.2
+**Date time:** 2026/09/18 SAST
+**Current stage:** v0.8.4.2 corrects false mail-failure messages after successful login/registration and preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical component geometry and theme presentation, with all-theme browser regression coverage. The passwordless account workflows are unchanged. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
 
 Only the project owner decides future release numbers.
 

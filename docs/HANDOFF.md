@@ -1,8 +1,8 @@
-# Catto Learning 0.8.4.1 — Development Handoff
+# Catto Learning 0.8.4.2 — Development Handoff
 
-**Date:** 2026/09/17 SAST
-**Update:** v0.8.4.1 trusted owner-authored course content
-**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1`, `v0.8.2`, `v0.8.3`, `v0.8.4` and `v0.8.4.1`
+**Date:** 2026/09/18 SAST
+**Update:** v0.8.4.2 passwordless success redirect correction
+**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1`, `v0.8.2`, `v0.8.3`, `v0.8.4` , `v0.8.4.1` and `v0.8.4.2`
 
 The v0.8.4.1 release preserves trusted SVG/HTML, styles and embedded code in course imports, edits
 and exports, and accepts SVG media. See the trusted course content validation at the end of this file.
@@ -17,6 +17,25 @@ with bank details stored in `app_options`; cart colours and surfaces belong to t
 Run additive migrations, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The published v0.8.3 baseline passed 636 tests and 43,787 assertions; v0.8.4 results are below. Passwordless registration, authenticated-email sessions and secondary-email promotion are covered by integration tests; public login, registration, catalogue, reports and the UI gallery were smoke-checked in Chromium at desktop and mobile widths.
 
 The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. The published v0.8.2 gate had 634 tests and 43,707 assertions; use the current validation below for v0.8.4.
+
+## Reviewed authentication redirect correction — 2026-09-18
+
+The v0.8.4.2 release includes reviewed commit `16e4f7c` from
+`fix/auth-success-redirect-v0.8.4.1`, changing only `AuthController.php`, plus controller regression
+coverage and current release documentation. The local code and GitHub `main` share this release.
+
+`BaseController::redirect()` throws `HttpRedirect`. Login and registration previously caught their
+own successful redirect as a service failure, after the email had already been sent. Both success
+redirects now run outside their service-call try/catch. Mail delivery, tokens, authentication and
+registration rules are unchanged. The added controller regression exercises both actions with the
+real authentication service and a fake mail transport, checking the success destination, one sent
+message and absence of error flashes. Existing delivery-failure tests remain in place.
+
+Validation: the controller regression fails against the pre-fix controller (redirects to `/login`)
+and passes against the reviewed fix. The authentication suite passes 8 tests / 35 assertions.
+Full `composer qa` passes 643 tests / 43,978 assertions, PHPStan, architecture, runtime, UI contracts
+and release validation. No browser/Mailpit end-to-end check was performed for this review.
+The regression and handoff are included in v0.8.4.2.
 
 ## Current trusted course-content policy
 

@@ -255,6 +255,46 @@ final class AuthWorkflowRegressionTest extends TestCase
         } finally { $fixture->cleanup(); }
     }
 
+    public function testControllerRedirectsAfterSuccessfulLoginAndRegistrationWithoutFailureFlash(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        $fixture = new DevelopmentFixture($container->get(Database::class));
+        $oldPost = $_POST;
+        $oldSession = $_SESSION ?? [];
+        try {
+            foreach (['requestLink', 'register'] as $action) {
+                $email = 'qa-redirect-' . strtolower($action) . '-' . $fixture->suffix() . '@example.test';
+                $fixture->rememberEmail($email);
+                if ($action === 'requestLink') {
+                    $user = $container->get(UserRepository::class)->createManagedUser($email);
+                    $fixture->rememberUser((int) $user['id']);
+                }
+                $mailer = new FakeMailer();
+                $controller = new \CattoLearning\Http\Controller\AuthController(
+                    $this->authService($container, $mailer),
+                    $container->get(\CattoLearning\View\ThemeRenderer::class),
+                    new \Symfony\Component\HttpFoundation\RequestStack()
+                );
+                $_SESSION = [];
+                $_POST = ['csrf' => \CattoLearning\Support\Csrf::token(), 'email' => $email,
+                    'first_name' => 'Redirect', 'last_name' => 'Test', 'account_type' => 'individual'];
+                try {
+                    $controller->$action();
+                    self::fail('Expected a success redirect.');
+                } catch (\CattoLearning\Http\HttpRedirect $redirect) {
+                    self::assertSame('/login/sent', $redirect->path, $action);
+                    self::assertSame(303, $redirect->status);
+                }
+                self::assertCount(1, $mailer->messages);
+                self::assertSame([], $_SESSION['flash'] ?? [], 'Successful delivery must not flash a failure.');
+            }
+        } finally {
+            $_POST = $oldPost;
+            $_SESSION = $oldSession;
+            $fixture->cleanup();
+        }
+    }
+
     private function authService(ContainerInterface $container, FakeMailer $mailer): AuthService
     {
         return new AuthService(

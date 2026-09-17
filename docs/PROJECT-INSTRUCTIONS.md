@@ -1,9 +1,9 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.8.4.1 (trusted course content, 2026/09/17; 0.5.8.3 remains the accepted VPS version)
-**Date time:** 2026/09/17 SAST
+**Current approved LMS version:** 0.8.4.2 (passwordless redirect correction, 2026/09/18; 0.5.8.3 remains the accepted VPS version)
+**Date time:** 2026/09/18 SAST
 **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
-**Current phase:** TEST/DEV; v0.8.4.1 preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical UI geometry and theme decoration; passwordless account workflows remain intact while v0.8 commerce continues through additive migrations. The development database is disposable; the authenticated-email session column is applied by migration.
+**Current phase:** TEST/DEV; v0.8.4.2 corrects false mail-failure messages after successful login/registration and preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical UI geometry and theme decoration; passwordless account workflows remain intact while v0.8 commerce continues through additive migrations. The development database is disposable; the authenticated-email session column is applied by migration.
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
