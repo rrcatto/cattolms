@@ -57,11 +57,14 @@ final class AuthController extends BaseController
         $this->requireCsrf();
         try {
             $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/library')));
-            $this->redirect('/login/sent');
         } catch (\Throwable $e) {
             $this->flash('danger', $e->getMessage());
             $this->redirect('/register?email=' . rawurlencode((string) ($_POST['email'] ?? '')));
         }
+
+        // redirect() throws HttpRedirect by design. Keep the successful redirect outside the
+        // service-call catch so the controller cannot mistake its own redirect for a failed send.
+        $this->redirect('/login/sent');
     }
 
 
@@ -73,7 +76,6 @@ final class AuthController extends BaseController
         $returnPath = $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/library'));
         try {
             $this->auth->requestLogin($email, $returnPath);
-            $this->redirect('/login/sent');
         } catch (UnknownLoginEmailException $e) {
             $this->redirect('/register?email=' . rawurlencode($e->email) . '&return=' . rawurlencode($returnPath));
         } catch (\InvalidArgumentException|\RuntimeException $e) {
@@ -85,6 +87,10 @@ final class AuthController extends BaseController
             $this->flash('danger', 'The sign-in email could not be sent. Please try again or contact support.');
             $this->redirect('/login');
         }
+
+        // redirect() throws HttpRedirect by design. A successful send must leave the try/catch
+        // before redirecting, otherwise catch (Throwable) catches that success redirect itself.
+        $this->redirect('/login/sent');
     }
 
 
