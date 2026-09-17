@@ -85,7 +85,7 @@ final class CourseService
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
         private readonly OptionRepository $options,
-        private readonly HtmlSanitizer $sanitizer,
+        private readonly CourseHtml $courseHtml,
         private readonly LegacyHtmlCourseImporter $importer,
         private readonly string $storageRoot,
         private readonly ?AccessService $commerceAccess = null
@@ -1131,7 +1131,7 @@ final class CourseService
         $assessmentData = [
             'title' => trim((string) ($input['assessment_title'] ?? ''))
                 ?: (string) $module['title'] . ' assessment',
-            'instructions_html' => $this->sanitizer->clean(
+            'instructions_html' => $this->courseHtml->preserve(
                 (string) ($input['instructions_html'] ?? '')
             ),
             'pass_mark' => $this->percentage($input['pass_mark'] ?? 50),
@@ -1271,11 +1271,11 @@ final class CourseService
                 ? count($this->courses->diagnosticAssessments($courseId, true)) + 1
                 : (int) $existing['position'],
             'title' => trim((string) ($input['assessment_title'] ?? '')) ?: (string) $course['title'] . ' diagnostic',
-            'instructions_html' => $this->sanitizer->clean((string) ($input['instructions_html'] ?? '')),
+            'instructions_html' => $this->courseHtml->preserve((string) ($input['instructions_html'] ?? '')),
             'pass_mark' => $this->percentage($input['pass_mark'] ?? 50),
             'required' => false,
-            'result_pass_html' => $this->sanitizer->clean((string) ($input['result_pass_html'] ?? '')),
-            'result_fail_html' => $this->sanitizer->clean((string) ($input['result_fail_html'] ?? '')),
+            'result_pass_html' => $this->courseHtml->preserve((string) ($input['result_pass_html'] ?? '')),
+            'result_fail_html' => $this->courseHtml->preserve((string) ($input['result_fail_html'] ?? '')),
             'diagnostic_pass_action' => (string) ($input['diagnostic_pass_action'] ?? 'guidance_only') === 'complete_course'
                 ? 'complete_course'
                 : 'guidance_only',
@@ -1378,7 +1378,7 @@ final class CourseService
         $assessmentData = [
             'title' => trim((string) ($input['assessment_title'] ?? ''))
                 ?: (string) $course['title'] . ' final assessment',
-            'instructions_html' => $this->sanitizer->clean(
+            'instructions_html' => $this->courseHtml->preserve(
                 (string) ($input['instructions_html'] ?? '')
             ),
             'pass_mark' => $this->percentage($input['pass_mark'] ?? 50),
@@ -1736,13 +1736,8 @@ final class CourseService
         $temporary = (string) ($uploadedFile['tmp_name'] ?? '');
         $original = basename((string) ($uploadedFile['name'] ?? 'file'));
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($temporary) ?: 'application/octet-stream';
-        $allowed = [
-            'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-            'application/pdf', 'text/plain', 'application/zip',
-        ];
-        if (!in_array($mime, $allowed, true)) {
-            throw new InvalidArgumentException('That media file type is not permitted.');
-        }
+        // Owner-supplied course media is stored as supplied, including SVG. MIME detection
+        // describes the download; it is not a content allowlist.
 
         $extension = strtolower(pathinfo($original, PATHINFO_EXTENSION));
         $storageKey = 'course-' . $courseId . '/' . bin2hex(random_bytes(16)) . ($extension !== '' ? '.' . preg_replace('/[^a-z0-9]+/', '', $extension) : '');
@@ -2085,7 +2080,7 @@ final class CourseService
             'title' => $title,
             'subtitle' => trim((string) ($input['subtitle'] ?? $existing['subtitle'] ?? '')),
             'summary' => trim((string) ($input['summary'] ?? $existing['summary'] ?? '')),
-            'description_html' => $this->sanitizer->clean((string) ($input['description_html'] ?? $existing['description_html'] ?? '')),
+            'description_html' => $this->courseHtml->preserve((string) ($input['description_html'] ?? $existing['description_html'] ?? '')),
             'level' => trim((string) ($input['level'] ?? $existing['level'] ?? '')),
             'estimated_minutes' => max(0, (int) ($input['estimated_minutes'] ?? $existing['estimated_minutes'] ?? 0)),
             'status' => (string) ($input['status'] ?? $existing['status'] ?? 'draft'),
@@ -2134,9 +2129,9 @@ final class CourseService
             'position' => $position,
             'title' => $title,
             'subtitle' => trim((string) ($input['subtitle'] ?? '')),
-            'learning_outcomes_html' => $this->sanitizer->cleanLearningOutcomes((string) ($input['learning_outcomes_html'] ?? '')),
-            'content_html' => $this->sanitizer->clean((string) ($input['content_html'] ?? '')),
-            'summary_html' => $this->sanitizer->clean((string) ($input['summary_html'] ?? '')),
+            'learning_outcomes_html' => $this->courseHtml->learningOutcomes((string) ($input['learning_outcomes_html'] ?? '')),
+            'content_html' => $this->courseHtml->preserve((string) ($input['content_html'] ?? '')),
+            'summary_html' => $this->courseHtml->preserve((string) ($input['summary_html'] ?? '')),
             'is_review' => $isReview,
             'assessment_required' => $assessmentRequired,
             'assessment' => is_array($input['assessment'] ?? null) ? $input['assessment'] : null,
@@ -2161,7 +2156,7 @@ final class CourseService
         $remediationKeys = (array) ($input['remediation_module_keys'] ?? []);
         $questions = [];
         foreach ($questionTexts as $index => $text) {
-            $text = $this->sanitizer->clean((string) $text);
+            $text = $this->courseHtml->preserve((string) $text);
             if ($text === '') {
                 continue;
             }
@@ -2169,7 +2164,7 @@ final class CourseService
             $correct = (int) ($correctOptions[$index] ?? -1);
             $options = [];
             foreach ($rawOptions as $optionIndex => $optionText) {
-                $optionText = $this->sanitizer->clean((string) $optionText);
+                $optionText = $this->courseHtml->preserve((string) $optionText);
                 if ($optionText === '') {
                     continue;
                 }
@@ -2184,7 +2179,7 @@ final class CourseService
             $questions[] = [
                 'question_html' => $text,
                 'points' => max(1, (int) ($points[$index] ?? 1)),
-                'explanation_html' => $this->sanitizer->clean((string) ($explanations[$index] ?? '')),
+                'explanation_html' => $this->courseHtml->preserve((string) ($explanations[$index] ?? '')),
                 'difficulty' => in_array((string) ($difficulties[$index] ?? 'standard'), ['introductory','standard','advanced'], true) ? (string) $difficulties[$index] : 'standard',
                 'practice_eligible' => array_key_exists((string) $index, $practiceEligible) || array_key_exists($index, $practiceEligible),
                 'graded_eligible' => array_key_exists((string) $index, $gradedEligible) || array_key_exists($index, $gradedEligible),

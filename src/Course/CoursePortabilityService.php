@@ -47,7 +47,7 @@ final class CoursePortabilityService
         private readonly CoursePortabilityRepository $portability,
         private readonly LegacyHtmlCourseImporter $htmlImporter,
         private readonly StructuredCourseImporter $jsonImporter,
-        private readonly HtmlSanitizer $sanitizer,
+        private readonly CourseHtml $courseHtml,
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
         private readonly OptionRepository $options,
@@ -337,7 +337,7 @@ final class CoursePortabilityService
     public function updateCertificateTemplate(int $courseId, array $input, int $userId): void
     {
         $this->requireCourse($courseId);
-        $html = $this->sanitizer->clean(trim((string) ($input['certificate_template_html'] ?? '')));
+        $html = $this->courseHtml->preserve(trim((string) ($input['certificate_template_html'] ?? '')));
         if ($html === '') {
             throw new InvalidArgumentException('Enter the certificate HTML template.');
         }
@@ -353,9 +353,6 @@ final class CoursePortabilityService
             }
         }
         $css = trim((string) ($input['certificate_template_css'] ?? ''));
-        if (preg_match('/(?:javascript:|expression\s*\(|@import|url\s*\()/i', $css) === 1) {
-            throw new InvalidArgumentException('Certificate CSS contains a disallowed construct.');
-        }
         $enabled = array_key_exists('certificate_enabled', $input);
         $title = mb_substr(trim((string) ($input['certificate_title'] ?? 'Certificate of Completion')), 0, 240);
         $body = mb_substr(trim((string) ($input['certificate_body_text'] ?? 'has successfully completed')), 0, 500);
@@ -495,7 +492,7 @@ final class CoursePortabilityService
             'title' => mb_substr($title, 0, 240),
             'subtitle' => mb_substr(trim((string) ($input['subtitle'] ?? '')), 0, 320),
             'summary' => trim((string) ($input['summary'] ?? '')),
-            'description_html' => $this->sanitizer->clean((string) ($input['description_html'] ?? '')),
+            'description_html' => $this->courseHtml->preserve((string) ($input['description_html'] ?? '')),
             'level' => mb_substr(trim((string) ($input['level'] ?? '')), 0, 80),
             'estimated_minutes' => max(0, (int) ($input['estimated_minutes'] ?? 0)),
             'status' => 'draft',
@@ -560,9 +557,9 @@ final class CoursePortabilityService
             'position' => $position,
             'title' => trim((string) ($input['title'] ?? 'Module ' . $position)),
             'subtitle' => trim((string) ($input['subtitle'] ?? '')),
-            'learning_outcomes_html' => $this->sanitizer->cleanLearningOutcomes((string) ($input['learning_outcomes_html'] ?? '')),
-            'content_html' => $this->sanitizer->clean($content),
-            'summary_html' => $this->sanitizer->clean((string) ($input['summary_html'] ?? '')),
+            'learning_outcomes_html' => $this->courseHtml->learningOutcomes((string) ($input['learning_outcomes_html'] ?? '')),
+            'content_html' => $this->courseHtml->preserve($content),
+            'summary_html' => $this->courseHtml->preserve((string) ($input['summary_html'] ?? '')),
             'content_blocks' => $blocks,
             'is_review' => $isReview,
             'assessment_required' => array_key_exists('assessment_required', $input)
