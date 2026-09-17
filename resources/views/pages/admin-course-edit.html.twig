@@ -345,7 +345,7 @@
 {% endembed %}
 						{% endif %}
 						<p>
-							For an already imported course, upload its original HTML file here. Only its presentation CSS and approved Google Fonts are refreshed; modules, assessments, grades, enrolments and course IDs are not changed.
+							For an already imported course, upload its original HTML file here. Only its presentation CSS and authored stylesheet imports are refreshed; modules, assessments, grades, enrolments and course IDs are not changed.
 						</p>
 						<form action="/admin/courses/{{ course.id }}/presentation" method="post" enctype="multipart/form-data">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}

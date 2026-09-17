@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.8.4
-**Date time:** 2026/09/16 SAST
-**Current stage:** v0.8.4 stabilises canonical component geometry and theme presentation, with all-theme browser regression coverage. The passwordless account workflows are unchanged. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
+**Current LMS version:** 0.8.4.1
+**Date time:** 2026/09/17 SAST
+**Current stage:** v0.8.4.1 preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical component geometry and theme presentation, with all-theme browser regression coverage. The passwordless account workflows are unchanged. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
 
 Only the project owner decides future release numbers.
 
@@ -661,7 +661,7 @@ doing the most work.
 - audio narration and inline audio/video blocks;
 - Nginx X-Accel-Redirect for protected media;
 - MP3/MP4 first, transcripts/captions and range requests;
-- enable SVG course media only after an approved sanitisation policy/library is selected;
+- SVG and owner-authored HTML are preserved by the current trusted course workflow; no sanitisation prerequisite applies. See `COURSE-SPECIFICATION.md` section 1.1;
 - formal course-access terms/acceptance before commercial launch.
 
 ## 5. Learner identity and communication

@@ -1,7 +1,20 @@
 # Changelog
 
-**LMS version:** 0.8.4
-**Date time:** 2026/09/16 SAST
+**LMS version:** 0.8.4.1
+**Date time:** 2026/09/17 SAST
+
+## 2026-09-17 SAST — v0.8.4.1 Trusted owner-authored course content
+
+- Remove course HTML/SVG, attribute, style and URL filtering from import, edits and certificate templates.
+- Preserve SVG namespaces/case and embedded script/style bodies during HTML extraction; retain
+  author-selected stylesheet links/imports while keeping ordinary course CSS selectors scoped.
+- Accept owner-provided course media without a MIME allowlist, including unchanged SVG files.
+- Retain course structure, assessment, certificate-placeholder, file-size and access validation.
+- Update the course specification and add import/save/export/media regression coverage.
+
+Validation: 642 tests, 43,572 assertions and the complete `composer qa` gate passed; 146 application
+Twig templates linted. Chromium verified imported SVG rendering and embedded interactions using
+the application importer and renderer in a standalone fixture.
 
 ## 2026-09-16 SAST — v0.8.4 UI stabilisation
 

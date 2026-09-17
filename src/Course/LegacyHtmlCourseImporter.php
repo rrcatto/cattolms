@@ -26,16 +26,16 @@ declare(strict_types=1);
 namespace CattoLearning\Course;
 
 use CattoLearning\Support\Slug;
-use DOMDocument;
-use DOMElement;
-use DOMNode;
-use DOMXPath;
+use Dom\HTMLDocument as DOMDocument;
+use Dom\Element as DOMElement;
+use Dom\Node as DOMNode;
+use Dom\XPath as DOMXPath;
 use InvalidArgumentException;
 use RuntimeException;
 
 final class LegacyHtmlCourseImporter
 {
-    public function __construct(private readonly HtmlSanitizer $sanitizer = new HtmlSanitizer())
+    public function __construct(private readonly CourseHtml $courseHtml = new CourseHtml())
     {
     }
 
@@ -63,13 +63,13 @@ final class LegacyHtmlCourseImporter
         // large HTML fragments inside JavaScript strings (quiz/review renderers).
         // libxml can misreport closing tags and entities inside those raw-text
         // blocks as structural document errors. Preserve line positions while
-        // blanking script/style bodies for DOM validation and extraction; quiz
+        // blanking script/style bodies for diagnostic validation only; quiz
         // metadata is still read from the untouched source HTML below.
         $domHtml = $this->htmlForDomParsing($html);
 
-        $document = new DOMDocument('1.0', 'UTF-8');
+        $diagnosticDocument = new \DOMDocument('1.0', 'UTF-8');
         $previous = libxml_use_internal_errors(true);
-        $loaded = $document->loadHTML('<?xml encoding="UTF-8">' . $domHtml, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT);
+        $loaded = $diagnosticDocument->loadHTML('<?xml encoding="UTF-8">' . $domHtml, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_COMPACT);
         $errors = libxml_get_errors();
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
@@ -77,6 +77,15 @@ final class LegacyHtmlCourseImporter
             throw new InvalidArgumentException('The uploaded course HTML could not be parsed.');
         }
 
+        // Extract the untouched source with the HTML5 parser. Unlike the diagnostic-only
+        // HTML4 parser, it preserves SVG namespaces, viewBox/gradient names and raw-text bodies.
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $document = DOMDocument::createFromString($html, \Dom\HTML_NO_DEFAULT_NS, 'UTF-8');
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
         $xpath = new DOMXPath($document);
         $title = $this->firstText($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " masthead ")]//h1[1]')
             ?: $this->firstText($xpath, '//title[1]');
@@ -97,7 +106,7 @@ final class LegacyHtmlCourseImporter
         }
 
         $moduleNodes = $xpath->query('//section[contains(concat(" ", normalize-space(@class), " "), " module ") and starts-with(@id,"mod-") and @id!="mod-review"]');
-        if ($moduleNodes === false || $moduleNodes->length === 0) {
+        if ($moduleNodes->length === 0) {
             throw new InvalidArgumentException('The importer could not identify any course modules.');
         }
 
@@ -108,7 +117,7 @@ final class LegacyHtmlCourseImporter
             if (!$node instanceof DOMElement) {
                 continue;
             }
-            $moduleKey = preg_replace('/^mod-/', '', trim($node->getAttribute('id'))) ?: 'm' . $position;
+            $moduleKey = preg_replace('/^mod-/', '', trim((string) $node->getAttribute('id'))) ?: 'm' . $position;
             $moduleTitle = $this->relativeText($xpath, $node, './/*[contains(concat(" ", normalize-space(@class), " "), " m-name ")][1]');
             if ($moduleTitle === '') {
                 $moduleTitle = 'Module ' . $position;
@@ -126,7 +135,7 @@ final class LegacyHtmlCourseImporter
             if (!$working instanceof DOMElement) {
                 continue;
             }
-            $workingDocument = new DOMDocument('1.0', 'UTF-8');
+            $workingDocument = DOMDocument::createEmpty('UTF-8');
             $working = $workingDocument->importNode($working, true);
             if (!$working instanceof DOMElement) {
                 continue;
@@ -135,16 +144,16 @@ final class LegacyHtmlCourseImporter
             $workingXpath = new DOMXPath($workingDocument);
 
             $outcomes = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " outcomes ")][1]', $working)->item(0);
-            $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->sanitizer->cleanLearningOutcomes($this->innerHtml($outcomes)) : '';
+            $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->courseHtml->learningOutcomes($this->innerHtml($outcomes)) : '';
             if ($outcomes instanceof DOMNode && $outcomes->parentNode !== null) {
                 $outcomes->parentNode->removeChild($outcomes);
             }
 
             $summaryElement = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " s-summary ")]//*[contains(concat(" ", normalize-space(@class), " "), " sub-inner ")][1]', $working)->item(0);
-            $summaryHtml = $summaryElement instanceof DOMElement ? $this->sanitizer->clean($this->innerHtml($summaryElement)) : '';
+            $summaryHtml = $summaryElement instanceof DOMElement ? $this->courseHtml->preserve($this->innerHtml($summaryElement)) : '';
 
             $subs = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " subs ")]', $working);
-            if ($subs !== false) {
+            if ($subs->length > 0) {
                 $remove = [];
                 foreach ($subs as $sub) {
                     $remove[] = $sub;
@@ -156,7 +165,7 @@ final class LegacyHtmlCourseImporter
                 }
             }
 
-            $contentHtml = $this->sanitizer->clean($this->innerHtml($working));
+            $contentHtml = $this->courseHtml->preserve($this->innerHtml($working));
             $contentBlocks = [
                 [
                     'type' => 'html',
@@ -217,7 +226,7 @@ final class LegacyHtmlCourseImporter
             $reviewTitle = $this->relativeText($xpath, $reviewNode, './/*[contains(concat(" ", normalize-space(@class), " "), " m-name ")][1]') ?: 'Review Study Aid';
             $reviewSubtitle = $this->relativeText($xpath, $reviewNode, './/small[1]');
             $reviewInner = $this->relativeElement($xpath, $reviewNode, './/*[contains(concat(" ", normalize-space(@class), " "), " review-inner ")][1]');
-            $reviewHtml = $reviewInner instanceof DOMElement ? $this->sanitizer->clean($this->innerHtml($reviewInner)) : '';
+            $reviewHtml = $reviewInner instanceof DOMElement ? $this->courseHtml->preserve($this->innerHtml($reviewInner)) : '';
             $reviewHtml = preg_replace('/<div\s+id="reviewCards"\s*><\/div>/i', '', $reviewHtml) ?? $reviewHtml;
             if (is_array($reviewData)) {
                 $reviewHtml .= $this->buildReviewHtml($reviewData);
@@ -395,7 +404,7 @@ final class LegacyHtmlCourseImporter
         if (!$element->hasAttribute($attribute)) {
             return $default;
         }
-        $value = strtolower(trim($element->getAttribute($attribute)));
+        $value = strtolower(trim((string) $element->getAttribute($attribute)));
         if ($value === '') {
             return true;
         }
@@ -418,12 +427,12 @@ final class LegacyHtmlCourseImporter
             $html .= '<div class="review-card">';
             $html .= '<h3>' . htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h3><ul>';
             foreach ($points as $point) {
-                $html .= '<li>' . $this->sanitizer->clean((string) $point) . '</li>';
+                $html .= '<li>' . $this->courseHtml->preserve((string) $point) . '</li>';
             }
             $html .= '</ul></div>';
         }
         $html .= '</div>';
-        return $this->sanitizer->clean($html);
+        return $this->courseHtml->preserve($html);
     }
 
     /** @return list<array<string,mixed>> */
@@ -441,7 +450,7 @@ final class LegacyHtmlCourseImporter
             $answer = (int) $raw['a'];
             foreach ((array) $raw['o'] as $index => $text) {
                 $options[] = [
-                    'option_html' => $this->sanitizer->clean((string) $text),
+                    'option_html' => $this->courseHtml->preserve((string) $text),
                     'is_correct' => (int) $index === $answer,
                 ];
             }
@@ -450,7 +459,7 @@ final class LegacyHtmlCourseImporter
             }
             $points = max(1, (int) ($raw['p'] ?? 1));
             $questions[] = [
-                'question_html' => $this->sanitizer->clean((string) $raw['q']),
+                'question_html' => $this->courseHtml->preserve((string) $raw['q']),
                 'points' => $points,
                 'difficulty' => match (true) {
                     $points >= 3 => 'advanced',
@@ -461,7 +470,7 @@ final class LegacyHtmlCourseImporter
                 'graded_eligible' => !$diagnostic,
                 'remediation_module_keys' => $this->remediationKeys($raw['u'] ?? []),
                 'incorrect_points' => 0,
-                'explanation_html' => $this->sanitizer->clean((string) ($raw['e'] ?? '')),
+                'explanation_html' => $this->courseHtml->preserve((string) ($raw['e'] ?? '')),
                 'options' => $options,
             ];
         }
@@ -615,11 +624,8 @@ final class LegacyHtmlCourseImporter
 
     /**
      * Extract and isolate the visual presentation rules from a legacy course.
-     * The returned stylesheet is safe to render on an LMS course page because
-     * ordinary selectors are scoped under .cl-course-presentation instead of
-     * being allowed to restyle the LMS shell. Google Fonts stylesheets are the
-     * only external stylesheets carried across; they provide font-face data but
-     * do not contain the source course's layout rules.
+     * Ordinary selectors retain the course wrapper scope as a presentation contract.
+     * Owner-authored CSS and external stylesheet imports are trusted, not filtered.
      */
     public function presentationCss(string $html): string
     {
@@ -640,10 +646,6 @@ final class LegacyHtmlCourseImporter
                     continue;
                 }
                 $href = html_entity_decode(trim((string) $hrefMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                $parts = parse_url($href);
-                if (($parts['scheme'] ?? '') !== 'https' || strtolower((string) ($parts['host'] ?? '')) !== 'fonts.googleapis.com') {
-                    continue;
-                }
                 $imports[] = '@import url("' . str_replace(['\\\\', '"'], ['\\\\\\\\', '\\"'], $href) . '");';
             }
         }
@@ -653,10 +655,16 @@ final class LegacyHtmlCourseImporter
             return implode("\n", array_values(array_unique($imports)));
         }
 
-        // Source-authored @import rules are deliberately removed. External
-        // CSS could otherwise escape course isolation. Approved Google Fonts
-        // links are reintroduced from <link rel="stylesheet"> above.
-        $css = preg_replace('~@import\\s+[^;]+;~i', '', $css) ?? $css;
+        // Keep author-provided imports before scoped rules; treating an @import and the
+        // following selector as one prelude would leave that selector unscoped.
+        $css = preg_replace_callback(
+            '~@import\s+(?:url\(\s*(?:"[^"]*"|\x27[^\x27]*\x27|[^)]*)\s*\)|"[^"]*"|\x27[^\x27]*\x27)[^;]*;~i',
+            static function (array $match) use (&$imports): string {
+                $imports[] = $match[0];
+                return '';
+            },
+            $css
+        ) ?? $css;
         $css = preg_replace('~/\\*.*?\\*/~s', '', $css) ?? $css;
         $scoped = trim($this->scopePresentationCss($css));
         $prefix = implode("\n", array_values(array_unique($imports)));
@@ -934,7 +942,7 @@ final class LegacyHtmlCourseImporter
         // New courses must state their level explicitly on the masthead. Do not
         // infer level from arbitrary teaching content: a course may legitimately
         // mention beginner/intermediate/advanced material without being that level.
-        $explicit = trim(preg_replace('/\s+/u', ' ', $masthead->getAttribute('data-level')) ?? $masthead->getAttribute('data-level'));
+        $explicit = trim(preg_replace('/\s+/u', ' ', (string) $masthead->getAttribute('data-level')) ?? (string) $masthead->getAttribute('data-level'));
         if ($explicit !== '') {
             $known = [
                 'beginner' => 'Beginner',
@@ -982,8 +990,12 @@ final class LegacyHtmlCourseImporter
     private function innerHtml(DOMElement $element): string
     {
         $html = '';
+        $document = $element->ownerDocument;
+        if (!$document instanceof DOMDocument) {
+            throw new \LogicException('Course fragments require an HTML document.');
+        }
         foreach ($element->childNodes as $child) {
-            $html .= $element->ownerDocument?->saveHTML($child) ?? '';
+            $html .= $document->saveHtml($child);
         }
         return $html;
     }

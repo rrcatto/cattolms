@@ -31,7 +31,7 @@ use JsonException;
 
 final class StructuredCourseImporter
 {
-    public function __construct(private readonly HtmlSanitizer $sanitizer = new HtmlSanitizer())
+    public function __construct(private readonly CourseHtml $courseHtml = new CourseHtml())
     {
     }
 
@@ -91,7 +91,7 @@ final class StructuredCourseImporter
             }
             $blocks = $this->blocks((array) ($moduleInput['blocks'] ?? []));
             if ($blocks === []) {
-                $legacyHtml = $this->sanitizer->clean((string) ($moduleInput['content_html'] ?? ''));
+                $legacyHtml = $this->courseHtml->preserve((string) ($moduleInput['content_html'] ?? ''));
                 if ($legacyHtml !== '') {
                     $blocks[] = [
                         'type' => 'html',
@@ -112,9 +112,9 @@ final class StructuredCourseImporter
                 'position' => $position,
                 'title' => $moduleTitle,
                 'subtitle' => trim((string) ($moduleInput['subtitle'] ?? '')),
-                'learning_outcomes_html' => $this->sanitizer->cleanLearningOutcomes((string) ($moduleInput['learning_outcomes_html'] ?? '')),
+                'learning_outcomes_html' => $this->courseHtml->learningOutcomes((string) ($moduleInput['learning_outcomes_html'] ?? '')),
                 'content_html' => $this->fallbackHtml($blocks),
-                'summary_html' => $this->sanitizer->clean((string) ($moduleInput['summary_html'] ?? '')),
+                'summary_html' => $this->courseHtml->preserve((string) ($moduleInput['summary_html'] ?? '')),
                 'content_blocks' => $blocks,
                 'is_review' => $isReview,
                 'assessment_required' => array_key_exists('assessment_required', $moduleInput)
@@ -189,7 +189,7 @@ final class StructuredCourseImporter
                 'title' => $title,
                 'subtitle' => trim((string) ($courseInput['subtitle'] ?? '')),
                 'summary' => trim((string) ($courseInput['summary'] ?? '')),
-                'description_html' => $this->sanitizer->clean((string) ($courseInput['description_html'] ?? '')),
+                'description_html' => $this->courseHtml->preserve((string) ($courseInput['description_html'] ?? '')),
                 'level' => trim((string) ($courseInput['level'] ?? '')),
                 'estimated_minutes' => max(0, (int) ($courseInput['estimated_minutes'] ?? 0)),
                 'default_access_period_seconds' => max(1, (int) ($courseInput['default_access_period_seconds'] ?? 31536000)),
@@ -243,7 +243,7 @@ final class StructuredCourseImporter
             if ($type === 'terminal') {
                 $content = '<pre>' . htmlspecialchars($content, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</pre>';
             } else {
-                $content = $this->sanitizer->clean($content);
+                $content = $this->courseHtml->preserve($content);
             }
             $result[] = [
                 'type' => $type,
@@ -278,7 +278,7 @@ final class StructuredCourseImporter
                     continue;
                 }
                 $options[] = [
-                    'option_html' => $this->sanitizer->clean((string) ($optionInput['option_html'] ?? $optionInput['text'] ?? '')),
+                    'option_html' => $this->courseHtml->preserve((string) ($optionInput['option_html'] ?? $optionInput['text'] ?? '')),
                     'is_correct' => (bool) ($optionInput['is_correct'] ?? false),
                 ];
             }
@@ -290,9 +290,9 @@ final class StructuredCourseImporter
                 $difficulty = 'standard';
             }
             $questions[] = [
-                'question_html' => $this->sanitizer->clean((string) ($questionInput['question_html'] ?? $questionInput['question'] ?? '')),
+                'question_html' => $this->courseHtml->preserve((string) ($questionInput['question_html'] ?? $questionInput['question'] ?? '')),
                 'points' => max(1, (int) ($questionInput['points'] ?? 1)),
-                'explanation_html' => $this->sanitizer->clean((string) ($questionInput['explanation_html'] ?? $questionInput['explanation'] ?? '')),
+                'explanation_html' => $this->courseHtml->preserve((string) ($questionInput['explanation_html'] ?? $questionInput['explanation'] ?? '')),
                 'difficulty' => $difficulty,
                 'practice_eligible' => (bool) ($questionInput['practice_eligible'] ?? true),
                 'graded_eligible' => $type === 'diagnostic' ? false : (bool) ($questionInput['graded_eligible'] ?? true),
@@ -306,7 +306,7 @@ final class StructuredCourseImporter
         }
         $maxAttempts = $input['maximum_attempts'] ?? ($type === 'final' ? 1 : null);
         $practicePoolMode = in_array((string) ($input['practice_pool_mode'] ?? 'both'), ['separate','graded','both'], true)
-            ? (string) $input['practice_pool_mode']
+            ? (string) ($input['practice_pool_mode'] ?? 'both')
             : 'both';
         $gradedEligible = array_filter($questions, static fn(array $question): bool => (bool) $question['graded_eligible']);
         $gradedQuestionCount = $type === 'diagnostic'
@@ -346,11 +346,11 @@ final class StructuredCourseImporter
             'assessment_key' => $type === 'diagnostic' ? trim((string) ($input['assessment_key'] ?? 'diagnostic')) : null,
             'position' => max(1, (int) ($input['position'] ?? 1)),
             'title' => trim((string) ($input['title'] ?? '')) ?: $defaultTitle,
-            'instructions_html' => $this->sanitizer->clean((string) ($input['instructions_html'] ?? '')),
+            'instructions_html' => $this->courseHtml->preserve((string) ($input['instructions_html'] ?? '')),
             'pass_mark' => min(100, max(0, (float) ($input['pass_mark'] ?? 50))),
             'required' => $type === 'diagnostic' ? false : (bool) ($input['required'] ?? true),
-            'result_pass_html' => $this->sanitizer->clean((string) ($input['result_pass_html'] ?? '')),
-            'result_fail_html' => $this->sanitizer->clean((string) ($input['result_fail_html'] ?? '')),
+            'result_pass_html' => $this->courseHtml->preserve((string) ($input['result_pass_html'] ?? '')),
+            'result_fail_html' => $this->courseHtml->preserve((string) ($input['result_fail_html'] ?? '')),
             'diagnostic_pass_action' => $diagnosticPassAction,
             'is_visible' => $type === 'diagnostic' ? (bool) ($input['is_visible'] ?? true) : true,
             'practice_enabled' => (bool) ($input['practice_enabled'] ?? true),
@@ -359,7 +359,7 @@ final class StructuredCourseImporter
             'graded_question_count' => $gradedQuestionCount,
             'maximum_attempts' => $maxAttempts === null || $maxAttempts === '' ? null : max(1, (int) $maxAttempts),
             'time_limit_seconds' => max(1, (int) ($input['time_limit_seconds'] ?? ($type === 'final' ? 7200 : 1800))),
-            'score_policy' => in_array((string) ($input['score_policy'] ?? 'highest'), ['highest','average','latest'], true) ? (string) $input['score_policy'] : 'highest',
+            'score_policy' => in_array((string) ($input['score_policy'] ?? 'highest'), ['highest','average','latest'], true) ? (string) ($input['score_policy'] ?? 'highest') : 'highest',
             'randomise_questions' => (bool) ($input['randomise_questions'] ?? true),
             'randomise_options' => (bool) ($input['randomise_options'] ?? true),
             'negative_marking' => (bool) ($input['negative_marking'] ?? false),

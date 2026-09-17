@@ -1,7 +1,7 @@
 # Catto Learning LMS
 
 Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce
-platform. The current development release is **v0.8.4** (the application package remains on the
+platform. The current development release is **v0.8.4.1** (the application package remains on the
 0.8 code line). Development data is disposable; no production data or upgrade compatibility is
 assumed.
 
@@ -24,6 +24,14 @@ The catalogue keeps Tier 1 categories visible as a persistent grid and presents 
 navigation in a flat dynamic workspace. Category and tag pages share the same course cards, search,
 filters and pagination. Every destination also works as an ordinary GET request when JavaScript is
 disabled.
+
+## Trusted course authoring
+
+Course import is an owner-authored workflow. HTML and JSON imports, subsequent edits and exports
+preserve authored SVG, markup, styles and embedded code. Course media uploads also accept SVG.
+Structural course/assessment validation and normal access controls remain in place. See the
+[course specification](docs/COURSE-SPECIFICATION.md). To recover graphics lost during an earlier
+import, reimport the original source.
 
 ## Canonical platform UI
 
@@ -91,9 +99,11 @@ podman exec -u cattotest env_php_1 sh -lc 'composer qa'
 ```
 
 It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and
-release validation. The v0.8.4 release passes 639 tests and 43,933 assertions; Twig lint
-passes for all 175 templates. The browser regression matrix passes 70 checks across all five themes,
-plus defect mutations and non-JavaScript pagination navigation. JavaScript changed in the repository should also pass `node --check`.
+release validation. The v0.8.4.1 release passes 642 tests and 43,572 assertions. Twig lint
+passes for all 146 application templates. A Chromium check of content produced by the real importer
+and renderer verifies SVG gradients, namespaces and embedded interactions. The existing all-theme
+UI browser regression matrix is documented in `tests/Browser/README.md`. JavaScript changed in the
+repository should also pass `node --check`.
 
 ## Documentation
 

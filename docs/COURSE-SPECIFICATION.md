@@ -1,7 +1,7 @@
 # Catto Learning HTML Course Specification
 
-**Target LMS:** 0.5.8.2  
-**Date time:** 2026/08/24 17:45 SAST  
+**Target LMS:** 0.8.4.1 release (0.8 code line)
+**Date time:** 2026/09/17 SAST
 **Status:** Canonical specification for the currently implemented HTML course authoring/import workflow.
 
 ## 1. Purpose
@@ -11,6 +11,41 @@ New HTML courses intended for Catto Learning must use one predictable static str
 Important content must therefore exist as real HTML. Assessment banks must exist in the `QUIZ` object. JavaScript may enhance the standalone course but must not be the sole source of teaching content.
 
 This document describes the current HTML importer. A future portable Catto Learning course-package format is roadmap work and does not replace this specification until implemented.
+
+### 1.1 Trusted author content
+
+**SVG graphics must not be stripped.** Inline `<svg>` graphics in imported course content and uploaded
+`.svg` course-media files are supported authoring formats. Authors do not need to convert SVG diagrams
+to PNG or remove SVG features to satisfy an importer security filter.
+
+The platform owner authors and imports these courses. Course content is trusted. The importer and
+course editor do not run an HTML/SVG element allowlist, attribute/style/URL filtering, or malicious-code
+stripping. Authored SVG, HTML, inline styles, event attributes, embedded scripts and stylesheet imports
+are preserved in the content fields that map into the LMS. Saving and exporting that content uses the
+same policy. Uploaded course media, including `.svg`, is stored unchanged; MIME detection describes
+the file rather than deciding which content is trusted.
+
+Course structure and data still have to be valid: titles, module identities, supported block types,
+question banks, answer indexes, grading/pool rules and certificate placeholder names remain checked.
+The existing import permissions, file-size limits, course ownership and learner-access rules remain
+in force. This is a content-preservation policy, not a change to authentication or course access.
+
+Inline SVG is supported, including `viewBox`, gradients, clipping paths, masks, symbols/`use`,
+`foreignObject`, namespace declarations and authored styling. The HTML importer uses an HTML5 parser
+so SVG names and attributes retain their proper case and namespace. For example:
+
+```html
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" aria-label="Process diagram">
+  <defs><linearGradient id="process-fill"><stop stop-color="#186477"/><stop offset="1" stop-color="#f7c59f"/></linearGradient></defs>
+  <rect x="10" y="10" width="180" height="60" rx="8" fill="url(#process-fill)"/>
+  <text x="100" y="46" text-anchor="middle">A course diagram</text>
+</svg>
+```
+
+Place diagrams inside `.module-body`, `.outcomes`, or the extracted summary/review content, according
+to where they should appear. SVG in the discarded standalone page shell is not teaching content.
+Give IDs referenced by gradients, masks, clips and `use` unique names across the rendered lesson.
+Already-stripped imported content cannot be reconstructed; reimport the original source to restore it.
 
 ## 2. Course-level metadata
 
@@ -352,7 +387,10 @@ Static review prose must exist in `.review-inner`; do not rely on JavaScript to 
 
 ## 13. Static HTML and JavaScript
 
-The importer does not execute standalone JavaScript.
+The importer parses rather than executes JavaScript. Scripts and event attributes inside extracted
+lesson fragments are retained. Standalone page-shell scripts outside those fragments are not copied
+as an application shell: the LMS supplies its own navigation, progress and assessment UI. `QUIZ` and
+`REVIEW` declarations are read as data, not executed.
 
 Bad:
 
@@ -371,13 +409,17 @@ JavaScript may enhance standalone interaction but must not be the only source of
 
 ## 14. CSS and supported presentation
 
-Course `<style>` blocks are imported and scoped under the LMS course-presentation wrapper. Approved Google Fonts stylesheet links may also be preserved.
+Course `<style>` blocks are imported, with ordinary selectors scoped under the LMS course-presentation
+wrapper to retain the existing course layout contract. Author-provided `@import` rules and external
+stylesheet links are preserved, including Google Fonts and other author-chosen sources. There is no
+stylesheet-domain allowlist. Referenced resources must be available at their authored URLs; HTML/JSON
+import does not bundle local sibling files automatically.
 
 Course CSS must style course content only and must not depend on overriding the LMS shell/navigation or structural content-card container.
 
 Prefer native `<details>/<summary>` for collapsible lesson content that must survive import.
 
-## 15. Markup safety
+## 15. Markup validity (not content security filtering)
 
 - Keep HTML ids unique.
 - Entity-encode literal `&`, `<` and `>` where required.
@@ -428,6 +470,7 @@ Before delivery:
 4. verify correct-answer indexes;
 5. check duplicate HTML ids and structural HTML errors;
 6. run the Catto Learning importer;
-7. verify importer preview metadata, module order, outcomes, summaries, assessment flags/counts, review, diagnostic/remediation, final assessment and detected presentation CSS.
+7. verify SVG graphics, gradients, clipping, authored styles and interactions in the rendered lesson;
+8. verify importer preview metadata, module order, outcomes, summaries, assessment flags/counts, review, diagnostic/remediation, final assessment and detected presentation CSS.
 
 **The Catto Learning importer preview is the final conformance authority.**
