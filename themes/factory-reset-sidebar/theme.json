@@ -5,14 +5,14 @@
   "theme": {
     "name": "Factory Reset Sidebar",
     "slug": "factory-reset-sidebar",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "author": "Catto Learning",
     "description": "Light content theme with a dark left sidebar, nested Account and Administration navigation, breadcrumb utility header and full footer.",
     "created_at": "2026-08-16T14:24:00+02:00"
   },
   "parent": {
     "name": "Factory Reset",
-    "version": "2.0.0"
+    "version": "2.0.1"
   },
   "styles": [],
   "scripts": [],

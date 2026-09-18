@@ -5,7 +5,7 @@
 	{% set ph_kicker = 'Course module' %}
 	{% set ph_title = module.id ? 'Edit module' : 'Add module' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container-fluid cl-container-wide py-5">
+	<section class="cl-page-section container-fluid cl-container-wide py-5">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
 {% block body %}
 

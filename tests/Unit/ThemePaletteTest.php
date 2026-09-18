@@ -72,6 +72,10 @@ final class ThemePaletteTest extends TestCase
         self::assertStringContainsString('--cl-darkest:var(--cl-color-1)', $contents);
         self::assertStringContainsString('--cl-page-bg:var(--cl-color-5)', $contents);
         self::assertStringContainsString('--cl-button-border:var(--cl-color-2)', $contents);
+        self::assertStringContainsString('[data-theme-nav] summary', $contents);
+        self::assertStringContainsString('.cl-header .cl-nav-panel{color:var(--cl-darkest)}', $contents);
+        self::assertStringNotContainsString('] .cl-nav-panel{color:var(--cl-darkest)}', $contents, 'Sidebar panels inherit their dark rail contrast.');
+        self::assertStringContainsString('[data-nav-item].is-active:not(details)', $contents, 'Active dropdowns paint their summary, not the entire panel.');
         self::assertDoesNotMatchRegularExpression('/\\.(?:btn-primary|card|stat-card|modal-card)\\b/', $contents);
     }
 

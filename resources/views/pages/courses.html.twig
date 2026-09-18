@@ -2,7 +2,7 @@
 {% extends layout %}
 {% block page_body %}
 	{% include '@platform/partials/page-head.html.twig' with {ph_kicker: 'Course catalogue', ph_title: 'Browse by category', ph_lead: 'Choose a subject or search for a course.', ph_action_href: '/courses/tags', ph_action_label: 'Browse by tag'} %}
-	<section class="container-fluid cl-container-wide py-4">
+	<section class="cl-page-section container-fluid cl-container-wide py-4">
 		<div id="catalogue-search">
 			{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}
 		</div>

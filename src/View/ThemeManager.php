@@ -904,10 +904,10 @@ final class ThemeManager
         }
         $css .= <<<'CSS'
 body[data-cl-palette-managed="1"]{color:var(--cl-darkest)}
-body[data-cl-palette-managed="1"] [data-theme-nav],body[data-cl-palette-managed="1"] .navbar,body[data-cl-palette-managed="1"] .sidebar,body[data-cl-palette-managed="1"] .rl-header{background:var(--cl-navbar-bg)!important;color:var(--cl-on-color-1)!important}
-body[data-cl-palette-managed="1"] [data-theme-nav] a,body[data-cl-palette-managed="1"] [data-theme-nav] button,body[data-cl-palette-managed="1"] .sidebar a,body[data-cl-palette-managed="1"] .sidebar button,body[data-cl-palette-managed="1"] .rl-header a,body[data-cl-palette-managed="1"] .rl-header button{color:var(--cl-on-color-1)}
-body[data-cl-palette-managed="1"] [data-nav-item].active,body[data-cl-palette-managed="1"] .nav-link.active,body[data-cl-palette-managed="1"] .rl-nav>a.active{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 3px 0 var(--cl-accent)}
-body[data-cl-palette-managed="1"] [data-nav-item].active>summary{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 0 -3px var(--cl-accent)}
+body[data-cl-palette-managed="1"] [data-theme-nav],body[data-cl-palette-managed="1"] .cl-sidebar,body[data-cl-palette-managed="1"] .cl-header{background:var(--cl-navbar-bg)!important;color:var(--cl-on-color-1)!important}
+body[data-cl-palette-managed="1"] [data-theme-nav] summary,body[data-cl-palette-managed="1"] [data-theme-nav] a,body[data-cl-palette-managed="1"] [data-theme-nav] button,body[data-cl-palette-managed="1"] .cl-sidebar a,body[data-cl-palette-managed="1"] .cl-sidebar button,body[data-cl-palette-managed="1"] .cl-header a,body[data-cl-palette-managed="1"] .cl-header button{color:var(--cl-on-color-1)}
+body[data-cl-palette-managed="1"] [data-nav-item].is-active:not(details),body[data-cl-palette-managed="1"] .cl-nav-link.is-active,body[data-cl-palette-managed="1"] .cl-navigation>a.is-active{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 3px 0 var(--cl-accent)}
+body[data-cl-palette-managed="1"] [data-nav-item].is-active>summary{background:var(--cl-active-bg)!important;color:var(--cl-on-color-2)!important;border-color:var(--cl-accent)!important;box-shadow:inset 0 -3px var(--cl-accent)}
 body[data-cl-palette-managed="1"] .hero,body[data-cl-palette-managed="1"] .cl-feature-band,body[data-cl-palette-managed="1"] [data-theme-block="dark"]{background-color:var(--cl-large-block-bg)!important;color:var(--cl-on-color-1)!important}
 /* A dropdown panel is inside the navigation element but is not part of it.
 
@@ -923,12 +923,12 @@ body[data-cl-palette-managed="1"] .hero,body[data-cl-palette-managed="1"] .cl-fe
    white panel background and no colour at all, so `inherit` alone walked straight back up to the
    navigation bar and stayed white on white.
 
-   Only a floating light panel carries the marker. A nested list drawn inside a dark sidebar is not
-   one - it is part of the bar and its light-on-dark colours are correct - which is why the marker
-   is opted into rather than applied to every panel class.
+   The shared panel class also appears in sidebars. Scope the foreground to top headers so nested
+   sidebar lists keep the rail’s light-on-dark contrast. Links and buttons inherit their panel’s
+   foreground in either geometry.
 
    No !important, so a theme that wants a dark panel says so at this selector's weight. */
-body[data-cl-palette-managed="1"] .cl-nav-panel{color:var(--cl-darkest)}
+body[data-cl-palette-managed="1"] .cl-header .cl-nav-panel{color:var(--cl-darkest)}
 body[data-cl-palette-managed="1"] .cl-nav-panel a,body[data-cl-palette-managed="1"] .cl-nav-panel button{color:inherit}
 CSS;
         $css = self::alsoMatchPaletteClasses($css);
@@ -949,7 +949,7 @@ CSS;
      * nothing changes on screen when it does.
      *
      * Each selector is rewritten individually rather than the prefix being replaced across the
-     * whole list: `body[...] .sidebar, body[...] .navbar` handled as a string would produce a rule
+     * whole list: `body[...] .cl-sidebar, body[...] .navbar` handled as a string would produce a rule
      * that matches `body` on its own, and repaint the entire page in navigation colours.
      */
     private static function alsoMatchPaletteClasses(string $css): string

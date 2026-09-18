@@ -1,46 +1,14 @@
-{% if ph_compact is defined and ph_compact %}
-	<section class="cl-page-head cl-page-head-compact">
-		<div class="container-fluid cl-container-wide py-3">
-			<div class="cl-page-head-row">
-				{% if ph_back_href is defined and ph_back_href %}
-					<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label is defined and ph_back_label ? ph_back_label : 'Back' }}</a>
-				{% endif %}
-				<h1 class="h5 mb-0">
-					{{ ph_title }}
-				</h1>
-			</div>
+<section class="cl-page-head {{ ph_compact|default(false) ? 'cl-page-head-compact' : '' }}">
+	<div class="cl-page-head-inner container-fluid cl-container-wide {{ ph_compact|default(false) ? 'py-3' : 'py-5' }}">
+		<div class="cl-page-head-content">
+			{% if ph_back_href|default('') %}<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label|default('Back', true) }}</a>{% endif %}
+			{% if ph_kicker|default('') %}<span class="cl-kicker d-block">{{ ph_kicker }}</span>{% endif %}
+			<h1 class="{{ ph_compact|default(false) ? 'h5 mb-0' : 'display-5 fw-bold' }}">{{ ph_title }}</h1>
+			{% if ph_lead|default('') %}<p class="lead mb-0">{{ ph_lead }}</p>{% endif %}
 		</div>
-	</section>
-{% else %}
-	<section class="cl-page-head">
-		<div class="container-fluid cl-container-wide py-5">
-			<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
-				<div>
-					{% if ph_back_href is defined and ph_back_href %}
-						<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label is defined and ph_back_label ? ph_back_label : 'Back' }}</a>
-					{% endif %}
-					{% if ph_kicker is defined and ph_kicker %}
-						<span class="cl-kicker d-block {{ ph_back_href is defined and ph_back_href ? 'mt-3' : '' }}">{{ ph_kicker }}</span>
-					{% endif %}
-					<h1 class="display-5 fw-bold">
-						{{ ph_title }}
-					</h1>
-					{% if ph_lead is defined and ph_lead %}
-						<p class="lead mb-0">
-							{{ ph_lead }}
-						</p>
-					{% endif %}
-				</div>
-				{% if ph_action_href is defined and ph_action_href %}
-					{{ ui('action.link', {label: (ph_action_label is defined and ph_action_label ? ph_action_label : 'Back'), variant: 'secondary', size: 'normal', href: (ph_action_href)}) }}
-				{% endif %}
-			</div>
-		</div>
-	</section>
-{% endif %}
-{#
-	The identity band belongs to the head rather than to the page, so it is included here instead of
-	by each page. That is also what keeps it directly beneath the head: a page that included it
-	itself could put it anywhere, and most pages never included it at all.
-#}
+		{% if ph_action_href|default('') %}
+			<div class="cl-page-head-actions">{{ ui('action.link', {label: ph_action_label|default('Back', true), variant: 'secondary', href: ph_action_href}) }}</div>
+		{% endif %}
+	</div>
+</section>
 {% include '@platform/partials/account/identity-head.html.twig' %}

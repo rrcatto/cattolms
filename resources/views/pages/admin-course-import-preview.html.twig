@@ -6,7 +6,7 @@
 	{% set ph_title = analysis.course.title %}
 	{% set ph_lead = analysis.course.summary %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container-fluid cl-container-wide py-5">
+	<section class="cl-page-section container-fluid cl-container-wide py-5">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
 {% block body %}
 

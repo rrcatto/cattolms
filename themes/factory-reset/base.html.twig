@@ -15,64 +15,30 @@
 			<link href="{{ resourceUrl }}" rel="stylesheet">
 		{% endfor %}
 	</head>
-	<body class="{{ body_class }} {{ course_content_mode ? 'cl-course-page' : '' }}">
-		{% if is_authenticated %}
-			<div class="app-shell">
-				{% include '@theme/partials/navigation.html.twig' %}
-				<main class="main">
-					<header class="topbar" data-theme-breadcrumb>
-						<div class="topbar-left">
-							<button class="icon-btn mobile-menu" id="mobileMenu" type="button" aria-label="Open navigation">☰</button>
-							<div>
-								<div class="page-kicker">
-									{{ page_kicker }}
-								</div>
-								<div class="page-title">
-									{{ page_title ?: title }}
-								</div>
-							</div>
-						</div>
-						<div class="top-actions">
-							<span class="small muted">{{ user_name ?: user_email }}</span>
-						</div>
-{% include '@platform/partials/cart-summary.html.twig' %}
-					</header>
-					{#
-						The page body sits in a boxed container so the slanted page canvas shows around
-						it rather than behind it. The footer is outside that box, as it is in Radiant
-						Learning: it is the end of the page, not part of its content.
-					#}
-					<div class="content">
-						{% include '@theme/partials/flash.html.twig' %}
-						{% block page_content %}
-							{% block page_body %}
-							{% endblock %}
-						{% endblock %}
+	<body class="cl-body factory-reset-theme {{ page.body_class }} {{ course_content_mode ? 'cl-course-page' : '' }}" data-cl-navigation="sidebar">
+		<a class="cl-skip-link" href="#cl-main">Skip to content</a>
+		<div class="cl-shell">
+			<aside class="cl-sidebar" data-theme-nav>
+				<a class="cl-brand" href="{{ app.base_url }}" aria-label="{{ app.name }} home"><span class="cl-brand-mark" aria-hidden="true">CL</span><span class="cl-brand-copy"><strong>{{ app.name }}</strong><small>{{ theme.name }}</small></span></a>
+				<button class="cl-nav-toggle" type="button" data-cl-nav-toggle aria-expanded="false" aria-controls="cl-primary-navigation">Menu</button>
+				{% include '@platform/partials/navigation.html.twig' %}
+			</aside>
+			<div class="cl-page">
+				<section class="cl-page-context" aria-label="Page context" data-theme-breadcrumb>
+					<div class="cl-page-context-inner">
+						{{ ui('layout.breadcrumb', {items: breadcrumbs}) }}
+						{% include '@platform/partials/cart-summary.html.twig' %}
 					</div>
+				</section>
+				<div class="cl-page-frame">
+					<main class="cl-main" id="cl-main">
+						{% include '@platform/partials/flash-messages.html.twig' %}
+						{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}
+					</main>
 					{% include '@theme/partials/footer.html.twig' %}
-				</main>
+				</div>
 			</div>
-		{% else %}
-			<div class="public-shell">
-				<nav class="public-nav" data-theme-nav>
-					<div class="public-nav-inner">
-						<a class="brand" href="/"><span class="brand-mark">CL</span><span><strong>{{ app_name }}</strong><small>Learning platform</small></span></a>
-						<div class="public-links">
-							{% for nav in navigation %}
-								{% if nav.method != 'POST' %}
-									{{ ui('action.link', {label: (nav.label), variant: nav.key=='signin' ? 'primary' : 'quiet', size: 'normal', href: (nav.href), navigation_key: (nav.key)}) }}
-								{% endif %}
-							{% endfor %}
-						</div>
-					</div>
-				</nav>
-				<div class="cl-public-cart-bar" data-theme-breadcrumb><a href="/">Home</a>{% include '@platform/partials/cart-summary.html.twig' %}</div>
-				<main class="public-main">
-					{% include '@theme/partials/flash.html.twig' %}{{ block('page_content') }}
-				</main>
-				{% include '@theme/partials/footer.html.twig' %}
-			</div>
-		{% endif %}
+		</div>
 		{% for resourceUrl in platform.scripts %}
 			<script src="{{ resourceUrl }}"></script>
 		{% endfor %}

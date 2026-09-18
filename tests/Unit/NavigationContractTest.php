@@ -223,7 +223,7 @@ final class NavigationContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2) . '/themes/factory-reset';
         $base = (string) file_get_contents($root . '/base.html.twig');
-        $nav = (string) file_get_contents($root . '/partials/navigation.html.twig');
+        $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/navigation.html.twig');
         $footer = (string) file_get_contents($root . '/partials/footer.html.twig');
         self::assertStringContainsString('navigation', $base);
         self::assertStringContainsString('navigation', $nav);
@@ -253,35 +253,35 @@ final class NavigationContractTest extends TestCase
      */
     public function testTheThirdNavigationLevelIsAFlyoutReachableWithoutAMouse(): void
     {
-        $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/themes/factory-reset/partials/navigation.html.twig');
+        $nav = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/navigation.html.twig');
 
         self::assertStringContainsString('child.children|length > 0', $nav, 'A menu child may hold children and the theme must render them.');
         self::assertStringContainsString('grandchild.href', $nav);
         // Asserted as a class rather than a whole attribute, for the reason given below about the
         // panel: the group also carries its active state now, so the entry leading to the page
         // being read can be marked.
-        self::assertMatchesRegularExpression('/class="[^"]*\bnav-group\b[^"]*"/', $nav);
+        self::assertMatchesRegularExpression('/class="[^"]*\bcl-nav-group\b[^"]*"/', $nav);
         // The panel may carry more than one class - it also marks itself as a navigation surface so
         // the generated palette leaves its text colour alone - so the class is asserted, not the
         // whole attribute.
-        self::assertMatchesRegularExpression('/class="[^"]*\bnav-subpanel\b[^"]*"/', $nav);
+        self::assertMatchesRegularExpression('/class="[^"]*\bcl-nav-subpanel\b[^"]*"/', $nav);
         self::assertMatchesRegularExpression(
-            '/<button class="nav-group-label" type="button"/',
+            '/<button class="cl-nav-group-label" type="button"/',
             $nav,
             'The group heading must be a button, or the flyout cannot be opened from the keyboard.'
         );
 
         $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
-        self::assertStringContainsString('.nav-subpanel{display:none', $css, 'The members are hidden until the group opens.');
-        self::assertStringContainsString('.nav-group:hover>.nav-subpanel', $css);
+        self::assertStringContainsString('.cl-nav-subpanel{display:none', $css, 'The members are hidden until the group opens.');
+        self::assertStringContainsString('.cl-nav-group:hover>.cl-nav-subpanel', $css);
         self::assertStringContainsString(
-            '.nav-group:focus-within>.nav-subpanel',
+            '.cl-nav-group:focus-within>.cl-nav-subpanel',
             $css,
             'Without :focus-within the flyout is mouse-only.'
         );
         // No script is involved, so nothing can regress into a JavaScript-only control.
         $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/js/platform-overrides.js');
-        self::assertStringNotContainsString('nav-subpanel', $js);
+        self::assertStringNotContainsString('cl-nav-subpanel', $js);
     }
 
     /**

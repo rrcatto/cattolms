@@ -1,7 +1,24 @@
 # Changelog
 
-**LMS version:** 0.8.4.2
+**LMS version:** 0.8.5
 **Date time:** 2026/09/18 SAST
+
+## 2026-09-18 SAST — v0.8.5 Canonical page construction
+
+- Release new bundled theme versions: Factory Reset, Factory Reset Sidebar and Light Default 2.0.1;
+  Gilded Noir 2.0.2; Radiant Learning 4.0.1. Install themes before applying the additive active-theme migration.
+- Apply the shared `cl-*` page vocabulary and semantic landmarks to all five bundled themes.
+- Use one shell per theme for guests and signed-in readers, with core-owned navigation and mobile
+  controls; keep top navigation in Radiant Learning, Light Default and Gilded Noir, and sidebars in
+  Factory Reset and Factory Reset Sidebar.
+- Place main and footer inside the same page frame; preserve Gilded Noir’s compact header identity,
+  engraved canvas and rich decorative footer, and Sidebar’s distinct footer.
+- Correct Sidebar frame sizing, compact identity styling, palette navigation contrast and mobile
+  navigation without JavaScript. Add rendered structural contracts and all-theme browser checks.
+
+Validation: local PHP 8.5.10 `composer qa` passes with 645 tests / 41,045 assertions and all static,
+architecture, runtime, UI and release checks. Twig lint passes 173 templates. Browser validation
+passes 30 shell combinations plus 70 component checks, three mutations and native navigation.
 
 ## 2026-09-18 SAST — v0.8.4.2 Passwordless success redirect correction
 

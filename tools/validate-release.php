@@ -49,7 +49,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.8', 'composer.json version must be 0.8.');
+$need(($composer['version'] ?? '') === '0.8.5', 'composer.json version must be 0.8.5.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bundle','doctrine/dbal'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
@@ -205,7 +205,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.8'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.5'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 
@@ -237,9 +237,9 @@ $need(($factoryManifest['format'] ?? '') === 'catto-learning-theme', 'Factory Re
 $need(preg_match('/^\d+\.\d+\.\d+$/', (string) ($factoryManifest['theme']['version'] ?? '')) === 1, 'Factory Reset must declare a semantic version.');
 $need(is_array($factoryManifest) && array_key_exists('parent', $factoryManifest) && $factoryManifest['parent'] === null, 'Factory Reset must be standalone.');
 $factoryBase = $read($root . '/themes/factory-reset/base.html.twig');
-$factoryNav = $read($root . '/themes/factory-reset/partials/navigation.html.twig');
+$coreNav = $read($root . '/resources/views/partials/navigation.html.twig');
 $factoryFooter = $read($root . '/themes/factory-reset/partials/footer.html.twig');
-$need(str_contains($factoryBase, 'navigation') && str_contains($factoryNav, 'navigation'), 'Factory Reset must render the core-owned standard navigation array.');
+$need(str_contains($factoryBase, '@platform/partials/navigation.html.twig') && str_contains($coreNav, 'navigation'), 'Factory Reset must render the core-owned standard navigation array.');
 // The footer's markup is core's and the theme includes it, so the array is read in core. Checking
 // only the theme file would pass a theme that included a footer which rendered nothing.
 $need(str_contains($factoryFooter, '@platform/partials/site-footer.html.twig'), 'Factory Reset must include the core-owned site footer.');

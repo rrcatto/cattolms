@@ -1,0 +1,9 @@
+{% set compact_name = identity_display_name|default(identity_name|default(user.name), true) %}
+<div class="cl-identity cl-identity-compact" data-nav-item="identity">
+	{% if identity_image|default('') %}<img class="cl-identity-avatar" src="{{ identity_image }}" alt="" width="46" height="46">
+	{% else %}<span class="cl-identity-avatar cl-identity-avatar-empty" aria-hidden="true">{{ compact_name ? compact_name|slice(0, 1)|upper : '?' }}</span>{% endif %}
+	<span class="cl-identity-meta"><strong class="cl-identity-name">{{ compact_name }}</strong>
+		{% if identity_email|default('') %}<span class="cl-identity-email">{{ identity_email }}</span>{% endif %}
+	</span>
+	{% if identity_role|default('') %}<span class="cl-identity-roles">{{ identity_role }}</span>{% endif %}
+</div>

@@ -24,7 +24,7 @@
     the property itself rather than returning nothing.
   */
   const NAV_SCROLL_KEY = 'catto-learning:nav-scroll';
-  const navScroller = () => document.querySelector('.sidebar, .side-nav, [data-theme-nav]');
+  const navScroller = () => document.querySelector('.cl-sidebar, .cl-navigation, [data-theme-nav]');
 
   const restoreNavScroll = () => {
     const nav = navScroller();
@@ -127,7 +127,7 @@
       }
     }));
 
-    const dropdownSelector = 'details.account-menu,details.rl-account-menu,details[data-cl-dropdown]';
+    const dropdownSelector = 'details[data-cl-dropdown]';
     /* Queried at the moment it is needed rather than snapshotted at load. A row's actions menu
        arrives with the rows, and every page turn replaces them, so a list captured once holds
        elements that are no longer in the document and misses every one that is. */
@@ -142,12 +142,30 @@
     document.addEventListener('click', event => { const target = event.target instanceof Element ? event.target : null; if (!target || !target.closest(dropdownSelector)) closeDropdowns(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeDropdowns(); document.querySelectorAll('.cl-ui-modal.open').forEach(closeModal); } });
 
-    const mobileMenu = document.getElementById('mobileMenu'); const sidebar = document.getElementById('sidebar');
-    if (mobileMenu && sidebar) mobileMenu.addEventListener('click', () => sidebar.classList.toggle('open'));
+    const navToggle = document.querySelector('[data-cl-nav-toggle]');
+    const primaryNav = document.getElementById('cl-primary-navigation');
+    if (navToggle && primaryNav) {
+      document.body.dataset.clNavReady = '1';
+      const setNavOpen = open => {
+        document.body.dataset.clNavOpen = open ? '1' : '0';
+        navToggle.setAttribute('aria-expanded', String(open));
+      };
+      setNavOpen(false);
+      navToggle.addEventListener('click', () => setNavOpen(navToggle.getAttribute('aria-expanded') !== 'true'));
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && navToggle.getAttribute('aria-expanded') === 'true') {
+          setNavOpen(false); navToggle.focus();
+        }
+      });
+      primaryNav.addEventListener('click', event => {
+        if (event.target instanceof Element && event.target.closest('a,button[type="submit"]')) setNavOpen(false);
+      });
+      window.matchMedia('(min-width:1121px)').addEventListener('change', () => setNavOpen(false));
+    }
 
     /* A dismissed message takes its container with it when it was the last one.
 
-       The message was being removed and the .flash-stack around it was not, which is not an empty
+       The message was being removed and the .cl-flash-stack around it was not, which is not an empty
        element with no consequences: every theme gives the stack a bottom margin (24px in Gilded
        Noir), so a saved-settings notice that had faded out left that margin sitting above the page
        head, and the header never returned to the top of its container. Nothing on screen explained
@@ -160,7 +178,7 @@
       if (stack && stack.isConnected && stack.querySelector('[data-flash-message]') === null) stack.remove();
     };
     document.querySelectorAll('[data-flash-message]').forEach(flash => {
-      const stack = flash.closest('.flash-stack');
+      const stack = flash.closest('.cl-flash-stack');
       const dismiss = () => { flash.classList.add('flash-hiding'); setTimeout(() => { flash.remove(); dropEmptyStack(stack); }, 180); };
       flash.querySelector('[data-flash-close]')?.addEventListener('click', dismiss);
       const type = flash.dataset.flashType || 'info'; if (type === 'success' || type === 'info') setTimeout(dismiss, type === 'success' ? 4500 : 6500);

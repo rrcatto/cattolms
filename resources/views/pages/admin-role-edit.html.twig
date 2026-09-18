@@ -6,7 +6,7 @@
 	{% set ph_title = role_acl.role_name %}
 	{% set ph_lead = role_acl.role_description %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container py-4">
+	<section class="cl-page-section container py-4">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
 {% block body %}
 

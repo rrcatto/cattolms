@@ -5,7 +5,7 @@
 	{% set ph_kicker = 'Course editor' %}
 	{% set ph_title = form_heading %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container py-5 cl-medium">
+	<section class="cl-page-section container py-5 cl-medium">
 		<form action="{{ form_action }}" method="post">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 

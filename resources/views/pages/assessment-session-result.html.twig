@@ -11,7 +11,7 @@
 	{% set ph_title = session.assessment_title %}
 	{% set ph_lead = 'Attempt '~(session.attempt_number)~' · '~(session.is_diagnostic ? 'Diagnostic' : session.attempt_mode|ucfirst) %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container py-5">
+	<section class="cl-page-section container py-5">
 		<div class="row g-4">
 			<div class="col-lg-8">
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}

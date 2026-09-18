@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8';
+    private const PLATFORM_ASSET_VERSION = '0.8.5';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -281,6 +281,7 @@ final class ThemeRenderer
             // changed icon reaches a browser that already cached the old one.
             'icon_sprite' => $this->platformAsset('/img/nav-icons.svg'),
         ];
+        $model['identity_placement'] = $themeInfo['slug'] === 'gilded-noir' ? 'navigation' : 'page';
         $model['theme'] = [
             'name' => (string) $themeInfo['name'],
             'version' => (string) $themeInfo['version'],

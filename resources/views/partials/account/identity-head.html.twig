@@ -1,22 +1,23 @@
+{% if identity_placement|default('page') == 'page' %}
 {% set identity_signed_in = is_authenticated is defined and is_authenticated %}
-<section class="cl-identity-head">
-	<div class="container-fluid cl-container-wide cl-identity-head-inner">
+<section class="cl-identity cl-identity-head" aria-label="Account identity">
+	<div class="container-fluid cl-container-wide cl-identity-meta">
 		{% if identity_signed_in %}
 			{% if identity_image is defined and identity_image %}
-				<img class="cl-profile-avatar" src="{{ identity_image }}" alt="" width="72" height="72">
+				<img class="cl-identity-avatar" src="{{ identity_image }}" alt="" width="72" height="72">
 			{% else %}
-				<div class="avatar cl-profile-avatar-empty">
+				<div class="cl-identity-avatar cl-identity-avatar-empty">
 					{{ identity_name is defined and identity_name ? identity_name|slice(0, 1)|upper : '?' }}
 				</div>
 			{% endif %}
-			<div class="profile-meta cl-identity-head-meta">
-				<h2>
+			<div class="cl-identity-details">
+				<h2 class="cl-identity-name">
 					{{ identity_name is defined ? identity_name : '' }}
 				</h2>
-				<p>
+				<p class="cl-identity-email">
 					{{ identity_email is defined ? identity_email : '' }}
 				</p>
-				<div class="chip-row cl-mt-2">
+				<div class="cl-identity-roles cl-mt-2">
 					{% if identity_roles is defined %}
 						{% for role in identity_roles %}
 							{{ ui('feedback.badge', {label: (role), tone: 'info'}) }}
@@ -28,17 +29,17 @@
 				</div>
 			</div>
 		{% else %}
-			<div class="avatar cl-profile-avatar-empty cl-identity-head-anonymous" aria-hidden="true">
+			<div class="cl-identity-avatar cl-identity-avatar-empty cl-identity-head-anonymous" aria-hidden="true">
 				<svg width="34" height="34" viewBox="0 0 24 24"><use href="{{ platform.icon_sprite }}#nav-account"></use></svg>
 			</div>
-			<div class="profile-meta cl-identity-head-meta">
-				<h2>
+			<div class="cl-identity-details">
+				<h2 class="cl-identity-name">
 					Welcome to {{ app.name }}
 				</h2>
-				<p>
+				<p class="cl-identity-email">
 					Sign in to see your courses, or register to start one.
 				</p>
-				<div class="chip-row cl-mt-2">
+				<div class="cl-identity-roles cl-mt-2">
 					{{ ui('action.link', {label: 'Sign in', variant: 'primary', size: 'small', href: '/login'}) }}
                     {{ ui('action.link', {label: 'Register', variant: 'secondary', size: 'small', href: '/register'}) }}
 				</div>
@@ -46,3 +47,4 @@
 		{% endif %}
 	</div>
 </section>
+{% endif %}

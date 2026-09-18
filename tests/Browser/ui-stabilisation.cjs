@@ -23,7 +23,7 @@ function measureUi() {
                         });
                         const pagers=[...document.querySelectorAll('.pagination-row')].filter(visible).map(e=>({box:box(e), clientWidth:e.clientWidth, scrollWidth:e.scrollWidth, overflow:getComputedStyle(e).overflowX, summary:e.querySelector('.pagination-summary').textContent.replace(/\s+/g,' ').trim(), groups:[e,...e.querySelectorAll('.pagination-summary,.pagination-controls,.pagination-pages-list,.pagination-jump,.pagination-page-size')].filter(visible).map(g=>({name:g.className,wrap:getComputedStyle(g).flexWrap,direction:getComputedStyle(g).flexDirection,box:box(g)})), children:[...e.children].filter(visible).map(box)}));
                         const banners=[...document.querySelectorAll('.company-context')].filter(visible).map(e=>({background:rgba(getComputedStyle(e).backgroundColor),contrast:contrast(getComputedStyle(e).backgroundColor,getComputedStyle(e).color)}));
-                        const footer=document.querySelector('.gn-footer,.fs-footer,.cl-footer');
+                        const footer=document.querySelector('.cl-footer');
                         const footerStyle=footer&&getComputedStyle(footer);
                         const grids=[...document.querySelectorAll('.cl-ui-stat-grid')].filter(visible).map(e=>({mode:e.dataset.columns||"auto",columns:getComputedStyle(e).gridTemplateColumns,cards:[...e.children].map(box)}));
                         return {heads,pagers,banners,grids,footer:footer&&{class:footer.className,background:rgba(footerStyle.backgroundColor),contrast:contrast(footerStyle.backgroundColor,footerStyle.color)},overflow:document.documentElement.scrollWidth-innerWidth};
@@ -49,7 +49,7 @@ function assertUi(measured,theme,route,width) {
                     if(route==='/company') assert.ok(measured.banners.length,'Company context exercised');
                     for(const b of measured.banners) {assert.equal(b.background[3],255,'Opaque context surface');assert.ok(Math.max(...b.background.slice(0,3))-Math.min(...b.background.slice(0,3))>=10,`Visible context colour: ${b.background}`);assert.ok(b.contrast>=4.5,`Context contrast ${b.contrast}`);}
                     assert.ok(measured.footer,'Footer rendered');
-                    const expected=theme.slug==='gilded-noir'?'gn-footer':theme.slug==='factory-reset-sidebar'?'fs-footer':'cl-footer';
+                    const expected='cl-footer';
                     assert.ok(measured.footer.class.split(' ').includes(expected),`Preserved ${expected}`);
                     assert.equal(measured.footer.background[3],255,'Footer has its own opaque surface');
                     assert.ok(measured.footer.contrast>=4.5,`Footer text contrast ${measured.footer.contrast}`);
@@ -99,16 +99,16 @@ function assertUi(measured,theme,route,width) {
         const light=themes.find(t=>t.slug==='light-default');
         await page.setViewportSize({width:1440,height:1000});
         await page.goto(`${base}/admin/system/ui-components?theme_preview=${light.key}`);
-        let mutation=await page.addStyleTag({content:'.ld-main .cl-ui-section-head::before{position:static}'});
+        let mutation=await page.addStyleTag({content:'.cl-main .cl-ui-section-head::before{position:static}'});
         let broken=await page.evaluate(measureUi);
         assert.throws(()=>assertUi(broken,light,'/admin/system/ui-components',1440),/Content starts left|Root decoration/);
         await mutation.evaluate(e=>e.remove());
-        mutation=await page.addStyleTag({content:'.ld-main .pagination-controls{flex-wrap:wrap}'});
+        mutation=await page.addStyleTag({content:'.cl-main .pagination-controls{flex-wrap:wrap}'});
         broken=await page.evaluate(measureUi);
         assert.throws(()=>assertUi(broken,light,'/admin/system/ui-components',1440),/pagination-controls/);
         await mutation.evaluate(e=>e.remove());
         await page.goto(`${base}/company?theme_preview=${light.key}`);
-        mutation=await page.addStyleTag({content:'.ld-main .company-context{background:white}'});
+        mutation=await page.addStyleTag({content:'.cl-main .company-context{background:white}'});
         broken=await page.evaluate(measureUi);
         assert.throws(()=>assertUi(broken,light,'/company',1440),/Visible context colour/);
         await mutation.evaluate(e=>e.remove());
@@ -123,12 +123,12 @@ function assertUi(measured,theme,route,width) {
         await p.goto(`${base}/admin/people`);
         await p.locator('.pagination-controls').first().getByRole('link',{name:'Next page',exact:true}).click();
         await p.waitForLoadState();
-        assert.match(await p.locator('.pagination-summary').first().innerText(),/Page 2 of/);
+        assert.match(await p.locator('.pagination-summary').first().innerText(),/Page 2 of/i);
         const jump=p.locator('.pagination-jump').first();
         await jump.locator('input[type=number]').fill('3');
         await jump.locator('input[type=number]').press('Enter');
         await p.waitForLoadState();
-        assert.match(await p.locator('.pagination-summary').first().innerText(),/Page 3 of/);
+        assert.match(await p.locator('.pagination-summary').first().innerText(),/Page 3 of/i);
         await p.goto(`${base}/courses`);
         assert.equal(new URL(p.url()).pathname,'/courses');
         console.log('PASS non-JavaScript GET controls');

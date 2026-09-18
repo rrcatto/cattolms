@@ -183,3 +183,37 @@ markup literals and class-producing operations in `public_html/js` and `assets/c
 canonical theme geometry and malformed Stimulus attributes. Comments and selector-only references
 do not count as generated UI. There are no file exemptions. Notice headings use
 `cl-ui-notice-heading`; inline emphasis in notice prose must stay inline.
+
+## Canonical page construction (2026-09-18)
+
+The component registry and Twig APIs are unchanged. Themes compose shared page concepts using the
+canonical classes in [Theme SDK](THEME-SDK.md#canonical-shared-page-vocabulary). Core owns one
+navigation partial, page-head partial, full/compact identity partials and flash stack. The standard
+footer remains shared; richer themed footers use the same vocabulary and retain unique decoration.
+
+Each shell places `main.cl-main` and `footer.cl-footer` beside one another inside
+`div.cl-page-frame`, after `section.cl-page-context`. The shell and framing are divs. Page heads,
+identity bands and meaningful content regions remain sections; ordinary content uses
+`cl-page-section`. Page-head content/actions have explicit wrappers. Navigation uses the core model
+for both authentication states; Gilded Noir places compact identity in the top navigation. A theme
+must not emit another guest shell or duplicate the identity band and hide it with CSS.
+
+`CanonicalPageConstructionTest` renders both states through every bundled theme and checks actual
+landmarks, semantic sections, menu nesting, logout method/CSRF and GN decoration. The browser test
+`tests/Browser/canonical-page.cjs` checks served pages at 1440, 820 and 390px, navigation controls,
+no-JavaScript links, overflow and main/footer position.
+
+### Shared page ownership in v0.8.5
+
+The registry remains 36 components; canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
+
+| Concern | Core source |
+| --- | --- |
+| Navigation model rendering | `resources/views/partials/navigation.html.twig` |
+| Page context and full identity placement | `resources/views/partials/page-head.html.twig` |
+| Full identity | `resources/views/partials/account/identity-head.html.twig` |
+| Compact header identity | `resources/views/partials/account/identity-compact.html.twig` |
+| Flash messages | `resources/views/partials/flash-messages.html.twig` |
+| Standard footer | `resources/views/partials/site-footer.html.twig` |
+
+Themes preserve top-header/sidebar shell geometry and decoration; core owns functional component geometry. Gilded Noir and Factory Reset Sidebar retain distinctive footer markup using canonical shared footer classes. Update `CanonicalPageConstructionTest`, existing component contracts and the [browser checks](../tests/Browser/README.md) whenever their supported structure changes.

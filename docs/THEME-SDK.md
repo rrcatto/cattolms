@@ -46,22 +46,65 @@ the required resource arrays, navigation, flash messages and appropriate footer.
 
 ```twig
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ page.title }}</title>
-    {% for resourceUrl in platform.styles %}<link rel="stylesheet" href="{{ resourceUrl }}">{% endfor %}
+    <title>{{ page.title }} · {{ app.name }}</title>
+    {% for url in platform.styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}
+    {% for url in theme.external_styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}
+    {% for url in theme.styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}
 </head>
-<body>
-    {% include '@theme/partials/navigation.html.twig' %}
-    {% include '@platform/partials/flash-messages.html.twig' %}
-    <main>{% block page_body %}{% endblock %}</main>
-    {% include '@platform/partials/site-footer.html.twig' %}
-    {% for resourceUrl in platform.scripts %}<script src="{{ resourceUrl }}"></script>{% endfor %}
+<body class="cl-body {{ page.body_class }}" data-cl-navigation="top">
+    <a class="cl-skip-link" href="#cl-main">Skip to content</a>
+    <div class="cl-shell">
+        <header class="cl-header" data-theme-nav>
+            <div class="cl-header-inner">
+                <a class="cl-brand" href="{{ app.base_url }}">
+                    <span class="cl-brand-mark" aria-hidden="true">CL</span>
+                    <span class="cl-brand-copy"><strong>{{ app.name }}</strong></span>
+                </a>
+                <button class="cl-nav-toggle" type="button" data-cl-nav-toggle
+                        aria-expanded="false" aria-controls="cl-primary-navigation">Menu</button>
+                {% include '@platform/partials/navigation.html.twig' %}
+            </div>
+        </header>
+        <div class="cl-page">
+            <section class="cl-page-context" aria-label="Page context" data-theme-breadcrumb>
+                <div class="cl-page-context-inner">
+                    {{ ui('layout.breadcrumb', {items: breadcrumbs}) }}
+                    {% include '@platform/partials/cart-summary.html.twig' %}
+                </div>
+            </section>
+            <div class="cl-page-frame">
+                <main class="cl-main" id="cl-main">
+                    {% include '@platform/partials/flash-messages.html.twig' %}
+                    {% block page_content %}{% block page_body %}{% endblock %}{% endblock %}
+                </main>
+                {% include '@theme/partials/footer.html.twig' %}
+            </div>
+        </div>
+    </div>
+    {% for url in platform.scripts %}<script src="{{ url }}"></script>{% endfor %}
+    {% for url in theme.external_scripts %}<script src="{{ url }}"></script>{% endfor %}
+    {% for url in theme.scripts %}<script src="{{ url }}"></script>{% endfor %}
 </body>
 </html>
 ```
+
+For sidebar navigation, set `data-cl-navigation="sidebar"` and replace the header with
+`aside.cl-sidebar[data-theme-nav]`, containing the same brand, toggle and core navigation include.
+The page/context/frame/main/footer construction remains identical. Factory Reset and Factory Reset
+Sidebar use this geometry; Radiant Learning, Light Default and Gilded Noir use the top-header geometry.
+Do not branch between guest and authenticated shells. Core supplies both navigation states.
+
+Core enhances `[data-cl-nav-toggle]` with expanded state and Escape/focus restoration. With JavaScript
+disabled the menu remains visible; narrow top headers stay in normal flow so navigation cannot
+cover page controls. At narrow widths the open enhanced menu also scrolls with the document. Scrollable sidebars keep nested navigation within their rail.
+Themes retain decoration, header/sidebar dimensions and unique elements; do not hide core navigation
+independently or install a second toggle handler.
+
+
 
 Family wrappers extend the base and retain the `page_body` block, optionally surrounding it with
 family decoration. They do not replace core forms, table rows or catalogue results. Use
@@ -77,7 +120,7 @@ intentional: use the documented objects and conditional defaults for optional va
 Render the permission-filtered navigation hierarchy, including active state at every level. Entries
 carry key, label, href, icon_id, active, method, csrf and children as appropriate. Preserve POST and
 CSRF for logout. Keep data-nav-item on destination links. Nested navigation groups use the core
-nav-group/nav-subpanel hooks. A scrolling sidebar nests the third level within its scroll area;
+cl-nav-group/cl-nav-subpanel hooks. A scrolling sidebar nests the third level within its scroll area;
 other navigation can use the core popout. Preserve visible keyboard focus and accessible mobile
 navigation controls. Navigation destinations are not a theme-maintained route catalogue.
 
@@ -87,8 +130,8 @@ learning sections), and Administration (Dashboard, People, companies, courses, R
 Themes, Settings and UI Components). Registries supply the exact labels, order and permission
 filtering; these examples do not authorise hard-coded destinations in themes.
 
-The standard footer destination array is core-owned. Factory Reset and its related themes delegate
-to the site-footer partial. Gilded Noir retains its individual footer composition using the same
+The standard footer destination array is core-owned. Factory Reset, Light Default and Radiant Learning delegate
+to the site-footer partial. Factory Reset Sidebar retains its richer themed footer. Gilded Noir retains its individual footer composition using the same
 standard destinations and platform action component. Do not replace its footer with another theme's.
 
 Account, company and admin family models expose `sections` and `section` for composed workspace and
@@ -142,7 +185,7 @@ colours; one is applied automatically; multiple palettes use the core palette sw
 a competing switcher or palette persistence. Core cart chrome exposes `cl-cart-count`,
 `cl-cart-panel` and `cl-cart-line`; give them opaque theme surfaces and suitable action colours.
 
-Theme JavaScript can enhance a drawer or decorative transition. It cannot own ACL, grading,
+Core JavaScript owns navigation toggles, Escape and mobile menu state. Theme JavaScript may enhance decorative transitions only. It cannot own ACL, grading,
 progress, payment state, persistence or core modal/dropdown behaviour. All essential navigation and
 forms work without JavaScript. Fonts and other declared external resources use HTTPS. Required core
 resources remain present even when a theme adds its own resources.
@@ -158,5 +201,71 @@ Run `composer qa`, inspect `/admin/system/ui-components`, and review actual logi
 administration, company, catalogue/tag, checkout and learning pages at desktop/tablet/mobile sizes.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
 pagination, htmx replacement and plain GET/POST fallbacks. Gilded Noir, Light Default, Factory Reset
-and Radiant Learning need individual visual checks; Factory Reset Sidebar must remain structurally
-sound. The component ownership contracts scan bundled theme templates as well as platform views.
+Radiant Learning and Factory Reset Sidebar all need individual visual checks. The component ownership contracts scan bundled theme templates as well as platform views.
+
+## Canonical shared page vocabulary
+
+| Concept | Canonical class |
+|---|---|
+| body | `cl-body` |
+| skip link | `cl-skip-link` |
+| whole application shell | `cl-shell` |
+| top header | `cl-header` |
+| header inner wrapper | `cl-header-inner` |
+| header actions | `cl-header-actions` |
+| brand | `cl-brand` |
+| brand mark | `cl-brand-mark` |
+| brand text wrapper | `cl-brand-copy` |
+| primary navigation | `cl-navigation` |
+| mobile nav toggle | `cl-nav-toggle` |
+| navigation menu | `cl-nav-menu` |
+| navigation link/summary | `cl-nav-link` |
+| navigation icon | `cl-nav-icon` |
+| dropdown panel | `cl-nav-panel` |
+| nested navigation group | `cl-nav-group` |
+| nested group label | `cl-nav-group-label` |
+| nested group caret | `cl-nav-group-caret` |
+| nested subpanel | `cl-nav-subpanel` |
+| nested sublink | `cl-nav-sublink` |
+| POST navigation form | `cl-nav-form` |
+| sidebar | `cl-sidebar` |
+| page region beside/below navigation | `cl-page` |
+| breadcrumb/cart/context band | `cl-page-context` |
+| context inner wrapper | `cl-page-context-inner` |
+| visual box containing main + footer | `cl-page-frame` |
+| primary content | `cl-main` |
+| flash stack | `cl-flash-stack` |
+| page heading section | `cl-page-head` |
+| page heading inner wrapper | `cl-page-head-inner` |
+| page heading content | `cl-page-head-content` |
+| page heading actions | `cl-page-head-actions` |
+| identity root | `cl-identity` |
+| full identity band | `cl-identity-head` |
+| compact/nav identity | `cl-identity-compact` |
+| identity avatar | `cl-identity-avatar` |
+| identity text/meta | `cl-identity-meta` |
+| identity name | `cl-identity-name` |
+| identity email | `cl-identity-email` |
+| identity role/status area | `cl-identity-roles` |
+| ordinary page content section | `cl-page-section` |
+| footer root | `cl-footer` |
+| footer inner wrapper | `cl-footer-inner` |
+| footer navigation | `cl-footer-nav` |
+| footer social links | `cl-footer-social` |
+
+Existing canonical component classes such as `cl-ui-*`, `cl-cart-*`, `cl-container-wide`, `cl-narrow`, `cl-medium` and other established core classes remain part of the same core vocabulary.
+
+Theme-specific elements may use theme-owned classes such as `gn-ribbon`, `gn-footer-art`, or future third-party theme classes.
+
+
+`cl-identity-details`, `cl-footer-grid` and `cl-footer-section` name the inner identity and rich-footer
+structures shown in the canonical samples. `cl-page-family` is a div around a decorated page family.
+Page heading and full identity are semantic sections; ordinary content uses `section.cl-page-section`.
+Never replace meaningful sections with generic divs to obtain a layout.
+
+The full identity band owns its padding and row layout; compact identity metadata has no band
+padding. Themes can set `--cl-identity-avatar-size` on the compact identity (Gilded Noir uses 46px).
+
+Gilded Noir uses the shared compact identity in its top navigation. Its footer retains three
+semantic sections, social presentation, `gn-footer-art`, `gn-footer-veil` and `gn-footnote`, with
+shared `cl-footer*` names on common concepts. Do not substitute the standard footer for it.

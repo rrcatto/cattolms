@@ -76,23 +76,13 @@ final class IdentityDisplayNameContractTest extends TestCase
      */
     public function testGildedNoirNavigationChipUsesTheDisplayName(): void
     {
-        $chip = $this->gildedNoirIdentityChip();
-
-        self::assertStringContainsString(
-            'identity_display_name',
-            $chip,
-            'The Gilded Noir navigation identity must read identity_display_name.'
-        );
-        self::assertStringContainsString(
-            '<strong class="gn-identity-name">{{ gn_identity_label }}</strong>',
-            $chip,
-            'The chip must print the resolved label, not identity_name directly.'
-        );
-        self::assertStringContainsString(
-            'identity_name is defined and identity_name ? identity_name : user.name',
-            $chip,
-            'The label must fall back to identity_name: display_name is a nullable column.'
-        );
+        foreach (['RichardC', ''] as $displayName) {
+            $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/account/identity-compact', [
+                'identity_display_name' => $displayName, 'identity_name' => 'Richard Catto',
+                'identity_email' => 'reader@example.test', 'user' => ['name' => 'Fallback'],
+            ]);
+            self::assertStringContainsString('<strong class="cl-identity-name">' . ($displayName ?: 'Richard Catto') . '</strong>', $html);
+        }
     }
 
     /**
@@ -134,18 +124,4 @@ final class IdentityDisplayNameContractTest extends TestCase
         return $keys;
     }
 
-    /** The markup between the opening of the identity chip and the sign-out form after it. */
-    private function gildedNoirIdentityChip(): string
-    {
-        $template = dirname(__DIR__, 2) . '/themes/gilded-noir/base.html.twig';
-        self::assertFileExists($template);
-        $markup = (string) file_get_contents($template);
-
-        $start = strpos($markup, '{% if user.logged_in %}');
-        self::assertNotFalse($start, 'The Gilded Noir navigation no longer carries an identity chip.');
-        $end = strpos($markup, '<form class="gn-nav-form"', $start);
-        self::assertNotFalse($end, 'The identity chip is no longer followed by the sign-out form.');
-
-        return substr($markup, $start, $end - $start);
-    }
 }

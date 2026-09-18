@@ -15,7 +15,7 @@
 2026/09/08 09:00 SAST
 - One row is one line, and it fits. The previous version was overridden on every screen by the themes, which each set flex-wrap:wrap at a higher specificity and load afterwards. Long values now truncate with an ellipsis rather than wrapping or scrolling, secondary lines sit inline, and in-row buttons are compact.
 2026/09/06 21:30 SAST
-- The third-level flyout opens to the right by default. A group in a panel anchored near the window edge carries nav-flyout-edge and flips left only on a desktop too narrow to hold it.
+- The third-level flyout opens to the right by default. A group in a panel anchored near the window edge carries cl-nav-flyout-edge and flips left only on a desktop too narrow to hold it.
 2026/09/06 20:10 SAST
 - The third navigation level became a hover/focus flyout: the group heading and its separator stay in the parent panel and the members open to the side. No JavaScript; the heading is a button so keyboard focus opens it, and narrow viewports fall back to the indented list.
 2026/09/04 20:49 SAST
@@ -31,7 +31,6 @@
 .cl-options{margin-left:0!important;display:grid;gap:.65rem}.cl-option{display:grid!important;grid-template-columns:1.25rem minmax(0,1fr);align-items:start!important;justify-content:start!important;gap:.7rem;width:100%;text-align:left!important}.cl-option input[type="radio"]{width:1rem!important;height:1rem!important;min-width:1rem;max-width:1rem;margin:.28rem 0 0!important;padding:0!important;justify-self:start}.cl-option>span{display:block;min-width:0;text-align:left!important}
 
 .cl-admin-workspace{display:grid;gap:1rem}.cl-ui-accordion-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}.cl-ui-accordion-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:800}.cl-ui-accordion-description{font-size:.875rem;opacity:.72}.cl-ui-accordion-toggle{justify-self:end}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-ui-accordion-link{white-space:nowrap}.cl-ui-accordion-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-ui-accordion-summary{grid-template-columns:1fr;gap:.35rem}.cl-ui-accordion-link{justify-self:start}}.cl-ui-modal[hidden],.cl-ui-modal[aria-hidden="true"]{display:none!important}.cl-ui-modal.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.cl-ui-modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
-.account-menu,.rl-account-menu{position:relative}.account-menu>summary,.rl-account-menu>summary{list-style:none;cursor:pointer}.account-menu>summary::-webkit-details-marker,.rl-account-menu>summary::-webkit-details-marker{display:none}.account-menu-panel,.rl-account-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:1040;min-width:190px;padding:7px;background:#fff;border:1px solid var(--cl-border,var(--line,#dfe4ea));border-radius:10px;box-shadow:0 14px 38px rgba(23,33,43,.16);display:grid}.account-menu-panel a,.rl-account-panel a{padding:9px 11px;border-radius:7px;color:var(--ink,#18212b);font-weight:700;white-space:nowrap}.account-menu-panel a:hover,.rl-account-panel a:hover{background:color-mix(in srgb,var(--cl-accent,#274b63) 10%,white);color:var(--cl-darkest,var(--primary,#274b63))}
 .cl-password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.cl-password-control input{min-width:0}.cl-password-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;min-height:42px}.cl-password-toggle svg{width:18px;height:18px;fill:currentColor;display:block}.cl-password-toggle:disabled{opacity:.55;cursor:wait}
 .cl-palette-switcher{position:fixed;right:18px;bottom:18px;z-index:1100;width:min(310px,calc(100vw - 36px));padding:12px;border:1px solid var(--cl-border,#dfe4ea);border-radius:14px;background:#fff;color:#18212b;box-shadow:0 18px 48px rgba(15,23,42,.20)}.cl-palette-switcher[hidden]{display:none!important}.cl-palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.cl-palette-head strong{font-size:.84rem}.cl-palette-hide,.cl-palette-show{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:6px 9px;font:inherit;font-weight:700}.cl-palette-show{position:fixed;right:18px;bottom:18px;z-index:1100;box-shadow:0 8px 24px rgba(15,23,42,.14)}.cl-palette-show[hidden]{display:none!important}.cl-palette-options{display:grid;gap:6px;max-height:min(52vh,430px);overflow:auto;padding-right:2px}.cl-palette-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;border:1px solid #dbe2ea;border-radius:9px;padding:8px 9px;background:#fff;color:#18212b;text-align:left;font:inherit}.cl-palette-option.active{border-color:var(--cl-accent,#64748b);box-shadow:inset 3px 0 var(--cl-accent,#64748b)}.cl-palette-name{font-size:.78rem;font-weight:800}.cl-palette-swatches{display:flex}.cl-palette-swatch{width:17px;height:17px;border:1px solid rgba(0,0,0,.13)}.cl-palette-swatch:first-child{border-radius:5px 0 0 5px}.cl-palette-swatch:last-child{border-radius:0 5px 5px 0}/* v0.5.7.5.1 scalable administration/account workspace layout primitives. */
 
@@ -92,8 +91,8 @@
 .cl-ui-accordion-lazy.htmx-request .cl-ui-accordion-loading{opacity:1}/* Navigation icons come from the platform sprite, so core supplies a baseline size. An inline SVG
    with no dimensions renders at 300x150; every theme's own icon class still overrides these. */
 
-.nav-icon{width:1.15em;height:1.15em;flex:0 0 auto;vertical-align:-.15em}
-.nav-icon use{pointer-events:none}/* Metric strip. Core owns the layout because the number of figures on a dashboard changes with
+.cl-nav-icon{width:1.15em;height:1.15em;flex:0 0 auto;vertical-align:-.15em}
+.cl-nav-icon use{pointer-events:none}/* Metric strip. Core owns the layout because the number of figures on a dashboard changes with
    the LMS, not with the theme: the Company dashboard went from four figures to five and no theme
    defines a five-column grid, so a fixed grid-N class would have broken every skin. Auto-fit lets
    any count lay out sensibly. Card styling stays the theme's. */
@@ -150,13 +149,13 @@
    positioned over page content and a theme's dark menu panel would otherwise hand it the light
    page's ink and render the heading invisible against itself. */
 
-.nav-group{position:relative;display:grid;gap:2px}
-.nav-group+.nav-group{margin-top:5px;padding-top:6px;border-top:1px solid var(--cl-border,rgba(127,127,127,.26))}
-.nav-group-label{display:flex;align-items:center;gap:.5rem;width:100%;margin:0;padding:.4rem .6rem;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.04em;line-height:1.35;text-transform:uppercase;text-align:left;opacity:.62;cursor:default}
-.nav-group-caret{margin-left:auto;flex:0 0 auto;font-size:1.1em;line-height:1;opacity:.75;transition:transform .15s ease}
-.nav-subpanel{display:none;position:absolute;top:-7px;left:100%;z-index:1070;min-width:13.5rem;padding:7px;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)}
-.nav-group:hover>.nav-subpanel,.nav-group:focus-within>.nav-subpanel{display:grid;gap:2px}
-.nav-group:hover>.nav-group-label,.nav-group:focus-within>.nav-group-label{opacity:1}/* The group holding the page being read.
+.cl-nav-group{position:relative;display:grid;gap:2px}
+.cl-nav-group+.cl-nav-group{margin-top:5px;padding-top:6px;border-top:1px solid var(--cl-border,rgba(127,127,127,.26))}
+.cl-nav-group-label{display:flex;align-items:center;gap:.5rem;width:100%;margin:0;padding:.4rem .6rem;border:0;border-radius:7px;background:transparent;color:inherit;font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.04em;line-height:1.35;text-transform:uppercase;text-align:left;opacity:.62;cursor:default}
+.cl-nav-group-caret{margin-left:auto;flex:0 0 auto;font-size:1.1em;line-height:1;opacity:.75;transition:transform .15s ease}
+.cl-nav-subpanel{display:none;position:absolute;top:-7px;left:100%;z-index:1070;min-width:13.5rem;padding:7px;border:1px solid var(--cl-border,#dfe4ea);border-radius:10px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,var(--ink,#18212b));box-shadow:0 14px 38px rgba(23,33,43,.16)}
+.cl-nav-group:hover>.cl-nav-subpanel,.cl-nav-group:focus-within>.cl-nav-subpanel{display:grid;gap:2px}
+.cl-nav-group:hover>.cl-nav-group-label,.cl-nav-group:focus-within>.cl-nav-group-label{opacity:1}/* The group holding the page being read.
 
    Marked on the heading, never on the group itself. A group is a container of several links, and
    the palette paints anything carrying data-nav-item and `active` as a solid pill - which is right
@@ -164,19 +163,19 @@
    its own class, and what changes is the heading: full strength rather than the dimmed default,
    with a rule down its leading edge. */
 
-.nav-group-current>.nav-group-label{opacity:1;box-shadow:inset 2px 0 currentColor}
-.nav-group:hover>.nav-group-label .nav-group-caret,.nav-group:focus-within>.nav-group-label .nav-group-caret{transform:translateX(3px)}
-.nav-flyout-left>.nav-subpanel{left:auto;right:100%}
+.cl-nav-group-current>.cl-nav-group-label{opacity:1;box-shadow:inset 2px 0 currentColor}
+.cl-nav-group:hover>.cl-nav-group-label .cl-nav-group-caret,.cl-nav-group:focus-within>.cl-nav-group-label .cl-nav-group-caret{transform:translateX(3px)}
+.cl-nav-flyout-left>.cl-nav-subpanel{left:auto;right:100%}
 /* A group inside a panel that is anchored near the window edge. It still opens to the right, which
    is the direction a reader expects, but a top-bar menu sits close to the right edge and on a
    narrower desktop there is simply not enough room out there: the flyout would be clipped by the
    window with no way to scroll to it. Below the width where it fits, the group opens to the left
    instead - the same thing a native menu does when it runs out of room. */
-@media(min-width:1081px) and (max-width:1600px){.nav-flyout-edge>.nav-subpanel{left:auto;right:100%}}
-.nav-sublink{display:flex;align-items:center;gap:.5rem;white-space:nowrap}
+@media(min-width:1081px) and (max-width:1600px){.cl-nav-flyout-edge>.cl-nav-subpanel{left:auto;right:100%}}
+.cl-nav-sublink{display:flex;align-items:center;gap:.5rem;white-space:nowrap}
 /* Narrow viewports have nowhere to fly out to, and a hover target is not a thing a finger has, so
    the members return to the indented list the group replaced. */
-@media(max-width:1080px){.nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}.nav-group-caret{display:none}.nav-group-label{opacity:.62}}/* Inside a scrolling sidebar the third level nests rather than flying out.
+@media(max-width:1080px){.cl-nav-group>.cl-nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}.cl-nav-group-caret{display:none}.cl-nav-group-label{opacity:.62}}/* Inside a scrolling sidebar the third level nests rather than flying out.
 
    A flyout is `position:absolute; left:100%`, so it is drawn outside its parent - and a sidebar
    that scrolls cannot let it. `overflow-y:auto` forces the other axis to compute as `auto` too:
@@ -188,9 +187,9 @@
    it needs no JavaScript, and it cannot be clipped because it takes part in the flow. Themes whose
    navigation is a top bar - Gilded Noir, Light Default - are unaffected and keep the flyout. */
 
-.sidebar .nav-group>.nav-subpanel,.side-nav .nav-group>.nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}
-.sidebar .nav-group-caret,.side-nav .nav-group-caret{transform:rotate(90deg)}
-.sidebar .nav-group>.nav-group-label,.side-nav .nav-group>.nav-group-label{opacity:.62}/* v0.6 category browsing. Core owns the breadcrumb and the narrowing rail because both are
+.cl-sidebar .cl-nav-group>.cl-nav-subpanel{display:grid;gap:2px;position:static;min-width:0;padding:0 0 0 .9rem;border:0;border-radius:0;background:transparent;color:inherit;box-shadow:none}
+.cl-sidebar .cl-nav-group-caret{transform:rotate(90deg)}
+.cl-sidebar .cl-nav-group>.cl-nav-group-label{opacity:.62}/* v0.6 category browsing. Core owns the breadcrumb and the narrowing rail because both are
    navigation: a reader who has browsed three levels down needs a way back up that does not depend
    on which theme is installed, and a branch offering a count has to show that count legibly. */
 
@@ -254,7 +253,7 @@
 */
 
 :root{--cl-danger-soft:color-mix(in srgb,var(--cl-danger,#a8452f) 12%,white);--cl-table-pad-y:6px;--cl-table-pad-x:9px;--cl-table-font:.78rem;--cl-table-head-font:.66rem;--cl-table-btn-font:.7rem}
-/* !important, and the reason matters. Gilded Noir declares `.gn-main .cl-ui-table{overflow:auto}`
+/* !important, and the reason matters. Gilded Noir declares `.cl-main .cl-ui-table{overflow:auto}`
    at specificity (0,2,0) and loads after core, so a bare `.cl-ui-table` rule loses to it. The
    wrapper then clips, and the row menu - which is absolutely positioned and has to escape the cell
    - is drawn outside it and never appears. That is why the actions menu did nothing in Gilded Noir
@@ -568,14 +567,14 @@
   background:var(--cl-page-surface,#fff);
   color:var(--cl-ink,var(--ink,#18212b));
   border-bottom:1px solid var(--cl-border,#dfe4ea)}
-.cl-identity-head-inner{display:flex;align-items:center;flex-wrap:wrap;gap:.9rem;padding-block:1rem}/* The signed-out mark. A symbol rather than an initial, because there is no name to take one
+.cl-identity-head .cl-identity-meta{display:flex;align-items:center;flex-wrap:wrap;gap:.9rem;padding-block:1rem}/* The signed-out mark. A symbol rather than an initial, because there is no name to take one
    from, and the band has to keep its height whoever is reading. */
 
 .cl-identity-head-anonymous{display:grid;place-items:center;color:var(--cl-ink,var(--ink,#18212b));opacity:.55}
 .cl-identity-head-anonymous svg{fill:none;stroke:currentColor;stroke-width:1.9}
-.cl-identity-head-meta{min-width:0}
-.cl-identity-head-meta h2{margin:0;font-size:1.15rem;line-height:1.25}
-.cl-identity-head-meta p{margin:.15rem 0 0;font-size:.85rem;opacity:.75}
+.cl-identity-details{min-width:0}
+.cl-identity-details h2{margin:0;font-size:1.15rem;line-height:1.25}
+.cl-identity-details p{margin:.15rem 0 0;font-size:.85rem;opacity:.75}
 .cl-filter-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
 .cl-filter-chip{display:inline-flex;align-items:center;padding:.3rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;font-size:.8rem;line-height:1.4;text-decoration:none;color:inherit}/* The selected state keeps the inherited text colour and tints the ground with a share of it, so
    it cannot fail contrast in a theme core knows nothing about - a filled chip in a fixed brand
@@ -603,7 +602,7 @@
    keeps a card that does wrap its content in a .cl-course-card-body from being padded twice. */
 
 .cl-ui-surface:where(:not(:has(> .cl-course-card-body))){padding:clamp(1rem,2vw,1.4rem)}/* The field rule needs !important, for the same reason the table-wrap block above does: Light
-   Default states gap:0 at .ld-main .cl-ui-field, which outranks any bare .cl-ui-field core can write and loads
+   Default states gap:0 at .cl-main .cl-ui-field, which outranks any bare .cl-ui-field core can write and loads
    after it. The gap between a label and its control is not a matter of taste a theme should be
    able to set to nothing, so core states it and means it. Only the gap is forced - a theme keeps
    full control of the field's display, margins, type and colour, and Light Default's own
@@ -741,7 +740,7 @@
    Core owns the sprite, so core states how it is drawn. A theme still sets the colour, because
    currentColor is whatever the theme painted the text. */
 
-.nav-icon{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}/* The tag row says what it is. A row of chips under a description is otherwise decoration. */
+.cl-nav-icon{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}/* The tag row says what it is. A row of chips under a description is otherwise decoration. */
 
 .cl-course-card-tags{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem}
 .cl-course-card-tags-label{font-size:.66rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;opacity:.65;margin-right:.1rem}/* Slanted texture: a named platform UI element.
@@ -940,3 +939,69 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 
 @media (max-width:1100px){.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:640px){.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:1fr}}
+
+/* Canonical page construction: shared landmarks and navigation behaviour. Themes decorate these
+   concepts and set their top-header/sidebar dimensions; auth state never selects another shell. */
+.cl-body{min-height:100vh;margin:0}
+.cl-shell,.cl-page,.cl-page-frame,.cl-main,.cl-page-family{min-width:0}
+.cl-page-frame>.cl-main{display:block}
+.cl-skip-link{position:fixed;top:-8rem;left:1rem;z-index:10000;padding:.7rem 1rem;background:#fff;color:#18212b}
+.cl-skip-link:focus{top:1rem}
+.cl-brand{display:flex;align-items:center;gap:.7rem}
+.cl-brand-copy{min-width:0}.cl-brand-copy strong,.cl-brand-copy small{display:block}
+.cl-header-inner{display:flex;align-items:center;flex-wrap:wrap;gap:1rem}
+.cl-header-actions{display:flex;align-items:center;min-width:0}
+.cl-page-context-inner{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;width:100%;min-width:0}
+.cl-page-head-inner{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.cl-page-head-content{flex:1 1 18rem;min-width:0;text-align:left}
+.cl-page-head-actions{display:flex;gap:.5rem;flex:0 0 auto;margin-left:auto}
+.cl-page-head-compact .cl-page-head-content{display:flex;align-items:center;flex-wrap:wrap;gap:.75rem}
+.cl-page-section{min-width:0}
+.cl-flash-stack{display:grid;gap:.5rem;margin-bottom:1rem}
+.cl-identity{min-width:0}
+.cl-identity-meta{min-width:0}
+.cl-identity-avatar{width:72px;height:72px;object-fit:cover;border-radius:12px;flex:0 0 auto}
+.cl-identity-avatar-empty{display:grid;place-items:center;background:var(--cl-primary-soft,#e8edf2);color:var(--cl-ink,#18212b);font-size:1.5rem;font-weight:700}
+.cl-identity-roles{display:flex;align-items:center;flex-wrap:wrap;gap:.45rem}
+.cl-identity-compact{display:flex;align-items:center;gap:.6rem;min-width:0}
+.cl-identity-compact .cl-identity-avatar{width:var(--cl-identity-avatar-size,38px);height:var(--cl-identity-avatar-size,38px)}
+.cl-identity-compact .cl-identity-meta{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem}
+.cl-identity-compact .cl-identity-roles{flex:0 0 auto}
+.cl-identity-compact .cl-identity-name,.cl-identity-compact .cl-identity-email{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-identity-compact .cl-identity-name{font-size:.85rem}
+.cl-identity-compact .cl-identity-email{font-size:.75rem;overflow-wrap:anywhere}
+.cl-nav-toggle{display:none;border:1px solid currentColor;border-radius:.5rem;padding:.5rem .8rem;background:transparent;color:inherit}
+.cl-navigation{display:flex;align-items:center;flex-wrap:wrap;gap:.3rem;min-width:0}
+.cl-nav-link,.cl-nav-sublink{display:flex;align-items:center;gap:.5rem;text-decoration:none;font:inherit;color:inherit;text-align:left}
+.cl-nav-link{border:0;background:transparent;padding:.6rem .7rem;border-radius:.5rem;white-space:nowrap}
+.cl-nav-menu{position:relative;min-width:0}
+.cl-nav-menu>summary{list-style:none;cursor:pointer}
+.cl-nav-menu>summary::-webkit-details-marker{display:none}
+.cl-nav-menu>summary::marker{content:""}
+.cl-nav-form{margin:0}
+.cl-nav-panel{position:absolute;right:0;top:calc(100% + .5rem);z-index:1060;min-width:15rem;padding:.5rem;background:var(--cl-page-surface,#fff);color:var(--cl-ink,#18212b);border:1px solid var(--cl-border,#dfe4ea);border-radius:.75rem;box-shadow:0 14px 38px #17212b29}
+.cl-nav-panel>nav{display:grid;gap:.15rem}
+.cl-nav-sublink{padding:.5rem .6rem;border-radius:.4rem}
+.cl-nav-panel a:hover{background:color-mix(in srgb,var(--cl-accent,#274b63) 10%,white);color:var(--cl-darkest,var(--primary,#274b63))}
+.cl-nav-icon{width:18px;height:18px;flex:0 0 auto}
+.cl-sidebar .cl-navigation{display:grid;align-items:stretch}
+.cl-sidebar .cl-nav-menu>.cl-nav-panel{position:static;min-width:0;max-width:100%;margin:.25rem 0 .5rem .7rem;box-shadow:none;background:transparent;color:inherit;border:0;border-left:1px solid currentColor}
+.cl-sidebar .cl-nav-subpanel{color:inherit}
+.cl-sidebar .cl-nav-link{width:100%}
+@media(max-width:1120px){
+ body.cl-body .cl-header-inner{flex-wrap:wrap}
+ body.cl-body:not([data-cl-nav-ready="1"]) .cl-header,body.cl-body[data-cl-nav-open="1"] .cl-header{position:static}
+ body.cl-body .cl-navigation{flex-direction:column;align-items:stretch;order:3;width:100%;margin:0;flex-basis:100%}
+ body.cl-body .cl-navigation .cl-nav-panel,body.cl-body .cl-navigation .cl-nav-subpanel{position:static;min-width:0;max-width:100%;width:auto;box-shadow:none}
+ body.cl-body .cl-nav-subpanel{display:grid}
+ body.cl-body .cl-nav-toggle{margin-left:auto}
+ body.cl-body[data-cl-nav-ready="1"] .cl-nav-toggle{display:block}
+ body.cl-body[data-cl-nav-ready="1"][data-cl-nav-open="0"] .cl-navigation{display:none}
+ body.cl-body[data-cl-nav-open="1"] .cl-navigation{display:flex}
+ body.cl-body[data-cl-navigation="sidebar"] .cl-shell{display:block}
+ body.cl-body[data-cl-navigation="sidebar"] .cl-sidebar{position:relative;inset:auto;width:100%;height:auto;min-height:0;overflow:visible;padding:1rem}
+ body.cl-body[data-cl-navigation="sidebar"] .cl-sidebar>.cl-brand{display:inline-flex;padding-bottom:.5rem}
+ body.cl-body[data-cl-navigation="sidebar"] .cl-nav-toggle{float:right}
+ body.cl-body[data-cl-navigation="sidebar"] .cl-page{margin-left:0}
+ .cl-header-actions{margin-left:auto}
+}

@@ -73,7 +73,7 @@ final class TableRowContractTest extends TestCase
         }
 
         // And the wrapper must not reintroduce the scrollbar the fixed layout removes the need for.
-        // !important, because the theme loads after core and declares `.gn-main .cl-ui-table
+        // !important, because the theme loads after core and declares `.cl-main .cl-ui-table
         // {overflow:auto}` at higher specificity. Without it the wrapper clips and the row menu -
         // absolutely positioned, and required to escape its cell - is never drawn.
         self::assertStringContainsString('.cl-ui-table{width:100%;overflow:visible!important}', $css);
