@@ -7,7 +7,7 @@
 	{% set ph_action_href = can_access_admin ? '/admin' : '' %}
 	{% set ph_action_label = 'All administration' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="section cl-admin-standalone-section" data-admin-section="{{ admin_section.key }}">
+	<section class="cl-page-section section cl-admin-standalone-section" data-admin-section="{{ admin_section.key }}">
 		{{ admin_section.content|raw }}
 	</section>
 {% endblock %}

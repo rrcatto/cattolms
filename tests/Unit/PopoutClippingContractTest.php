@@ -18,7 +18,7 @@ button that does nothing.
 
 It has now happened twice, in two different themes, for the same reason:
 
-  - Gilded Noir declares `.gn-main .cl-ui-table { overflow: auto }`. Core's `.cl-ui-table` rule was
+  - Gilded Noir declares `.cl-main .cl-ui-table { overflow: auto }`. Core's `.cl-ui-table` rule was
     not marked important and has lower specificity, and the theme stylesheet loads after core, so
     the theme won: the actions menu was drawn outside the wrapper and clipped away. It worked in
     the default theme, which made it look like a Gilded Noir bug rather than a core one.
@@ -195,11 +195,11 @@ final class PopoutClippingContractTest extends TestCase
     {
         $core = (string) file_get_contents(self::root() . '/public_html/css/catto-platform.css');
 
-        self::assertStringContainsString('.sidebar .nav-group>.nav-subpanel', $core);
+        self::assertStringContainsString('.cl-sidebar .cl-nav-group>.cl-nav-subpanel', $core);
         self::assertNotSame(
             [],
             array_filter(
-                self::declarations($core, 'position', '.sidebar .nav-group>.nav-subpanel'),
+                self::declarations($core, 'position', '.cl-sidebar .cl-nav-group>.cl-nav-subpanel'),
                 static fn(array $rule): bool => true
             ),
             'The sidebar sub-panel must take part in the flow, or it is clipped by the scroll container.'

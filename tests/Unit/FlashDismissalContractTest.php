@@ -11,7 +11,7 @@ Description:
 Protects what a dismissed flash message takes with it.
 
 A success cl-ui-notice hides itself after 4.5 seconds. It was removing the message and leaving the
-`.flash-stack` around it in the document, and that stack is not an inert cl-ui-empty-state element: every theme
+`.cl-flash-stack` around it in the document, and that stack is not an inert cl-ui-empty-state element: every theme
 gives it a bottom margin - 24px in Gilded Noir - so the gap the message had occupied stayed above
 the page head after the message had gone. On Administration Settings that read as the header
 refusing to return to the top of its container, with nothing on screen to explain why.
@@ -45,7 +45,7 @@ final class FlashDismissalContractTest extends TestCase
         $js = $this->platformScript();
 
         self::assertStringContainsString('const dropEmptyStack', $js);
-        self::assertStringContainsString("flash.closest('.flash-stack')", $js);
+        self::assertStringContainsString("flash.closest('.cl-flash-stack')", $js);
         self::assertStringContainsString(
             "stack.querySelector('[data-flash-message]') === null",
             $js,
@@ -72,11 +72,11 @@ final class FlashDismissalContractTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         foreach (self::THEMES_WITH_FLASH_PARTIALS as $theme) {
-            self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/' . $theme . '/partials/flash.html.twig'));
+            self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/' . $theme . '/base.html.twig'));
         }
         self::assertStringContainsString('partials/flash-messages.html.twig', (string) file_get_contents($root . '/themes/radiant-learning/base.html.twig'));
         $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/flash-messages', ['flash_messages' => [['type' => 'success', 'message' => 'Saved']]]);
-        foreach (['flash-stack', 'data-flash-message', 'data-flash-close', 'data-flash-type="success"'] as $hook) self::assertStringContainsString($hook, $html);
+        foreach (['cl-flash-stack', 'data-flash-message', 'data-flash-close', 'data-flash-type="success"'] as $hook) self::assertStringContainsString($hook, $html);
     }
 
     private function platformScript(): string

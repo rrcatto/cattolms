@@ -449,3 +449,15 @@ freely and impossible to undo selectively.
 Configure Administration → Settings → Bank details before accepting EFT payments. Bank name, account name, account number and branch code are stored together as JSON under `commerce_bank_details` in `app_options`, with the saving administrator and timestamp. There is no environment-variable fallback. Existing EFT orders display the current settings together with their unique order reference; when unconfigured they ask the customer to check the order again before paying. Invoice snapshots remain unchanged.
 
 Settings use individual accordions and separate saves for platform identity, outgoing mail and bank details. Saving one section does not submit another section’s fields. Configuration guidance and maintenance keep their own accordions.
+
+## v0.8.5 theme and browser verification
+
+Install changed theme sources through ThemeManager, using `themes:install -- --force` only in development. Compile AssetMapper assets and publish the compiled output and changed core assets as the application user; never mirror the whole runtime tree or recursively change its ownership from the host. Clear the application cache after publication.
+
+Run the canonical shell and component matrices serially using the [browser instructions](../tests/Browser/README.md), then Twig lint and full `composer qa`. The canonical matrix temporarily activates themes for anonymous requests; restore its saved active theme before removing its isolated identity, including after an interrupted run. Component checks alone do not verify shell construction.
+
+For an authorized release, increment changed theme versions and the child’s exact parent requirement, rebuild `extras/themes` from final source, and validate packages. Do not overwrite accepted installed versions with development `--force`. v0.8.5 bundles Factory Reset/Sidebar/Light Default 2.0.1, Gilded Noir 2.0.2 and Radiant Learning 4.0.1. Git publication does not deploy or certify the VPS. Push the reviewed development commit to `main` directly without checking out branches in the served directory.
+
+### v0.8.5 upgrade order
+
+Run `composer themes:install` before `composer migrate`. The additive canonical-theme migration advances only the immediately preceding bundled active-theme keys to their new installed versions; it preserves custom or other selections. Then publish compiled/core assets and clear caches. The report is [Canonical Page Construction](../REPORTS/20260918-CattoLMS-Canonical-Page-Construction-Report.md).

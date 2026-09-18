@@ -1,15 +1,15 @@
-# Factory Reset Sidebar 1.0.1
+# Factory Reset Sidebar
 
-Child theme for Factory Reset 1.0.1.
+Theme version **2.0.1**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
 
-Features:
-- dark left sidebar
-- Account and Administration submenus
-- route-aware breadcrumb utility header
-- Profile + Logout controls, or separate Sign in and Register controls when logged out
-- full footer with social icons and Contact link
-- four palettes from the approved light-theme mockup
-- automatic Catto Learning palette deployment
+This child theme requires Factory Reset **2.0.1** exactly. It retains its own sidebar shell and decorative footer. Its palettes are Carnival Cotton Candy, Coastal Blue, Forest & Sand and Plum & Rose.
 
-Requires the revised Catto Learning Theme Package 4.0 palette contract that permits one or more palettes.
-It will not install on the original v0.5.7 validator, which still requires exactly three palettes.
+## Canonical construction
+
+`base.html.twig` provides one shell for anonymous and authenticated readers. Navigation is a sidebar and consumes the platform navigation model through `partials/navigation.html.twig`. Shared page concepts use the canonical `cl-*` classes. `main.cl-main` and `footer.cl-footer` are siblings within `div.cl-page-frame`. Use divs for framing and page-family wrappers; retain sections for meaningful regions.
+
+Core owns page bodies, page heads, identity, flash messages, navigation destinations, functional component geometry and mobile menu interaction. Theme CSS owns palette, typography, borders, shadows and decorative art. Do not duplicate navigation, component markup or permission logic. Mobile navigation must remain usable with JavaScript disabled.
+
+## Development and validation
+
+See the [Theme SDK](../../docs/THEME-SDK.md), [UX/UI rules](../../docs/ux-ui-rules.md) and [browser checks](../../tests/Browser/README.md). Install source changes with `composer themes:install -- --force` only in development. Run both browser matrices, Twig lint and `composer qa`. Rebuild packages with `composer themes:package` for an authorized release; installed release versions are immutable.

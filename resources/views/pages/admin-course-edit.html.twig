@@ -8,7 +8,7 @@
 	{% set ph_action_href = '/admin/courses/'~(course.id)~'/modules/new' %}
 	{% set ph_action_label = 'Add module' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container-fluid cl-container-wide py-5">
+	<section class="cl-page-section container-fluid cl-container-wide py-5">
 		<nav aria-label="Course administration sections">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 

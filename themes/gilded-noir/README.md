@@ -1,37 +1,15 @@
 # Gilded Noir
 
-Gilded Noir is a complete standalone Catto Learning LMS theme. It keeps the light ivory application plate, black structure, restrained gold detailing, compact data UI and complete styling for the platform's canonical UI components.
+Theme version **2.0.2**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
 
-## Package contract
+This standalone theme retains its engraved canvas, gold and ivory styling, ribbon, artwork and rich footer, including `gn-footer-art`, `gn-footer-veil` and `gn-footnote`. The shared compact identity appears in the header; the full page identity band is omitted. Theme JavaScript decorates the scrolled header; core owns menu interaction. There is no selectable palette list.
 
-This ZIP is self-contained. A theme generator/designer needs this README plus the separately supplied **Catto Learning LMS Theme SDK (Package 4.0 / Template API 2.0)**; the Catto Learning application source tree is not required.
+## Canonical construction
 
-The package supplies `base.html`, `public/css/theme.css`, presentation-only JavaScript, SVG icon sprite, artwork, partials, and all 14 supported page-family wrappers. Every wrapper preserves `{{ @content | raw }}` so the LMS retains ownership of functional markup and business controls.
+`base.html.twig` provides one shell for anonymous and authenticated readers. Navigation is a top header and consumes the platform navigation model through `partials/navigation.html.twig`. Shared page concepts use the canonical `cl-*` classes. `main.cl-main` and `footer.cl-footer` are siblings within `div.cl-page-frame`. Use divs for framing and page-family wrappers; retain sections for meaningful regions.
 
-Gilded Noir renders the core-owned `@navigation`, `@footer_navigation` and `@breadcrumbs` arrays. It does not hard-code the platform menu hierarchy. Core also supplies stable Administration, Account and Company objects:
+Core owns page bodies, page heads, identity, flash messages, navigation destinations, functional component geometry and mobile menu interaction. Theme CSS owns palette, typography, borders, shadows and decorative art. Do not duplicate navigation, component markup or permission logic. Mobile navigation must remain usable with JavaScript disabled.
 
-- `@admin.sections` / `@admin.section`
-- `@account.sections` / `@account.section`
-- `@company.sections` / `@company.section`
+## Development and validation
 
-These objects are literal API names. Themes may style/rearrange complete rendered sections but must not replace platform forms, permissions, routing or business logic.
-
-## Page families
-
-`home`, `catalogue`, `course-detail`, `auth`, `account`, `library`, `course-player`, `assessment`, `certificate`, `commerce`, `company`, `admin`, `error`, `content`.
-
-## Functional component styling
-
-The platform owns navigation, search, pagination, tables, forms and component behavior. Gilded Noir
-styles the canonical classes for surfaces, section heads, toolbars, action groups, form grids,
-datasets, tables, badges, notices, progress, modals and accordions. Shared server-rendered search
-and pagination continue to work after htmx swaps; the theme JavaScript only controls its navigation
-drawer and scrolled header.
-
-## Theme assets and individuality
-
-Browser assets resolve through `@theme.asset_url`, while `@platform.styles` and `@platform.scripts`
-provide shared LMS behavior. The theme intentionally owns its black, gold, silver and ivory palette,
-typography, engraved canvas, hero artwork, serpent section texture and sphere footer. Functional
-structure remains identical across themes so responsive and progressive-enhancement behavior is
-consistent without flattening Gilded Noir's visual identity.
+See the [Theme SDK](../../docs/THEME-SDK.md), [UX/UI rules](../../docs/ux-ui-rules.md) and [browser checks](../../tests/Browser/README.md). Install source changes with `composer themes:install -- --force` only in development. Run both browser matrices, Twig lint and `composer qa`. Rebuild packages with `composer themes:package` for an authorized release; installed release versions are immutable.

@@ -2,7 +2,7 @@
 {% extends layout %}
 {% block page_body %}
 	{% include '@platform/partials/page-head.html.twig' with {ph_back_href: '/courses', ph_back_label: 'Browse by category', ph_kicker: 'Browse', ph_title: 'Browse by tag', ph_lead: 'Discover courses through the labels they share.'} %}
-	<section class="container-fluid cl-container-wide py-4">
+	<section class="cl-page-section container-fluid cl-container-wide py-4">
 		{{ importmap() }}
 		{{ ui('catalogue.tag-browser', {tags: tag_index, selected_slug: selected_tag.slug|default('')}) }}
 		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}

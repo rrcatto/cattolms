@@ -12,7 +12,7 @@
 	{% set ph_kicker = assessment.assessment_type == 'final' ? 'Final assessment' : (assessment.assessment_type == 'diagnostic' ? 'Course diagnostic' : 'Module self assessment') %}
 	{% set ph_title = assessment.title %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="container py-5">
+	<section class="cl-page-section container py-5">
 		<div class="row g-4">
 			<div class="col-lg-8">
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}

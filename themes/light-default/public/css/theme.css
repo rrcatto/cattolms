@@ -1,28 +1,6 @@
-/* ==========================================================================
-   Light Default 1.0.0 — Catto Learning Theme Package 3.0
-   Presentation only. All routes, permissions, forms, data controls, modal
-   behaviour and palette selection remain platform-owned.
-
-   Colour contract
-   ---------------
-   Catto Learning writes catto-palette.css after this stylesheet and defines
-   --cl-color-1..5 (sorted darkest to lightest) plus --cl-on-color-1..5 on
-   <body>. The values declared at .company-context{
-  --cl-context-surface:color-mix(in srgb,var(--ld-accent) 22%,white);
-  --cl-context-ink:var(--ld-band-ink);
-}
-
-:root below are only a fallback so the theme
-   renders correctly if that generated stylesheet is ever unavailable; the
-   platform still owns palette choice and persistence.
-
-   The neutral interface chrome is deliberately fixed, exactly as in the source
-   design: the selected palette drives brand, actions, active states, focus and
-   highlights rather than repainting every surface.
-   ========================================================================== */
-
+/* Canonical page construction. Theme colours, typography and decorative chrome. */
 :root{
-  /* Fallback = the theme's first palette after the platform's luminance sort. */
+
   --cl-color-1:#2A324B;
   --cl-color-2:#767B91;
   --cl-color-3:#C7CCDB;
@@ -36,7 +14,7 @@
 }
 
 body.ld-body{
-  /* Fixed neutral chrome */
+
   --ld-bg:#f3f5f8;
   --ld-panel:#ffffff;
   --ld-soft:#f8fafc;
@@ -55,7 +33,6 @@ body.ld-body{
   --ld-warn:#9a5b00;
   --ld-warn-bg:#fff1da;
 
-  /* Palette-driven accents */
   --ld-accent:var(--cl-color-1);
   --ld-accent-2:var(--cl-color-2);
   --ld-accent-3:var(--cl-color-3);
@@ -68,14 +45,6 @@ body.ld-body{
   --ld-accent-chip:color-mix(in srgb, var(--cl-color-1) 12%, #ffffff);
   --ld-accent-dark:color-mix(in srgb, var(--cl-color-1) 84%, #000000);
 
-  /* Band system (new in 1.1.1).
-     The reference design maps its hero/section-header band to a LIGHT palette
-     colour with dark text, not to the darkest colour. After the platform's
-     luminance sort that role is --cl-color-4, which is light in every shipped
-     palette, so page headers take real palette colour while ink stays dark.
-     --ld-band-ink-2 mixes the band ink with the band itself, which keeps
-     secondary copy legible on tinted surfaces where the neutral --ld-muted
-     grey would not reach 4.5:1. */
   --ld-band:var(--cl-color-4);
   --ld-band-ink:var(--cl-on-color-4, #18212b);
   --ld-band-ink-2:color-mix(in srgb, var(--cl-on-color-4, #18212b) 72%, var(--cl-color-4));
@@ -83,7 +52,6 @@ body.ld-body{
   --ld-band-faint:color-mix(in srgb, var(--cl-color-4) 22%, #ffffff);
   --ld-band-line:color-mix(in srgb, var(--cl-color-4) 66%, var(--cl-color-2));
 
-  /* Geometry */
   --ld-frame:1180px;
   --ld-gutter:22px;
   --ld-radius:11px;
@@ -96,25 +64,17 @@ body.ld-body{
   --ld-ui:"Inter",ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --ld-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 
-  /* The slanted canvas texture from the source design. */
-  /* The slanted texture is a core platform element now, not this theme's own gradient. The theme
-     states the two greys it wants and core draws it: same angle, same two bands, one definition. */
   --cl-texture-dark:#edf0f3;
   --cl-texture-light:#f5f7f9;
 
-  /* The footer's own dark ground, kept as its own three colours rather than reusing the light
-     palette's, because everything in the footer resolves against this and nothing else does. */
   --ld-footer-bg:#1b2530;
   --ld-footer-line:rgba(255,255,255,.14);
   --ld-footer-ink:#f2f5f8;
   --ld-footer-muted:rgba(233,239,245,.72);
-}/* --------------------------------------------------------------------------
-   1. Document base and compact type scale
-   -------------------------------------------------------------------------- */
+}
 
 html{
-  /* 87.5% keeps every Bootstrap rem proportional to the smaller type scale
-     while still respecting the reader's own base font-size preference. */
+
   font-size:87.5%;
   background:var(--ld-bg);
   scroll-behavior:smooth;
@@ -134,13 +94,12 @@ body.ld-body{
 
 .ld-body *{box-sizing:border-box}
 
-.ld-body h1,.ld-body h2,.ld-body h3,.ld-body h4,.ld-body h5,.ld-body h6,
-.ld-body .h1,.ld-body .h2,.ld-body .h3,.ld-body .h4,.ld-body .h5,.ld-body .h6{
+.ld-body h1,.ld-body h2,.ld-body h3,.ld-body h4,.ld-body h5,.ld-body h6,.ld-body .h1,.ld-body .h2,.ld-body .h3,.ld-body .h4,.ld-body .h5,.ld-body .h6{
   font-family:var(--ld-ui);
   font-weight:750;
   letter-spacing:-.011em;
   line-height:1.24;
-  color:inherit;              /* never force ink: dark platform bands invert */
+  color:inherit;
   margin:0 0 .45rem;
 }
 
@@ -190,10 +149,10 @@ body.ld-body{
   padding:12px 14px;
   overflow:auto;
 }
-.ld-body pre code{background:none;border:0;padding:0}/* Links */
+.ld-body pre code{background:none;border:0;padding:0}
 
-.ld-main a{color:var(--ld-accent);text-decoration-color:var(--ld-accent-line);text-underline-offset:2px}
-.ld-main a:hover{color:var(--ld-accent);text-decoration-color:currentColor}/* Visible focus everywhere. */
+.cl-main a{color:var(--ld-accent);text-decoration-color:var(--ld-accent-line);text-underline-offset:2px}
+.cl-main a:hover{color:var(--ld-accent);text-decoration-color:currentColor}
 
 .ld-body :focus-visible{
   outline:2px solid var(--ld-accent);
@@ -201,7 +160,7 @@ body.ld-body{
   border-radius:4px;
 }
 
-.ld-skip{
+.cl-skip-link{
   position:absolute;
   left:-9999px;
   top:0;
@@ -212,16 +171,14 @@ body.ld-body{
   border-radius:0 0 var(--ld-radius-sm) 0;
   font-weight:700;
 }
-.ld-skip:focus{left:0}/* --------------------------------------------------------------------------
-   2. Sticky top navigation bar — sits outside the boxed content frame
-   -------------------------------------------------------------------------- */
+.cl-skip-link:focus{left:0}
 
-.ld-topbar{
+.cl-header{
   position:sticky;
   top:0;
-  /* A menu panel is drawn outside this bar. Anything that clips here hides every dropdown. */
+
   overflow:visible;
-  z-index:60;                 /* deliberately far below the core modal layer */
+  z-index:60;
   background:rgba(255,255,255,.96);
   -webkit-backdrop-filter:blur(12px);
   backdrop-filter:blur(12px);
@@ -230,38 +187,23 @@ body.ld-body{
   flex:0 0 auto;
 }
 
-.ld-topbar-inner{
-  /* Aligned to the boxed frame, not to the document.
-     The bar used to run the full width, which left the brand and the account chip floating out
-     past the content on a wide screen - two edges that never lined up with anything. Constraining
-     the bar to the same frame the content uses puts the brand on the content's left edge and the
-     account chip on its right, with the navigation centred between them.
-     The extra 20px is the stage's own horizontal padding, so the inner content box is exactly the
-     frame width rather than the frame minus padding. */
+.cl-header-inner{
+
   max-width:calc(var(--ld-frame) + 20px);
   width:100%;
   margin:0 auto;
   min-height:58px;
-  /* Three items on one line: brand, navigation, status. Flex rather than grid, with the brand and
-     the status given equal growth and the navigation none, so the navigation sits centred over the
-     boxed container whatever those two happen to measure.
 
-     Nothing here scrolls, wraps or clips. The owner's instruction, 2026/09/10: if the menu is wider
-     than the space between the brand and the status, it overhangs left and right rather than
-     becoming a second row - so the brand and the status give way (min-width:0) and the menu keeps
-     its single line. Overflow stays visible, which is also what lets a dropdown open: a scroll
-     container on this element clipped every menu panel at its edge. */
   display:flex;
   align-items:center;
   gap:12px;
   padding:0 10px;
   overflow:visible;
 }
-.ld-topbar-inner > .ld-brand{flex:1 1 0;min-width:0}
-.ld-topbar-inner > .ld-nav{flex:0 0 auto;justify-content:center}
-.ld-topbar-inner > .ld-status{flex:1 1 0;min-width:0;justify-content:flex-end}
+.cl-header-inner > .cl-brand{flex:1 1 0;min-width:0}
+.cl-header-inner > .cl-header-actions{min-width:0;justify-content:flex-end}
 
-.ld-brand{
+.cl-brand{
   display:flex;
   align-items:center;
   gap:10px;
@@ -273,9 +215,9 @@ body.ld-body{
   padding:4px 2px;
   border-radius:var(--ld-radius-sm);
 }
-.ld-brand:hover{color:inherit}
+.cl-brand:hover{color:inherit}
 
-.ld-mark{
+.cl-brand-mark{
   width:28px;
   height:28px;
   flex:0 0 28px;
@@ -285,40 +227,38 @@ body.ld-body{
   background:var(--ld-accent);
   color:var(--ld-on-accent);
 }
-.ld-mark .ld-ico{width:16px;height:16px}
+.cl-brand-mark .ld-ico{width:16px;height:16px}
 .ld-mark-sm{width:24px;height:24px;flex-basis:24px;border-radius:8px}
 .ld-mark-sm .ld-ico{width:14px;height:14px}
 
-.ld-brand-copy{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.cl-brand-copy{display:flex;flex-direction:column;min-width:0;line-height:1.2}
 .ld-brand-name{font-weight:780;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ld-brand-sub{font-size:.78rem;color:var(--ld-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.ld-status{
-  display:none;                /* revealed only when the bar has room to spare */
+.cl-identity-compact{
+  display:none;
   align-items:center;
   gap:7px;
   flex:0 1 auto;
-  color:var(--ld-muted);
+  color:var(--cl-on-color-1,var(--ld-text));
   font-size:.82rem;
-  max-width:170px;
+  max-width:240px;
   margin-left:10px;
   padding-left:10px;
   border-left:1px solid var(--ld-line);
 }
-@media (min-width:1100px){.ld-status{display:flex}}
-.ld-status i{width:8px;height:8px;border-radius:50%;background:var(--ld-accent-4);flex:0 0 8px}
-.ld-status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (min-width:1100px){.cl-identity-compact{display:flex}}
+.cl-identity-compact i{width:8px;height:8px;border-radius:50%;background:var(--ld-accent-4);flex:0 0 8px}
+.cl-identity-compact span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-.ld-ico{width:14px;height:14px;flex:0 0 auto;display:block;fill:none;stroke:currentColor}/* Menu toggle (small screens only) */
+.ld-ico{width:14px;height:14px;flex:0 0 auto;display:block;fill:none;stroke:currentColor}
 
-.ld-burger{
-  display:none;
-  align-items:center;
+.cl-nav-toggle{
   gap:7px;
   margin-left:auto;
-  border:1px solid var(--ld-line-2);
-  background:#fff;
-  color:var(--ld-text);
+  border:1px solid currentColor;
+  background:transparent;
+  color:inherit;
   padding:7px 11px;
   border-radius:var(--ld-radius-sm);
   font:inherit;
@@ -326,19 +266,14 @@ body.ld-body{
   font-weight:680;
   cursor:pointer;
 }
-.ld-burger:hover{border-color:var(--ld-accent);color:var(--ld-accent)}/* Primary navigation */
+.cl-nav-toggle:hover{background:color-mix(in srgb,currentColor 12%,transparent)}
 
-.ld-nav{
-  display:flex;
-  align-items:center;
+.cl-navigation{
   gap:0;
   margin-left:auto;
-  flex-wrap:nowrap;
 }
 
-.ld-nav-link{
-  display:inline-flex;
-  align-items:center;
+.cl-nav-link{
   gap:6px;
   padding:6px 9px;
   border-radius:var(--ld-radius-sm);
@@ -349,54 +284,32 @@ body.ld-body{
   font-size:.83rem;
   font-weight:640;
   text-decoration:none;
-  white-space:nowrap;
   cursor:pointer;
   list-style:none;
 }
-.ld-nav-link:hover{background:var(--ld-soft);color:var(--ld-text)}
-.ld-nav-link.is-active,.ld-menu.is-active>.ld-nav-link{
+.cl-nav-link:hover{background:var(--ld-soft);color:var(--ld-text)}
+.cl-nav-link.is-active,.cl-nav-menu.is-active>.cl-nav-link{
   background:var(--ld-accent-soft);
   color:var(--ld-accent);
   font-weight:740;
 }
-.ld-nav-link .ld-ico{opacity:.85}
+.cl-nav-link .cl-nav-icon{opacity:.85}
 
-.ld-nav-cta{
-  background:var(--ld-accent);
-  border-color:var(--ld-accent);
-  color:var(--ld-on-accent);
-  font-weight:730;
-}
-.ld-nav-cta:hover{background:var(--ld-accent-dark);border-color:var(--ld-accent-dark);color:var(--ld-on-accent)}
+.cl-nav-form{margin:0}
 
-.ld-nav-form{margin:0;display:inline-flex}
-.ld-nav-post{border:1px solid var(--ld-line-2);background:#fff}
-.ld-nav-post:hover{border-color:var(--ld-danger-line);color:var(--ld-danger);background:#fff}/* Dropdown groups. Open/close, Escape and click-away stay platform-owned
-   through details[data-cl-dropdown]; the theme supplies presentation only. */
+.cl-nav-menu>summary{list-style:none}
+.cl-nav-menu>summary::marker{content:""}
+.cl-nav-group-caret{opacity:.6;transition:transform .18s ease}
 
-.ld-menu{position:relative}
-.ld-menu>summary{list-style:none}
-.ld-menu>summary::-webkit-details-marker{display:none}
-.ld-menu>summary::marker{content:""}
-.ld-caret{width:11px;height:11px;opacity:.6;transition:transform .18s ease;flex:0 0 11px}
-.ld-menu[open]>summary .ld-caret{transform:rotate(180deg)}
-
-.ld-menu-panel{
-  position:absolute;
-  right:0;
-  top:calc(100% + 8px);
-  z-index:1040;
-  min-width:230px;
+.cl-nav-panel{
   padding:7px;
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   box-shadow:0 14px 38px rgba(23,33,43,.16);
 }
-.ld-menu-panel nav{display:grid;gap:1px}
-.ld-menu-link{
-  display:flex;
-  align-items:center;
+.cl-nav-panel nav{gap:1px}
+.cl-nav-sublink{
   gap:9px;
   padding:8px 10px;
   border-radius:7px;
@@ -404,32 +317,26 @@ body.ld-body{
   font-size:.86rem;
   font-weight:640;
   text-decoration:none;
-  white-space:nowrap;
 }
-.ld-menu-link:hover{background:var(--ld-accent-soft);color:var(--ld-accent)}
-.ld-menu-link .ld-ico{opacity:.7}/* --------------------------------------------------------------------------
-   3. Textured stage canvas and the rounded boxed frame that overlays it
-   -------------------------------------------------------------------------- */
+.cl-nav-sublink:hover{background:var(--ld-accent-soft);color:var(--ld-accent)}
+.cl-nav-sublink .cl-nav-icon{opacity:.7}
 
-.ld-stage{
+.cl-page{
   flex:1 0 auto;
   background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2));
   padding:16px 14px 30px;
 }
 
-.ld-shell{max-width:var(--ld-frame);margin:0 auto}
-
-.ld-frame{
+.cl-page-frame{max-width:var(--ld-frame);margin-inline:auto;
   background:var(--ld-panel);
   border:1px solid #cfd6df;
   border-radius:var(--ld-radius);
   box-shadow:var(--ld-shadow-frame);
-  overflow:hidden;                 /* the texture must never bleed inside */
+  overflow:hidden;
   color:var(--ld-text);
-}/* Frame chrome strip: page context, styled from the source design's header
-   band. Breadcrumb data is core-supplied. */
+}
 
-.ld-frame-chrome{
+.cl-page-context-inner{max-width:var(--ld-frame);margin-inline:auto;
   display:flex;
   align-items:center;
   gap:8px;
@@ -438,17 +345,17 @@ body.ld-body{
   background:#eef1f4;
   border-bottom:1px solid #d7dde5;
 }
-.ld-chrome-ico{width:13px;height:13px;color:var(--ld-muted);flex:0 0 13px}.ld-frame-chrome .cl-ui-breadcrumb{
+.ld-chrome-ico{width:13px;height:13px;color:var(--ld-muted);flex:0 0 13px}.cl-page-context-inner .cl-ui-breadcrumb{
   gap:0 5px;
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:5px;
   padding:2px 9px;
   font-size:.7rem;
-  color:var(--ld-muted)}.ld-frame-chrome .cl-ui-breadcrumb a{color:var(--ld-muted);text-decoration:none}
-.ld-frame-chrome .cl-ui-breadcrumb a:hover{color:var(--ld-accent);text-decoration:underline}
-.ld-frame-chrome .cl-ui-breadcrumb [aria-current]{color:var(--ld-text);font-weight:700}
-.ld-frame-chrome .cl-ui-breadcrumb-separator{opacity:.5}
+  color:var(--ld-muted)}.cl-page-context-inner .cl-ui-breadcrumb a{color:var(--ld-muted);text-decoration:none}
+.cl-page-context-inner .cl-ui-breadcrumb a:hover{color:var(--ld-accent);text-decoration:underline}
+.cl-page-context-inner .cl-ui-breadcrumb [aria-current]{color:var(--ld-text);font-weight:700}
+.cl-page-context-inner .cl-ui-breadcrumb-separator{opacity:.5}
 
 .ld-chrome-flag{
   font-size:.66rem;
@@ -462,16 +369,10 @@ body.ld-body{
   white-space:nowrap;
 }
 
-.ld-main{display:block}
-.ld-page{display:block}/* Neutralise Bootstrap container widths: the frame already owns page width. */
+.cl-main{display:block}
+.cl-page-family{display:block}
 
-.ld-main .container,
-.ld-main .container-fluid,
-.ld-main .container-sm,
-.ld-main .container-md,
-.ld-main .container-lg,
-.ld-main .container-xl,
-.ld-main .container-xxl{
+.cl-main .container,.cl-main .container-fluid,.cl-main .container-sm,.cl-main .container-md,.cl-main .container-lg,.cl-main .container-xl,.cl-main .container-xxl{
   width:100%;
   max-width:none;
   margin-left:0;
@@ -479,116 +380,24 @@ body.ld-body{
   padding-left:var(--ld-gutter);
   padding-right:var(--ld-gutter);
 }
-.ld-main .cl-container-wide{max-width:none}
-.ld-main .cl-container-course{max-width:1080px;margin-inline:auto}
-.ld-main .cl-medium{max-width:860px;margin-inline:auto}
-.ld-main .cl-narrow{max-width:620px;margin-inline:auto}/* Wrappers that are not inside a core .container still need gutters. */
+.cl-main .cl-container-wide{max-width:none}
+.cl-main .cl-container-course{max-width:1080px;margin-inline:auto}
+.cl-main .cl-medium{max-width:860px;margin-inline:auto}
+.cl-main .cl-narrow{max-width:620px;margin-inline:auto}
 
-.ld-page>.ld-workspace,
-.ld-page>.cl-ui-section-head,
-.ld-page>.section,
-.ld-page>.cl-ui-toolbar,
-.ld-page>.cl-ui-list,
-.ld-page>.cl-ui-table,
-.ld-page>.cl-admin-workspace,
-.ld-page>.cl-account-workspace,
-.ld-page>.cl-company-workspace{
+.cl-page-family>.ld-workspace,.cl-page-family>.cl-ui-section-head,.cl-page-family>.section,.cl-page-family>.cl-ui-toolbar,.cl-page-family>.cl-ui-list,.cl-page-family>.cl-ui-table,.cl-page-family>.cl-admin-workspace,.cl-page-family>.cl-account-workspace,.cl-page-family>.cl-company-workspace{
   margin-left:var(--ld-gutter);
   margin-right:var(--ld-gutter);
 }
-.ld-page>.cl-ui-section-head:first-child,
-.ld-page>.ld-workspace:first-child{margin-top:var(--ld-gutter)}
-.ld-page>*:last-child{margin-bottom:var(--ld-gutter)}/* Centred families (auth, error, certificate) read better narrower. */
+.cl-page-family>.cl-ui-section-head:first-child,.cl-page-family>.ld-workspace:first-child{margin-top:var(--ld-gutter)}
+.cl-page-family>*:last-child{margin-bottom:var(--ld-gutter)}
 
-.ld-page-centred{padding:8px 0}/* Course player uses more of the viewport, per the SDK layout brief. */
+.ld-page-centred{padding:8px 0}
 
 .ld-family-course-player{--ld-frame:1360px}
-.ld-family-certificate{--ld-frame:920px}/* --------------------------------------------------------------------------
-   4. Footer — the dashed panel from the source design
-   -------------------------------------------------------------------------- *//* Dark, on the owner's instruction, 2026/09/10. A footer the same shade as the page it ends does
-   not read as a footer at all - it reads as one more panel, and the social links and the
-   installation facts inside it went unnoticed for exactly that reason. Every colour inside it is
-   restated below against the dark ground; inheriting the light-ground greys would leave grey text
-   on near-black. */
+.ld-family-certificate{--ld-frame:920px}
 
-.ld-footer{
-  margin-top:14px;
-  padding:22px 24px;
-  border-radius:var(--ld-radius-md);
-  background:var(--ld-footer-bg);
-  border:1px solid var(--ld-footer-line);
-  color:var(--ld-footer-muted);
-  font-size:.86rem;
-}
-.ld-footer .ld-mark{background:rgba(255,255,255,.08);border-color:var(--ld-footer-line)}
-.ld-footer .ld-ico{color:var(--ld-footer-ink)}
-.ld-social{border-color:var(--ld-footer-line);color:var(--ld-footer-muted)}
-.ld-social:hover{color:var(--ld-footer-ink);border-color:var(--ld-footer-ink);background:rgba(255,255,255,.06)}
-.ld-social[aria-disabled="true"]:hover{color:var(--ld-footer-muted);border-color:var(--ld-footer-line);background:none}
-
-.ld-footer-grid{
-  display:grid;
-  /* Four columns since the footer stopped repeating the primary navigation: identity, the two
-     destinations that are not in the top bar, the social links, and what this installation is
-     running. */
-  grid-template-columns:1.6fr .8fr .8fr 1.1fr;
-  gap:20px;
-}/* Social links. Placeholders until the real profile URLs exist, so they are visibly inert rather
-   than pointing somewhere wrong - a footer link that goes to the wrong site is worse than one that
-   goes nowhere. */
-
-.ld-socials{display:flex;flex-wrap:wrap;gap:8px}
-.ld-social{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:32px;
-  height:32px;
-  border-radius:9px;
-  border:1px solid var(--ld-line-2);
-  color:var(--ld-muted);
-  text-decoration:none;
-}
-.ld-social svg{width:16px;height:16px;fill:currentColor;stroke:none;display:block}
-.ld-social:hover{color:var(--ld-text);border-color:var(--ld-line)}
-.ld-social[aria-disabled="true"]{opacity:.55;cursor:default}
-.ld-social[aria-disabled="true"]:hover{color:var(--ld-muted);border-color:var(--ld-line-2)}/* The legal line sits under the grid, separated by the same hairline the rest of the theme uses. */
-
-.ld-footer-legal{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  gap:8px;
-  margin-top:18px;
-  padding-top:14px;
-  border-top:1px solid var(--ld-footer-line);
-  color:var(--ld-footer-muted);
-  font-size:.8rem;
-}
-.ld-footer-sep{opacity:.6}
-
-.ld-footer-brand{display:flex;gap:10px;align-items:flex-start}
-.ld-footer-brand strong{display:block;color:var(--ld-footer-ink);font-size:.92rem;font-weight:760}
-.ld-footer-brand p{margin:3px 0 0;font-size:.84rem;line-height:1.5;max-width:44ch;color:var(--ld-footer-muted)}/* Scoped so it outranks the shared heading rule (.ld-body h2). */
-
-.ld-footer .ld-footer-title{
-  font-size:.72rem;
-  font-weight:800;
-  letter-spacing:.08em;
-  text-transform:uppercase;
-  color:var(--ld-footer-muted);
-  margin:0 0 7px;
-}
-
-.ld-footer ul{list-style:none;margin:0;padding:0;display:grid;gap:5px}
-.ld-footer-nav a{color:var(--ld-footer-muted);text-decoration:none;font-size:.86rem}
-.ld-footer-nav a:hover{color:var(--ld-footer-ink);text-decoration:underline}
-.ld-footer-meta li{display:flex;justify-content:space-between;gap:12px;font-size:.82rem}
-.ld-footer-meta li span:last-child{color:var(--ld-footer-ink);font-weight:640;text-align:right}/* --------------------------------------------------------------------------
-   5. Flash messages
-   -------------------------------------------------------------------------- */
-
-.ld-flash-stack{display:grid;gap:8px;padding:var(--ld-gutter) var(--ld-gutter) 0}
+.cl-flash-stack{display:grid;gap:8px;padding:var(--ld-gutter) var(--ld-gutter) 0}
 [data-flash-message]{
   display:flex;
   align-items:flex-start;
@@ -621,9 +430,7 @@ body.ld-body{
 [data-flash-message].cl-ui-notice--warning{background:var(--ld-warn-bg);border-color:#f0d5a6;color:#7d4a00}
 [data-flash-message].cl-ui-notice--warning .ld-flash-dot{background:#d89532}
 [data-flash-message].cl-ui-notice--danger{background:var(--ld-danger-bg);border-color:var(--ld-danger-line);color:#8f1c12}
-[data-flash-message].cl-ui-notice--danger .ld-flash-dot{background:var(--ld-danger)}/* --------------------------------------------------------------------------
-   6. Buttons and action states
-   -------------------------------------------------------------------------- */.ld-main .cl-ui-action{
+[data-flash-message].cl-ui-notice--danger .ld-flash-dot{background:var(--ld-danger)}.cl-main .cl-ui-action{
   --bs-btn-padding-y:0;
   --bs-btn-padding-x:0;
   gap:7px;
@@ -638,41 +445,41 @@ body.ld-body{
   line-height:1.25;
   text-decoration:none;
   transition:background-color .14s ease,border-color .14s ease,color .14s ease}
-.ld-main .cl-ui-action:hover{background:var(--ld-soft);border-color:#aeb8c4;color:var(--ld-text)}
-.ld-main .cl-ui-action:disabled,.ld-main .cl-ui-action.disabled,.ld-main .cl-ui-action[aria-disabled="true"]{
+.cl-main .cl-ui-action:hover{background:var(--ld-soft);border-color:#aeb8c4;color:var(--ld-text)}
+.cl-main .cl-ui-action:disabled,.cl-main .cl-ui-action.disabled,.cl-main .cl-ui-action[aria-disabled="true"]{
   opacity:.55;
   cursor:not-allowed;
   box-shadow:none;
 }
-.ld-main .cl-ui-action--small{padding:6px 10px;font-size:.79rem;border-radius:7px}
-.ld-main .cl-ui-action--large{padding:11px 18px;font-size:.94rem;border-radius:var(--ld-radius-md)}
+.cl-main .cl-ui-action--small{padding:6px 10px;font-size:.79rem;border-radius:7px}
+.cl-main .cl-ui-action--large{padding:11px 18px;font-size:.94rem;border-radius:var(--ld-radius-md)}
 
-.ld-main .cl-ui-action--primary,.ld-body .cl-cart-chrome .cl-ui-action--primary{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
-.ld-main .cl-ui-action--primary:hover,.ld-body .cl-cart-chrome .cl-ui-action--primary:hover{background:var(--ld-accent-dark);border-color:var(--ld-accent-dark);color:var(--ld-on-accent)}
+.cl-main .cl-ui-action--primary,.ld-body .cl-cart-chrome .cl-ui-action--primary{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .cl-ui-action--primary:hover,.ld-body .cl-cart-chrome .cl-ui-action--primary:hover{background:var(--ld-accent-dark);border-color:var(--ld-accent-dark);color:var(--ld-on-accent)}
 
-.ld-main .cl-ui-action--secondary{
+.cl-main .cl-ui-action--secondary{
   background:var(--ld-accent-soft);
   border-color:var(--ld-accent-line);
   color:var(--ld-accent);
 }
-.ld-main .cl-ui-action--secondary:hover{
+.cl-main .cl-ui-action--secondary:hover{
   background:var(--ld-accent-tint);
   border-color:var(--ld-accent);
   color:var(--ld-accent);
 }
 
-.ld-main .cl-ui-action--quiet{background:transparent;border-color:transparent;color:var(--ld-muted)}
-.ld-main .cl-ui-action--quiet:hover{background:var(--ld-soft);border-color:var(--ld-line);color:var(--ld-text)}
+.cl-main .cl-ui-action--quiet{background:transparent;border-color:transparent;color:var(--ld-muted)}
+.cl-main .cl-ui-action--quiet:hover{background:var(--ld-soft);border-color:var(--ld-line);color:var(--ld-text)}
 
-.ld-main .cl-ui-action--danger{background:var(--ld-danger);border-color:var(--ld-danger);color:#fff}
-.ld-main .cl-ui-action--danger:hover{background:#94180f;border-color:#94180f;color:#fff}/* Dark bands supply light outline buttons. */.ld-main .toolbar-actions,.ld-main .cl-module-actions{
+.cl-main .cl-ui-action--danger{background:var(--ld-danger);border-color:var(--ld-danger);color:#fff}
+.cl-main .cl-ui-action--danger:hover{background:#94180f;border-color:#94180f;color:#fff}.cl-main .toolbar-actions,.cl-main .cl-module-actions{
   display:flex;
   align-items:center;
   gap:7px;
   flex-wrap:wrap;
-}.ld-main .cl-ui-row-actions{
+}.cl-main .cl-ui-row-actions{
   gap:7px}
-.ld-main .cl-ui-row-actions form{margin:0}.ld-main .cl-ui-close{
+.cl-main .cl-ui-row-actions form{margin:0}.cl-main .cl-ui-close{
   border:1px solid transparent;
   background:transparent;
   color:var(--ld-muted);
@@ -680,9 +487,9 @@ body.ld-body{
   font-size:1.2rem;
   line-height:1;
   cursor:pointer}
-.ld-main .cl-ui-close:hover{background:var(--ld-soft);border-color:var(--ld-line);color:var(--ld-text)}
+.cl-main .cl-ui-close:hover{background:var(--ld-soft);border-color:var(--ld-line);color:var(--ld-text)}
 
-.ld-main .back-link,.ld-main .cl-back-link{
+.cl-main .back-link,.cl-main .cl-back-link{
   display:inline-flex;
   align-items:center;
   gap:6px;
@@ -691,28 +498,21 @@ body.ld-body{
   color:var(--ld-muted);
   text-decoration:none;
 }
-.ld-main .back-link:hover,.ld-main .cl-back-link:hover{color:var(--ld-accent)}/* --------------------------------------------------------------------------
-   7. Forms, validation and dense controls
-   -------------------------------------------------------------------------- */.ld-main label,.ld-main legend{
+.cl-main .back-link:hover,.cl-main .cl-back-link:hover{color:var(--ld-accent)}.cl-main label,.cl-main legend{
   display:block;
   font-size:.8rem;
   font-weight:700;
   color:var(--ld-text);
   margin-bottom:5px;
-}.ld-main .cl-ui-field-label,.ld-main .cl-ui-field>label{
+}.cl-main .cl-ui-field-label,.cl-main .cl-ui-field>label{
   font-size:.8rem;
   font-weight:700;
   color:var(--ld-text);
   margin-bottom:5px}
-.ld-main legend{font-size:.9rem;font-weight:760;margin-bottom:8px;float:none;width:auto;padding:0}
-.ld-main fieldset{border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);padding:14px;margin:0 0 14px;min-width:0}
+.cl-main legend{font-size:.9rem;font-weight:760;margin-bottom:8px;float:none;width:auto;padding:0}
+.cl-main fieldset{border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);padding:14px;margin:0 0 14px;min-width:0}
 
-.ld-main input[type="text"],.ld-main input[type="email"],.ld-main input[type="password"],
-.ld-main input[type="number"],.ld-main input[type="date"],.ld-main input[type="datetime-local"],
-.ld-main input[type="time"],.ld-main input[type="search"],.ld-main input[type="tel"],
-.ld-main input[type="url"],.ld-main input:not([type]),
-.ld-main select,.ld-main textarea,
-.ld-main .form-control,.ld-main .form-select{
+.cl-main input[type="text"],.cl-main input[type="email"],.cl-main input[type="password"],.cl-main input[type="number"],.cl-main input[type="date"],.cl-main input[type="datetime-local"],.cl-main input[type="time"],.cl-main input[type="search"],.cl-main input[type="tel"],.cl-main input[type="url"],.cl-main input:not([type]),.cl-main select,.cl-main textarea,.cl-main .form-control,.cl-main .form-select{
   width:100%;
   min-height:38px;
   border:1px solid var(--ld-line-2);
@@ -725,26 +525,24 @@ body.ld-body{
   box-shadow:none;
   transition:border-color .14s ease,box-shadow .14s ease;
 }
-.ld-main textarea,.ld-main .form-control[rows]{min-height:96px;line-height:1.5;resize:vertical}
-.ld-main input:hover,.ld-main select:hover,.ld-main textarea:hover{border-color:#aeb8c4}
-.ld-main input:focus,.ld-main select:focus,.ld-main textarea:focus,
-.ld-main .form-control:focus,.ld-main .form-select:focus{
+.cl-main textarea,.cl-main .form-control[rows]{min-height:96px;line-height:1.5;resize:vertical}
+.cl-main input:hover,.cl-main select:hover,.cl-main textarea:hover{border-color:#aeb8c4}
+.cl-main input:focus,.cl-main select:focus,.cl-main textarea:focus,.cl-main .form-control:focus,.cl-main .form-select:focus{
   border-color:var(--ld-accent);
   box-shadow:0 0 0 3px var(--ld-accent-soft);
   outline:none;
 }
-.ld-main input:disabled,.ld-main select:disabled,.ld-main textarea:disabled,
-.ld-main .form-control:disabled,.ld-main .form-select:disabled{
+.cl-main input:disabled,.cl-main select:disabled,.cl-main textarea:disabled,.cl-main .form-control:disabled,.cl-main .form-select:disabled{
   background:var(--ld-soft);
   color:var(--ld-muted);
   cursor:not-allowed;
 }
-.ld-main input[readonly],.ld-main .form-control[readonly]{background:var(--ld-soft-2)}
-.ld-main .form-control-lg{min-height:44px;font-size:.96rem;padding:10px 12px}
-.ld-main .form-control-sm,.ld-main .form-select-sm{min-height:32px;font-size:.8rem;padding:5px 8px}
-.ld-main ::placeholder{color:var(--ld-muted);opacity:1}
+.cl-main input[readonly],.cl-main .form-control[readonly]{background:var(--ld-soft-2)}
+.cl-main .form-control-lg{min-height:44px;font-size:.96rem;padding:10px 12px}
+.cl-main .form-control-sm,.cl-main .form-select-sm{min-height:32px;font-size:.8rem;padding:5px 8px}
+.cl-main ::placeholder{color:var(--ld-muted);opacity:1}
 
-.ld-main input[type="checkbox"],.ld-main input[type="radio"],.ld-main .form-check-input{
+.cl-main input[type="checkbox"],.cl-main input[type="radio"],.cl-main .form-check-input{
   width:1rem;
   height:1rem;
   min-height:0;
@@ -753,46 +551,46 @@ body.ld-body{
   background-color:#fff;
   cursor:pointer;
 }
-.ld-main .form-check-input:checked{background-color:var(--ld-accent);border-color:var(--ld-accent)}
-.ld-main .form-check{display:flex;align-items:flex-start;gap:8px;padding-left:0;margin-bottom:6px;min-height:0}
-.ld-main .form-check .form-check-input{margin:2px 0 0;float:none;flex:0 0 auto}
-.ld-main .form-check-label,.ld-main .form-check label{margin:0;font-weight:600;font-size:.86rem;cursor:pointer}
-.ld-main input[type="range"]{accent-color:var(--ld-accent);min-height:0;padding:0;border:0;background:transparent}
-.ld-main input[type="color"]{padding:3px;min-height:38px;cursor:pointer}
-.ld-main input[type="file"]{padding:7px 10px;background:var(--ld-soft-2);cursor:pointer}
+.cl-main .form-check-input:checked{background-color:var(--ld-accent);border-color:var(--ld-accent)}
+.cl-main .form-check{display:flex;align-items:flex-start;gap:8px;padding-left:0;margin-bottom:6px;min-height:0}
+.cl-main .form-check .form-check-input{margin:2px 0 0;float:none;flex:0 0 auto}
+.cl-main .form-check-label,.cl-main .form-check label{margin:0;font-weight:600;font-size:.86rem;cursor:pointer}
+.cl-main input[type="range"]{accent-color:var(--ld-accent);min-height:0;padding:0;border:0;background:transparent}
+.cl-main input[type="color"]{padding:3px;min-height:38px;cursor:pointer}
+.cl-main input[type="file"]{padding:7px 10px;background:var(--ld-soft-2);cursor:pointer}
 
-.ld-main .cl-ui-field{margin-bottom:12px}.ld-main .cl-ui-form-grid{
+.cl-main .cl-ui-field{margin-bottom:12px}.cl-main .cl-ui-form-grid{
   gap:12px 14px}
-.ld-main .cl-ui-form-grid .cl-ui-field{margin-bottom:0}.ld-main .form-text,.ld-main .help{
+.cl-main .cl-ui-form-grid .cl-ui-field{margin-bottom:0}.cl-main .form-text,.cl-main .help{
   display:block;
   font-size:.78rem;
   color:var(--ld-muted);
   margin-top:5px;
   line-height:1.45;
-}.ld-main .cl-ui-field .help{
+}.cl-main .cl-ui-field .help{
   font-size:.78rem;
   color:var(--ld-muted);
   margin-top:5px;
-  line-height:1.45}.ld-main .invalid-feedback{
+  line-height:1.45}.cl-main .invalid-feedback{
   display:block;
   font-size:.78rem;
   font-weight:640;
   color:var(--ld-danger);
   margin-top:5px;
-}.ld-main .cl-ui-field .error{
+}.cl-main .cl-ui-field .error{
   font-size:.78rem;
   font-weight:640;
   color:var(--ld-danger);
   margin-top:5px}
-.ld-main .is-invalid,.ld-main input[aria-invalid="true"]{border-color:var(--ld-danger)}
-.ld-main .is-invalid:focus{box-shadow:0 0 0 3px var(--ld-danger-bg)}
+.cl-main .is-invalid,.cl-main input[aria-invalid="true"]{border-color:var(--ld-danger)}
+.cl-main .is-invalid:focus{box-shadow:0 0 0 3px var(--ld-danger-bg)}
 
-.ld-main .input-group{display:flex;align-items:stretch;flex-wrap:nowrap;width:100%}
-.ld-main .input-group>*{border-radius:0}
-.ld-main .input-group>:first-child{border-top-left-radius:var(--ld-radius-sm);border-bottom-left-radius:var(--ld-radius-sm)}
-.ld-main .input-group>:last-child{border-top-right-radius:var(--ld-radius-sm);border-bottom-right-radius:var(--ld-radius-sm)}
-.ld-main .input-group>:not(:first-child){margin-left:-1px}
-.ld-main .input-group-text{
+.cl-main .input-group{display:flex;align-items:stretch;flex-wrap:nowrap;width:100%}
+.cl-main .input-group>*{border-radius:0}
+.cl-main .input-group>:first-child{border-top-left-radius:var(--ld-radius-sm);border-bottom-left-radius:var(--ld-radius-sm)}
+.cl-main .input-group>:last-child{border-top-right-radius:var(--ld-radius-sm);border-bottom-right-radius:var(--ld-radius-sm)}
+.cl-main .input-group>:not(:first-child){margin-left:-1px}
+.cl-main .input-group-text{
   display:flex;
   align-items:center;
   background:var(--ld-soft);
@@ -803,13 +601,13 @@ body.ld-body{
   white-space:nowrap;
 }
 
-.ld-main .cl-password-toggle{min-height:38px;border:1px solid var(--ld-line-2);background:#fff;border-radius:var(--ld-radius-sm)}
-.ld-main .cl-password-toggle:hover{border-color:var(--ld-accent);color:var(--ld-accent)}.ld-main .cl-ui-toolbar{
+.cl-main .cl-password-toggle{min-height:38px;border:1px solid var(--ld-line-2);background:#fff;border-radius:var(--ld-radius-sm)}
+.cl-main .cl-password-toggle:hover{border-color:var(--ld-accent);color:var(--ld-accent)}.cl-main .cl-ui-toolbar{
   gap:10px;
   margin-bottom:12px}
-.ld-main .search-wrap{position:relative;flex:1;min-width:220px;max-width:460px}
-.ld-main .search-wrap input{padding-left:32px}
-.ld-main .search-icon{
+.cl-main .search-wrap{position:relative;flex:1;min-width:220px;max-width:460px}
+.cl-main .search-wrap input{padding-left:32px}
+.cl-main .search-icon{
   position:absolute;
   left:11px;
   top:50%;
@@ -818,7 +616,7 @@ body.ld-body{
   font-size:.95rem;
   pointer-events:none;
 }
-.ld-main .activity-filters{
+.cl-main .activity-filters{
   border:1px solid var(--ld-line);
   background:var(--ld-soft-2);
   border-radius:var(--ld-radius-md);
@@ -826,72 +624,70 @@ body.ld-body{
   margin-bottom:12px;
 }
 
-.ld-main .danger-zone{
+.cl-main .danger-zone{
   border:1px solid var(--ld-danger-line);
   background:var(--ld-danger-bg);
   border-radius:var(--ld-radius-md);
   padding:14px;
   margin-top:14px;
 }
-.ld-main .danger-zone h2,.ld-main .danger-zone h3,.ld-main .danger-zone h4{color:#8f1c12}
-.ld-main .danger-zone p{color:#8f1c12}
+.cl-main .danger-zone h2,.cl-main .danger-zone h3,.cl-main .danger-zone h4{color:#8f1c12}
+.cl-main .danger-zone p{color:#8f1c12}
 
-.ld-main .cl-rich-editor{border:1px solid var(--ld-line-2);border-radius:var(--ld-radius-sm);overflow:hidden;background:#fff}
-.ld-main .ck-editor__editable{min-height:260px}/* --------------------------------------------------------------------------
-   8. Section heads, cards, panels, lists, metrics and empty states
-   -------------------------------------------------------------------------- */.ld-main .cl-ui-section-head{
+.cl-main .cl-rich-editor{border:1px solid var(--ld-line-2);border-radius:var(--ld-radius-sm);overflow:hidden;background:#fff}
+.cl-main .ck-editor__editable{min-height:260px}.cl-main .cl-ui-section-head{
   gap:14px;
   padding:18px 0 14px;
   border-bottom:1px solid var(--ld-line);
   margin-bottom:16px}
-.ld-main .cl-ui-section-head h1,.ld-main .cl-ui-section-head h2,.ld-main .cl-ui-section-head h3{margin:5px 0 4px}.ld-main .cl-ui-section-head p{margin:0;color:var(--ld-muted);font-size:.88rem}.ld-main .cl-kicker,.ld-main .sec-label{
+.cl-main .cl-ui-section-head h1,.cl-main .cl-ui-section-head h2,.cl-main .cl-ui-section-head h3{margin:5px 0 4px}.cl-main .cl-ui-section-head p{margin:0;color:var(--ld-muted);font-size:.88rem}.cl-main .cl-kicker,.cl-main .sec-label{
   display:inline-block;
   font-size:.71rem;
   font-weight:800;
   letter-spacing:.09em;
   text-transform:uppercase;
   color:var(--ld-muted);
-}.ld-main .cl-ui-eyebrow{
+}.cl-main .cl-ui-eyebrow{
   font-size:.71rem;
   font-weight:800;
   letter-spacing:.09em;
   text-transform:uppercase;
   color:var(--ld-muted)}
-.ld-main .cl-kicker.text-primary,.ld-main .cl-ui-eyebrow.text-primary{color:var(--ld-accent)!important}
+.cl-main .cl-kicker.text-primary,.cl-main .cl-ui-eyebrow.text-primary{color:var(--ld-accent)!important}
 
-.ld-main .section{margin-top:18px}
-.ld-main .sub,.ld-main .sub-inner{color:var(--ld-muted);font-size:.86rem}.ld-main .cl-ui-surface{
+.cl-main .section{margin-top:18px}
+.cl-main .sub,.cl-main .sub-inner{color:var(--ld-muted);font-size:.86rem}.cl-main .cl-ui-surface{
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   box-shadow:var(--ld-shadow-card)}
-.ld-main .cl-course-card-body{padding:14px}
-.ld-main .cl-course-card-body.p-4,.ld-main .cl-course-card-body.p-lg-5{padding:18px}
+.cl-main .cl-course-card-body{padding:14px}
+.cl-main .cl-course-card-body.p-4,.cl-main .cl-course-card-body.p-lg-5{padding:18px}
 
-.ld-main .cl-ui-surface.border-0{border:1px solid var(--ld-line)}
-.ld-main .cl-ui-surface.border-danger{border-color:var(--ld-danger-line)}
-.ld-main .cl-ui-surface.border-warning{border-color:#f0d5a6}
-.ld-main .cl-ui-surface.border-info,.ld-main .cl-ui-surface.border-secondary{border-color:var(--ld-accent-line)}
-.ld-main .cl-ui-surface.border-success{border-color:#bfe3ce}
-.ld-main .shadow-sm{box-shadow:var(--ld-shadow-card)!important}
+.cl-main .cl-ui-surface.border-0{border:1px solid var(--ld-line)}
+.cl-main .cl-ui-surface.border-danger{border-color:var(--ld-danger-line)}
+.cl-main .cl-ui-surface.border-warning{border-color:#f0d5a6}
+.cl-main .cl-ui-surface.border-info,.cl-main .cl-ui-surface.border-secondary{border-color:var(--ld-accent-line)}
+.cl-main .cl-ui-surface.border-success{border-color:#bfe3ce}
+.cl-main .shadow-sm{box-shadow:var(--ld-shadow-card)!important}
 
-.ld-main .cl-ui-stat-card{
+.cl-main .cl-ui-stat-card{
   background:var(--ld-soft-2);
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   padding:13px 14px}
-.ld-main .cl-ui-stat-value{font-size:1.6rem;font-weight:800;line-height:1.1;color:var(--ld-accent);letter-spacing:-.02em}
-.ld-main .cl-ui-stat-label{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-muted);margin-top:5px}
-.ld-main .cl-ui-stat-note{font-size:.79rem;color:var(--ld-muted);margin-top:4px;line-height:1.4}.ld-main .cl-ui-list{gap:0;border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);background:#fff}.ld-main .cl-ui-list-item{
+.cl-main .cl-ui-stat-value{font-size:1.6rem;font-weight:800;line-height:1.1;color:var(--ld-accent);letter-spacing:-.02em}
+.cl-main .cl-ui-stat-label{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ld-muted);margin-top:5px}
+.cl-main .cl-ui-stat-note{font-size:.79rem;color:var(--ld-muted);margin-top:4px;line-height:1.4}.cl-main .cl-ui-list{gap:0;border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);background:#fff}.cl-main .cl-ui-list-item{
   gap:12px;
   padding:11px 13px;
   border-bottom:1px solid var(--ld-line-3)}
-.ld-main .cl-ui-list-item:last-child{border-bottom:0}
-.ld-main .cl-ui-list-item:hover{background:var(--ld-soft-2)}
-.ld-main .cl-ui-list-item strong{font-size:.9rem;font-weight:720}
-.ld-main .cl-ui-list-item p{margin:2px 0 0;color:var(--ld-muted);font-size:.82rem}/* Empty states reuse the dashed panel language of the footer. */
+.cl-main .cl-ui-list-item:last-child{border-bottom:0}
+.cl-main .cl-ui-list-item:hover{background:var(--ld-soft-2)}
+.cl-main .cl-ui-list-item strong{font-size:.9rem;font-weight:720}
+.cl-main .cl-ui-list-item p{margin:2px 0 0;color:var(--ld-muted);font-size:.82rem}
 
-.ld-main .cl-ui-empty-state,.ld-main .cl-empty-state{
+.cl-main .cl-ui-empty-state,.cl-main .cl-empty-state{
   padding:20px;
   border-radius:var(--ld-radius-md);
   background:var(--ld-soft);
@@ -900,9 +696,9 @@ body.ld-body{
   font-size:.88rem;
   text-align:center;
 }
-.ld-main .cl-empty-state{padding:32px 20px}
-.ld-main .cl-empty-state h3{color:var(--ld-text);margin-bottom:5px}
-.ld-main .cl-empty-icon{
+.cl-main .cl-empty-state{padding:32px 20px}
+.cl-main .cl-empty-state h3{color:var(--ld-text);margin-bottom:5px}
+.cl-main .cl-empty-icon{
   display:inline-grid;
   place-items:center;
   width:38px;
@@ -912,7 +708,7 @@ body.ld-body{
   color:var(--ld-accent);
   font-weight:800;
   margin-bottom:10px;
-}.ld-main .cl-callout{
+}.cl-main .cl-callout{
   display:flex;
   align-items:flex-start;
   gap:10px;
@@ -924,7 +720,7 @@ body.ld-body{
   font-size:.85rem;
   line-height:1.5;
   margin-bottom:12px;
-}.ld-main .cl-ui-notice{
+}.cl-main .cl-ui-notice{
   gap:10px;
   padding:11px 13px;
   border-radius:var(--ld-radius-md);
@@ -934,9 +730,9 @@ body.ld-body{
   font-size:.85rem;
   line-height:1.5;
   margin-bottom:12px}
-.ld-main .cl-ui-notice>span:first-child{color:var(--ld-accent);font-size:1rem;line-height:1.3}
+.cl-main .cl-ui-notice>span:first-child{color:var(--ld-accent);font-size:1rem;line-height:1.3}
 
-.ld-main .cl-warning-panel{
+.cl-main .cl-warning-panel{
   padding:12px 14px;
   border-radius:var(--ld-radius-md);
   background:var(--ld-warn-bg);
@@ -946,8 +742,8 @@ body.ld-body{
   margin-top:12px;
 }
 
-.ld-main .person{display:flex;align-items:center;gap:9px;min-width:0}
-.ld-main .avatar{
+.cl-main .person{display:flex;align-items:center;gap:9px;min-width:0}
+.cl-main .avatar{
   width:30px;
   height:30px;
   flex:0 0 30px;
@@ -959,13 +755,13 @@ body.ld-body{
   font-weight:800;
   font-size:.78rem;
 }
-.ld-main .role-list,.ld-main .chip-row{display:flex;flex-wrap:wrap;gap:4px}
+.cl-main .role-list,.cl-main .chip-row{display:flex;flex-wrap:wrap;gap:4px}
 
-.ld-main .timeline{display:grid;gap:0;position:relative;padding-left:16px}
-.ld-main .timeline:before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--ld-line)}
-.ld-main .timeline-item{position:relative;padding:9px 0 9px 8px;border-bottom:1px solid var(--ld-line-3);font-size:.85rem}
-.ld-main .timeline-item:last-child{border-bottom:0}
-.ld-main .timeline-dot{
+.cl-main .timeline{display:grid;gap:0;position:relative;padding-left:16px}
+.cl-main .timeline:before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--ld-line)}
+.cl-main .timeline-item{position:relative;padding:9px 0 9px 8px;border-bottom:1px solid var(--ld-line-3);font-size:.85rem}
+.cl-main .timeline-item:last-child{border-bottom:0}
+.cl-main .timeline-dot{
   position:absolute;
   left:-16px;
   top:14px;
@@ -976,7 +772,7 @@ body.ld-body{
   box-shadow:0 0 0 3px #fff;
 }
 
-.ld-main .profile-head,.ld-main .admin-person-head{
+.cl-main .profile-head,.cl-main .admin-person-head{
   display:flex;
   align-items:center;
   gap:12px;
@@ -985,11 +781,9 @@ body.ld-body{
   border-bottom:1px solid var(--ld-line);
   margin-bottom:14px;
 }
-.ld-main .profile-meta,.ld-main .admin-person-summary{color:var(--ld-muted);font-size:.85rem}
-.ld-main .admin-person-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);gap:16px}
-.ld-main .admin-settings-layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}/* --------------------------------------------------------------------------
-   9. Badges, alerts and progress
-   -------------------------------------------------------------------------- */.ld-main .cl-ui-badge{
+.cl-main .profile-meta,.cl-main .admin-person-summary{color:var(--ld-muted);font-size:.85rem}
+.cl-main .admin-person-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);gap:16px}
+.cl-main .admin-settings-layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}.cl-main .cl-ui-badge{
   gap:5px;
   padding:3px 8px;
   border-radius:999px;
@@ -1000,16 +794,16 @@ body.ld-body{
   letter-spacing:.06em;
   text-transform:uppercase;
   line-height:1.5}
-.ld-main .cl-ui-badge--info,.ld-main .cl-ui-badge.cl-ui-badge--info,.ld-main .cl-ui-badge.cl-ui-badge--neutral{
+.cl-main .cl-ui-badge--info,.cl-main .cl-ui-badge--info,.cl-main .cl-ui-badge--neutral{
   background:var(--ld-accent-chip);color:var(--ld-accent)
 }
-.ld-main .cl-ui-badge--success,.ld-main .cl-ui-badge.cl-ui-badge--success{background:var(--ld-good-bg);color:var(--ld-good)}
-.ld-main .cl-ui-badge--warning,.ld-main .cl-ui-badge.cl-ui-badge--warning{background:var(--ld-warn-bg);color:var(--ld-warn)}
-.ld-main .cl-ui-badge--danger,.ld-main .cl-ui-badge.cl-ui-badge--danger{background:var(--ld-danger-bg);color:var(--ld-danger)}
-.ld-main .cl-ui-badge.cl-ui-badge--neutral{background:var(--ld-soft);color:var(--ld-muted);border:1px solid var(--ld-line)}
-.ld-main .permanent{background:var(--ld-soft);color:var(--ld-muted);border:1px solid var(--ld-line)}
+.cl-main .cl-ui-badge--success,.cl-main .cl-ui-badge--success{background:var(--ld-good-bg);color:var(--ld-good)}
+.cl-main .cl-ui-badge--warning,.cl-main .cl-ui-badge--warning{background:var(--ld-warn-bg);color:var(--ld-warn)}
+.cl-main .cl-ui-badge--danger,.cl-main .cl-ui-badge--danger{background:var(--ld-danger-bg);color:var(--ld-danger)}
+.cl-main .cl-ui-badge--neutral{background:var(--ld-soft);color:var(--ld-muted);border:1px solid var(--ld-line)}
+.cl-main .permanent{background:var(--ld-soft);color:var(--ld-muted);border:1px solid var(--ld-line)}
 
-.ld-main .cl-ui-notice{
+.cl-main .cl-ui-notice{
   padding:12px 14px;
   border-radius:var(--ld-radius-md);
   border:1px solid var(--ld-line);
@@ -1018,18 +812,18 @@ body.ld-body{
   font-size:.87rem;
   margin-bottom:14px;
 }
-.ld-main .cl-ui-notice--success{background:var(--ld-good-bg);border-color:#bfe3ce;color:#12603d}
-.ld-main .cl-ui-notice--warning{background:var(--ld-warn-bg);border-color:#f0d5a6;color:#7d4a00}
-.ld-main .cl-ui-notice--danger{background:var(--ld-danger-bg);border-color:var(--ld-danger-line);color:#8f1c12}
-.ld-main .cl-ui-notice--info{background:var(--ld-accent-soft);border-color:var(--ld-accent-line);color:var(--ld-accent)}
-.ld-main .cl-ui-notice h1,.ld-main .cl-ui-notice h2,.ld-main .cl-ui-notice h3,.ld-main .cl-ui-notice h4{color:inherit;font-size:.95rem}.ld-main .cl-ui-progress{
+.cl-main .cl-ui-notice--success{background:var(--ld-good-bg);border-color:#bfe3ce;color:#12603d}
+.cl-main .cl-ui-notice--warning{background:var(--ld-warn-bg);border-color:#f0d5a6;color:#7d4a00}
+.cl-main .cl-ui-notice--danger{background:var(--ld-danger-bg);border-color:var(--ld-danger-line);color:#8f1c12}
+.cl-main .cl-ui-notice--info{background:var(--ld-accent-soft);border-color:var(--ld-accent-line);color:var(--ld-accent)}
+.cl-main .cl-ui-notice h1,.cl-main .cl-ui-notice h2,.cl-main .cl-ui-notice h3,.cl-main .cl-ui-notice h4{color:inherit;font-size:.95rem}.cl-main .cl-ui-progress{
   background:var(--ld-line-3);
   border-radius:999px;
-  border:1px solid var(--ld-line)}.ld-main .cl-ui-progress>span,.ld-main .cl-ui-progress-bar{
+  border:1px solid var(--ld-line)}.cl-main .cl-ui-progress>span,.cl-main .cl-ui-progress-bar{
   background:var(--ld-accent);
   border-radius:999px;
   transition:width .3s ease}
-.ld-main .cl-countdown{
+.cl-main .cl-countdown{
   display:inline-flex;
   align-items:center;
   gap:7px;
@@ -1040,29 +834,27 @@ body.ld-body{
   font-weight:800;
   font-size:.84rem;
   font-variant-numeric:tabular-nums;
-}/* Status chips from the source design's audit strip. */
+}
 
-.ld-main .pass,.ld-main .good{background:var(--ld-good-bg);color:var(--ld-good)}
-.ld-main .warn,.ld-main .warning{background:var(--ld-warn-bg);color:var(--ld-warn)}
-.ld-main .fail{background:var(--ld-danger-bg);color:var(--ld-danger)}/* --------------------------------------------------------------------------
-   10. Tables, filters and pagination
-   -------------------------------------------------------------------------- */.ld-main .table-responsive{
+.cl-main .pass,.cl-main .good{background:var(--ld-good-bg);color:var(--ld-good)}
+.cl-main .warn,.cl-main .warning{background:var(--ld-warn-bg);color:var(--ld-warn)}
+.cl-main .fail{background:var(--ld-danger-bg);color:var(--ld-danger)}.cl-main .table-responsive{
   overflow-x:auto;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   background:#fff;
-}.ld-main .cl-ui-table{
+}.cl-main .cl-ui-table{
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   background:#fff}
-.ld-main table{
+.cl-main table{
   width:100%;
   border-collapse:collapse;
   font-size:.85rem;
   margin:0;
   color:var(--ld-text);
 }
-.ld-main thead th{
+.cl-main thead th{
   position:sticky;
   top:0;
   z-index:1;
@@ -1077,42 +869,33 @@ body.ld-body{
   padding:9px 12px;
   white-space:nowrap;
 }
-.ld-main tbody td{padding:10px 12px;border-bottom:1px solid var(--ld-line-3);vertical-align:middle}
-.ld-main tbody tr:last-child td{border-bottom:0}
-.ld-main tbody tr:hover{background:var(--ld-soft-2)}
-.ld-main table .muted,.ld-main table .small{color:var(--ld-muted)}
-.ld-main .align-middle{vertical-align:middle}
+.cl-main tbody td{padding:10px 12px;border-bottom:1px solid var(--ld-line-3);vertical-align:middle}
+.cl-main tbody tr:last-child td{border-bottom:0}
+.cl-main tbody tr:hover{background:var(--ld-soft-2)}
+.cl-main table .muted,.cl-main table .small{color:var(--ld-muted)}
+.cl-main .align-middle{vertical-align:middle}
 
-.ld-main .pagination-row{
+.cl-main .pagination-row{
   gap:10px;
   padding:12px 0 2px;
   font-size:.83rem;
   color:var(--ld-muted);
 }
 
-/* --------------------------------------------------------------------------
-   11. Tab decks — the source design's tab strip and panel container
-   -------------------------------------------------------------------------- *//* The section jump-nav wraps rather than scrolling.
+.cl-main .tab-btn:hover{background:var(--ld-soft);color:var(--ld-text)}
+.cl-main .tab-btn.active{background:var(--ld-accent-soft);color:var(--ld-accent)}
+.cl-main .tab-btn .ld-ico{opacity:.8}
 
-   It used to be overflow-x:auto, so on a course with every section available the last few scrolled
-   off the right-hand edge and there was nothing on screen to say so. A row of links is not a
-   carousel: it has no natural reading direction to scroll along and no affordance saying more is
-   hidden. Every other theme already wrapped this; this one was alone in scrolling it. */
-
-.ld-main .tab-btn:hover{background:var(--ld-soft);color:var(--ld-text)}
-.ld-main .tab-btn.active{background:var(--ld-accent-soft);color:var(--ld-accent)}
-.ld-main .tab-btn .ld-ico{opacity:.8}
-
-.ld-main .ld-deck{
+.cl-main .ld-deck{
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-lg);
   overflow:hidden;
 }
-.ld-main .ld-panel{padding:18px}
-.ld-main .ld-panel+.ld-panel{border-top:1px solid var(--ld-line)}
+.cl-main .ld-panel{padding:18px}
+.cl-main .ld-panel+.ld-panel{border-top:1px solid var(--ld-line)}
 
-.ld-main .ld-panel-head{
+.cl-main .ld-panel-head{
   display:flex;
   align-items:flex-end;
   justify-content:space-between;
@@ -1122,7 +905,7 @@ body.ld-body{
   border-bottom:1px solid var(--ld-line);
   margin-bottom:16px;
 }
-.ld-main .ld-panel-eyebrow{
+.cl-main .ld-panel-eyebrow{
   display:block;
   font-size:.71rem;
   font-weight:800;
@@ -1130,9 +913,9 @@ body.ld-body{
   text-transform:uppercase;
   color:var(--ld-muted);
 }
-.ld-main .ld-panel-head h2{margin:5px 0 3px;font-size:1.18rem}
-.ld-main .ld-panel-head p{margin:0;color:var(--ld-muted);font-size:.86rem;max-width:78ch}
-.ld-main .ld-panel-link{
+.cl-main .ld-panel-head h2{margin:5px 0 3px;font-size:1.18rem}
+.cl-main .ld-panel-head p{margin:0;color:var(--ld-muted);font-size:.86rem;max-width:78ch}
+.cl-main .ld-panel-link{
   border:1px solid var(--ld-line-2);
   background:#fff;
   color:var(--ld-text);
@@ -1143,24 +926,17 @@ body.ld-body{
   text-decoration:none;
   white-space:nowrap;
 }
-.ld-main .ld-panel-link:hover{border-color:var(--ld-accent);color:var(--ld-accent);background:var(--ld-accent-soft)}/* The panel already supplies the section heading, so a nested duplicate
-   platform head is de-emphasised rather than repeated at full weight. */
+.cl-main .ld-panel-link:hover{border-color:var(--ld-accent);color:var(--ld-accent);background:var(--ld-accent-soft)}
 
-.ld-main .ld-panel>.cl-ui-section-head:first-of-type{padding-top:0;border-bottom:0;margin-bottom:10px}
-.ld-main .ld-panel>.cl-ui-section-head:first-of-type h1,
-.ld-main .ld-panel>.cl-ui-section-head:first-of-type h2{font-size:1rem;color:var(--ld-muted);font-weight:700}
+.cl-main .ld-panel>.cl-ui-section-head:first-of-type{padding-top:0;border-bottom:0;margin-bottom:10px}
+.cl-main .ld-panel>.cl-ui-section-head:first-of-type h1,.cl-main .ld-panel>.cl-ui-section-head:first-of-type h2{font-size:1rem;color:var(--ld-muted);font-weight:700}
 
-.ld-main .ld-workspace{margin-bottom:18px}
-.ld-main .cl-admin-workspace,.ld-main .cl-account-workspace,.ld-main .cl-company-workspace{display:grid;gap:12px}/* --------------------------------------------------------------------------
-   12. Native details accordions
-   Chevrons: the platform supplies its own indicator for administration
-   sections and the ACL groups, so the theme styles those instead of adding a
-   second marker. Help items have no core indicator and receive one here.
-   -------------------------------------------------------------------------- */.ld-main details.cl-ui-accordion-section{
+.cl-main .ld-workspace{margin-bottom:18px}
+.cl-main .cl-admin-workspace,.cl-main .cl-account-workspace,.cl-main .cl-company-workspace{display:grid;gap:12px}.cl-main details.cl-ui-accordion-section{
   border:1px solid var(--ld-line);
   background:#fff;
   border-radius:var(--ld-radius-lg);
-  margin-bottom:10px}.ld-main details.cl-ui-accordion-section>summary{
+  margin-bottom:10px}.cl-main details.cl-ui-accordion-section>summary{
   gap:10px;
   padding:13px 15px;
   background:#fff;
@@ -1170,25 +946,25 @@ body.ld-body{
   cursor:pointer;
   list-style:none;
   text-align:left}
-.ld-main details>summary::-webkit-details-marker{display:none}
-.ld-main details.cl-ui-accordion-section>summary:hover{background:var(--ld-soft-2)}
-.ld-main details[open]>summary{border-bottom:1px solid var(--ld-line)}/* Theme-drawn indicator, Help items only. *//* Platform-supplied indicators. */
+.cl-main details>summary::-webkit-details-marker{display:none}
+.cl-main details.cl-ui-accordion-section>summary:hover{background:var(--ld-soft-2)}
+.cl-main details[open]>summary{border-bottom:1px solid var(--ld-line)}
 
-.ld-main .cl-ui-accordion-toggle{
+.cl-main .cl-ui-accordion-toggle{
   margin-left:auto;
   color:var(--ld-muted);
   font-size:1rem;
   line-height:1;
   transition:transform .18s ease;
 }
-.ld-main details.cl-ui-accordion-section[open] .cl-ui-accordion-toggle{transform:rotate(180deg)}.ld-main .cl-ui-accordion-summary{
-  gap:12px}.ld-main .cl-ui-accordion-title{font-weight:780}.ld-main .cl-ui-accordion-description{font-size:.83rem;color:var(--ld-muted);font-weight:400}
-.ld-main .cl-ui-accordion-content{
+.cl-main details.cl-ui-accordion-section[open] .cl-ui-accordion-toggle{transform:rotate(180deg)}.cl-main .cl-ui-accordion-summary{
+  gap:12px}.cl-main .cl-ui-accordion-title{font-weight:780}.cl-main .cl-ui-accordion-description{font-size:.83rem;color:var(--ld-muted);font-weight:400}
+.cl-main .cl-ui-accordion-content{
   padding:15px;
   border-top:0;
   font-size:.88rem;
   line-height:1.6;
-}.ld-main .cl-ui-accordion-actions{margin-bottom:11px}.ld-main .cl-ui-accordion-link{
+}.cl-main .cl-ui-accordion-actions{margin-bottom:11px}.cl-main .cl-ui-accordion-link{
   font-size:.79rem;
   font-weight:700;
   color:var(--ld-accent);
@@ -1197,12 +973,12 @@ body.ld-body{
   background:var(--ld-accent-soft);
   padding:5px 10px;
   border-radius:7px}
-.ld-main .cl-ui-accordion-link:hover{background:var(--ld-accent-tint)}/* Roles & ACL editor */
+.cl-main .cl-ui-accordion-link:hover{background:var(--ld-accent-tint)}
 
-.ld-main .acl-groups{display:grid;gap:10px}
+.cl-main .acl-groups{display:grid;gap:10px}
 
-.ld-main .role-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
-.ld-main .role-check{
+.cl-main .role-checkbox-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.cl-main .role-check{
   display:flex;
   align-items:flex-start;
   gap:8px;
@@ -1211,9 +987,7 @@ body.ld-body{
   border-radius:9px;
   background:var(--ld-soft-2);
   font-size:.85rem;
-}/* --------------------------------------------------------------------------
-   13. Modals — presentation only; core owns open/close/Escape/focus
-   -------------------------------------------------------------------------- */.ld-body .cl-ui-modal{
+}.ld-body .cl-ui-modal{
   padding:20px 14px;
   background:rgba(15,23,42,.55);
   -webkit-backdrop-filter:blur(2px);
@@ -1234,76 +1008,62 @@ body.ld-body{
   padding:13px 17px;
   border-top:1px solid var(--ld-line);
   background:var(--ld-soft)}
-.ld-body .cl-ui-modal-foot:last-child{border-radius:0 0 14px 14px}/* --------------------------------------------------------------------------
-   14. Catalogue, course detail and course cards
-   -------------------------------------------------------------------------- */
+.ld-body .cl-ui-modal-foot:last-child{border-radius:0 0 14px 14px}
 
-.ld-main .cl-hero{
+.cl-main .cl-hero{
   background:var(--ld-accent);
   color:var(--cl-on-color-1,#fff);
   padding:6px 0;
 }
-.ld-main .cl-hero h1,.ld-main .cl-hero h2,.ld-main .cl-hero h3{color:inherit}
-.ld-main .cl-hero p,.ld-main .cl-hero .lead{color:inherit;opacity:.86}
-.ld-main .cl-hero .cl-kicker,.ld-main .cl-hero .cl-ui-eyebrow{color:inherit;opacity:.75}
-.ld-main .cl-hero .min-vh-hero{min-height:0}
-.ld-main .cl-hero-panel{
+.cl-main .cl-hero h1,.cl-main .cl-hero h2,.cl-main .cl-hero h3{color:inherit}
+.cl-main .cl-hero p,.cl-main .cl-hero .lead{color:inherit;opacity:.86}
+.cl-main .cl-hero .cl-kicker,.cl-main .cl-hero .cl-ui-eyebrow{color:inherit;opacity:.75}
+.cl-main .cl-hero .min-vh-hero{min-height:0}
+.cl-main .cl-hero-panel{
   background:rgba(255,255,255,.10);
   border:1px solid rgba(255,255,255,.22);
   border-radius:var(--ld-radius-lg);
   padding:18px;
 }
-.ld-main .cl-hero-panel ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:.87rem;opacity:.9}
-.ld-main .cl-hero .cl-ui-action--primary{background:var(--ld-accent-4);border-color:var(--ld-accent-4);color:var(--cl-on-color-4,#18212b)}
-.ld-main .cl-hero .cl-ui-action--primary:hover{background:var(--ld-accent-3);border-color:var(--ld-accent-3);color:var(--cl-on-color-3,#18212b)}/* Vertical rhythm. The platform composes generous Bootstrap spacing utilities
-   (often two stacked py-5 blocks); this theme is a compact design, so band
-   padding is tightened to the reference density. Utilities already carry
-   !important, so overriding them requires the same weight at higher
-   specificity. Scoped to the content frame only. */
+.cl-main .cl-hero-panel ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:.87rem;opacity:.9}
+.cl-main .cl-hero .cl-ui-action--primary{background:var(--ld-accent-4);border-color:var(--ld-accent-4);color:var(--cl-on-color-4,#18212b)}
+.cl-main .cl-hero .cl-ui-action--primary:hover{background:var(--ld-accent-3);border-color:var(--ld-accent-3);color:var(--cl-on-color-3,#18212b)}
 
-.ld-main .py-5{padding-top:2.1rem!important;padding-bottom:2.1rem!important}
-.ld-main .py-lg-6{padding-top:2.1rem!important;padding-bottom:2.1rem!important}
-.ld-main .cl-hero>.container{padding-top:1.9rem!important;padding-bottom:1.7rem!important}
-.ld-main .cl-hero .row>[class*="col-"]{padding-top:.5rem!important;padding-bottom:.5rem!important}
-.ld-main .cl-feature-band>.container{padding-top:.4rem!important;padding-bottom:.4rem!important}
-.ld-main .mt-4{margin-top:.85rem!important}
-.ld-main .mt-3{margin-top:.6rem!important}
-.ld-main .mb-4{margin-bottom:.95rem!important}
-.ld-main .g-4{--bs-gutter-y:1rem;--bs-gutter-x:1rem}/* Dark platform bands. Core paints .hero, .cl-hero, .cl-feature-band and the
-   preview bar from the palette, so Bootstrap text utilities inside them must
-   not fall back to ink intended for light surfaces. */
+.cl-main .py-5{padding-top:2.1rem!important;padding-bottom:2.1rem!important}
+.cl-main .py-lg-6{padding-top:2.1rem!important;padding-bottom:2.1rem!important}
+.cl-main .cl-hero>.container{padding-top:1.9rem!important;padding-bottom:1.7rem!important}
+.cl-main .cl-hero .row>[class*="col-"]{padding-top:.5rem!important;padding-bottom:.5rem!important}
+.cl-main .cl-feature-band>.container{padding-top:.4rem!important;padding-bottom:.4rem!important}
+.cl-main .mt-4{margin-top:.85rem!important}
+.cl-main .mt-3{margin-top:.6rem!important}
+.cl-main .mb-4{margin-bottom:.95rem!important}
+.cl-main .g-4{--bs-gutter-y:1rem;--bs-gutter-x:1rem}
 
-.ld-main .hero{
+.cl-main .hero{
   background:var(--ld-accent);
   color:var(--cl-on-color-1,#fff);
   border-radius:var(--ld-radius-lg);
   padding:22px;
   margin-bottom:16px;
 }
-.ld-main .hero-content{max-width:72ch}
-.ld-main .hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.ld-main .hero p{opacity:.87}
+.cl-main .hero-content{max-width:72ch}
+.cl-main .hero-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.cl-main .hero p{opacity:.87}
 
-.ld-main .cl-hero .text-warning,.ld-main .cl-feature-band .text-warning,
-.ld-main .hero .text-warning,.ld-main .cl-preview-bar .text-warning{color:var(--ld-accent-4)!important}
-.ld-main .cl-hero .text-primary,.ld-main .cl-feature-band .text-primary,
-.ld-main .hero .text-primary,.ld-main .cl-preview-bar .text-primary,
-.ld-main .cl-hero .text-info,.ld-main .hero .text-info,
-.ld-main .cl-hero .text-body-secondary,.ld-main .cl-hero .text-secondary,
-.ld-main .cl-feature-band .text-body-secondary,.ld-main .hero .text-body-secondary,
-.ld-main .cl-preview-bar .text-body-secondary{color:inherit!important;opacity:.85}
+.cl-main .cl-hero .text-warning,.cl-main .cl-feature-band .text-warning,.cl-main .hero .text-warning,.cl-main .cl-preview-bar .text-warning{color:var(--ld-accent-4)!important}
+.cl-main .cl-hero .text-primary,.cl-main .cl-feature-band .text-primary,.cl-main .hero .text-primary,.cl-main .cl-preview-bar .text-primary,.cl-main .cl-hero .text-info,.cl-main .hero .text-info,.cl-main .cl-hero .text-body-secondary,.cl-main .cl-hero .text-secondary,.cl-main .cl-feature-band .text-body-secondary,.cl-main .hero .text-body-secondary,.cl-main .cl-preview-bar .text-body-secondary{color:inherit!important;opacity:.85}
 
-.ld-main .cl-page-head{
+.cl-main .cl-page-head{
   background:var(--ld-soft);
   border-bottom:1px solid var(--ld-line);
 }
-.ld-main .cl-page-head .container{padding-top:20px!important;padding-bottom:20px!important}
-.ld-main .cl-page-head h1{margin-top:6px}
+.cl-main .cl-page-head .container{padding-top:20px!important;padding-bottom:20px!important}
+.cl-main .cl-page-head h1{margin-top:6px}
 
-.ld-main .cl-feature-band{background:var(--ld-accent);color:var(--cl-on-color-1,#fff)}
-.ld-main .cl-feature-band h1,.ld-main .cl-feature-band h2,.ld-main .cl-feature-band h3{color:inherit}
-.ld-main .cl-feature{padding:4px}
-.ld-main .cl-feature span{
+.cl-main .cl-feature-band{background:var(--ld-accent);color:var(--cl-on-color-1,#fff)}
+.cl-main .cl-feature-band h1,.cl-main .cl-feature-band h2,.cl-main .cl-feature-band h3{color:inherit}
+.cl-main .cl-feature{padding:4px}
+.cl-main .cl-feature span{
   display:inline-grid;
   place-items:center;
   width:30px;
@@ -1314,21 +1074,21 @@ body.ld-body{
   font-size:.8rem;
   margin-bottom:9px;
 }
-.ld-main .cl-feature p{opacity:.85;font-size:.87rem;margin:0}
+.cl-main .cl-feature p{opacity:.85;font-size:.87rem;margin:0}
 
-.ld-main .cl-course-card,.ld-main .course-card{
+.cl-main .cl-course-card,.cl-main .course-card{
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   box-shadow:var(--ld-shadow-card);
   transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
 }
-.ld-main .cl-course-card:hover,.ld-main .course-card:hover{
+.cl-main .cl-course-card:hover,.cl-main .course-card:hover{
   transform:translateY(-2px);
   box-shadow:0 14px 30px rgba(20,30,40,.12);
   border-color:var(--ld-accent-line);
 }
-.ld-main .cl-course-cover,.ld-main .course-cover{
+.cl-main .cl-course-cover,.cl-main .course-cover{
   height:86px;
   width:100%;
   object-fit:cover;
@@ -1337,13 +1097,13 @@ body.ld-body{
   display:grid;
   place-items:center;
 }
-.ld-main .cl-course-cover-placeholder span{
+.cl-main .cl-course-cover-placeholder span{
   color:var(--cl-on-color-1,#fff);
   font-size:1.5rem;
   font-weight:800;
   opacity:.9;
 }
-.ld-main .course-level{
+.cl-main .course-level{
   position:absolute;
   left:10px;
   bottom:9px;
@@ -1356,10 +1116,10 @@ body.ld-body{
   letter-spacing:.06em;
   text-transform:uppercase;
 }
-.ld-main .course-body{padding:13px}
-.ld-main .course-title{font-weight:750;font-size:.98rem;line-height:1.3;margin-bottom:3px}
-.ld-main .course-meta{color:var(--ld-muted);font-size:.8rem}
-.ld-main .course-footer{
+.cl-main .course-body{padding:13px}
+.cl-main .course-title{font-weight:750;font-size:.98rem;line-height:1.3;margin-bottom:3px}
+.cl-main .course-meta{color:var(--ld-muted);font-size:.8rem}
+.cl-main .course-footer{
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -1369,27 +1129,25 @@ body.ld-body{
   margin-top:12px;
   padding-top:11px;
 }
-.ld-main .course-footer form{margin:0}
-.ld-main .course-price{font-weight:800;color:var(--ld-accent);font-size:.95rem}
-.ld-main .favourite{color:var(--ld-accent)}
-.ld-main .stretched-link{font-weight:700;text-decoration:none}/* --------------------------------------------------------------------------
-   15. Course player, imported course content and module navigation
-   -------------------------------------------------------------------------- */
+.cl-main .course-footer form{margin:0}
+.cl-main .course-price{font-weight:800;color:var(--ld-accent);font-size:.95rem}
+.cl-main .favourite{color:var(--ld-accent)}
+.cl-main .stretched-link{font-weight:700;text-decoration:none}
 
-.ld-main .cl-preview-bar,.ld-main .cl-preview-banner{
+.cl-main .cl-preview-bar,.cl-main .cl-preview-banner{
   background:var(--ld-accent);
   color:var(--cl-on-color-1,#fff);
   padding:9px 0;
   font-size:.85rem;
 }
-.ld-main .cl-preview-bar a{color:inherit}
+.cl-main .cl-preview-bar a{color:inherit}
 
-.ld-main .cl-course-toolbar{
+.cl-main .cl-course-toolbar{
   background:var(--ld-soft);
   border-bottom:1px solid var(--ld-line);
   font-size:.85rem;
 }
-.ld-main .cl-course-toolbar>div{
+.cl-main .cl-course-toolbar>div{
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -1397,10 +1155,10 @@ body.ld-body{
   flex-wrap:wrap;
   padding:10px var(--ld-gutter);
 }
-.ld-main .cl-course-toolbar a{font-weight:700;text-decoration:none;margin-right:10px}
-.ld-main .cl-course-toolbar span{color:var(--ld-muted)}
+.cl-main .cl-course-toolbar a{font-weight:700;text-decoration:none;margin-right:10px}
+.cl-main .cl-course-toolbar span{color:var(--ld-muted)}
 
-.ld-main .cl-course-nav{
+.cl-main .cl-course-nav{
   position:sticky;
   top:78px;
   background:#fff;
@@ -1410,8 +1168,8 @@ body.ld-body{
   max-height:calc(100vh - 100px);
   overflow:auto;
 }
-.ld-main .cl-course-nav nav{display:grid;gap:2px;margin-top:9px}
-.ld-main .cl-course-nav nav a{
+.cl-main .cl-course-nav nav{display:grid;gap:2px;margin-top:9px}
+.cl-main .cl-course-nav nav a{
   display:flex;
   align-items:flex-start;
   gap:9px;
@@ -1423,7 +1181,7 @@ body.ld-body{
   text-decoration:none;
   line-height:1.4;
 }
-.ld-main .cl-course-nav nav a span{
+.cl-main .cl-course-nav nav a span{
   flex:0 0 21px;
   width:21px;
   height:21px;
@@ -1435,13 +1193,13 @@ body.ld-body{
   font-size:.7rem;
   font-weight:800;
 }
-.ld-main .cl-course-nav nav a:hover{background:var(--ld-soft)}
-.ld-main .cl-course-nav nav a.active{background:var(--ld-accent-soft);color:var(--ld-accent);font-weight:760}
-.ld-main .cl-course-nav nav a.active span{background:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .cl-course-nav nav a:hover{background:var(--ld-soft)}
+.cl-main .cl-course-nav nav a.active{background:var(--ld-accent-soft);color:var(--ld-accent);font-weight:760}
+.cl-main .cl-course-nav nav a.active span{background:var(--ld-accent);color:var(--ld-on-accent)}
 
-.ld-main .cl-module-header{padding-bottom:12px;border-bottom:1px solid var(--ld-line);margin-bottom:16px}
-.ld-main .cl-module-list{display:grid;gap:8px}
-.ld-main .cl-module-row,.ld-main .cl-module-link{
+.cl-main .cl-module-header{padding-bottom:12px;border-bottom:1px solid var(--ld-line);margin-bottom:16px}
+.cl-main .cl-module-list{display:grid;gap:8px}
+.cl-main .cl-module-row,.cl-main .cl-module-link{
   display:flex;
   align-items:center;
   gap:11px;
@@ -1452,8 +1210,8 @@ body.ld-body{
   text-decoration:none;
   color:var(--ld-text);
 }
-.ld-main .cl-module-link:hover{border-color:var(--ld-accent-line);background:var(--ld-soft-2)}
-.ld-main .cl-module-number{
+.cl-main .cl-module-link:hover{border-color:var(--ld-accent-line);background:var(--ld-soft-2)}
+.cl-main .cl-module-number{
   flex:0 0 26px;
   width:26px;
   height:26px;
@@ -1465,30 +1223,28 @@ body.ld-body{
   font-weight:800;
   font-size:.76rem;
 }
-.ld-main .cl-module-summary{color:var(--ld-muted);font-size:.83rem}
+.cl-main .cl-module-summary{color:var(--ld-muted);font-size:.83rem}
 
-.ld-main .cl-outcomes,.ld-main .outcomes{
+.cl-main .cl-outcomes,.cl-main .outcomes{
   background:var(--ld-soft-2);
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   padding:14px 16px;
   margin:14px 0;
 }
-.ld-main .cl-outcomes ul,.ld-main .outcomes ul{margin:8px 0 0;padding-left:18px;display:grid;gap:5px;font-size:.87rem}/* Imported course content: readable measure, theme typography, but the
-   course's own scoped presentation CSS keeps priority over decoration. */
+.cl-main .cl-outcomes ul,.cl-main .outcomes ul{margin:8px 0 0;padding-left:18px;display:grid;gap:5px;font-size:.87rem}
 
-.ld-main .cl-course-content,.ld-main .cl-prose,.ld-main .cl-course-presentation,.ld-main .module-body{
+.cl-main .cl-course-content,.cl-main .cl-prose,.cl-main .cl-course-presentation,.cl-main .module-body{
   font-size:.95rem;
   line-height:1.68;
   color:var(--ld-text);
   max-width:76ch;
 }
-.ld-main .cl-course-content h2,.ld-main .cl-prose h2{margin-top:1.5rem}
-.ld-main .cl-course-content h3,.ld-main .cl-prose h3{margin-top:1.2rem}
-.ld-main .cl-course-content ul,.ld-main .cl-course-content ol,
-.ld-main .cl-prose ul,.ld-main .cl-prose ol{padding-left:20px;display:grid;gap:6px;margin-bottom:1rem}
-.ld-main .cl-course-content img,.ld-main .cl-prose img{max-width:100%;height:auto;border-radius:var(--ld-radius-sm)}
-.ld-main .cl-course-content blockquote,.ld-main .cl-prose blockquote{
+.cl-main .cl-course-content h2,.cl-main .cl-prose h2{margin-top:1.5rem}
+.cl-main .cl-course-content h3,.cl-main .cl-prose h3{margin-top:1.2rem}
+.cl-main .cl-course-content ul,.cl-main .cl-course-content ol,.cl-main .cl-prose ul,.cl-main .cl-prose ol{padding-left:20px;display:grid;gap:6px;margin-bottom:1rem}
+.cl-main .cl-course-content img,.cl-main .cl-prose img{max-width:100%;height:auto;border-radius:var(--ld-radius-sm)}
+.cl-main .cl-course-content blockquote,.cl-main .cl-prose blockquote{
   margin:1rem 0;
   padding:10px 15px;
   border-left:3px solid var(--ld-accent);
@@ -1496,24 +1252,22 @@ body.ld-body{
   border-radius:0 var(--ld-radius-sm) var(--ld-radius-sm) 0;
   color:var(--ld-muted);
 }
-.ld-main .cl-course-content table,.ld-main .cl-prose table{margin:1rem 0;border:1px solid var(--ld-line);border-radius:var(--ld-radius-sm)}/* --------------------------------------------------------------------------
-   16. Assessments, results and certificates
-   -------------------------------------------------------------------------- */
+.cl-main .cl-course-content table,.cl-main .cl-prose table{margin:1rem 0;border:1px solid var(--ld-line);border-radius:var(--ld-radius-sm)}
 
-.ld-main .cl-assessment-section,.ld-main .cl-assessment-form{
+.cl-main .cl-assessment-section,.cl-main .cl-assessment-form{
   background:#fff;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-lg);
   padding:18px;
 }
-.ld-main .cl-question,.ld-main .cl-question-focus{
+.cl-main .cl-question,.cl-main .cl-question-focus{
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   background:var(--ld-soft-2);
   padding:16px;
   margin-bottom:14px;
 }
-.ld-main .cl-question-number{
+.cl-main .cl-question-number{
   display:inline-flex;
   padding:3px 9px;
   border-radius:999px;
@@ -1525,9 +1279,9 @@ body.ld-body{
   text-transform:uppercase;
   margin-bottom:8px;
 }
-.ld-main .cl-question-text{font-size:.98rem;font-weight:700;line-height:1.5;margin-bottom:12px}/* Option layout is core-owned functional markup; only the frame is themed. */
+.cl-main .cl-question-text{font-size:.98rem;font-weight:700;line-height:1.5;margin-bottom:12px}
 
-.ld-main .cl-option{
+.cl-main .cl-option{
   padding:10px 12px;
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-sm);
@@ -1535,11 +1289,11 @@ body.ld-body{
   cursor:pointer;
   transition:border-color .14s ease,background-color .14s ease;
 }
-.ld-main .cl-option:hover{border-color:var(--ld-accent-line);background:var(--ld-accent-soft)}
-.ld-main .cl-option:has(input:checked){border-color:var(--ld-accent);background:var(--ld-accent-soft)}
-.ld-main .cl-option>span{font-size:.89rem;line-height:1.5}
+.cl-main .cl-option:hover{border-color:var(--ld-accent-line);background:var(--ld-accent-soft)}
+.cl-main .cl-option:has(input:checked){border-color:var(--ld-accent);background:var(--ld-accent-soft)}
+.cl-main .cl-option>span{font-size:.89rem;line-height:1.5}
 
-.ld-main .cl-assessment-cta,.ld-main .cl-assessment-submit{
+.cl-main .cl-assessment-cta,.cl-main .cl-assessment-submit{
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -1549,7 +1303,7 @@ body.ld-body{
   border-top:1px solid var(--ld-line);
   margin-top:16px;
 }
-.ld-main .cl-result-score{
+.cl-main .cl-result-score{
   display:grid;
   place-items:center;
   gap:3px;
@@ -1560,10 +1314,10 @@ body.ld-body{
   color:var(--ld-accent);
   margin-bottom:16px;
 }
-.ld-main .cl-result-score strong,.ld-main .cl-result-score .cl-ui-stat-value{font-size:2.2rem;font-weight:800;line-height:1}
-.ld-main .answered{border-color:var(--ld-accent)}
+.cl-main .cl-result-score strong,.cl-main .cl-result-score .cl-ui-stat-value{font-size:2.2rem;font-weight:800;line-height:1}
+.cl-main .answered{border-color:var(--ld-accent)}
 
-.ld-main .cl-certificate{
+.cl-main .cl-certificate{
   background:#fff;
   border:1px solid var(--ld-accent-line);
   border-radius:var(--ld-radius-lg);
@@ -1572,7 +1326,7 @@ body.ld-body{
   box-shadow:var(--ld-shadow);
   position:relative;
 }
-.ld-main .cl-certificate:before{
+.cl-main .cl-certificate:before{
   content:"";
   position:absolute;
   inset:9px;
@@ -1580,103 +1334,75 @@ body.ld-body{
   border-radius:var(--ld-radius-md);
   pointer-events:none;
 }
-.ld-main .cl-certificate h1,.ld-main .cl-certificate h2{color:var(--ld-accent)}
-.ld-main .cl-certificate-preview-frame{
+.cl-main .cl-certificate h1,.cl-main .cl-certificate h2{color:var(--ld-accent)}
+.cl-main .cl-certificate-preview-frame{
   border:1px solid var(--ld-line);
   border-radius:var(--ld-radius-md);
   overflow:hidden;
   background:#fff;
   width:100%;
   min-height:420px;
-}/* --------------------------------------------------------------------------
-   17. Theme management and editor choice surfaces
-   -------------------------------------------------------------------------- */
+}
 
-.ld-main .editor-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
-.ld-main .editor-choice{
+.cl-main .editor-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.cl-main .editor-choice{
   border:1px solid var(--ld-line-2);
   border-radius:var(--ld-radius-md);
   background:#fff;
   padding:12px;
   text-align:left;
 }
-.ld-main .editor-choice.active,.ld-main .active-theme{
+.cl-main .editor-choice.active,.cl-main .active-theme{
   border-color:var(--ld-accent);
   background:var(--ld-accent-soft);
   box-shadow:0 0 0 1px var(--ld-accent) inset;
 }
 
-.ld-main .s-summary{font-size:.84rem;color:var(--ld-muted)}
-
-/* --------------------------------------------------------------------------
-   18. Responsive behaviour
-   -------------------------------------------------------------------------- */
+.cl-main .s-summary{font-size:.84rem;color:var(--ld-muted)}
 
 @media (max-width:1024px){
   body.ld-body{--ld-gutter:18px}
-  .ld-main .admin-person-layout{grid-template-columns:1fr}
-  .ld-footer-grid{grid-template-columns:1fr 1fr}
-  .ld-footer-social{grid-column:auto}
-  .ld-main .cl-course-nav{position:static;max-height:none}
+  .cl-main .admin-person-layout{grid-template-columns:1fr}
+
+  .cl-main .cl-course-nav{position:static;max-height:none}
 
 }
 
 @media (max-width:1099px){
-  .ld-burger{display:inline-flex}
-  .ld-topbar-inner{flex-wrap:wrap;padding:0 14px;row-gap:0}
-  .ld-status{display:none}
+  .cl-header-inner{flex-wrap:wrap;padding:0 14px;row-gap:0}
+  .cl-identity-compact{display:none}
 
-  .ld-nav{
-    display:none;
-    order:3;
-    width:100%;
-    flex-direction:column;
-    align-items:stretch;
+  .cl-navigation{
     gap:2px;
     margin:0 0 12px;
     padding-top:10px;
     border-top:1px solid var(--ld-line);
   }
-  .ld-nav.is-open{display:flex}
-  .ld-status{display:none}
-  .ld-nav-link{width:100%;justify-content:flex-start;padding:10px 12px;font-size:.9rem}
-  .ld-nav-form{width:100%}
-  .ld-nav-post{width:100%;justify-content:flex-start}
-  .ld-menu{width:100%}
-  .ld-menu-panel{
-    position:static;
-    width:100%;
-    min-width:0;
+  .cl-identity-compact{display:none}
+  .cl-nav-link{padding:10px 12px;font-size:.9rem}
+
+  .cl-nav-panel{
     margin-top:3px;
     box-shadow:none;
     background:var(--ld-soft-2);
   }
-  .ld-caret{margin-left:auto}
+  .cl-nav-group-caret{margin-left:auto}
 
-  .ld-stage{padding:12px 10px 24px}.ld-main .cl-ui-section-head{gap:10px}
-  .ld-main .ld-panel-head{align-items:flex-start;flex-direction:column;gap:10px}.ld-main .cl-ui-accordion-summary{gap:5px}
-  .ld-main .ld-panel{padding:14px}
-  .ld-footer-grid{grid-template-columns:1fr;gap:16px}
+  .cl-page{padding:12px 10px 24px}.cl-main .cl-ui-section-head{gap:10px}
+  .cl-main .ld-panel-head{align-items:flex-start;flex-direction:column;gap:10px}.cl-main .cl-ui-accordion-summary{gap:5px}
+  .cl-main .ld-panel{padding:14px}
+
 }
 
 @media (max-width:560px){
   body.ld-body{--ld-gutter:14px;--ld-radius:10px}
   .ld-brand-sub{display:none}
-  .ld-frame-chrome{padding:0 9px}
-  .ld-frame-chrome .cl-ui-breadcrumb{font-size:.68rem}
-  .ld-main .cl-ui-action{padding:8px 11px}
-  .ld-main .cl-ui-stat-value{font-size:1.35rem}
-  .ld-main .cl-certificate{padding:20px}.ld-main .cl-ui-list-item{gap:8px}
-}/* Long labels must never collide with an accordion or menu indicator. */
-
-.ld-main summary>span,.ld-main .tab-btn>span,.ld-nav-link>span,.ld-menu-link>span{
-  min-width:0;
-  overflow-wrap:anywhere;
+  .cl-page-context-inner{padding:0 9px}
+  .cl-page-context-inner .cl-ui-breadcrumb{font-size:.68rem}
+  .cl-main .cl-ui-action{padding:8px 11px}
+  .cl-main .cl-ui-stat-value{font-size:1.35rem}
+  .cl-main .cl-certificate{padding:20px}.cl-main .cl-ui-list-item{gap:8px}
 }
-
-/* --------------------------------------------------------------------------
-   19. Motion, print and forced colours
-   -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
@@ -1685,52 +1411,39 @@ body.ld-body{
     animation-iteration-count:1!important;
     transition-duration:.001ms!important;
   }
-  .ld-main .cl-course-card:hover,.ld-main .course-card:hover{transform:none}
+  .cl-main .cl-course-card:hover,.cl-main .course-card:hover{transform:none}
 }
 
 @media print{
-  .ld-topbar,.ld-footer,.ld-frame-chrome,.ld-skip,.ld-flash-stack,.panel-tabs{display:none!important}
+  .cl-header,.cl-footer,.cl-page-context-inner,.cl-skip-link,.cl-flash-stack,.panel-tabs{display:none!important}
   html,body.ld-body{background:#fff;font-size:11pt}
-  .ld-stage{background:none;padding:0}
-  .ld-frame{border:0;box-shadow:none;border-radius:0}
+  .cl-page{background:none;padding:0}
+  .cl-page-frame{border:0;box-shadow:none;border-radius:0}
 
-  .ld-main .cl-ui-surface,.ld-main .ld-deck,.ld-main .cl-certificate{box-shadow:none;border-color:#bbb;break-inside:avoid}
-  .ld-main .cl-certificate:before{border-color:#bbb}.ld-main .ld-panel-link{display:none!important}
-  .ld-main a{text-decoration:none;color:#000}
-  .ld-main thead th{position:static}
+  .cl-main .cl-ui-surface,.cl-main .ld-deck,.cl-main .cl-certificate{box-shadow:none;border-color:#bbb;break-inside:avoid}
+  .cl-main .cl-certificate:before{border-color:#bbb}.cl-main .ld-panel-link{display:none!important}
+  .cl-main a{text-decoration:none;color:#000}
+  .cl-main thead th{position:static}
 }
 
 @media (forced-colors:active){
-  .ld-frame,.ld-main .cl-ui-surface,.ld-main .ld-deck,.ld-body .cl-ui-modal-card{border:1px solid CanvasText}
-  .ld-main .tab-btn.active{outline:2px solid Highlight}
+  .cl-page-frame,.cl-main .cl-ui-surface,.cl-main .ld-deck,.ld-body .cl-ui-modal-card{border:1px solid CanvasText}
+  .cl-main .tab-btn.active{outline:2px solid Highlight}
   .ld-ico{stroke:CanvasText}
-}/* ==========================================================================
-   20. Palette colour layer (added in 1.1.1)
+}
 
-   The reference design's role map assigns its hero/section-header band to a
-   light palette colour with dark text. This layer applies that mapping to the
-   platform's own heading surfaces so every page opens on a coloured band, and
-   pushes palette colour into tabs, accordions, tables and pagination.
-
-   Declared last on purpose: these rules restate selectors defined earlier in
-   this stylesheet and win on source order rather than by escalating
-   specificity or adding !important.
-   ========================================================================== *//* -- Page-opening bands ---------------------------------------------------- */
-
-.ld-main .cl-hero{
+.cl-main .cl-hero{
   background:var(--ld-band);
   color:var(--ld-band-ink);
   border-bottom:1px solid var(--ld-band-line);
   padding:0;
 }
-.ld-main .cl-hero h1,.ld-main .cl-hero h2,.ld-main .cl-hero h3{color:inherit}
-.ld-main .cl-hero p,.ld-main .cl-hero .lead,.ld-main .cl-hero li{color:var(--ld-band-ink-2)}
-.ld-main .cl-hero .cl-kicker,.ld-main .cl-hero .cl-ui-eyebrow{color:var(--ld-band-ink-2)}
-.ld-main .cl-hero .text-warning,.ld-main .cl-hero .text-primary,
-.ld-main .cl-hero .text-info,.ld-main .cl-hero .text-body-secondary,
-.ld-main .cl-hero .text-secondary{color:var(--ld-band-ink-2)!important;opacity:1}
+.cl-main .cl-hero h1,.cl-main .cl-hero h2,.cl-main .cl-hero h3{color:inherit}
+.cl-main .cl-hero p,.cl-main .cl-hero .lead,.cl-main .cl-hero li{color:var(--ld-band-ink-2)}
+.cl-main .cl-hero .cl-kicker,.cl-main .cl-hero .cl-ui-eyebrow{color:var(--ld-band-ink-2)}
+.cl-main .cl-hero .text-warning,.cl-main .cl-hero .text-primary,.cl-main .cl-hero .text-info,.cl-main .cl-hero .text-body-secondary,.cl-main .cl-hero .text-secondary{color:var(--ld-band-ink-2)!important;opacity:1}
 
-.ld-main .cl-hero-panel{
+.cl-main .cl-hero-panel{
   background:rgba(255,255,255,.72);
   border:1px solid rgba(255,255,255,.9);
   border-radius:var(--ld-radius-lg);
@@ -1738,26 +1451,24 @@ body.ld-body{
   padding:18px;
   color:var(--ld-band-ink);
 }
-.ld-main .cl-hero-panel ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:.87rem}/* Platform page heads: the h1 surface at the top of most application pages. */
+.cl-main .cl-hero-panel ul{margin:10px 0 0;padding-left:18px;display:grid;gap:6px;font-size:.87rem}
 
-.ld-main .cl-page-head{
+.cl-main .cl-page-head{
   background:var(--ld-band);
   color:var(--ld-band-ink);
   border-bottom:1px solid var(--ld-band-line);
 }
-.ld-main .cl-page-head h1,.ld-main .cl-page-head h2{color:inherit}
-.ld-main .cl-page-head p,.ld-main .cl-page-head .lead,
-.ld-main .cl-page-head .cl-kicker,.ld-main .cl-page-head .cl-ui-eyebrow{color:var(--ld-band-ink-2)}
-.ld-main .cl-page-head .cl-back-link,.ld-main .cl-page-head .back-link{color:var(--ld-band-ink-2)}
-.ld-main .cl-page-head .cl-back-link:hover{color:var(--ld-band-ink)}
-.ld-main .cl-page-head .text-body-secondary,.ld-main .cl-page-head .text-primary{color:var(--ld-band-ink-2)!important}/* Section heads: the other heading surface the platform uses, including the
-   page-opening head on Catalogue, Help and every Administration section. */.ld-main .cl-ui-section-head{
+.cl-main .cl-page-head h1,.cl-main .cl-page-head h2{color:inherit}
+.cl-main .cl-page-head p,.cl-main .cl-page-head .lead,.cl-main .cl-page-head .cl-kicker,.cl-main .cl-page-head .cl-ui-eyebrow{color:var(--ld-band-ink-2)}
+.cl-main .cl-page-head .cl-back-link,.cl-main .cl-page-head .back-link{color:var(--ld-band-ink-2)}
+.cl-main .cl-page-head .cl-back-link:hover{color:var(--ld-band-ink)}
+.cl-main .cl-page-head .text-body-secondary,.cl-main .cl-page-head .text-primary{color:var(--ld-band-ink-2)!important}.cl-main .cl-ui-section-head{
   background:var(--ld-band-soft);
   border:1px solid var(--ld-band-line);
   border-radius:var(--ld-radius-lg);
   padding:15px 18px 15px 21px;
   margin-bottom:16px;
-  color:var(--ld-band-ink)}.ld-main .cl-ui-section-head::before{
+  color:var(--ld-band-ink)}.cl-main .cl-ui-section-head::before{
   content:"";
   position:absolute;
   pointer-events:none;
@@ -1766,88 +1477,83 @@ body.ld-body{
   left:0;
   width:3px;
   background:var(--ld-accent)}
-.ld-main .cl-ui-section-head h1,.ld-main .cl-ui-section-head h2,.ld-main .cl-ui-section-head h3{color:inherit;margin:5px 0 4px}
-.ld-main .cl-ui-section-head p{color:var(--ld-band-ink-2)}
-.ld-main .cl-ui-section-head .cl-ui-eyebrow,.ld-main .cl-ui-section-head .cl-kicker{color:var(--ld-accent)}
-.ld-main .cl-ui-section-head .search-wrap input{background:#fff}/* Auth and error pages carry their heading inside a card, so the band becomes
-   a coloured cap on that card. */
+.cl-main .cl-ui-section-head h1,.cl-main .cl-ui-section-head h2,.cl-main .cl-ui-section-head h3{color:inherit;margin:5px 0 4px}
+.cl-main .cl-ui-section-head p{color:var(--ld-band-ink-2)}
+.cl-main .cl-ui-section-head .cl-ui-eyebrow,.cl-main .cl-ui-section-head .cl-kicker{color:var(--ld-accent)}
+.cl-main .cl-ui-section-head .search-wrap input{background:#fff}
 
 .ld-page-auth .cl-ui-surface{border-top:5px solid var(--ld-band)}
 .ld-page-error .cl-ui-surface{border-top:5px solid var(--ld-danger)}
-.ld-page-auth .cl-kicker{color:var(--ld-accent)}/* -- Tabs ------------------------------------------------------------------ */
+.ld-page-auth .cl-kicker{color:var(--ld-accent)}
 
-.ld-main .panel-tabs{
+.cl-main .panel-tabs{
   background:var(--ld-band-faint);
   border:1px solid var(--ld-band-line);
 }
 
-.ld-main .tab-btn:hover{background:rgba(255,255,255,.75);color:var(--ld-accent)}
-.ld-main .tab-btn.active{
+.cl-main .tab-btn:hover{background:rgba(255,255,255,.75);color:var(--ld-accent)}
+.cl-main .tab-btn.active{
   background:var(--ld-accent);
   color:var(--ld-on-accent);
   box-shadow:0 2px 8px rgba(23,33,43,.18);
 }
-.ld-main .tab-btn.active .ld-ico{opacity:1}
+.cl-main .tab-btn.active .ld-ico{opacity:1}
 
-.ld-main .ld-deck{border-color:var(--ld-band-line)}
-.ld-main .ld-panel-head{border-bottom:1px solid var(--ld-band-line)}
-.ld-main .ld-panel-eyebrow{color:var(--ld-accent)}
-.ld-main .ld-panel-link{border-color:var(--ld-accent-line);background:var(--ld-accent-soft);color:var(--ld-accent)}
-.ld-main .ld-panel-link:hover{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}/* A section head nested directly inside a themed panel would repeat the band
-   the panel header already provides, so it is reduced to a plain caption. */
+.cl-main .ld-deck{border-color:var(--ld-band-line)}
+.cl-main .ld-panel-head{border-bottom:1px solid var(--ld-band-line)}
+.cl-main .ld-panel-eyebrow{color:var(--ld-accent)}
+.cl-main .ld-panel-link{border-color:var(--ld-accent-line);background:var(--ld-accent-soft);color:var(--ld-accent)}
+.cl-main .ld-panel-link:hover{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
 
-.ld-main .ld-panel>.cl-ui-section-head:first-of-type{
+.cl-main .ld-panel>.cl-ui-section-head:first-of-type{
   background:none;
   border:0;
   border-radius:0;
   padding:0;
   margin-bottom:10px;
-}/* -- Accordions ------------------------------------------------------------ */
-.ld-main details.cl-ui-accordion-section{border-color:var(--ld-band-line)}
-.ld-main details.cl-ui-accordion-section>summary{
+}
+.cl-main details.cl-ui-accordion-section{border-color:var(--ld-band-line)}
+.cl-main details.cl-ui-accordion-section>summary{
   background:var(--ld-band-soft);
   color:var(--ld-band-ink);
 }
-.ld-main details.cl-ui-accordion-section>summary:hover{background:var(--ld-band)}
-.ld-main details.cl-ui-accordion-section[open]>summary{
+.cl-main details.cl-ui-accordion-section>summary:hover{background:var(--ld-band)}
+.cl-main details.cl-ui-accordion-section[open]>summary{
   background:var(--ld-accent);
   color:var(--ld-on-accent);
   border-bottom:1px solid var(--ld-accent);
 }
 
-.ld-main details.cl-ui-accordion-section[open] .cl-ui-accordion-toggle{color:inherit}
-.ld-main details.cl-ui-accordion-section>summary .cl-ui-accordion-description,
-.ld-main details.cl-ui-accordion-section>summary .cl-ui-accordion-toggle{color:inherit;opacity:.78}
-.ld-main details.cl-ui-accordion-section[open]{border-color:var(--ld-accent)}/* -- Tables, cards and metrics --------------------------------------------- */
+.cl-main details.cl-ui-accordion-section[open] .cl-ui-accordion-toggle{color:inherit}
+.cl-main details.cl-ui-accordion-section>summary .cl-ui-accordion-description,.cl-main details.cl-ui-accordion-section>summary .cl-ui-accordion-toggle{color:inherit;opacity:.78}
+.cl-main details.cl-ui-accordion-section[open]{border-color:var(--ld-accent)}
 
-.ld-main thead th{
+.cl-main thead th{
   background:var(--ld-band-soft);
   color:var(--ld-band-ink-2);
   border-bottom:1px solid var(--ld-band-line);
 }
-.ld-main .cl-ui-table,.ld-main .table-responsive{border-color:var(--ld-band-line)}
-.ld-main tbody tr:hover{background:var(--ld-band-faint)}
+.cl-main .cl-ui-table,.cl-main .table-responsive{border-color:var(--ld-band-line)}
+.cl-main tbody tr:hover{background:var(--ld-band-faint)}
 
-.ld-main .cl-ui-stat-card{
+.cl-main .cl-ui-stat-card{
   background:linear-gradient(180deg,var(--ld-band-soft),var(--ld-band-faint));
   border-color:var(--ld-band-line);
 }
-.ld-main .cl-ui-stat-label{color:var(--ld-band-ink-2)}
-.ld-main .cl-ui-stat-note{color:var(--ld-band-ink-2)}
-.ld-main .cl-empty-icon{background:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .cl-ui-stat-label{color:var(--ld-band-ink-2)}
+.cl-main .cl-ui-stat-note{color:var(--ld-band-ink-2)}
+.cl-main .cl-empty-icon{background:var(--ld-accent);color:var(--ld-on-accent)}
 
-.ld-main .cl-question-number{background:var(--ld-accent);color:var(--ld-on-accent)}
-.ld-main .cl-module-number{background:var(--ld-accent);color:var(--ld-on-accent)}
-.ld-main .avatar{background:var(--ld-accent);color:var(--ld-on-accent)}
-.ld-main .course-level{background:var(--ld-band);color:var(--ld-band-ink)}
-.ld-main .cl-outcomes,.ld-main .outcomes{
+.cl-main .cl-question-number{background:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .cl-module-number{background:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .avatar{background:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .course-level{background:var(--ld-band);color:var(--ld-band-ink)}
+.cl-main .cl-outcomes,.cl-main .outcomes{
   background:var(--ld-band-faint);
   border-color:var(--ld-band-line);
-}/* -- Pagination ------------------------------------------------------------ *//* The platform renders pagination as .pagination-row holding two .cl-ui-action links
-   and a page indicator; .pagination / .page-link is covered too so a future
-   list-based control inherits the same treatment. */
+}
 
-.ld-main .pagination-row{
+.cl-main .pagination-row{
   gap:10px;
   margin:16px auto 2px;
   padding:8px 10px;
@@ -1857,15 +1563,13 @@ body.ld-body{
   color:var(--ld-band-ink-2);
   font-size:.83rem;
 }
-.ld-main .pagination-row .small,
-.ld-main .pagination-row .muted,
-.ld-main .pagination-row span{
+.cl-main .pagination-row .small,.cl-main .pagination-row .muted,.cl-main .pagination-row span{
   color:var(--ld-band-ink-2)!important;
   font-weight:700;
   font-variant-numeric:tabular-nums;
   padding:0 4px;
 }
-.ld-main .pagination-row .cl-ui-action{
+.cl-main .pagination-row .cl-ui-action{
   background:#fff;
   border-color:var(--ld-band-line);
   color:var(--ld-accent);
@@ -1873,33 +1577,21 @@ body.ld-body{
   padding:5px 14px;
   font-weight:700;
 }
-.ld-main .pagination-row .cl-ui-action:hover{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
+.cl-main .pagination-row .cl-ui-action:hover{background:var(--ld-accent);border-color:var(--ld-accent);color:var(--ld-on-accent)}
 
 @media (max-width:560px){
-  .ld-main .pagination-row{border-radius:var(--ld-radius-lg)}
-  .ld-main .cl-ui-section-head{padding:13px 14px 13px 17px}
-}/* Neutral --ld-muted grey does not reach 4.5:1 on the tinted band surfaces,
-   so secondary copy inside a band switches to the band's own muted ink. */
+  .cl-main .pagination-row{border-radius:var(--ld-radius-lg)}
+  .cl-main .cl-ui-section-head{padding:13px 14px 13px 17px}
+}
 
-.ld-main .cl-ui-section-head .muted,.ld-main .cl-ui-section-head .small,
-.ld-main .cl-ui-section-head .text-body-secondary,.ld-main .cl-ui-section-head .text-secondary,
-.ld-main .cl-ui-section-head .help,.ld-main .cl-ui-section-head .form-text,
-.ld-main .cl-ui-section-head .search-icon,
-.ld-main .cl-page-head .muted,.ld-main .cl-page-head .small,
-.ld-main .cl-page-head .search-icon,
-.ld-main .cl-hero .muted,.ld-main .cl-hero .small,
-.ld-main .cl-ui-stat-card .muted,.ld-main .cl-ui-stat-card .small,
-.ld-main thead th .muted,.ld-main thead th .small{
+.cl-main .cl-ui-section-head .muted,.cl-main .cl-ui-section-head .small,.cl-main .cl-ui-section-head .text-body-secondary,.cl-main .cl-ui-section-head .text-secondary,.cl-main .cl-ui-section-head .help,.cl-main .cl-ui-section-head .form-text,.cl-main .cl-ui-section-head .search-icon,.cl-main .cl-page-head .muted,.cl-main .cl-page-head .small,.cl-main .cl-page-head .search-icon,.cl-main .cl-hero .muted,.cl-main .cl-hero .small,.cl-main .cl-ui-stat-card .muted,.cl-main .cl-ui-stat-card .small,.cl-main thead th .muted,.cl-main thead th .small{
   color:var(--ld-band-ink-2)!important;
 }
-.ld-main .cl-ui-section-head ::placeholder{color:var(--ld-muted);opacity:1}/* Row hover stays neutral: a palette tint here would put muted cell text on a
-   surface it cannot reach 4.5:1 against. */
+.cl-main .cl-ui-section-head ::placeholder{color:var(--ld-muted);opacity:1}
 
-.ld-main tbody tr:hover{background:var(--ld-soft-2)}/* A section head that opens a card becomes that card's header rather than a
-   floating band inside it: square top corners, no side borders, flush to the
-   card edge. The platform nests this pattern in ten places. */
+.cl-main tbody tr:hover{background:var(--ld-soft-2)}
 
-.ld-main .cl-ui-surface>.cl-ui-section-head:first-child{
+.cl-main .cl-ui-surface>.cl-ui-section-head:first-child{
   border-radius:0;
   border-top:0;
   border-left:0;
@@ -1907,25 +1599,21 @@ body.ld-body{
   border-bottom:1px solid var(--ld-band-line);
   margin-bottom:0;
 }
-.ld-main .cl-ui-surface>.cl-ui-section-head:first-child+*{margin-top:14px}
-.ld-main .cl-ui-surface>.cl-ui-section-head:first-child+.cl-ui-list,
-.ld-main .cl-ui-surface>.cl-ui-section-head:first-child+.cl-ui-table{
+.cl-main .cl-ui-surface>.cl-ui-section-head:first-child+*{margin-top:14px}
+.cl-main .cl-ui-surface>.cl-ui-section-head:first-child+.cl-ui-list,.cl-main .cl-ui-surface>.cl-ui-section-head:first-child+.cl-ui-table{
   margin-top:0;
   border:0;
   border-radius:0;
-}/* Third navigation level, v1.1.3. Core owns the flyout; this matches its panel to the theme's own
-   menu surface. The group carries nav-flyout-edge, so it opens to the right and core flips it left
-   only on a desktop too narrow to hold it beside a menu this close to the window edge. */
+}
 
-.ld-menu-panel .nav-subpanel{background:#fff;border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);box-shadow:0 14px 38px rgba(23,33,43,.16);color:inherit}
-.ld-menu-panel .nav-group+.nav-group{border-top-color:var(--ld-line)}
-.ld-menu-panel .nav-group-label{font-size:.7rem;letter-spacing:.08em;opacity:.55}
-.ld-menu-panel .nav-group:hover>.nav-group-label,.ld-menu-panel .nav-group:focus-within>.nav-group-label{opacity:.9}
-.ld-menu-panel .nav-group-label .ld-ico{width:15px;height:15px;flex:0 0 15px}/* Breadcrumb cart material belongs to Light Default. */
+.cl-nav-panel .cl-nav-subpanel{background:#fff;border:1px solid var(--ld-line);border-radius:var(--ld-radius-md);box-shadow:0 14px 38px rgba(23,33,43,.16);color:inherit}
+.cl-nav-panel .cl-nav-group+.cl-nav-group{border-top-color:var(--ld-line)}
+.cl-nav-panel .cl-nav-group-label{font-size:.7rem;letter-spacing:.08em;opacity:.55}
+.cl-nav-panel .cl-nav-group:hover>.cl-nav-group-label,.cl-nav-panel .cl-nav-group:focus-within>.cl-nav-group-label{opacity:.9}
 
-.ld-frame-chrome { display:flex; align-items:center; gap:1rem; }
-.ld-frame { overflow:visible; }
+.cl-page-context-inner { display:flex; align-items:center; gap:1rem; }
+.cl-page-frame { overflow:visible; }
 .ld-body .cl-cart-count { background:var(--ld-accent); color:var(--ld-on-accent); }
 .ld-body .cl-cart-panel { background:var(--ld-panel); color:var(--ld-text); border-color:var(--ld-line); box-shadow:0 14px 38px rgba(23,33,43,.16); }
 .ld-body .cl-cart-line { border-color:var(--ld-line); }
-@media(max-width:700px) { .ld-frame-chrome { flex-wrap:wrap; } }
+@media(max-width:700px) { .cl-page-context-inner { flex-wrap:wrap; } }

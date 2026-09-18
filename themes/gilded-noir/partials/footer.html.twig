@@ -1,18 +1,18 @@
-<footer class="gn-footer">
+<footer class="cl-footer">
 	<div class="gn-footer-art" aria-hidden="true">
 	</div>
 	<div class="gn-footer-veil" aria-hidden="true">
 	</div>
-	<div class="gn-footer-inner">
-		<div class="gn-footer-grid gn-footer-grid-v113">
-			<section class="gn-footer-lead">
+	<div class="cl-footer-inner">
+		<div class="cl-footer-grid">
+			<section class="cl-footer-section cl-footer-section-lead">
 				<h3>
 					{{ app_name }}
 				</h3>
 				<p>
 					Structured self-study courses, measurable progress, assessments and certificates in one learning account.
 				</p>
-				<div class="gn-social" aria-label="Social media and contact links">
+				<div class="cl-footer-social" aria-label="Social media and contact links">
 					<a href="#" aria-label="Facebook"><svg class="gn-social-icon" aria-hidden="true"><use href="{{ theme.asset_url }}/img/icons.svg#social-facebook"></use></svg></a>
 					<a href="#" aria-label="Threads"><svg class="gn-social-icon" aria-hidden="true"><use href="{{ theme.asset_url }}/img/icons.svg#social-threads"></use></svg></a>
 					<a href="#" aria-label="X"><svg class="gn-social-icon" aria-hidden="true"><use href="{{ theme.asset_url }}/img/icons.svg#social-x"></use></svg></a>
@@ -23,19 +23,19 @@
 					<a href="/contact" aria-label="Email / contact"><svg class="gn-social-icon" aria-hidden="true"><use href="{{ theme.asset_url }}/img/icons.svg#social-email"></use></svg></a>
 				</div>
 			</section>
-			<section class="gn-footer-links">
+			<section class="cl-footer-section cl-footer-section-links">
 				<h4>
 					Explore
 				</h4>
-				<ul>
+				<nav class="cl-footer-nav" aria-label="Explore"><ul>
 					{% for footerItem in footer_navigation %}
 						<li>
 							<a href="{{ footerItem.href }}">{{ footerItem.label }}</a>
 						</li>
 					{% endfor %}
-				</ul>
+				</ul></nav>
 			</section>
-			<section class="gn-footer-contact">
+			<section class="cl-footer-section cl-footer-section-contact">
 				<h4>
 					Get in touch
 				</h4>

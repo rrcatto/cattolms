@@ -57,7 +57,6 @@ final class CoreStyleNamespaceContractTest extends TestCase
         'cl-company-section',
         'cl-course-head',
         'cl-course-presentation',
-        'cl-page-head-compact',
         'cl-rich-editor',
         'cl-section-body',
     ];

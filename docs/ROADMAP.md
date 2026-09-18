@@ -1,8 +1,8 @@
 # Catto Learning Development Roadmap
 
-**Current LMS version:** 0.8.4.2
+**Current LMS version:** 0.8.5
 **Date time:** 2026/09/18 SAST
-**Current stage:** v0.8.4.2 corrects false mail-failure messages after successful login/registration and preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical component geometry and theme presentation, with all-theme browser regression coverage. The passwordless account workflows are unchanged. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
+**Current stage:** v0.8.5 unifies canonical page construction across five themes and retains the correction for false mail-failure messages after successful login/registration; it preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical component geometry and theme presentation, with all-theme browser regression coverage. The passwordless account workflows are unchanged. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains the accepted VPS version.
 
 Only the project owner decides future release numbers.
 
@@ -25,6 +25,11 @@ The purpose is consistency: independently vibe-coded LLM views had allowed equiv
 drift in markup, spacing, responsive behavior, accessibility and progressive enhancement. New views
 must compose the registry and extend its contract tests only when a reusable job is not already
 represented.
+
+The v0.8.5 canonical page construction also unifies shared shell, navigation, page-context,
+identity and footer vocabulary across all five bundled themes. Authentication changes the core
+navigation model, not shell geometry. Theme-specific art and the top-header/sidebar distinction
+remain. See `THEME-SDK.md` and `tests/Browser/README.md`.
 
 ## 1. v0.5.7.5.1 ACL foundation
 

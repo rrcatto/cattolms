@@ -7,7 +7,7 @@
 	{% set ph_lead = 'Cross-cutting labels a course may carry as many of as it needs.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{# The plain section wrapper the other Courses pages use, so the card lands in the same place. #}
-	<section class="section">
+	<section class="cl-page-section section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
 {% block body %}
 

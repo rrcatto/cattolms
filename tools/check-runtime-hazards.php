@@ -39,7 +39,7 @@ foreach (['pageTemplate($page)','layoutFor(','templates->use('] as $token) $need
 $need(!str_contains($renderer,'themes/factory-reset/pages'),'Theme renderer must not source functional pages from Factory Reset.');
 
 $base = $read($root . '/themes/factory-reset/base.html.twig');
-foreach (['block page_body','@theme/partials/navigation.html.twig','@theme/partials/flash.html.twig','@theme/partials/footer.html.twig'] as $token) $need(str_contains($base,$token),'Factory Reset base runtime dependency missing: '.$token);
+foreach (['block page_body','@platform/partials/navigation.html.twig','@platform/partials/flash-messages.html.twig','@theme/partials/footer.html.twig'] as $token) $need(str_contains($base,$token),'Factory Reset base runtime dependency missing: '.$token);
 
 $baselineMatches = glob($root . '/database/migrations/*_baseline.php') ?: [];
 $need(count($baselineMatches) === 1, 'Expected exactly one baseline migration, found ' . count($baselineMatches) . '.');

@@ -145,6 +145,8 @@ final class NavigationIconContractTest extends TestCase
             }
 
             $name = basename($theme);
+            self::assertStringContainsString('@platform/partials/navigation.html.twig', $markup);
+            $markup .= (string) file_get_contents(self::root() . '/resources/views/partials/navigation.html.twig');
             self::assertStringContainsString(
                 'platform.icon_sprite',
                 $markup,

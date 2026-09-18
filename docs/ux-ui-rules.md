@@ -1,7 +1,7 @@
 # Catto Learning UX/UI Rules
 
 **LMS:** 0.8 (development)
-**Date time:** 2026/09/10 02:25 SAST
+**Date time:** 2026/09/18 SAST
 **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written
@@ -117,7 +117,7 @@ consumes the same components as every theme. Its engraved canvas, gold actions, 
 identity chip and individual footer remain theme-owned. Themes decorate canonical selectors; they
 must not replace component DOM, required spacing, GET/POST semantics, behaviour hooks or accessibility.
 
-**1.7 Every page is built the same way.** Page head, then the identity band, then the body on cards:
+**1.7 Every page is built the same way.** Page head, then the shared identity band (Gilded Noir uses compact header identity), then the body on cards:
 
 ```text
 page-head partial
@@ -144,18 +144,32 @@ are otherwise bare (`.cl-ui-toolbar`, `.cl-ui-section-head`, `.cl-ui-notice`, `.
 already inside a card, so this holds without each template having to remember it.
 
 Company context is an opaque, visibly tinted banner, not an ordinary white card. Its colour follows
-the theme/palette while core retains its control layout. GN keeps `gn-footer`, Factory Reset Sidebar
-keeps `fs-footer`, and core footers use a surfaced palette colour with its contrasting foreground.
+the theme/palette while core retains its control layout. Every footer uses `cl-footer` inside `cl-page-frame`. Gilded Noir retains its rich footer and
+`gn-footer-art`, `gn-footer-veil` and `gn-footnote`; Factory Reset Sidebar retains its decorative
+footer treatment. Standard footers use a surfaced palette colour with its contrasting foreground.
 
 The check is the delivered HTML, not the template: walk every text node's ancestors and look for one
 that paints a background. A partial can look carded in source and still render bare once a wrapper
 decides otherwise.
 
-**1.9 The page body sits in a boxed container.** Each theme puts the body in one box with a surface,
-a border and a radius — `.rl-content` in Radiant Learning, `.main > .content` in Factory Reset — so
-the texture shows *around* the page rather than behind its text. The footer sits outside that box:
-it is the end of the page, not part of its content. A course page opts out, because its reading
-column already sets its own width and a second box would inset the text twice.
+**1.9 The page frame contains main and footer.** All five themes use `div.cl-shell`, a top
+`header.cl-header` or `aside.cl-sidebar`, `div.cl-page`, `section.cl-page-context` with its inner
+wrapper, and `div.cl-page-frame`. Exactly one `main.cl-main` and its following `footer.cl-footer`
+are siblings inside that frame. Layout/framing wrappers are divs; meaningful page regions remain
+sections. Course presentation can adjust the frame surface/width without changing these landmarks.
+
+**1.10 Shared page concepts use canonical classes.** The core navigation partial renders the core
+model using `cl-navigation` and `cl-nav-*`. Top navigation: Radiant Learning, Light Default, Gilded
+Noir. Sidebar navigation: Factory Reset and Factory Reset Sidebar. Authentication changes entries,
+identity and actions, never the shell construction. No hard-coded guest menu or old/new class aliases.
+
+Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-actions`. Identity
+uses `cl-identity` plus `cl-identity-head` or `cl-identity-compact`, with shared avatar/meta/name/email/
+roles classes. Gilded Noir's compact identity stays in the header navigation; core omits its full
+page band rather than rendering and hiding a duplicate. Ordinary content sections use
+`section.cl-page-section`; specialised course/admin/catalogue sections retain their own classes.
+The Theme SDK contains the canonical class table and shell sample. Structural rendering contracts
+and the browser matrix cover all five themes in both states at desktop, tablet and mobile widths.
 
 ---
 
@@ -276,15 +290,15 @@ leaves a reader who has opened Administration → System → Themes with no indi
 are. Only the path is compared, never the query string: paging or searching a list is a view of a
 page, not a different page, and must not unmark the entry the reader arrived through.
 
-**5.5a A group is marked with `nav-group-current`, never `active`.** The palette paints anything
-carrying `data-nav-item` and `active` as a filled pill, which is right for a link. A group is a
+**5.5a A group is marked with `cl-nav-group-current`, never `is-active`.** The palette paints destination links
+carrying `data-nav-item` and `is-active` as a filled pill, which is right for a link. A group is a
 container holding several links, so the same class turns the whole group into a slab of colour with
 its heading inside it. The group says it is current under its own class and core marks the heading,
 not the block.
 
 **5.5b Put the state on the link, not on what is inside it.** A child anchor that carries no class
 of its own is easy to mark by rewriting "the first class attribute on the line" — which is the
-`nav-icon` inside the anchor. The state then lands on the SVG, where nothing styles it, and the
+`cl-nav-icon` inside the anchor. The state then lands on the SVG, where nothing styles it, and the
 entry is never marked at all.
 
 **5.6 A flyout anchors to its own group.** The group is the positioning context, so `left: 100%` is
@@ -340,19 +354,21 @@ without `!important` and without depending on stylesheet order. A palette re-col
 setting the texture's two band colours — never by painting a flat colour over it, which is what a
 `background` on the shell or on `body[data-cl-palette-managed]` does.
 
-**6.6 Identity band.** Who the reader is, directly under the page head on every page. Included by
+**6.6 Identity band.** Who the reader is, directly under the page head, except Gilded Noir’s shared compact header identity. Included by
 `partials/page-head.html.twig` rather than by each page, so a page cannot forget it and cannot put
 it anywhere else. A signed-out reader gets the same band — same height, same shape — with an account
 mark and a way in; a header that appears for some readers and not others makes the page jump about
 depending on who is looking at it.
-Core classes: `.cl-identity-head`, `.cl-identity-head-inner`, `.cl-identity-head-meta`.
+Core classes: `.cl-identity.cl-identity-head`, `.cl-identity-meta`, `.cl-identity-details`.
+Gilded Noir uses the shared compact identity in its header instead; the full band is omitted at
+render time. Compact styles must not inherit the full band’s padding or avatar dimensions.
 
-**6.7 Site footer.** Core-owned markup in `partials/site-footer.html.twig`, included by every
-theme's own footer partial. It was five inline footers that disagreed with each other and none of
-which had a surface. A theme changes how it looks by changing the palette, not by rewriting it.
-It carries the footer navigation and the social marks, on a light pastel surface with a dark border.
-→ Enforced by `NavigationContractTest`, `tools/validate-ui-contracts.php` and `validate-release.php`,
-each of which checks both halves: the theme delegates, and the core footer renders the array.
+**6.7 Site footer.** Every footer uses `cl-footer` and follows `main.cl-main` inside
+`div.cl-page-frame`. Factory Reset, Light Default and Radiant Learning delegate to
+`partials/site-footer.html.twig`. Gilded Noir and Factory Reset Sidebar keep their distinctive rich
+footers while using the same shared footer vocabulary and core `footer_navigation` destinations.
+Gilded Noir retains `gn-footer-art`, `gn-footer-veil` and `gn-footnote`.
+→ Enforced by `CanonicalPageConstructionTest` and the browser matrices.
 
 **6.8 Social marks.** Brand glyphs in the core sprite as `social-<key>`, keyed to `SocialPlatform`
 so a mark and a link cannot disagree about which service they name. These are the one exception to
@@ -377,7 +393,7 @@ it goes. Success hides itself after 4.5 seconds, info after 6.5, and every messa
 control; on the way out the *container* goes too once it holds nothing, or its bottom margin is left
 holding open a gap the reader can no longer account for and the page head never returns to the top
 of its boxed container. Owner's instruction, 2026/09/12, from Administration Settings after a save.
-Core hooks the themes must emit: `.flash-stack` around the messages, `data-flash-message` on each,
+Core hooks the themes must emit: `.cl-flash-stack` around the messages, `data-flash-message` on each,
 `data-flash-close` on its control — the dismissal in `platform-overrides.js` finds the stack through
 them. Note that `:empty` cannot do this in CSS: the whitespace text nodes between the messages
 survive their removal, so the stack is never empty in the selector's sense.
@@ -397,7 +413,7 @@ third-level flyout, the page canvas and the identity band were all shaped there.
 either as a defect.
 
 **7.2 The footer is visually distinct from what sits above it.** In a sidebar theme the footer must
-not be the same colour as the sidebar. In Light Default the footer background is dark.
+not be the same colour as the sidebar. Footer surfaces and readable foregrounds follow the active theme/palette; Light Default is not restricted to a fixed dark footer.
 
 **7.3 Every theme's footer carries social media icons.**
 
@@ -655,3 +671,7 @@ must clone the server-rendered canonical prototypes; JavaScript may reindex cont
 create a competing UI. Themes must not redefine canonical display, grids, overflow, positioning,
 visibility or touch dimensions. Notice headings have a dedicated hook, separate from prose emphasis.
 See `UI-COMPONENTS.md` for the helper, native action contracts and ownership enforcement.
+
+## v0.8.5 navigation regression rules
+
+Core owns the mobile toggle and Escape handling. With JavaScript disabled, navigation stays visible and functional. Expanded narrow top headers stay in normal flow so they cannot cover page controls. Sidebar groups expand inline; desktop top-navigation groups use flyouts. Menu text must meet 4.5:1 contrast. Compact identity must not inherit full-band padding or avatar sizing. Verify both browser matrices after changes; do not infer shell correctness from component assertions alone.

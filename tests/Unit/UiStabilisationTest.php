@@ -61,8 +61,8 @@ TWIG, []);
         }
         self::assertSame([], UiOwnershipAudit::themeGeometry(<<<'CSS'
 :root{--cl-context-surface:#efdca9}
-.gn-footer{display:grid;grid-template-columns:1fr 1fr}
-.fs-shell{display:grid;min-height:100vh}
+.cl-footer{display:grid;grid-template-columns:1fr 1fr}
+.cl-shell{display:grid;min-height:100vh}
 :is(.gn-family-admin,.gn-family-company) .cl-ui-section-head::before,
 .gn-family-account .cl-ui-section-head::before{content:"";position:absolute;pointer-events:none;inset:0;background:gold}
 .cl-ui-section-head h2::after{content:"";position:absolute;pointer-events:none;bottom:0;width:92px;height:5px;background:gold}

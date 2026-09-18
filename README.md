@@ -1,7 +1,7 @@
 # Catto Learning LMS
 
 Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce
-platform. The current development release is **v0.8.4.2** (the application package remains on the
+platform. The current development release is **v0.8.5** (the application package remains on the
 0.8 code line). Development data is disposable; no production data or upgrade compatibility is
 assumed.
 
@@ -47,7 +47,9 @@ feedback, overlays, icons and catalogue components.
 This prevents independently generated views from drifting in markup, spacing, accessibility,
 responsive behavior and progressive enhancement. Shared search, pagination, sortable headers,
 entity lookup, course cards and navigation remain canonical partials. Gilded Noir and Factory Reset
-Sidebar retain their own footer markup and shell treatment. The component
+Sidebar retain their own footer markup and shell treatment. In v0.8.5,
+all five themes use the canonical page vocabulary: one shell for both authentication states, shared
+navigation, and main/footer siblings inside `cl-page-frame`. The component
 gallery is available at `/admin/system/ui-components` for an administrator with the existing system
 settings permission.
 
@@ -103,8 +105,8 @@ podman exec -u cattotest env_php_1 sh -lc 'composer qa'
 ```
 
 It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and
-release validation. The v0.8.4.2 release passes 643 tests and 43,978 assertions. Twig lint
-passes for all 146 application templates. A Chromium check of content produced by the real importer
+release validation. The v0.8.5 release passes 645 tests and 41,045 assertions. Twig lint
+passes for all 173 application and theme templates. A Chromium check of content produced by the real importer
 and renderer verifies SVG gradients, namespaces and embedded interactions. The existing all-theme
 UI browser regression matrix is documented in `tests/Browser/README.md`. JavaScript changed in the
 repository should also pass `node --check`.
@@ -131,3 +133,5 @@ deliberate reset is intended.
 ## License
 
 Catto Learning LMS is released under the MIT license; see [LICENSE](LICENSE).
+
+The v0.8.5 [canonical page construction report](REPORTS/20260918-CattoLMS-Canonical-Page-Construction-Report.md) records the architecture, fixes, validation scope and release handling.

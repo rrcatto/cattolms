@@ -1,8 +1,8 @@
-# Catto Learning 0.8.4.2 — Development Handoff
+# Catto Learning 0.8.5 — Development Handoff
 
 **Date:** 2026/09/18 SAST
-**Update:** v0.8.4.2 passwordless success redirect correction
-**Git publication:** `main`, `dev-v0.8`, annotated tags `v0.8`, `v0.8.1`, `v0.8.2`, `v0.8.3`, `v0.8.4` , `v0.8.4.1` and `v0.8.4.2`
+**Update:** v0.8.5 canonical page construction across all five themes
+**Git publication:** release on `main`, annotated tag `v0.8.5`; development checkout remains `dev-v0.8`.
 
 The v0.8.4.1 release preserves trusted SVG/HTML, styles and embedded code in course imports, edits
 and exports, and accepts SVG media. See the trusted course content validation at the end of this file.
@@ -17,6 +17,45 @@ with bank details stored in `app_options`; cart colours and surfaces belong to t
 Run additive migrations, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The published v0.8.3 baseline passed 636 tests and 43,787 assertions; v0.8.4 results are below. Passwordless registration, authenticated-email sessions and secondary-email promotion are covered by integration tests; public login, registration, catalogue, reports and the UI gallery were smoke-checked in Chromium at desktop and mobile widths.
 
 The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. The published v0.8.2 gate had 634 tests and 43,707 assertions; use the current validation below for v0.8.4.
+
+## v0.8.5 canonical page construction — 2026-09-18
+
+The development tree implements the owner’s canonical page construction v2 specification for all
+five bundled themes. The workspace specification files are
+`UX-SPEC/CattoLMS-canonical-page-construction-v2.md` and its YAML companion (the local filenames
+omit the date prefix used in the original request).
+
+Shared page concepts now use the canonical `cl-*` vocabulary. Each theme renders one shell for
+both authentication states, delegates navigation to the platform partial, and places exactly one
+`main.cl-main` followed by `footer.cl-footer` inside `div.cl-page-frame`. Meaningful page regions
+remain sections; shell/frame/family wrappers are divs. Radiant Learning, Light Default and Gilded
+Noir retain top navigation; Factory Reset and Factory Reset Sidebar retain sidebars. Gilded Noir
+keeps its compact navigation identity, canvas, ribbon and rich footer art/veil/footnote.
+
+Resumed validation corrected mobile and report/gallery frame overflow in Sidebar, misplaced
+sidebar-only submenu CSS, compact identity padding/avatar styling, palette navigation contrast,
+brand-mark alignment and the Light Default mobile Menu label. Mobile menus work without scripts;
+expanded narrow headers stay in normal flow so they cannot cover page controls. Removed obsolete
+navigation CSS and corrected accidental property renames in the existing browser runner.
+
+Development themes were installed through `composer themes:install -- --force`; AssetMapper assets
+were compiled and core/theme browser assets published as `cattotest`. The active theme is restored
+by the canonical browser runner. Theme-state recovery after interruption is documented in
+`tests/Browser/README.md`. The owner subsequently authorized release v0.8.5 and publication to
+GitHub main. Theme packages are rebuilt from final source with new versions: Factory Reset,
+Factory Reset Sidebar and Light Default 2.0.1; Gilded Noir 2.0.2; Radiant Learning 4.0.1.
+The Sidebar child pins Factory Reset 2.0.1. Earlier sections below are historical release records.
+
+Validation: the canonical browser matrix passes 30 theme/state/viewport combinations at 1440, 820
+and 390px, plus ten native navigation checks with JavaScript disabled. The existing component
+matrix passes 70 page/theme/viewport checks, three defect mutations and native Next/jump navigation.
+Screenshots for both authentication states, all widths, open navigation and footers were visually
+reviewed. Artifacts are `/tmp/catto-canonical-page/` and `/tmp/catto-ui-stabilisation/` on the host.
+Full `composer qa` passes on the local PHP 8.5.10 development container: 645 tests / 41,045
+assertions, PHPStan, architecture, runtime-hazard, UI-contract and release validation. Twig lint
+passes all 173 templates; `git diff --check` is clean. Runtime/release validators now require the
+core navigation and flash includes. The original active theme was restored and the isolated browser
+identity/session and host state file were cleaned up after validation.
 
 ## Reviewed authentication redirect correction — 2026-09-18
 
@@ -57,12 +96,12 @@ course-card/pagination geometry. See [browser validation](../tests/Browser/READM
 computed-style, bounding-box, contrast, mutation and non-JavaScript checks. The release is tagged v0.8.4; the application package remains on the 0.8 code line.
 No business or authentication behaviour changed.
 
-Known pre-existing visual limitation: Sidebar's narrow shell translates away a static sidebar but
+Historical limitation, resolved in v0.8.5: Sidebar's narrow shell translated away a static sidebar but
 retains its grid row, leaving blank space above content. Its shell rules were deliberately preserved
 as required; see the browser README and mobile screenshots. Automatic Company/Account stat-grid
 sizing is fixed in core, separately from Reports' explicit four-column layout.
 
-Current validation (2026-09-16):
+Historical v0.8.4 validation (2026-09-16):
 
 - `vendor/bin/phpunit tests/Unit/UiStabilisationTest.php tests/Unit/UiRemediationContractTest.php tests/Unit/PaginationUiContractTest.php`: 45 tests, 294 assertions passed.
 - `php bin/console lint:twig resources/views themes`: all 175 templates passed.
@@ -1187,3 +1226,7 @@ an explanatory error, because `companies.domain` is unique platform-wide.
 - `git diff --check`: passed.
 - Chromium via Playwright: a standalone fixture generated by the real HTML importer and content renderer preserved SVG namespaces, `viewBox`, gradient and clip-path references; rendered the gradient and executed the embedded script/button interaction. Screenshot inspected. This was not a live authenticated learner-page check.
 - Original course files must be reimported to restore graphics removed by earlier imports; stripped content cannot be recovered from stored HTML alone.
+
+### v0.8.5 upgrade order
+
+Run `composer themes:install` before `composer migrate`. The additive canonical-theme migration advances only the immediately preceding bundled active-theme keys to their new installed versions; it preserves custom or other selections. Then publish compiled/core assets and clear caches. The report is [Canonical Page Construction](../REPORTS/20260918-CattoLMS-Canonical-Page-Construction-Report.md).

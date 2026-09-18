@@ -2,7 +2,7 @@
 {% block page_body %}
     {% set ph_title = 'Checkout' %}{% set ph_kicker = '' %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+    <section class="cl-page-section container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
         <nav aria-label="Checkout progress" class="cl-checkout-steps">

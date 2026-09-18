@@ -33,7 +33,7 @@ $coreFooter = $read($root . '/resources/views/partials/site-footer.html.twig');
 $need(str_contains($coreFooter, 'footer_navigation'), 'The core footer must render the core footer_navigation array.');
 
 $coreJs = $read($root . '/public_html/js/platform-overrides.js');
-foreach (['data-open-modal','details.account-menu','dataset.tabHistory','localStorage','/theme/palette','cl-palette-switcher','modal.hidden = true','modal.hidden = false'] as $token) {
+foreach (['data-open-modal','details[data-cl-dropdown]','dataset.tabHistory','localStorage','/theme/palette','cl-palette-switcher','modal.hidden = true','modal.hidden = false'] as $token) {
     $need(str_contains($coreJs, $token), 'Core platform interaction missing: ' . $token);
 }
 $need(!str_contains($coreJs, 'data-admin-tab'), 'Legacy Administration tab JavaScript must not return.');
@@ -207,7 +207,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is built as a plain array now rather than written into F3's hive, so these look
 // for the assignment rather than for set(). What is being protected is unchanged: every page is
 // given navigation, a footer and its section keys, whichever engine renders it.
-foreach (["PLATFORM_ASSET_VERSION = '0.8'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.5'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer contract missing: ' . $token);
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);

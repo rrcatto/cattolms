@@ -1,6 +1,6 @@
 # Catto Learning HTML Course Specification
 
-**Target LMS:** 0.8.4.2 release (0.8 code line)
+**Target LMS:** 0.8.5 release (0.8 code line)
 **Date time:** 2026/09/18 SAST
 **Status:** Canonical specification for the currently implemented HTML course authoring/import workflow.
 

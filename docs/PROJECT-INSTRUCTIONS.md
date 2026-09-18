@@ -1,9 +1,9 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.8.4.2 (passwordless redirect correction, 2026/09/18; 0.5.8.3 remains the accepted VPS version)
+**Current approved LMS version:** 0.8.5 (canonical page construction, 2026/09/18; 0.5.8.3 remains the accepted VPS version)
 **Date time:** 2026/09/18 SAST
 **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
-**Current phase:** TEST/DEV; v0.8.4.2 corrects false mail-failure messages after successful login/registration and preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical UI geometry and theme decoration; passwordless account workflows remain intact while v0.8 commerce continues through additive migrations. The development database is disposable; the authenticated-email session column is applied by migration.
+**Current phase:** TEST/DEV; v0.8.5 unifies canonical page construction across five themes and retains the correction for false mail-failure messages after successful login/registration; it preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical UI geometry and theme decoration; passwordless account workflows remain intact while v0.8 commerce continues through additive migrations. The development database is disposable; the authenticated-email session column is applied by migration.
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -197,6 +197,15 @@ Canonical consolidated workspaces:
 Every top-level section also has a semantic standalone route. Do not reintroduce `/admin?tab=...` as a section-selection contract.
 
 Core supplies permission-filtered `navigation` and `footer_navigation` arrays. Themes must not maintain separate hard-coded route catalogues.
+
+## Canonical page construction in v0.8.5
+
+All bundled themes share the `cl-*` page vocabulary in `THEME-SDK.md`, core navigation and identity
+partials. Each theme uses one shell in both authentication states. Main and footer are siblings
+inside `div.cl-page-frame`; meaningful regions remain sections. Top headers belong to Radiant
+Learning, Light Default and Gilded Noir; Factory Reset and Factory Reset Sidebar use sidebars.
+Gilded Noir retains its compact navigation identity and rich decorative footer. Browser validation
+covers both states at desktop, tablet and mobile sizes; see `tests/Browser/README.md`.
 
 ## 7. Theme architecture
 
