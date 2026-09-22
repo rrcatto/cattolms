@@ -38,38 +38,6 @@ final class CoursePortabilityRepository
     ) {
     }
 
-    /** @return list<array<string,mixed>> */
-    public function contentBlocks(int $moduleId): array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT * FROM course_content_blocks WHERE module_id = :module_id ORDER BY parent_block_id NULLS FIRST, position',
-            ['module_id' => $moduleId]
-        );
-        $byParent = [];
-        foreach ($rows as $row) {
-            $parent = $row['parent_block_id'] === null ? 0 : (int) $row['parent_block_id'];
-            $row['settings'] = $this->jsonArray($row['settings'] ?? []);
-            $row['blocks'] = [];
-            $byParent[$parent][] = $row;
-        }
-        $build = function (int $parentId) use (&$build, &$byParent): array {
-            $result = [];
-            foreach ($byParent[$parentId] ?? [] as $row) {
-                $row['blocks'] = $build((int) $row['id']);
-                $result[] = $row;
-            }
-            return $result;
-        };
-        return $build(0);
-    }
-
-    /** @param list<array<string,mixed>> $blocks */
-    public function replaceContentBlocks(int $moduleId, array $blocks): void
-    {
-        $this->db->executeStatement('DELETE FROM course_content_blocks WHERE module_id = :module_id', ['module_id' => $moduleId]);
-        $this->insertBlocks($moduleId, null, $blocks);
-    }
-
     public function hasStartedLearners(int $courseId): bool
     {
         $rows = $this->db->fetchAllAssociative(
@@ -77,19 +45,6 @@ final class CoursePortabilityRepository
             ['course_id' => $courseId]
         );
         return (int) ($rows[0]['total'] ?? 0) > 0;
-    }
-
-    /** @return list<string> */
-    public function mediaStorageKeys(int $courseId): array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT storage_key FROM course_media WHERE course_id=:course_id',
-            ['course_id' => $courseId]
-        );
-        return array_values(array_filter(array_map(
-            static fn(array $row): string => (string) ($row['storage_key'] ?? ''),
-            $rows
-        )));
     }
 
     public function resetCourseContent(int $courseId): void
@@ -102,16 +57,51 @@ final class CoursePortabilityRepository
             ['course_id' => $courseId]
         );
         $this->db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:course_id', ['course_id' => $courseId]);
-        $this->db->executeStatement('DELETE FROM course_assessments WHERE course_id=:course_id', ['course_id' => $courseId]);
-        $this->db->executeStatement('DELETE FROM course_modules WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $itemIds = array_map('intval', $this->db->fetchFirstColumn(
+            'SELECT course_item_id FROM course_item_placements WHERE course_id=:course_id',
+            ['course_id' => $courseId]
+        ));
+        $this->db->executeStatement('DELETE FROM course_structure_nodes WHERE course_id=:course_id', ['course_id' => $courseId]);
+        // The structure deletion cascades to placements. Only then may we discard the old
+        // Course Items, and only if no other placement or embedded use keeps them shared.
+        foreach ($itemIds as $itemId) {
+            $this->db->executeStatement(
+                "DELETE FROM course_items ci
+                 WHERE ci.id=:item_id
+                   AND NOT EXISTS (SELECT 1 FROM course_item_placements other WHERE other.course_item_id=ci.id)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM course_item_references r
+                       JOIN course_item_placements source ON source.course_item_id=r.source_course_item_id
+                       WHERE r.referenced_key=ci.item_key
+                   )",
+                ['item_id' => $itemId]
+            );
+        }
         $this->db->executeStatement('DELETE FROM course_grade_bands WHERE course_id=:course_id', ['course_id' => $courseId]);
-        $this->db->executeStatement('DELETE FROM course_media WHERE course_id=:course_id', ['course_id' => $courseId]);
         $this->db->executeStatement(
             "UPDATE courses SET status='draft', publication_approval_status='pending', source_filename=NULL,
                     updated_at=NOW(), certificate_template_html='', certificate_template_css='', presentation_css=''
              WHERE id=:course_id",
             ['course_id' => $courseId]
         );
+    }
+
+    public function itemKeyIsExclusiveToCourse(string $key, int $courseId): bool
+    {
+        $item = $this->db->fetchAssociative('SELECT id FROM course_items WHERE item_key=:key', ['key' => $key]);
+        if ($item === false) {
+            return true;
+        }
+        $itemId = (int) $item['id'];
+        return (int) $this->db->fetchOne(
+            "SELECT COALESCE(SUM(total),0) FROM (
+                 SELECT COUNT(*) AS total FROM course_item_placements p WHERE p.course_item_id=:item AND p.course_id<>:course
+                 UNION ALL
+                 SELECT COUNT(*) AS total FROM course_item_references r JOIN course_item_placements source ON source.course_item_id=r.source_course_item_id
+                  WHERE r.referenced_key=:key AND source.course_id<>:course
+             ) conflicts",
+            ['item' => $itemId, 'key' => $key, 'course' => $courseId]
+        ) === 0;
     }
 
     public function deleteCourse(int $courseId): void
@@ -221,67 +211,5 @@ final class CoursePortabilityRepository
             'DELETE FROM course_enrolments WHERE user_id=:user_id AND course_id=:course_id AND is_preview=TRUE',
             ['user_id' => $userId, 'course_id' => $courseId]
         );
-    }
-
-    public function setRevisionMetadata(int $courseId, ?int $parentCourseId, int $revisionNumber, string $approvalStatus): void
-    {
-        $this->db->executeStatement(
-            'UPDATE courses SET parent_course_id=:parent, revision_number=:revision, publication_approval_status=:approval, updated_at=NOW() WHERE id=:course_id',
-            [
-                'parent' => $parentCourseId,
-                'revision' => $revisionNumber,
-                'approval' => $approvalStatus,
-                'course_id' => $courseId,
-            ]
-        );
-    }
-
-    /** @param list<array<string,mixed>> $blocks */
-    private function insertBlocks(int $moduleId, ?int $parentId, array $blocks): void
-    {
-        foreach ($blocks as $position => $block) {
-            $rows = $this->db->fetchAllAssociative(
-                'INSERT INTO course_content_blocks
-                    (public_id, module_id, parent_block_id, position, block_type,
-                     title, content_html, settings, created_at, updated_at)
-                 VALUES
-                    (:public_id, :module_id, :parent_block_id, :position, :block_type,
-                     :title, :content_html, :settings, :created_at, :updated_at)
-                 RETURNING id',
-                [
-                    'public_id' => Uuid::v4(),
-                    'module_id' => $moduleId,
-                    'parent_block_id' => $parentId,
-                    'position' => $position + 1,
-                    'block_type' => (string) ($block['type'] ?? $block['block_type'] ?? 'html'),
-                    'title' => ($block['title'] ?? null) !== '' ? ($block['title'] ?? null) : null,
-                    'content_html' => (string) ($block['content_html'] ?? ''),
-                    'settings' => json_encode((array) ($block['settings'] ?? []), JSON_THROW_ON_ERROR),
-                    'created_at' => gmdate('Y-m-d H:i:sP'),
-                    'updated_at' => gmdate('Y-m-d H:i:sP'),
-                ]
-            );
-            $id = (int) ($rows[0]['id'] ?? 0);
-            if ($id < 1) {
-                throw new RuntimeException('Unable to create course content block.');
-            }
-            $children = (array) ($block['blocks'] ?? []);
-            if ($children !== []) {
-                $this->insertBlocks($moduleId, $id, $children);
-            }
-        }
-    }
-
-    /** @return array<string,mixed> */
-    private function jsonArray(mixed $value): array
-    {
-        if (is_array($value)) {
-            return $value;
-        }
-        if (is_string($value) && $value !== '') {
-            $decoded = json_decode($value, true);
-            return is_array($decoded) ? $decoded : [];
-        }
-        return [];
     }
 }

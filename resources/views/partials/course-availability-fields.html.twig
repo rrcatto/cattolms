@@ -1,0 +1,5 @@
+{% set delay_total = delay_total|default(0) %}
+{% set delay_values = {weeks:delay_total // 10080,days:(delay_total % 10080) // 1440,hours:(delay_total % 1440) // 60,minutes:delay_total % 60} %}
+{% for unit in ['weeks','days','hours','minutes'] %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Delay ' ~ unit,for:delay_prefix ~ '-' ~ unit})} %}{% block control %}<input class="form-control" id="{{ delay_prefix }}-{{ unit }}" name="delay_{{ unit }}" type="number" min="0" value="{{ attribute(delay_values,unit) }}" {{ course.availability_locked ? 'disabled' : '' }} {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endfor %}

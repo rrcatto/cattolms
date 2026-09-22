@@ -143,7 +143,6 @@ final class CourseRepository
         'status' => 'c.status',
         'editors' => '(SELECT COUNT(*) FROM course_editors sed WHERE sed.course_id = c.id)',
         'learners' => '(SELECT COUNT(*) FROM course_enrolments sen WHERE sen.course_id = c.id AND sen.is_preview = FALSE)',
-        'revision' => 'c.revision',
         'updated' => 'c.updated_at',
     ];
     private const CATALOGUE_ORDER = 'c.published_at DESC NULLS LAST, c.title, c.id';
@@ -181,11 +180,11 @@ final class CourseRepository
         $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
                     c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
                     c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
-                    cover.public_id AS cover_media_public_id,
-                    (SELECT COUNT(*)::int FROM course_modules cm WHERE cm.course_id = c.id) AS module_count,
+                    NULL::text AS cover_media_public_id,
+                    (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id = c.id) AS item_count,
                     (SELECT COUNT(*)::int FROM assessment_questions aq
-                       JOIN course_assessments ca ON ca.id = aq.assessment_id
-                      WHERE ca.course_id = c.id) AS question_count,
+                       JOIN course_item_placements cip ON cip.course_item_id = aq.course_item_id
+                      WHERE cip.course_id = c.id) AS question_count,
                     (SELECT cpv.id FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_variant_id,
                     (SELECT cpv.price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
                     (SELECT cpv.currency_code FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code,
@@ -193,12 +192,7 @@ final class CourseRepository
                     (SELECT COUNT(*)::int FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE) AS active_price_variant_count
              FROM page
              JOIN courses c ON c.id = page.id
-             LEFT JOIN course_categories cc ON cc.id = c.category_id
-             LEFT JOIN LATERAL (
-                 SELECT public_id FROM course_media
-                 WHERE course_id = c.id AND media_role = 'cover'
-                 ORDER BY created_at DESC LIMIT 1
-             ) cover ON TRUE";
+             LEFT JOIN course_categories cc ON cc.id = c.category_id";
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, self::CATALOGUE_ORDER, $limit, $offset),
@@ -355,19 +349,14 @@ final class CourseRepository
                                              AND cu.company_id = :company_id AND cu.status = 'active'
                        WHERE ce.course_id = c.id AND ce.is_preview = FALSE
                          AND ce.status = 'completed') AS staff_completed,
-                    cover.public_id AS cover_media_public_id,
-                    COUNT(DISTINCT cm.id)::int AS module_count
+                    NULL::text AS cover_media_public_id,
+                    COUNT(DISTINCT cip.node_id)::int AS item_count
              FROM page
              JOIN courses c ON c.id = page.id
              LEFT JOIN course_categories cc ON cc.id = c.category_id
              LEFT JOIN companies oc ON oc.id = c.owner_company_id
-             LEFT JOIN LATERAL (
-                 SELECT public_id FROM course_media
-                 WHERE course_id = c.id AND media_role = 'cover'
-                 ORDER BY created_at DESC LIMIT 1
-             ) cover ON TRUE
-             LEFT JOIN course_modules cm ON cm.course_id = c.id
-             GROUP BY c.id, cc.name, cc.slug, oc.name, cover.public_id";
+             LEFT JOIN course_item_placements cip ON cip.course_id = c.id
+             GROUP BY c.id, cc.name, cc.slug, oc.name";
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -548,12 +537,12 @@ final class CourseRepository
     private static function courseAdministrationDetail(): string
     {
         return "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status, c.level,
-                    c.updated_at, c.published_at, c.revision_number, c.owner_user_id, c.owner_company_id,
+                    c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id,
                     cc.name AS category_name,
                     oc.name AS owner_company_name,
                     COALESCE(NULLIF(trim(concat_ws(' ',ou.first_name,ou.last_name)),''),ou.display_name,oue.email) AS owner_person_name,
-                    (SELECT COUNT(*)::int FROM course_modules cm WHERE cm.course_id=c.id) AS module_count,
-                    (SELECT COUNT(*)::int FROM assessment_questions aq JOIN course_assessments ca ON ca.id=aq.assessment_id WHERE ca.course_id=c.id) AS question_count,
+                    (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id=c.id) AS item_count,
+                    (SELECT COUNT(*)::int FROM assessment_questions aq JOIN course_item_placements cip ON cip.course_item_id=aq.course_item_id WHERE cip.course_id=c.id) AS question_count,
                     (SELECT COUNT(*)::int FROM course_editors ced WHERE ced.course_id=c.id) AS editor_count,
                     (SELECT COUNT(DISTINCT ce.user_id)::int FROM course_enrolments ce WHERE ce.course_id=c.id AND ce.status IN ('assigned','active','completed') AND ce.is_preview=FALSE) AS learner_count,
                     (SELECT COUNT(DISTINCT ce.user_id)::int FROM course_enrolments ce WHERE ce.course_id=c.id AND ce.started_at IS NOT NULL AND ce.is_preview=FALSE) AS started_count
@@ -729,20 +718,15 @@ final class CourseRepository
                           c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
                           c.cover_svg, c.category_id,
                           cat.name AS category_name, cat.slug AS category_slug,
-                          cover.public_id AS cover_media_public_id,
-                          (SELECT COUNT(*)::int FROM course_modules cm WHERE cm.course_id = c.id) AS module_count,
+                          NULL::text AS cover_media_public_id,
+                          (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id = c.id) AS item_count,
                           (SELECT cpv.price_minor_units FROM course_price_variants cpv
                             WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
                           (SELECT cpv.currency_code FROM course_price_variants cpv
                             WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code
                    FROM page
                    JOIN courses c ON c.id = page.id
-                   LEFT JOIN course_categories cat ON cat.id = c.category_id
-                   LEFT JOIN LATERAL (
-                       SELECT public_id FROM course_media
-                       WHERE course_id = c.id AND media_role = 'cover'
-                       ORDER BY created_at DESC LIMIT 1
-                   ) cover ON TRUE";
+                   LEFT JOIN course_categories cat ON cat.id = c.category_id";
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, self::CATALOGUE_ORDER, $limit, $offset),
@@ -1676,169 +1660,6 @@ final class CourseRepository
     }
 
     /** @return list<array<string,mixed>> */
-    public function modules(int $courseId): array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT cm.*,
-                    ca.id AS assessment_id,
-                    ca.public_id AS assessment_public_id,
-                    ca.title AS assessment_title,
-                    ca.pass_mark,
-                    COUNT(aq.id)::int AS question_count,
-                    COALESCE(SUM(aq.points), 0)::int AS maximum_points
-             FROM course_modules cm
-             LEFT JOIN course_assessments ca ON ca.module_id = cm.id
-             LEFT JOIN assessment_questions aq ON aq.assessment_id = ca.id
-             WHERE cm.course_id = :course_id
-             GROUP BY cm.id, ca.id
-             ORDER BY cm.position',
-            ['course_id' => $courseId]
-        );
-        return $this->normaliseRows($rows);
-    }
-
-    /** @return array<string,mixed>|null */
-    public function moduleById(int $courseId, int $moduleId): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM course_modules WHERE course_id = :course_id AND id = :id',
-            ['course_id' => $courseId, 'id' => $moduleId]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return array<string,mixed>|null */
-    public function moduleByPosition(int $courseId, int $position): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM course_modules WHERE course_id = :course_id AND position = :position',
-            ['course_id' => $courseId, 'position' => $position]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return array<string,mixed>|null */
-    public function assessmentForModule(int $moduleId): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            "SELECT * FROM course_assessments WHERE module_id = :module_id AND assessment_type = 'module'",
-            ['module_id' => $moduleId]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return array<string,mixed>|null */
-    public function finalAssessment(int $courseId): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            "SELECT * FROM course_assessments WHERE course_id = :course_id AND assessment_type = 'final'",
-            ['course_id' => $courseId]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return list<array<string,mixed>> */
-    public function diagnosticAssessments(int $courseId, bool $includeHidden = true): array
-    {
-        $visible = $includeHidden ? '' : ' AND is_visible = TRUE';
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT * FROM course_assessments
-              WHERE course_id = :course_id AND assessment_type = 'diagnostic'" . $visible
-                . ' ORDER BY position, id',
-            ['course_id' => $courseId]
-        );
-
-        return array_map(fn(array $row): array => $this->normaliseRow($row), $rows);
-    }
-
-    /** @return array<string,mixed>|null */
-    public function diagnosticAssessment(int $courseId, string $key, bool $includeHidden = true): ?array
-    {
-        $visible = $includeHidden ? '' : ' AND is_visible = TRUE';
-        $row = $this->db->fetchAssociative(
-            "SELECT * FROM course_assessments
-              WHERE course_id = :course_id AND assessment_type = 'diagnostic'
-                AND assessment_key = :assessment_key" . $visible,
-            ['course_id' => $courseId, 'assessment_key' => $key]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-
-    /** @return array<string,mixed>|null */
-    public function diagnosticAssessmentById(int $courseId, int $assessmentId): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            "SELECT * FROM course_assessments
-              WHERE id = :id AND course_id = :course_id AND assessment_type = 'diagnostic'",
-            ['id' => $assessmentId, 'course_id' => $courseId]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return list<array<string,mixed>> */
-    public function questions(int $assessmentId, bool $includeCorrect = false): array
-    {
-        $questionRows = $this->db->fetchAllAssociative(
-            'SELECT * FROM assessment_questions WHERE assessment_id = :assessment_id ORDER BY position, id',
-            ['assessment_id' => $assessmentId]
-        );
-        if ($questionRows === []) {
-            return [];
-        }
-
-        // One query for every option in the assessment rather than one per question. They are
-        // grouped by question below, so the shape the caller receives is unchanged.
-        $optionRows = $this->db->fetchAllAssociative(
-            'SELECT o.* FROM assessment_options o
-               JOIN assessment_questions q ON q.id = o.question_id
-              WHERE q.assessment_id = :assessment_id
-              ORDER BY o.position, o.id',
-            ['assessment_id' => $assessmentId]
-        );
-
-        $optionsByQuestion = [];
-        foreach ($optionRows as $optionRow) {
-            $option = [
-                'id' => (int) $optionRow['id'],
-                'public_id' => (string) $optionRow['public_id'],
-                'position' => (int) $optionRow['position'],
-                'option_html' => (string) $optionRow['option_html'],
-            ];
-            if ($includeCorrect) {
-                $option['is_correct'] = $this->databaseBoolean($optionRow['is_correct']);
-            }
-            $optionsByQuestion[(int) $optionRow['question_id']][] = $option;
-        }
-
-        $questions = [];
-        foreach ($questionRows as $questionRow) {
-            $questions[] = [
-                'id' => (int) $questionRow['id'],
-                'public_id' => (string) $questionRow['public_id'],
-                'position' => (int) $questionRow['position'],
-                'question_html' => (string) $questionRow['question_html'],
-                'points' => (int) $questionRow['points'],
-                'explanation_html' => (string) $questionRow['explanation_html'],
-                'difficulty' => (string) ($questionRow['difficulty'] ?? 'standard'),
-                'practice_eligible' => $this->databaseBoolean($questionRow['practice_eligible'] ?? true),
-                'graded_eligible' => $this->databaseBoolean($questionRow['graded_eligible'] ?? true),
-                'remediation_module_keys' => $this->jsonArray($questionRow['remediation_module_keys'] ?? '[]'),
-                'incorrect_points' => (float) ($questionRow['incorrect_points'] ?? 0),
-                'options' => $optionsByQuestion[(int) $questionRow['id']] ?? [],
-            ];
-        }
-
-        return $questions;
-    }
-
-    /** @return list<array<string,mixed>> */
     public function gradeBands(int $courseId): array
     {
         $rows = $this->db->fetchAllAssociative(
@@ -1858,89 +1679,6 @@ final class CourseRepository
             ],
             $rows
         );
-    }
-
-
-    /** @return list<array<string,mixed>> */
-    public function media(int $courseId): array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT * FROM course_media WHERE course_id = :course_id ORDER BY created_at DESC, id DESC',
-            ['course_id' => $courseId]
-        );
-
-        return array_map(
-            fn(array $row): array => [
-                'id' => (int) $row['id'],
-                'public_id' => (string) $row['public_id'],
-                'module_id' => $row['module_id'] === null ? null : (int) $row['module_id'],
-                'media_role' => (string) $row['media_role'],
-                'original_filename' => (string) $row['original_filename'],
-                'mime_type' => (string) $row['mime_type'],
-                'byte_size' => (int) $row['byte_size'],
-                'sha256' => (string) $row['sha256'],
-                'alt_text' => $row['alt_text'],
-                'is_public' => $this->databaseBoolean($row['is_public']),
-                'created_at' => $row['created_at'],
-            ],
-            $rows
-        );
-    }
-
-    /** @return array<string,mixed>|null */
-    public function mediaByPublicId(string $publicId): ?array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT cm.*, c.status AS course_status
-             FROM course_media cm JOIN courses c ON c.id = cm.course_id
-             WHERE cm.public_id = :public_id LIMIT 1',
-            ['public_id' => $publicId]
-        );
-        return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
-    }
-
-    /** @param array<string,mixed> $data */
-    public function addMedia(
-        int $courseId,
-        ?int $moduleId,
-        array $data,
-        int $userId
-    ): int {
-        if ((string) $data['media_role'] === 'cover') {
-            // SQL is appropriate for the bulk demotion of any previous covers.
-            $this->db->executeStatement(
-                "UPDATE course_media
-                 SET media_role = 'content'
-                 WHERE course_id = :course_id AND media_role = 'cover'",
-                ['course_id' => $courseId]
-            );
-        }
-
-        $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO course_media
-                 (public_id,course_id,module_id,media_role,original_filename,storage_key,
-                  mime_type,byte_size,sha256,alt_text,is_public,created_by_user_id,created_at)
-             VALUES (:public_id,:course_id,:module_id,:media_role,:original_filename,:storage_key,
-                     :mime_type,:byte_size,:sha256,:alt_text,:is_public,:created_by,:created_at)
-             RETURNING id',
-            [
-                'public_id' => Uuid::v4(),
-                'course_id' => $courseId,
-                'module_id' => $moduleId,
-                'media_role' => (string) $data['media_role'],
-                'original_filename' => (string) $data['original_filename'],
-                'storage_key' => (string) $data['storage_key'],
-                'mime_type' => (string) $data['mime_type'],
-                'byte_size' => (int) $data['byte_size'],
-                'sha256' => (string) $data['sha256'],
-                'alt_text' => $data['alt_text'] ?: null,
-                'is_public' => (bool) $data['is_public'],
-                'created_by' => $userId,
-                'created_at' => gmdate('Y-m-d H:i:sP'),
-            ]
-        );
-
-        return (int) ($rows[0]['id'] ?? 0);
     }
 
     /** @return list<array<string,mixed>> */
@@ -1973,19 +1711,19 @@ final class CourseRepository
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO courses
                  (public_id,category_id,slug,title,subtitle,summary,description_html,level,
-                  estimated_minutes,status,default_access_period_seconds,module_weight,final_weight,
+                  estimated_minutes,status,default_access_period_seconds,introduction_html,show_outline_on_intro,
                   certificate_enabled,certificate_title,certificate_template,certificate_body_text,
                   certificate_footer_text,certificate_signatory_name,certificate_signatory_title,
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
-                  parent_course_id,revision_number,publication_approval_status,certificate_template_html,
+                  publication_approval_status,certificate_template_html,
                   certificate_template_css,interchange_schema_version,created_by_user_id,updated_by_user_id,
                   created_at,updated_at,cover_svg)
              VALUES (:public_id,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
-                     :estimated_minutes,:status,:default_access_period_seconds,:module_weight,:final_weight,
+                     :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,:show_outline_on_intro,
                      :certificate_enabled,:certificate_title,:certificate_template,:certificate_body_text,
                      :certificate_footer_text,:certificate_signatory_name,:certificate_signatory_title,
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
-                     :parent_course_id,:revision_number,:publication_approval_status,:certificate_template_html,
+                     :publication_approval_status,:certificate_template_html,
                      :certificate_template_css,:interchange_schema_version,:created_by,:updated_by,
                      :created_at,:updated_at,:cover_svg)
              RETURNING id',
@@ -2001,8 +1739,8 @@ final class CourseRepository
                 'estimated_minutes' => $data['estimated_minutes'] ?: null,
                 'status' => (string) ($data['status'] ?? 'draft'),
                 'default_access_period_seconds' => $data['default_access_period_seconds'],
-                'module_weight' => $data['module_weight'],
-                'final_weight' => $data['final_weight'],
+                'introduction_html' => (string) ($data['introduction_html'] ?? ''),
+                'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
                 'certificate_enabled' => (bool) $data['certificate_enabled'],
                 'certificate_title' => $data['certificate_title'] ?: null,
                 'certificate_template' => (string) ($data['certificate_template'] ?? 'classic'),
@@ -2015,8 +1753,6 @@ final class CourseRepository
                 'source_filename' => ($data['source_filename'] ?? '') ?: null,
                 'owner_company_id' => $ownerCompanyId,
                 'owner_user_id' => $ownerUserId,
-                'parent_course_id' => $data['parent_course_id'] ?? null,
-                'revision_number' => (int) ($data['revision_number'] ?? 1),
                 'publication_approval_status' => (string) ($data['publication_approval_status'] ?? 'pending'),
                 'certificate_template_html' => (string) ($data['certificate_template_html'] ?? ''),
                 'certificate_template_css' => (string) ($data['certificate_template_css'] ?? ''),
@@ -2052,8 +1788,8 @@ final class CourseRepository
             'level' => $data['level'] ?: null,
             'estimated_minutes' => $data['estimated_minutes'] ?: null,
             'default_access_period_seconds' => $data['default_access_period_seconds'],
-            'module_weight' => $data['module_weight'],
-            'final_weight' => $data['final_weight'],
+            'introduction_html' => (string) ($data['introduction_html'] ?? ''),
+            'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) $data['certificate_enabled'],
             'certificate_title' => $data['certificate_title'] ?: null,
             'certificate_template' => (string) ($data['certificate_template'] ?? 'classic'),
@@ -2067,8 +1803,8 @@ final class CourseRepository
         ];
         $set = 'category_id=:category_id,slug=:slug,title=:title,subtitle=:subtitle,summary=:summary,'
             . 'description_html=:description_html,level=:level,estimated_minutes=:estimated_minutes,'
-            . 'default_access_period_seconds=:default_access_period_seconds,module_weight=:module_weight,'
-            . 'final_weight=:final_weight,certificate_enabled=:certificate_enabled,'
+            . 'default_access_period_seconds=:default_access_period_seconds,introduction_html=:introduction_html,'
+            . 'show_outline_on_intro=:show_outline_on_intro,certificate_enabled=:certificate_enabled,'
             . 'certificate_title=:certificate_title,certificate_template=:certificate_template,'
             . 'certificate_body_text=:certificate_body_text,certificate_footer_text=:certificate_footer_text,'
             . 'certificate_signatory_name=:certificate_signatory_name,'
@@ -2173,303 +1909,6 @@ final class CourseRepository
         }
     }
 
-    /** @param array<string,mixed> $data */
-    public function createModule(int $courseId, array $data): int
-    {
-        $now = gmdate('Y-m-d H:i:sP');
-        $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO course_modules
-                 (public_id,course_id,module_key,position,title,subtitle,learning_outcomes_html,
-                  content_html,summary_html,content_structure,is_review,assessment_required,created_at,updated_at)
-             VALUES (:public_id,:course_id,:module_key,:position,:title,:subtitle,:learning_outcomes_html,
-                     :content_html,:summary_html,:content_structure,:is_review,:assessment_required,:created_at,:updated_at)
-             RETURNING id',
-            [
-                'public_id' => Uuid::v4(),
-                'course_id' => $courseId,
-                'module_key' => (string) $data['module_key'],
-                'position' => (int) $data['position'],
-                'title' => (string) $data['title'],
-                'subtitle' => $data['subtitle'] ?: null,
-                'learning_outcomes_html' => (string) $data['learning_outcomes_html'],
-                'content_html' => (string) $data['content_html'],
-                'summary_html' => (string) $data['summary_html'],
-                'content_structure' => json_encode((array) ($data['content_blocks'] ?? []), JSON_THROW_ON_ERROR),
-                'is_review' => (bool) $data['is_review'],
-                'assessment_required' => (bool) $data['assessment_required'],
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]
-        );
-
-        $id = (int) ($rows[0]['id'] ?? 0);
-        if ($id < 1) {
-            throw new RuntimeException('Unable to create course module.');
-        }
-
-        return $id;
-    }
-
-    /** @param array<string,mixed> $data */
-    public function updateModule(int $moduleId, array $data): void
-    {
-        $updated = $this->db->executeStatement(
-            'UPDATE course_modules
-                SET module_key=:module_key,position=:position,title=:title,subtitle=:subtitle,
-                    learning_outcomes_html=:learning_outcomes_html,content_html=:content_html,
-                    summary_html=:summary_html,content_structure=:content_structure,is_review=:is_review,
-                    assessment_required=:assessment_required,updated_at=:updated_at
-              WHERE id=:id',
-            [
-                'module_key' => (string) $data['module_key'],
-                'position' => (int) $data['position'],
-                'title' => (string) $data['title'],
-                'subtitle' => $data['subtitle'] ?: null,
-                'learning_outcomes_html' => (string) $data['learning_outcomes_html'],
-                'content_html' => (string) $data['content_html'],
-                'summary_html' => (string) $data['summary_html'],
-                'content_structure' => json_encode((array) ($data['content_blocks'] ?? []), JSON_THROW_ON_ERROR),
-                'is_review' => (bool) $data['is_review'],
-                'assessment_required' => (bool) $data['assessment_required'],
-                'updated_at' => gmdate('Y-m-d H:i:sP'),
-                'id' => $moduleId,
-            ]
-        );
-        if ($updated === 0) {
-            throw new RuntimeException('The course module does not exist.');
-        }
-        $this->db->executeStatement(
-            'UPDATE course_assessments SET required = :required, updated_at = NOW() WHERE module_id = :module_id',
-            ['required' => (bool) $data['assessment_required'], 'module_id' => $moduleId]
-        );
-    }
-
-    public function deleteModule(int $courseId, int $moduleId): void
-    {
-        $this->db->executeStatement(
-            'DELETE FROM course_modules WHERE id=:id AND course_id=:course_id',
-            ['id' => $moduleId, 'course_id' => $courseId]
-        );
-    }
-
-    /** @param array<string,mixed> $data */
-    public function createAssessment(
-        int $courseId,
-        ?int $moduleId,
-        array $data
-    ): int {
-        $now = gmdate('Y-m-d H:i:sP');
-        $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO course_assessments
-                 (public_id,course_id,module_id,assessment_type,assessment_key,title,
-                  instructions_html,position,pass_mark,required,result_pass_html,result_fail_html,
-                  diagnostic_pass_action,is_visible,practice_enabled,practice_pool_mode,
-                  practice_question_count,graded_question_count,maximum_attempts,time_limit_seconds,
-                  score_policy,randomise_questions,randomise_options,negative_marking,
-                  difficulty_selection,created_at,updated_at)
-             VALUES (:public_id,:course_id,:module_id,:assessment_type,:assessment_key,:title,
-                     :instructions_html,:position,:pass_mark,:required,:result_pass_html,:result_fail_html,
-                     :diagnostic_pass_action,:is_visible,:practice_enabled,:practice_pool_mode,
-                     :practice_question_count,:graded_question_count,:maximum_attempts,:time_limit_seconds,
-                     :score_policy,:randomise_questions,:randomise_options,:negative_marking,
-                     :difficulty_selection,:created_at,:updated_at)
-             RETURNING id',
-            [
-                'public_id' => Uuid::v4(),
-                'course_id' => $courseId,
-                'module_id' => $moduleId,
-                'assessment_type' => $data['assessment_type'],
-                'assessment_key' => $data['assessment_key'] ?? null,
-                'title' => $data['title'],
-                'instructions_html' => $data['instructions_html'] ?? '',
-                'position' => $data['position'] ?? 1,
-                'pass_mark' => $data['pass_mark'] ?? 50,
-                'required' => (bool) ($data['required'] ?? true),
-                'result_pass_html' => $data['result_pass_html'] ?? '',
-                'result_fail_html' => $data['result_fail_html'] ?? '',
-                'diagnostic_pass_action' => $data['diagnostic_pass_action'] ?? 'guidance_only',
-                'is_visible' => (bool) ($data['is_visible'] ?? true),
-                'practice_enabled' => (bool) ($data['practice_enabled'] ?? true),
-                'practice_pool_mode' => $data['practice_pool_mode'] ?? 'both',
-                'practice_question_count' => $data['practice_question_count'] ?? 5,
-                'graded_question_count' => $data['graded_question_count'] ?? null,
-                'maximum_attempts' => $data['maximum_attempts'] ?? null,
-                'time_limit_seconds' => $data['time_limit_seconds'] ?? 1800,
-                'score_policy' => $data['score_policy'] ?? 'highest',
-                'randomise_questions' => (bool) ($data['randomise_questions'] ?? true),
-                'randomise_options' => (bool) ($data['randomise_options'] ?? true),
-                'negative_marking' => (bool) ($data['negative_marking'] ?? false),
-                'difficulty_selection' => json_encode((array) ($data['difficulty_selection'] ?? []), JSON_THROW_ON_ERROR),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]
-        );
-
-        $id = (int) ($rows[0]['id'] ?? 0);
-        if ($id < 1) {
-            throw new RuntimeException('Unable to create assessment.');
-        }
-
-        return $id;
-    }
-
-    /** @param array<string,mixed> $data */
-    public function updateAssessment(
-        int $assessmentId,
-        int $courseId,
-        array $data
-    ): void {
-        $set = 'title=:title,instructions_html=:instructions_html,pass_mark=:pass_mark,required=:required,'
-            . 'result_pass_html=:result_pass_html,result_fail_html=:result_fail_html,'
-            . 'diagnostic_pass_action=:diagnostic_pass_action,is_visible=:is_visible,'
-            . 'practice_enabled=:practice_enabled,practice_pool_mode=:practice_pool_mode,'
-            . 'practice_question_count=:practice_question_count,graded_question_count=:graded_question_count,'
-            . 'maximum_attempts=:maximum_attempts,time_limit_seconds=:time_limit_seconds,'
-            . 'score_policy=:score_policy,randomise_questions=:randomise_questions,'
-            . 'randomise_options=:randomise_options,negative_marking=:negative_marking,'
-            . 'difficulty_selection=:difficulty_selection,updated_at=:updated_at';
-        $params = [
-            'title' => $data['title'],
-            'instructions_html' => $data['instructions_html'] ?? '',
-            'pass_mark' => $data['pass_mark'] ?? 50,
-            'required' => (bool) ($data['required'] ?? true),
-            'result_pass_html' => $data['result_pass_html'] ?? '',
-            'result_fail_html' => $data['result_fail_html'] ?? '',
-            'diagnostic_pass_action' => $data['diagnostic_pass_action'] ?? 'guidance_only',
-            'is_visible' => (bool) ($data['is_visible'] ?? true),
-            'practice_enabled' => (bool) ($data['practice_enabled'] ?? true),
-            'practice_pool_mode' => $data['practice_pool_mode'] ?? 'both',
-            'practice_question_count' => $data['practice_question_count'] ?? 5,
-            'graded_question_count' => $data['graded_question_count'] ?? null,
-            'maximum_attempts' => $data['maximum_attempts'] ?? null,
-            'time_limit_seconds' => $data['time_limit_seconds'] ?? 1800,
-            'score_policy' => $data['score_policy'] ?? 'highest',
-            'randomise_questions' => (bool) ($data['randomise_questions'] ?? true),
-            'randomise_options' => (bool) ($data['randomise_options'] ?? true),
-            'negative_marking' => (bool) ($data['negative_marking'] ?? false),
-            'difficulty_selection' => json_encode((array) ($data['difficulty_selection'] ?? []), JSON_THROW_ON_ERROR),
-            'updated_at' => gmdate('Y-m-d H:i:sP'),
-            'id' => $assessmentId,
-            'course_id' => $courseId,
-        ];
-
-        // The key and the position belong to the diagnostic screens; a module assessment form does
-        // not carry them, and writing them unconditionally would blank a key the caller never saw.
-        if (array_key_exists('assessment_key', $data)) {
-            $set .= ',assessment_key=:assessment_key';
-            $params['assessment_key'] = $data['assessment_key'];
-        }
-        if (array_key_exists('position', $data)) {
-            $set .= ',position=:position';
-            $params['position'] = (int) $data['position'];
-        }
-
-        $updated = $this->db->executeStatement(
-            'UPDATE course_assessments SET ' . $set . ' WHERE id=:id AND course_id=:course_id',
-            $params
-        );
-        if ($updated === 0) {
-            throw new RuntimeException('The assessment does not exist.');
-        }
-    }
-
-    public function deleteAssessment(int $courseId, int $assessmentId): void
-    {
-        $this->db->executeStatement(
-            'DELETE FROM course_assessments WHERE id=:id AND course_id=:course_id',
-            ['id' => $assessmentId, 'course_id' => $courseId]
-        );
-    }
-
-    public function moveDiagnostic(int $courseId, int $assessmentId, string $direction): void
-    {
-        if (!in_array($direction, ['up', 'down'], true)) {
-            throw new InvalidArgumentException('Select a valid diagnostic move direction.');
-        }
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT id FROM course_assessments WHERE course_id = :course_id AND assessment_type = 'diagnostic' ORDER BY position, id",
-            ['course_id' => $courseId]
-        );
-        $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
-        $index = array_search($assessmentId, $ids, true);
-        if ($index === false) {
-            throw new RuntimeException('The diagnostic does not exist.');
-        }
-        $target = $direction === 'up' ? $index - 1 : $index + 1;
-        if ($target >= 0 && $target < count($ids)) {
-            [$ids[$index], $ids[$target]] = [$ids[$target], $ids[$index]];
-        }
-        foreach ($ids as $position => $id) {
-            $this->db->executeStatement(
-                'UPDATE course_assessments SET position = :position, updated_at = NOW() WHERE id = :id AND course_id = :course_id',
-                ['position' => $position + 1, 'id' => $id, 'course_id' => $courseId]
-            );
-        }
-    }
-
-    /** @param list<array<string,mixed>> $questions */
-    public function replaceAssessmentQuestions(int $assessmentId, array $questions): void
-    {
-        // A replacement is a bulk operation; deleting the existing graph is clearer in SQL.
-        $this->db->executeStatement(
-            'DELETE FROM assessment_questions WHERE assessment_id = :assessment_id',
-            ['assessment_id' => $assessmentId]
-        );
-
-        // Every row in the graph belongs to the one assessment, so its universe is resolved once.
-        $now = gmdate('Y-m-d H:i:sP');
-
-        foreach ($questions as $questionPosition => $question) {
-            $rows = $this->db->fetchAllAssociative(
-                'INSERT INTO assessment_questions
-                     (public_id,assessment_id,position,question_html,points,explanation_html,
-                      difficulty,practice_eligible,graded_eligible,remediation_module_keys,incorrect_points,
-                      created_at,updated_at)
-                 VALUES (:public_id,:assessment_id,:position,:question_html,:points,:explanation_html,
-                         :difficulty,:practice_eligible,:graded_eligible,:remediation_module_keys,:incorrect_points,
-                         :created_at,:updated_at)
-                 RETURNING id',
-                [
-                    'public_id' => Uuid::v4(),
-                    'assessment_id' => $assessmentId,
-                    'position' => $questionPosition + 1,
-                    'question_html' => (string) $question['question_html'],
-                    'points' => (int) $question['points'],
-                    'explanation_html' => (string) ($question['explanation_html'] ?? ''),
-                    'difficulty' => (string) ($question['difficulty'] ?? 'standard'),
-                    'practice_eligible' => (bool) ($question['practice_eligible'] ?? true),
-                    'graded_eligible' => (bool) ($question['graded_eligible'] ?? true),
-                    'remediation_module_keys' => json_encode(array_values((array) ($question['remediation_module_keys'] ?? [])), JSON_THROW_ON_ERROR),
-                    'incorrect_points' => min(0, (float) ($question['incorrect_points'] ?? 0)),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]
-            );
-
-            $questionId = (int) ($rows[0]['id'] ?? 0);
-            if ($questionId < 1) {
-                throw new RuntimeException('Unable to create assessment question.');
-            }
-
-            foreach ((array) $question['options'] as $optionPosition => $option) {
-                $this->db->executeStatement(
-                    'INSERT INTO assessment_options
-                         (public_id,question_id,position,option_html,is_correct,created_at,updated_at)
-                     VALUES (:public_id,:question_id,:position,:option_html,:is_correct,:created_at,:updated_at)',
-                    [
-                        'public_id' => Uuid::v4(),
-                        'question_id' => $questionId,
-                        'position' => $optionPosition + 1,
-                        'option_html' => (string) $option['option_html'],
-                        'is_correct' => (bool) $option['is_correct'],
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ]
-                );
-            }
-        }
-    }
-
     /** @param list<array<string,mixed>> $bands */
     public function replaceGradeBands(int $courseId, array $bands): void
     {
@@ -2529,7 +1968,7 @@ final class CourseRepository
             "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.status AS course_status,
                     c.certificate_enabled, c.certificate_title, c.certificate_template, c.certificate_body_text,
                     c.certificate_footer_text, c.certificate_signatory_name, c.certificate_signatory_title,
-                    c.module_weight, c.final_weight
+                    0.5::numeric AS module_weight, 0.5::numeric AS final_weight
              FROM course_enrolments ce
              JOIN courses c ON c.id = ce.course_id
              WHERE ce.user_id = :user_id AND ce.course_id = :course_id
@@ -2571,19 +2010,17 @@ final class CourseRepository
 
         $detail = "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.level, c.status AS course_status,
                     cc.name AS category_name,
-                    COUNT(DISTINCT cm.id)::int AS module_count,
-                    COUNT(DISTINCT mp.module_id) FILTER (WHERE mp.first_opened_at IS NOT NULL)::int AS opened_module_count,
-                    COUNT(DISTINCT mp.module_id) FILTER (WHERE mp.best_percentage IS NOT NULL)::int AS assessed_module_count,
+                    assessment_progress.assessment_count,
+                    assessment_progress.submitted_assessment_count,
                     cr.overall_percentage, cr.grade_code AS overall_grade_code,
                     cert.public_id AS certificate_public_id
              FROM %s
              LEFT JOIN course_categories cc ON cc.id = c.category_id
-             LEFT JOIN course_modules cm ON cm.course_id = c.id AND cm.assessment_required = TRUE
-             LEFT JOIN module_progress mp ON mp.enrolment_id = ce.id AND mp.module_id = cm.id
+             " . CourseItemRepository::assessmentProgressJoin() . "
              LEFT JOIN course_results cr ON cr.enrolment_id = ce.id
              LEFT JOIN certificates cert ON cert.enrolment_id = ce.id AND cert.revoked_at IS NULL
              %s
-             GROUP BY ce.id, c.id, cc.name, cr.overall_percentage, cr.grade_code, cert.public_id";
+             GROUP BY ce.id, c.id, cc.name, cr.overall_percentage, cr.grade_code, cert.public_id,assessment_progress.assessment_count,assessment_progress.submitted_assessment_count";
 
         // A limit of zero means the learner's whole library, which the API, the MCP surface and the
         // administrator's view of a learner all ask for. There is nothing to defer then: every
@@ -2691,7 +2128,7 @@ final class CourseRepository
     public function enrolmentByIdForUser(int $enrolmentId, int $userId): ?array
     {
         $rows = $this->db->fetchAllAssociative(
-            'SELECT ce.*, c.slug, c.title, c.status AS course_status, c.module_weight, c.final_weight,
+            'SELECT ce.*, c.slug, c.title, c.status AS course_status, 0.5::numeric AS module_weight, 0.5::numeric AS final_weight,
                     c.certificate_enabled, c.certificate_title, c.certificate_template, c.certificate_body_text,
                     c.certificate_footer_text, c.certificate_signatory_name, c.certificate_signatory_title
              FROM course_enrolments ce JOIN courses c ON c.id = ce.course_id
@@ -2737,225 +2174,6 @@ final class CourseRepository
                 ['enrolment_id' => $enrolmentId]
             );
         }
-    }
-
-    public function completeEnrolmentFromDiagnostic(int $enrolmentId): void
-    {
-        $now = gmdate('Y-m-d H:i:sP');
-        $this->db->executeStatement(
-            "UPDATE course_enrolments
-             SET status='completed', completed_at=COALESCE(completed_at,:completed_at), updated_at=:updated_at
-             WHERE id=:id AND status IN ('assigned','active','completed')",
-            ['id' => $enrolmentId, 'completed_at' => $now, 'updated_at' => $now]
-        );
-    }
-
-    public function touchModule(int $enrolmentId, int $moduleId): void
-    {
-        $this->db->executeStatement(
-            'INSERT INTO module_progress (enrolment_id,module_id,first_opened_at,last_viewed_at)
-             VALUES (:enrolment_id,:module_id,NOW(),NOW())
-             ON CONFLICT (enrolment_id,module_id) DO UPDATE SET last_viewed_at=NOW()',
-            [
-                'enrolment_id' => $enrolmentId,
-                'module_id' => $moduleId,
-            ]
-        );
-    }
-
-    /** @return array<string,mixed>|null */
-    public function bestAttempt(int $enrolmentId, int $assessmentId): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM assessment_attempts
-              WHERE enrolment_id = :enrolment_id AND assessment_id = :assessment_id
-              ORDER BY percentage DESC, submitted_at DESC
-              LIMIT 1',
-            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return list<array<string,mixed>> */
-    public function attemptsForEnrolment(int $enrolmentId): array
-    {
-        return $this->normaliseRows($this->db->fetchAllAssociative(
-            'SELECT aa.*, ca.assessment_type, ca.module_id, ca.title AS assessment_title
-             FROM assessment_attempts aa
-             JOIN course_assessments ca ON ca.id = aa.assessment_id
-             WHERE aa.enrolment_id = :enrolment_id
-             ORDER BY aa.submitted_at DESC',
-            ['enrolment_id' => $enrolmentId]
-        ));
-    }
-
-    /** @param list<array<string,mixed>> $responses */
-    public function saveAttempt(
-        int $enrolmentId,
-        int $assessmentId,
-        float $earned,
-        float $maximum,
-        float $percentage,
-        string $gradeCode,
-        bool $passed,
-        array $responses
-    ): int {
-        // The row lock serialises concurrent submissions for this enrolment. MAX()+1
-        // is then safe inside the surrounding service transaction.
-        $this->db->fetchAllAssociative(
-            'SELECT id FROM course_enrolments WHERE id = :id FOR UPDATE',
-            ['id' => $enrolmentId]
-        );
-        $attemptRows = $this->db->fetchAllAssociative(
-            'SELECT COALESCE(MAX(attempt_number), 0) + 1 AS next_number
-             FROM assessment_attempts
-             WHERE enrolment_id = :enrolment_id AND assessment_id = :assessment_id',
-            [
-                'enrolment_id' => $enrolmentId,
-                'assessment_id' => $assessmentId,
-            ]
-        );
-        $attemptNumber = (int) ($attemptRows[0]['next_number'] ?? 1);
-
-        $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO assessment_attempts
-                 (public_id,enrolment_id,assessment_id,attempt_number,earned_points,
-                  maximum_points,percentage,grade_code,passed,submitted_at)
-             VALUES (:public_id,:enrolment_id,:assessment_id,:attempt_number,:earned_points,
-                     :maximum_points,:percentage,:grade_code,:passed,:submitted_at)
-             RETURNING id',
-            [
-                'public_id' => Uuid::v4(),
-                'enrolment_id' => $enrolmentId,
-                'assessment_id' => $assessmentId,
-                'attempt_number' => $attemptNumber,
-                'earned_points' => $earned,
-                'maximum_points' => $maximum,
-                'percentage' => $percentage,
-                'grade_code' => $gradeCode,
-                'passed' => $passed,
-                'submitted_at' => gmdate('Y-m-d H:i:sP'),
-            ]
-        );
-
-        $attemptId = (int) ($rows[0]['id'] ?? 0);
-        if ($attemptId < 1) {
-            throw new RuntimeException('Unable to save assessment attempt.');
-        }
-
-        foreach ($responses as $response) {
-            $this->db->executeStatement(
-                'INSERT INTO assessment_responses
-                 (attempt_id,question_id,selected_option_id,is_correct,points_awarded)
-                 VALUES (:attempt_id,:question_id,:selected_option_id,:is_correct,:points_awarded)
-                 ON CONFLICT (attempt_id,question_id) DO UPDATE
-                 SET selected_option_id=EXCLUDED.selected_option_id,is_correct=EXCLUDED.is_correct,points_awarded=EXCLUDED.points_awarded',
-                [
-                    'attempt_id' => $attemptId,
-                    'question_id' => (int) $response['question_id'],
-                    'selected_option_id' => $response['selected_option_id'],
-                    'is_correct' => (bool) $response['is_correct'],
-                    'points_awarded' => $response['points_awarded'],
-                ]
-            );
-        }
-
-        return $attemptId;
-    }
-
-    public function updateModuleBest(
-        int $enrolmentId,
-        int $moduleId,
-        float $percentage,
-        string $gradeCode
-    ): void {
-        $this->db->executeStatement(
-            'INSERT INTO module_progress
-             (enrolment_id,module_id,first_opened_at,last_viewed_at,completed_at,best_percentage,best_grade_code)
-             VALUES (:enrolment_id,:module_id,NOW(),NOW(),NOW(),:percentage,:grade_code)
-             ON CONFLICT (enrolment_id,module_id) DO UPDATE SET
-               last_viewed_at=NOW(), completed_at=NOW(),
-               best_percentage=CASE WHEN module_progress.best_percentage IS NULL OR EXCLUDED.best_percentage>module_progress.best_percentage THEN EXCLUDED.best_percentage ELSE module_progress.best_percentage END,
-               best_grade_code=CASE WHEN module_progress.best_percentage IS NULL OR EXCLUDED.best_percentage>module_progress.best_percentage THEN EXCLUDED.best_grade_code ELSE module_progress.best_grade_code END',
-            [
-                'enrolment_id' => $enrolmentId,
-                'module_id' => $moduleId,
-                'percentage' => $percentage,
-                'grade_code' => $gradeCode,
-            ]
-        );
-    }
-
-    public function setModuleResult(
-        int $enrolmentId,
-        int $moduleId,
-        float $percentage,
-        string $gradeCode
-    ): void {
-        $this->db->executeStatement(
-            'INSERT INTO module_progress
-             (enrolment_id,module_id,first_opened_at,last_viewed_at,completed_at,best_percentage,best_grade_code)
-             VALUES (:enrolment_id,:module_id,NOW(),NOW(),NOW(),:percentage,:grade_code)
-             ON CONFLICT (enrolment_id,module_id) DO UPDATE SET
-               last_viewed_at=NOW(),completed_at=NOW(),best_percentage=EXCLUDED.best_percentage,best_grade_code=EXCLUDED.best_grade_code',
-            [
-                'enrolment_id' => $enrolmentId,
-                'module_id' => $moduleId,
-                'percentage' => $percentage,
-                'grade_code' => $gradeCode,
-            ]
-        );
-    }
-
-    public function moduleAssessmentsCompleted(int $enrolmentId, int $courseId): bool
-    {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT
-                COUNT(DISTINCT cm.id)::int AS required_count,
-                COUNT(DISTINCT aa.assessment_id)::int AS attempted_count
-             FROM course_modules cm
-             LEFT JOIN course_assessments ca ON ca.module_id = cm.id AND ca.assessment_type = 'module'
-             LEFT JOIN assessment_attempts aa ON aa.assessment_id = ca.id AND aa.enrolment_id = :enrolment_id
-             WHERE cm.course_id = :course_id AND cm.assessment_required = TRUE",
-            ['enrolment_id' => $enrolmentId, 'course_id' => $courseId]
-        );
-        $required = (int) ($rows[0]['required_count'] ?? 0);
-        $attempted = (int) ($rows[0]['attempted_count'] ?? 0);
-        return $required > 0 && $required === $attempted;
-    }
-
-    /** @return array<string,float|int> */
-    public function resultPercentages(int $enrolmentId, int $courseId): array
-    {
-        $moduleRows = $this->db->fetchAllAssociative(
-            "SELECT COALESCE(SUM(best.earned_points),0)::int AS earned,
-                    COALESCE(SUM(best.maximum_points),0)::int AS maximum
-             FROM course_assessments ca
-             JOIN course_modules cm ON cm.id = ca.module_id
-             JOIN LATERAL (
-                 SELECT aa.earned_points, aa.maximum_points
-                 FROM assessment_attempts aa
-                 WHERE aa.assessment_id = ca.id AND aa.enrolment_id = :enrolment_id
-                 ORDER BY aa.percentage DESC, aa.submitted_at DESC LIMIT 1
-             ) best ON TRUE
-             WHERE ca.course_id = :course_id AND ca.assessment_type = 'module' AND cm.assessment_required = TRUE",
-            ['enrolment_id' => $enrolmentId, 'course_id' => $courseId]
-        );
-        $finalRows = $this->db->fetchAllAssociative(
-            "SELECT aa.percentage
-             FROM assessment_attempts aa
-             JOIN course_assessments ca ON ca.id = aa.assessment_id
-             WHERE aa.enrolment_id = :enrolment_id AND ca.course_id = :course_id AND ca.assessment_type = 'final'
-             ORDER BY aa.percentage DESC, aa.submitted_at DESC LIMIT 1",
-            ['enrolment_id' => $enrolmentId, 'course_id' => $courseId]
-        );
-        $earned = (int) ($moduleRows[0]['earned'] ?? 0);
-        $maximum = (int) ($moduleRows[0]['maximum'] ?? 0);
-        return [
-            'module_percentage' => $maximum > 0 ? ($earned / $maximum * 100) : 0.0,
-            'final_percentage' => isset($finalRows[0]['percentage']) ? (float) $finalRows[0]['percentage'] : 0.0,
-        ];
     }
 
     public function saveCourseResult(
@@ -3194,17 +2412,6 @@ final class CourseRepository
         );
     }
 
-    /** @return list<array<string,mixed>> */
-    public function moduleProgress(int $enrolmentId): array
-    {
-        return $this->normaliseRows($this->db->fetchAllAssociative(
-            'SELECT mp.*, cm.position, cm.title, cm.is_review, cm.assessment_required
-             FROM module_progress mp JOIN course_modules cm ON cm.id = mp.module_id
-             WHERE mp.enrolment_id = :enrolment_id ORDER BY cm.position',
-            ['enrolment_id' => $enrolmentId]
-        ));
-    }
-
     /** @return array<string,mixed>|null */
     public function findUserByEmail(string $email): ?array
     {
@@ -3366,20 +2573,6 @@ final class CourseRepository
         if ($updated === 0) {
             throw new RuntimeException('The course does not exist.');
         }
-    }
-
-
-    /** @return list<string> */
-    private function jsonArray(mixed $value): array
-    {
-        if (is_array($value)) {
-            return array_values(array_map('strval', $value));
-        }
-        if (!is_string($value) || trim($value) === '') {
-            return [];
-        }
-        $decoded = json_decode($value, true);
-        return is_array($decoded) ? array_values(array_map('strval', $decoded)) : [];
     }
 
     private function databaseBoolean(mixed $value): bool

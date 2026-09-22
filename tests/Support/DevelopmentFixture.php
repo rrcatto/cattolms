@@ -125,37 +125,24 @@ final class DevelopmentFixture
         )[0]['id'];
     }
 
-    public function createModule(int $courseId, string $moduleKey = 'm1', int $position = 1, bool $assessmentRequired = true): int
+    /** @return array{item_id:int,node_id:int,key:string} */
+    public function createAssessmentItem(int $courseId, int $ownerId, string $role = 'graded', ?int $maximumAttempts = null): array
     {
-        return (int) $this->db->fetchAllAssociative(
-            'INSERT INTO course_modules
-             (public_id,course_id,module_key,position,title,content_html,assessment_required)
-             VALUES (:public_id,:course_id,:module_key,:position,:title,:content_html,:required) RETURNING id',
-            [
-                'public_id' => Uuid::v4(), 'course_id' => $courseId, 'module_key' => $moduleKey,
-                'position' => $position, 'title' => 'QA module ' . $position, 'content_html' => '<p>QA content</p>',
-                'required' => $assessmentRequired,
-            ]
-        )[0]['id'];
-    }
-
-    public function createAssessment(
-        int $courseId,
-        ?int $moduleId,
-        string $type,
-        string $title,
-        ?string $key = null,
-        ?int $maximumAttempts = null
-    ): int {
-        return (int) $this->db->fetchAllAssociative(
-            'INSERT INTO course_assessments
-             (public_id,course_id,module_id,assessment_type,assessment_key,title,pass_mark,required,practice_enabled,practice_pool_mode,practice_question_count,graded_question_count,maximum_attempts,time_limit_seconds,score_policy,randomise_questions,randomise_options)
-             VALUES (:public_id,:course_id,:module_id,:type,:assessment_key,:title,50,TRUE,TRUE,\'both\',1,1,:maximum_attempts,1800,\'highest\',FALSE,FALSE) RETURNING id',
-            [
-                'public_id' => Uuid::v4(), 'course_id' => $courseId, 'module_id' => $moduleId,
-                'type' => $type, 'assessment_key' => $key, 'title' => $title, 'maximum_attempts' => $maximumAttempts,
-            ]
-        )[0]['id'];
+        $key = 'qa-assessment-' . $this->suffix();
+        $item = (int) $this->db->fetchOne(
+            "INSERT INTO course_items(public_id,item_key,item_type,title,created_by_user_id,updated_by_user_id) VALUES (:public,:key,'assessment','QA assessment',:owner,:owner) RETURNING id",
+            ['public' => Uuid::v4(), 'key' => $key, 'owner' => $ownerId]
+        );
+        $this->db->executeStatement(
+            "INSERT INTO course_item_assessments(course_item_id,practice_enabled,practice_question_count,graded_question_count,maximum_attempts,randomise_questions,randomise_options) VALUES (:id,TRUE,1,1,:maximum,FALSE,FALSE)",
+            ['id' => $item, 'maximum' => $maximumAttempts]
+        );
+        $node = (int) $this->db->fetchOne(
+            "INSERT INTO course_structure_nodes(public_id,course_id,position,node_type) SELECT :public,:course,COALESCE(MAX(position),0)+1,'item' FROM course_structure_nodes WHERE course_id=:course AND parent_node_id IS NULL RETURNING id",
+            ['public' => Uuid::v4(), 'course' => $courseId]
+        );
+        $this->db->executeStatement('INSERT INTO course_item_placements(node_id,course_id,course_item_id,assessment_role) VALUES (:node,:course,:item,:role)', ['node' => $node, 'course' => $courseId, 'item' => $item, 'role' => $role]);
+        return ['item_id' => $item, 'node_id' => $node, 'key' => $key];
     }
 
     /** @return array{question_id:int,correct_option_id:int,wrong_option_id:int} */
@@ -163,7 +150,7 @@ final class DevelopmentFixture
     {
         $questionId = (int) $this->db->fetchAllAssociative(
             'INSERT INTO assessment_questions
-             (public_id,assessment_id,position,question_html,points,difficulty,practice_eligible,graded_eligible)
+             (public_id,course_item_id,position,question_html,points,difficulty,practice_eligible,graded_eligible)
              VALUES (:public_id,:assessment_id,:position,:question,1,\'standard\',TRUE,TRUE) RETURNING id',
             ['public_id' => Uuid::v4(), 'assessment_id' => $assessmentId, 'position' => $position, 'question' => 'QA question?']
         )[0]['id'];
@@ -247,6 +234,8 @@ final class DevelopmentFixture
             $this->db->executeStatement('DELETE FROM auth_login_tokens WHERE LOWER(email)=:email', ['email' => $email]);
         }
         foreach (array_reverse($this->users) as $id) {
+            $this->db->executeStatement('DELETE FROM course_items WHERE created_by_user_id=:id', ['id' => $id]);
+            $this->db->executeStatement('DELETE FROM resources WHERE created_by_user_id=:id', ['id' => $id]);
             $this->db->executeStatement('DELETE FROM users WHERE id=:id', ['id' => $id]);
         }
     }

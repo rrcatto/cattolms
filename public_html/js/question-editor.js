@@ -22,10 +22,15 @@
           if (value) element.setAttribute(attribute, value.replace(/question-[^-\s]+-/g, `question-${qi}-`));
         }
       });
+      question.querySelectorAll('button[name="question_action"]').forEach(button => { button.value = `${button.value.split(':')[0]}:${qi}`; });
       question.querySelectorAll('[data-option]').forEach((option, oi) => {
         option.dataset.optionIndex = String(oi);
+        const remove = option.querySelector('button[name="question_action"]');
+        if (remove) remove.value = `remove-option:${qi}:${oi}`;
         option.querySelector('input[type="radio"]').value = String(oi);
         option.querySelector('input[name^="option_html["]').name = `option_html[${qi}][${oi}]`;
+        const identity = option.querySelector('input[name^="option_id["]');
+        if (identity) identity.name = `option_id[${qi}][${oi}]`;
         option.querySelectorAll('[id], [for], [aria-describedby]').forEach((element) => {
           for (const attribute of ['id', 'for', 'aria-describedby']) {
             const value = element.getAttribute(attribute);
@@ -44,18 +49,20 @@
     editor.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  addQuestionButton.addEventListener('click', addQuestion);
+  addQuestionButton.addEventListener('click', event => { event.preventDefault(); addQuestion(); });
   editor.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
     const action = event.target.closest('button[name="question_action"]');
     const question = action?.closest('[data-question]');
     if (!action || !question) return;
-    if (action.value === 'remove-question') {
+    event.preventDefault();
+    const operation = action.value.split(':')[0];
+    if (operation === 'remove-question') {
       if (confirm('Remove this question?')) { question.remove(); renumber(); }
-    } else if (action.value === 'add-option') {
+    } else if (operation === 'add-option') {
       question.querySelector('[data-options]').append(optionTemplate.content.cloneNode(true));
       renumber();
-    } else if (action.value === 'remove-option') {
+    } else if (operation === 'remove-option') {
       const options = question.querySelector('[data-options]');
       if (options.querySelectorAll('[data-option]').length <= 2) {
         alert('Every question requires at least two options.');

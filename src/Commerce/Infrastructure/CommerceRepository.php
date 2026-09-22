@@ -30,13 +30,13 @@ final class CommerceRepository
     /** @return list<array<string,mixed>> */
     public function cartItems(int $cartId): array
     {
-        return $this->db->fetchAllAssociative('SELECT v.*,c.title,c.slug,c.revision_number,c.status AS course_status FROM commerce_cart_items i JOIN course_price_variants v ON v.id=i.variant_id JOIN courses c ON c.id=v.course_id WHERE i.cart_id=:id ORDER BY v.id', ['id'=>$cartId]);
+        return $this->db->fetchAllAssociative('SELECT v.*,c.title,c.slug,c.status AS course_status FROM commerce_cart_items i JOIN course_price_variants v ON v.id=i.variant_id JOIN courses c ON c.id=v.course_id WHERE i.cart_id=:id ORDER BY v.id', ['id'=>$cartId]);
     }
 
     /** @return array<string,mixed> */
     public function offer(int $variantId): array
     {
-        return $this->db->fetchAssociative('SELECT v.*,c.title,c.slug,c.revision_number,c.status AS course_status FROM course_price_variants v JOIN courses c ON c.id=v.course_id WHERE v.id=:id', ['id'=>$variantId]) ?: throw new RuntimeException('The offer does not exist.');
+        return $this->db->fetchAssociative('SELECT v.*,c.title,c.slug,c.status AS course_status FROM course_price_variants v JOIN courses c ON c.id=v.course_id WHERE v.id=:id', ['id'=>$variantId]) ?: throw new RuntimeException('The offer does not exist.');
     }
 
     public function changeCart(int $cartId, int $variantId, bool $remove): void

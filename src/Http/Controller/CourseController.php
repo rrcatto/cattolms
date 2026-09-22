@@ -231,32 +231,6 @@ final class CourseController extends BaseController
     }
 
 
-    #[Route('/course-media/{public_id}', name: 'course_media', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]
-    public function media(): Response
-    {
-        $publicId = (string) $this->param('public_id');
-        $media = $this->courses->media($publicId);
-        if ($media === null) {
-            throw new NotFoundHttpException('The course media file could not be found.');
-        }
-
-        $allowed = (bool) $media['is_public'] && (string) $media['course_status'] === 'published';
-        $user = $this->currentUser();
-        if (!$allowed && $user !== null) {
-            $allowed = $this->courses->userCanAccessMedia($user->id, $media, $user->hasPermission('PLATFORM.DASHBOARD.VIEW'));
-        }
-        if (!$allowed) {
-            throw new AccessDeniedHttpException('You do not have access to this course media.');
-        }
-
-        $filename = str_replace(["\r", "\n", '"'], '', (string) $media['original_filename']);
-        header('Content-Type: ' . (string) $media['mime_type']);
-        header('Content-Length: ' . (string) filesize((string) $media['path']));
-        header('Cache-Control: private, max-age=3600');
-        header('Content-Disposition: ' . ((string) $media['media_role'] === 'download' ? 'attachment' : 'inline') . '; filename="' . $filename . '"');
-        readfile((string) $media['path']);
-        exit;
-    }
 
 
     #[Route('/certificates/{public_id}', name: 'course_certificate', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]

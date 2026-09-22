@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.5';
+    private const PLATFORM_ASSET_VERSION = '0.8.6';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -306,7 +306,7 @@ final class ThemeRenderer
         // on after the page has painted. The switcher stores the choice in a cookie as well as in
         // localStorage precisely so this can be known before a byte of HTML is written.
         $palette = $_COOKIE['cl_palette'] ?? null;
-        if (is_string($palette) && preg_match('/^\d{1,2}$/', $palette) === 1) {
+        if (!in_array($family, ['course-player', 'assessment'], true) && is_string($palette) && preg_match('/^\d{1,2}$/', $palette) === 1) {
             $bodyClass .= ' cl-palette-managed cl-palette-' . $palette;
         }
 
@@ -361,7 +361,9 @@ final class ThemeRenderer
         $context = $this->viewModel($page, $data, $themeKey, $previewActive);
         // The layout a page extends: the theme's optional wrapper for this family, or its base.
         // Resolved here so no platform page template has to know which themes ship wrappers.
-        $context['layout'] = $this->templates->layoutFor($family);
+        $context['layout'] = in_array($family, ['course-player', 'assessment'], true)
+            ? '@' . ThemeTemplates::PLATFORM_NAMESPACE . '/layout/course-presentation.html.twig'
+            : $this->templates->layoutFor($family);
 
         return $this->stampGenerator(
             $this->twig->render($this->templates->pageTemplate($page), $context)
@@ -538,6 +540,11 @@ final class ThemeRenderer
                 }
                 $section = $visibleSections[$sectionKey];
                 $grandchildren[] = $child('admin-' . $sectionKey, $section['label'], $section['route'], $section['icon']);
+
+                if ($sectionKey === 'courses' && $this->can($data, 'COURSE.MANAGEMENT.VIEW')) {
+                    $grandchildren[] = $child('admin-course-items', 'Course Item Library', '/admin/course-items', 'courses');
+                    $grandchildren[] = $child('admin-resources', 'Resource Library', '/admin/resources', 'courses');
+                }
 
                 // The taxonomy belongs with the catalogue, and neither part of it is a section of
                 // its own. They are separately permissioned because they are separate decisions.
@@ -927,9 +934,9 @@ final class ThemeRenderer
         if (str_starts_with($page, 'admin-')) return 'admin';
         if (str_starts_with($page, 'assessment-')) return 'assessment';
         return match ($page) {
-            'home' => 'home', 'courses' => 'catalogue', 'course-detail' => 'course-detail',
+            'home' => 'home', 'courses' => 'catalogue', 'course-detail' => 'course-detail', 'course-public-preview','course-public-preview-item' => 'course-player',
             'login','login-sent','register','company-register' => 'auth', 'profile','sessions','account-control-centre','account-section','account-dashboard','account-activity' => 'account',
-            'library' => 'library', 'learn-course','learn-module' => 'course-player',
+            'library' => 'library', 'learn-course','learn-item' => 'course-player',
             'certificate' => 'certificate', 'company-control-centre','company-section' => 'company', 'error' => 'error',
             default => 'content',
         };

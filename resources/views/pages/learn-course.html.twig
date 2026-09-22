@@ -1,154 +1,20 @@
 {% extends layout %}
 {% block page_body %}
-	{% if is_preview %}
-		<div class="cl-preview-bar">
-			<div class="container-fluid cl-container-wide d-flex flex-wrap align-items-center justify-content-between gap-2">
-				<strong>Student-view preview</strong><span>Progress and scores are stored only in your preview record.</span>
-				<div class="d-flex gap-2">
-					{{ ui('action.link', {label: 'Exit preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id)}) }}
-					<form action="/admin/courses/{{ course.id }}/preview/reset" method="post">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{{ ui('action.button', {label: 'Reset preview', variant: 'secondary', size: 'small', type: 'submit'}) }}
-					</form>
-				</div>
-			</div>
-		</div>
-	{% endif %}
-	{% set ph_compact = 1 %}
-	{% set ph_back_href = is_preview ? '/admin/courses/'~course.id : '/account/library' %}
-	{% set ph_back_label = is_preview ? 'Course editor' : 'My library' %}
-	{% set ph_title = course.title %}
-	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-page-section container py-5">
-		{% if not course.enrolment.started_at %}
-			<div class="row justify-content-center">
-				<div class="col-lg-8">
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-
-							{{ ui('feedback.badge', {label: 'Ready to begin', tone: 'info'}) }}
-							<h2 class="display-6 fw-bold mt-3">
-								Start when you are ready
-							</h2>
-							<p class="lead">
-								Your access period begins only when you click the button below.
-							</p>
-							<div class="cl-warning-panel">
-								<strong>This action starts the course.</strong>
-								<p class="mb-0 mt-2">
-									For a company-assigned course, its matching course credit is permanently consumed and cannot then be returned or reassigned.
-								</p>
-							</div>
-							<form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post" class="mt-4">
-								<input type="hidden" name="csrf" value="{{ csrf }}">
-								{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit'}) }}
-							</form>
-
-{% endblock %}
-{% endembed %}
-				</div>
-			</div>
-		{% else %}
-			<div class="row g-4">
-				<div class="col-lg-8">
-					{% if course.diagnostic_assessments %}
-						<div class="mb-4">
-							<span class="cl-kicker text-info">Before Module 1</span>
-							<h2 class="h3">
-								Course diagnostics
-							</h2>
-							<p class="text-body-secondary">
-								These checks are recorded separately from normal module and final grades. A diagnostic may be configured to complete the course when its threshold is met.
-							</p>
-							<div class="vstack gap-3">
-								{% for diagnostic in course.diagnostic_assessments %}
-									{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info'})} %}
-{% block surface_body %}
-
-											<div>
-												<strong>{{ diagnostic.title }}</strong>
-												<div class="text-body-secondary">
-													{{ diagnostic.question_count }} questions · suggested threshold {{ diagnostic.pass_mark }}%
-												</div>
-												{% if diagnostic.diagnostic_pass_action == 'complete_course' %}
-													<small class="text-success">Passing this diagnostic completes the course.</small>
-												{% endif %}
-											</div>
-											{{ ui('action.link', {label: 'Open diagnostic', variant: 'secondary', size: 'normal', href: '/learn/' ~ (course.slug) ~ '/diagnostic/' ~ (diagnostic.assessment_key) ~ (preview_query)}) }}
-
-{% endblock %}
-{% endembed %}
-								{% endfor %}
-							</div>
-						</div>
-					{% endif %}
-					<div class="d-flex justify-content-between align-items-end mb-3">
-						<div>
-							<span class="cl-kicker text-primary">Course content</span>
-							<h2 class="h3 mb-0">
-								Modules
-							</h2>
-						</div>
-						<strong>{{ course.progress.assessed_count }} of {{ course.progress.module_count }} assessed</strong>
-					</div>
-					{{ ui('feedback.progress', {value: course.progress.percentage, label: 'Course progress', size: 'large'}) }}
-					<div class="cl-module-list">
-						{% for module in course.modules %}
-							<a class="cl-module-row cl-module-link" href="/learn/{{ course.slug }}/module/{{ module.position }}{{ preview_query }}"><span class="cl-module-number">{{ module.position }}</span>
-							<div>
-								<strong>{{ module.title }}</strong>
-								{% if module.subtitle %}
-									<small>{{ module.subtitle }}</small>
-								{% endif %}
-							</div>
-							<span class="ms-auto d-flex gap-1">
-							{% if module.is_review %}
-								{{ ui('feedback.badge', {label: 'Review', tone: 'neutral'}) }}
-							{% endif %}
-							{% if not module.assessment_required %}
-								{{ ui('feedback.badge', {label: 'No assessment required', tone: 'neutral'}) }}
-							{% endif %}
-							{% if module.question_count > 0 %}
-								{{ ui('feedback.badge', {label: (module.question_count) ~ ' questions', tone: 'neutral'}) }}
-							{% endif %}
-							</span></a>
-						{% endfor %}
-					</div>
-					{% if course.final_unlocked %}
-						{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'info'})} %}
-{% block surface_body %}
-
-								<div>
-									<span class="cl-kicker text-primary">Final assessment</span>
-									<h3 class="h4 mb-1">
-										Final assessment available
-									</h3>
-									<p class="mb-0">
-										Open the assessment page to review its rules before starting.
-									</p>
-								</div>
-								{{ ui('action.link', {label: 'Open final assessment', variant: 'primary', size: 'normal', href: '/learn/' ~ (course.slug) ~ '/final/assessment' ~ (preview_query)}) }}
-
-{% endblock %}
-{% endembed %}
-					{% endif %}
-				</div>
-				<aside class="col-lg-4">
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
-{% block surface_body %}
-
-							<h2 class="h4">
-								Course access
-							</h2>
-							{{ ui('data.key-value-list', {items: [{label: 'Started', value: (course.enrolment.started_at)}, {label: 'Expires', value: (course.enrolment.expires_at ?: 'No preview expiry')}, {label: 'Status', value: (course.enrolment.status)}]}) }}
-							{% if course.certificate %}
-								{{ ui('action.link', {label: (is_preview ? 'View preview certificate' : 'View certificate'), variant: 'secondary', size: 'normal', full_width: true, href: '/certificates/' ~ (course.certificate.public_id)}) }}
-							{% endif %}
-
-{% endblock %}
-{% endembed %}
-				</aside>
-			</div>
-		{% endif %}
-	</section>
+<section class="cl-course-presentation catto-standalone cl-course-presentation-intro">
+<header class="masthead" data-level="{{ course.level|default('') }}">
+{% if course.level|default('') %}<p class="eyebrow">{{ course.level }}</p>{% endif %}
+<h1>{{ course.title }}</h1>
+{% if course.subtitle|default('') %}<p class="course-subtitle">{{ course.subtitle }}</p>{% endif %}
+{% if course.summary|default('') %}<p class="course-summary">{{ course.summary }}</p>{% endif %}
+<div class="meta"><span>{{ course.structure|length }} course items</span>{% if course.estimated_minutes|default(0) %}<span>{{ course.estimated_minutes }} minutes</span>{% endif %}</div>
+</header>
+<div class="course-introduction-copy">{{ course.introduction_html|raw }}</div>
+{% if not course.enrolment.started_at %}
+<form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit'}) }}</form>
+{% elseif course.structure|default([])|length %}
+<nav class="cl-course-item-paging" aria-label="Course content">
+<span></span>{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ preview_query}) }}
+</nav>
+{% endif %}
+</section>
 {% endblock %}

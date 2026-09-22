@@ -1,0 +1,13 @@
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
+<h1>{{ item.node_type == 'section' ? item.section_title : (item.display_title_override ?: item.item_title) }}</h1>
+{% if item.node_type == 'item' and (item.display_description_override ?: item.description_html) %}<div>{{ (item.display_description_override ?: item.description_html)|raw }}</div>{% endif %}
+<div class="cl-course-item-body cl-course-presentation catto-standalone">{{ item.rendered_html|raw }}</div>
+{% if item.node_type == 'section' and item.show_outline %}
+<ol>{% set in_section = false %}{% for node in course.structure %}{% if node.id == item.id %}{% set in_section = true %}{% elseif in_section and node.depth <= item.depth %}{% set in_section = false %}{% elseif in_section %}<li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>{% endif %}{% endfor %}</ol>
+{% endif %}
+<nav class="cl-course-item-paging" aria-label="Course Content">
+{% if item.previous_node %}{% set previous_is_assessment = item.previous_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: '← Previous', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ item.previous_node.id ~ (previous_is_assessment ? '/assessment/' ~ item.previous_node.item_key : '/content') ~ preview_query}) }}{% endif %}
+{% if item.next_node %}{% set next_is_assessment = item.next_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Next →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ item.next_node.id ~ (next_is_assessment ? '/assessment/' ~ item.next_node.item_key : '/content') ~ preview_query}) }}{% endif %}
+</nav>
+{% endblock %}

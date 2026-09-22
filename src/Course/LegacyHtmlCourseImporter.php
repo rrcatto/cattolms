@@ -110,6 +110,20 @@ final class LegacyHtmlCourseImporter
             throw new InvalidArgumentException('The importer could not identify any course modules.');
         }
 
+        // The authored material between the masthead and the module stream is the course
+        // introduction. It commonly contains how the course works, facts, grading and study
+        // guidance; preserve it as authored HTML rather than reducing it to a summary.
+        $introductionHtml = '';
+        $modulesContainer = $xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " modules ")][1]')->item(0);
+        if ($modulesContainer instanceof DOMElement) {
+            foreach ($xpath->query('preceding-sibling::*', $modulesContainer) as $introNode) {
+                if (!$introNode instanceof DOMElement || str_contains(' ' . $introNode->getAttribute('class') . ' ', ' masthead ')) {
+                    continue;
+                }
+                $introductionHtml .= (string) $document->saveHTML($introNode);
+            }
+        }
+
         $modules = [];
         $warnings = [];
         $position = 1;
@@ -144,10 +158,7 @@ final class LegacyHtmlCourseImporter
             $workingXpath = new DOMXPath($workingDocument);
 
             $outcomes = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " outcomes ")][1]', $working)->item(0);
-            $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->courseHtml->learningOutcomes($this->innerHtml($outcomes)) : '';
-            if ($outcomes instanceof DOMNode && $outcomes->parentNode !== null) {
-                $outcomes->parentNode->removeChild($outcomes);
-            }
+            $learningOutcomesHtml = $outcomes instanceof DOMElement ? $this->courseHtml->learningOutcomes((string) $workingDocument->saveHTML($outcomes)) : '';
 
             $summaryElement = $workingXpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " s-summary ")]//*[contains(concat(" ", normalize-space(@class), " "), " sub-inner ")][1]', $working)->item(0);
             $summaryHtml = $summaryElement instanceof DOMElement ? $this->courseHtml->preserve($this->innerHtml($summaryElement)) : '';
@@ -353,6 +364,7 @@ final class LegacyHtmlCourseImporter
                 'subtitle' => $courseSubtitle,
                 'summary' => $summary,
                 'description_html' => $summary !== '' ? '<p>' . htmlspecialchars($summary, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>' : '',
+                'introduction_html' => $this->courseHtml->preserve($introductionHtml),
                 'level' => $this->detectLevel($xpath),
                 'estimated_minutes' => null,
                 'default_access_period_seconds' => 31536000,
@@ -468,7 +480,7 @@ final class LegacyHtmlCourseImporter
                 },
                 'practice_eligible' => true,
                 'graded_eligible' => !$diagnostic,
-                'remediation_module_keys' => $this->remediationKeys($raw['u'] ?? []),
+                'remediation_item_keys' => $this->remediationKeys($raw['u'] ?? []),
                 'incorrect_points' => 0,
                 'explanation_html' => $this->courseHtml->preserve((string) ($raw['e'] ?? '')),
                 'options' => $options,
@@ -515,7 +527,6 @@ final class LegacyHtmlCourseImporter
             'required' => false,
             'result_pass_html' => $passHtml,
             'result_fail_html' => $failHtml,
-            'diagnostic_pass_action' => $passAction,
             'is_visible' => true,
             'practice_enabled' => true,
             'practice_pool_mode' => 'both',
@@ -857,7 +868,12 @@ final class LegacyHtmlCourseImporter
                 continue;
             }
             if (preg_match('/^(?:html\\s+)?body(?=$|[\\s.#:\\[])/i', $selector) === 1) {
-                $scoped[] = preg_replace('/^(?:html\\s+)?body/i', $scope, $selector, 1) ?? ($scope . ' ' . $selector);
+                $remainder = (string) preg_replace('/^(?:html\\s+)?body/i', '', $selector, 1);
+                // The imported body element is not copied into the LMS reader. Preserve
+                // body-qualified rules by applying them to the Core content boundary.
+                $scoped[] = $remainder === '' || !str_starts_with($remainder, ' ')
+                    ? $scope
+                    : $scope . $remainder;
                 continue;
             }
             if (preg_match('/^html(?=$|[\\s.#:\\[])/i', $selector) === 1) {

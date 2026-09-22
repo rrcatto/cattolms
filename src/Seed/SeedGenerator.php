@@ -427,7 +427,7 @@ final class SeedGenerator
      * @param list<array{id:int,name:string,level:int,root:string,branch:string}> $categories
      * @param list<array{id:int,domain:string,name:string}> $companies
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
-     * @return list<array{id:int,modules:list<int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}>
+     * @return list<array{id:int,placements:array<int,int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}>
      */
     private function generateCourses(
         SeedGenerationPlan $plan,
@@ -481,13 +481,10 @@ final class SeedGenerator
                     60,
                     $status,
                     31536000,
-                    0.6,
-                    0.4,
                     true,
                     'classic',
                     $owner,
                     $company['id'],
-                    1,
                     'approved',
                     $owner,
                     $owner,
@@ -500,9 +497,9 @@ final class SeedGenerator
                 'courses',
                 [
                     'public_id', 'category_id', 'slug', 'title', 'summary', 'level', 'estimated_minutes',
-                    'status', 'default_access_period_seconds', 'module_weight', 'final_weight',
+                    'status', 'default_access_period_seconds',
                     'certificate_enabled', 'certificate_template', 'owner_user_id', 'owner_company_id',
-                    'revision_number', 'publication_approval_status', 'created_by_user_id',
+                    'publication_approval_status', 'created_by_user_id',
                     'updated_by_user_id', 'published_at', 'cover_svg',
                 ],
                 $courseRows,
@@ -528,8 +525,8 @@ final class SeedGenerator
         $this->tagCourses($courseIds, $courseCategories);
 
         $richCourseIds = array_slice($courseIds, 0, $plan->richCourses);
-        $modulesByCourse = $this->generateModules($richCourseIds, $token);
-        $assessments = $this->generateAssessments($richCourseIds, $modulesByCourse, $token);
+        $components = $this->generateCourseItems($richCourseIds, $people['owners'], $suffix);
+        $assessments = $components['assessments'];
         $questionBank = $this->generateQuestions($assessments['ids'], $token);
 
         $courses = [];
@@ -537,7 +534,7 @@ final class SeedGenerator
             $courses[] = [
                 'id' => $courseId,
                 'title' => $titles[$index],
-                'modules' => $modulesByCourse[$courseId] ?? [],
+                'placements' => $components['placements'][$courseId] ?? [],
                 'assessments' => $assessments['byCourse'][$courseId] ?? [],
                 'questions' => $questionBank['questions'],
                 'options' => $questionBank['options'],
@@ -690,96 +687,48 @@ final class SeedGenerator
     }
 
     /**
+     * Creates independent HTML and Assessment items and their ordered course placements.
      * @param list<int> $courseIds
-     * @return array<int,list<int>> module ids per course
+     * @param list<int> $owners
+     * @return array{assessments:array{ids:list<int>,byCourse:array<int,list<int>>},placements:array<int,array<int,int>>}
      */
-    private function generateModules(array $courseIds, string $token): array
+    private function generateCourseItems(array $courseIds, array $owners, string $suffix): array
     {
-        $rows = [];
-        $order = [];
-        foreach ($courseIds as $courseId) {
-            for ($position = 1; $position <= SeedGenerationPlan::MODULES_PER_COURSE; $position++) {
-                $order[] = $courseId;
-                $rows[] = [
-                    Uuid::v4(), $courseId, 'module-' . $position, $position,
-                    'Module ' . $position, 'Generated module content for volume testing.',
-                ];
+        $rows = []; $contexts = [];
+        foreach ($courseIds as $index => $courseId) {
+            $owner = $owners[$index % count($owners)];
+            for ($position = 1; $position <= SeedGenerationPlan::LESSONS_PER_COURSE; $position++) {
+                foreach (['html_lesson', 'assessment'] as $type) {
+                    $key = 'seed-' . $suffix . '-course-' . $index . '-' . $type . '-' . $position;
+                    $title = ($type === 'html_lesson' ? 'Lesson ' : 'Assessment ') . $position;
+                    $rows[] = [Uuid::v4(), $key, $type, $title, $type === 'html_lesson' ? '<h2>' . $title . '</h2><p>Generated learning content.</p>' : '', $owner, $owner];
+                    $contexts[] = [$courseId, $position * 2 - ($type === 'html_lesson' ? 1 : 0), $type, 'graded'];
+                }
+            }
+            $rows[] = [Uuid::v4(), 'seed-' . $suffix . '-course-' . $index . '-final', 'assessment', 'Final assessment', '', $owner, $owner];
+            $contexts[] = [$courseId, SeedGenerationPlan::LESSONS_PER_COURSE * 2 + 1, 'assessment', 'final'];
+        }
+        $ids = $this->write('course_items', ['public_id','item_key','item_type','title','content_source','created_by_user_id','updated_by_user_id'], $rows, true);
+        $nodes = []; $configs = []; $assessmentIds = []; $byCourse = [];
+        foreach ($ids as $index => $id) {
+            [$courseId, $position, $type] = $contexts[$index];
+            $nodes[] = [Uuid::v4(), $courseId, $position, 'item'];
+            if ($type === 'assessment') {
+                $configs[] = [$id, 50, true, SeedGenerationPlan::QUESTIONS_PER_ASSESSMENT, SeedGenerationPlan::QUESTIONS_PER_ASSESSMENT];
+                $assessmentIds[] = $id;
+                $byCourse[$courseId][] = $id;
             }
         }
-
-        $ids = $this->write(
-            'course_modules',
-            ['public_id', 'course_id', 'module_key', 'position', 'title', 'content_html'],
-            $rows,
-            true
-        );
-
-        $byCourse = [];
-        $blockRows = [];
-        foreach ($ids as $index => $moduleId) {
-            $byCourse[$order[$index]][] = $moduleId;
-            for ($position = 1; $position <= SeedGenerationPlan::BLOCKS_PER_MODULE; $position++) {
-                $blockRows[] = [
-                    Uuid::v4(), $moduleId, $position, 'html',
-                    'Section ' . $position, '<p>Generated seed content.</p>',
-                ];
-            }
+        $this->write('course_item_assessments', ['course_item_id','pass_mark','practice_enabled','practice_question_count','graded_question_count'], $configs);
+        $nodeIds = $this->write('course_structure_nodes', ['public_id','course_id','position','node_type'], $nodes, true);
+        $placements = []; $byItem = [];
+        foreach ($ids as $index => $id) {
+            [$courseId, $position, $type, $role] = $contexts[$index];
+            $placements[] = [$nodeIds[$index], $courseId, $id, $type === 'assessment' ? $role : 'content', $position === 1];
+            $byItem[$courseId][$id] = $nodeIds[$index];
         }
-
-        $this->write(
-            'course_content_blocks',
-            ['public_id', 'module_id', 'position', 'block_type', 'title', 'content_html'],
-            $blockRows
-        );
-
-        return $byCourse;
-    }
-
-    /**
-     * One assessment per module plus one final per course.
-     *
-     * The schema permits exactly one assessment per module and exactly one final per course, so
-     * the shape here is fixed rather than randomised.
-     *
-     * @param list<int> $courseIds
-     * @param array<int,list<int>> $modulesByCourse
-     * @return array{ids:list<int>,byCourse:array<int,list<int>>}
-     */
-    private function generateAssessments(array $courseIds, array $modulesByCourse, string $token): array
-    {
-        $rows = [];
-        $order = [];
-        foreach ($courseIds as $courseId) {
-            foreach ($modulesByCourse[$courseId] ?? [] as $position => $moduleId) {
-                $order[] = $courseId;
-                $rows[] = [
-                    Uuid::v4(), $courseId, $moduleId, 'module', 'Module ' . ($position + 1) . ' assessment',
-                    $position + 1, 50.0, true, 5, 1800, 'highest',
-                ];
-            }
-            $order[] = $courseId;
-            $rows[] = [
-                Uuid::v4(), $courseId, null, 'final', 'Final assessment',
-                99, 60.0, true, 5, 3600, 'highest',
-            ];
-        }
-
-        $ids = $this->write(
-            'course_assessments',
-            [
-                'public_id', 'course_id', 'module_id', 'assessment_type', 'title', 'position',
-                'pass_mark', 'required', 'practice_question_count', 'time_limit_seconds', 'score_policy',
-            ],
-            $rows,
-            true
-        );
-
-        $byCourse = [];
-        foreach ($ids as $index => $assessmentId) {
-            $byCourse[$order[$index]][] = $assessmentId;
-        }
-
-        return ['ids' => $ids, 'byCourse' => $byCourse];
+        $this->write('course_item_placements', ['node_id','course_id','course_item_id','assessment_role','public_preview'], $placements);
+        return ['assessments' => ['ids' => $assessmentIds, 'byCourse' => $byCourse], 'placements' => $byItem];
     }
 
     /**
@@ -815,7 +764,7 @@ final class SeedGenerator
 
             $ids = $this->write(
                 'assessment_questions',
-                ['public_id', 'assessment_id', 'position', 'question_html', 'points', 'difficulty'],
+                ['public_id', 'course_item_id', 'position', 'question_html', 'points', 'difficulty'],
                 $rows,
                 true
             );
@@ -858,7 +807,7 @@ final class SeedGenerator
      * Enrolments and everything that hangs off them: progress, attempts, responses, sessions,
      * results and certificates.
      *
-     * @param list<array{id:int,modules:list<int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
+     * @param list<array{id:int,placements:array<int,int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
      */
     private function generateEnrolmentActivity(
@@ -943,7 +892,6 @@ final class SeedGenerator
             );
             unset($enrolmentRows);
 
-            $progressRows = [];
             $attemptRows = [];
             $attemptContext = [];
             $sessionRows = [];
@@ -971,16 +919,8 @@ final class SeedGenerator
                 }
                 $worked++;
 
-                foreach ($course['modules'] as $moduleId) {
-                    $progressRows[] = [
-                        $enrolmentId, $moduleId, $now, $now,
-                        $complete ? $now : null,
-                        $complete ? 75.0 : null,
-                        $complete ? 'MERIT' : null,
-                    ];
-                }
-
                 $assessmentId = $course['assessments'][0];
+                $nodeId = $course['placements'][$assessmentId];
                 $questions = $course['questions'][$assessmentId] ?? [];
                 $maximum = max(1, count($questions));
 
@@ -989,7 +929,7 @@ final class SeedGenerator
                     $percentage = round($earned / $maximum * 100, 2);
                     $attemptContext[] = [$questions, $earned, $course['options']];
                     $attemptRows[] = [
-                        Uuid::v4(), $enrolmentId, $assessmentId, $attempt,
+                        Uuid::v4(), $enrolmentId, $assessmentId, $nodeId, $attempt,
                         $earned, $maximum, $percentage,
                         $this->gradeFor($percentage), $percentage >= 50.0, $now,
                     ];
@@ -997,7 +937,7 @@ final class SeedGenerator
 
                 $sessionContext[] = $questions;
                 $sessionRows[] = [
-                    Uuid::v4(), $enrolmentId, $assessmentId, 'graded', 1, 'submitted',
+                    Uuid::v4(), $enrolmentId, $assessmentId, $nodeId, 'graded', 1, 'submitted',
                     $maximum, $maximum, $now, gmdate('Y-m-d H:i:sP', time() + 3600), $now,
                 ];
 
@@ -1015,16 +955,9 @@ final class SeedGenerator
             }
             unset($context, $enrolmentIds);
 
-            $this->write(
-                'module_progress',
-                ['enrolment_id', 'module_id', 'first_opened_at', 'last_viewed_at', 'completed_at', 'best_percentage', 'best_grade_code'],
-                $progressRows
-            );
-            unset($progressRows);
-
             $attemptIds = $this->write(
                 'assessment_attempts',
-                ['public_id', 'enrolment_id', 'assessment_id', 'attempt_number', 'earned_points', 'maximum_points', 'percentage', 'grade_code', 'passed', 'submitted_at'],
+                ['public_id', 'enrolment_id', 'course_item_id', 'structure_node_id', 'attempt_number', 'earned_points', 'maximum_points', 'percentage', 'grade_code', 'passed', 'submitted_at'],
                 $attemptRows,
                 true
             );
@@ -1052,7 +985,7 @@ final class SeedGenerator
 
             $sessionIds = $this->write(
                 'assessment_sessions',
-                ['public_id', 'enrolment_id', 'assessment_id', 'attempt_mode', 'attempt_number', 'status', 'selected_question_count', 'current_sequence', 'started_at', 'deadline_at', 'completed_at'],
+                ['public_id', 'enrolment_id', 'course_item_id', 'structure_node_id', 'attempt_mode', 'attempt_number', 'status', 'selected_question_count', 'current_sequence', 'started_at', 'deadline_at', 'completed_at'],
                 $sessionRows,
                 true
             );
@@ -1102,7 +1035,7 @@ final class SeedGenerator
     /**
      * Favourites, course requests, company credits and their allocations.
      *
-     * @param list<array{id:int,modules:list<int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
+     * @param list<array{id:int,placements:array<int,int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
      * @param list<array{id:int,domain:string,name:string}> $companies
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
      */
@@ -1177,7 +1110,7 @@ final class SeedGenerator
     /**
      * Course edit history and audit activity, so the Activity screen has volume to page through.
      *
-     * @param list<array{id:int,modules:list<int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
+     * @param list<array{id:int,placements:array<int,int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
      */
     private function generateAuditTrail(SeedGenerationPlan $plan, string $token, array $courses, array $people): void

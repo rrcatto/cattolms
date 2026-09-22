@@ -1,9 +1,6 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8
-**Date time:** 2026/09/12 SAST
-**Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
-**Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8 **Date time:** 2026/09/12 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
 ## v0.8 commerce upgrade from v0.7
 
@@ -13,41 +10,24 @@ Run `php bin/console commerce:maintain --no-debug` once per minute from the inst
 
 Configure Administration → Settings → Bank details before providing EFT instructions to customers. The Dummy gateway simulates card outcomes only in development/test environments. No live payment-processor credentials are included in this update.
 
-**How much of this document is v0.7.** The install, reset, QA-gate and Seed Database instructions
-below are current, and the sections that described the REAL/SEED universe have been corrected to say
-what v0.7 actually does rather than left to mislead. The pagination-benchmark numbers are v0.6's and
-are labelled as such, because the two instruments that produced them do not run on v0.7 — that
-section says why. Everything else still reads as it was written for v0.6 and has not been re-verified
-line by line; where it and `PROJECT-INSTRUCTIONS.md` disagree, the latter is current.
+**How much of this document is v0.7.** The install, reset, QA-gate and Seed Database instructions below are current, and the sections that described the REAL/SEED universe have been corrected to say what v0.7 actually does rather than left to mislead. The pagination-benchmark numbers are v0.6's and are labelled as such, because the two instruments that produced them do not run on v0.7 — that section says why. Everything else still reads as it was written for v0.6 and has not been re-verified line by line; where it and `PROJECT-INSTRUCTIONS.md` disagree, the latter is current.
 
-**v0.7 is a reset for the same reason v0.6 was.** It inherits v0.6's single baseline, so there is no
-upgrade path into it either: installing v0.7 is `composer smoke:install` and a discarded database.
-The section below is v0.6's account of that, and every word of it applies unchanged.
+**v0.7 is a reset for the same reason v0.6 was.** It inherits v0.6's single baseline, so there is no upgrade path into it either: installing v0.7 is `composer smoke:install` and a discarded database. The section below is v0.6's account of that, and every word of it applies unchanged.
 
 ## v0.6 is a reset, not an upgrade
 
-**There is no migration path from 0.5.8.3 to v0.6.** v0.6 collapses the 0.5.8 baseline and the five
-migrations that followed it into one canonical baseline, which is a schema rebase — the same
-situation 0.5.7.5.1 was in, and the reason `validate-release.php` forbids rebasing by default.
-Installing v0.6 means the full install/reset path below, and the database is discarded.
+**There is no migration path from 0.5.8.3 to v0.6.** v0.6 collapses the 0.5.8 baseline and the five migrations that followed it into one canonical baseline, which is a schema rebase — the same situation 0.5.7.5.1 was in, and the reason `validate-release.php` forbids rebasing by default. Installing v0.6 means the full install/reset path below, and the database is discarded.
 
-That is acceptable only while the database is disposable TEST/DEV state. Once production is
-declared it stops being an option, and any change of this shape needs a real migration instead.
+That is acceptable only while the database is disposable TEST/DEV state. Once production is declared it stops being an option, and any change of this shape needs a real migration instead.
 
 Two v0.6 install steps that did not exist before:
 
-- `composer seeds:publish` copies the bundled name lists into `storage/seeds/`, where the Seed
-  Database reads them and the operator edits them. It never overwrites a file the instance already
-  has, so an upgrade that adds two hundred surnames leaves an edited list alone. It runs as part of
-  `composer smoke:install`.
-- Course categories and tags are no longer generated per seed set. They are universe-free labels
-  installed by the baseline and managed in Administration, so a seed set files its generated courses
-  under the same taxonomy a genuine course uses.
+- `composer seeds:publish` copies the bundled name lists into `storage/seeds/`, where the Seed Database reads them and the operator edits them. It never overwrites a file the instance already has, so an upgrade that adds two hundred surnames leaves an edited list alone. It runs as part of `composer smoke:install`.
+- Course categories and tags are no longer generated per seed set. They are universe-free labels installed by the baseline and managed in Administration, so a seed set files its generated courses under the same taxonomy a genuine course uses.
 
 ## Upgrading 0.5.7.6 to 0.5.8
 
-0.5.8 **rebases the baseline migration**, so unlike 0.5.7.6 it requires a destructive development
-database reset. There is no incremental upgrade path.
+0.5.8 **rebases the baseline migration**, so unlike 0.5.7.6 it requires a destructive development database reset. There is no incremental upgrade path.
 
 Set these before migrating:
 
@@ -56,11 +36,7 @@ SEED_SYSTEM_COMPANY_NAME="SEED System Company"
 SEED_SYSTEM_COMPANY_DOMAIN=seed.your-domain.example
 ```
 
-`SEED_SYSTEM_COMPANY_DOMAIN` must differ from `APP_DOMAIN` — `companies.domain` is unique across
-the whole platform and the migration stops with an explanatory error otherwise — and it must be a
-domain you genuinely receive mail for, because every message addressed to a generated identity is
-delivered there. Leave it blank to disable the rewrite; seed mail then simply bounces, which is
-safe for an installation that never signs in as a generated identity.
+`SEED_SYSTEM_COMPANY_DOMAIN` must differ from `APP_DOMAIN` — `companies.domain` is unique across the whole platform and the migration stops with an explanatory error otherwise — and it must be a domain you genuinely receive mail for, because every message addressed to a generated identity is delivered there. Leave it blank to disable the rewrite; seed mail then simply bounces, which is safe for an installation that never signs in as a generated identity.
 
 Then deploy alongside the existing version, repoint the `current` symlink and reset:
 
@@ -69,8 +45,7 @@ runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prett
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer smoke:install
 ```
 
-`smoke:install` is destructive by design and is acceptable only while the database is disposable
-TEST/DEV state.
+`smoke:install` is destructive by design and is acceptable only while the database is disposable TEST/DEV state.
 
 ```bash
 sudo ln -sfn /usr/local/lib/php/catto-learning/0.5.8 /usr/local/lib/php/catto-learning/current.tmp
@@ -121,17 +96,13 @@ chmod 755 /home/prettythings/releases/deploy-catto-learning-v0.5.7.5.1.sh
 
 Required PHP extensions: DOM, fileinfo, GD, JSON, mbstring, OpenSSL, PDO/PostgreSQL and ZIP.
 
-GD is required from v0.7 for the profile image: an upload is validated, cropped to a square and
-resized to 256x256 before it is stored. Without it the profile image control is the only thing that
-fails, but it fails at upload time rather than at boot.
+GD is required from v0.7 for the profile image: an upload is validated, cropped to a square and resized to 256x256 before it is stored. Without it the profile image control is the only thing that fails, but it fails at upload time rather than at boot.
 
 `composer migrate` is the canonical migration command. There is no separate `migrate-test` convention.
 
 ## Bundled themes
 
-The platform ships five themes as source trees under `themes/` in the code root: Factory Reset,
-Factory Reset Sidebar, Gilded Noir, Light Default and Radiant Learning. They are versioned and
-committed with the code.
+The platform ships five themes as source trees under `themes/` in the code root: Factory Reset, Factory Reset Sidebar, Gilded Noir, Light Default and Radiant Learning. They are versioned and committed with the code.
 
 ```bash
 composer themes:install            # install any that are missing, and publish every one's assets
@@ -139,18 +110,11 @@ composer themes:install -- --force # replace installed themes at the same versio
 composer themes:package            # rebuild extras/themes/*.zip from the trees
 ```
 
-`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up with all
-five. On an existing instance run `themes:install` after deploying a release: it leaves every
-already-installed theme exactly as it is and republishes browser assets, which is what a deployment
-that overlays the code root but not the public web root needs.
+`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up with all five. On an existing instance run `themes:install` after deploying a release: it leaves every already-installed theme exactly as it is and republishes browser assets, which is what a deployment that overlays the code root but not the public web root needs.
 
-**`--force` is not an upgrade path.** An installed theme is an immutable release; replacing one at
-the same version produces two builds wearing one version number. On a server whose themes are
-accepted releases, use a new version instead.
+**`--force` is not an upgrade path.** An installed theme is an immutable release; replacing one at the same version produces two builds wearing one version number. On a server whose themes are accepted releases, use a new version instead.
 
-Never install or update a theme by copying files into `/home/<site-user>/themes/` by hand. Those
-paths are written by the site user, and files placed there by another user cannot be replaced by
-the installer afterwards.
+Never install or update a theme by copying files into `/home/<site-user>/themes/` by hand. Those paths are written by the site user, and files placed there by another user cannot be replaced by the installer afterwards.
 
 ## VPS QA gate
 
@@ -168,10 +132,7 @@ runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prett
 
 `composer qa` is the authoritative pre-handoff/pre-release gate and includes the full PHPUnit suite, PHPStan and project validators.
 
-**Check the suites can start before running them.** `composer qa` begins with
-`tools/check-test-suite.php` for a reason: a test class that cannot be declared kills PHPUnit
-during suite construction, before any test — including any guard written as a test — can run. The
-companion command is:
+**Check the suites can start before running them.** `composer qa` begins with `tools/check-test-suite.php` for a reason: a test class that cannot be declared kills PHPUnit during suite construction, before any test — including any guard written as a test — can run. The companion command is:
 
 ```bash
 php vendor/bin/phpunit --list-tests --testsuite Integration
@@ -203,15 +164,9 @@ Artifact-generation environments without the VPS PHP/Composer/PostgreSQL may run
 
 ## Pagination benchmark (v0.6)
 
-Pagination 2.0 is measured rather than assumed, and the two tools that do it are development
-instruments only — both refuse to run unless `APP_ENV=development`.
+Pagination 2.0 is measured rather than assumed, and the two tools that do it are development instruments only — both refuse to run unless `APP_ENV=development`.
 
-The Seed Database generates a *realistic* graph: a volume of 100,000 is a budget of 100,000 rows
-spread across roughly thirty tables, so it produces about 1,300 people and 2,500 enrolments. That is
-right for exercising the interface and useless for measuring pagination, because a list of 1,300
-rows is fast however it is written. `seed-benchmark-dataset.php` writes the opposite shape: one
-hundred thousand rows in each of the tables the paginated lists actually read, and nothing
-underneath them.
+The Seed Database generates a *realistic* graph: a volume of 100,000 is a budget of 100,000 rows spread across roughly thirty tables, so it produces about 1,300 people and 2,500 enrolments. That is right for exercising the interface and useless for measuring pagination, because a list of 1,300 rows is fast however it is written. `seed-benchmark-dataset.php` writes the opposite shape: one hundred thousand rows in each of the tables the paginated lists actually read, and nothing underneath them.
 
 ```bash
 catto 'php tools/seed-benchmark-dataset.php'          # ~920,000 rows, about 2.5 minutes
@@ -220,34 +175,15 @@ catto 'php tools/seed-benchmark-dataset.php --list'   # the seed batches present
 catto 'php tools/seed-benchmark-dataset.php --remove=<token>'
 ```
 
-**Neither instrument runs on v0.7, and the commands above are the v0.6 ones.** Both were written
-against the universe model and neither was carried across when it was removed:
-`benchmark-pagination.php` imports `CattoLearning\Auth\DataUniverse` and fatals on the class;
-`seed-benchmark-dataset.php` calls `SeedRepository::sets()`, which no longer exists, and its inserts
-still name the dropped `seed_token` and `company_type` columns. Every listed command therefore ends
-in an uncaught `Error` rather than a measurement.
+**Neither instrument runs on v0.7, and the commands above are the v0.6 ones.** Both were written against the universe model and neither was carried across when it was removed: `benchmark-pagination.php` imports `CattoLearning\Auth\DataUniverse` and fatals on the class; `seed-benchmark-dataset.php` calls `SeedRepository::sets()`, which no longer exists, and its inserts still name the dropped `seed_token` and `company_type` columns. Every listed command therefore ends in an uncaught `Error` rather than a measurement.
 
-The gate does not catch this and is not wrong to miss it: `tools/check-architecture.php` scans
-`src/` only, so a banned symbol surviving under `tools/` fails nothing. Widening it is the cheap
-guard if these are repaired.
+The gate does not catch this and is not wrong to miss it: `tools/check-architecture.php` scans `src/` only, so a banned symbol surviving under `tools/` fails nothing. Widening it is the cheap guard if these are repaired.
 
-Repairing them is bounded work rather than a rewrite — drop the universe argument from the
-benchmark's calls, and drop set registration, `--list` and `--remove` from the dataset writer, which
-have nothing to key on now that a generated row is an ordinary row. Removal becomes what it is
-everywhere else: reset the database. Until then, treat the numbers below as the v0.6 record they
-are.
+Repairing them is bounded work rather than a rewrite — drop the universe argument from the benchmark's calls, and drop set registration, `--list` and `--remove` from the dataset writer, which have nothing to key on now that a generated row is an ordinary row. Removal becomes what it is everywhere else: reset the database. Until then, treat the numbers below as the v0.6 record they are.
 
-`composer qa` passes with the batch loaded — 580 tests in about four and a half minutes rather than
-the usual one — but it is close to Composer's 300-second per-script process timeout, so a slower
-machine may need `COMPOSER_PROCESS_TIMEOUT=0 composer qa`. That is a timeout, not a failure. Before
-the v0.6 foreign-key indexes the same suite took eight minutes and could not finish inside it at
-all.
+`composer qa` passes with the batch loaded — 580 tests in about four and a half minutes rather than the usual one — but it is close to Composer's 300-second per-script process timeout, so a slower machine may need `COMPOSER_PROCESS_TIMEOUT=0 composer qa`. That is a timeout, not a failure. Before the v0.6 foreign-key indexes the same suite took eight minutes and could not finish inside it at all.
 
-Read the benchmark output as relative rather than absolute; a development container shares a
-machine. What matters is the shape: a healthy list costs roughly the same on its last page as on its
-first. A list whose deepest page costs seconds is the signal to look at. In v0.6 that signal found
-the Companies cartesian aggregate, the Activity metadata lookups, a course sub-select the planner
-was answering by scanning a partial index end to end, and thirty-four unindexed foreign keys.
+Read the benchmark output as relative rather than absolute; a development container shares a machine. What matters is the shape: a healthy list costs roughly the same on its last page as on its first. A list whose deepest page costs seconds is the signal to look at. In v0.6 that signal found the Companies cartesian aggregate, the Activity metadata lookups, a course sub-select the planner was answering by scanning a partial index end to end, and thirty-four unindexed foreign keys.
 
 The v0.6 baseline, at 100,000 rows in every paginated table, page size 25, median of three runs:
 
@@ -266,9 +202,7 @@ public catalogue              13334        1.7        1.5        2.3        2.9
 company people                20000       30.1        3.9       53.6       52.5
 ```
 
-A number several times these is worth investigating; the same number is not, because the machine
-underneath is shared. The one list that grows with depth is Administration People, and that is the
-OFFSET walk itself rather than a defect: reaching row 100,000 means passing the 99,999 before it.
+A number several times these is worth investigating; the same number is not, because the machine underneath is shared. The one list that grows with depth is Administration People, and that is the OFFSET walk itself rather than a defect: reaching row 100,000 means passing the 99,999 before it.
 
 ## ACL verification after reset
 
@@ -284,9 +218,7 @@ COURSE_OWNER
 
 Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
 
-The Commerce permission set is reserved in the ACL now but Commerce itself is not installed.
-`SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is
-no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
+The Commerce permission set is reserved in the ACL now but Commerce itself is not installed. `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
 
 ## Browser acceptance after clean QA
 
@@ -317,9 +249,7 @@ At minimum review:
 
 Also validate the accepted external theme at desktop and mobile widths.
 
-`/help` is a public route and must return the learner-facing guide without an authentication
-cookie. Keep its instructions focused on finding courses, buying access, course structure and
-learning; do not turn it into an administration manual.
+`/help` is a public route and must return the learner-facing guide without an authentication cookie. Keep its instructions focused on finding courses, buying access, course structure and learning; do not turn it into an administration manual.
 
 ## Application logging and browser asset cache
 
@@ -335,30 +265,18 @@ Core and theme browser assets are emitted with content fingerprints. A repaired 
 
 ## Working tree traps
 
-**Never check out a branch in the served directory.** `code/current` is what the web server serves,
-so `git checkout main` replaces the running application. Checking out v0.6 while `vendor/` holds
-Symfony gives every request `Class "Base" not found`, because the old code wants Fat-Free and it is
-no longer installed. To move a branch pointer, use `git branch -f main dev-0.7`, or push a ref
-directly with `git push origin dev-0.7:main`. Neither touches a single file.
+**Never check out a branch in the served directory.** `code/current` is what the web server serves, so `git checkout main` replaces the running application. Checking out v0.6 while `vendor/` holds Symfony gives every request `Class "Base" not found`, because the old code wants Fat-Free and it is no longer installed. To move a branch pointer, use `git branch -f main dev-0.7`, or push a ref directly with `git push origin dev-0.7:main`. Neither touches a single file.
 
-**A path checkout does not delete.** `git checkout <branch> -- .` writes the files the branch has
-and leaves behind every file the branch dropped. After restoring this way, remove what does not
-belong: ask the commit what should exist (`git ls-tree -r --name-only <branch>`) rather than asking
-the diff what was deleted, because `--diff-filter=D` misses a file that was *renamed* away. A single
-leftover Fat-Free class is enough to stop Symfony building its container.
+**A path checkout does not delete.** `git checkout <branch> -- .` writes the files the branch has and leaves behind every file the branch dropped. After restoring this way, remove what does not belong: ask the commit what should exist (`git ls-tree -r --name-only <branch>`) rather than asking the diff what was deleted, because `--diff-filter=D` misses a file that was *renamed* away. A single leftover Fat-Free class is enough to stop Symfony building its container.
 
-**`core.fileMode` is false in this repository.** Git therefore ignores the executable bit, and a
-file that is executable on disk can be stored as `100644`. A later checkout writes it without the
-bit and `bin/console` answers `Permission denied`. Fix the stored mode, not just the file:
+**`core.fileMode` is false in this repository.** Git therefore ignores the executable bit, and a file that is executable on disk can be stored as `100644`. A later checkout writes it without the bit and `bin/console` answers `Permission denied`. Fix the stored mode, not just the file:
 
 ```bash
 chmod +x bin/console
 git update-index --chmod=+x bin/console
 ```
 
-**Build output under `public_html/assets/` is owned by the container user**, because
-`asset-map:compile` runs as `cattotest`. The host cannot delete it; remove it from inside the
-container. The same applies to anything else PHP-FPM writes.
+**Build output under `public_html/assets/` is owned by the container user**, because `asset-map:compile` runs as `cattotest`. The host cannot delete it; remove it from inside the container. The same applies to anything else PHP-FPM writes.
 
 ## Development database cleanup
 
@@ -401,48 +319,21 @@ Theme source under `/home/<site-user>/themes/` is authoritative. `themes:sync` s
 
 Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE`.
 
-**Generating.** Enter an approximate record count. It is a soft whole-set target across every
-seeded table, not a per-table quota, and lands within about 1% of the request from 1,000 upward.
-Generation runs in one transaction, so a failure rolls the whole set back and leaves nothing
-behind. Start at 1,000 to confirm the graph looks right, then scale to 25,000 and beyond.
+**Generating.** Enter an approximate record count. It is a soft whole-set target across every seeded table, not a per-table quota, and lands within about 1% of the request from 1,000 upward. Generation runs in one transaction, so a failure rolls the whole set back and leaves nothing behind. Start at 1,000 to confirm the graph looks right, then scale to 25,000 and beyond.
 
-**Memory.** The full 500,000-row maximum completes against the deployed `memory_limit=128M`,
-peaking at about 58 MB on a fresh database. It did not always: every phase used to build all of its
-rows before writing any of them, which made cost linear in the request and put the largest sets out
-of reach with `Allowed memory size ... exhausted`. The generator now streams — a chunk is built,
-written, its identifiers kept and its rows discarded — so peak cost follows
-`SeedGenerator::GENERATION_CHUNK` rather than the volume asked for. Generating repeatedly adds a
-few MB per set, because the name factory is primed with every name already stored so a later set
-cannot repeat one; three consecutive maximum sets peak at about 75 MB.
+**Memory.** The full 500,000-row maximum completes against the deployed `memory_limit=128M`, peaking at about 58 MB on a fresh database. It did not always: every phase used to build all of its rows before writing any of them, which made cost linear in the request and put the largest sets out of reach with `Allowed memory size ... exhausted`. The generator now streams — a chunk is built, written, its identifiers kept and its rows discarded — so peak cost follows `SeedGenerator::GENERATION_CHUNK` rather than the volume asked for. Generating repeatedly adds a few MB per set, because the name factory is primed with every name already stored so a later set cannot repeat one; three consecutive maximum sets peak at about 75 MB.
 
-**There is no cleanup by token.** Generated rows are ordinary rows, so a set cannot be selectively
-removed once written. Resetting the database is the only way back to a clean state, which is what
-`composer smoke:install` does.
+**There is no cleanup by token.** Generated rows are ordinary rows, so a set cannot be selectively removed once written. Resetting the database is the only way back to a clean state, which is what `composer smoke:install` does.
 
-**What a set contains.** People, companies, courses with modules,
-content blocks, assessments, questions and options, grade bands, price variants, editors,
-enrolments with progress, attempts, responses, sessions, results, certificates, favourites,
-requests, credits, allocations, edit history and audit activity — 29 tables.
+**What a set contains.** People, companies, courses with modules, content blocks, assessments, questions and options, grade bands, price variants, editors, enrolments with progress, attempts, responses, sessions, results, certificates, favourites, requests, credits, allocations, edit history and audit activity — 29 tables.
 
-Never fabricated: `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tokens`,
-`web_sessions`. Generation sends **zero email**.
+Never fabricated: `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tokens`, `web_sessions`. Generation sends **zero email**.
 
-**Signing in as a generated identity.** Request an ordinary passwordless login for the generated
-address. The stored domain is the company's name plus `.invalid` — RFC 2606 reserves that suffix so
-the address can never leave the building — and `GeneratedDomainMailer` re-addresses the message to
-the same local part at `APP_DOMAIN`, so it arrives in the one inbox you already read. There is no
-`SEED_SYSTEM_COMPANY_DOMAIN` any more, and nothing in the mail path refers to seed data: these are
-simply the domains the platform invents.
+**Signing in as a generated identity.** Request an ordinary passwordless login for the generated address. The stored domain is the company's name plus `.invalid` — RFC 2606 reserves that suffix so the address can never leave the building — and `GeneratedDomainMailer` re-addresses the message to the same local part at `APP_DOMAIN`, so it arrives in the one inbox you already read. There is no `SEED_SYSTEM_COMPANY_DOMAIN` any more, and nothing in the mail path refers to seed data: these are simply the domains the platform invents.
 
-**There is nothing to clean up, switch between or verify the isolation of.** Those three
-operations were this section's bulk until v0.7 and all three are gone with the REAL/SEED split:
-there is no Clean up action, no All/Real/Seed control above the Administration lists, and no
-cross-universe trigger to test an INSERT against. A generated row is an ordinary row. If the
-paragraphs you remember are the ones that described them, they described v0.6.
+**There is nothing to clean up, switch between or verify the isolation of.** Those three operations were this section's bulk until v0.7 and all three are gone with the REAL/SEED split: there is no Clean up action, no All/Real/Seed control above the Administration lists, and no cross-universe trigger to test an INSERT against. A generated row is an ordinary row. If the paragraphs you remember are the ones that described them, they described v0.6.
 
-What replaces all three is the single sentence above: reset the database. `composer smoke:install`
-is the whole cleanup story now, and it is the only one, which is why generating is safe to do
-freely and impossible to undo selectively.
+What replaces all three is the single sentence above: reset the database. `composer smoke:install` is the whole cleanup story now, and it is the only one, which is why generating is safe to do freely and impossible to undo selectively.
 
 ### EFT bank details
 
@@ -450,14 +341,18 @@ Configure Administration → Settings → Bank details before accepting EFT paym
 
 Settings use individual accordions and separate saves for platform identity, outgoing mail and bank details. Saving one section does not submit another section’s fields. Configuration guidance and maintenance keep their own accordions.
 
-## v0.8.5 theme and browser verification
+## v0.8.6 release and browser verification
 
 Install changed theme sources through ThemeManager, using `themes:install -- --force` only in development. Compile AssetMapper assets and publish the compiled output and changed core assets as the application user; never mirror the whole runtime tree or recursively change its ownership from the host. Clear the application cache after publication.
 
 Run the canonical shell and component matrices serially using the [browser instructions](../tests/Browser/README.md), then Twig lint and full `composer qa`. The canonical matrix temporarily activates themes for anonymous requests; restore its saved active theme before removing its isolated identity, including after an interrupted run. Component checks alone do not verify shell construction.
 
-For an authorized release, increment changed theme versions and the child’s exact parent requirement, rebuild `extras/themes` from final source, and validate packages. Do not overwrite accepted installed versions with development `--force`. v0.8.5 bundles Factory Reset/Sidebar/Light Default 2.0.1, Gilded Noir 2.0.2 and Radiant Learning 4.0.1. Git publication does not deploy or certify the VPS. Push the reviewed development commit to `main` directly without checking out branches in the served directory.
+For an authorized release, increment changed theme versions and the child’s exact parent requirement, rebuild `extras/themes` from final source, and validate packages. Do not overwrite accepted installed versions with development `--force`. v0.8.6 retains Factory Reset/Sidebar/Light Default 2.0.1, Gilded Noir 2.0.2 and Radiant Learning 4.0.1. Git publication does not deploy or certify the VPS. Push the reviewed development commit to `main` directly without checking out branches in the served directory.
 
-### v0.8.5 upgrade order
+### v0.8.6 installation order
 
-Run `composer themes:install` before `composer migrate`. The additive canonical-theme migration advances only the immediately preceding bundled active-theme keys to their new installed versions; it preserves custom or other selections. Then publish compiled/core assets and clear caches. The report is [Canonical Page Construction](../REPORTS/20260918-CattoLMS-Canonical-Page-Construction-Report.md).
+Run `composer themes:install` before `composer migrate`. The additive canonical-theme migration advances only the immediately preceding bundled active-theme keys to their new installed versions; it preserves custom or other selections. Then publish compiled/core assets and clear caches. Historical reports are kept outside the code repository in workspace `cattolms/REPORTS/`.
+
+## Course Components development baseline
+
+The active update replaces the disposable module-centric baseline with `20260906110000_create_v085_course_components_baseline.php`. The owner-authorized reset and 100,000-record generation have already run; do not rerun destructive operations merely to resume a session. Resources live in the instance storage root under `course-resources`; files may be transferred there externally and then registered by exact filename in `/admin/resources`. Do not overwrite registered files or automatically rename duplicates. All reports belong in workspace `cattolms/REPORTS`, outside the code repository. The former code-tree REPORTS content is intentionally removed. Validation remains in progress; workspace AGENTS.md records current results and gaps.

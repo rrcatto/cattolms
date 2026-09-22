@@ -1,6 +1,6 @@
 # Radiant Learning
 
-Theme version **4.0.1**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
+Theme version **4.0.1**, bundled with CattoLMS **v0.8.6**. Theme Package 4.0 / Twig Template API 2.0.
 
 This standalone theme retains its rounded, boxed presentation and shared site footer. Its palettes are Ocean & Sun, Woodland and Tranquil. It needs no theme JavaScript or independent page bodies.
 

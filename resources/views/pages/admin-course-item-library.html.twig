@@ -1,0 +1,19 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/courses' %}{% set ph_back_label = 'Courses' %}{% set ph_kicker = 'Reusable course content' %}{% set ph_title = 'Course Item Library' %}{% set ph_lead = 'Edit shared Course Items and see every course placement. Items without placements remain available under Not currently in use.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+<form method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', for: 'course-item-search'})} %}{% block control %}<input class="form-control" id="course-item-search" name="q" value="{{ item_library.search }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Type', for: 'course-item-type'})} %}{% block control %}<select class="form-select" id="course-item-type" name="type" {{ ui_field_attrs(props) }}><option value="">All types</option>{% for type in item_types %}<option value="{{ type }}" {{ item_library.type == type ? 'selected' : '' }}>{{ type|replace({'_':' '})|title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter library', type: 'submit', variant: 'primary'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Resource Library', href: '/admin/resources'}) }}{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}</form>
+{% for group in item_library.groups %}
+{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'course-items-' ~ group.course.id, heading: group.course.title, summary: group.items|length ~ ' Course Items', open: false})} %}{% block body %}
+{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in group.items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|replace({'_':' '}) }}</div>{% endblock %}{% block actions %}{{ ui('action.link', {label: 'Edit shared item', href: '/admin/course-items/' ~ item.id, size: 'small'}) }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+{% endfor %}
+{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'course-items-unused', heading: 'Not currently in use', summary: item_library.unused|length ~ ' Course Items', open: true})} %}{% block body %}
+{% if item_library.unused %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in item_library.unused %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|replace({'_':' '}) }}</div>{% endblock %}{% block actions %}{{ ui('action.link', {label: 'Edit', href: '/admin/course-items/' ~ item.id, size: 'small'}) }}{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}{% else %}{{ ui('feedback.empty', {heading: 'Every Course Item is placed', summary: 'There are no unused Course Items.'}) }}{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

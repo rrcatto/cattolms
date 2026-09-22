@@ -67,7 +67,7 @@ final class PublishedCourseEditingRegressionTest extends TestCase
             self::assertNotNull($published);
             self::assertSame('published', (string) $published['status']);
             $publicId = (string) $published['public_id'];
-            $revision = (int) $published['revision_number'];
+            self::assertArrayNotHasKey('revision_number', $published);
 
             $service->updateCourse($courseId, [
                 'title' => 'Updated QA Course ' . $suffix,
@@ -79,7 +79,7 @@ final class PublishedCourseEditingRegressionTest extends TestCase
             self::assertNotNull($updated);
             self::assertSame($courseId, (int) $updated['id']);
             self::assertSame($publicId, (string) $updated['public_id']);
-            self::assertSame($revision, (int) $updated['revision_number']);
+            self::assertArrayNotHasKey('revision_number', $updated);
             self::assertSame('published', (string) $updated['status']);
             self::assertSame('Updated QA Course ' . $suffix, (string) $updated['title']);
             self::assertSame('Updated while already published.', (string) $updated['summary']);

@@ -1,0 +1,13 @@
+{% extends layout %}
+{% block page_body %}
+<section class="cl-course-presentation catto-standalone cl-course-presentation-intro">
+<header class="masthead" data-level="{{ course.level|default('') }}">
+{% if course.level|default('') %}<p class="eyebrow">{{ course.level }}</p>{% endif %}
+<h1>{{ course.title }}</h1>
+{% if course.subtitle|default('') %}<p class="course-subtitle">{{ course.subtitle }}</p>{% endif %}
+{% if course.summary|default('') %}<p class="course-summary">{{ course.summary }}</p>{% endif %}
+</header>
+<div class="course-introduction-copy"><p>These Course Items are available before enrolment.</p></div>
+{% if course.structure %}{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Start public preview →', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ course.public_preview_query|default('')}) }}{% endif %}
+</section>
+{% endblock %}

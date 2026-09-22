@@ -81,14 +81,12 @@ final class CourseService
     public function __construct(
         private readonly TransactionManager $transactions,
         private readonly CourseRepository $courses,
-        private readonly CoursePortabilityRepository $portability,
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
         private readonly OptionRepository $options,
         private readonly CourseHtml $courseHtml,
         private readonly LegacyHtmlCourseImporter $importer,
-        private readonly string $storageRoot,
-        private readonly ?AccessService $commerceAccess = null
+        private readonly CourseItemService $courseItems
     ) {
     }
 
@@ -531,22 +529,6 @@ final class CourseService
         return $this->courses->enrolment($userId, $courseId);
     }
 
-    /**
-     * @param array<string,mixed> $media
-     */
-    public function userCanAccessMedia(int $userId, array $media, bool $platformAdministrator = false): bool
-    {
-        if ($platformAdministrator) return true;
-        $enrolment = $this->courses->enrolment($userId, (int) ($media['course_id'] ?? 0));
-        if ($enrolment === null) return false;
-        try {
-            $this->commerceAccess?->assertAccess((int)$enrolment['id']);
-        } catch (InvalidArgumentException) {
-            return false;
-        }
-        return true;
-    }
-
     /** One category's published-course total. */
     public function categoryCourseTotal(int $categoryId): int
     {
@@ -773,19 +755,18 @@ final class CourseService
         if ($course === null) {
             return null;
         }
-        $course['modules'] = $this->courses->modules((int) $course['id']);
+        $course['structure'] = $this->courseItems->availability((int) $course['id'], null, false);
         $course['grade_bands'] = $this->courses->gradeBands((int) $course['id']);
-        $course['module_count'] = count($course['modules']);
-        $course['question_count'] = array_sum(array_map(
-            static fn(array $module): int => (int) ($module['question_count'] ?? 0),
-            $course['modules']
-        ));
-        foreach ($this->courses->diagnosticAssessments((int) $course['id']) as $diagnostic) {
-            $course['question_count'] += count($this->courses->questions((int) $diagnostic['id'], false));
-        }
-        $final = $this->courses->finalAssessment((int) $course['id']);
-        if ($final !== null) {
-            $course['question_count'] += count($this->courses->questions((int) $final['id'], false));
+        $course['item_count'] = 0;
+        $course['question_count'] = 0;
+        $course['has_public_preview'] = false;
+        foreach ($course['structure'] as $node) {
+            if (($node['node_type'] ?? '') !== 'item') { continue; }
+            $course['item_count']++;
+            $course['has_public_preview'] = $course['has_public_preview'] || (bool) $node['public_preview'];
+            if (in_array((string) ($node['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) {
+                $course['question_count'] += count($this->courseItems->item((int) $node['course_item_id'])['questions']);
+            }
         }
         $course['price_variants'] = $this->normalisePriceVariants($this->courses->priceVariants((int) $course['id'], true));
         return $course;
@@ -798,22 +779,12 @@ final class CourseService
         if ($course === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
-        $course['modules'] = $this->courses->modules($courseId);
+        $course['structure'] = $this->courseItems->availability($courseId, null, false);
         $course['grade_bands'] = $this->courses->gradeBands($courseId);
-        $course['media'] = $this->courses->media($courseId);
         $course['history'] = $this->courses->history($courseId);
         $course['editors'] = $this->courses->courseEditors($courseId);
         $course['price_variants'] = $this->normalisePriceVariants($this->courses->priceVariants($courseId));
-        $course['diagnostic_assessments'] = $this->courses->diagnosticAssessments($courseId);
-        foreach ($course['diagnostic_assessments'] as &$diagnostic) {
-            $diagnostic['question_count'] = count($this->courses->questions((int) $diagnostic['id'], true));
-        }
-        unset($diagnostic);
-        $course['final_assessment'] = $this->courses->finalAssessment($courseId);
-        if (is_array($course['final_assessment'])) {
-            $course['final_assessment']['questions'] = $this->courses->questions((int) $course['final_assessment']['id'], true);
-            $course['final_assessment']['question_count'] = count($course['final_assessment']['questions']);
-        }
+        $course['publication_validation'] = $this->courseItems->publicationValidation($courseId);
         return $course;
     }
 
@@ -827,7 +798,6 @@ final class CourseService
 
         $courseId = $this->transactions->run(function () use ($data, $userId): int {
             $courseId = $this->courses->createCourse($data, $userId);
-            $this->courses->replaceGradeBands($courseId, $this->defaultGradeBands());
             $this->courses->recordHistory(
                 $courseId,
                 $userId,
@@ -986,7 +956,7 @@ final class CourseService
         $this->audit->record($userId, 'course.pricing_reordered', ['course_id' => $courseId, 'price_variant_id' => $variantId]);
     }
 
-    public function changeStatus(int $courseId, string $status, int $userId): void
+    public function changeStatus(int $courseId, string $status, int $userId, bool $overrideWarnings = false): void
     {
         if (!in_array($status, ['draft', 'published', 'retired', 'archived'], true)) {
             throw new InvalidArgumentException('Invalid course status.');
@@ -996,448 +966,23 @@ final class CourseService
             throw new InvalidArgumentException('The course does not exist.');
         }
         if ($status === 'published') {
-            $this->assertPublishable($courseId);
+            $this->assertPublishable($courseId, $overrideWarnings);
         }
         $this->courses->setStatus($courseId, $status, $userId);
         $this->courses->recordHistory($courseId, $userId, 'course.status_changed', 'course', $courseId, 'Course status changed to ' . $status . '.', ['status' => $status]);
         $this->audit->record($userId, 'course.status_changed', ['course_id' => $courseId, 'status' => $status]);
     }
 
-    public function submitForApproval(int $courseId, int $userId): void
+    public function submitForApproval(int $courseId, int $userId, bool $overrideWarnings = false): void
     {
         $course = $this->courses->findById($courseId);
         if ($course === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
-        $this->assertPublishable($courseId);
+        $this->assertPublishable($courseId, $overrideWarnings);
         $this->courses->setApprovalStatus($courseId, 'pending', $userId);
         $this->courses->recordHistory($courseId, $userId, 'course.submitted_for_approval', 'course', $courseId, 'Course submitted for publication approval.');
         $this->audit->record($userId, 'course.submitted_for_approval', ['course_id' => $courseId]);
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     */
-    public function createModule(int $courseId, array $input, int $userId): int
-    {
-        $course = $this->courses->findById($courseId);
-        if ($course === null) {
-            throw new InvalidArgumentException('The course does not exist.');
-        }
-        $data = $this->validateModuleInput($input);
-        $moduleId = $this->courses->createModule($courseId, $data);
-        $this->courses->recordHistory($courseId, $userId, 'module.created', 'module', $moduleId, 'Module created: ' . $data['title'] . '.', $data);
-        $this->audit->record($userId, 'course.module_created', ['course_id' => $courseId, 'module_id' => $moduleId]);
-        return $moduleId;
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     */
-    public function updateModule(int $courseId, int $moduleId, array $input, int $userId): void
-    {
-        if ($this->courses->moduleById($courseId, $moduleId) === null) {
-            throw new InvalidArgumentException('The course module does not exist.');
-        }
-        $data = $this->validateModuleInput($input);
-        $this->transactions->run(function () use ($courseId, $moduleId, $data, $userId): void {
-            $this->courses->updateModule($moduleId, $data);
-            $blocks = $this->portability->contentBlocks($moduleId);
-            if ($blocks === []) {
-                $blocks = [['type' => 'html', 'title' => null, 'content_html' => $data['content_html'], 'settings' => []]];
-            } else {
-                $htmlIndex = null;
-                foreach ($blocks as $index => $block) {
-                    if ((string) ($block['block_type'] ?? $block['type'] ?? '') === 'html') {
-                        $htmlIndex = $index;
-                        break;
-                    }
-                }
-                if ($htmlIndex === null) {
-                    array_unshift($blocks, ['type' => 'html', 'title' => null, 'content_html' => $data['content_html'], 'settings' => []]);
-                } else {
-                    $blocks[$htmlIndex]['block_type'] = 'html';
-                    $blocks[$htmlIndex]['type'] = 'html';
-                    $blocks[$htmlIndex]['content_html'] = $data['content_html'];
-                }
-            }
-            $summaryIndex = null;
-            foreach ($blocks as $index => $block) {
-                $type = (string) ($block['block_type'] ?? $block['type'] ?? '');
-                if ($type === 'accordion' && trim((string) ($block['title'] ?? '')) === 'Module summary') {
-                    $summaryIndex = $index;
-                    break;
-                }
-            }
-            if (trim((string) $data['summary_html']) !== '') {
-                $summary = ['type' => 'accordion', 'title' => 'Module summary', 'content_html' => $data['summary_html'], 'settings' => ['initially_open' => false]];
-                if ($summaryIndex === null) {
-                    $blocks[] = $summary;
-                } else {
-                    $blocks[$summaryIndex] = $summary;
-                }
-            } elseif ($summaryIndex !== null) {
-                array_splice($blocks, $summaryIndex, 1);
-            }
-            $this->portability->replaceContentBlocks($moduleId, $blocks);
-            $this->courses->recordHistory($courseId, $userId, 'module.updated', 'module', $moduleId, 'Module updated: ' . $data['title'] . '.', $data);
-        });
-        $this->audit->record($userId, 'course.module_updated', ['course_id' => $courseId, 'module_id' => $moduleId]);
-    }
-
-    public function deleteModule(int $courseId, int $moduleId, int $userId): void
-    {
-        $module = $this->courses->moduleById($courseId, $moduleId);
-        if ($module === null) {
-            throw new InvalidArgumentException('The course module does not exist.');
-        }
-        $this->courses->deleteModule($courseId, $moduleId);
-        $this->courses->recordHistory($courseId, $userId, 'module.deleted', 'module', $moduleId, 'Module deleted: ' . (string) $module['title'] . '.');
-        $this->audit->record($userId, 'course.module_deleted', ['course_id' => $courseId, 'module_id' => $moduleId]);
-    }
-
-    /** @return array<string,mixed> */
-    public function moduleEditor(int $courseId, int $moduleId): array
-    {
-        $course = $this->courses->findById($courseId);
-        $module = $this->courses->moduleById($courseId, $moduleId);
-        if ($course === null || $module === null) {
-            throw new InvalidArgumentException('The course module does not exist.');
-        }
-        $module['content_blocks'] = $this->portability->contentBlocks($moduleId);
-        $assessment = $this->courses->assessmentForModule($moduleId);
-        if ($assessment !== null) {
-            $assessment['questions'] = $this->courses->questions((int) $assessment['id'], true);
-        }
-        return ['course' => $course, 'module' => $module, 'assessment' => $assessment];
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     */
-    public function replaceModuleAssessment(
-        int $courseId,
-        int $moduleId,
-        array $input,
-        int $userId
-    ): void {
-        $module = $this->courses->moduleById($courseId, $moduleId);
-        if ($module === null) {
-            throw new InvalidArgumentException('The course module does not exist.');
-        }
-
-        $questions = $this->parseQuestionEditorInput($input);
-        $assessment = $this->courses->assessmentForModule($moduleId);
-        $assessmentData = [
-            'title' => trim((string) ($input['assessment_title'] ?? ''))
-                ?: (string) $module['title'] . ' assessment',
-            'instructions_html' => $this->courseHtml->preserve(
-                (string) ($input['instructions_html'] ?? '')
-            ),
-            'pass_mark' => $this->percentage($input['pass_mark'] ?? 50),
-            'required' => (bool) ($module['assessment_required'] ?? true),
-            'practice_enabled' => $this->boolValue($input['practice_enabled'] ?? false),
-            'practice_pool_mode' => in_array((string) ($input['practice_pool_mode'] ?? 'both'), ['separate','graded','both'], true) ? (string) $input['practice_pool_mode'] : 'both',
-            'practice_question_count' => max(1, (int) ($input['practice_question_count'] ?? 5)),
-            'graded_question_count' => max(1, (int) ($input['graded_question_count'] ?? count($questions))),
-            'maximum_attempts' => trim((string) ($input['maximum_attempts'] ?? '')) === '' ? null : max(1, (int) $input['maximum_attempts']),
-            'time_limit_seconds' => max(1, (int) ($input['time_limit_seconds'] ?? 1800)),
-            'score_policy' => in_array((string) ($input['score_policy'] ?? 'highest'), ['highest','average','latest'], true) ? (string) $input['score_policy'] : 'highest',
-            'randomise_questions' => $this->boolValue($input['randomise_questions'] ?? false),
-            'randomise_options' => $this->boolValue($input['randomise_options'] ?? false),
-            'negative_marking' => $this->boolValue($input['negative_marking'] ?? false),
-            'difficulty_selection' => [
-                'introductory' => max(0, (int) ($input['difficulty_introductory'] ?? 0)),
-                'standard' => max(0, (int) ($input['difficulty_standard'] ?? 0)),
-                'advanced' => max(0, (int) ($input['difficulty_advanced'] ?? 0)),
-            ],
-        ];
-        $this->validateAssessmentSelection($assessmentData, $questions);
-
-        $this->transactions->run(function () use (
-            $assessment,
-            $assessmentData,
-            $courseId,
-            $moduleId,
-            $questions,
-            $userId
-        ): void {
-            if ($assessment === null) {
-                $assessmentId = $this->courses->createAssessment(
-                    $courseId,
-                    $moduleId,
-                    ['assessment_type' => 'module'] + $assessmentData
-                );
-            } else {
-                $assessmentId = (int) $assessment['id'];
-                $this->courses->updateAssessment(
-                    $assessmentId,
-                    $courseId,
-                    $assessmentData
-                );
-            }
-
-            $this->courses->replaceAssessmentQuestions($assessmentId, $questions);
-            $this->courses->recordHistory(
-                $courseId,
-                $userId,
-                'assessment.updated',
-                'assessment',
-                $assessmentId,
-                'Module assessment updated.',
-                ['question_count' => count($questions)]
-            );
-        });
-
-        $this->audit->record($userId, 'course.assessment_updated', [
-            'course_id' => $courseId,
-            'module_id' => $moduleId,
-        ]);
-    }
-
-    /** @return array<string,mixed> */
-    public function diagnosticEditor(int $courseId, ?int $assessmentId = null): array
-    {
-        $course = $this->courses->findById($courseId);
-        if ($course === null) {
-            throw new InvalidArgumentException('The course does not exist.');
-        }
-        $modules = $this->courses->modules($courseId);
-        $assessment = $assessmentId === null
-            ? null
-            : $this->courses->diagnosticAssessmentById($courseId, $assessmentId);
-        if ($assessmentId !== null && $assessment === null) {
-            throw new InvalidArgumentException('The course diagnostic does not exist.');
-        }
-        if ($assessment !== null) {
-            $assessment['questions'] = $this->courses->questions((int) $assessment['id'], true);
-        }
-        return ['course' => $course, 'modules' => $modules, 'assessment' => $assessment];
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     */
-    public function saveDiagnostic(
-        int $courseId,
-        ?int $assessmentId,
-        array $input,
-        int $userId
-    ): int {
-        $course = $this->courses->findById($courseId);
-        if ($course === null) {
-            throw new InvalidArgumentException('The course does not exist.');
-        }
-        $existing = $assessmentId === null
-            ? null
-            : $this->courses->diagnosticAssessmentById($courseId, $assessmentId);
-        if ($assessmentId !== null && $existing === null) {
-            throw new InvalidArgumentException('The course diagnostic does not exist.');
-        }
-
-        $questions = $this->parseQuestionEditorInput($input);
-        $validModuleKeys = [];
-        foreach ($this->courses->modules($courseId) as $module) {
-            $validModuleKeys[(string) $module['module_key']] = true;
-        }
-        foreach ($questions as &$question) {
-            $question['practice_eligible'] = true;
-            $question['graded_eligible'] = false;
-            $question['incorrect_points'] = 0.0;
-            $question['remediation_module_keys'] = array_values(array_filter(
-                array_unique(array_map('strval', (array) ($question['remediation_module_keys'] ?? []))),
-                static fn(string $key): bool => isset($validModuleKeys[$key])
-            ));
-        }
-        unset($question);
-
-        $keyInput = trim((string) ($input['assessment_key'] ?? ''));
-        $key = $keyInput === '' ? 'diagnostic' : Slug::from($keyInput);
-        if (strlen($key) > 64) {
-            throw new InvalidArgumentException('The diagnostic key must be 64 characters or fewer.');
-        }
-        $byKey = $this->courses->diagnosticAssessment($courseId, $key, true);
-        if ($byKey !== null && (int) $byKey['id'] !== (int) ($assessmentId ?? 0)) {
-            throw new InvalidArgumentException('That diagnostic key is already used by this course.');
-        }
-
-        $maximumAttempts = trim((string) ($input['maximum_attempts'] ?? '')) === ''
-            ? null
-            : max(1, (int) $input['maximum_attempts']);
-        $assessmentData = [
-            'assessment_type' => 'diagnostic',
-            'assessment_key' => $key,
-            'position' => $existing === null
-                ? count($this->courses->diagnosticAssessments($courseId, true)) + 1
-                : (int) $existing['position'],
-            'title' => trim((string) ($input['assessment_title'] ?? '')) ?: (string) $course['title'] . ' diagnostic',
-            'instructions_html' => $this->courseHtml->preserve((string) ($input['instructions_html'] ?? '')),
-            'pass_mark' => $this->percentage($input['pass_mark'] ?? 50),
-            'required' => false,
-            'result_pass_html' => $this->courseHtml->preserve((string) ($input['result_pass_html'] ?? '')),
-            'result_fail_html' => $this->courseHtml->preserve((string) ($input['result_fail_html'] ?? '')),
-            'diagnostic_pass_action' => (string) ($input['diagnostic_pass_action'] ?? 'guidance_only') === 'complete_course'
-                ? 'complete_course'
-                : 'guidance_only',
-            'is_visible' => $this->boolValue($input['is_visible'] ?? false),
-            'practice_enabled' => true,
-            'practice_pool_mode' => 'both',
-            'practice_question_count' => count($questions),
-            'graded_question_count' => count($questions),
-            'maximum_attempts' => $maximumAttempts,
-            'time_limit_seconds' => max(1, (int) ($input['time_limit_seconds'] ?? 3600)),
-            'score_policy' => 'latest',
-            'randomise_questions' => $this->boolValue($input['randomise_questions'] ?? false),
-            'randomise_options' => $this->boolValue($input['randomise_options'] ?? false),
-            'negative_marking' => false,
-            'difficulty_selection' => [],
-        ];
-
-        $savedId = $this->transactions->run(function () use ($existing, $assessmentData, $courseId, $questions, $userId): int {
-            if ($existing === null) {
-                $id = $this->courses->createAssessment($courseId, null, $assessmentData);
-                $event = 'diagnostic.created';
-                $summary = 'Course diagnostic created.';
-            } else {
-                $id = (int) $existing['id'];
-                $this->courses->updateAssessment($id, $courseId, $assessmentData);
-                $event = 'diagnostic.updated';
-                $summary = 'Course diagnostic updated.';
-            }
-            $this->courses->replaceAssessmentQuestions($id, $questions);
-            $this->courses->recordHistory($courseId, $userId, $event, 'assessment', $id, $summary, [
-                'question_count' => count($questions),
-                'assessment_key' => $assessmentData['assessment_key'],
-            ]);
-            return $id;
-        });
-
-        $this->audit->record($userId, $existing === null ? 'course.diagnostic_created' : 'course.diagnostic_updated', [
-            'course_id' => $courseId,
-            'assessment_id' => $savedId,
-        ]);
-        return $savedId;
-    }
-
-    public function deleteDiagnostic(int $courseId, int $assessmentId, int $userId): void
-    {
-        $diagnostic = $this->courses->diagnosticAssessmentById($courseId, $assessmentId);
-        if ($diagnostic === null) {
-            throw new InvalidArgumentException('The course diagnostic does not exist.');
-        }
-        $this->transactions->run(function () use ($courseId, $assessmentId, $userId, $diagnostic): void {
-            $this->courses->deleteAssessment($courseId, $assessmentId);
-            $this->courses->recordHistory($courseId, $userId, 'diagnostic.deleted', 'assessment', $assessmentId, 'Course diagnostic deleted: ' . (string) $diagnostic['title'] . '.');
-        });
-        $this->audit->record($userId, 'course.diagnostic_deleted', ['course_id' => $courseId, 'assessment_id' => $assessmentId]);
-    }
-
-    public function moveDiagnostic(int $courseId, int $assessmentId, string $direction, int $userId): void
-    {
-        if ($this->courses->diagnosticAssessmentById($courseId, $assessmentId) === null) {
-            throw new InvalidArgumentException('The course diagnostic does not exist.');
-        }
-        $this->courses->moveDiagnostic($courseId, $assessmentId, $direction);
-        $this->courses->recordHistory($courseId, $userId, 'diagnostic.reordered', 'assessment', $assessmentId, 'Course diagnostics reordered.');
-        $this->audit->record($userId, 'course.diagnostic_reordered', [
-            'course_id' => $courseId,
-            'assessment_id' => $assessmentId,
-            'direction' => $direction,
-        ]);
-    }
-
-    /** @return array<string,mixed> */
-    public function finalAssessmentEditor(int $courseId): array
-    {
-        $course = $this->courses->findById($courseId);
-        if ($course === null) {
-            throw new InvalidArgumentException('The course does not exist.');
-        }
-        $assessment = $this->courses->finalAssessment($courseId);
-        if ($assessment !== null) {
-            $assessment['questions'] = $this->courses->questions((int) $assessment['id'], true);
-        }
-        return ['course' => $course, 'assessment' => $assessment];
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     */
-    public function replaceFinalAssessment(
-        int $courseId,
-        array $input,
-        int $userId
-    ): void {
-        $course = $this->courses->findById($courseId);
-        if ($course === null) {
-            throw new InvalidArgumentException('The course does not exist.');
-        }
-
-        $questions = $this->parseQuestionEditorInput($input);
-        $assessment = $this->courses->finalAssessment($courseId);
-        $assessmentData = [
-            'title' => trim((string) ($input['assessment_title'] ?? ''))
-                ?: (string) $course['title'] . ' final assessment',
-            'instructions_html' => $this->courseHtml->preserve(
-                (string) ($input['instructions_html'] ?? '')
-            ),
-            'pass_mark' => $this->percentage($input['pass_mark'] ?? 50),
-            'required' => true,
-            'practice_enabled' => $this->boolValue($input['practice_enabled'] ?? false),
-            'practice_pool_mode' => in_array((string) ($input['practice_pool_mode'] ?? 'both'), ['separate','graded','both'], true) ? (string) $input['practice_pool_mode'] : 'both',
-            'practice_question_count' => max(1, (int) ($input['practice_question_count'] ?? 5)),
-            'graded_question_count' => max(1, (int) ($input['graded_question_count'] ?? count($questions))),
-            'maximum_attempts' => trim((string) ($input['maximum_attempts'] ?? '')) === '' ? null : max(1, (int) $input['maximum_attempts']),
-            'time_limit_seconds' => max(1, (int) ($input['time_limit_seconds'] ?? 1800)),
-            'score_policy' => in_array((string) ($input['score_policy'] ?? 'highest'), ['highest','average','latest'], true) ? (string) $input['score_policy'] : 'highest',
-            'randomise_questions' => $this->boolValue($input['randomise_questions'] ?? false),
-            'randomise_options' => $this->boolValue($input['randomise_options'] ?? false),
-            'negative_marking' => $this->boolValue($input['negative_marking'] ?? false),
-            'difficulty_selection' => [
-                'introductory' => max(0, (int) ($input['difficulty_introductory'] ?? 0)),
-                'standard' => max(0, (int) ($input['difficulty_standard'] ?? 0)),
-                'advanced' => max(0, (int) ($input['difficulty_advanced'] ?? 0)),
-            ],
-        ];
-        $this->validateAssessmentSelection($assessmentData, $questions);
-
-        $this->transactions->run(function () use (
-            $assessment,
-            $assessmentData,
-            $courseId,
-            $questions,
-            $userId
-        ): void {
-            if ($assessment === null) {
-                $assessmentId = $this->courses->createAssessment(
-                    $courseId,
-                    null,
-                    ['assessment_type' => 'final'] + $assessmentData
-                );
-            } else {
-                $assessmentId = (int) $assessment['id'];
-                $this->courses->updateAssessment(
-                    $assessmentId,
-                    $courseId,
-                    $assessmentData
-                );
-            }
-
-            $this->courses->replaceAssessmentQuestions($assessmentId, $questions);
-            $this->courses->recordHistory(
-                $courseId,
-                $userId,
-                'assessment.updated',
-                'assessment',
-                $assessmentId,
-                'Final assessment updated.',
-                ['question_count' => count($questions)]
-            );
-        });
-
-        $this->audit->record($userId, 'course.final_assessment_updated', [
-            'course_id' => $courseId,
-        ]);
     }
 
     /**
@@ -1493,158 +1038,6 @@ final class CourseService
         $this->courses->replaceGradeBands($courseId, $bands);
         $this->courses->recordHistory($courseId, $userId, 'grade_bands.updated', 'course', $courseId, 'Course grade bands updated.', ['bands' => $bands]);
         $this->audit->record($userId, 'course.grade_bands_updated', ['course_id' => $courseId]);
-    }
-
-    /**
-     * @param array<string,mixed> $uploadedFile
-     * @return array<string,mixed>
-     */
-    public function stageImport(array $uploadedFile, int $userId): array
-    {
-        $error = (int) ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($error !== UPLOAD_ERR_OK) {
-            throw new InvalidArgumentException('Select a valid HTML file to import.');
-        }
-        $size = (int) ($uploadedFile['size'] ?? 0);
-        if ($size < 1 || $size > 10 * 1024 * 1024) {
-            throw new InvalidArgumentException('The HTML course file must be between 1 byte and 10 MB.');
-        }
-        $name = basename((string) ($uploadedFile['name'] ?? 'course.html'));
-        if (!preg_match('/\.html?$/i', $name)) {
-            throw new InvalidArgumentException('Only HTML course files can be imported.');
-        }
-        $temporary = (string) ($uploadedFile['tmp_name'] ?? '');
-        if (!is_uploaded_file($temporary) && !is_file($temporary)) {
-            throw new InvalidArgumentException('The uploaded course file is unavailable.');
-        }
-
-        $directory = $this->storageRoot . '/imports';
-        $this->requireDirectory($directory);
-        $key = bin2hex(random_bytes(16));
-        $path = $directory . '/' . $key . '.html';
-        if (!move_uploaded_file($temporary, $path) && !rename($temporary, $path)) {
-            throw new RuntimeException('The uploaded course file could not be staged.');
-        }
-        chmod($path, 0640);
-        $metadataPath = $directory . '/' . $key . '.json';
-        $metadataBytes = file_put_contents($metadataPath, json_encode([
-            'original_filename' => $name,
-            'uploaded_by_user_id' => $userId,
-            'staged_at' => date(DATE_ATOM),
-        ], JSON_THROW_ON_ERROR), LOCK_EX);
-        if ($metadataBytes === false) {
-            @unlink($path);
-            throw new RuntimeException('The import metadata could not be staged.');
-        }
-        chmod($metadataPath, 0640);
-
-        $analysis = $this->importer->analyseFile($path, $name);
-        $analysis['import_key'] = $key;
-        $analysis['uploaded_by_user_id'] = $userId;
-        $analysis['staged_path'] = $path;
-        return $analysis;
-    }
-
-    /** @return array<string,mixed> */
-    public function reanalyseImport(string $key): array
-    {
-        if (preg_match('/^[a-f0-9]{32}$/', $key) !== 1) {
-            throw new InvalidArgumentException('Invalid import reference.');
-        }
-        $path = $this->storageRoot . '/imports/' . $key . '.html';
-        $metadataPath = $this->storageRoot . '/imports/' . $key . '.json';
-        $originalFilename = basename($path);
-        if (is_file($metadataPath)) {
-            $metadata = json_decode((string) file_get_contents($metadataPath), true);
-            if (is_array($metadata) && is_string($metadata['original_filename'] ?? null)) {
-                $originalFilename = basename($metadata['original_filename']);
-            }
-        }
-        $analysis = $this->importer->analyseFile($path, $originalFilename);
-        $analysis['import_key'] = $key;
-        return $analysis;
-    }
-
-    public function commitImport(string $key, int $categoryId, int $userId): int
-    {
-        $analysis = $this->reanalyseImport($key);
-        $courseData = (array) $analysis['course'];
-        $courseData['category_id'] = $categoryId > 0 ? $categoryId : null;
-        $courseData['status'] = 'draft';
-        $courseData = $this->validateCourseInput($courseData);
-        // Import is REAL-only (decision D5), so both the ownership default and the slug
-        // collision check are asked about the genuine universe explicitly.
-        $courseData = $this->withDefaultOwnership($courseData, $userId);
-
-        if ($this->courses->findBySlug((string) $courseData['slug']) !== null) {
-            throw new InvalidArgumentException(
-                'A course with the slug ' . $courseData['slug'] . ' already exists.'
-            );
-        }
-
-        $courseId = $this->transactions->run(function () use (
-            $analysis,
-            $courseData,
-            $userId
-        ): int {
-            $courseId = $this->courses->createCourse($courseData, $userId);
-
-            foreach ((array) $analysis['modules'] as $moduleData) {
-                $moduleData = $this->validateModuleInput((array) $moduleData);
-                $moduleId = $this->courses->createModule($courseId, $moduleData);
-                $assessment = $moduleData['assessment'] ?? null;
-                if (is_array($assessment)) {
-                    $assessment['required'] = (bool) $moduleData['assessment_required'];
-                    $assessmentId = $this->courses->createAssessment(
-                        $courseId,
-                        $moduleId,
-                        $assessment
-                    );
-                    $this->courses->replaceAssessmentQuestions(
-                        $assessmentId,
-                        (array) $assessment['questions']
-                    );
-                }
-            }
-
-            $final = $analysis['final_assessment'] ?? null;
-            if (is_array($final)) {
-                $assessmentId = $this->courses->createAssessment(
-                    $courseId,
-                    null,
-                    $final
-                );
-                $this->courses->replaceAssessmentQuestions(
-                    $assessmentId,
-                    (array) $final['questions']
-                );
-            }
-
-            $this->courses->replaceGradeBands(
-                $courseId,
-                (array) $analysis['grade_bands']
-            );
-            $this->courses->recordHistory(
-                $courseId,
-                $userId,
-                'course.imported',
-                'course',
-                $courseId,
-                'Course imported from ' . (string) $courseData['source_filename'] . '.',
-                (array) $analysis['statistics']
-            );
-
-            return $courseId;
-        });
-
-        @unlink($this->storageRoot . '/imports/' . $key . '.html');
-        @unlink($this->storageRoot . '/imports/' . $key . '.json');
-        $this->audit->record($userId, 'course.imported', [
-            'course_id' => $courseId,
-            'statistics' => $analysis['statistics'],
-        ]);
-
-        return $courseId;
     }
 
     /**
@@ -1717,59 +1110,6 @@ final class CourseService
      * @param array<string,mixed> $uploadedFile
      * @return array<string,mixed>
      */
-    public function saveMedia(int $courseId, array $uploadedFile, string $role, string $altText, int $userId): array
-    {
-        if ($this->courses->findById($courseId) === null) {
-            throw new InvalidArgumentException('The course does not exist.');
-        }
-        if (!in_array($role, ['cover', 'content', 'download'], true)) {
-            throw new InvalidArgumentException('Invalid media role.');
-        }
-        $error = (int) ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($error !== UPLOAD_ERR_OK) {
-            throw new InvalidArgumentException('Select a valid media file.');
-        }
-        $size = (int) ($uploadedFile['size'] ?? 0);
-        if ($size < 1 || $size > 25 * 1024 * 1024) {
-            throw new InvalidArgumentException('Course media must be smaller than 25 MB.');
-        }
-        $temporary = (string) ($uploadedFile['tmp_name'] ?? '');
-        $original = basename((string) ($uploadedFile['name'] ?? 'file'));
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($temporary) ?: 'application/octet-stream';
-        // Owner-supplied course media is stored as supplied, including SVG. MIME detection
-        // describes the download; it is not a content allowlist.
-
-        $extension = strtolower(pathinfo($original, PATHINFO_EXTENSION));
-        $storageKey = 'course-' . $courseId . '/' . bin2hex(random_bytes(16)) . ($extension !== '' ? '.' . preg_replace('/[^a-z0-9]+/', '', $extension) : '');
-        $destination = $this->storageRoot . '/course-media/' . $storageKey;
-        $this->requireDirectory(dirname($destination));
-        if (!move_uploaded_file($temporary, $destination) && !rename($temporary, $destination)) {
-            throw new RuntimeException('The course media file could not be stored.');
-        }
-        chmod($destination, 0640);
-        $sha256 = hash_file('sha256', $destination);
-        if (!is_string($sha256)) {
-            @unlink($destination);
-            throw new RuntimeException('The media checksum could not be calculated.');
-        }
-        $this->courses->addMedia($courseId, null, [
-            'media_role' => $role,
-            'original_filename' => $original,
-            'storage_key' => $storageKey,
-            'mime_type' => $mime,
-            'byte_size' => $size,
-            'sha256' => $sha256,
-            'alt_text' => trim($altText),
-            'is_public' => $role === 'cover',
-        ], $userId);
-        $this->audit->record($userId, 'course.media_added', ['course_id' => $courseId, 'role' => $role]);
-        return ['storage_key' => $storageKey, 'mime_type' => $mime];
-    }
-
-    /**
-     * @param array<string,mixed> $uploadedFile
-     * @return array<string,mixed>
-     */
     public function importPresentationFromHtml(int $courseId, array $uploadedFile, int $userId): array
     {
         if ($this->courses->findById($courseId) === null) {
@@ -1813,21 +1153,6 @@ final class CourseService
             'css_bytes' => strlen($css),
         ]);
         return ['source_filename' => $original, 'css_bytes' => strlen($css)];
-    }
-
-    /** @return array<string,mixed>|null */
-    public function media(string $publicId): ?array
-    {
-        $media = $this->courses->mediaByPublicId($publicId);
-        if ($media === null) {
-            return null;
-        }
-        $path = $this->storageRoot . '/course-media/' . (string) $media['storage_key'];
-        if (!is_file($path)) {
-            return null;
-        }
-        $media['path'] = $path;
-        return $media;
     }
 
     /**
@@ -2063,11 +1388,6 @@ final class CourseService
         }
         $slugInput = trim((string) ($input['slug'] ?? $existing['slug'] ?? ''));
         $slug = $slugInput !== '' ? Slug::validate($slugInput) : Slug::from($title);
-        $moduleWeight = $this->fraction($input['module_weight'] ?? $existing['module_weight'] ?? 0.5);
-        $finalWeight = $this->fraction($input['final_weight'] ?? $existing['final_weight'] ?? 0.5);
-        if (abs(($moduleWeight + $finalWeight) - 1.0) > 0.0001) {
-            throw new InvalidArgumentException('Module and final-assessment weights must total 1.0.');
-        }
         $period = array_key_exists('access_days', $input)
             ? max(1, (int) $input['access_days']) * 86400
             : (int) ($input['default_access_period_seconds'] ?? $existing['default_access_period_seconds'] ?? 31536000);
@@ -2085,8 +1405,8 @@ final class CourseService
             'estimated_minutes' => max(0, (int) ($input['estimated_minutes'] ?? $existing['estimated_minutes'] ?? 0)),
             'status' => (string) ($input['status'] ?? $existing['status'] ?? 'draft'),
             'default_access_period_seconds' => $period,
-            'module_weight' => $moduleWeight,
-            'final_weight' => $finalWeight,
+            'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $existing['introduction_html'] ?? '')),
+            'show_outline_on_intro' => $this->boolValue($input['show_outline_on_intro'] ?? $existing['show_outline_on_intro'] ?? true),
             'certificate_enabled' => $this->boolValue($input['certificate_enabled'] ?? $existing['certificate_enabled'] ?? true),
             'certificate_title' => trim((string) ($input['certificate_title'] ?? $existing['certificate_title'] ?? 'Certificate of Completion')),
             'certificate_template' => trim((string) ($input['certificate_template'] ?? $existing['certificate_template'] ?? 'classic')) ?: 'classic',
@@ -2097,153 +1417,6 @@ final class CourseService
             'course_style_key' => trim((string) ($input['course_style_key'] ?? $existing['course_style_key'] ?? 'standard')) ?: 'standard',
             'source_filename' => trim((string) ($input['source_filename'] ?? $existing['source_filename'] ?? '')),
         ];
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     * @return array<string,mixed>
-     */
-    private function validateModuleInput(array $input): array
-    {
-        $title = trim((string) ($input['title'] ?? ''));
-        if ($title === '') {
-            throw new InvalidArgumentException('Enter a module title.');
-        }
-        $position = (int) ($input['position'] ?? 0);
-        if ($position < 1) {
-            throw new InvalidArgumentException('Module position must be one or greater.');
-        }
-        $moduleKey = trim((string) ($input['module_key'] ?? ''));
-        if ($moduleKey === '') {
-            $moduleKey = 'm' . $position;
-        }
-        if (preg_match('/^[a-zA-Z0-9_-]+$/', $moduleKey) !== 1) {
-            throw new InvalidArgumentException('Module keys may contain letters, numbers, underscores and hyphens only.');
-        }
-        $isReview = $this->boolValue($input['is_review'] ?? false);
-        $assessmentRequired = array_key_exists('assessment_required', $input)
-            ? $this->boolValue($input['assessment_required'])
-            : !$isReview;
-        return [
-            'module_key' => $moduleKey,
-            'position' => $position,
-            'title' => $title,
-            'subtitle' => trim((string) ($input['subtitle'] ?? '')),
-            'learning_outcomes_html' => $this->courseHtml->learningOutcomes((string) ($input['learning_outcomes_html'] ?? '')),
-            'content_html' => $this->courseHtml->preserve((string) ($input['content_html'] ?? '')),
-            'summary_html' => $this->courseHtml->preserve((string) ($input['summary_html'] ?? '')),
-            'is_review' => $isReview,
-            'assessment_required' => $assessmentRequired,
-            'assessment' => is_array($input['assessment'] ?? null) ? $input['assessment'] : null,
-        ];
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     * @return list<array<string,mixed>>
-     */
-    private function parseQuestionEditorInput(array $input): array
-    {
-        $questionTexts = (array) ($input['question_html'] ?? []);
-        $points = (array) ($input['question_points'] ?? []);
-        $explanations = (array) ($input['question_explanation'] ?? []);
-        $optionTexts = (array) ($input['option_html'] ?? []);
-        $correctOptions = (array) ($input['correct_option'] ?? []);
-        $difficulties = (array) ($input['question_difficulty'] ?? []);
-        $practiceEligible = (array) ($input['practice_eligible'] ?? []);
-        $gradedEligible = (array) ($input['graded_eligible'] ?? []);
-        $incorrectPoints = (array) ($input['incorrect_points'] ?? []);
-        $remediationKeys = (array) ($input['remediation_module_keys'] ?? []);
-        $questions = [];
-        foreach ($questionTexts as $index => $text) {
-            $text = $this->courseHtml->preserve((string) $text);
-            if ($text === '') {
-                continue;
-            }
-            $rawOptions = is_array($optionTexts[$index] ?? null) ? $optionTexts[$index] : [];
-            $correct = (int) ($correctOptions[$index] ?? -1);
-            $options = [];
-            foreach ($rawOptions as $optionIndex => $optionText) {
-                $optionText = $this->courseHtml->preserve((string) $optionText);
-                if ($optionText === '') {
-                    continue;
-                }
-                $options[] = [
-                    'option_html' => $optionText,
-                    'is_correct' => (int) $optionIndex === $correct,
-                ];
-            }
-            if (count($options) < 2 || count(array_filter($options, static fn(array $o): bool => $o['is_correct'])) !== 1) {
-                throw new InvalidArgumentException('Every question requires at least two options and exactly one correct answer.');
-            }
-            $questions[] = [
-                'question_html' => $text,
-                'points' => max(1, (int) ($points[$index] ?? 1)),
-                'explanation_html' => $this->courseHtml->preserve((string) ($explanations[$index] ?? '')),
-                'difficulty' => in_array((string) ($difficulties[$index] ?? 'standard'), ['introductory','standard','advanced'], true) ? (string) $difficulties[$index] : 'standard',
-                'practice_eligible' => array_key_exists((string) $index, $practiceEligible) || array_key_exists($index, $practiceEligible),
-                'graded_eligible' => array_key_exists((string) $index, $gradedEligible) || array_key_exists($index, $gradedEligible),
-                'incorrect_points' => min(0, (float) ($incorrectPoints[$index] ?? 0)),
-                'remediation_module_keys' => array_values(array_filter(array_map(
-                    static fn(mixed $value): string => trim((string) $value),
-                    is_array($remediationKeys[$index] ?? null) ? $remediationKeys[$index] : []
-                ), static fn(string $value): bool => $value !== '')),
-                'options' => $options,
-            ];
-        }
-        if ($questions === []) {
-            throw new InvalidArgumentException('Add at least one assessment question.');
-        }
-        return $questions;
-    }
-
-    /**
-     * @param array<string,mixed> $assessment
-     * @param list<array<string,mixed>> $questions
-     */
-    private function validateAssessmentSelection(array $assessment, array $questions): void
-    {
-        $graded = array_values(array_filter($questions, static fn(array $question): bool => (bool) ($question['graded_eligible'] ?? false)));
-        $gradedCount = (int) ($assessment['graded_question_count'] ?? 0);
-        if ($gradedCount < 1 || $gradedCount > count($graded)) {
-            throw new InvalidArgumentException('The graded question count must not exceed the number of graded-eligible questions.');
-        }
-
-        $quotas = (array) ($assessment['difficulty_selection'] ?? []);
-        $quotaTotal = array_sum(array_map('intval', $quotas));
-        if ($quotaTotal > 0 && $quotaTotal !== $gradedCount) {
-            throw new InvalidArgumentException('Difficulty quotas must total the graded questions drawn.');
-        }
-        foreach (['introductory','standard','advanced'] as $tier) {
-            $available = count(array_filter($graded, static fn(array $question): bool => (string) ($question['difficulty'] ?? 'standard') === $tier));
-            if ((int) ($quotas[$tier] ?? 0) > $available) {
-                throw new InvalidArgumentException('The ' . $tier . ' quota exceeds the available graded-eligible questions.');
-            }
-        }
-
-        if (!(bool) ($assessment['practice_enabled'] ?? false)) {
-            return;
-        }
-        $poolMode = (string) ($assessment['practice_pool_mode'] ?? 'both');
-        $practice = array_values(array_filter($questions, static function (array $question) use ($poolMode): bool {
-            return match ($poolMode) {
-                'separate' => (bool) ($question['practice_eligible'] ?? false) && !(bool) ($question['graded_eligible'] ?? false),
-                'graded' => (bool) ($question['graded_eligible'] ?? false),
-                default => (bool) ($question['practice_eligible'] ?? false) || (bool) ($question['graded_eligible'] ?? false),
-            };
-        }));
-        if ((int) ($assessment['practice_question_count'] ?? 0) > count($practice)) {
-            throw new InvalidArgumentException('The practice question count exceeds the eligible practice pool.');
-        }
-    }
-
-    private function fraction(mixed $value): float
-    {
-        $number = (float) $value;
-        if ($number < 0 || $number > 1) {
-            throw new InvalidArgumentException('Assessment weights must be between 0 and 1.');
-        }
-        return $number;
     }
 
     private function percentage(mixed $value): float
@@ -2261,54 +1434,16 @@ final class CourseService
     }
 
 
-    private function assertPublishable(int $courseId): void
+    private function assertPublishable(int $courseId, bool $overrideWarnings = false): void
     {
-        $modules = $this->courses->modules($courseId);
-        foreach ($modules as $module) {
-            if (!(bool) ($module['assessment_required'] ?? true)) {
-                continue;
-            }
-            $assessment = $this->courses->assessmentForModule((int) $module['id']);
-            if ($assessment === null || $this->courses->questions((int) $assessment['id'], false) === []) {
-                throw new InvalidArgumentException(
-                    'Every module explicitly marked as requiring an assessment must have at least one assessment question before publication.'
-                );
-            }
-        }
-
-        $finalAssessment = $this->courses->finalAssessment($courseId);
-        if ($finalAssessment !== null
-            && (bool) ($finalAssessment['required'] ?? false)
-            && $this->courses->questions((int) $finalAssessment['id'], false) === []) {
-            throw new InvalidArgumentException('A final assessment marked as required must contain at least one question before publication.');
-        }
+        $validation = $this->courseItems->publicationValidation($courseId);
+        if ($validation['errors'] !== []) { throw new InvalidArgumentException(implode(' ', $validation['errors'])); }
+        if ($validation['warnings'] !== [] && !$overrideWarnings) { throw new InvalidArgumentException(implode(' ', $validation['warnings']) . ' Select the publication-warning override to proceed.'); }
 
         $activePrices = $this->courses->priceVariants($courseId, true);
         $defaults = array_filter($activePrices, static fn(array $variant): bool => (bool) ($variant['is_default'] ?? false));
         if ($activePrices === [] || count($defaults) !== 1) {
             throw new InvalidArgumentException('Define at least one active course price and exactly one default price before publication.');
-        }
-    }
-
-    /** @return list<array<string,mixed>> */
-    private function defaultGradeBands(): array
-    {
-        return [
-            ['grade_code' => 'A', 'grade_label' => 'First Class (A)', 'minimum_percentage' => 75, 'is_passing' => true],
-            ['grade_code' => 'B+', 'grade_label' => 'Second Class (B+)', 'minimum_percentage' => 70, 'is_passing' => true],
-            ['grade_code' => 'B', 'grade_label' => 'Second Class (B)', 'minimum_percentage' => 60, 'is_passing' => true],
-            ['grade_code' => 'C', 'grade_label' => 'Third (C)', 'minimum_percentage' => 50, 'is_passing' => true],
-            ['grade_code' => 'Fail', 'grade_label' => 'Fail', 'minimum_percentage' => 0, 'is_passing' => false],
-        ];
-    }
-
-    private function requireDirectory(string $directory): void
-    {
-        if (!is_dir($directory) && !mkdir($directory, 0770, true) && !is_dir($directory)) {
-            throw new RuntimeException('Unable to create storage directory: ' . $directory);
-        }
-        if (!is_writable($directory)) {
-            throw new RuntimeException('Storage directory is not writable: ' . $directory);
         }
     }
 }

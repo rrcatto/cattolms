@@ -53,8 +53,9 @@ final class LearningService
 
     public function __construct(
         private readonly CourseRepository $courses,
-        private readonly CoursePortabilityRepository $portability,
-        private readonly ContentBlockRenderer $blockRenderer,
+        private readonly CourseItemRepository $courseItemRecords,
+        private readonly CourseItemService $courseItems,
+        private readonly CourseItemRenderer $courseItemRenderer,
         private readonly AuditRepository $audit,
         private readonly AdministrationRepository $administration,
         private readonly ?AccessService $commerceAccess = null
@@ -142,11 +143,9 @@ final class LearningService
     private function decorateLibrary(array $items): array
     {
         foreach ($items as &$item) {
-            $moduleCount = max(0, (int) ($item['module_count'] ?? 0));
-            $assessed = max(0, (int) ($item['assessed_module_count'] ?? 0));
-            $item['progress_percentage'] = $item['overall_percentage'] !== null
-                ? 100
-                : ($moduleCount > 0 ? min(90, (int) round($assessed / $moduleCount * 90)) : 0);
+            $assessmentCount = max(0, (int) ($item['assessment_count'] ?? 0));
+            $assessed = max(0, (int) ($item['submitted_assessment_count'] ?? 0));
+            $item['progress_percentage'] = $assessmentCount > 0 ? min(100, (int) round($assessed / $assessmentCount * 100)) : 0;
             $item['is_started'] = !empty($item['started_at']);
             $item['is_expired'] = $this->expired($item);
             $item['access_period_label'] = $this->durationLabel((int) $item['access_period_seconds']);
@@ -175,21 +174,12 @@ final class LearningService
         if (!($this->commerceAccess?->assertAccess((int)$enrolment['id']) ?? false)) {
             $this->assertNotExpired($enrolment);
         }
-        $course['modules'] = $this->courses->modules((int) $course['id']);
         $course['grade_bands'] = $this->courses->gradeBands((int) $course['id']);
         $course['enrolment'] = $enrolment;
-        $course['progress'] = $this->progress((int) $enrolment['id'], $course['modules']);
-        $course['attempts'] = $this->courses->attemptsForEnrolment((int) $enrolment['id']);
-        $course['diagnostic_assessments'] = $this->courses->diagnosticAssessments((int) $course['id'], $preview);
-        foreach ($course['diagnostic_assessments'] as &$diagnostic) {
-            $diagnostic['question_count'] = count($this->courses->questions((int) $diagnostic['id'], false));
-        }
-        unset($diagnostic);
-        $finalAssessment = $this->courses->finalAssessment((int) $course['id']);
-        $course['final_available'] = $finalAssessment !== null;
-        $course['final_unlocked'] = $finalAssessment !== null
-            && ($preview || $this->courses->moduleAssessmentsCompleted((int) $enrolment['id'], (int) $course['id']));
+        $course['structure'] = $this->courseItems->availability((int) $course['id'], empty($enrolment['started_at']) ? null : (string) $enrolment['started_at'], false);
+        $course['progress'] = $this->courseItemRecords->assessmentProgress((int) $enrolment['id'], (int) $course['id']);
         $course['is_preview'] = $preview;
+        $course['remaining_access_label'] = empty($enrolment['expires_at']) ? '' : CourseItemService::duration((int) ceil(max(0, (strtotime((string) $enrolment['expires_at']) ?: time()) - time()) / 60));
         $course['certificate'] = $this->courses->certificateForEnrolment((int) $enrolment['id']);
         return $course;
     }
@@ -215,33 +205,29 @@ final class LearningService
     }
 
     /** @return array<string,mixed> */
-    public function module(int $userId, string $slug, int $position, bool $preview = false): array
+    public function item(int $userId, string $slug, int $nodeId, bool $preview = false): array
     {
         $course = $this->courseHome($userId, $slug, $preview);
         $enrolment = (array) $course['enrolment'];
         if (empty($enrolment['started_at'])) {
-            throw new InvalidArgumentException('Click Start course before opening the modules.');
+            throw new InvalidArgumentException('Click Start course before opening Course Content.');
         }
-        $module = $this->courses->moduleByPosition((int) $course['id'], $position);
-        if ($module === null) {
-            throw new InvalidArgumentException('The course module does not exist.');
+        $node = null; $items = [];
+        foreach ((array) $course['structure'] as $row) {
+            if (($row['node_type'] ?? '') !== 'item' && empty($row['section_introduction_html']) && empty($row['show_outline'])) { continue; }
+            $items[] = $row;
+            if ((int) $row['id'] === $nodeId) { $node = $row; }
         }
-        $this->courses->touchModule((int) $enrolment['id'], (int) $module['id']);
-        $blocks = $this->portability->contentBlocks((int) $module['id']);
-        $module['content_blocks'] = $blocks;
-        $module['rendered_content_html'] = $blocks !== []
-            ? $this->blockRenderer->render($blocks, 'module-' . (int) $module['id'])
-            : (string) $module['content_html'];
-        $assessment = $this->courses->assessmentForModule((int) $module['id']);
-        if ($assessment !== null) {
-            $assessment['questions'] = $this->courses->questions((int) $assessment['id'], false);
-            $assessment['best_attempt'] = $this->courses->bestAttempt((int) $enrolment['id'], (int) $assessment['id']);
-        }
-        $modules = (array) $course['modules'];
-        $module['previous_position'] = $this->adjacentPosition($modules, $position, -1);
-        $module['next_position'] = $this->adjacentPosition($modules, $position, 1);
-        $module['assessment'] = $assessment;
-        $course['module'] = $module;
+        if ($node === null) { throw new InvalidArgumentException('The Course Item placement does not exist.'); }
+        if (!empty($node['is_locked']) && !$preview) { throw new InvalidArgumentException('This Course Item is not available yet.'); }
+        if (($node['assessment_role'] ?? '') === 'final' && !$preview && !$this->courseItemRecords->precedingGradedAssessmentsSubmitted((int) $enrolment['id'], (int) $course['id'], $nodeId)) { throw new InvalidArgumentException('Submit every preceding graded assessment before opening the final assessment.'); }
+        $index = array_search($nodeId, array_map(static fn(array $row): int => (int) $row['id'], $items), true);
+        $node['previous_node'] = $index !== false && $index > 0 ? $items[$index - 1] : null;
+        $node['next_node'] = $index !== false && isset($items[$index + 1]) ? $items[$index + 1] : null;
+        $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], $nodeId, false);
+        if ($preview) { $node['rendered_html'] = preg_replace('/(href="\/learn\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
+        $course['item'] = $node;
+        $course['current_node_id'] = $nodeId;
         return $course;
     }
 
@@ -252,51 +238,6 @@ final class LearningService
             return null;
         }
         return $this->courses->certificateByPublicId($publicId);
-    }
-
-    /**
-     * @param list<array<string,mixed>> $modules
-     * @return array<string,mixed>
-     */
-    private function progress(int $enrolmentId, array $modules): array
-    {
-        $progressRows = $this->courses->moduleProgress($enrolmentId);
-        $byModule = [];
-        foreach ($progressRows as $row) {
-            $byModule[(int) $row['module_id']] = $row;
-        }
-        $assessedModules = array_values(array_filter($modules, static fn(array $m): bool => (bool) ($m['assessment_required'] ?? true)));
-        $opened = 0;
-        $assessed = 0;
-        foreach ($assessedModules as $module) {
-            if (isset($byModule[(int) $module['id']])) {
-                $opened++;
-                if ($byModule[(int) $module['id']]['best_percentage'] !== null) {
-                    $assessed++;
-                }
-            }
-        }
-        $total = count($assessedModules);
-        return [
-            'module_count' => $total,
-            'opened_count' => $opened,
-            'assessed_count' => $assessed,
-            'percentage' => $total > 0 ? (int) round($assessed / $total * 90) : 0,
-            'rows' => $progressRows,
-        ];
-    }
-
-    /** @param list<array<string,mixed>> $modules */
-    private function adjacentPosition(array $modules, int $position, int $direction): ?int
-    {
-        $positions = array_map(static fn(array $module): int => (int) $module['position'], $modules);
-        sort($positions);
-        $index = array_search($position, $positions, true);
-        if ($index === false) {
-            return null;
-        }
-        $target = $index + $direction;
-        return isset($positions[$target]) ? $positions[$target] : null;
     }
 
     /** @param array<string,mixed> $enrolment */

@@ -1,13 +1,5 @@
-{% extends layout %}
-{% block page_body %}
-	{% if is_preview %}
-		<div class="cl-preview-bar">
-			<div class="container-fluid cl-container-wide d-flex justify-content-between align-items-center gap-2">
-				<strong>Student-view preview</strong><span>Preview data remains until Reset preview.</span>
-			</div>
-		</div>
-	{% endif %}
-	<section class="cl-page-section container py-4 py-lg-5 cl-medium">
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
 		<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
 			<div>
 				<span class="cl-kicker text-primary">{{ session.attempt_mode == 'diagnostic' ? 'Course diagnostic' : (session.attempt_mode == 'practice' ? 'Practice assessment' : 'Graded assessment') }}</span>
@@ -76,5 +68,4 @@
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{{ ui('action.button', {label: 'Finish assessment now', variant: 'secondary', size: 'normal', type: 'submit'}) }}
 		</form>
-	</section>
 {% endblock %}

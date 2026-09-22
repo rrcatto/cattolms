@@ -1,0 +1,10 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = course_id ? '/admin/courses/' ~ course_id ~ '/content' : '/admin/course-items' %}{% set ph_back_label = 'Cancel' %}{% set ph_title = title %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props:ui_props('layout.surface',{})} %}{% block surface_body %}
+<form action="/admin/course-items/new" method="get"><input type="hidden" name="course_id" value="{{ course_id }}">
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Course Item type',for:'new-item-type',required:true})} %}{% block control %}<select class="form-select" id="new-item-type" name="type" required {{ ui_field_attrs(props) }}>{% for type in item_types %}<option value="{{ type }}">{{ type|replace({'_':' '})|title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props:ui_props('form.actions',{})} %}{% block primary_actions %}{{ ui('action.button',{label:'Continue',type:'submit',variant:'primary'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link',{label:'Cancel',href:ph_back_href}) }}{% endblock %}{% endembed %}
+</form>{% endblock %}{% endembed %}</section>
+{% endblock %}

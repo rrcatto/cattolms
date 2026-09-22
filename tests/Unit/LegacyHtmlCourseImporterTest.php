@@ -193,9 +193,9 @@ HTML;
         self::assertSame(80.0, $analysis['diagnostic_assessments'][0]['pass_mark']);
         self::assertFalse($analysis['diagnostic_assessments'][0]['required']);
         self::assertTrue($analysis['diagnostic_assessments'][0]['is_visible']);
-        self::assertSame('complete_course', $analysis['diagnostic_assessments'][0]['diagnostic_pass_action']);
+        self::assertArrayNotHasKey('diagnostic_pass_action', $analysis['diagnostic_assessments'][0]);
         self::assertFalse($analysis['diagnostic_assessments'][0]['questions'][0]['graded_eligible']);
-        self::assertSame(['m1','m2'], $analysis['diagnostic_assessments'][0]['questions'][0]['remediation_module_keys']);
+        self::assertSame(['m1','m2'], $analysis['diagnostic_assessments'][0]['questions'][0]['remediation_item_keys']);
         self::assertCount(1, $analysis['final_assessment']['questions']);
         self::assertSame(3, $analysis['final_assessment']['questions'][0]['points']);
     }
@@ -217,7 +217,7 @@ HTML;
 
         $analysis = (new LegacyHtmlCourseImporter())->analyse($html, 'diagnostic.html');
 
-        self::assertSame(['m1'], $analysis['diagnostic_assessments'][0]['questions'][0]['remediation_module_keys']);
+        self::assertSame(['m1'], $analysis['diagnostic_assessments'][0]['questions'][0]['remediation_item_keys']);
         self::assertContains(
             'Course diagnostic "diag" contains numeric remediation references. Use explicit module keys such as "m3"; numeric mappings were ignored.',
             $analysis['warnings']
@@ -251,7 +251,7 @@ HTML;
         self::assertCount(1, $analysis['diagnostic_assessments']);
         self::assertSame('prereq', $analysis['diagnostic_assessments'][0]['assessment_key']);
         self::assertSame(66.67, $analysis['diagnostic_assessments'][0]['pass_mark']);
-        self::assertSame('guidance_only', $analysis['diagnostic_assessments'][0]['diagnostic_pass_action']);
+        self::assertArrayNotHasKey('diagnostic_pass_action', $analysis['diagnostic_assessments'][0]);
         self::assertCount(12, $analysis['diagnostic_assessments'][0]['questions']);
         self::assertSame(1, $analysis['statistics']['diagnostic_count']);
     }
@@ -323,7 +323,7 @@ HTML;
     }
 
 
-    public function testItStoresLearningOutcomeContentWithoutRepeatingTheSourceHeading(): void
+    public function testItPreservesTheAuthoredLearningOutcomesBlockAndHeading(): void
     {
         if (!class_exists(\DOMDocument::class)) {
             self::markTestSkipped('The DOM extension is not installed.');
@@ -343,7 +343,11 @@ HTML;
         $outcomes = (string) $analysis['modules'][0]['learning_outcomes_html'];
 
         self::assertStringContainsString('Explain the test.', $outcomes);
-        self::assertStringNotContainsString('Learning outcomes', $outcomes);
+        self::assertStringContainsString('Learning outcomes', $outcomes);
+        self::assertStringContainsString('class="outcomes"', $outcomes);
+        $content = (string) $analysis['modules'][0]['content_html'];
+        self::assertStringContainsString('class="outcomes"', $content);
+        self::assertLessThan(strpos($content, 'Content.'), strpos($content, 'Learning outcomes'));
     }
 
 

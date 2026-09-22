@@ -1,20 +1,18 @@
 # Catto Learning Project Guide
 
-**Current approved LMS version:** 0.8.5 (canonical page construction, 2026/09/18; 0.5.8.3 remains the accepted VPS version)
-**Date time:** 2026/09/18 SAST
-**Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15
-**Current phase:** TEST/DEV; v0.8.5 unifies canonical page construction across five themes and retains the correction for false mail-failure messages after successful login/registration; it preserves trusted authored SVG/HTML throughout course import, editing and export. The existing UI baseline stabilises canonical UI geometry and theme decoration; passwordless account workflows remain intact while v0.8 commerce continues through additive migrations. The development database is disposable; the authenticated-email session column is applied by migration.
+## Course Components update — current working tree
+
+The owner-approved Course Components v2 redesign is released as v0.8.6. The disposable database was dropped and recreated from `20260906110000_create_v085_course_components_baseline.php`, then populated with the requested 100,000-record seed dataset. The runtime uses reusable Course Items, separate course placements, sections, tracked shortcode references and immutable Resources. Module/content-block/media/progress tables were removed. No production-data migration or compatibility layer is intended.
+
+Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract, and workspace `AGENTS.md` for the exact resume checkpoint and remaining implementation/validation work. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. The owner has not authorized a commit, push or version increment. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
+
+**Current approved LMS version:** 0.8.6 (Course Components, 2026/09/22; 0.5.8.3 remains the accepted VPS version) **Date time:** 2026/09/22 SAST **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Current phase:** TEST/DEV; v0.8.6 adds reusable Course Items, Resources, placement-based presentation, preserved trusted authored SVG/HTML/CSS, direct assessment navigation and assessment-only grading. The development database is disposable; no production migration or compatibility layer exists.
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
 ## Current trusted course-content policy
 
-The owner imports trusted authored courses. Preserve HTML/SVG, styles, event attributes and embedded
-code throughout import, editing and export; do not reintroduce content sanitisation or media MIME
-allowlists. `CourseHtml` performs only structural outcome-heading normalisation, and HTML5 extraction
-preserves SVG namespaces/case. Keep course/assessment validity and existing access rules. The current
-authoring contract is `docs/COURSE-SPECIFICATION.md` section 1.1 (2026-09-17). Existing content that was
-stripped needs reimporting from its original source.
+The owner imports trusted authored courses. Preserve HTML/SVG, styles, event attributes and embedded code throughout import, editing and export; do not reintroduce content sanitisation or media MIME allowlists. `CourseHtml` performs only structural outcome-heading normalisation, and HTML5 extraction preserves SVG namespaces/case. Keep course/assessment validity and existing access rules. The current authoring contract is `docs/COURSE-SPECIFICATION.md` section 1.1 (2026-09-17). Existing content that was stripped needs reimporting from its original source.
 
 ## 1. Project purpose
 
@@ -52,8 +50,7 @@ Catto Learning is a multi-company learning-management and course-commerce platfo
 - A bulk write streams. Build a chunk, write it, keep the generated identifiers and discard the rows; never accumulate a whole set in PHP before issuing a statement. The seed generator is the reference implementation: it went from ~120 MB for 500,000 rows, which could not finish against the deployed 128 MB limit, to about 58 MB, by chunking every phase.
 - Never build a parallel index of parents where the shape is a fixed count per parent. The parent of row *n* is arithmetic on *n*; a 60,000-entry lookup recording what integer division already knows is pure cost.
 - A set primed from the whole database grows with the installation's history rather than with the request. Key such sets by a 64-bit hash rather than by the value: 141,067 names cost 26 MB as string keys and 12 MB as integer keys.
-- Release per-run state when the run finishes. `SeedGenerator` holds the name factory only for the duration of a generation, which `names()` had always implied and nothing had enforced.
-→ Guarded by `SeedGeneratorMemoryTest`, which asserts the shape of the curve — ten times the rows must not cost ten times the memory — rather than an absolute ceiling, which would be flaky across allocators.
+- Release per-run state when the run finishes. `SeedGenerator` holds the name factory only for the duration of a generation, which `names()` had always implied and nothing had enforced. → Guarded by `SeedGeneratorMemoryTest`, which asserts the shape of the curve — ten times the rows must not cost ten times the memory — rather than an absolute ceiling, which would be flaky across allocators.
 
 ## 4. Roles, permissions and ACL
 
@@ -64,8 +61,7 @@ role -> permissions        = what may this identity do?
 resource relationship     = which specific own/company/assigned/platform records are in scope?
 ```
 
-There were three until v0.7. The data universe was the third — "which REAL or SEED records may it
-see?" — and it is gone; see section 5.
+There were three until v0.7. The data universe was the third — "which REAL or SEED records may it see?" — and it is gone; see section 5.
 
 Do not encode both concerns into permission names.
 
@@ -113,9 +109,7 @@ COURSE_EDITOR
 COURSE_OWNER
 ```
 
-**That is the whole list.** The five `SEED_*` roles were removed in v0.7 with the rest of the
-REAL/SEED split and are not to be reintroduced: there is one role family, one business catalogue,
-and a generated identity holds exactly the roles a hand-entered one holds.
+**That is the whole list.** The five `SEED_*` roles were removed in v0.7 with the rest of the REAL/SEED split and are not to be reintroduced: there is one role family, one business catalogue, and a generated identity holds exactly the roles a hand-entered one holds.
 
 - Every user receives `STUDENT` as the baseline role.
 - Stronger roles add capabilities rather than replacing the baseline learner role.
@@ -142,44 +136,23 @@ API/MCP transport scopes are separate from ACL permissions. An API/MCP operation
 
 ## 5. There is one kind of data
 
-**The REAL/SEED split is gone, in full, and is not to be reintroduced.** The owner's instruction:
-"It is all one. There is only one type of data... ALL DATA IS DISPOSABLE AND IT IS ALL ONE TYPE."
-This section used to specify the opposite at length; what follows is what replaced it.
+**The REAL/SEED split is gone, in full, and is not to be reintroduced.** The owner's instruction: "It is all one. There is only one type of data... ALL DATA IS DISPOSABLE AND IT IS ALL ONE TYPE." This section used to specify the opposite at length; what follows is what replaced it.
 
-Removed with the split: `seed_token` on every table, the `seed_data` and `seed_data_tables`
-metadata tables, the cross-universe constraint triggers and their function, `DataUniverse` and the
-parameter threaded through every repository read, the All/Real/Seed control above the Administration
-lists, `SeedTableCatalog`, the shared SEED System Company, and the five `SEED_*` roles. A generated
-row is written exactly as a hand-entered row is, because that is what it is.
+Removed with the split: `seed_token` on every table, the `seed_data` and `seed_data_tables` metadata tables, the cross-universe constraint triggers and their function, `DataUniverse` and the parameter threaded through every repository read, the All/Real/Seed control above the Administration lists, `SeedTableCatalog`, the shared SEED System Company, and the five `SEED_*` roles. A generated row is written exactly as a hand-entered row is, because that is what it is.
 
-**The generator stayed, and the distinction matters.** Removing the classification was asked for;
-removing the generator was not. Administration → Seed Database, guarded by `SYSTEM.SEED.MANAGE`, is
-still how the interface is exercised at volume. Do not remove it and do not rename it.
+**The generator stayed, and the distinction matters.** Removing the classification was asked for; removing the generator was not. Administration → Seed Database, guarded by `SYSTEM.SEED.MANAGE`, is still how the interface is exercised at volume. Do not remove it and do not rename it.
 
 Three rules from that era survive, because none of them was about universes:
 
-- **A generated company's domain is its name plus `.invalid`.** RFC 2606 reserves the suffix, so an
-  invented address cannot leave the building. `GeneratedDomainMailer` re-addresses mail for one to
-  the same local part at `APP_DOMAIN`; nothing in the mail path refers to seed data.
-- **Nothing is ever appended to a generated name to make it unique** — no digits, no set key, no
-  characters of any kind. If a pool needs more names, edit the word list in `storage/seeds/`.
-- **Generation sends no email at all**, and never fabricates `course_media`, `auth_sessions`,
-  `auth_login_tokens`, `api_tokens` or `web_sessions`.
+- **A generated company's domain is its name plus `.invalid`.** RFC 2606 reserves the suffix, so an invented address cannot leave the building. `GeneratedDomainMailer` re-addresses mail for one to the same local part at `APP_DOMAIN`; nothing in the mail path refers to seed data.
+- **Nothing is ever appended to a generated name to make it unique** — no digits, no set key, no characters of any kind. If a pool needs more names, edit the word list in `storage/seeds/`.
+- **Generation sends no email at all**, and never fabricates `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tokens` or `web_sessions`.
 
-**There is no cleanup by token**, because there is no token. A set cannot be selectively removed
-once written; `composer smoke:install` and a discarded database is the way back, which is acceptable
-only while the database is disposable TEST/DEV state.
+**There is no cleanup by token**, because there is no token. A set cannot be selectively removed once written; `composer smoke:install` and a discarded database is the way back, which is acceptable only while the database is disposable TEST/DEV state.
 
 ### Labels classify a course, and always did
 
-**A category and a tag classify a course; they do not describe a person, a company or a
-transaction.** They are shared vocabulary, exactly as `roles` and `permissions` are. `tags` and
-`course_tags` were built this way from the start; `course_categories` was seed-aware until v0.6 and
-should not have been. The cost showed twice: a generated course could only sit in a generated
-category, so generated data could never exercise the real taxonomy; and generated category names had
-to carry a set suffix to avoid colliding with genuine ones, which is exactly the appended nonsense
-the naming rules forbid everywhere else. Both objections outlived the universe that produced them,
-and neither table carries provenance now.
+**A category and a tag classify a course; they do not describe a person, a company or a transaction.** They are shared vocabulary, exactly as `roles` and `permissions` are. `tags` and `course_tags` were built this way from the start; `course_categories` was seed-aware until v0.6 and should not have been. The cost showed twice: a generated course could only sit in a generated category, so generated data could never exercise the real taxonomy; and generated category names had to carry a set suffix to avoid colliding with genuine ones, which is exactly the appended nonsense the naming rules forbid everywhere else. Both objections outlived the universe that produced them, and neither table carries provenance now.
 
 ## 6. Core-owned workspaces and navigation
 
@@ -187,12 +160,9 @@ Core owns routes, permission filtering, data loading, forms, business controls a
 
 Canonical consolidated workspaces:
 
-- `/admin` — Dashboard, Courses, People, Course Consumers, Course Creators, Course Requests,
-  Enrolments, Credits, Activity, Course Performance, Company Enrolments, Themes, Roles & ACL,
-  Seed Database, Settings.
+- `/admin` — Dashboard, Courses, People, Course Consumers, Course Creators, Course Requests, Enrolments, Credits, Activity, Course Performance, Company Enrolments, Themes, Roles & ACL, Seed Database, Settings.
 - `/account` — Dashboard, Profile, My Learning, Sessions, Activity.
-- `/company` — Dashboard, People, Course Requests, Enrolments, Performance, Courses Created,
-  Favourites, Courses Bought, Credits.
+- `/company` — Dashboard, People, Course Requests, Enrolments, Performance, Courses Created, Favourites, Courses Bought, Credits.
 
 Every top-level section also has a semantic standalone route. Do not reintroduce `/admin?tab=...` as a section-selection contract.
 
@@ -200,12 +170,7 @@ Core supplies permission-filtered `navigation` and `footer_navigation` arrays. T
 
 ## Canonical page construction in v0.8.5
 
-All bundled themes share the `cl-*` page vocabulary in `THEME-SDK.md`, core navigation and identity
-partials. Each theme uses one shell in both authentication states. Main and footer are siblings
-inside `div.cl-page-frame`; meaningful regions remain sections. Top headers belong to Radiant
-Learning, Light Default and Gilded Noir; Factory Reset and Factory Reset Sidebar use sidebars.
-Gilded Noir retains its compact navigation identity and rich decorative footer. Browser validation
-covers both states at desktop, tablet and mobile sizes; see `tests/Browser/README.md`.
+All bundled themes share the `cl-*` page vocabulary in `THEME-SDK.md`, core navigation and identity partials. Each theme uses one shell in both authentication states. Main and footer are siblings inside `div.cl-page-frame`; meaningful regions remain sections. Top headers belong to Radiant Learning, Light Default and Gilded Noir; Factory Reset and Factory Reset Sidebar use sidebars. Gilded Noir retains its compact navigation identity and rich decorative footer. Browser validation covers both states at desktop, tablet and mobile sizes; see `tests/Browser/README.md`.
 
 ## 7. Theme architecture
 

@@ -33,7 +33,7 @@ final class TrustedCourseHtmlTest extends TestCase
             $fragment = $data['modules'][0][$field];
             foreach (['viewBox="0 0 120 60"', '<linearGradient', '<clipPath', '<foreignObject', 'fill="url(#lessonGradient)"', 'http://www.w3.org/2000/svg'] as $required) self::assertStringContainsString($required, $fragment);
         }
-        self::assertStringNotContainsString('Learning outcomes', $data['modules'][0]['learning_outcomes_html']);
+        self::assertStringContainsString('Learning outcomes', $data['modules'][0]['learning_outcomes_html']);
         self::assertStringContainsString('<script>window.lessonReady=true;</script>', $data['modules'][0]['content_html']);
         self::assertStringContainsString('onclick="this.dataset.clicked=1"', $data['modules'][0]['content_html']);
         self::assertStringContainsString('<style>.local{fill:red}</style>', $data['modules'][0]['content_html']);

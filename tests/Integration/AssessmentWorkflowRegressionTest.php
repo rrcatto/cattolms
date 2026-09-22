@@ -60,15 +60,16 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             $slug = 'qa-assess-' . $suffix;
             $courseId = $fixture->createCourse($adminId, $companyId, $slug, 'QA Assessment Course ' . $suffix, 'published');
             $fixture->addGradeBands($courseId);
-            $moduleId = $fixture->createModule($courseId, 'm1', 1, true);
-            $moduleAssessmentId = $fixture->createAssessment($courseId, $moduleId, 'module', 'Module assessment', null, 1);
+            $gradedItem = $fixture->createAssessmentItem($courseId, $adminId, 'graded', 1);
+            $moduleAssessmentId = $gradedItem['item_id'];
             $moduleQuestion = $fixture->createQuestion($moduleAssessmentId);
-            $finalAssessmentId = $fixture->createAssessment($courseId, null, 'final', 'Final assessment', null, 1);
+            $finalItem = $fixture->createAssessmentItem($courseId, $adminId, 'final', 1);
+            $finalAssessmentId = $finalItem['item_id'];
             $finalQuestion = $fixture->createQuestion($finalAssessmentId);
             $enrolmentId = $fixture->createEnrolment($learnerId, $courseId, $adminId, 2592000);
             $learning->start($learnerId, $slug);
 
-            $practice = $assessments->startModuleAttempt($learnerId, $slug, 1, 'practice');
+            $practice = $assessments->startAttempt($learnerId, $slug, $gradedItem['node_id'], $gradedItem['key'], 'practice');
             $practiceResult = $assessments->respond(
                 $learnerId,
                 (string) $practice['public_id'],
@@ -81,17 +82,14 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             self::assertSame(100.0, (float) $practiceResult['percentage']);
 
             $attemptCount = $db->fetchAllAssociative(
-                'SELECT COUNT(*)::int AS total FROM assessment_attempts WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id',
+                'SELECT COUNT(*)::int AS total FROM assessment_attempts WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id',
                 ['enrolment_id' => $enrolmentId, 'assessment_id' => $moduleAssessmentId]
             );
             self::assertSame(0, (int) $attemptCount[0]['total']);
-            $progress = $db->fetchAllAssociative(
-                'SELECT completed_at,best_percentage FROM module_progress WHERE enrolment_id=:enrolment_id AND module_id=:module_id',
-                ['enrolment_id' => $enrolmentId, 'module_id' => $moduleId]
-            );
-            self::assertSame([], $progress);
+            $progress = $container->get(\CattoLearning\Course\CourseItemRepository::class)->assessmentProgress($enrolmentId, $courseId);
+            self::assertSame(0, $progress['submitted']);
 
-            $graded = $assessments->startModuleAttempt($learnerId, $slug, 1, 'graded');
+            $graded = $assessments->startAttempt($learnerId, $slug, $gradedItem['node_id'], $gradedItem['key'], 'graded');
             $gradedResult = $assessments->respond(
                 $learnerId,
                 (string) $graded['public_id'],
@@ -103,29 +101,25 @@ final class AssessmentWorkflowRegressionTest extends TestCase
             self::assertSame(100.0, (float) $gradedResult['percentage']);
 
             $attempt = $db->fetchAllAssociative(
-                'SELECT percentage,passed FROM assessment_attempts WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id',
+                'SELECT percentage,passed FROM assessment_attempts WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id',
                 ['enrolment_id' => $enrolmentId, 'assessment_id' => $moduleAssessmentId]
             );
             self::assertCount(1, $attempt);
             self::assertSame(100.0, (float) $attempt[0]['percentage']);
             self::assertContains($attempt[0]['passed'], [true, 1, '1', 't', 'true']);
 
-            $progress = $db->fetchAllAssociative(
-                'SELECT completed_at,best_percentage FROM module_progress WHERE enrolment_id=:enrolment_id AND module_id=:module_id',
-                ['enrolment_id' => $enrolmentId, 'module_id' => $moduleId]
-            );
-            self::assertCount(1, $progress);
-            self::assertNotSame('', trim((string) $progress[0]['completed_at']));
-            self::assertSame(100.0, (float) $progress[0]['best_percentage']);
+            $progress = $container->get(\CattoLearning\Course\CourseItemRepository::class)->assessmentProgress($enrolmentId, $courseId);
+            self::assertSame(1, $progress['submitted']);
+            self::assertSame(50, $progress['percentage']);
 
             try {
-                $assessments->startModuleAttempt($learnerId, $slug, 1, 'graded');
+                $assessments->startAttempt($learnerId, $slug, $gradedItem['node_id'], $gradedItem['key'], 'graded');
                 self::fail('Expected maximum graded-attempt limit to be enforced.');
             } catch (InvalidArgumentException $e) {
                 self::assertSame('No graded assessment attempts remain.', $e->getMessage());
             }
 
-            $final = $assessments->startFinalAttempt($learnerId, $slug, 'graded');
+            $final = $assessments->startAttempt($learnerId, $slug, $finalItem['node_id'], $finalItem['key'], 'graded');
             $finalResult = $assessments->respond(
                 $learnerId,
                 (string) $final['public_id'],

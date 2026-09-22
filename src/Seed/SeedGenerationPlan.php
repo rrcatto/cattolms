@@ -49,8 +49,7 @@ final class SeedGenerationPlan
     public const DEFAULT_VOLUME = 5000;
 
     /** Fixed shape of one generated course. */
-    public const MODULES_PER_COURSE = 4;
-    public const BLOCKS_PER_MODULE = 2;
+    public const LESSONS_PER_COURSE = 4;
     public const QUESTIONS_PER_ASSESSMENT = 4;
     public const OPTIONS_PER_QUESTION = 4;
     public const GRADE_BANDS_PER_COURSE = 4;
@@ -176,7 +175,7 @@ final class SeedGenerationPlan
      */
     private function businessRows(): array
     {
-        $modules = $this->richCourses * self::MODULES_PER_COURSE;
+        $lessons = $this->richCourses * self::LESSONS_PER_COURSE;
         $assessments = $this->richCourses * $this->assessmentsPerCourse();
         $questions = $assessments * self::QUESTIONS_PER_ASSESSMENT;
         $worked = $this->workedEnrolments;
@@ -189,16 +188,16 @@ final class SeedGenerationPlan
             'companies' => $this->companies,
             'company_users' => $this->users,
             'courses' => $this->courses,
-            'course_modules' => $modules,
-            'course_content_blocks' => $modules * self::BLOCKS_PER_MODULE,
-            'course_assessments' => $assessments,
+            'course_items' => $lessons + $assessments,
+            'course_structure_nodes' => $lessons + $assessments,
+            'course_item_placements' => $lessons + $assessments,
+            'course_item_assessments' => $assessments,
             'assessment_questions' => $questions,
             'assessment_options' => $questions * self::OPTIONS_PER_QUESTION,
             'course_grade_bands' => $this->courses * self::GRADE_BANDS_PER_COURSE,
             'course_price_variants' => $this->courses,
             'course_editors' => $this->courses,
             'course_enrolments' => $this->enrolments,
-            'module_progress' => $worked * self::MODULES_PER_COURSE,
             'assessment_attempts' => $worked * self::ATTEMPTS_PER_ENROLMENT,
             'assessment_responses' => $worked * self::ATTEMPTS_PER_ENROLMENT * self::QUESTIONS_PER_ASSESSMENT,
             'assessment_sessions' => $worked,
@@ -256,7 +255,7 @@ final class SeedGenerationPlan
     /** Assessments per course: one per module plus one final. */
     public function assessmentsPerCourse(): int
     {
-        return self::MODULES_PER_COURSE + 1;
+        return self::LESSONS_PER_COURSE + 1;
     }
 
     /**

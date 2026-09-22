@@ -151,6 +151,84 @@ final class UiComponentContractTest extends TestCase
         self::assertStringContainsString('data-tag-cloud-limit-value="80"', $tagBrowser);
     }
 
+    public function testCoursePresentationNavigationComposesCanonicalActions(): void
+    {
+        $templates = self::templates();
+        foreach (['learn-course', 'learn-item', 'course-public-preview', 'course-public-preview-item'] as $page) {
+            $source = $templates['resources/views/pages/' . $page . '.html.twig'];
+            self::assertStringContainsString("ui('action.", $source, $page . ' must compose canonical actions.');
+        }
+        foreach (['learn-item', 'course-public-preview-item'] as $page) {
+            $source = $templates['resources/views/pages/' . $page . '.html.twig'];
+            self::assertStringNotContainsString('<a href=', $source, $page . ' must not recreate course paging links.');
+        }
+        foreach (['assessment-overview', 'assessment-public-preview'] as $page) {
+            $source = $templates['resources/views/pages/' . $page . '.html.twig'];
+            self::assertStringContainsString('cl-course-item-paging', $source, $page . ' must provide course navigation.');
+            self::assertStringContainsString("ui('action.link'", $source, $page . ' must compose canonical navigation actions.');
+        }
+    }
+
+    public function testEveryCourseItemPageComposesTheSameCoreArticleLayout(): void
+    {
+        $templates = self::templates();
+        foreach (['learn-item', 'course-public-preview-item', 'assessment-overview', 'assessment-question', 'assessment-session-result', 'assessment-public-preview'] as $page) {
+            $source = $templates['resources/views/pages/' . $page . '.html.twig'];
+            self::assertStringContainsString("extends '@platform/layout/course-item.html.twig'", $source, $page . ' must use the standard Course Item page construction.');
+            self::assertStringContainsString('block course_item_body', $source, $page . ' must render inside the standard Course Item article.');
+        }
+    }
+
+    public function testCourseReaderExcludesTheThemePaletteSwitcher(): void
+    {
+        $root = dirname(__DIR__, 2);
+        self::assertStringContainsString('data-cl-course-reader="1"', (string) file_get_contents($root . '/resources/views/layout/course-presentation.html.twig'));
+        self::assertStringContainsString("document.body.dataset.clCourseReader==='1'", (string) file_get_contents($root . '/public_html/js/platform-overrides.js'));
+        self::assertStringContainsString("!in_array(\$family, ['course-player', 'assessment'], true)", (string) file_get_contents($root . '/src/View/ThemeRenderer.php'));
+        self::assertStringContainsString('body[data-cl-course-reader="1"] .cl-palette-switcher', (string) file_get_contents($root . '/public_html/css/catto-platform.css'));
+    }
+
+    public function testCourseReaderAssessmentLinksBypassTheGenericItemPage(): void
+    {
+        $source = self::templates()['resources/views/layout/course-presentation.html.twig'];
+        self::assertStringContainsString("node.item_type in ['assessment', 'diagnostic']", $source);
+        self::assertStringContainsString("'/assessment/' ~ node.item_key", $source);
+        self::assertStringContainsString("'/content'", $source);
+        $root = dirname(__DIR__, 2);
+        foreach (['src/Http/Controller/LearningController.php', 'src/Http/Controller/CoursePresentationController.php'] as $path) {
+            $controller = (string) file_get_contents($root . '/' . $path);
+            self::assertStringContainsString("throw \$this->notFound('Assessments open from their direct assessment route.')", $controller);
+        }
+        $renderer = (string) file_get_contents($root . '/src/Course/CourseItemRenderer.php');
+        self::assertStringNotContainsString('cl-course-item-assessment"><summary>', $renderer);
+    }
+
+    public function testCourseReaderSidebarKeepsItsIntroductionAndAssessmentLabelsConcise(): void
+    {
+        $source = self::templates()['resources/views/layout/course-presentation.html.twig'];
+        self::assertStringContainsString('cl-course-outline-introduction', $source);
+        self::assertStringContainsString("'Module ' ~ node.assessment_module_number ~ ' '", $source);
+        $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
+        self::assertStringContainsString('.cl-course-outline-introduction.is-current', $css);
+        self::assertStringContainsString('.cl-course-outline-title{font-size:.95rem;font-weight:800', $css);
+    }
+
+    public function testDraftPublicPreviewExitsToCourseContentRatherThanThePublicCatalogue(): void
+    {
+        $source = self::templates()['resources/views/layout/course-presentation.html.twig'];
+        self::assertStringContainsString("admin_public_preview = public_preview and course.public_preview_query|default('') == '?preview=1'", $source);
+        self::assertStringContainsString("'/admin/courses/' ~ course.id ~ '/content'", $source);
+        self::assertStringContainsString("'Exit public preview'", $source);
+    }
+
+    public function testImportedCourseIntroductionKeepsMastheadAndCardsOnOneWidth(): void
+    {
+        $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
+        self::assertStringContainsString('.cl-course-presentation-intro{padding:clamp(1.4rem,5vw,3.2rem)!important}', $css);
+        self::assertStringContainsString('.cl-course-presentation-intro .masthead{margin:0 0 1.5rem!important}', $css);
+        self::assertStringContainsString('.cl-course-presentation-intro .course-introduction-copy{max-width:none;margin:0}', $css);
+    }
+
     public function testObsoletePublicCategoryImplementationsAreAbsent(): void
     {
         $root = dirname(__DIR__, 2);

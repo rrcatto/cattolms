@@ -1,0 +1,9 @@
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
+<h1>{{ item.node_type == 'section' ? item.section_title : (item.display_title_override ?: item.item_title) }}</h1>
+<div class="cl-course-item-body cl-course-presentation catto-standalone">{{ item.rendered_html|raw }}</div>
+<nav class="cl-course-item-paging" aria-label="Public Course Content">
+{% if item.previous_node %}{% set previous_is_assessment = item.previous_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: '← Previous', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ item.previous_node.id ~ (previous_is_assessment ? '/assessment/' ~ item.previous_node.item_key : '/content') ~ course.public_preview_query|default('')}) }}{% endif %}
+{% if item.next_node %}{% set next_is_assessment = item.next_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Next →', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ item.next_node.id ~ (next_is_assessment ? '/assessment/' ~ item.next_node.item_key : '/content') ~ course.public_preview_query|default('')}) }}{% endif %}
+</nav>
+{% endblock %}

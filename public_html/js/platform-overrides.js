@@ -285,6 +285,7 @@
       tooltipResize = setTimeout(() => applyCellTooltips(document), 200);
     });
 
+    if(document.body.dataset.clCourseReader==='1')return;
     const preview = new URL(location.href).searchParams.get('theme_preview');
     const paletteUrl = new URL('/theme/palette', location.origin); if (preview) paletteUrl.searchParams.set('theme_preview', preview);
     fetch(paletteUrl,{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'}).then(response=>response.ok?response.json():null).then(config=>{

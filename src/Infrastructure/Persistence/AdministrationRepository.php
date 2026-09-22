@@ -530,7 +530,7 @@ SQL;
         // Modules completed, which is what the Progress column shows. Ordering by the fraction
         // instead would put a one-module course finished ahead of a fifty-module course nearly
         // finished, which is not what a reader scanning for progress is looking for.
-        'progress' => '(SELECT COUNT(*) FROM module_progress smp WHERE smp.enrolment_id=ce.id AND smp.completed_at IS NOT NULL)',
+        'progress' => '(SELECT COUNT(DISTINCT aa.structure_node_id) FROM assessment_attempts aa JOIN course_item_placements p ON p.node_id=aa.structure_node_id JOIN course_item_assessments a ON a.course_item_id=p.course_item_id WHERE aa.enrolment_id=ce.id AND a.practice=FALSE)',
         'assigned' => 'ce.assigned_at',
         'updated' => 'ce.updated_at',
         'expires' => 'ce.expires_at',
@@ -676,13 +676,15 @@ SQL;
                     c.id AS course_id, c.title AS course_title, c.slug,
                     u.id AS user_id, COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
                     ue.email,
-                    COALESCE((SELECT COUNT(*) FROM module_progress mp WHERE mp.enrolment_id=ce.id AND mp.completed_at IS NOT NULL),0)::int AS modules_completed,
-                    COALESCE((SELECT COUNT(*) FROM course_modules cm WHERE cm.course_id=ce.course_id),0)::int AS module_count
+                    assessment_progress.submitted_assessment_count,
+                    assessment_progress.assessment_count
              FROM page
              JOIN course_enrolments ce ON ce.id=page.id
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
+
+        $detail .= \CattoLearning\Course\CourseItemRepository::assessmentProgressJoin();
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -979,13 +981,15 @@ SQL;
                     ce.access_removed_at,ce.access_removed_reason,c.id AS course_id,c.title AS course_title,c.slug,
                     u.id AS user_id,COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
                     ue.email,
-                    COALESCE((SELECT COUNT(*) FROM module_progress mp WHERE mp.enrolment_id=ce.id AND mp.completed_at IS NOT NULL),0)::int AS modules_completed,
-                    COALESCE((SELECT COUNT(*) FROM course_modules cm WHERE cm.course_id=ce.course_id),0)::int AS module_count
+                    assessment_progress.submitted_assessment_count,
+                    assessment_progress.assessment_count
              FROM page
              JOIN course_enrolments ce ON ce.id=page.id
              JOIN courses c ON c.id=ce.course_id
              JOIN users u ON u.id=ce.user_id
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE';
+
+        $detail .= \CattoLearning\Course\CourseItemRepository::assessmentProgressJoin();
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -1143,7 +1147,7 @@ SQL;
             $where[] = "(
                 al.metadata->>'course_id'=:course_direct
                 OR EXISTS (SELECT 1 FROM course_enrolments ace WHERE ace.id::text=al.metadata->>'enrolment_id' AND ace.course_id::text=:course_enrolment)
-                OR EXISTS (SELECT 1 FROM course_assessments aca WHERE aca.id::text=al.metadata->>'assessment_id' AND aca.course_id::text=:course_assessment)
+                OR EXISTS (SELECT 1 FROM course_structure_nodes aca WHERE aca.id::text=al.metadata->>'structure_node_id' AND aca.course_id::text=:course_assessment)
                 OR EXISTS (SELECT 1 FROM course_requests acr WHERE acr.id::text=al.metadata->>'request_id' AND acr.course_id::text=:course_request)
             )";
         }
@@ -1210,7 +1214,7 @@ SELECT al.id, al.event_key, al.metadata, al.created_at, al.user_id AS actor_user
        COALESCE(
            (SELECT c.title FROM courses c WHERE c.id::text=al.metadata->>'course_id' LIMIT 1),
            (SELECT c.title FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1),
-           (SELECT c.title FROM course_assessments ca JOIN courses c ON c.id=ca.course_id WHERE ca.id::text=al.metadata->>'assessment_id' LIMIT 1),
+           (SELECT c.title FROM course_structure_nodes ca JOIN courses c ON c.id=ca.course_id WHERE ca.id::text=al.metadata->>'structure_node_id' LIMIT 1),
            (SELECT c.title FROM course_requests cr JOIN courses c ON c.id=cr.course_id WHERE cr.id::text=al.metadata->>'request_id' LIMIT 1)
        ) AS course_title,
        COALESCE(
