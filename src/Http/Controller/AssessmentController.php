@@ -65,7 +65,11 @@ final class AssessmentController extends BaseController
     private function previewQuery(bool $preview): string { return $preview ? '?preview=1' : ''; }
     private function sessionUrl(string $slug, string $session, string $suffix, bool $preview): string { return '/learn/' . rawurlencode($slug) . '/assessment/session/' . rawurlencode($session) . $suffix . $this->previewQuery($preview); }
 
-    /** @param array<string,mixed> $item @param array<string,mixed> $course @return array<string,mixed> */
+    /**
+     * @param array<string,mixed> $item
+     * @param array<string,mixed> $course
+     * @return array<string,mixed>
+     */
     private function withCourseNavigation(array $item, array $course, int $nodeId): array
     {
         $sequence = array_values(array_filter((array) ($course['structure'] ?? []), static fn(array $node): bool => ($node['node_type'] ?? '') === 'item'));

@@ -56,6 +56,11 @@ final class CourseComponentsIntegrationTest extends TestCase
         return $this->items->create(['item_key' => $name . '-' . $this->suffix, 'item_type' => 'html_lesson', 'title' => $name, 'content_source' => $source], $this->owner);
     }
 
+    private function assessment(string $name): int
+    {
+        return $this->items->create(['item_key' => $name . '-' . $this->suffix, 'item_type' => 'assessment', 'title' => $name], $this->owner);
+    }
+
     public function testSharedSaveAndIndependentSaveAsKeepPlacementOverrides(): void
     {
         $id = $this->lesson('shared');
@@ -125,6 +130,24 @@ final class CourseComponentsIntegrationTest extends TestCase
         self::assertSame('01 weeks 02 days 00 hours 00 minutes', CourseItemService::duration(12960));
         self::assertFalse($rows[0]['is_locked']);
         self::assertTrue($rows[2]['is_locked']);
+    }
+
+    public function testReviewStudyAidAndFinalAssessmentDoNotReceiveModuleNumbers(): void
+    {
+        $module = $this->lesson('ordinary-module');
+        $moduleAssessment = $this->assessment('ordinary-module-assessment');
+        $review = $this->items->create(['item_key' => 'review-' . $this->suffix, 'item_type' => 'html_lesson', 'title' => 'Review Study Aid', 'type_config' => ['presentation_role' => 'review_study_aid']], $this->owner);
+        $final = $this->assessment('integrated-final-assessment');
+        $this->items->addExisting($this->course, $module, [], $this->owner);
+        $this->items->addExisting($this->course, $moduleAssessment, ['assessment_role' => 'graded'], $this->owner);
+        $this->items->addExisting($this->course, $review, [], $this->owner);
+        $this->items->addExisting($this->course, $final, ['assessment_role' => 'final'], $this->owner);
+
+        $rows = $this->items->availability($this->course, null, false);
+        self::assertSame([1, null, null, null], array_column($rows, 'module_number'));
+        self::assertSame([null, 1, null, null], array_column($rows, 'assessment_module_number'));
+        self::assertTrue($rows[2]['is_review_study_aid']);
+        self::assertTrue($rows[3]['is_final_assessment']);
     }
 
     public function testAvailabilityCannotBeClearedForAnActiveLearner(): void

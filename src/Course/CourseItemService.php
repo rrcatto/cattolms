@@ -393,7 +393,7 @@ final class CourseItemService
     {
         $rows = $this->items->structure($courseId, $publicOnly);
         if ($publicOnly) { $rows = array_values(array_filter($rows, static fn(array $row): bool => $row['node_type'] === 'item')); }
-        $availableByNode = []; $lastByParent = []; $scheduledAncestor = []; $moduleNumber = 0;
+        $availableByNode = []; $lastByParent = []; $scheduledAncestor = []; $moduleNumber = 0; $assessmentModuleNumber = null;
         foreach ($rows as &$row) {
             $parent = $row['parent_node_id'] === null ? 0 : (int) $row['parent_node_id'];
             $ancestorUnlock = $parent === 0 ? null : ($scheduledAncestor[$parent] ?? null);
@@ -409,12 +409,24 @@ final class CourseItemService
             $row['is_locked'] = !$publicOnly && empty($row['public_preview']) && $unlockTimestamp !== null && $unlockTimestamp > time();
             $row['remaining_delay_label'] = self::duration($unlockTimestamp === null ? 0 : (int) ceil(max(0, $unlockTimestamp - time()) / 60));
             $row['delay_label'] = self::duration($own);
-            $isHtmlModule = $row['node_type'] === 'item' && $row['item_type'] === 'html_lesson';
-            $row['module_number'] = $isHtmlModule ? ++$moduleNumber : null;
-            $row['assessment_module_number'] = !$isHtmlModule && $row['node_type'] === 'item' && in_array($row['item_type'], ['assessment', 'diagnostic'], true) && $moduleNumber > 0 ? $moduleNumber : null;
+            $isReviewStudyAid = $row['node_type'] === 'item' && $row['item_type'] === 'html_lesson' && $this->isReviewStudyAid($row);
+            $isHtmlModule = $row['node_type'] === 'item' && $row['item_type'] === 'html_lesson' && !$isReviewStudyAid;
+            if ($isHtmlModule) { $moduleNumber++; $assessmentModuleNumber = $moduleNumber; }
+            if ($isReviewStudyAid) { $assessmentModuleNumber = null; }
+            $row['is_review_study_aid'] = $isReviewStudyAid;
+            $row['is_final_assessment'] = ($row['assessment_role'] ?? '') === 'final';
+            $row['module_number'] = $isHtmlModule ? $moduleNumber : null;
+            $row['assessment_module_number'] = !$row['is_final_assessment'] && !$isHtmlModule && !$isReviewStudyAid && $row['node_type'] === 'item' && in_array($row['item_type'], ['assessment', 'diagnostic'], true) ? $assessmentModuleNumber : null;
         }
         unset($row);
         return $rows;
+    }
+
+    /** @param array<string,mixed> $row */
+    private function isReviewStudyAid(array $row): bool
+    {
+        if (($row['type_config']['presentation_role'] ?? null) === 'review_study_aid') { return true; }
+        return (string) ($row['item_title'] ?? '') === 'Review Study Aid' && str_ends_with((string) ($row['item_key'] ?? ''), '-review');
     }
 
     public static function duration(int $minutes): string
