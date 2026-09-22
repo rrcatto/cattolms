@@ -208,6 +208,8 @@ final class UiComponentContractTest extends TestCase
         $source = self::templates()['resources/views/layout/course-presentation.html.twig'];
         self::assertStringContainsString('cl-course-outline-introduction', $source);
         self::assertStringContainsString("'Module ' ~ node.assessment_module_number ~ ' '", $source);
+        self::assertStringContainsString("node.is_final_assessment|default(false) ? 'Final Assessment'", $source);
+        self::assertStringContainsString("node.is_review_study_aid|default(false) ? 'Review Study Aid'", $source);
         $css = (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css');
         self::assertStringContainsString('.cl-course-outline-introduction.is-current', $css);
         self::assertStringContainsString('.cl-course-outline-title{font-size:.95rem;font-weight:800', $css);
