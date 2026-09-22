@@ -1,6 +1,6 @@
 # Factory Reset Sidebar
 
-Theme version **2.0.1**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
+Theme version **2.0.1**, bundled with CattoLMS **v0.8.6**. Theme Package 4.0 / Twig Template API 2.0.
 
 This child theme requires Factory Reset **2.0.1** exactly. It retains its own sidebar shell and decorative footer. Its palettes are Carnival Cotton Candy, Coastal Blue, Forest & Sand and Plum & Rose.
 

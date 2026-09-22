@@ -14,7 +14,7 @@
 				{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
 {% block body %}
 
-						{{ ui('data.stat-card', {label: 'Modules', value: (analysis.display_module_count)}) }}
+						{{ ui('data.stat-card', {label: 'Course Items', value: (analysis.statistics.course_item_count|default(analysis.display_module_count))}) }}
 
 						{{ ui('data.stat-card', {label: 'Module assessments', value: (analysis.display_module_assessment_count), note: (analysis.display_module_question_count) ~ ' questions'}) }}
 
@@ -49,9 +49,7 @@
 										</div>
 										<div class="text-end">
 											{{ ui('feedback.badge', {label: 'Suggested threshold ' ~ (diagnostic.pass_mark) ~ '%', tone: 'info'}) }}
-											{% if diagnostic.diagnostic_pass_action == 'complete_course' %}
-												<small class="d-block text-success mt-1">Passing completes course</small>
-											{% endif %}
+											<small class="d-block text-body-secondary mt-1">Guidance only; does not affect grade or completion</small>
 										</div>
 									</div>
 
@@ -105,11 +103,14 @@
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-					{{ ui('layout.section-head', {heading: 'Detected modules and blocks', heading_level: 2}) }}
+					{{ ui('layout.section-head', {heading: 'Course Item structure and keys', heading_level: 2, summary: 'Key collisions must be resolved before import; CattoLMS does not rename or guess.'}) }}
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in analysis.course_items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|replace({'_':' '}) }}</div>{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
+					{% if analysis.key_conflicts|default([]) %}{{ ui('feedback.notice', {tone: 'danger', heading: 'Resolve Course Item key conflicts before importing', section_spacing: true}) }}{% endif %}
+					<h3>Legacy source components</h3>
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}
 
-						{% for module in analysis.modules %}
+						{% for module in analysis.modules|default([]) %}
 							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
 
@@ -120,9 +121,9 @@
 										{% if module.subtitle %}
 											<small class="d-block text-body-secondary">{{ module.subtitle }}</small>
 										{% endif %}
-										{{ ui('feedback.badge', {label: (module.block_count) ~ ' content blocks', tone: 'neutral'}) }}
+										{{ ui('feedback.badge', {label: (module.content_blocks|default([])|length) ~ ' content blocks', tone: 'neutral'}) }}
 										{% if module.assessment %}
-											{{ ui('feedback.badge', {label: (module.question_count) ~ ' assessment questions', tone: 'neutral'}) }}
+											{{ ui('feedback.badge', {label: (module.assessment.questions|default([])|length) ~ ' assessment questions', tone: 'neutral'}) }}
 										{% endif %}
 										{% if module.is_review %}
 											{{ ui('feedback.badge', {label: 'Review module', tone: 'neutral'}) }}
@@ -218,13 +219,13 @@
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-						<h2 class="h4">
-							Commit import
+										<h2 class="h4">
+											Commit import
 						</h2>
-						<p>
-							Create a new draft, or replace a resettable course shell.
+										<p>
+											Create a new draft, or replace an existing shell that has no started learners. Existing courses with learner activity are intentionally excluded.
 						</p>
-						<form action="/admin/courses/import/commit" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+						<form action="/admin/courses/import/commit" method="post"><div data-category-picker>{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
 							<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -239,7 +240,7 @@
 									{% endfor %}
 									</select>
 									{% if can_manage_categories %}
-										{{ ui('action.button', {label: '+ New', variant: 'secondary', size: 'normal', type: 'button'}) }}
+										{{ ui('action.button', {label: '+ New', variant: 'secondary', size: 'normal', type: 'button', category_create_toggle: true, expanded: false}) }}
 									{% endif %}
 								</div>
 								{% if can_manage_categories %}
@@ -252,7 +253,7 @@
 										{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 
-											{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add'}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button'}) }}
+											{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true}) }}
 
 {% endblock %}
 {% endembed %}
@@ -261,7 +262,7 @@
 
 {% endblock %}
 {% endembed %}
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', for: 'field-admin-course-import-preview', required: false})} %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', help: 'Only resettable courses you own or administer are listed. Courses with started learners cannot be replaced.', for: 'field-admin-course-import-preview', required: false})} %}
 {% block control %}
 <select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
 							{% for existing in replaceable_courses %}
@@ -276,7 +277,7 @@
 {% endembed %}
 
 {% endblock %}
-{% endembed %}</form>
+{% endembed %}</div></form>
 
 {% endblock %}
 {% endembed %}

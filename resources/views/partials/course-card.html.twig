@@ -46,7 +46,7 @@
 				{% endfor %}
 			</div>
 		{% endif %}
-		{{ ui('data.key-value-list', {items: [{label: 'Level', value: (course.level)}, {label: 'Modules', value: (course.module_count)}, {label: 'Price', value: (course.default_price_label)}]}) }}
+		{{ ui('data.key-value-list', {items: [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label)}]}) }}
 		<div class="cl-course-card-foot">
 			{{ ui('action.link', {label: 'View course', variant: 'primary', size: 'small', href: '/courses/' ~ (course.slug)}) }}
 		</div>

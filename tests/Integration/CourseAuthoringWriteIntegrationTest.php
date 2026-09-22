@@ -152,53 +152,15 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
             $repository->setApprovalStatus($courseId, 'pending', $ownerId);
             self::assertSame('pending', (string) $repository->findById($courseId)['publication_approval_status']);
 
-            $moduleId = $repository->createModule($courseId, [
-                'module_key' => 'qa-module',
-                'position' => 1,
-                'title' => 'QA Module',
-                'subtitle' => '',
-                'learning_outcomes_html' => '',
-                'content_html' => '<p>Module.</p>',
-                'summary_html' => '',
-                'content_blocks' => [['type' => 'text']],
-                'is_review' => false,
-                'assessment_required' => true,
-            ]);
-            self::assertGreaterThan(0, $moduleId);
+            $items = $container->get(\CattoLearning\Course\CourseItemService::class);
+            $records = $container->get(\CattoLearning\Course\CourseItemRepository::class);
+            $assessmentId = $items->create(['item_key' => 'qa-assessment-' . $suffix, 'item_type' => 'assessment', 'title' => 'QA Assessment', 'pass_mark' => 50], $ownerId);
+            $items->update($assessmentId, ['item_key' => 'qa-assessment-' . $suffix, 'item_type' => 'assessment', 'title' => 'QA Assessment Renamed', 'pass_mark' => 60], $ownerId);
+            $assessmentNode = $items->addExisting($courseId, $assessmentId, ['assessment_role' => 'graded'], $ownerId);
+            self::assertSame('QA Assessment Renamed', $items->item($assessmentId)['title']);
+            self::assertSame(60, (int) $items->item($assessmentId)['pass_mark']);
 
-            $repository->updateModule($moduleId, [
-                'module_key' => 'qa-module',
-                'position' => 1,
-                'title' => 'QA Module Renamed',
-                'subtitle' => '',
-                'learning_outcomes_html' => '',
-                'content_html' => '<p>Revised module.</p>',
-                'summary_html' => '',
-                'content_blocks' => [],
-                'is_review' => false,
-                'assessment_required' => false,
-            ]);
-            $module = $repository->moduleById($courseId, $moduleId);
-            self::assertNotNull($module);
-            self::assertSame('QA Module Renamed', (string) $module['title']);
-
-            $assessmentId = $repository->createAssessment($courseId, $moduleId, [
-                'assessment_type' => 'module',
-                'title' => 'QA Assessment',
-                'position' => 1,
-            ]);
-            self::assertGreaterThan(0, $assessmentId);
-
-            $repository->updateAssessment($assessmentId, $courseId, [
-                'title' => 'QA Assessment Renamed',
-                'pass_mark' => 60,
-            ]);
-            $assessment = $repository->assessmentForModule($moduleId);
-            self::assertNotNull($assessment);
-            self::assertSame('QA Assessment Renamed', (string) $assessment['title']);
-            self::assertSame(60, (int) $assessment['pass_mark']);
-
-            $repository->replaceAssessmentQuestions($assessmentId, [
+            $records->replaceQuestions($assessmentId, [
                 [
                     'question_html' => 'First question',
                     'points' => 2,
@@ -215,7 +177,7 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
                     ],
                 ],
             ]);
-            $questions = $repository->questions($assessmentId, true);
+            $questions = $records->questions($assessmentId, true);
             self::assertCount(2, $questions);
             self::assertSame('First question', (string) $questions[0]['question_html']);
             self::assertCount(2, $questions[0]['options']);
@@ -226,7 +188,7 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
             self::assertCount(1, $questions[1]['options']);
             self::assertSame('Only', (string) $questions[1]['options'][0]['option_html']);
             // Without includeCorrect the answer must not reach the caller at all.
-            self::assertArrayNotHasKey('is_correct', $repository->questions($assessmentId)[0]['options'][0]);
+            self::assertArrayNotHasKey('is_correct', $records->questions($assessmentId, false)[0]['options'][0]);
 
             $repository->replaceGradeBands($courseId, [
                 ['grade_code' => 'A', 'grade_label' => 'Distinction', 'minimum_percentage' => 80, 'is_passing' => true],
@@ -239,25 +201,8 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
 
             $repository->recordHistory($courseId, $ownerId, 'course.updated', 'course', $courseId, 'Checked.', ['checked' => true]);
             $history = $repository->history($courseId);
-            self::assertCount(1, $history);
+            self::assertNotEmpty($history);
             self::assertSame('course.updated', (string) $history[0]['event_key']);
-
-            $mediaId = $repository->addMedia($courseId, $moduleId, [
-                'media_role' => 'cover',
-                'original_filename' => 'cover.png',
-                'storage_key' => 'qa/' . $suffix . '.png',
-                'mime_type' => 'image/png',
-                'byte_size' => 1024,
-                'sha256' => str_repeat('a', 64),
-                'alt_text' => '',
-                'is_public' => true,
-            ], $ownerId);
-            self::assertGreaterThan(0, $mediaId);
-            $media = $repository->media($courseId);
-            self::assertCount(1, $media);
-            self::assertSame('cover', (string) $media[0]['media_role']);
-            self::assertNull($media[0]['alt_text']);
-            self::assertTrue($media[0]['is_public']);
 
             $firstVariantId = $repository->createPriceVariant($courseId, [
                 'access_period_seconds' => 2592000,
@@ -331,11 +276,9 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
             self::assertSame($companyId, (int) $owned['owner_company_id']);
             self::assertSame($ownerId, (int) $owned['owner_user_id']);
 
-            $repository->deleteAssessment($courseId, $assessmentId);
-            self::assertNull($repository->assessmentForModule($moduleId));
-
-            $repository->deleteModule($courseId, $moduleId);
-            self::assertNull($repository->moduleById($courseId, $moduleId));
+            $items->removeFromCourse($courseId, $assessmentNode, $ownerId);
+            $items->delete($assessmentId, $ownerId);
+            self::assertNull($records->item($assessmentId));
         } finally {
             if ($courseId > 0) {
                 $db->executeStatement('DELETE FROM course_enrolments WHERE course_id = :id', ['id' => $courseId]);

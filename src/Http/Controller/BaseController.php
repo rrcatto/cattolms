@@ -278,7 +278,6 @@ abstract class BaseController
             'can_manage_categories' => 'COURSE.CATEGORY.MANAGE',
             'can_manage_course_ownership' => 'COURSE.OWNERSHIP.MANAGE',
             'can_manage_course_pricing' => 'COURSE.PRICING.MANAGE',
-            'can_manage_course_media' => 'COURSE.MEDIA.MANAGE',
             'can_manage_assessments' => 'COURSE.ASSESSMENT.MANAGE',
             'can_manage_certificates' => 'COURSE.CERTIFICATE.MANAGE',
             'can_preview_courses' => 'COURSE.PREVIEW',

@@ -1,0 +1,18 @@
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
+<h1>{{ assessment.title }}</h1>
+<p>Public preview: answers and results are not saved and do not affect course progress or grades.</p>
+{{ assessment.instructions_html|raw }}
+{% if submitted %}<p>Your preview result: <strong>{{ percentage }}%</strong></p>{{ (percentage >= assessment.pass_mark ? assessment.result_pass_html : assessment.result_fail_html)|raw }}{% endif %}
+<form method="post" action="/courses/{{ course.slug }}/preview/{{ node_id }}/assessment/{{ assessment.item_key }}{{ course.public_preview_query|default('') }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+{% for question in questions %}<fieldset><legend>{{ question.question_html|raw }}</legend>
+{% for option in question.options %}<label><input type="radio" name="answers[{{ question.id }}]" value="{{ option.id }}" {{ question.selected_option_id == option.id ? 'checked' : '' }}> {{ option.option_html|raw }}</label><br>{% endfor %}
+{% if submitted %}<p>{{ question.answered_correctly ? 'Correct' : 'Review this answer' }}</p>{{ question.explanation_html|raw }}{% endif %}
+</fieldset>{% endfor %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Submit preview answers', variant: 'primary', type: 'submit'}) }}{% endblock %}{% endembed %}
+</form>
+<nav class="cl-course-item-paging" aria-label="Public Course Content">
+{% if assessment.previous_node %}{% set previous_is_assessment = assessment.previous_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: '← Previous', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ assessment.previous_node.id ~ (previous_is_assessment ? '/assessment/' ~ assessment.previous_node.item_key : '/content') ~ course.public_preview_query|default('')}) }}{% endif %}
+{% if assessment.next_node %}{% set next_is_assessment = assessment.next_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Next →', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ assessment.next_node.id ~ (next_is_assessment ? '/assessment/' ~ assessment.next_node.item_key : '/content') ~ course.public_preview_query|default('')}) }}{% endif %}
+</nav>
+{% endblock %}

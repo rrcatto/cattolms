@@ -1,9 +1,10 @@
 <div data-question data-question-index="{{ qi }}">
+    <input type="hidden" name="question_id[{{ qi }}]" value="{{ question.id|default(0) }}">
     {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
         {% block surface_body %}
             {% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
                 {% block toolbar_primary %}<h3>Question <span data-question-number>{{ qi == '__q__' ? '' : qi + 1 }}</span></h3>{% endblock %}
-                {% block toolbar_actions %}{{ ui('action.button', {label: 'Remove question', icon: 'action-remove', variant: 'danger', size: 'small', type: 'button', name: 'question_action', value: 'remove-question'}) }}{% endblock %}
+                {% block toolbar_actions %}{{ ui('action.button', {label: 'Remove question', icon: 'action-remove', variant: 'danger', size: 'small', type: 'submit', skip_validation: true, name: 'question_action', value: 'remove-question:' ~ qi}) }}{% endblock %}
             {% endembed %}
             {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
                 {% block body %}
@@ -32,11 +33,12 @@
                         {% endembed %}
                     {% endfor %}
                     {% if diagnostic %}
-                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Suggest modules when incorrect', for: 'question-' ~ qi ~ '-remediation', help: 'Select the modules to suggest after an incorrect answer.'})} %}
-                            {% block control %}<select id="{{ props.for }}" name="remediation_module_keys[{{ qi }}][]" multiple size="4" {{ ui_field_attrs(props) }}>{% for module in modules %}<option value="{{ module.module_key }}" {{ module.module_key in question.remediation_module_keys|default([]) ? 'selected' : '' }}>{{ module.position }}. {{ module.title }}</option>{% endfor %}</select>{% endblock %}
+                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Suggested Course Item keys', for: 'question-' ~ qi ~ '-remediation', help: 'Separate keys with commas. References are never rewritten automatically.'})} %}
+                            {% block control %}<input id="{{ props.for }}" name="remediation_item_keys[{{ qi }}]" value="{{ question.remediation_item_keys|default([])|join(', ') }}" {{ ui_field_attrs(props) }}>{% endblock %}
                         {% endembed %}
                         <input type="hidden" name="question_difficulty[{{ qi }}]" value="standard">
                         <input type="hidden" name="practice_eligible[{{ qi }}]" value="1">
+                        <input type="hidden" name="graded_eligible[{{ qi }}]" value="1">
                         <input type="hidden" name="incorrect_points[{{ qi }}]" value="0">
                     {% else %}
                         {% for key, label in {practice_eligible: 'Practice eligible', graded_eligible: 'Graded eligible'} %}
@@ -52,7 +54,7 @@
                     {% include '@platform/partials/question-editor-option.html.twig' %}
                 {% endfor %}
             </div>
-            {{ ui('action.button', {label: 'Add option', icon: 'action-add', type: 'button', name: 'question_action', value: 'add-option'}) }}
+            {{ ui('action.button', {label: 'Add option', icon: 'action-add', type: 'submit', skip_validation: true, name: 'question_action', value: 'add-option:' ~ qi}) }}
         {% endblock %}
     {% endembed %}
 </div>

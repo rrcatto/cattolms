@@ -161,36 +161,6 @@ final class AdminCourseController extends BaseController
     }
 
 
-    #[Route('/admin/courses/{id}/preview/modules/{module_id}', name: 'admin_course_preview_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['GET'])]
-    public function previewModule(): Response
-    {
-        $this->requirePermission('COURSE.PREVIEW');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $moduleId = $this->moduleId();
-        $data = $this->courses->moduleEditor($courseId, $moduleId);
-        $modules = (array) ($data['course']['modules'] ?? $this->courses->adminCourse($courseId)['modules']);
-        $previous = null;
-        $next = null;
-        foreach ($modules as $index => $module) {
-            if ((int) $module['id'] === $moduleId) {
-                $previous = $index > 0 ? $modules[$index - 1] : null;
-                $next = $index < count($modules) - 1 ? $modules[$index + 1] : null;
-                break;
-            }
-        }
-        return $this->render('admin-module-preview', [
-            'title' => 'Preview ' . (string) $data['module']['title'],
-            'course' => $data['course'],
-            'module' => $data['module'],
-            'assessment' => $data['assessment'],
-            'previous_module' => $previous,
-            'next_module' => $next,
-            'course_content_mode' => true,
-        ]);
-    }
-
-
     #[Route('/admin/courses/{id}/certificate', name: 'admin_course_certificate', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function certificate(): Response
     {
@@ -342,7 +312,7 @@ final class AdminCourseController extends BaseController
         $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($user, $courseId): void {
             $status = trim((string) ($_POST['status'] ?? ''));
-            $this->courses->changeStatus($courseId, $status, $user->id);
+            $this->courses->changeStatus($courseId, $status, $user->id, !empty($_POST['override_publication_warnings']));
             $this->flash('success', 'The course status is now ' . $status . '.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);
@@ -357,258 +327,10 @@ final class AdminCourseController extends BaseController
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($user, $courseId): void {
-            $this->courses->submitForApproval($courseId, $user->id);
+            $this->courses->submitForApproval($courseId, $user->id, !empty($_POST['override_publication_warnings']));
             $this->flash('success', 'The course was submitted for platform approval.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);
-    }
-
-
-    #[Route('/admin/courses/{id}/modules/new', name: 'admin_course_create_module_form', requirements: ['id' => '\\d+'], methods: ['GET'])]
-    public function createModuleForm(): Response
-    {
-        $this->requirePermission('COURSE.EDIT');
-        $course = $this->requireManagedCourse($this->courseId());
-        $nextPosition = count((array) $course['modules']) + 1;
-        return $this->render('admin-module-form', [
-            'title' => 'Add module',
-            'course' => $course,
-            'module' => [
-                'id' => 0,
-                'module_key' => 'm' . $nextPosition,
-                'position' => $nextPosition,
-                'title' => '',
-                'subtitle' => '',
-                'learning_outcomes_html' => '',
-                'content_html' => '',
-                'summary_html' => '',
-                'is_review' => false,
-                'assessment_required' => true,
-            ],
-            'assessment' => $this->prepareAssessment($this->blankAssessment('')),
-            'editor_questions' => [],
-            'editor_question_count' => 0,
-            'form_action' => '/admin/courses/' . (int) $course['id'] . '/modules',
-            'load_ckeditor' => true,
-            'load_question_editor' => true,
-        ]);
-    }
-
-
-    #[Route('/admin/courses/{id}/modules', name: 'admin_course_create_module', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function createModule(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.EDIT');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
-            $moduleId = $this->courses->createModule($courseId, $_POST, $user->id);
-            $this->flash('success', 'The module was created.');
-            $this->redirect('/admin/courses/' . $courseId . '/modules/' . $moduleId);
-        }, '/admin/courses/' . $courseId . '/modules/new');
-    }
-
-
-    #[Route('/admin/courses/{id}/modules/{module_id}', name: 'admin_course_edit_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['GET'])]
-    public function editModule(): Response
-    {
-        $this->requirePermission('COURSE.EDIT');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $moduleId = $this->moduleId();
-        $data = $this->courses->moduleEditor($courseId, $moduleId);
-        $assessment = is_array($data['assessment'])
-            ? $data['assessment']
-            : $this->blankAssessment((string) $data['module']['title'] . ' assessment');
-        $assessment = $this->prepareAssessment($assessment);
-        return $this->render('admin-module-form', [
-            'title' => 'Edit ' . (string) $data['module']['title'],
-            'course' => $data['course'],
-            'module' => $data['module'],
-            'assessment' => $assessment,
-            'editor_questions' => (array) ($assessment['questions'] ?? []),
-            'editor_question_count' => count((array) ($assessment['questions'] ?? [])),
-            'form_action' => '/admin/courses/' . $courseId . '/modules/' . $moduleId,
-            'load_ckeditor' => true,
-            'load_question_editor' => true,
-        ]);
-    }
-
-
-    #[Route('/admin/courses/{id}/modules/{module_id}', name: 'admin_course_update_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['POST'])]
-    public function updateModule(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.EDIT');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $moduleId = $this->moduleId();
-        return $this->handle(function () use ($user, $courseId, $moduleId): void {
-            $this->courses->updateModule($courseId, $moduleId, $_POST, $user->id);
-            $this->flash('success', 'The module was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '/modules/' . $moduleId);
-        }, '/admin/courses/' . $courseId . '/modules/' . $moduleId);
-    }
-
-
-    #[Route('/admin/courses/{id}/modules/{module_id}/assessment', name: 'admin_course_update_assessment', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['POST'])]
-    public function updateAssessment(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $moduleId = $this->moduleId();
-        return $this->handle(function () use ($user, $courseId, $moduleId): void {
-            $this->courses->replaceModuleAssessment($courseId, $moduleId, $_POST, $user->id);
-            $this->flash('success', 'The module assessment was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '/modules/' . $moduleId . '#assessment');
-        }, '/admin/courses/' . $courseId . '/modules/' . $moduleId . '#assessment');
-    }
-
-
-    #[Route('/admin/courses/{id}/diagnostics/new', name: 'admin_course_create_diagnostic_form', requirements: ['id' => '\\d+'], methods: ['GET'])]
-    public function createDiagnosticForm(): Response
-    {
-        $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $course = $this->requireManagedCourse($this->courseId());
-        $assessment = $this->blankDiagnostic((string) $course['title'] . ' diagnostic');
-        $diagnosticCount = count((array) ($course['diagnostic_assessments'] ?? []));
-        $assessment['assessment_key'] = $diagnosticCount === 0 ? 'diagnostic' : 'diagnostic-' . ($diagnosticCount + 1);
-        return $this->render('admin-diagnostic-assessment', [
-            'title' => 'Add diagnostic · ' . (string) $course['title'],
-            'course' => $course,
-            'modules' => (array) $course['modules'],
-            'assessment' => $assessment,
-            'editor_questions' => [],
-            'form_action' => '/admin/courses/' . (int) $course['id'] . '/diagnostics',
-            'form_heading' => 'Add course diagnostic',
-            'load_ckeditor' => true,
-            'load_question_editor' => true,
-        ]);
-    }
-
-
-    #[Route('/admin/courses/{id}/diagnostics', name: 'admin_course_create_diagnostic', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function createDiagnostic(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
-            $diagnosticId = $this->courses->saveDiagnostic($courseId, null, $_POST, $user->id);
-            $this->flash('success', 'The course diagnostic was created.');
-            $this->redirect('/admin/courses/' . $courseId . '/diagnostics/' . $diagnosticId);
-        }, '/admin/courses/' . $courseId . '/diagnostics/new');
-    }
-
-
-    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}', name: 'admin_course_edit_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['GET'])]
-    public function editDiagnostic(): Response
-    {
-        $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $data = $this->courses->diagnosticEditor($courseId, $this->diagnosticId());
-        $assessment = $this->prepareAssessment((array) $data['assessment']);
-        return $this->render('admin-diagnostic-assessment', [
-            'title' => 'Diagnostic · ' . (string) $assessment['title'],
-            'course' => $data['course'],
-            'modules' => $data['modules'],
-            'assessment' => $assessment,
-            'editor_questions' => (array) ($assessment['questions'] ?? []),
-            'form_action' => '/admin/courses/' . $courseId . '/diagnostics/' . (int) $assessment['id'],
-            'form_heading' => 'Edit course diagnostic',
-            'load_ckeditor' => true,
-            'load_question_editor' => true,
-        ]);
-    }
-
-
-    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}', name: 'admin_course_update_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['POST'])]
-    public function updateDiagnostic(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $diagnosticId = $this->diagnosticId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId, $diagnosticId): void {
-            $this->courses->saveDiagnostic($courseId, $diagnosticId, $_POST, $user->id);
-            $this->flash('success', 'The course diagnostic was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '/diagnostics/' . $diagnosticId);
-        }, '/admin/courses/' . $courseId . '/diagnostics/' . $diagnosticId);
-    }
-
-
-    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}/delete', name: 'admin_course_delete_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['POST'])]
-    public function deleteDiagnostic(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $diagnosticId = $this->diagnosticId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId, $diagnosticId): void {
-            $this->courses->deleteDiagnostic($courseId, $diagnosticId, $user->id);
-            $this->flash('success', 'The course diagnostic was deleted.');
-            $this->redirect('/admin/courses/' . $courseId);
-        }, '/admin/courses/' . $courseId);
-    }
-
-
-    #[Route('/admin/courses/{id}/diagnostics/{diagnostic_id}/move', name: 'admin_course_move_diagnostic', requirements: ['id' => '\\d+', 'diagnostic_id' => '\\d+'], methods: ['POST'])]
-    public function moveDiagnostic(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $diagnosticId = $this->diagnosticId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId, $diagnosticId): void {
-            $this->courses->moveDiagnostic($courseId, $diagnosticId, (string) ($_POST['direction'] ?? ''), $user->id);
-            $this->redirect('/admin/courses/' . $courseId . '#diagnostics');
-        }, '/admin/courses/' . $courseId . '#diagnostics');
-    }
-
-
-    #[Route('/admin/courses/{id}/final-assessment', name: 'admin_course_edit_final_assessment', requirements: ['id' => '\\d+'], methods: ['GET'])]
-    public function editFinalAssessment(): Response
-    {
-        $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $data = $this->courses->finalAssessmentEditor($courseId);
-        $assessment = is_array($data['assessment'])
-            ? $data['assessment']
-            : $this->blankAssessment((string) $data['course']['title'] . ' final assessment');
-        $assessment = $this->prepareAssessment($assessment);
-        return $this->render('admin-final-assessment', [
-            'title' => 'Final assessment · ' . (string) $data['course']['title'],
-            'course' => $data['course'],
-            'assessment' => $assessment,
-            'editor_questions' => (array) ($assessment['questions'] ?? []),
-            'editor_question_count' => count((array) ($assessment['questions'] ?? [])),
-            'load_ckeditor' => true,
-            'load_question_editor' => true,
-        ]);
-    }
-
-
-    #[Route('/admin/courses/{id}/final-assessment', name: 'admin_course_update_final_assessment', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function updateFinalAssessment(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.ASSESSMENT.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
-            $this->courses->replaceFinalAssessment($courseId, $_POST, $user->id);
-            $this->flash('success', 'The final assessment was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '/final-assessment');
-        }, '/admin/courses/' . $courseId . '/final-assessment');
     }
 
 
@@ -624,22 +346,6 @@ final class AdminCourseController extends BaseController
             $this->flash('success', 'The course grade bands were updated.');
             $this->redirect('/admin/courses/' . $courseId . '#grading');
         }, '/admin/courses/' . $courseId . '#grading');
-    }
-
-
-    #[Route('/admin/courses/{id}/modules/{module_id}/delete', name: 'admin_course_delete_module', requirements: ['id' => '\\d+', 'module_id' => '\\d+'], methods: ['POST'])]
-    public function deleteModule(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.EDIT');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        $moduleId = $this->moduleId();
-        return $this->handle(function () use ($user, $courseId, $moduleId): void {
-            $this->courses->deleteModule($courseId, $moduleId, $user->id);
-            $this->flash('success', 'The module was deleted.');
-            $this->redirect('/admin/courses/' . $courseId);
-        }, '/admin/courses/' . $courseId . '/modules/' . $moduleId);
     }
 
 
@@ -672,7 +378,7 @@ final class AdminCourseController extends BaseController
         $key = trim((string) ($_GET['key'] ?? ''));
         return $this->handle(function () use ($key): Response {
             $analysis = $this->portability->reanalyseImport($key);
-            foreach ($analysis['modules'] as &$module) {
+            foreach ($analysis['modules'] ?? [] as &$module) {
                 $blocks = (array) ($module['content_blocks'] ?? $module['blocks'] ?? []);
                 $module['block_count'] = count($blocks);
                 $module['question_count'] = isset($module['assessment']) && is_array($module['assessment'])
@@ -680,7 +386,7 @@ final class AdminCourseController extends BaseController
                     : 0;
             }
             unset($module);
-            $analysis['display_module_count'] = (int) ($analysis['statistics']['module_count'] ?? count($analysis['modules']));
+            $analysis['display_module_count'] = (int) ($analysis['statistics']['module_count'] ?? count((array) ($analysis['modules'] ?? [])));
 
             $moduleAssessmentCount = 0;
             $moduleQuestionCount = 0;
@@ -796,27 +502,6 @@ final class AdminCourseController extends BaseController
     }
 
 
-    #[Route('/admin/courses/{id}/media', name: 'admin_course_upload_media', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function uploadMedia(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.MEDIA.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
-            $this->courses->saveMedia(
-                $courseId,
-                (array) ($_FILES['media_file'] ?? []),
-                (string) ($_POST['media_role'] ?? 'content'),
-                (string) ($_POST['alt_text'] ?? ''),
-                $user->id
-            );
-            $this->flash('success', 'The course media file was uploaded.');
-            $this->redirect('/admin/courses/' . $courseId . '#media');
-        }, '/admin/courses/' . $courseId . '#media');
-    }
-
-
     #[Route('/admin/courses/{id}/presentation', name: 'admin_course_import_presentation', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function importPresentation(): Response
     {
@@ -893,21 +578,6 @@ final class AdminCourseController extends BaseController
         }, '/admin/courses');
     }
 
-
-    #[Route('/admin/courses/{id}/revision', name: 'admin_course_clone_revision', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function cloneRevision(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.CREATE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
-            $newId = $this->portability->cloneRevision($courseId, $user->id);
-            $this->flash('success', 'A new draft revision was created.');
-            $this->redirect('/admin/courses/' . $newId);
-        }, '/admin/courses/' . $courseId);
-    }
-
     /** @return array<string,mixed> */
     private function requireManagedCourse(int $courseId): array
     {
@@ -935,85 +605,6 @@ final class AdminCourseController extends BaseController
             throw new InvalidArgumentException('Invalid price variant identifier.');
         }
         return $id;
-    }
-
-    private function moduleId(): int
-    {
-        $id = (int) $this->param('module_id');
-        if ($id < 1) {
-            throw new InvalidArgumentException('Invalid module identifier.');
-        }
-        return $id;
-    }
-
-    private function diagnosticId(): int
-    {
-        $id = (int) $this->param('diagnostic_id');
-        if ($id < 1) {
-            throw new InvalidArgumentException('Invalid diagnostic identifier.');
-        }
-        return $id;
-    }
-
-    /**
-     * @param array<string,mixed> $assessment
-     * @return array<string,mixed>
-     */
-    private function prepareAssessment(array $assessment): array
-    {
-        $difficulty = $assessment['difficulty_selection'] ?? [];
-        if (is_string($difficulty)) {
-            $decoded = json_decode($difficulty, true);
-            $difficulty = is_array($decoded) ? $decoded : [];
-        }
-        $assessment['difficulty_introductory'] = (int) ($difficulty['introductory'] ?? 0);
-        $assessment['difficulty_standard'] = (int) ($difficulty['standard'] ?? 0);
-        $assessment['difficulty_advanced'] = (int) ($difficulty['advanced'] ?? 0);
-        return $assessment;
-    }
-
-    /** @return array<string,mixed> */
-    private function blankAssessment(string $title): array
-    {
-        return [
-            'id' => 0,
-            'title' => $title,
-            'instructions_html' => '<p>Answer every question, then submit the assessment for grading.</p>',
-            'pass_mark' => 50,
-            'practice_enabled' => true,
-            'practice_pool_mode' => 'both',
-            'practice_question_count' => 5,
-            'graded_question_count' => 10,
-            'maximum_attempts' => null,
-            'time_limit_seconds' => 1800,
-            'score_policy' => 'highest',
-            'randomise_questions' => true,
-            'randomise_options' => true,
-            'negative_marking' => false,
-            'difficulty_selection' => [],
-            'questions' => [],
-        ];
-    }
-
-    /** @return array<string,mixed> */
-    private function blankDiagnostic(string $title): array
-    {
-        return [
-            'id' => 0,
-            'assessment_key' => 'diagnostic',
-            'title' => $title,
-            'instructions_html' => '<p>Answer the diagnostic questions to identify areas that may need revision.</p>',
-            'pass_mark' => 50,
-            'result_pass_html' => '<p><strong>Ready.</strong> Your result meets the suggested threshold.</p>',
-            'result_fail_html' => '<p><strong>Revision recommended.</strong> Review the suggested modules before continuing.</p>',
-            'diagnostic_pass_action' => 'guidance_only',
-            'is_visible' => true,
-            'maximum_attempts' => null,
-            'time_limit_seconds' => 3600,
-            'randomise_questions' => false,
-            'randomise_options' => false,
-            'questions' => [],
-        ];
     }
 
     /** @return array<string,mixed> */

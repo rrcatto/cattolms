@@ -1,6 +1,6 @@
 # Factory Reset
 
-Theme version **2.0.1**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
+Theme version **2.0.1**, bundled with CattoLMS **v0.8.6**. Theme Package 4.0 / Twig Template API 2.0.
 
 This standalone reference theme uses a sidebar and the shared site footer. Its palette choices are Carnival Cotton Candy, Coastal Blue and Forest & Sand.
 

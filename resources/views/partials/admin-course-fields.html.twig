@@ -1,6 +1,9 @@
 {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Course introduction',for:'course-introduction',full_width:true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="course-introduction" name="introduction_html" rows="6" {{ ui_field_attrs(props) }}>{{ course.introduction_html|default('') }}</textarea>{% endblock %}{% endembed %}
+<input type="hidden" name="show_outline_on_intro" value="0">
+{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:'Show generated outline on introduction'})} %}{% block control %}<input type="checkbox" name="show_outline_on_intro" value="1" {{ course.show_outline_on_intro|default(false) ? 'checked' : '' }}>{% endblock %}{% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course title', full_width: false, for: 'title', required: true})} %}
 {% block control %}
 
@@ -86,20 +89,6 @@
 {% block control %}
 
 		<input class="form-control" id="access-days" type="number" min="1" name="access_days" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Module assessment weight', full_width: false, for: 'module-weight', required: true})} %}
-{% block control %}
-
-		<input class="form-control" id="module-weight" type="number" min="0" max="1" step="0.01" name="module_weight" value="{{ course.module_weight }}" required {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Final assessment weight', full_width: false, for: 'final-weight', required: true})} %}
-{% block control %}
-
-		<input class="form-control" id="final-weight" type="number" min="0" max="1" step="0.01" name="final_weight" value="{{ course.final_weight }}" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

@@ -1,6 +1,6 @@
 # Gilded Noir
 
-Theme version **2.0.2**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
+Theme version **2.0.2**, bundled with CattoLMS **v0.8.6**. Theme Package 4.0 / Twig Template API 2.0.
 
 This standalone theme retains its engraved canvas, gold and ivory styling, ribbon, artwork and rich footer, including `gn-footer-art`, `gn-footer-veil` and `gn-footnote`. The shared compact identity appears in the header; the full page identity band is omitted. Theme JavaScript decorates the scrolled header; core owns menu interaction. There is no selectable palette list.
 

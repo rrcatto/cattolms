@@ -2,11 +2,11 @@
 {% block page_body %}
 	{% set ph_back_href = '/admin/courses' %}
 	{% set ph_back_label = 'Course administration' %}
-	{% set ph_kicker = (course.status)~' · revision '~(course.revision_number) %}
+	{% set ph_kicker = course.status %}
 	{% set ph_title = course.title %}
 	{% set ph_lead = '/'~(course.slug) %}
-	{% set ph_action_href = '/admin/courses/'~(course.id)~'/modules/new' %}
-	{% set ph_action_label = 'Add module' %}
+	{% set ph_action_href = '/admin/courses/'~(course.id)~'/content' %}
+	{% set ph_action_label = 'Edit Course Content' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section container-fluid cl-container-wide py-5">
 		<nav aria-label="Course administration sections">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
@@ -19,7 +19,7 @@
 			{% if can_manage_course_pricing %}
 				{{ ui('action.link', {label: 'Pricing', href: '#pricing', size: 'small'}) }}
 			{% endif %}
-			{{ ui('action.link', {label: 'Modules', href: '#modules', size: 'small'}) }}{{ ui('action.link', {label: 'Presentation', href: '#presentation', size: 'small'}) }}{{ ui('action.link', {label: 'Grades', href: '#grading', size: 'small'}) }}{{ ui('action.link', {label: 'Media', href: '#media', size: 'small'}) }}{{ ui('action.link', {label: 'History', href: '#history', size: 'small'}) }}{{ ui('action.link', {label: 'Reset / delete', href: '#danger', size: 'small'}) }}
+			{{ ui('action.link', {label: 'Course Content', href: '#course-content', size: 'small'}) }}{{ ui('action.link', {label: 'Presentation', href: '#presentation', size: 'small'}) }}{{ ui('action.link', {label: 'Grades', href: '#grading', size: 'small'}) }}{{ ui('action.link', {label: 'History', href: '#history', size: 'small'}) }}{{ ui('action.link', {label: 'Reset / delete', href: '#danger', size: 'small'}) }}
 
 {% endblock %}
 {% endembed %}</nav>
@@ -272,53 +272,14 @@
 {% endblock %}
 {% endembed %}
 				{% endif %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'modules'})} %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'course-content'})} %}
 {% block surface_body %}
-
-					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Modules and assessments', heading_level: 2, summary: 'Module content and self assessments are stored separately.'})} %}
+					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course Content', heading_level: 2, summary: 'Build the nested course structure from reusable Course Items and course-specific placements.'})} %}
 {% block section_actions %}
-{{ ui('action.link', {label: 'Add module', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/modules/new', icon: 'action-add'}) }}
+{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/content'}) }}
 {% endblock %}
 {% endembed %}
-					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-						{% for module in course.modules %}
-							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-								<span class="cl-module-number">{{ module.position }}</span>
-								<div class="flex-grow-1">
-									<strong>{{ module.title }}</strong>
-									<br>
-									<small>{{ module.question_count }} questions · {{ module.maximum_points }} points</small>
-								</div>
-								{% if module.is_review %}
-									{{ ui('feedback.badge', {label: 'Review', tone: 'neutral'}) }}
-								{% endif %}
-								{% if not module.assessment_required %}
-									{{ ui('feedback.badge', {label: 'No assessment required', tone: 'neutral'}) }}
-								{% endif %}
-								{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
-{% block body %}
-
-									{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/preview/modules/' ~ (module.id)}) }}
-									{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/modules/' ~ (module.id)}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-						{% endfor %}
-						{% if not course.modules %}
-							<div class="p-4 text-body-secondary">
-								No modules have been added.
-							</div>
-						{% endif %}
-
-{% endblock %}
-{% endembed %}
+					<p>{{ course.structure|length }} structure rows. Assessments and diagnostics use the same Course Item lifecycle and sharing model as every other item.</p>
 
 {% endblock %}
 {% endembed %}
@@ -426,81 +387,6 @@
 
 {% endblock %}
 {% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'media'})} %}
-{% block surface_body %}
-
-					{{ ui('layout.section-head', {heading: 'Private course media', heading_level: 2, summary: 'Files are stored outside public_html and served through access-controlled routes.'}) }}
-
-						<form action="/admin/courses/{{ course.id }}/media" method="post" enctype="multipart/form-data">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'File', full_width: false, for: 'field-admin-course-edit-15-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-								<input class="form-control" type="file" name="media_file" required id="field-admin-course-edit-15-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role', full_width: false, for: 'field-admin-course-edit-16-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-								<select class="form-select" name="media_role" id="field-admin-course-edit-16-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="cover">Course cover</option><option value="content">Course content</option><option value="download">Download</option></select>
-
-{% endblock %}
-{% endembed %}
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Alternative text', full_width: false, for: 'field-admin-course-edit-17-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-								<input class="form-control" name="alt_text" id="field-admin-course-edit-17-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-								{{ ui('action.button', {label: 'Upload media', variant: 'secondary', size: 'normal', type: 'submit'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}</form>
-						{% if course.media %}
-
-								{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-{% block header %}
-
-										<tr>
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 60, label: 'File'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Role'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Type'}} %}
-										</tr>
-
-{% endblock %}
-{% block body %}
-
-										{% for media in course.media %}
-											<tr>
-												<td>
-													{{ media.original_filename }}
-												</td>
-												<td>
-													{{ media.media_role }}
-												</td>
-												<td>
-													{{ media.mime_type }}
-												</td>
-											</tr>
-										{% endfor %}
-
-{% endblock %}
-{% endembed %}
-
-						{% endif %}
-
-{% endblock %}
-{% endembed %}
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'history'})} %}
 {% block surface_body %}
 
@@ -594,111 +480,12 @@
 {% block surface_body %}
 
 						<h2 class="h4">
-							New revision
-						</h2>
-						<p>
-							Clone this course into a new draft revision before making larger changes.
-						</p>
-						<form action="/admin/courses/{{ course.id }}/revision" method="post">
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{{ ui('action.button', {label: 'Create new revision', variant: 'secondary', size: 'normal', full_width: true, type: 'submit', icon: 'action-add'}) }}
-						</form>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
 							Certificate
 						</h2>
 						<p>
 							Edit the certificate HTML and CSS, insert placeholders and preview the result.
 						</p>
 						{{ ui('action.link', {label: 'Edit certificate template', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/certificate'}) }}
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'diagnostics'})} %}
-{% block surface_body %}
-
-						<div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-							<div>
-								<h2 class="h4 mb-1">
-									Course diagnostics
-								</h2>
-								<p class="text-body-secondary mb-0">
-									Readiness and revision checks are non-graded and managed independently from module and final assessments.
-								</p>
-							</div>
-							{{ ui('action.link', {label: 'Add diagnostic', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/diagnostics/new', icon: 'action-add'}) }}
-						</div>
-						{% if course.diagnostic_assessments %}
-							<div class="vstack gap-3">
-								{% for diagnostic_index, diagnostic in course.diagnostic_assessments %}
-									<div class="border rounded p-3">
-										<div class="d-flex flex-wrap justify-content-between gap-2">
-											<div>
-												<strong>{{ diagnostic.title }}</strong>
-												<div>
-													<small>{{ diagnostic.question_count }} questions · threshold {{ diagnostic.pass_mark }}% · key {{ diagnostic.assessment_key }}</small>
-												</div>
-												<div class="d-flex flex-wrap gap-1 mt-2">
-													{{ ui('feedback.badge', {label: (diagnostic.is_visible ? 'Visible' : 'Hidden'), tone: diagnostic.is_visible ? 'success' : 'neutral'}) }}{{ ui('feedback.badge', {label: (diagnostic.maximum_attempts ? diagnostic.maximum_attempts~' attempt'~(diagnostic.maximum_attempts == 1 ? '' : 's') : 'Unlimited attempts'), tone: 'neutral'}) }}{{ ui('feedback.badge', {label: (diagnostic.diagnostic_pass_action == 'complete_course' ? 'Pass completes course' : 'Guidance only'), tone: diagnostic.diagnostic_pass_action == 'complete_course' ? 'warning' : 'neutral'}) }}
-												</div>
-											</div>
-											{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
-{% block body %}
-
-												{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/diagnostics/' ~ (diagnostic.id)}) }}
-												<form action="/admin/courses/{{ course.id }}/diagnostics/{{ diagnostic.id }}/move" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													<input type="hidden" name="direction" value="up">
-													{{ ui('action.button', {label: '↑', variant: 'secondary', size: 'small', type: 'submit', disabled: diagnostic_index == 0}) }}
-												</form>
-												<form action="/admin/courses/{{ course.id }}/diagnostics/{{ diagnostic.id }}/move" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													<input type="hidden" name="direction" value="down">
-													{{ ui('action.button', {label: '↓', variant: 'secondary', size: 'small', type: 'submit', disabled: diagnostic_index + 1 == course.diagnostic_assessments|length}) }}
-												</form>
-												<form action="/admin/courses/{{ course.id }}/diagnostics/{{ diagnostic.id }}/delete" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this diagnostic and all of its questions?', icon: 'action-remove'}) }}
-												</form>
-
-{% endblock %}
-{% endembed %}
-										</div>
-									</div>
-								{% endfor %}
-							</div>
-						{% else %}
-							<p class="text-body-secondary mb-0">
-								No course diagnostics have been created.
-							</p>
-						{% endif %}
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Final assessment
-						</h2>
-						{% if course.final_assessment %}
-							<p>
-								<strong>{{ course.final_assessment.title }}</strong>
-								<br>
-								{{ course.final_assessment.question_count }} questions
-							</p>
-							{{ ui('action.link', {label: 'Edit final assessment', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/final-assessment'}) }}
-						{% else %}
-							<p>
-								No final assessment exists.
-							</p>
-							{{ ui('action.link', {label: 'Create final assessment', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/final-assessment', icon: 'action-add'}) }}
-						{% endif %}
 
 {% endblock %}
 {% endembed %}
@@ -715,7 +502,7 @@
 							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
 
-								<strong>Publication checks:</strong> assessments are optional. Any module or final assessment explicitly marked required must contain questions. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.
+								<strong>Publication checks:</strong> Courses may omit assessments. Assessed courses require exactly one final assessment and valid question banks. Unresolved Course Item references, missing Resources and invalid availability schedules block publication. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.
 
 {% endblock %}
 {% endembed %}
@@ -743,7 +530,7 @@
 							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
 
-								<strong>Publication checks:</strong> assessments are optional. Any module or final assessment explicitly marked required must contain questions. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.
+								<strong>Publication checks:</strong> Courses may omit assessments. Assessed courses require exactly one final assessment and valid question banks. Unresolved Course Item references, missing Resources and invalid availability schedules block publication. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.
 
 {% endblock %}
 {% endembed %}
@@ -751,7 +538,9 @@
 {% block body %}
 
 								<input type="hidden" name="csrf" value="{{ csrf }}">
-								<select class="form-select mb-3" name="status">
+								{% for error in course.publication_validation.errors %}<p>{{ error }}</p>{% endfor %}{% for warning in course.publication_validation.warnings %}<p>{{ warning }}</p>{% endfor %}
+{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:'Override publication warnings'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
+<select class="form-select mb-3" name="status">
 								{% for state in course_states %}
 									<option value="{{ state }}" {{ state == course.status ? 'selected' : '' }}>{{ state|ucfirst }}</option>
 								{% endfor %}

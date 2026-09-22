@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · {{ app.name }}</title>
+{% for resourceUrl in platform.styles %}<link rel="stylesheet" href="{{ resourceUrl }}">{% endfor %}
+{% if course.presentation_css|default('') %}<style>{{ course.presentation_css|raw }}</style>{% endif %}
+</head>
+<body class="cl-course-presentation-shell" data-cl-course-reader="1">
+{% set public_preview = is_public_preview|default(false) %}
+{% set presentation_query = preview_query|default('') %}
+{% include '@platform/partials/flash-messages.html.twig' %}
+{% if course is defined %}
+{% set admin_public_preview = public_preview and course.public_preview_query|default('') == '?preview=1' %}
+<header class="cl-course-presentation-head">
+<a href="{{ admin_public_preview ? '/admin/courses/' ~ course.id ~ '/content' : (public_preview ? '/courses/' ~ course.slug : (is_preview|default(false) ? '/admin/courses/' ~ course.id ~ '/content' : '/account/library')) }}">← {{ admin_public_preview ? 'Exit public preview' : 'Exit course' }}</a>
+<strong>{{ course.title }}</strong>
+{% if course.remaining_access_label|default('') %}<span>Access remaining: {{ course.remaining_access_label }}</span>{% endif %}
+</header>
+{% if course.progress|default(null) %}<div class="cl-course-reader-progress progress-strip"><div class="ps-inner"><div class="ps-row"><span class="ps-label">Course progress, <b>{{ course.progress.submitted|default(0) }} of {{ course.progress.total|default(0) }} assessed items</b></span><span class="ps-pct">{{ course.progress.percentage|default(0) }}%</span></div>{{ ui('feedback.progress', {value: course.progress.percentage|default(0), label: 'Course progress', size: 'normal'}) }}</div></div>{% endif %}
+<div class="cl-course-reader">
+<nav class="cl-course-outline" aria-label="Course outline">
+<h2 class="cl-course-outline-title">Course Modules</h2>
+{% set on_introduction = not course.current_node_id|default(null) %}
+<a class="cl-course-outline-introduction{% if on_introduction %} is-current{% endif %}"{% if on_introduction %} aria-current="page"{% endif %} href="{{ public_preview ? '/courses/' ~ course.slug ~ '/preview' ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ presentation_query }}">Course introduction</a>
+{% for node in course.structure|default([]) %}
+<div class="cl-course-outline-item cl-course-depth-{{ node.depth }}{% if node.assessment_role|default('content') == 'graded' %} cl-course-outline-assessment{% endif %}{% if course.current_node_id|default(0) == node.id %} is-current{% endif %}">
+{% set node_title = node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) %}
+{% set is_assessment = node.node_type == 'item' and node.item_type in ['assessment', 'diagnostic'] %}
+{% set node_label = is_assessment and node.assessment_module_number|default(null) ? 'Module ' ~ node.assessment_module_number ~ ' ' ~ (node.item_type == 'diagnostic' ? 'Diagnostic' : 'Assessment') : (node.module_number|default(null) ? 'Module ' ~ node.module_number ~ ' · ' ~ node_title : node_title) %}
+{% set node_href = is_assessment ? (public_preview ? '/courses/' ~ course.slug ~ '/preview/' ~ node.id ~ '/assessment/' ~ node.item_key ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ '/item/' ~ node.id ~ '/assessment/' ~ node.item_key ~ presentation_query) : (public_preview ? '/courses/' ~ course.slug ~ '/preview/' ~ node.id ~ '/content' ~ course.public_preview_query|default('') : '/learn/' ~ course.slug ~ '/item/' ~ node.id ~ '/content' ~ presentation_query) %}
+{% if node.is_locked and not is_preview|default(false) %}
+<span>Locked: {{ node_label }}</span><small>Available in {{ node.remaining_delay_label }} ({{ node.unlock_at }})</small>
+{% elseif node.node_type == 'section' and not node.section_introduction_html and not node.show_outline %}
+<strong>{{ node_label }}</strong>
+{% elseif public_preview or course.enrolment.started_at|default(null) %}
+<a{% if course.current_node_id|default(0) == node.id %} aria-current="page"{% endif %} href="{{ node_href }}">{{ node_label }}</a>
+{% else %}<span>{{ node_label }}</span>{% endif %}
+</div>
+{% endfor %}
+</nav>
+<main class="cl-course-reader-content">{% block page_body %}{% endblock %}</main>
+</div>
+{% else %}
+<header class="cl-course-presentation-head"><a href="{{ course_url|default('/account/library') }}">← Exit assessment</a></header>
+{{ block('page_body') }}
+{% endif %}
+{% for resourceUrl in platform.scripts %}<script src="{{ resourceUrl }}"></script>{% endfor %}
+</body>
+</html>

@@ -1,17 +1,8 @@
-{% extends layout %}
-{% block page_body %}
-	{% if is_preview %}
-		<div class="cl-preview-bar">
-			<div class="container-fluid cl-container-wide d-flex justify-content-between align-items-center gap-2">
-				<strong>Student-view preview</strong><span>This result is excluded from real reports.</span>
-			</div>
-		</div>
-	{% endif %}
-	{% set ph_kicker = session.is_diagnostic ? 'Diagnostic result' : 'Assessment result' %}
-	{% set ph_title = session.assessment_title %}
-	{% set ph_lead = 'Attempt '~(session.attempt_number)~' · '~(session.is_diagnostic ? 'Diagnostic' : session.attempt_mode|ucfirst) %}
-	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-page-section container py-5">
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
+	<span class="cl-kicker">{{ session.is_diagnostic ? 'Diagnostic result' : 'Assessment result' }}</span>
+	<h1>{{ session.assessment_title }}</h1>
+	<p>Attempt {{ session.attempt_number }} · {{ session.is_diagnostic ? 'Diagnostic' : session.attempt_mode|ucfirst }}</p>
 		<div class="row g-4">
 			<div class="col-lg-8">
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
@@ -44,34 +35,22 @@
 {% block body %}
 
 								{{ session.diagnostic_message_html|raw }}
-								{% if session.diagnostic_course_completed %}
-									<p class="mb-0">
-										<strong>This diagnostic pass has completed the course because the imported course explicitly permits a diagnostic pass-out.</strong>
-									</p>
-								{% else %}
-									<p class="mb-0">
-										<strong>This diagnostic does not affect your course grade, progress or certificate.</strong>
-									</p>
-								{% endif %}
+								<p>This diagnostic does not affect your course grade, progress or certificate.</p>
 
 {% endblock %}
 {% endembed %}
-							{% if session.diagnostic_remediation_modules %}
+							{% if session.diagnostic_remediation_items %}
 								<div class="mt-4">
 									<h2 class="h5">
-										Suggested modules to review
+										Suggested Course Items to review
 									</h2>
 									{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}
 
-										{% for module in session.diagnostic_remediation_modules %}
+										{% for item in session.diagnostic_remediation_items %}
 											{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
-<a href="/learn/{{ session.slug }}/module/{{ module.position }}{{ is_preview ? '?preview=1' : '' }}"><strong>{{ module.title }}</strong>
-											{% if module.subtitle %}
-												<small class="d-block text-body-secondary">{{ module.subtitle }}</small>
-											{% endif %}
-											</a>
+{% if item.node_id %}<a href="/learn/{{ session.slug }}/item/{{ item.node_id }}/content{{ is_preview ? '?preview=1' : '' }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}
 {% endblock %}
 {% endembed %}
 										{% endfor %}
@@ -135,5 +114,4 @@
 {% endembed %}
 			</aside>
 		</div>
-	</section>
 {% endblock %}

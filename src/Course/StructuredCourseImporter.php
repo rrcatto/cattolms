@@ -67,7 +67,7 @@ final class StructuredCourseImporter
             throw new InvalidArgumentException('Unsupported course JSON format.');
         }
         $schemaVersion = (string) ($data['schema_version'] ?? '1.0');
-        if (!in_array($schemaVersion, ['1.0'], true)) {
+        if (!in_array($schemaVersion, ['1.0','2.0'], true)) {
             throw new InvalidArgumentException('Unsupported course JSON schema version: ' . $schemaVersion);
         }
 
@@ -75,6 +75,19 @@ final class StructuredCourseImporter
         $title = trim((string) ($courseInput['title'] ?? ''));
         if ($title === '') {
             throw new InvalidArgumentException('The course JSON does not contain a course title.');
+        }
+        if ($schemaVersion === '2.0') {
+            $items = array_values(array_filter((array) ($data['course_items'] ?? []), 'is_array'));
+            $structure = array_values(array_filter((array) ($data['structure'] ?? []), 'is_array'));
+            if ($items === [] || $structure === []) { throw new InvalidArgumentException('Course JSON schema 2.0 requires Course Items and course structure.'); }
+            foreach ($items as &$item) {
+                $item['description_html'] = $this->courseHtml->preserve((string) ($item['description_html'] ?? ''));
+                $item['content_source'] = $this->courseHtml->preserve((string) ($item['content_source'] ?? ''));
+            }
+            unset($item);
+            $courseInput['slug'] = trim((string) ($courseInput['slug'] ?? '')) ?: Slug::from($title);
+            $courseInput['source_filename'] = $sourceFilename;
+            return ['format' => 'catto-learning-course', 'schema_version' => '2.0', 'course' => $courseInput, 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
         }
 
         $modules = [];
@@ -206,7 +219,6 @@ final class StructuredCourseImporter
                 'course_style_key' => trim((string) ($courseInput['course_style_key'] ?? 'standard')) ?: 'standard',
                 'presentation_css' => (string) ($courseInput['presentation_css'] ?? ''),
                 'source_filename' => $sourceFilename,
-                'revision_number' => max(1, (int) ($courseInput['revision_number'] ?? 1)),
             ],
             'modules' => $modules,
             'diagnostic_assessments' => $diagnostics,
@@ -296,7 +308,7 @@ final class StructuredCourseImporter
                 'difficulty' => $difficulty,
                 'practice_eligible' => (bool) ($questionInput['practice_eligible'] ?? true),
                 'graded_eligible' => $type === 'diagnostic' ? false : (bool) ($questionInput['graded_eligible'] ?? true),
-                'remediation_module_keys' => array_values(array_map('strval', (array) ($questionInput['remediation_module_keys'] ?? []))),
+                'remediation_item_keys' => array_values(array_map('strval', (array) ($questionInput['remediation_item_keys'] ?? $questionInput['remediation_module_keys'] ?? []))),
                 'incorrect_points' => min(0, (float) ($questionInput['incorrect_points'] ?? 0)),
                 'options' => $options,
             ];
@@ -337,10 +349,6 @@ final class StructuredCourseImporter
                 throw new InvalidArgumentException('The imported ' . $tier . ' quota exceeds the available question pool.');
             }
         }
-        $diagnosticPassAction = $type === 'diagnostic'
-            && (string) ($input['diagnostic_pass_action'] ?? 'guidance_only') === 'complete_course'
-            ? 'complete_course'
-            : 'guidance_only';
         return [
             'assessment_type' => $type,
             'assessment_key' => $type === 'diagnostic' ? trim((string) ($input['assessment_key'] ?? 'diagnostic')) : null,
@@ -351,7 +359,6 @@ final class StructuredCourseImporter
             'required' => $type === 'diagnostic' ? false : (bool) ($input['required'] ?? true),
             'result_pass_html' => $this->courseHtml->preserve((string) ($input['result_pass_html'] ?? '')),
             'result_fail_html' => $this->courseHtml->preserve((string) ($input['result_fail_html'] ?? '')),
-            'diagnostic_pass_action' => $diagnosticPassAction,
             'is_visible' => $type === 'diagnostic' ? (bool) ($input['is_visible'] ?? true) : true,
             'practice_enabled' => (bool) ($input['practice_enabled'] ?? true),
             'practice_pool_mode' => $practicePoolMode,

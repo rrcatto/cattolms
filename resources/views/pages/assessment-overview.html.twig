@@ -1,189 +1,48 @@
-{% extends layout %}
-{% block page_body %}
-	{% if is_preview %}
-		<div class="cl-preview-bar">
-			<div class="container-fluid cl-container-wide d-flex justify-content-between align-items-center gap-2">
-				<strong>Student-view preview</strong>{{ ui('action.link', {label: 'Exit preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id)}) }}
-			</div>
-		</div>
-	{% endif %}
-	{% set ph_back_href = back_url %}
-	{% set ph_back_label = 'Back' %}
-	{% set ph_kicker = assessment.assessment_type == 'final' ? 'Final assessment' : (assessment.assessment_type == 'diagnostic' ? 'Course diagnostic' : 'Module self assessment') %}
-	{% set ph_title = assessment.title %}
-	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-page-section container py-5">
-		<div class="row g-4">
-			<div class="col-lg-8">
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Before you begin
-						</h2>
-						{{ assessment.instructions_html|raw }}
-						{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+{% extends '@platform/layout/course-item.html.twig' %}
+{% block course_item_body %}
+<span class="cl-kicker">{{ assessment.assessment_role == 'final' ? 'Final assessment' : (assessment.assessment_type == 'diagnostic' ? 'Course diagnostic' : 'Assessment') }}</span>
+<h1>{{ assessment.title }}</h1>
+<h2 class="h4">Before you begin</h2>
+{{ assessment.instructions_html|raw }}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 {% block body %}
-
-								{{ ui('data.stat-card', {label: 'Question pool', value: (assessment.question_pool_count)}) }}
-
-								{{ ui('data.stat-card', {label: 'Questions drawn', value: (assessment.assessment_type == 'diagnostic' ? assessment.practice_question_count : assessment.graded_question_count)}) }}
-
-								{{ ui('data.stat-card', {label: 'Time', value: (time_limit_label)}) }}
-
-								{{ ui('data.stat-card', {label: (assessment.assessment_type == 'diagnostic' ? 'Suggested threshold' : 'Pass mark'), value: (assessment.pass_mark) ~ '%'}) }}
-
+{{ ui('data.stat-card', {label: 'Question pool', value: assessment.question_pool_count}) }}
+{{ ui('data.stat-card', {label: 'Questions drawn', value: assessment.assessment_type == 'diagnostic' ? assessment.practice_question_count : assessment.graded_question_count}) }}
+{{ ui('data.stat-card', {label: 'Time', value: time_limit_label}) }}
+{{ ui('data.stat-card', {label: assessment.assessment_type == 'diagnostic' ? 'Suggested threshold' : 'Pass mark', value: assessment.pass_mark ~ '%'}) }}
 {% endblock %}
 {% endembed %}
-						{% if assessment.assessment_type == 'diagnostic' %}
-							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
+<h2 class="h4 cl-course-assessment-scoring-heading">Scoring</h2>
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 {% block body %}
-
-								<strong>Diagnostic assessment.</strong>
-								{% if assessment.diagnostic_pass_action == 'complete_course' %}
-									Meeting the threshold records this course enrolment as completed.
-								{% else %}
-									This result is recorded for your reference but does not contribute to module progress, your course grade, final assessment eligibility or certificate result.
-								{% endif %}
-
+{% if assessment.assessment_type == 'diagnostic' %}
+{{ ui('data.stat-card', {label: 'Course grade', value: 'Not affected'}) }}{{ ui('data.stat-card', {label: 'Assessment progress', value: 'Not affected'}) }}{{ ui('data.stat-card', {label: 'Attempts', value: assessment.maximum_attempts ? assessment.maximum_attempts : 'Unlimited'}) }}{{ ui('data.stat-card', {label: 'Passing result', value: 'Readiness guidance'}) }}
+{% else %}
+{{ ui('data.stat-card', {label: 'Recorded result', value: assessment.score_policy|ucfirst ~ ' score'}) }}{{ ui('data.stat-card', {label: 'Incorrect answers', value: assessment.negative_marking ? 'Configured negative points' : 'Zero points'}) }}{{ ui('data.stat-card', {label: 'Skipped', value: 'Zero points'}) }}{{ ui('data.stat-card', {label: 'Minimum result', value: '0%'}) }}
+{% endif %}
 {% endblock %}
 {% endembed %}
-						{% else %}
-							<ul class="mt-4 mb-0">
-								<li>
-									One question appears at a time.
-								</li>
-								<li>
-									You may skip a question and return to it while time remains.
-								</li>
-								<li>
-									Unanswered questions receive zero when time expires.
-								</li>
-								{% if assessment.negative_marking %}
-									<li>
-										Incorrect answers may lose points; the final score cannot fall below zero.
-									</li>
-								{% endif %}
-								<li>
-									Answer and question order may be randomised for each attempt.
-								</li>
-							</ul>
-						{% endif %}
-
-{% endblock %}
-{% endembed %}
-				{% if assessment.assessment_type == 'diagnostic' %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info'})} %}
-{% block surface_body %}
-
-							<span class="cl-kicker text-info">Readiness and revision</span>
-							<h2 class="h4">
-								Take the diagnostic
-							</h2>
-							<p>
-								Answer the complete diagnostic. When you finish, the LMS will show your result, explanations and any course modules linked to answers that need revision.
-							</p>
-							<p>
-								<strong>Attempts used:</strong> {{ attempts_used }}
-								{% if attempts_limited %}
-									· <strong>remaining:</strong> {{ attempts_remaining }}
-								{% endif %}
-							</p>
-							{% if can_start_graded %}
-								<form action="{{ start_action }}" method="post">
-									<input type="hidden" name="csrf" value="{{ csrf }}">
-									{{ ui('action.button', {label: 'Start diagnostic', variant: 'secondary', size: 'large', type: 'submit'}) }}
-								</form>
-							{% else %}
-								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
+{% if assessment.assessment_type == 'diagnostic' %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Diagnostic assessment.', section_spacing: true})} %}{% block body %}This result provides readiness guidance and does not contribute to your course grade, final assessment eligibility or certificate result.{% endblock %}{% endembed %}
+<h2 class="h4">Take the diagnostic</h2><p>Answer the complete diagnostic. When you finish, the LMS will show your result, explanations and any Course Items linked to answers that need revision.</p>
+{% if can_start_graded %}<form action="{{ start_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="diagnostic">{{ ui('action.button', {label: 'Start diagnostic', variant: 'primary', size: 'large', type: 'submit'}) }}</form>{% else %}{{ ui('feedback.notice', {tone: 'warning', heading: 'No diagnostic attempts remain.'}) }}{% endif %}
+{% else %}
+<ul><li>One question appears at a time.</li><li>You may skip a question and return to it while time remains.</li><li>Unanswered questions receive zero when time expires.</li>{% if assessment.negative_marking %}<li>Incorrect answers may lose points; the final score cannot fall below zero.</li>{% endif %}<li>Answer and question order may be randomised for each attempt.</li></ul>
+{% if assessment.practice_enabled and not assessment.practice %}
+<div class="cl-course-assessment-action-cards">
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
 {% block body %}
-
-									No diagnostic attempts remain.
-
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info'})} %}{% block surface_body %}<h2 class="h4">Practice assessment</h2><p>Take {{ assessment.practice_question_count }} practice questions as often as needed. Practice does not affect your grade, and feedback appears after every answer.</p><form action="{{ start_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="practice">{{ ui('action.button', {label: 'Start practice assessment', variant: 'secondary', size: 'normal', type: 'submit'}) }}</form>{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info'})} %}{% block surface_body %}<h2 class="h4">Commit to the assessment</h2><p>Your result policy is <strong>{{ assessment.score_policy|ucfirst }}</strong>. {% if attempts_limited %}You may make {{ assessment.maximum_attempts }} graded attempt{{ assessment.maximum_attempts == 1 ? '' : 's' }}.{% else %}Graded attempts are unlimited.{% endif %}</p>{% if can_start_graded %}<form action="{{ start_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="graded">{{ ui('action.button', {label: 'Start graded assessment', variant: 'primary', size: 'large', type: 'submit'}) }}</form>{% else %}{{ ui('feedback.notice', {tone: 'warning', heading: 'No graded attempts remain.'}) }}{% endif %}{% endblock %}{% endembed %}
 {% endblock %}
 {% endembed %}
-							{% endif %}
-
-{% endblock %}
-{% endembed %}
-				{% else %}
-					{% if assessment.practice_enabled %}
-						{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, tone: 'info'})} %}
-{% block surface_body %}
-
-								<span class="cl-kicker text-info">Unlimited practice</span>
-								<h2 class="h4">
-									Practice assessment
-								</h2>
-								<p>
-									Take {{ assessment.practice_question_count }} practice questions as often as needed. Practice does not affect your grade, and feedback appears after every answer.
-								</p>
-								<form action="{{ start_action }}" method="post">
-									<input type="hidden" name="csrf" value="{{ csrf }}">
-									<input type="hidden" name="mode" value="practice">
-									{{ ui('action.button', {label: 'Start practice assessment', variant: 'secondary', size: 'normal', type: 'submit'}) }}
-								</form>
-
-{% endblock %}
-{% endembed %}
-					{% endif %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info'})} %}
-{% block surface_body %}
-
-							<span class="cl-kicker text-primary">Graded attempt</span>
-							<h2 class="h4">
-								Commit to the assessment
-							</h2>
-							<p>
-								Your result policy is <strong>{{ assessment.score_policy|ucfirst }}</strong>.
-								{% if attempts_limited %}
-									You may make {{ assessment.maximum_attempts }} graded attempt{{ assessment.maximum_attempts == 1 ? '' : 's' }}.
-								{% else %}
-									Graded attempts are unlimited.
-								{% endif %}
-							</p>
-							<p>
-								<strong>Attempts used:</strong> {{ attempts_used }}
-								{% if attempts_limited %}
-									· <strong>remaining:</strong> {{ attempts_remaining }}
-								{% endif %}
-							</p>
-							{% if can_start_graded %}
-								<form action="{{ start_action }}" method="post">
-									<input type="hidden" name="csrf" value="{{ csrf }}">
-									<input type="hidden" name="mode" value="graded">
-									{{ ui('action.button', {label: 'Start graded assessment', variant: 'primary', size: 'large', type: 'submit'}) }}
-								</form>
-							{% else %}
-								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
-{% block body %}
-
-									No graded attempts remain.
-
-{% endblock %}
-{% endembed %}
-							{% endif %}
-
-{% endblock %}
-{% endembed %}
-				{% endif %}
-			</div>
-			<aside class="col-lg-4">
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Scoring
-						</h2>
-						{% if assessment.assessment_type == 'diagnostic' %}
-							{{ ui('data.key-value-list', {items: [{label: 'Course grade', value: 'Not affected'}, {label: 'Module progress', value: 'Not affected'}, {label: 'Attempts', value: (assessment.maximum_attempts ? assessment.maximum_attempts : 'Unlimited')}, {label: 'Passing result', value: (assessment.diagnostic_pass_action == 'complete_course' ? 'Completes course enrolment' : 'Readiness guidance')}]}) }}
-						{% else %}
-							{{ ui('data.key-value-list', {items: [{label: 'Recorded result', value: (assessment.score_policy|ucfirst) ~ ' score'}, {label: 'Incorrect answers', value: (assessment.negative_marking ? 'Configured negative points' : 'Zero points')}, {label: 'Skipped', value: 'Zero points'}, {label: 'Minimum result', value: '0%'}]}) }}
-						{% endif %}
-
-{% endblock %}
-{% endembed %}
-			</aside>
-		</div>
-	</section>
+</div>
+{% else %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'info', section_spacing: true})} %}{% block surface_body %}<h2 class="h4">Commit to the assessment</h2><p>Your result policy is <strong>{{ assessment.score_policy|ucfirst }}</strong>. {% if attempts_limited %}You may make {{ assessment.maximum_attempts }} graded attempt{{ assessment.maximum_attempts == 1 ? '' : 's' }}.{% else %}{{ assessment.practice ? 'Practice attempts are unlimited and do not affect your course grade.' : 'Graded attempts are unlimited.' }}{% endif %}</p>{% if can_start_graded %}<form action="{{ start_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="mode" value="graded">{{ ui('action.button', {label: assessment.practice ? 'Start practice assessment' : 'Start graded assessment', variant: 'primary', size: 'large', type: 'submit'}) }}</form>{% else %}{{ ui('feedback.notice', {tone: 'warning', heading: 'No graded attempts remain.'}) }}{% endif %}{% endblock %}{% endembed %}
+{% endif %}
+{% endif %}
+<nav class="cl-course-item-paging" aria-label="Course Content">
+{% if assessment.previous_node %}{% set previous_is_assessment = assessment.previous_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: '← Previous', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ assessment.previous_node.id ~ (previous_is_assessment ? '/assessment/' ~ assessment.previous_node.item_key : '/content') ~ preview_query}) }}{% endif %}
+{% if assessment.next_node %}{% set next_is_assessment = assessment.next_node.item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Next →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ assessment.next_node.id ~ (next_is_assessment ? '/assessment/' ~ assessment.next_node.item_key : '/content') ~ preview_query}) }}{% endif %}
+</nav>
 {% endblock %}

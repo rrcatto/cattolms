@@ -68,17 +68,25 @@ TWIG;
         }
     }
 
+    public function testActionLinksRenderIconsOnlyWhenTheCallerRequestsOne(): void
+    {
+        $plain = RenderHarness::renderSource("{{ ui('action.link', {label: 'Next →', href: '/next'}) }}");
+        self::assertStringNotContainsString('<svg', $plain);
+        $icon = RenderHarness::renderSource("{{ ui('action.link', {label: 'Create', href: '/create', icon: 'action-add'}) }}");
+        self::assertStringContainsString('<svg', $icon);
+    }
+
     public function testQuestionPrototypesAndExistingQuestionsShareCanonicalControls(): void
     {
         $root = dirname(__DIR__, 2);
-        foreach (['partials/assessment-editor', 'pages/admin-diagnostic-assessment'] as $caller) {
+        foreach (['pages/admin-course-item-form'] as $caller) {
             self::assertStringContainsString("include '@platform/partials/question-editor.html.twig'", (string) file_get_contents($root . '/resources/views/' . $caller . '.html.twig'));
         }
         $javascript = (string) preg_replace('~/\*.*?\*/|//[^\n]*~s', '', (string) file_get_contents($root . '/public_html/js/question-editor.js'));
         self::assertDoesNotMatchRegularExpression('/insertAdjacentHTML|innerHTML\s*=|createElement\s*\(/', $javascript);
 
         foreach ([false, true] as $diagnostic) {
-            $html = RenderHarness::render('partials/question-editor', ['diagnostic' => $diagnostic, 'modules' => [['module_key' => 'm1', 'position' => 1, 'title' => '<Module>']], 'editor_questions' => [['question_html' => '<Saved>', 'practice_eligible' => false, 'graded_eligible' => false, 'remediation_module_keys' => ['m1'], 'options' => [['option_html' => 'First', 'is_correct' => false], ['option_html' => 'Second', 'is_correct' => true]]]]]);
+            $html = RenderHarness::render('partials/question-editor', ['diagnostic' => $diagnostic, 'editor_questions' => [['question_html' => '<Saved>', 'practice_eligible' => false, 'graded_eligible' => false, 'remediation_item_keys' => ['m1'], 'options' => [['option_html' => 'First', 'is_correct' => false], ['option_html' => 'Second', 'is_correct' => true]]]]]);
             $dom = self::dom($html);
             self::assertSame(1.0, $dom->evaluate('count(//*[@id="question-editor"]/*[@data-question])'));
             self::assertSame(1.0, $dom->evaluate('count(//template[@id="question-editor-question-template"]//*[@data-question])'));
@@ -86,10 +94,18 @@ TWIG;
             self::assertSame(1.0, $dom->evaluate('count(//*[@id="question-editor"]//input[@type="radio" and @value="1" and @checked])'));
             self::assertSame('<Saved>', $dom->evaluate('string(//*[@id="question-0-question_html"])'));
             self::assertSame(0.0, $dom->evaluate('count(//*[@id="question-editor"]//input[@type="checkbox" and @checked])'));
-            self::assertSame($diagnostic ? 1.0 : 0.0, $dom->evaluate('count(//*[@id="question-editor"]//select[@multiple]/option[@value="m1" and @selected])'));
+            self::assertSame($diagnostic ? 1.0 : 0.0, $dom->evaluate('count(//*[@id="question-editor"]//input[@name="remediation_item_keys[0]" and @value="m1"])'));
             self::assertSame(0.0, $dom->evaluate('count(//*[@data-question]//button[not(contains(@class,"cl-ui-action"))])'));
             self::assertStringContainsString('question-__q__-option-__o__', $html);
         }
+    }
+
+    public function testUnsavedEditorButtonsCanSkipNativeValidationWithoutSaving(): void
+    {
+        $html = RenderHarness::renderSource("{{ ui('action.button', {label:'Add question', type:'submit', name:'question_action', value:'add-question', skip_validation:true}) }}");
+        self::assertSame(1.0, self::dom($html)->evaluate('count(//button[@formnovalidate and @name="question_action"])'));
+        $normal = RenderHarness::renderSource("{{ ui('action.button', {label:'Save', type:'submit'}) }}");
+        self::assertSame(0.0, self::dom($normal)->evaluate('count(//button[@formnovalidate])'));
     }
 
     public function testJavascriptOwnershipGuardDetectsGeneratedControlsWithoutBanningSelectors(): void

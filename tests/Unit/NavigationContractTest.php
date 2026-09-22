@@ -154,7 +154,7 @@ final class NavigationContractTest extends TestCase
             'Administration must be gathered into its five groups, in order.'
         );
         self::assertSame(
-            ['admin-courses', 'admin-course-categories', 'admin-course-tags', 'admin-requests', 'admin-enrolments'],
+            ['admin-courses', 'admin-course-items', 'admin-resources', 'admin-course-categories', 'admin-course-tags', 'admin-requests', 'admin-enrolments'],
             $groups['admin-group-catalogue'],
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );

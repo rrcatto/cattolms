@@ -39,33 +39,33 @@ final class AssessmentRepository
     }
 
     /** @return array<string,mixed>|null */
-    public function activeSession(int $enrolmentId, int $assessmentId, string $mode): ?array
+    public function activeSession(int $enrolmentId, int $assessmentId, int $structureNodeId, string $mode): ?array
     {
         $rows = $this->db->fetchAllAssociative(
-            "SELECT s.*, a.title AS assessment_title, a.assessment_type, a.module_id,
+            "SELECT s.*, ci.title AS assessment_title,ci.item_type AS assessment_type,
                     a.pass_mark, a.score_policy, a.negative_marking, a.maximum_attempts,
-                    a.time_limit_seconds, a.practice_enabled, a.assessment_key,
-                    a.result_pass_html, a.result_fail_html, a.diagnostic_pass_action
+                    a.time_limit_seconds, a.practice_enabled,ci.item_key AS assessment_key,
+                    a.result_pass_html,a.result_fail_html
              FROM assessment_sessions s
-             JOIN course_assessments a ON a.id=s.assessment_id
-             WHERE s.enrolment_id=:enrolment_id AND s.assessment_id=:assessment_id
+             JOIN course_items ci ON ci.id=s.course_item_id JOIN course_item_assessments a ON a.course_item_id=ci.id
+             WHERE s.enrolment_id=:enrolment_id AND s.course_item_id=:assessment_id AND s.structure_node_id=:node_id
                AND s.attempt_mode=:mode AND s.status='in_progress'
              ORDER BY s.id DESC LIMIT 1",
-            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'mode' => $mode]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'node_id' => $structureNodeId, 'mode' => $mode]
         );
         return isset($rows[0]) ? $this->normalise($rows[0]) : null;
     }
 
-    public function completedAttemptCount(int $enrolmentId, int $assessmentId, string $mode = 'graded'): int
+    public function completedAttemptCount(int $enrolmentId, int $assessmentId, int $structureNodeId, string $mode = 'graded'): int
     {
         if (!in_array($mode, ['graded', 'diagnostic'], true)) {
             throw new \InvalidArgumentException('Select a valid completed-attempt mode.');
         }
         $rows = $this->db->fetchAllAssociative(
             "SELECT COUNT(*)::int AS total FROM assessment_sessions
-             WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id
+             WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id AND structure_node_id=:node_id
                AND attempt_mode=:mode AND status IN ('submitted','timed_out')",
-            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'mode' => $mode]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'node_id' => $structureNodeId, 'mode' => $mode]
         );
         return (int) ($rows[0]['total'] ?? 0);
     }
@@ -82,8 +82,8 @@ final class AssessmentRepository
         array $questions
     ): array {
         $attemptRows = $this->db->fetchAllAssociative(
-            'SELECT COALESCE(MAX(attempt_number),0)+1 AS next_number FROM assessment_sessions WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id AND attempt_mode=:mode',
-            ['enrolment_id' => $enrolmentId, 'assessment_id' => (int) $assessment['id'], 'mode' => $mode]
+            'SELECT COALESCE(MAX(attempt_number),0)+1 AS next_number FROM assessment_sessions WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id AND structure_node_id=:node_id AND attempt_mode=:mode',
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => (int) $assessment['id'], 'node_id' => (int) $assessment['structure_node_id'], 'mode' => $mode]
         );
         $attemptNumber = (int) ($attemptRows[0]['next_number'] ?? 1);
         $started = time();
@@ -92,11 +92,11 @@ final class AssessmentRepository
         $sessionPublicId = Uuid::v4();
         $sessionRows = $this->db->fetchAllAssociative(
             'INSERT INTO assessment_sessions
-                (public_id, enrolment_id, assessment_id, attempt_mode, attempt_number,
+                (public_id, enrolment_id, course_item_id, structure_node_id, attempt_mode, attempt_number,
                  status, selected_question_count, current_sequence, earned_points, maximum_points,
                  started_at, deadline_at, created_at)
              VALUES
-                (:public_id, :enrolment_id, :assessment_id, :attempt_mode, :attempt_number,
+                (:public_id, :enrolment_id, :assessment_id, :structure_node_id, :attempt_mode, :attempt_number,
                  :status, :selected_question_count, :current_sequence, :earned_points, :maximum_points,
                  :started_at, :deadline_at, :created_at)
              RETURNING id',
@@ -104,6 +104,7 @@ final class AssessmentRepository
                 'public_id' => $sessionPublicId,
                 'enrolment_id' => $enrolmentId,
                 'assessment_id' => (int) $assessment['id'],
+                'structure_node_id' => (int) $assessment['structure_node_id'],
                 'attempt_mode' => $mode,
                 'attempt_number' => $attemptNumber,
                 'status' => 'in_progress',
@@ -146,17 +147,16 @@ final class AssessmentRepository
     public function sessionByPublicId(string $publicId): ?array
     {
         $rows = $this->db->fetchAllAssociative(
-            "SELECT s.*, a.title AS assessment_title, a.assessment_type, a.module_id,
+            "SELECT s.*,ci.title AS assessment_title,ci.item_type AS assessment_type,
                     a.pass_mark, a.score_policy, a.negative_marking, a.maximum_attempts,
-                    a.time_limit_seconds, a.practice_enabled, a.course_id, a.assessment_key,
-                    a.result_pass_html, a.result_fail_html, a.diagnostic_pass_action,
-                    ce.user_id, ce.is_preview, c.slug, c.title AS course_title,
-                    cm.position AS module_position
+                    a.time_limit_seconds,a.practice_enabled,ce.course_id,ci.item_key AS assessment_key,
+                    a.result_pass_html,a.result_fail_html,p.assessment_role,
+                    ce.user_id, ce.is_preview, c.slug, c.title AS course_title
              FROM assessment_sessions s
-             JOIN course_assessments a ON a.id=s.assessment_id
+             JOIN course_items ci ON ci.id=s.course_item_id JOIN course_item_assessments a ON a.course_item_id=ci.id
              JOIN course_enrolments ce ON ce.id=s.enrolment_id
              JOIN courses c ON c.id=ce.course_id
-             LEFT JOIN course_modules cm ON cm.id=a.module_id
+             LEFT JOIN course_item_placements p ON p.node_id=s.structure_node_id
              WHERE s.public_id=:public_id LIMIT 1",
             ['public_id' => $publicId]
         );
@@ -385,6 +385,33 @@ final class AssessmentRepository
         );
     }
 
+    /**
+     * @param array<string,mixed> $session
+     * @param array<string,mixed> $result
+     * @param list<array<string,mixed>> $responses
+     */
+    public function saveAttempt(array $session, array $result, array $responses): int
+    {
+        $row = $this->db->fetchAssociative(
+            'INSERT INTO assessment_attempts (public_id,enrolment_id,course_item_id,structure_node_id,attempt_number,earned_points,maximum_points,percentage,grade_code,passed,submitted_at) VALUES (:public_id,:enrolment,:item,:node,:attempt,:earned,:maximum,:percentage,:grade,:passed,NOW()) RETURNING id',
+            ['public_id' => Uuid::v4(), 'enrolment' => (int) $session['enrolment_id'], 'item' => (int) $session['course_item_id'], 'node' => (int) $session['structure_node_id'], 'attempt' => (int) $session['attempt_number'], 'earned' => $result['earned_points'], 'maximum' => $result['maximum_points'], 'percentage' => $result['percentage'], 'grade' => $result['grade_code'], 'passed' => $result['passed']]
+        );
+        $attemptId = (int) ($row['id'] ?? 0);
+        foreach ($responses as $response) {
+            $this->db->executeStatement('INSERT INTO assessment_responses (attempt_id,question_id,selected_option_id,is_correct,points_awarded) VALUES (:attempt,:question,:option,:correct,:points)', ['attempt' => $attemptId, 'question' => $response['question_id'], 'option' => $response['selected_option_id'], 'correct' => $response['is_correct'], 'points' => $response['points_awarded']]);
+        }
+        return $attemptId;
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function gradedPlacementScores(int $enrolmentId, int $courseId): array
+    {
+        return $this->db->fetchAllAssociative(
+            "SELECT p.node_id,p.assessment_role,a.score_policy,aa.percentage,aa.submitted_at,aa.id FROM course_item_placements p JOIN course_items ci ON ci.id=p.course_item_id JOIN course_item_assessments a ON a.course_item_id=ci.id JOIN assessment_attempts aa ON aa.course_item_id=ci.id AND aa.structure_node_id=p.node_id AND aa.enrolment_id=:enrolment WHERE p.course_id=:course AND p.assessment_role IN ('graded','final') AND a.practice=FALSE ORDER BY p.node_id,aa.submitted_at,aa.id",
+            ['enrolment' => $enrolmentId, 'course' => $courseId]
+        );
+    }
+
 
     /** @return array<string,int> */
     public function sessionCounts(int $sessionId): array
@@ -418,7 +445,7 @@ final class AssessmentRepository
     public function sessionResponses(int $sessionId): array
     {
         return array_map(fn(array $r): array => $this->normalise($r), $this->db->fetchAllAssociative(
-            "SELECT sq.*, q.question_html, q.explanation_html, q.points, q.remediation_module_keys,
+            "SELECT sq.*,q.question_html,q.explanation_html,q.points,q.remediation_item_keys,
                     selected.option_html AS selected_option_html,
                     correct.option_html AS correct_option_html
              FROM assessment_session_questions sq
@@ -431,14 +458,14 @@ final class AssessmentRepository
     }
 
     /** @return list<float> */
-    public function completedPercentages(int $enrolmentId, int $assessmentId): array
+    public function completedPercentages(int $enrolmentId, int $assessmentId, int $nodeId): array
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT percentage FROM assessment_sessions
-             WHERE enrolment_id=:enrolment_id AND assessment_id=:assessment_id
+             WHERE enrolment_id=:enrolment_id AND course_item_id=:assessment_id AND structure_node_id=:node
                AND attempt_mode='graded' AND status IN ('submitted','timed_out')
              ORDER BY completed_at, id",
-            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId]
+            ['enrolment_id' => $enrolmentId, 'assessment_id' => $assessmentId, 'node' => $nodeId]
         );
         return array_map(static fn(array $r): float => (float) $r['percentage'], $rows);
     }
@@ -454,13 +481,18 @@ final class AssessmentRepository
                 $row[$key] = $this->boolean($row[$key]);
             }
         }
-        if (array_key_exists('remediation_module_keys', $row)) {
-            $value = $row['remediation_module_keys'];
+        if (array_key_exists('remediation_item_keys', $row)) {
+            $value = $row['remediation_item_keys'];
             if (is_string($value)) {
                 $decoded = json_decode($value, true);
                 $value = is_array($decoded) ? $decoded : [];
             }
-            $row['remediation_module_keys'] = is_array($value) ? array_values(array_map('strval', $value)) : [];
+            $row['remediation_item_keys'] = is_array($value) ? array_values(array_map('strval', $value)) : [];
+        }
+        if (array_key_exists('remediation_item_keys', $row)) {
+            $value = $row['remediation_item_keys'];
+            if (is_string($value)) { $decoded = json_decode($value, true); $value = is_array($decoded) ? $decoded : []; }
+            $row['remediation_item_keys'] = is_array($value) ? array_values(array_map('strval', $value)) : [];
         }
         return $row;
     }

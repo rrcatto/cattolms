@@ -52,14 +52,14 @@ final class AuthorizationMatrixTest extends TestCase
             [AdminController::class, ['removeEnrolment','restoreEnrolment'], 'PLATFORM.ENROLMENT.MANAGE'],
             [AdminController::class, ['addCredit'], 'PLATFORM.CREDIT.MANAGE'],
             [AdminCourseCategoryController::class, ['index','create','inlineCreate','edit','update','move','delete'], 'COURSE.CATEGORY.MANAGE'],
-            [AdminCourseController::class, ['createForm','create','cloneRevision'], 'COURSE.CREATE'],
-            [AdminCourseController::class, ['edit','update','createModuleForm','createModule','editModule','updateModule'], 'COURSE.EDIT'],
-            [AdminCourseController::class, ['preview','resetPreview','previewModule'], 'COURSE.PREVIEW'],
+            [AdminCourseController::class, ['createForm','create'], 'COURSE.CREATE'],
+            [AdminCourseController::class, ['edit','update'], 'COURSE.EDIT'],
+            [AdminCourseController::class, ['preview','resetPreview'], 'COURSE.PREVIEW'],
             [AdminCourseController::class, ['importForm','stageImport','previewImport','commitImport'], 'COURSE.IMPORT'],
             [AdminCourseController::class, ['export'], 'COURSE.EXPORT'],
-            [AdminCourseController::class, ['uploadMedia'], 'COURSE.MEDIA.MANAGE'],
+            [\CattoLearning\Http\Controller\AdminCourseComponentController::class, ['create','edit','update','saveAs','delete','content','addSection','addPlacement','updatePlacement','move','remove','resourceLibrary','uploadResource','registerResource','deleteResource','updateSection','moveSelection'], 'COURSE.EDIT'],
             [AdminCourseController::class, ['certificate','updateCertificate'], 'COURSE.CERTIFICATE.MANAGE'],
-            [AdminCourseController::class, ['updateAssessment','createDiagnosticForm','createDiagnostic','editDiagnostic','updateDiagnostic','deleteDiagnostic','moveDiagnostic','editFinalAssessment','updateFinalAssessment','updateGradeBands'], 'COURSE.ASSESSMENT.MANAGE'],
+            [AdminCourseController::class, ['updateGradeBands'], 'COURSE.ASSESSMENT.MANAGE'],
             [AdminCourseController::class, ['status'], 'COURSE.PUBLISH'],
             [AdminCourseController::class, ['submitForApproval'], 'COURSE.PUBLICATION.REQUEST'],
             [AdminCourseController::class, ['resetCourse','deleteCourse'], 'COURSE.DELETE'],
@@ -156,7 +156,7 @@ final class AuthorizationMatrixTest extends TestCase
     public function testLearnerAndAssessmentOperationsUseBusinessPermissions(): void
     {
         self::assertStringContainsString("requirePermission('LEARNING.COURSE.START')", $this->methodSource(LearningController::class, 'start'));
-        foreach (['startDiagnostic','startModule','startFinal','respond','finish'] as $method) {
+        foreach (['start','respond','finish'] as $method) {
             self::assertStringContainsString("requirePermission('LEARNING.ASSESSMENT.TAKE')", $this->methodSource(AssessmentController::class, $method));
         }
         self::assertStringContainsString("requirePermission('COURSE.EDIT')", $this->methodSource(BaseController::class, 'requireCourseAuthor'));

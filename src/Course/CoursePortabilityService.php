@@ -48,6 +48,8 @@ final class CoursePortabilityService
         private readonly LegacyHtmlCourseImporter $htmlImporter,
         private readonly StructuredCourseImporter $jsonImporter,
         private readonly CourseHtml $courseHtml,
+        private readonly CourseItemService $courseItems,
+        private readonly CourseItemRepository $courseItemRecords,
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
         private readonly OptionRepository $options,
@@ -153,6 +155,23 @@ final class CoursePortabilityService
         // the course.
         $this->refuseSeedImporter($userId);
         $analysis = $this->reanalyseImport($key);
+        if ($replaceCourseId !== null) {
+            $replaceableKeys = [];
+            foreach ((array) ($analysis['course_items'] ?? []) as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $itemKey = (string) ($item['item_key'] ?? '');
+                if ($itemKey !== '' && $this->portability->itemKeyIsExclusiveToCourse($itemKey, $replaceCourseId)) {
+                    $replaceableKeys[] = $itemKey;
+                }
+            }
+            $analysis['key_conflicts'] = array_values(array_filter(
+                (array) ($analysis['key_conflicts'] ?? []),
+                static fn(mixed $conflict): bool => !in_array((string) preg_replace('/^Course Item key already exists: (.+)\\. Resolve the collision before importing\\.$/', '$1', (string) $conflict), $replaceableKeys, true)
+            ));
+        }
+        if ((array) ($analysis['key_conflicts'] ?? []) !== []) { throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts'])); }
         $courseId = $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId);
         [$path] = $this->staged($key);
         @unlink($path);
@@ -164,56 +183,36 @@ final class CoursePortabilityService
     public function exportCourse(int $courseId): array
     {
         $course = $this->requireRealCourse($courseId);
-        $modules = [];
-        foreach ($this->courses->modules($courseId) as $module) {
-            $assessment = $this->courses->assessmentForModule((int) $module['id']);
-            if ($assessment !== null) {
-                $assessment['questions'] = $this->courses->questions((int) $assessment['id'], true);
-                $assessment = $this->exportAssessment($assessment);
+        $rows = $this->courseItemRecords->structure($courseId); $byNode = []; foreach ($rows as $row) { $byNode[(int) $row['id']] = (string) $row['public_id']; }
+        $courseItems = []; $resources = []; $structure = [];
+        foreach ($rows as $row) {
+            $node = ['node_key' => (string) $row['public_id'], 'parent_node_key' => $row['parent_node_id'] === null ? null : ($byNode[(int) $row['parent_node_id']] ?? null), 'position' => (int) $row['position'], 'node_type' => (string) $row['node_type'], 'relative_delay_minutes' => (int) $row['relative_delay_minutes']];
+            if ($row['node_type'] === 'section') { $node += ['title' => (string) $row['section_title'], 'introduction_html' => (string) $row['section_introduction_html'], 'show_outline' => (bool) $row['show_outline']]; }
+            else {
+                $key = (string) $row['item_key']; $node += ['item_key' => $key, 'display_title_override' => $row['display_title_override'], 'display_description_override' => $row['display_description_override'], 'public_preview' => (bool) $row['public_preview'], 'assessment_role' => (string) $row['assessment_role']];
+                foreach ($this->courseItemRecords->reachableItems((int) $row['course_item_id']) as $reachable) {
+                    $key = (string) $reachable['item_key'];
+                    if (isset($courseItems[$key])) { continue; }
+                    $item = $this->courseItems->item((int) $reachable['id']);
+                    foreach ($item['questions'] as &$question) {
+                        unset($question['id'], $question['course_item_id']);
+                        foreach ($question['options'] as &$option) { unset($option['id'], $option['question_id']); }
+                        unset($option);
+                    }
+                    unset($question);
+                    foreach (['poster_resource_id','subtitle_resource_id'] as $field) {
+                        if (empty($item['type_config'][$field])) { continue; }
+                        $auxiliary = $this->courseItemRecords->resource((int) $item['type_config'][$field]);
+                        if ($auxiliary !== null) { $item['type_config'][str_replace('_id', '_public_id', $field)] = $auxiliary['public_id']; $resources[(string) $auxiliary['public_id']] = array_intersect_key($auxiliary, array_flip(['public_id','title','description','filename','original_filename','resource_type','mime_type','byte_size'])); }
+                        unset($item['type_config'][$field]);
+                    }
+ $courseItems[$key] = ['item_key' => $key, 'item_type' => $item['item_type'], 'title' => $item['title'], 'description_html' => $item['description_html'], 'content_source' => $item['content_source'], 'type_config' => $item['type_config'], 'resource_public_id' => $item['resource_public_id'] ?? null, 'instructions_html' => $item['instructions_html'] ?? '', 'result_pass_html' => $item['result_pass_html'] ?? '', 'result_fail_html' => $item['result_fail_html'] ?? '', 'pass_mark' => $item['pass_mark'] ?? null, 'practice' => $item['practice'] ?? false, 'practice_enabled' => $item['practice_enabled'] ?? false, 'practice_pool_mode' => $item['practice_pool_mode'] ?? null, 'practice_question_count' => $item['practice_question_count'] ?? null, 'graded_question_count' => $item['graded_question_count'] ?? null, 'maximum_attempts' => $item['maximum_attempts'] ?? null, 'time_limit_seconds' => $item['time_limit_seconds'] ?? null, 'score_policy' => $item['score_policy'] ?? null, 'randomise_questions' => $item['randomise_questions'] ?? false, 'randomise_options' => $item['randomise_options'] ?? false, 'negative_marking' => $item['negative_marking'] ?? false, 'questions' => $item['questions']]; if (!empty($item['resource_public_id'])) { $resources[(string) $item['resource_public_id']] = ['public_id' => $item['resource_public_id'], 'title' => $item['resource_title'], 'description' => $item['resource_description'], 'filename' => $item['resource_filename'], 'original_filename' => $item['original_filename'], 'resource_type' => $item['resource_type'], 'mime_type' => $item['mime_type'], 'byte_size' => (int) $item['byte_size']]; } }
             }
-            $blocks = $this->portability->contentBlocks((int) $module['id']);
-            if ($blocks === []) {
-                $blocks = [[
-                    'type' => 'html',
-                    'title' => null,
-                    'content_html' => (string) $module['content_html'],
-                    'settings' => [],
-                ]];
-                if (trim((string) $module['summary_html']) !== '') {
-                    $blocks[] = [
-                        'type' => 'accordion',
-                        'title' => 'Module summary',
-                        'content_html' => (string) $module['summary_html'],
-                        'settings' => ['initially_open' => false],
-                    ];
-                }
-            }
-            $modules[] = [
-                'module_key' => $module['module_key'],
-                'position' => (int) $module['position'],
-                'title' => $module['title'],
-                'subtitle' => $module['subtitle'],
-                'learning_outcomes_html' => $module['learning_outcomes_html'],
-                'summary_html' => $module['summary_html'],
-                'is_review' => (bool) $module['is_review'],
-                'assessment_required' => (bool) ($module['assessment_required'] ?? true),
-                'blocks' => $this->exportBlocks($blocks),
-                'assessment' => $assessment,
-            ];
-        }
-        $diagnostics = [];
-        foreach ($this->courses->diagnosticAssessments($courseId) as $diagnostic) {
-            $diagnostic['questions'] = $this->courses->questions((int) $diagnostic['id'], true);
-            $diagnostics[] = $this->exportAssessment($diagnostic);
-        }
-        $final = $this->courses->finalAssessment($courseId);
-        if ($final !== null) {
-            $final['questions'] = $this->courses->questions((int) $final['id'], true);
-            $final = $this->exportAssessment($final);
+            $structure[] = $node;
         }
         return [
             'format' => 'catto-learning-course',
-            'schema_version' => '1.0',
+            'schema_version' => '2.0',
             'exported_at' => date(DATE_ATOM),
             'course' => [
                 'public_id' => $course['public_id'],
@@ -225,8 +224,8 @@ final class CoursePortabilityService
                 'level' => $course['level'],
                 'estimated_minutes' => $course['estimated_minutes'],
                 'default_access_period_seconds' => (int) $course['default_access_period_seconds'],
-                'module_weight' => (float) $course['module_weight'],
-                'final_weight' => (float) $course['final_weight'],
+                'introduction_html' => $course['introduction_html'],
+                'show_outline_on_intro' => (bool) $course['show_outline_on_intro'],
                 'certificate_enabled' => (bool) $course['certificate_enabled'],
                 'certificate_title' => $course['certificate_title'],
                 'certificate_body_text' => $course['certificate_body_text'] ?? 'has successfully completed',
@@ -237,11 +236,10 @@ final class CoursePortabilityService
                 'certificate_template_css' => $course['certificate_template_css'] ?? '',
                 'course_style_key' => $course['course_style_key'],
                 'presentation_css' => $course['presentation_css'] ?? '',
-                'revision_number' => (int) ($course['revision_number'] ?? 1),
             ],
-            'modules' => $modules,
-            'diagnostic_assessments' => $diagnostics,
-            'final_assessment' => $final,
+            'resources' => array_values($resources),
+            'course_items' => array_values($courseItems),
+            'structure' => $structure,
             'grade_bands' => $this->courses->gradeBands($courseId),
         ];
     }
@@ -283,9 +281,7 @@ final class CoursePortabilityService
     public function resetCourse(int $courseId, int $userId): void
     {
         $this->requireCourse($courseId);
-        $mediaKeys = $this->portability->mediaStorageKeys($courseId);
         $this->transactions->run(fn() => $this->portability->resetCourseContent($courseId));
-        $this->removeMediaFiles($mediaKeys);
         $this->courses->recordHistory($courseId, $userId, 'course.reset', 'course', $courseId, 'Course content and learner test data reset by Platform Administrator.');
         $this->audit->record($userId, 'course.reset', ['course_id' => $courseId]);
     }
@@ -293,42 +289,8 @@ final class CoursePortabilityService
     public function deleteCourse(int $courseId, int $userId): void
     {
         $course = $this->requireCourse($courseId);
-        $mediaKeys = $this->portability->mediaStorageKeys($courseId);
         $this->transactions->run(fn() => $this->portability->deleteCourse($courseId));
-        $this->removeMediaFiles($mediaKeys);
         $this->audit->record($userId, 'course.deleted', ['course_id' => $courseId, 'title' => $course['title']]);
-    }
-
-    public function cloneRevision(int $courseId, int $userId): int
-    {
-        // Cloning is export followed by import, so it is a portability path and D5 applies to it
-        // in both directions: a SEED source would otherwise be re-imported as a REAL revision,
-        // which is precisely the provenance strip the decision forbids.
-        $source = $this->requireRealCourse($courseId);
-        $export = $this->exportCourse($courseId);
-        $nextRevision = (int) ($source['revision_number'] ?? 1) + 1;
-        $rootId = (int) ($source['parent_course_id'] ?? 0) ?: $courseId;
-        $export['course']['title'] = (string) $source['title'] . ' — Revision ' . $nextRevision;
-        $baseSlug = preg_replace('/-revision-\d+$/', '', (string) $source['slug']) ?: (string) $source['slug'];
-        $export['course']['slug'] = $baseSlug . '-revision-' . $nextRevision;
-        $export['course']['revision_number'] = $nextRevision;
-        $export['course']['source_filename'] = 'Cloned from course #' . $courseId;
-        $newId = $this->importAnalysis($export, (int) ($source['category_id'] ?? 0), $userId, null);
-        $this->portability->setRevisionMetadata(
-            $newId,
-            $rootId,
-            $nextRevision,
-            'pending'
-        );
-        $this->courses->setCourseOwnership(
-            $newId,
-            (int) ($source['owner_company_id'] ?? $this->defaultOwnerCompanyId($userId)),
-            (int) ($source['owner_user_id'] ?? $userId),
-            $userId
-        );
-        $this->courses->recordHistory($newId, $userId, 'course.revision_created', 'course', $newId, 'Revision cloned from course #' . $courseId . '.');
-        $this->audit->record($userId, 'course.revision_created', ['source_course_id' => $courseId, 'course_id' => $newId]);
-        return $newId;
     }
 
     /**
@@ -410,13 +372,12 @@ final class CoursePortabilityService
             // the target must be REAL too.
             $existing = $this->requireRealCourse($replaceCourseId);
             if ($this->portability->hasStartedLearners($replaceCourseId)) {
-                throw new InvalidArgumentException('A started course cannot be reset or replaced. Create a new revision.');
+                throw new InvalidArgumentException('A started course cannot be reset or replaced. Import as a separate course.');
             }
             if ($data['slug'] !== $existing['slug'] && $this->courses->findBySlug((string) $data['slug']) !== null) {
                 throw new InvalidArgumentException('A course with the imported slug already exists.');
             }
         }
-        $replaceMediaKeys = $replaceCourseId !== null ? $this->portability->mediaStorageKeys($replaceCourseId) : [];
         $courseId = $this->transactions->run(function () use ($analysis, $data, $userId, $replaceCourseId): int {
             if ($replaceCourseId !== null) {
                 $this->portability->resetCourseContent($replaceCourseId);
@@ -425,48 +386,26 @@ final class CoursePortabilityService
             } else {
                 $courseId = $this->courses->createCourse($data, $userId);
             }
-            foreach ((array) ($analysis['diagnostic_assessments'] ?? []) as $diagnostic) {
-                if (!is_array($diagnostic)) {
-                    continue;
-                }
-                $assessmentId = $this->courses->createAssessment($courseId, null, $diagnostic);
-                $this->courses->replaceAssessmentQuestions($assessmentId, (array) ($diagnostic['questions'] ?? []));
+            $created = [];
+            foreach ((array) ($analysis['course_items'] ?? []) as $itemData) {
+                if (!is_array($itemData)) { continue; }
+                $created[(string) $itemData['item_key']] = $this->courseItems->create($itemData, $userId);
             }
-            foreach ((array) ($analysis['modules'] ?? []) as $moduleData) {
-                if (!is_array($moduleData)) {
-                    continue;
-                }
-                $module = $this->moduleData($moduleData);
-                $moduleId = $this->courses->createModule($courseId, $module);
-                $this->portability->replaceContentBlocks($moduleId, (array) ($moduleData['content_blocks'] ?? $moduleData['blocks'] ?? []));
-                $assessment = $moduleData['assessment'] ?? null;
-                if (is_array($assessment)) {
-                    $assessment['required'] = (bool) $module['assessment_required'];
-                    $assessmentId = $this->courses->createAssessment($courseId, $moduleId, $assessment);
-                    $this->courses->replaceAssessmentQuestions($assessmentId, (array) ($assessment['questions'] ?? []));
-                }
-            }
-            $final = $analysis['final_assessment'] ?? null;
-            if (is_array($final)) {
-                $assessmentId = $this->courses->createAssessment($courseId, null, $final);
-                $this->courses->replaceAssessmentQuestions($assessmentId, (array) ($final['questions'] ?? []));
+            $createdNodes = [];
+            foreach ((array) ($analysis['structure'] ?? []) as $placement) {
+                if (!is_array($placement)) { continue; }
+                $placement['parent_node_id'] = empty($placement['parent_node_key']) ? null : ($createdNodes[(string) $placement['parent_node_key']] ?? throw new InvalidArgumentException('The import structure parent must appear before its children.'));
+                if (($placement['node_type'] ?? 'item') === 'section') { $nodeId = $this->courseItems->addSection($courseId, $placement, $userId); }
+                else { if (!isset($created[(string) ($placement['item_key'] ?? '')])) { throw new InvalidArgumentException('The import structure references an undefined Course Item key.'); } $nodeId = $this->courseItems->addExisting($courseId, $created[(string) $placement['item_key']], $placement, $userId); }
+                if (!empty($placement['node_key'])) { $createdNodes[(string) $placement['node_key']] = $nodeId; }
             }
             $bands = (array) ($analysis['grade_bands'] ?? []);
             if ($bands !== []) {
                 $this->courses->replaceGradeBands($courseId, $bands);
             }
-            $this->portability->setRevisionMetadata(
-                $courseId,
-                isset($data['parent_course_id']) ? (int) $data['parent_course_id'] : null,
-                (int) $data['revision_number'],
-                (string) $data['publication_approval_status']
-            );
             $this->courses->recordHistory($courseId, $userId, 'course.imported', 'course', $courseId, 'Course imported from ' . (string) $data['source_filename'] . '.', (array) ($analysis['statistics'] ?? []));
             return $courseId;
         });
-        if ($replaceMediaKeys !== []) {
-            $this->removeMediaFiles($replaceMediaKeys);
-        }
         $this->audit->record($userId, 'course.imported', ['course_id' => $courseId, 'statistics' => $analysis['statistics'] ?? []]);
         return $courseId;
     }
@@ -481,11 +420,6 @@ final class CoursePortabilityService
         if ($title === '') {
             throw new InvalidArgumentException('The imported course has no title.');
         }
-        $moduleWeight = (float) ($input['module_weight'] ?? 0.5);
-        $finalWeight = (float) ($input['final_weight'] ?? 0.5);
-        if (abs($moduleWeight + $finalWeight - 1) > 0.0001) {
-            throw new InvalidArgumentException('Imported module and final weights must total 1.0.');
-        }
         return [
             'category_id' => $categoryId > 0 ? $categoryId : null,
             'slug' => Slug::validate((string) ($input['slug'] ?? Slug::from($title))),
@@ -497,8 +431,8 @@ final class CoursePortabilityService
             'estimated_minutes' => max(0, (int) ($input['estimated_minutes'] ?? 0)),
             'status' => 'draft',
             'default_access_period_seconds' => max(1, (int) ($input['default_access_period_seconds'] ?? 31536000)),
-            'module_weight' => $moduleWeight,
-            'final_weight' => $finalWeight,
+            'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $input['description_html'] ?? '')),
+            'show_outline_on_intro' => (bool) ($input['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) ($input['certificate_enabled'] ?? true),
             'certificate_title' => trim((string) ($input['certificate_title'] ?? 'Certificate of Completion')),
             'certificate_template' => 'custom',
@@ -513,8 +447,6 @@ final class CoursePortabilityService
             'source_filename' => basename((string) ($input['source_filename'] ?? 'structured-course.json')),
             'owner_company_id' => $this->defaultOwnerCompanyId($userId),
             'owner_user_id' => $userId,
-            'parent_course_id' => $input['parent_course_id'] ?? null,
-            'revision_number' => max(1, (int) ($input['revision_number'] ?? 1)),
             'publication_approval_status' => 'pending',
             'interchange_schema_version' => '1.0',
         ];
@@ -536,111 +468,6 @@ final class CoursePortabilityService
     }
 
     /**
-     * @param array<string,mixed> $input
-     * @return array<string,mixed>
-     */
-    private function moduleData(array $input): array
-    {
-        $position = max(1, (int) ($input['position'] ?? 1));
-        $blocks = (array) ($input['content_blocks'] ?? $input['blocks'] ?? []);
-        $content = (string) ($input['content_html'] ?? '');
-        if ($content === '' && $blocks !== []) {
-            foreach ($blocks as $block) {
-                if (is_array($block)) {
-                    $content .= (string) ($block['content_html'] ?? '');
-                }
-            }
-        }
-        $isReview = (bool) ($input['is_review'] ?? false);
-        return [
-            'module_key' => trim((string) ($input['module_key'] ?? 'm' . $position)) ?: 'm' . $position,
-            'position' => $position,
-            'title' => trim((string) ($input['title'] ?? 'Module ' . $position)),
-            'subtitle' => trim((string) ($input['subtitle'] ?? '')),
-            'learning_outcomes_html' => $this->courseHtml->learningOutcomes((string) ($input['learning_outcomes_html'] ?? '')),
-            'content_html' => $this->courseHtml->preserve($content),
-            'summary_html' => $this->courseHtml->preserve((string) ($input['summary_html'] ?? '')),
-            'content_blocks' => $blocks,
-            'is_review' => $isReview,
-            'assessment_required' => array_key_exists('assessment_required', $input)
-                ? (bool) $input['assessment_required']
-                : !$isReview,
-        ];
-    }
-
-    /**
-     * @param array<string,mixed> $assessment
-     * @return array<string,mixed>
-     */
-    private function exportAssessment(array $assessment): array
-    {
-        $questions = [];
-        foreach ((array) ($assessment['questions'] ?? []) as $question) {
-            $questions[] = [
-                'question_html' => $question['question_html'],
-                'points' => (int) $question['points'],
-                'explanation_html' => $question['explanation_html'],
-                'difficulty' => $question['difficulty'] ?? 'standard',
-                'practice_eligible' => (bool) ($question['practice_eligible'] ?? true),
-                'graded_eligible' => (bool) ($question['graded_eligible'] ?? true),
-                'remediation_module_keys' => array_values((array) ($question['remediation_module_keys'] ?? [])),
-                'incorrect_points' => (float) ($question['incorrect_points'] ?? 0),
-                'options' => array_map(static fn(array $o): array => [
-                    'option_html' => $o['option_html'],
-                    'is_correct' => (bool) ($o['is_correct'] ?? false),
-                ], (array) $question['options']),
-            ];
-        }
-        $difficulty = $assessment['difficulty_selection'] ?? [];
-        if (is_string($difficulty)) {
-            $decoded = json_decode($difficulty, true);
-            $difficulty = is_array($decoded) ? $decoded : [];
-        }
-        return [
-            'assessment_type' => $assessment['assessment_type'] ?? null,
-            'assessment_key' => $assessment['assessment_key'] ?? null,
-            'position' => (int) ($assessment['position'] ?? 1),
-            'title' => $assessment['title'],
-            'instructions_html' => $assessment['instructions_html'],
-            'pass_mark' => (float) $assessment['pass_mark'],
-            'required' => (bool) $assessment['required'],
-            'result_pass_html' => (string) ($assessment['result_pass_html'] ?? ''),
-            'result_fail_html' => (string) ($assessment['result_fail_html'] ?? ''),
-            'diagnostic_pass_action' => (string) ($assessment['diagnostic_pass_action'] ?? 'guidance_only'),
-            'is_visible' => (bool) ($assessment['is_visible'] ?? true),
-            'practice_enabled' => (bool) ($assessment['practice_enabled'] ?? true),
-            'practice_pool_mode' => $assessment['practice_pool_mode'] ?? 'both',
-            'practice_question_count' => (int) ($assessment['practice_question_count'] ?? 5),
-            'graded_question_count' => $assessment['graded_question_count'] !== null ? (int) $assessment['graded_question_count'] : null,
-            'maximum_attempts' => $assessment['maximum_attempts'] !== null ? (int) $assessment['maximum_attempts'] : null,
-            'time_limit_seconds' => (int) ($assessment['time_limit_seconds'] ?? 1800),
-            'score_policy' => $assessment['score_policy'] ?? 'highest',
-            'randomise_questions' => (bool) ($assessment['randomise_questions'] ?? true),
-            'randomise_options' => (bool) ($assessment['randomise_options'] ?? true),
-            'negative_marking' => (bool) ($assessment['negative_marking'] ?? false),
-            'difficulty_selection' => $difficulty,
-            'questions' => $questions,
-        ];
-    }
-
-    /**
-     * @param list<array<string,mixed>> $blocks
-     * @return list<array<string,mixed>>
-     */
-    private function exportBlocks(array $blocks): array
-    {
-        return array_map(function (array $block): array {
-            return [
-                'type' => $block['block_type'] ?? $block['type'] ?? 'html',
-                'title' => $block['title'] ?? null,
-                'content_html' => $block['content_html'] ?? '',
-                'settings' => is_array($block['settings'] ?? null) ? $block['settings'] : [],
-                'blocks' => $this->exportBlocks((array) ($block['blocks'] ?? [])),
-            ];
-        }, $blocks);
-    }
-
-    /**
      * @param array<string,mixed> $course
      * @param array<string,string> $values
      */
@@ -655,25 +482,6 @@ final class CoursePortabilityService
         }
         $css = (string) ($course['certificate_template_css'] ?? '');
         return '<style>' . $css . '</style>' . $html;
-    }
-
-    /** @param list<string> $storageKeys */
-    private function removeMediaFiles(array $storageKeys): void
-    {
-        $root = realpath($this->storageRoot . '/course-media');
-        if ($root === false) {
-            return;
-        }
-        foreach ($storageKeys as $storageKey) {
-            $candidate = $this->storageRoot . '/course-media/' . ltrim($storageKey, '/');
-            $directory = realpath(dirname($candidate));
-            if ($directory === false || !str_starts_with($directory . '/', $root . '/')) {
-                continue;
-            }
-            if (is_file($candidate)) {
-                @unlink($candidate);
-            }
-        }
     }
 
     /** @return array<string,mixed> */
@@ -745,9 +553,109 @@ final class CoursePortabilityService
     /** @return array<string,mixed> */
     private function analysePath(string $path, string $name, string $extension): array
     {
-        return $extension === 'json'
+        $analysis = $extension === 'json'
             ? $this->jsonImporter->analyseFile($path, $name)
             : $this->htmlImporter->analyseFile($path, $name);
+        return $this->courseComponentAnalysis($analysis);
+    }
+
+    /**
+     * @param array<string,mixed> $analysis
+     * @return array<string,mixed>
+     */
+    private function courseComponentAnalysis(array $analysis): array
+    {
+        if (isset($analysis['course_items'], $analysis['structure'])) {
+            $seen = []; $conflicts = []; $importItems = (array) $analysis['course_items'];
+            foreach ($importItems as &$item) {
+                if (!is_array($item)) { continue; } $itemKey = (string) ($item['item_key'] ?? '');
+                if ($itemKey === '' || isset($seen[$itemKey])) { $conflicts[] = 'The import contains a duplicate or empty Course Item key: ' . ($itemKey ?: '(empty)') . '.'; }
+                elseif ($this->courseItemRecords->itemByKey($itemKey) !== null) { $conflicts[] = 'Course Item key already exists: ' . $itemKey . '. Resolve the collision before importing.'; }
+                if (preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}$/', $itemKey) !== 1) { $conflicts[] = 'Invalid Course Item key: ' . $itemKey . '.'; }
+                if (!in_array((string) ($item['item_type'] ?? ''), CourseItemService::TYPES, true)) { $conflicts[] = 'Unsupported Course Item type for ' . $itemKey . '.'; }
+                if (trim((string) ($item['title'] ?? '')) === '') { $conflicts[] = 'Course Item ' . $itemKey . ' needs a title.'; }
+                $resourcePublicId = trim((string) ($item['resource_public_id'] ?? ''));
+                if ($resourcePublicId !== '') { $resource = $this->courseItemRecords->resourceByPublicId($resourcePublicId); if ($resource === null) { $conflicts[] = 'Course Item ' . $itemKey . ' references a Resource that is not installed: ' . $resourcePublicId . '.'; } else { $item['resource_id'] = (int) $resource['id']; } }
+                if (in_array((string) ($item['item_type'] ?? ''), ['pdf','image_graphic','uploaded_video','markdown','document'], true) && empty($item['resource_id'])) { $conflicts[] = 'Course Item ' . $itemKey . ' needs an installed Resource.'; }
+                foreach (['poster_resource_id','subtitle_resource_id'] as $field) {
+                    $publicField = str_replace('_id', '_public_id', $field);
+                    if (!empty($item['type_config'][$publicField])) {
+                        $auxiliary = $this->courseItemRecords->resourceByPublicId((string) $item['type_config'][$publicField]);
+                        if ($auxiliary === null) { $conflicts[] = 'Course Item ' . $itemKey . ' references a missing ' . $publicField . '.'; }
+                        else { $item['type_config'][$field] = (int) $auxiliary['id']; }
+                    }
+                }
+                $seen[$itemKey] = true;
+            }
+            unset($item);
+            $nodeKeys = []; $siblingPositions = [];
+            foreach ((array) $analysis['structure'] as $index => $placement) {
+                if (!is_array($placement)) { continue; }
+                $nodeKey = (string) ($placement['node_key'] ?? ''); $parentKey = (string) ($placement['parent_node_key'] ?? '');
+                $nodeType = (string) ($placement['node_type'] ?? 'item');
+                if (!in_array($nodeType, ['section','item'], true)) { $conflicts[] = 'Invalid structure row type: ' . $nodeType . '.'; }
+                if ($parentKey !== '' && (!isset($nodeKeys[$parentKey]) || $nodeKeys[$parentKey]['type'] !== 'section')) { $conflicts[] = 'A structure parent must be an earlier section: ' . $parentKey . '.'; }
+                $depth = $parentKey === '' ? 1 : (int) ($nodeKeys[$parentKey]['depth'] ?? 0) + 1;
+                if ($nodeType === 'section' && $depth > 3) { $conflicts[] = 'The import exceeds three section levels.'; }
+                if ($nodeKey !== '' && isset($nodeKeys[$nodeKey])) { $conflicts[] = 'Duplicate structure node key: ' . $nodeKey . '.'; }
+                if ($nodeKey !== '') { $nodeKeys[$nodeKey] = ['type' => $nodeType, 'depth' => $depth]; }
+                if ((int) ($placement['relative_delay_minutes'] ?? 0) < 0) { $conflicts[] = 'Availability delays cannot be negative.'; }
+                if (isset($placement['position'])) {
+                    $positionKey = $parentKey . ':' . (int) $placement['position'];
+                    if ((int) $placement['position'] < 1 || isset($siblingPositions[$positionKey])) { $conflicts[] = 'Invalid or duplicate sibling position at structure row ' . ($index + 1) . '.'; }
+                    $siblingPositions[$positionKey] = true;
+                }
+            }
+            foreach ((array) $analysis['structure'] as $placement) { if (is_array($placement) && ($placement['node_type'] ?? 'item') === 'item' && !isset($seen[(string) ($placement['item_key'] ?? '')])) { $conflicts[] = 'The import structure references an undefined Course Item key: ' . (string) ($placement['item_key'] ?? '') . '.'; } }
+            foreach ($importItems as $item) { if (!is_array($item) || ($item['item_type'] ?? '') !== 'html_lesson') { continue; } foreach ($this->courseItems->shortcodes((string) ($item['content_source'] ?? '')) as $reference) { if (!isset($seen[$reference]) && $this->courseItemRecords->itemByKey($reference) === null) { $conflicts[] = 'Course Item ' . (string) ($item['item_key'] ?? '') . ' contains unresolved shortcode [course-item:' . $reference . '].'; } } }
+            $analysis['course_items'] = $importItems; $analysis['key_conflicts'] = array_values(array_unique($conflicts)); $analysis['warnings'] = array_values(array_unique(array_merge((array) ($analysis['warnings'] ?? []), $conflicts)));
+            return $analysis;
+        }
+        $slug = Slug::validate((string) ($analysis['course']['slug'] ?? Slug::from((string) ($analysis['course']['title'] ?? 'course'))));
+        $items = []; $structure = []; $keys = []; $moduleKeys = [];
+        $key = function (string $suffix) use ($slug, &$keys): string {
+            $clean = trim((string) preg_replace('/[^a-z0-9._-]+/', '-', strtolower($suffix)), '-');
+            $candidate = mb_substr($slug . '-' . ($clean !== '' ? $clean : 'item'), 0, 120);
+            if (isset($keys[$candidate])) { throw new InvalidArgumentException('The imported course produces a duplicate Course Item key: ' . $candidate . '. Rename the source component and review the import again.'); }
+            $keys[$candidate] = true; return $candidate;
+        };
+        foreach ((array) ($analysis['diagnostic_assessments'] ?? []) as $index => $assessment) {
+            if (!is_array($assessment)) { continue; }
+            $itemKey = $key((string) ($assessment['assessment_key'] ?? 'diagnostic-' . ($index + 1))); $items[] = $this->importAssessmentItem($assessment, $itemKey, 'diagnostic'); $structure[] = ['item_key' => $itemKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+        }
+        foreach ((array) ($analysis['modules'] ?? []) as $index => $module) {
+            if (!is_array($module)) { continue; }
+            $moduleKey = $key((string) ($module['module_key'] ?? 'content-' . ($index + 1))); $moduleKeys[(string) ($module['module_key'] ?? 'content-' . ($index + 1))] = $moduleKey; $summary = trim((string) ($module['summary_html'] ?? '')); $content = (string) ($module['content_html'] ?? '') . ($summary === '' ? '' : '<section><h2>Summary</h2>' . $summary . '</section>');
+            $items[] = ['item_key' => $moduleKey, 'item_type' => 'html_lesson', 'title' => (string) ($module['title'] ?? 'Course content'), 'description_html' => (string) ($module['subtitle'] ?? ''), 'content_source' => $content, 'type_config' => [], 'resource_id' => null]; $structure[] = ['item_key' => $moduleKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+            if (is_array($module['assessment'] ?? null)) { $assessmentKey = $key((string) ($module['module_key'] ?? 'assessment-' . ($index + 1)) . '-assessment'); $items[] = $this->importAssessmentItem((array) $module['assessment'], $assessmentKey, 'assessment'); $structure[] = ['item_key' => $assessmentKey, 'assessment_role' => !empty($module['assessment_required']) ? 'graded' : 'content', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
+        }
+        if (is_array($analysis['final_assessment'] ?? null)) { $finalKey = $key('final-assessment'); $items[] = $this->importAssessmentItem((array) $analysis['final_assessment'], $finalKey, 'assessment'); $structure[] = ['item_key' => $finalKey, 'assessment_role' => 'final', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
+        foreach ($items as &$item) {
+            if (!isset($item['questions'])) { continue; }
+            foreach ($item['questions'] as &$question) {
+                $references = (array) ($question['remediation_item_keys'] ?? []);
+                foreach ((array) ($question['remediation_module_keys'] ?? []) as $reference) {
+                    if (!isset($moduleKeys[(string) $reference])) { throw new InvalidArgumentException('The imported diagnostic references an unknown source module: ' . (string) $reference . '. Resolve it explicitly before importing.'); }
+                    $references[] = $moduleKeys[(string) $reference];
+                }
+                $question['remediation_item_keys'] = array_values(array_unique($references));
+                unset($question['remediation_module_keys']);
+            }
+            unset($question);
+        }
+        unset($item);
+        $conflicts = []; foreach ($items as $item) { if ($this->courseItemRecords->itemByKey((string) $item['item_key']) !== null) { $conflicts[] = 'Course Item key already exists: ' . $item['item_key'] . '. Resolve the collision before importing.'; } }
+        $analysis['course_items'] = $items; $analysis['structure'] = $structure; $analysis['key_conflicts'] = $conflicts; $analysis['warnings'] = array_values(array_unique(array_merge((array) ($analysis['warnings'] ?? []), $conflicts))); $analysis['statistics']['course_item_count'] = count($items);
+        return $this->courseComponentAnalysis($analysis);
+    }
+
+    /**
+     * @param array<string,mixed> $assessment
+     * @return array<string,mixed>
+     */
+    private function importAssessmentItem(array $assessment, string $key, string $type): array
+    {
+        return ['item_key' => $key, 'item_type' => $type, 'title' => (string) ($assessment['title'] ?? ucfirst($type)), 'description_html' => '', 'content_source' => '', 'type_config' => [], 'resource_id' => null, 'instructions_html' => (string) ($assessment['instructions_html'] ?? ''), 'result_pass_html' => (string) ($assessment['result_pass_html'] ?? ''), 'result_fail_html' => (string) ($assessment['result_fail_html'] ?? ''), 'pass_mark' => $assessment['pass_mark'] ?? 50, 'practice' => false, 'practice_enabled' => $assessment['practice_enabled'] ?? false, 'practice_pool_mode' => $assessment['practice_pool_mode'] ?? 'both', 'practice_question_count' => $assessment['practice_question_count'] ?? 5, 'graded_question_count' => $assessment['graded_question_count'] ?? max(1, count((array) ($assessment['questions'] ?? []))), 'maximum_attempts' => $assessment['maximum_attempts'] ?? null, 'time_limit_seconds' => $assessment['time_limit_seconds'] ?? 1800, 'score_policy' => $assessment['score_policy'] ?? 'highest', 'randomise_questions' => $assessment['randomise_questions'] ?? false, 'randomise_options' => $assessment['randomise_options'] ?? false, 'negative_marking' => $assessment['negative_marking'] ?? false, 'questions' => (array) ($assessment['questions'] ?? [])];
     }
 
     private function requireDirectory(string $directory): void

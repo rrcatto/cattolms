@@ -1,6 +1,6 @@
 # Light Default
 
-Theme version **2.0.1**, bundled with CattoLMS **v0.8.5**. Theme Package 4.0 / Twig Template API 2.0.
+Theme version **2.0.1**, bundled with CattoLMS **v0.8.6**. Theme Package 4.0 / Twig Template API 2.0.
 
 This standalone theme uses the shared site footer. Its fourteen page-family wrappers are `div.cl-page-family` containers around core page bodies, not an independent tab or navigation system. Its palettes are Carnival Cotton Candy, Coastal Blue, Forest & Sand and Plum & Rose.
 

@@ -1,0 +1,67 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = course_id ? '/admin/courses/' ~ course_id ~ '/content' : '/admin/course-items' %}{% set ph_back_label = course_id ? 'Course Content' : 'Course Item Library' %}{% set ph_kicker = item.id ? item.item_type|replace({'_':' '})|title : 'New reusable content' %}{% set ph_title = title %}{% set ph_lead = item.id ? 'Save updates every placement of this shared item. Save As creates an independent item and keeps the same Resource reference.' : 'New Course Items are normally created from Course Content.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% if item.usage %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Shared item usage', section_spacing: true})} %}{% block body %}<p>Used by {{ item.course_usage|default([])|length }} courses. Saving changes affects all of these courses.</p><p>Changing the key does not rewrite shortcodes. Review these usages before saving.</p><ul>{% for usage in item.usage %}<li>{{ usage.usage_type|title }}: {{ usage.course_title ?: usage.source_item_title ?: 'unplaced reference' }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}{% endif %}
+<form id="question-editor-form" action="{{ form_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="course_id" value="{{ course_id }}">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Course Item', summary: 'Keys are unique, human-readable and ADMIN-editable. Shortcodes use [course-item:key].'}) }}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Item key', for: 'item-key', required: true, help: 'Case-sensitive letters, numbers, dots, underscores and hyphens.'})} %}{% block control %}<input class="form-control" id="item-key" name="item_key" required value="{{ item.item_key }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Type', for: 'item-type', required: true})} %}{% block control %}<input type="hidden" name="item_type" value="{{ item.item_type }}"><input class="form-control" id="item-type" value="{{ item.item_type|replace({'_':' '})|title }}" readonly {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title', for: 'item-title', required: true, full_width: true})} %}{% block control %}<input class="form-control" id="item-title" name="title" required value="{{ item.title }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', for: 'item-description', full_width: true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="item-description" name="description_html" rows="4" {{ ui_field_attrs(props) }}>{{ item.description_html }}</textarea>{% endblock %}{% endembed %}
+{% if item.item_type == 'html_lesson' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'HTML source', for: 'item-source', full_width: true, help: 'HTML Course Items may embed another item with [course-item:key]. Source is stored unchanged and resolved when displayed.'})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="item-source" name="content_source" rows="14" {{ ui_field_attrs(props) }}>{{ item.content_source }}</textarea>{% endblock %}{% endembed %}
+{% endif %}
+{% if item.item_type in ['pdf','image_graphic','uploaded_video','audio','markdown','document'] %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Resource', for: 'item-resource', full_width: true, help: 'Required for PDF, image, uploaded video, Markdown and downloadable document items.'})} %}{% block control %}<select class="form-select" id="item-resource" name="resource_id" {{ ui_field_attrs(props) }}><option value="">No Resource</option>{% for resource in resources %}<option value="{{ resource.id }}" {{ item.resource_id == resource.id ? 'selected' : '' }}>{{ resource.title }} · {{ resource.filename }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endif %}
+{% if item.item_type == 'uploaded_video' %}
+{% for field in [{name:'poster_resource_id',label:'Video poster Resource'},{name:'subtitle_resource_id',label:'Video captions Resource (WebVTT)'}] %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:field.label,for:field.name})} %}{% block control %}<select class="form-select" id="{{ field.name }}" name="{{ field.name }}" {{ ui_field_attrs(props) }}><option value="">None</option>{% for resource in resources %}<option value="{{ resource.id }}" {{ attribute(item.type_config,field.name)|default('') == resource.id ? 'selected' : '' }}>{{ resource.title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% endfor %}
+{% endif %}
+{% if item.item_type == 'youtube' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'YouTube ID', for: 'youtube-id'})} %}{% block control %}<input class="form-control" id="youtube-id" name="youtube_id" value="{{ item.type_config.youtube_id|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% if item.item_type == 'audio' %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Remote audio URI', for: 'remote-uri'})} %}{% block control %}<input class="form-control" id="remote-uri" name="remote_uri" value="{{ item.type_config.remote_uri|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% if item.item_type in ['image_graphic','uploaded_video','youtube','audio'] %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Caption', for: 'item-caption'})} %}{% block control %}<input class="form-control" id="item-caption" name="caption" value="{{ item.type_config.caption|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% if item.item_type in ['image_graphic','uploaded_video','youtube','audio'] %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Transcript', for: 'item-transcript', full_width: true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="item-transcript" name="transcript" rows="5" {{ ui_field_attrs(props) }}>{{ item.type_config.transcript|default('') }}</textarea>{% endblock %}{% endembed %}
+{% endif %}
+{% endblock %}{% endembed %}
+{% if item.item_type in ['assessment','diagnostic'] %}
+{{ ui('layout.section-head', {heading: 'Assessment settings', heading_level: 3, summary: 'Assessment and diagnostic Course Items share the same reusable lifecycle.'}) }}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Pass mark (%)', for: 'pass-mark'})} %}{% block control %}<input class="form-control" type="number" min="0" max="100" step="0.01" id="pass-mark" name="pass_mark" value="{{ item.pass_mark }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Graded questions drawn', for: 'graded-count'})} %}{% block control %}<input class="form-control" type="number" min="1" id="graded-count" name="graded_question_count" value="{{ item.graded_question_count }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Maximum attempts', for: 'maximum-attempts'})} %}{% block control %}<input class="form-control" type="number" min="1" id="maximum-attempts" name="maximum_attempts" value="{{ item.maximum_attempts }}" placeholder="Unlimited" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time limit (seconds)', for: 'time-limit'})} %}{% block control %}<input class="form-control" type="number" min="60" id="time-limit" name="time_limit_seconds" value="{{ item.time_limit_seconds }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Score policy', for: 'score-policy'})} %}{% block control %}<select class="form-select" id="score-policy" name="score_policy" {{ ui_field_attrs(props) }}>{% for policy in ['highest','average','latest'] %}<option value="{{ policy }}" {{ item.score_policy == policy ? 'selected' : '' }}>{{ policy|title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+<div class="col-12">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Practice assessment'})} %}{% block control %}<input type="checkbox" name="practice" value="1" {{ item.practice ? 'checked' : '' }}>{% endblock %}{% endembed %}</div>
+{% endblock %}{% endembed %}
+{% for field in [{name:'instructions_html',label:'Instructions'},{name:'result_pass_html',label:'Pass result content'},{name:'result_fail_html',label:'Fail result content'}] %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:field.label,for:field.name,full_width:true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="{{ field.name }}" name="{{ field.name }}" {{ ui_field_attrs(props) }}>{{ attribute(item,field.name)|default('') }}</textarea>{% endblock %}{% endembed %}
+{% endfor %}
+{% for field in [{name:'practice_enabled',label:'Allow practice attempts'},{name:'randomise_questions',label:'Randomise questions'},{name:'randomise_options',label:'Randomise options'},{name:'negative_marking',label:'Use configured negative points'}] %}
+{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:field.label})} %}{% block control %}<input type="checkbox" name="{{ field.name }}" value="1" {{ attribute(item,field.name)|default(false) ? 'checked' : '' }}>{% endblock %}{% endembed %}
+{% endfor %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Practice or diagnostic questions drawn',for:'practice-count'})} %}{% block control %}<input class="form-control" type="number" min="1" id="practice-count" name="practice_question_count" value="{{ item.practice_question_count }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Practice question pool',for:'practice-pool'})} %}{% block control %}<select class="form-select" id="practice-pool" name="practice_pool_mode" {{ ui_field_attrs(props) }}>{% for pool in ['separate','graded','both'] %}<option value="{{ pool }}" {{ item.practice_pool_mode == pool ? 'selected' : '' }}>{{ pool|title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% include '@platform/partials/question-editor.html.twig' with {diagnostic: item.item_type == 'diagnostic'} %}{{ ui('action.button', {label: 'Add question', variant: 'secondary', type: 'submit', skip_validation: true, name: 'question_action', value: 'add-question', id: 'add-question', icon: 'action-add'}) }}
+{% endif %}
+{% if item.id %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'New key for Save As', for: 'copy-key', help: 'Enter a new unique key to create an independent copy of the values in this form.'})} %}{% block control %}<input id="copy-key" name="copy_key" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'New title for Save As', for: 'copy-title'})} %}{% block control %}<input id="copy-title" name="copy_title" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endif %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: item.id ? 'Save shared Course Item' : 'Save Course Item', variant: 'primary', type: 'submit'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: ph_back_href}) }}{% if item.id %}{{ ui('action.button', {label: 'Save As', type: 'submit', name: 'item_action', value: 'save_as'}) }}{% endif %}{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}</form>
+{% if item.id %}
+<form action="/admin/course-items/{{ item.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete unused Course Item', variant: 'danger', type: 'submit', confirm: 'Delete this Course Item?'}) }}</form>{% endif %}
+</section>
+{% endblock %}

@@ -187,19 +187,22 @@ final class LearningController extends BaseController
     }
 
 
-    #[Route('/learn/{slug}/module/{position}', name: 'learning_module', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'position' => '\\d+'], methods: ['GET'])]
-    public function module(): Response
+    #[Route('/learn/{slug}/item/{node_id}/content', name: 'learning_course_content', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+'], methods: ['GET'])]
+    public function item(): Response
     {
         $user = $this->requirePermission('LEARNING.COURSE.VIEW');
         $slug = (string) $this->param('slug');
-        $position = (int) $this->param('position');
+        $nodeId = (int) $this->param('node_id');
         $preview = $this->previewMode();
-        return $this->handle(function () use ($user, $slug, $position, $preview): Response {
-            $course = $this->learning->module($user->id, $slug, $position, $preview);
-            return $this->render('learn-module', [
-                'title' => (string) $course['module']['title'],
+        return $this->handle(function () use ($user, $slug, $nodeId, $preview): Response {
+            $course = $this->learning->item($user->id, $slug, $nodeId, $preview);
+            if (in_array((string) ($course['item']['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) {
+                throw $this->notFound('Assessments open from their direct assessment route.');
+            }
+            return $this->render('learn-item', [
+                'title' => (string) ($course['item']['display_title_override'] ?: $course['item']['item_title']),
                 'course' => $course,
-                'module' => $course['module'],
+                'item' => $course['item'],
                 'course_content_mode' => true,
                 'is_preview' => $preview,
                 'preview_query' => $preview ? '?preview=1' : '',

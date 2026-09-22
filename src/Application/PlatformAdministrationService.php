@@ -1119,7 +1119,6 @@ final class PlatformAdministrationService
                     ], array_keys(CourseRepository::ADMIN_COURSE_SORTS), $searchFilter, [
                         'editors' => SortOrder::DESCENDING,
                         'learners' => SortOrder::DESCENDING,
-                        'revision' => SortOrder::DESCENDING,
                         'updated' => SortOrder::DESCENDING,
                     ]);
             })(),
@@ -2649,8 +2648,8 @@ final class PlatformAdministrationService
     private function normaliseEnrolments(array $rows): array
     {
         foreach ($rows as &$row) {
-            $total = max(0, (int) ($row['module_count'] ?? 0));
-            $done = max(0, (int) ($row['modules_completed'] ?? 0));
+            $total = max(0, (int) ($row['assessment_count'] ?? 0));
+            $done = max(0, (int) ($row['submitted_assessment_count'] ?? 0));
             $row['progress_percentage'] = $total > 0 ? min(100, (int) round($done / $total * 100)) : 0;
         }
         unset($row);

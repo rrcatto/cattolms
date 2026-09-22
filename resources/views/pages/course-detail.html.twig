@@ -40,7 +40,7 @@
 				<div class="col-lg-4">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
-{{ ui('data.key-value-list', {items: [{label: 'Modules', value: (course.module_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'When you start'}]}) }}
+{{ ui('data.key-value-list', {items: [{label: 'Course Items', value: (course.item_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'When you start'}]}) }}
 {% endblock %}
 {% endembed %}
 				</div>
@@ -55,27 +55,15 @@
 				<div class="cl-prose mb-5">
 					{{ course.description_html|raw }}
 				</div>
-				<h2 class="h3 mb-3">
-					Course modules
-				</h2>
-				<div class="cl-module-list">
-					{% for module in course.modules %}
-						<div class="cl-module-row">
-							<span class="cl-module-number">{{ module.position }}</span>
-							<div>
-								<strong>{{ module.title }}</strong>
-								{% if module.subtitle %}
-									<small>{{ module.subtitle }}</small>
-								{% endif %}
-							</div>
-							<span class="ms-auto text-body-secondary">
-							{% if module.question_count > 0 %}
-								{{ module.question_count }} questions
-							{% endif %}
-							</span>
-						</div>
-					{% endfor %}
-				</div>
+				<h2 class="h3 mb-3">Course Content</h2>
+                <ol>
+                {% for node in course.structure %}
+                    <li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>
+                {% endfor %}
+                </ol>
+                {% if course.has_public_preview %}
+                    {{ ui('action.link', {label: 'Preview this course', href: '/courses/' ~ course.slug ~ '/preview', variant: 'secondary'}) }}
+                {% endif %}
 				<h2 class="h3 mt-5 mb-3">
 					Grading
 				</h2>

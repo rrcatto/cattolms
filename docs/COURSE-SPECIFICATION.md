@@ -1,8 +1,6 @@
-# Catto Learning HTML Course Specification
+# Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.5 release (0.8 code line)
-**Date time:** 2026/09/18 SAST
-**Status:** Canonical specification for the currently implemented HTML course authoring/import workflow.
+**Target LMS:** 0.8.6 release (0.8 code line) **Date time:** 2026/09/22 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow.
 
 ## 1. Purpose
 
@@ -10,29 +8,17 @@ New HTML courses intended for Catto Learning must use one predictable static str
 
 Important content must therefore exist as real HTML. Assessment banks must exist in the `QUIZ` object. JavaScript may enhance the standalone course but must not be the sole source of teaching content.
 
-This document describes the current HTML importer. A future portable Catto Learning course-package format is roadmap work and does not replace this specification until implemented.
+Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain and structured interchange format implemented by the active update. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
 
 ### 1.1 Trusted author content
 
-**SVG graphics must not be stripped.** Inline `<svg>` graphics in imported course content and uploaded
-`.svg` course-media files are supported authoring formats. Authors do not need to convert SVG diagrams
-to PNG or remove SVG features to satisfy an importer security filter.
+**SVG graphics must not be stripped.** Inline `<svg>` graphics in imported course content and uploaded `.svg` course-media files are supported authoring formats. Authors do not need to convert SVG diagrams to PNG or remove SVG features to satisfy an importer security filter.
 
-The platform owner authors and imports these courses. Course content is trusted. The importer and
-course editor do not run an HTML/SVG element allowlist, attribute/style/URL filtering, or malicious-code
-stripping. Authored SVG, HTML, inline styles, event attributes, embedded scripts and stylesheet imports
-are preserved in the content fields that map into the LMS. Saving and exporting that content uses the
-same policy. Uploaded course media, including `.svg`, is stored unchanged; MIME detection describes
-the file rather than deciding which content is trusted.
+The platform owner authors and imports these courses. Course content is trusted. The importer and course editor do not run an HTML/SVG element allowlist, attribute/style/URL filtering, or malicious-code stripping. Authored SVG, HTML, inline styles, event attributes, embedded scripts and stylesheet imports are preserved in the content fields that map into the LMS. Saving and exporting that content uses the same policy. Uploaded course media, including `.svg`, is stored unchanged; MIME detection describes the file rather than deciding which content is trusted.
 
-Course structure and data still have to be valid: titles, module identities, supported block types,
-question banks, answer indexes, grading/pool rules and certificate placeholder names remain checked.
-The existing import permissions, file-size limits, course ownership and learner-access rules remain
-in force. This is a content-preservation policy, not a change to authentication or course access.
+Course structure and data still have to be valid: titles, module identities, supported block types, question banks, answer indexes, grading/pool rules and certificate placeholder names remain checked. The existing import permissions, file-size limits, course ownership and learner-access rules remain in force. This is a content-preservation policy, not a change to authentication or course access.
 
-Inline SVG is supported, including `viewBox`, gradients, clipping paths, masks, symbols/`use`,
-`foreignObject`, namespace declarations and authored styling. The HTML importer uses an HTML5 parser
-so SVG names and attributes retain their proper case and namespace. For example:
+Inline SVG is supported, including `viewBox`, gradients, clipping paths, masks, symbols/`use`, `foreignObject`, namespace declarations and authored styling. The HTML importer uses an HTML5 parser so SVG names and attributes retain their proper case and namespace. For example:
 
 ```html
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" aria-label="Process diagram">
@@ -42,10 +28,7 @@ so SVG names and attributes retain their proper case and namespace. For example:
 </svg>
 ```
 
-Place diagrams inside `.module-body`, `.outcomes`, or the extracted summary/review content, according
-to where they should appear. SVG in the discarded standalone page shell is not teaching content.
-Give IDs referenced by gradients, masks, clips and `use` unique names across the rendered lesson.
-Already-stripped imported content cannot be reconstructed; reimport the original source to restore it.
+Place diagrams inside `.module-body`, `.outcomes`, or the extracted summary/review content, according to where they should appear. SVG in the discarded standalone page shell is not teaching content. Give IDs referenced by gradients, masks, clips and `use` unique names across the rendered lesson. Already-stripped imported content cannot be reconstructed; reimport the original source to restore it.
 
 ## 2. Course-level metadata
 
@@ -387,10 +370,7 @@ Static review prose must exist in `.review-inner`; do not rely on JavaScript to 
 
 ## 13. Static HTML and JavaScript
 
-The importer parses rather than executes JavaScript. Scripts and event attributes inside extracted
-lesson fragments are retained. Standalone page-shell scripts outside those fragments are not copied
-as an application shell: the LMS supplies its own navigation, progress and assessment UI. `QUIZ` and
-`REVIEW` declarations are read as data, not executed.
+The importer parses rather than executes JavaScript. Scripts and event attributes inside extracted lesson fragments are retained. Standalone page-shell scripts outside those fragments are not copied as an application shell: the LMS supplies its own navigation, progress and assessment UI. `QUIZ` and `REVIEW` declarations are read as data, not executed.
 
 Bad:
 
@@ -409,11 +389,7 @@ JavaScript may enhance standalone interaction but must not be the only source of
 
 ## 14. CSS and supported presentation
 
-Course `<style>` blocks are imported, with ordinary selectors scoped under the LMS course-presentation
-wrapper to retain the existing course layout contract. Author-provided `@import` rules and external
-stylesheet links are preserved, including Google Fonts and other author-chosen sources. There is no
-stylesheet-domain allowlist. Referenced resources must be available at their authored URLs; HTML/JSON
-import does not bundle local sibling files automatically.
+Course `<style>` blocks are imported, with ordinary selectors scoped under the LMS course-presentation wrapper to retain the existing course layout contract. Author-provided `@import` rules and external stylesheet links are preserved, including Google Fonts and other author-chosen sources. There is no stylesheet-domain allowlist. Referenced resources must be available at their authored URLs; HTML/JSON import does not bundle local sibling files automatically.
 
 Course CSS must style course content only and must not depend on overriding the LMS shell/navigation or structural content-card container.
 
@@ -474,3 +450,41 @@ Before delivery:
 8. verify importer preview metadata, module order, outcomes, summaries, assessment flags/counts, review, diagnostic/remediation, final assessment and detected presentation CSS.
 
 **The Catto Learning importer preview is the final conformance authority.**
+
+## 18. Course Components contract (active development update)
+
+The owner-approved Course Components v2 specification supersedes module-centric runtime assumptions. The application version is 0.8.6. Consult HANDOFF.md for the implemented contract and validation record.
+
+### Identity, sharing and author control
+
+A Course Item is an independent reusable record. A course placement supplies its structural position, optional title/description overrides, public-preview flag and assessment role. Sections form a mixed ordered tree with at most three section levels. Assessments and diagnostics have the same sharing, Save, Save As and deletion lifecycle as other Course Items.
+
+Course Item keys are unique and case-sensitive, accept ASCII letters, numbers, dots, underscores and hyphens, begin with a letter or number, and contain at most 120 characters. ADMIN may change a key. Changing it never rewrites authored content. `[course-item:My-Key]` remains stored as source and is resolved at display time by the referenced item's type renderer. Broken draft references are allowed; unresolved or circular references block publication. The library shows standalone and embedded usages. Permanent deletion requires zero placements and zero live embedding references.
+
+Save changes the shared item everywhere. Save As requires an explicit new key and title and creates independent content/configuration/question records. Resource-backed copies initially reference the same immutable Resource file. No automatic repair, cleanup, substitution, collision renaming, key-reference rewriting or inferred ADMIN intent is permitted. Assistance may be offered but must be explicitly chosen. There is no development backward-compatibility requirement for obsolete database behavior.
+
+### File and content policy
+
+HTML lessons retain trusted authored HTML, SVG, CSS, scripts and embedded markup. Inline images, SVG and YouTube embeds remain ordinary authored content unless explicitly defined or referenced as Course Items. Import must not atomise media fragments.
+
+PDF, image/graphic, uploaded video, audio files, Markdown, Word, Excel, OpenOffice and other downloads reference the Resource Library. YouTube IDs and remote audio URIs are pointers, not Resources. Registered files occupy one flat `course-resources` directory; filenames and titles are unique and duplicates are rejected without renaming. Files are immutable. Upload or register a new external file, explicitly change references, then optionally delete an unreferenced old Resource. Poster/subtitle references also protect a Resource from deletion.
+
+### Learning and availability
+
+Deliberate Start Course begins learner-relative timing. Delays use whole weeks/days/hours/minutes stored as total minutes and are relative to the preceding structural element. A scheduled section controls all descendants. Configuration cannot change while learners are active. Public placements ignore delays, require no enrolment and record no progress. Anonymous assessment previews return an immediate, unrecorded result.
+
+Progress comes only from submitted non-practice graded assessments. Ordinary content has locked/unlocked state only; there is no passive completion, Mark as complete, required/optional ordinary content or section progress. Preceding graded assessments collectively contribute 50% and the final contributes 50%. Exactly one final is required in an assessed course; preceding graded assessments must be submitted, not necessarily passed. Final submission completes the enrolment. Assessmentless courses have no invented completion event. Diagnostics never grade or complete a course.
+
+The course reader and assessment pages use the Core-owned full-screen white presentation layout, persistent outline, exit action and Previous/Next navigation. Themes cannot wrap or style this screen. Embedded items do not add sequence positions unless separately placed.
+
+### HTML import mapping
+
+Existing conforming HTML remains valid input. Teaching modules become HTML Course Items and placements. Separately represented graded assessments, diagnostics, finals and review components become their own Course Items. Author identifiers/titles produce deterministic keys; existing/imported key collisions are reported and block commit pending explicit resolution. Existing authored media remains embedded. Shortcodes may refer to definitions in the package or an existing Course Item by exact key. Missing references are import errors. Commit is transactional; technical failures do not leave half-created courses.
+
+### Structured interchange 2.0
+
+The JSON package uses `format: catto-learning-course`, `schema_version: 2.0`, course metadata, `course_items`, `structure`, Resource metadata and assessment banks. Each item contains its exact `item_key`, `item_type`, title/description, source, type configuration, Resource public identifier where relevant and assessment configuration/questions. Each structure row has `node_key`, optional `parent_node_key`, `node_type`, position and relative delay; item rows reference `item_key` and carry placement overrides/public/final settings. Parents precede children. Export includes items reachable through shortcodes, preserving source. Question and option database IDs are excluded so import creates independent identities. Resource files must be registered explicitly on the target instance; export does not duplicate physical files. Existing keys are not silently reused or overwritten when a package also defines them.
+
+### Publication
+
+Drafts may be incomplete. Publication errors include unresolved item references, invalid assessment/final relationships, missing required Resources and schedules unlocking at or after expiry. Less than seven days remaining after unlock is a warning. ADMIN may explicitly override warnings; errors cannot be overridden. Saving a changed duration does not silently rewrite availability.

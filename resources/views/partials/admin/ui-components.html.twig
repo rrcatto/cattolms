@@ -184,7 +184,7 @@ Example list item without actions.
 {{ ui('layout.section-head', {heading: 'Catalogue'}) }}
 {% set sample_item = {name: 'Sample category', description: 'Static example', href: '#gallery-actions', is_active: true, icon_svg: ''} %}
 {% set sample_tag = {name: 'Sample tag', slug: 'sample', course_count: 1, weight: 3} %}
-{% set sample_course = {title: 'Example course', slug: 'example', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', module_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
+{% set sample_course = {title: 'Example course', slug: 'example', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', item_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
 {% set sample_navigation = {roots: [sample_item], tier_2: [sample_item], tier_3: [], trail: []} %}
 
 {{ ui('catalogue.category-grid', {navigation: sample_navigation}) }}{{ ui('catalogue.category-tile', {item: sample_item}) }}{{ ui('catalogue.filter-rail', {label: 'Example filters', items: [sample_item]}) }}{{ ui('catalogue.filter-pill', {item: sample_item}) }}{{ ui('catalogue.tag-browser', {tags: [sample_tag], selected_slug: 'sample'}) }}{{ ui('catalogue.tag-chip', {tag: sample_tag}) }}{{ ui('catalogue.course-grid', {courses: [sample_course]}) }}{{ ui('catalogue.workspace', {navigation: {tier_2: [], tier_3: [], trail: []}, courses: [], workspace: {heading: 'Sample workspace', summary: 'The existing catalogue composition.', paginated: false, empty_heading: 'No sample courses', empty_summary: 'This is static reference content.'}}) }}
