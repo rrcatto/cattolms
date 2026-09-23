@@ -31,7 +31,9 @@
 										{{ enrolment.course_title }}
 									</td>
 									<td>
-										{{ ui('feedback.badge', {label: (enrolment.status), tone: enrolment.status=='cancelled' ? 'danger' : 'info'}) }}
+										{% set enrolment_expired = enrolment.status in ['assigned', 'active', 'completed'] and enrolment.expires_at|default(null) and enrolment.expires_at|date('U') < 'now'|date('U') %}
+										{{ ui('feedback.badge', {label: enrolment_expired ? 'expired' : enrolment.status, tone: enrolment.status=='cancelled' ? 'danger' : 'info'}) }}
+										{% if enrolment.expires_at|default(null) %}<small>Until {{ enrolment.expires_at|date('j M Y H:i') }}</small>{% endif %}
 									</td>
 									<td>
 										{{ enrolment.progress_percentage }}%

@@ -223,7 +223,7 @@
 											Commit import
 						</h2>
 										<p>
-											Create a new draft, or replace an existing shell that has no started learners. Existing courses with learner activity are intentionally excluded.
+											Create a new draft, or replace an existing course. Replacement removes test grants and course work for this course, including attempts, results and certificates. Purchased enrolments remain, with their old course work cleared.
 						</p>
 						<form action="/admin/courses/import/commit" method="post"><div data-category-picker>{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
@@ -262,7 +262,7 @@
 
 {% endblock %}
 {% endembed %}
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', help: 'Only resettable courses you own or administer are listed. Courses with started learners cannot be replaced.', for: 'field-admin-course-import-preview', required: false})} %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', help: 'Courses you own or administer are listed. Replacement resets their learner test work; purchased entitlements retain their financial history.', for: 'field-admin-course-import-preview', required: false})} %}
 {% block control %}
 <select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
 							{% for existing in replaceable_courses %}

@@ -371,9 +371,6 @@ final class CoursePortabilityService
             // Replacing an existing course rewrites its content wholesale from a REAL package, so
             // the target must be REAL too.
             $existing = $this->requireRealCourse($replaceCourseId);
-            if ($this->portability->hasStartedLearners($replaceCourseId)) {
-                throw new InvalidArgumentException('A started course cannot be reset or replaced. Import as a separate course.');
-            }
             if ($data['slug'] !== $existing['slug'] && $this->courses->findBySlug((string) $data['slug']) !== null) {
                 throw new InvalidArgumentException('A course with the imported slug already exists.');
             }

@@ -1,8 +1,18 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8 **Date time:** 2026/09/12 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.6.1 **Date time:** 2026/09/23 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## v0.8 commerce upgrade from v0.7
+## Current v0.8.6.1 operational position
+
+The active local code is `code/current` on `dev-v0.8`. The v0.8.6 Course Components baseline and 100,000-record development dataset already exist; do not reset them as part of ordinary documentation or feature work. v0.8.6.1 adds initial ADMIN test access and corrected current documentation. Individual checkout, Dummy card payment, EFT instructions, persisted orders/invoices and access fulfilment are implemented. Company credit purchasing, ADMIN payment confirmation and refunds are not. The owner approved documentation correction, tester-administration completion, company credit purchasing, and payment administration/refunds in that order, with a review break after each step. The v0.8.6.1 commit, `main` push and tag were specifically authorized; later pushes and versions need a new instruction.
+
+Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It cancels overdue unpaid orders, advances access deadlines and retries requested invoice emails. The local Podman setup uses a dedicated worker; `deployment/commerce-worker.compose.yaml` exports its configuration for use with the workspace’s `env/compose.yaml`.
+
+Configure Administration → Settings → Bank details before providing EFT instructions to customers. The Dummy gateway simulates card outcomes only in development/test environments. EFT instructions do not confirm a bank payment; the ADMIN confirmation workflow is planned. No live payment-processor credentials are included in the current code.
+
+The version-specific installation and reset instructions below describe their named historical versions. They are not an upgrade procedure for the current v0.8.6.1 code or for a production system. Follow the current release procedure and `PROJECT-INSTRUCTIONS.md` for any later authorized deployment; do not apply a historical reset command to a populated instance.
+
+## Historical v0.8 commerce upgrade from v0.7
 
 Use the existing database and run `composer install` followed by `composer migrate`. The three commerce migrations are additive. Do not use `smoke:install` to upgrade a populated v0.7 development instance. Publish core CSS/JS and the modified bundled themes using the development publication procedure below.
 
@@ -10,7 +20,7 @@ Run `php bin/console commerce:maintain --no-debug` once per minute from the inst
 
 Configure Administration → Settings → Bank details before providing EFT instructions to customers. The Dummy gateway simulates card outcomes only in development/test environments. No live payment-processor credentials are included in this update.
 
-**How much of this document is v0.7.** The install, reset, QA-gate and Seed Database instructions below are current, and the sections that described the REAL/SEED universe have been corrected to say what v0.7 actually does rather than left to mislead. The pagination-benchmark numbers are v0.6's and are labelled as such, because the two instruments that produced them do not run on v0.7 — that section says why. Everything else still reads as it was written for v0.6 and has not been re-verified line by line; where it and `PROJECT-INSTRUCTIONS.md` disagree, the latter is current.
+**Historical note:** The following install, reset, benchmark and seed sections describe v0.5–v0.8 transition states. Their old paths, version numbers, REAL/SEED details and reset commands are retained for provenance and must not be used as current instructions. `PROJECT-INSTRUCTIONS.md` and the current position above take precedence.
 
 **v0.7 is a reset for the same reason v0.6 was.** It inherits v0.6's single baseline, so there is no upgrade path into it either: installing v0.7 is `composer smoke:install` and a discarded database. The section below is v0.6's account of that, and every word of it applies unchanged.
 
@@ -353,6 +363,6 @@ For an authorized release, increment changed theme versions and the child’s ex
 
 Run `composer themes:install` before `composer migrate`. The additive canonical-theme migration advances only the immediately preceding bundled active-theme keys to their new installed versions; it preserves custom or other selections. Then publish compiled/core assets and clear caches. Historical reports are kept outside the code repository in workspace `cattolms/REPORTS/`.
 
-## Course Components development baseline
+## Course Components development baseline — completed
 
-The active update replaces the disposable module-centric baseline with `20260906110000_create_v085_course_components_baseline.php`. The owner-authorized reset and 100,000-record generation have already run; do not rerun destructive operations merely to resume a session. Resources live in the instance storage root under `course-resources`; files may be transferred there externally and then registered by exact filename in `/admin/resources`. Do not overwrite registered files or automatically rename duplicates. All reports belong in workspace `cattolms/REPORTS`, outside the code repository. The former code-tree REPORTS content is intentionally removed. Validation remains in progress; workspace AGENTS.md records current results and gaps.
+The released Course Components implementation replaced the disposable module-centric baseline with `20260906110000_create_v085_course_components_baseline.php`. The owner-authorized reset and 100,000-record generation have already run; do not rerun destructive operations merely to resume a session. Resources live in the instance storage root under `course-resources`; files may be transferred there externally and then registered by exact filename in `/admin/resources`. Do not overwrite registered files or automatically rename duplicates. All reports belong in workspace `cattolms/REPORTS`, outside the code repository. The former code-tree REPORTS content is intentionally removed. The v0.8.6 release validation is recorded in `HANDOFF.md`; workspace `AGENTS.md` records the current local tester-access checkpoint.

@@ -49,14 +49,25 @@ final class CoursePortabilityRepository
 
     public function resetCourseContent(int $courseId): void
     {
-        // Reset is deliberately destructive during platform development: keep
-        // only the course shell so a corrected import can replace its content.
-        // Certificates restrict enrolment deletion, so remove them first.
+        // Re-import discards course work and ordinary grants. Purchased enrolments stay
+        // attached to immutable commerce history, but their old course work is cleared.
         $this->db->executeStatement(
             'DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)',
             ['course_id' => $courseId]
         );
-        $this->db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:course_id', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM course_results WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM assessment_sessions WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)', ['course_id' => $courseId]);
+        $this->db->executeStatement('DELETE FROM assessment_attempts WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)', ['course_id' => $courseId]);
+        $this->db->executeStatement(
+            'DELETE FROM course_enrolments ce WHERE ce.course_id=:course_id
+             AND NOT EXISTS (SELECT 1 FROM commerce_entitlements entitlement WHERE entitlement.enrolment_id=ce.id)',
+            ['course_id' => $courseId]
+        );
+        $this->db->executeStatement(
+            "UPDATE course_enrolments SET status=CASE WHEN started_at IS NULL THEN 'assigned' ELSE 'active' END,
+                    completed_at=NULL,updated_at=NOW() WHERE course_id=:course_id AND status='completed'",
+            ['course_id' => $courseId]
+        );
         $itemIds = array_map('intval', $this->db->fetchFirstColumn(
             'SELECT course_item_id FROM course_item_placements WHERE course_id=:course_id',
             ['course_id' => $courseId]

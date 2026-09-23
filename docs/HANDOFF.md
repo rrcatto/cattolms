@@ -1,10 +1,16 @@
-# Catto Learning 0.8.6 — Development Handoff
+# Catto Learning 0.8.6.1 — Development Handoff
 
-## Course Components update — current working tree
+## Current development handoff — 2026/09/23
 
 The owner-approved Course Components v2 redesign is released as v0.8.6. The disposable database was dropped and recreated from `20260906110000_create_v085_course_components_baseline.php`, then populated with the requested 100,000-record seed dataset. The runtime uses reusable Course Items, separate course placements, sections, tracked shortcode references and immutable Resources. Module/content-block/media/progress tables were removed. No production-data migration or compatibility layer is intended.
 
 Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
+
+The v0.8.6.1 ADMIN test-access update adds course-first and person-first grants for active verified accounts, including drafts. New ADMIN grants expire from assignment; Start Course retains its separate progress/availability role. Elapsed grants can be issued again. Started test learners no longer block edits or replacement import. Replacement clears old course work and ordinary grants while retaining purchased entitlements required by immutable commerce history. The full `composer qa` gate, Twig lint, both browser matrices, a no-JavaScript grant-form smoke test and `git diff --check` passed before this release preparation. The owner approved this order, with a review break between steps: correct documentation, finish tester administration, build company credit purchasing, then build payment administration and refunds. The documentation step and initial grant workflow are included in v0.8.6.1; finish tester administration next, with a later push only on explicit owner instruction.
+
+**Date:** 2026/09/23 SAST **Update:** v0.8.6.1 ADMIN test access and canonical documentation **Git publication:** owner-authorized `main` push and annotated tag `v0.8.6.1`; development checkout remains `dev-v0.8`.
+
+Release validation: `composer qa`, Composer manifest/lock validation, Twig lint of all 179 templates and `git diff --check` pass. Both all-theme browser matrices and a no-JavaScript tester-grant form smoke check passed before the version-only release edits. The platform asset version changes to 0.8.6.1; bundled theme versions and the database schema do not change.
 
 **Date:** 2026/09/22 SAST **Update:** v0.8.6 Course Components **Git publication:** release on `main`, annotated tag `v0.8.6`; development checkout remains `dev-v0.8`.
 
@@ -16,7 +22,7 @@ The preceding v0.8.4 update stabilises shared UI geometry and theme decoration w
 
 Run additive migrations, publish the modified core/theme assets, and run `commerce:maintain` every minute or with `--watch`. Configure the bank account in Administration → Settings. No bank details belong in `.env`. The published v0.8.3 baseline passed 636 tests and 43,787 assertions; v0.8.4 results are below. Passwordless registration, authenticated-email sessions and secondary-email promotion are covered by integration tests; public login, registration, catalogue, reports and the UI gallery were smoke-checked in Chromium at desktop and mobile widths.
 
-The broader commerce plan remains open: real processors, bank confirmation administration, company commerce, funds, refunds, debt, gifts and academic-history changes are future work. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. The published v0.8.2 gate had 634 tests and 43,707 assertions; use the current validation below for v0.8.4.
+The broader commerce plan remains open: bank confirmation administration, company credit purchasing, funds, refunds, debt, gifts, academic-history changes and real processors are future work. The owner has scheduled company credit purchasing and then payment administration/refunds after tester administration; the other items require separate scope decisions. Invoice email delivery retries may resend a message if an SMTP acknowledgement is lost; payments and fulfilment remain idempotent. The seed memory issue described in the historical handoff below has been fixed by streaming name reservations and rolling back test fixtures. The published v0.8.2 gate had 634 tests and 43,707 assertions; use the current v0.8.6 validation near the top of this document for the active code.
 
 ## v0.8.5 canonical page construction — 2026-09-18
 
@@ -73,6 +79,8 @@ The public catalogue now composes canonical platform UI templates through `Platf
 Historical references below to descendant-inclusive *ordinary browsing*, recursive category accordions, `open` query state, five-column grids and 25-card public pages are superseded by `ux-ui-rules.md` section 8. They are not alternative implementations or current requirements.
 
 ## Historical v0.7 handoff
+
+Everything below is a dated implementation record. Statements that Commerce was not started, that REAL/SEED data universes exist, or that a historical “Next” task is pending do not describe v0.8.6. Use the current handoff above, `PROJECT-INSTRUCTIONS.md` and `ROADMAP.md` for active guidance.
 
 ### Catto Learning 0.7 — Development Handoff
 

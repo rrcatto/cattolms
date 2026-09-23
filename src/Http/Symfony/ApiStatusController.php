@@ -43,10 +43,7 @@ final class ApiStatusController
             'data' => [
                 'name' => $this->settings->platformName(),
                 'api_version' => 'v1',
-                // Carried over unchanged from the Fat-Free controller. It is stale - the platform
-                // is past 0.5.8.2 - but version metadata is the owner's to set, and a port that
-                // quietly corrected it would stop being a port.
-                'application_version' => '0.5.8.2',
+                'application_version' => '0.8.6.1',
                 'authentication' => 'Bearer token',
             ],
         ]);

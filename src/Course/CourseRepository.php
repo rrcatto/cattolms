@@ -2078,6 +2078,7 @@ final class CourseRepository
 
         $where = 'WHERE ce.user_id = :user_id AND ce.is_preview = FALSE'
             . ' AND ce.status IN (' . implode(',', $names) . ')';
+        $where .= ' AND (ce.expires_at IS NULL OR ce.expires_at > NOW())';
 
         [$match, $searchBindings] = self::andTitleSearch($search);
 
@@ -2088,8 +2089,10 @@ final class CourseRepository
         int $userId,
         int $courseId,
         int $accessPeriodSeconds,
-        int $assignedByUserId
+        int $assignedByUserId,
+        bool $expiresFromGrant = false
     ): int {
+        $this->expireElapsedEnrolment($userId, $courseId);
         if ($this->enrolment($userId, $courseId) !== null) {
             throw new RuntimeException('That user already has this course in their library.');
         }
@@ -2098,9 +2101,9 @@ final class CourseRepository
         $rows = $this->db->fetchAllAssociative(
             "INSERT INTO course_enrolments
                  (public_id,user_id,course_id,source_type,source_reference,status,
-                  access_period_seconds,assigned_at,assigned_by_user_id,created_at,updated_at)
+                  access_period_seconds,assigned_at,expires_at,assigned_by_user_id,created_at,updated_at)
              VALUES (:public_id,:user_id,:course_id,'administrator',NULL,'assigned',
-                     :access_period_seconds,:assigned_at,:assigned_by,:created_at,:updated_at)
+                     :access_period_seconds,:assigned_at,:expires_at,:assigned_by,:created_at,:updated_at)
              RETURNING id",
             [
                 'public_id' => Uuid::v4(),
@@ -2110,6 +2113,7 @@ final class CourseRepository
                 'course_id' => $courseId,
                 'access_period_seconds' => $accessPeriodSeconds,
                 'assigned_at' => $now,
+                'expires_at' => $expiresFromGrant ? gmdate('Y-m-d H:i:sP', time() + $accessPeriodSeconds) : null,
                 'assigned_by' => $assignedByUserId,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -2122,6 +2126,16 @@ final class CourseRepository
         }
 
         return $id;
+    }
+
+    public function expireElapsedEnrolment(int $userId, int $courseId): void
+    {
+        $this->db->executeStatement(
+            "UPDATE course_enrolments SET status='expired',updated_at=NOW()
+             WHERE user_id=:user_id AND course_id=:course_id AND is_preview=FALSE
+               AND status IN ('assigned','active','completed') AND expires_at<=NOW()",
+            ['user_id' => $userId, 'course_id' => $courseId]
+        );
     }
 
     /** @return array<string,mixed>|null */
@@ -2141,7 +2155,7 @@ final class CourseRepository
     public function startEnrolment(int $enrolmentId, int $userId): void
     {
         $enrolment = $this->db->fetchAssociative(
-            "SELECT access_period_seconds, is_preview FROM course_enrolments
+            "SELECT access_period_seconds, expires_at, is_preview FROM course_enrolments
               WHERE id = :id AND user_id = :user_id AND status = 'assigned'",
             ['id' => $enrolmentId, 'user_id' => $userId]
         );
@@ -2151,9 +2165,13 @@ final class CourseRepository
 
         $isPreview = $this->databaseBoolean($enrolment['is_preview']);
         $startedAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-        $expiresAt = $startedAt->modify(
-            '+' . (int) $enrolment['access_period_seconds'] . ' seconds'
-        );
+        $expiresAt = !empty($enrolment['expires_at'])
+            ? new \DateTimeImmutable((string) $enrolment['expires_at'])
+            : $startedAt->modify('+' . (int) $enrolment['access_period_seconds'] . ' seconds');
+        if (!$isPreview && $expiresAt <= $startedAt) {
+            $this->markEnrolmentExpired($enrolmentId);
+            throw new RuntimeException('Your access period for this course has expired.');
+        }
 
         $this->db->executeStatement(
             "UPDATE course_enrolments
@@ -2407,7 +2425,7 @@ final class CourseRepository
     {
         $this->db->executeStatement(
             "UPDATE course_enrolments SET status='expired',updated_at=:updated_at
-              WHERE id=:id AND status IN ('active','completed')",
+              WHERE id=:id AND status IN ('assigned','active','completed')",
             ['updated_at' => gmdate('Y-m-d H:i:sP'), 'id' => $enrolmentId]
         );
     }
@@ -2422,6 +2440,32 @@ final class CourseRepository
             ['email' => $email, 'status' => 'active']
         );
         return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
+    }
+
+    /** @return array<string,mixed>|null */
+    public function grantRecipient(int $userId): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT u.id,ue.email FROM users u JOIN user_emails ue ON ue.user_id=u.id AND ue.verified_at IS NOT NULL
+             WHERE u.id=:id AND u.status='active' ORDER BY ue.is_primary DESC,ue.id LIMIT 1",
+            ['id' => $userId]
+        );
+        return $row === false ? null : $this->normaliseRow($row);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function courseTestGrants(int $courseId): array
+    {
+        return $this->normaliseRows($this->db->fetchAllAssociative(
+            "SELECT ce.id,ce.user_id,ce.status,ce.assigned_at,ce.expires_at,ue.email,
+                    COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email) AS learner_name
+             FROM course_enrolments ce JOIN users u ON u.id=ce.user_id
+             JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
+             WHERE ce.course_id=:course AND ce.source_type='administrator' AND ce.is_preview=FALSE
+               AND ce.status IN ('assigned','active','completed') AND (ce.expires_at IS NULL OR ce.expires_at>NOW())
+             ORDER BY ce.assigned_at DESC,ce.id DESC LIMIT 100",
+            ['course' => $courseId]
+        ));
     }
 
 

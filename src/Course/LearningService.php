@@ -194,6 +194,7 @@ final class LearningService
         if ($enrolment === null) {
             throw new InvalidArgumentException('This course is not in your library.');
         }
+        if (!$preview) { $this->assertNotExpired($enrolment); }
         if ($this->commerceAccess?->start((int)$enrolment['id'])) return;
         if ((string) $enrolment['status'] === 'assigned') {
             $this->courses->startEnrolment((int) $enrolment['id'], $userId);

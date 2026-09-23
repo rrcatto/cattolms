@@ -76,6 +76,7 @@ use CattoLearning\Infrastructure\Mail\MailerInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Course\LearningService;
+use CattoLearning\Course\CourseService;
 
 use CattoLearning\Maintenance\MaintenanceService;
 
@@ -114,6 +115,7 @@ final class AdminController extends BaseController
         private readonly ThemeManager $themes,
         private readonly MaintenanceService $maintenance,
         private readonly LearningService $learning,
+        private readonly CourseService $courses,
         private readonly MailerInterface $mailer,
         private readonly RoleAdministrationService $roleAdministration,
         private readonly SelectedCompanyContext $companyContext
@@ -412,6 +414,10 @@ final class AdminController extends BaseController
         $favourites = $this->platformAdministration->favourites($target);
         $requests = $this->platformAdministration->userRequests($target);
         $sessions = $this->auth->activeSessions($target);
+        $courseSearch = PlatformAdministrationService::searchTerm('grant_courses', $_GET);
+        $grantCourses = $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE') && mb_strlen($courseSearch) >= 2
+            ? $this->platformAdministration->lookupEntities('courses', $courseSearch)
+            : [];
         return $this->render('admin-person-profile', $data + [
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
@@ -421,7 +427,22 @@ final class AdminController extends BaseController
             'favourites' => $favourites,
             'requests' => $requests,
             'sessions' => $sessions,
+            'grant_course_search' => $courseSearch,
+            'grant_courses' => $grantCourses,
         ]);
+    }
+
+    #[Route('/admin/people/{id}/courses/grant', name: 'admin_person_grant_course', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function grantPersonCourse(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
+        $personId = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $personId): void {
+            $result = $this->courses->grantToPerson((int) ($_POST['course_id'] ?? 0), $personId, (int) ($_POST['access_days'] ?? 0), $user->id);
+            $this->flash('success', 'Course access granted until ' . $result['expires_at'] . '.');
+            $this->redirect('/admin/people/' . $personId);
+        }, '/admin/people/' . $personId);
     }
 
     #[Route('/admin/people', name: 'admin_create_person', methods: ['POST'])]

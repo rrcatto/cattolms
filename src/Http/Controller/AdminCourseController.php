@@ -133,6 +133,7 @@ final class AdminCourseController extends BaseController
             'course_states' => ['draft', 'published', 'retired', 'archived'],
             'owner_people' => $people,
             'owner_companies' => $companies,
+            'test_grants' => $user->hasPermission('PLATFORM.ENROLMENT.MANAGE') ? $this->courses->courseTestGrants($courseId) : [],
             'load_ckeditor' => true,
         ]);
     }
@@ -434,8 +435,7 @@ final class AdminCourseController extends BaseController
             // recorded as a follow-up candidate for the entity-lookup pattern.
             $replaceable = array_values(array_filter(
                 $this->courses->adminCourses(null, true, max(Pagination::PAGE_SIZES), 0),
-                fn(array $course): bool => !$this->portability->hasStartedLearners((int) $course['id'])
-                    && ($user->hasPermission('PLATFORM.DASHBOARD.VIEW') || (int) ($course['owner_user_id'] ?? 0) === $user->id)
+                fn(array $course): bool => $user->hasPermission('PLATFORM.DASHBOARD.VIEW') || (int) ($course['owner_user_id'] ?? 0) === $user->id
             ));
             return $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
@@ -490,13 +490,14 @@ final class AdminCourseController extends BaseController
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($user, $courseId): void {
-            $this->courses->grantByEmail(
+            $emails = preg_split('/[\s,;]+/', trim((string) ($_POST['emails'] ?? ''))) ?: [];
+            $result = $this->courses->grantByEmails(
                 $courseId,
-                (string) ($_POST['email'] ?? ''),
-                max(1, (int) ($_POST['access_days'] ?? 365)),
+                array_values(array_filter($emails, static fn(string $email): bool => $email !== '')),
+                (int) ($_POST['access_days'] ?? 0),
                 $user->id
             );
-            $this->flash('success', 'The course was added to the user’s library.');
+            $this->flash('success', 'Course access granted to ' . $result['count'] . ' people until ' . $result['expires_at'] . '.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);
     }

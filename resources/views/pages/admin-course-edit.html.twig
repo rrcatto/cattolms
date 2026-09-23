@@ -13,6 +13,7 @@
 {% block body %}
 
 			{{ ui('action.link', {label: 'Overview', href: '#overview', size: 'small'}) }}
+			{% if can_manage_enrolments %}{{ ui('action.link', {label: 'Test access', href: '#test-access', size: 'small'}) }}{% endif %}
 			{% if can_manage_course_ownership %}
 				{{ ui('action.link', {label: 'Owner & Editors', href: '#people', size: 'small'}) }}
 			{% endif %}
@@ -446,6 +447,30 @@
 				{% endif %}
 			</div>
 			<aside>
+				{% if can_manage_enrolments %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'test-access'})} %}
+{% block surface_body %}
+						{{ ui('layout.section-head', {heading: 'Grant test access', heading_level: 2, summary: 'Add existing people to this course, including while it is a draft. Access expires from the time you grant it.'}) }}
+						<form action="/admin/courses/{{ course.id }}/grant" method="post">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Verified account emails', for: 'test-access-emails', required: true, help: 'Enter one email per line. Every person must have an active, verified account.'})} %}
+{% block control %}<textarea id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'test-access-days', required: true, help: 'The countdown begins when you grant access.'})} %}
+{% block control %}<input id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+						</form>
+						{% if test_grants %}
+							<h3 class="h5">Current direct grants</h3>
+							{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+								{% for grant in test_grants %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ grant.learner_name }}</strong><p>{{ grant.email }} · {{ grant.status }} · {% if grant.expires_at %}until {{ grant.expires_at|date('j M Y H:i') }}{% else %}clock begins on Start course{% endif %}</p>{% endblock %}{% endembed %}{% endfor %}
+							{% endblock %}{% endembed %}
+						{% endif %}
+						{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
+{% endblock %}
+{% endembed %}
+				{% endif %}
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, sticky: true})} %}
 {% block surface_body %}
 
@@ -470,7 +495,7 @@
 							Import and portability
 						</h2>
 						<p>
-							Export the complete course as structured JSON, or replace an unstarted course through the import screen.
+							Export the complete course as structured JSON, or replace its content through the import screen.
 						</p>
 						{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/export'}) }}{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/import'}) }}
 

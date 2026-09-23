@@ -27,6 +27,7 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\LearningService;
+use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 use InvalidArgumentException;
@@ -34,6 +35,95 @@ use PHPUnit\Framework\TestCase;
 
 final class CourseAccessLifecycleTest extends TestCase
 {
+    public function testAdministratorGrantToDraftExpiresFromAssignmentAndDoesNotResetOnStart(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var Database $db */
+        $db = $container->get(Database::class);
+        /** @var CourseService $courses */
+        $courses = $container->get(CourseService::class);
+        /** @var LearningService $learning */
+        $learning = $container->get(LearningService::class);
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        try {
+            $admin = $fixture->createUser('Grant admin ' . $suffix, 'grant-admin-' . $suffix . '@example.test');
+            $first = $fixture->createUser('First friend ' . $suffix, 'grant-first-' . $suffix . '@example.test');
+            $second = $fixture->createUser('Second friend ' . $suffix, 'grant-second-' . $suffix . '@example.test');
+            $company = $fixture->createCompany($admin, 'Grant ' . $suffix, 'grant-' . $suffix . '.example.test');
+            $slug = 'grant-' . $suffix;
+            $course = $fixture->createCourse($admin, $company, $slug, 'Draft for friends');
+            $result = $courses->grantByEmails($course, ['grant-first-' . $suffix . '@example.test', 'grant-second-' . $suffix . '@example.test'], 7, $admin);
+            self::assertSame(2, $result['count']);
+            $firstEnrolment = $db->fetchAssociative('SELECT id,status,started_at,expires_at FROM course_enrolments WHERE course_id=:course AND user_id=:user', ['course' => $course, 'user' => $first]);
+            self::assertIsArray($firstEnrolment);
+            self::assertSame('assigned', $firstEnrolment['status']);
+            self::assertNull($firstEnrolment['started_at']);
+            self::assertNotNull($firstEnrolment['expires_at']);
+            self::assertCount(2, $courses->courseTestGrants($course));
+            $learning->courseHome($first, $slug);
+            $learning->start($first, $slug);
+            $started = $db->fetchAssociative('SELECT status,started_at,expires_at FROM course_enrolments WHERE id=:id', ['id' => $firstEnrolment['id']]);
+            self::assertIsArray($started);
+            self::assertSame('active', $started['status']);
+            self::assertNotNull($started['started_at']);
+            self::assertSame($firstEnrolment['expires_at'], $started['expires_at']);
+            $secondEnrolment = $db->fetchAssociative('SELECT id FROM course_enrolments WHERE course_id=:course AND user_id=:user', ['course' => $course, 'user' => $second]);
+            self::assertIsArray($secondEnrolment);
+            $db->executeStatement("UPDATE course_enrolments SET expires_at=NOW()-INTERVAL '1 minute' WHERE id=:id", ['id' => $secondEnrolment['id']]);
+            $this->expectException(InvalidArgumentException::class);
+            $learning->start($second, $slug);
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
+    public function testGrantFromPersonProfileUsesSameClockAndRejectsDuplicateAccess(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var Database $db */
+        $db = $container->get(Database::class);
+        /** @var CourseService $courses */
+        $courses = $container->get(CourseService::class);
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        try {
+            $admin = $fixture->createUser('Grant admin ' . $suffix, 'grant-admin-' . $suffix . '@example.test');
+            $friend = $fixture->createUser('Grant friend ' . $suffix, 'grant-friend-' . $suffix . '@example.test');
+            $company = $fixture->createCompany($admin, 'Grant ' . $suffix, 'grant-' . $suffix . '.example.test');
+            $course = $fixture->createCourse($admin, $company, 'grant-' . $suffix, 'Draft for a friend');
+            self::assertSame(1, $courses->grantToPerson($course, $friend, 3, $admin)['count']);
+            self::assertNotNull($db->fetchOne('SELECT expires_at FROM course_enrolments WHERE course_id=:course AND user_id=:user', ['course' => $course, 'user' => $friend]));
+            $this->expectException(InvalidArgumentException::class);
+            $courses->grantToPerson($course, $friend, 3, $admin);
+        } finally {
+            $fixture->cleanup();
+        }
+    }
+
+    public function testAdministratorCanGrantAgainAfterPreviousAccessElapsed(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var Database $db */
+        $db = $container->get(Database::class);
+        /** @var CourseService $courses */
+        $courses = $container->get(CourseService::class);
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        try {
+            $admin = $fixture->createUser('Grant admin ' . $suffix, 'grant-admin-' . $suffix . '@example.test');
+            $friend = $fixture->createUser('Grant friend ' . $suffix, 'grant-friend-' . $suffix . '@example.test');
+            $company = $fixture->createCompany($admin, 'Grant ' . $suffix, 'grant-' . $suffix . '.example.test');
+            $course = $fixture->createCourse($admin, $company, 'grant-' . $suffix, 'Draft for a friend');
+            $courses->grantToPerson($course, $friend, 1, $admin);
+            $db->executeStatement("UPDATE course_enrolments SET expires_at=NOW()-INTERVAL '1 minute' WHERE course_id=:course AND user_id=:user", ['course' => $course, 'user' => $friend]);
+            $courses->grantToPerson($course, $friend, 2, $admin);
+            $statuses = $db->fetchFirstColumn('SELECT status FROM course_enrolments WHERE course_id=:course AND user_id=:user ORDER BY id', ['course' => $course, 'user' => $friend]);
+            self::assertSame(['expired', 'assigned'], $statuses);
+        } finally {
+            $fixture->cleanup();
+        }
+    }
     public function testAccessClockStartsOnlyOnceWhenLearnerStartsCourse(): void
     {
         $container = CliBootstrap::boot()['container'];

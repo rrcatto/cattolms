@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.6 release (0.8 code line) **Date time:** 2026/09/22 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow.
+**Target LMS:** 0.8.6.1 release (0.8 code line) **Date time:** 2026/09/23 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow.
 
 ## 1. Purpose
 
@@ -453,7 +453,7 @@ Before delivery:
 
 ## 18. Course Components contract (active development update)
 
-The owner-approved Course Components v2 specification supersedes module-centric runtime assumptions. The application version is 0.8.6. Consult HANDOFF.md for the implemented contract and validation record.
+The owner-approved Course Components v2 specification supersedes module-centric runtime assumptions. The application version is 0.8.6.1. Consult HANDOFF.md for the implemented contract and validation record.
 
 ### Identity, sharing and author control
 
@@ -471,7 +471,9 @@ PDF, image/graphic, uploaded video, audio files, Markdown, Word, Excel, OpenOffi
 
 ### Learning and availability
 
-Deliberate Start Course begins learner-relative timing. Delays use whole weeks/days/hours/minutes stored as total minutes and are relative to the preceding structural element. A scheduled section controls all descendants. Configuration cannot change while learners are active. Public placements ignore delays, require no enrolment and record no progress. Anonymous assessment previews return an immediate, unrecorded result.
+Deliberate Start Course begins learner-relative content availability timing. Delays use whole weeks/days/hours/minutes stored as total minutes and are relative to the preceding structural element. A scheduled section controls all descendants. ADMIN may change content and availability during development even after testers start; the current schedule then applies to their next request. Public placements ignore delays, require no enrolment and record no progress. Anonymous assessment previews return an immediate, unrecorded result.
+
+ADMIN may grant a draft or published course to active users with verified email addresses from either the course page or the person's administration profile. An ADMIN grant has a positive whole-day duration that begins when it is made; Start Course begins the learner's progress but never extends that grant's expiry. Company and purchased access retain their own existing timing rules. Duplicate open grants are rejected, while an elapsed grant is marked expired and may be granted again. Replacement import is permitted after testers start and clears old course work, certificates and ordinary grants. Purchased enrolments remain linked to immutable commerce history, but their old course work is cleared. A replacement does not silently preserve or reconstruct test progress. ADMIN can grant friends access again after replacement.
 
 Progress comes only from submitted non-practice graded assessments. Ordinary content has locked/unlocked state only; there is no passive completion, Mark as complete, required/optional ordinary content or section progress. Preceding graded assessments collectively contribute 50% and the final contributes 50%. Exactly one final is required in an assessed course; preceding graded assessments must be submitted, not necessarily passed. Final submission completes the enrolment. Assessmentless courses have no invented completion event. Diagnostics never grade or complete a course.
 
