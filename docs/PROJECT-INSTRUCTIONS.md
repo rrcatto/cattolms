@@ -1,12 +1,16 @@
 # Catto Learning Project Guide
 
-## Course Components update — current working tree
+## Current development position — 2026/09/23
 
 The owner-approved Course Components v2 redesign is released as v0.8.6. The disposable database was dropped and recreated from `20260906110000_create_v085_course_components_baseline.php`, then populated with the requested 100,000-record seed dataset. The runtime uses reusable Course Items, separate course placements, sections, tracked shortcode references and immutable Resources. Module/content-block/media/progress tables were removed. No production-data migration or compatibility layer is intended.
 
-Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract, and workspace `AGENTS.md` for the exact resume checkpoint and remaining implementation/validation work. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. The owner has not authorized a commit, push or version increment. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
+Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract, and workspace `AGENTS.md` for the local resume checkpoint. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. The owner authorized the v0.8.6.1 version, commit, `main` push and tag; later releases and pushes require a new explicit instruction. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
 
-**Current approved LMS version:** 0.8.6 (Course Components, 2026/09/22; 0.5.8.3 remains the accepted VPS version) **Date time:** 2026/09/22 SAST **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Current phase:** TEST/DEV; v0.8.6 adds reusable Course Items, Resources, placement-based presentation, preserved trusted authored SVG/HTML/CSS, direct assessment navigation and assessment-only grading. The development database is disposable; no production migration or compatibility layer exists.
+ADMIN test grants may be made from a course or a person's profile for active verified accounts, including draft courses. Their access clock starts when granted; Start Course only starts progress and learner-relative content scheduling. During development, started testers do not lock course edits or replacement import. A replacement clears old course work, certificates and ordinary grants; purchased entitlements retain their immutable financial links and lose old course work. See `COURSE-SPECIFICATION.md` section 18.
+
+The owner-approved next-work order is documentation correction, tester-administration completion, company credit purchasing, then payment administration and refunds. Pause after each step for owner review. Documentation correction and the initial test-grant implementation are included in v0.8.6.1; the remaining tester-administration controls are next. `ROADMAP.md` and `COMMERCE-IMPLEMENTATION-PLAN.md` carry the current status and boundaries; their labelled historical sections are not instructions to recreate retired data universes or individual-commerce foundations.
+
+**Current approved LMS version:** 0.8.6.1 (ADMIN test access and documentation, 2026/09/23; 0.5.8.3 remains the accepted VPS version) **Date time:** 2026/09/23 SAST **Runtime target:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Current phase:** TEST/DEV; v0.8.6 supplies reusable Course Items, Resources, placement-based presentation, preserved trusted SVG/HTML/CSS, direct assessment navigation and assessment-only grading. The development database is disposable; no production migration or compatibility layer exists.
 
 This is the canonical developer brief for the Catto Learning LMS. Read it with `HANDOFF.md` and `ROADMAP.md` before modifying code.
 
@@ -146,7 +150,7 @@ Three rules from that era survive, because none of them was about universes:
 
 - **A generated company's domain is its name plus `.invalid`.** RFC 2606 reserves the suffix, so an invented address cannot leave the building. `GeneratedDomainMailer` re-addresses mail for one to the same local part at `APP_DOMAIN`; nothing in the mail path refers to seed data.
 - **Nothing is ever appended to a generated name to make it unique** — no digits, no set key, no characters of any kind. If a pool needs more names, edit the word list in `storage/seeds/`.
-- **Generation sends no email at all**, and never fabricates `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tokens` or `web_sessions`.
+- **Generation sends no email at all**, and never fabricates physical Resource Library files, `auth_sessions`, `auth_login_tokens`, `api_tokens` or `web_sessions`.
 
 **There is no cleanup by token**, because there is no token. A set cannot be selectively removed once written; `composer smoke:install` and a discarded database is the way back, which is acceptable only while the database is disposable TEST/DEV state.
 
@@ -191,7 +195,7 @@ All bundled themes share the `cl-*` page vocabulary in `THEME-SDK.md`, core navi
 - A credit is not permanently consumed until the learner explicitly starts the course; before commencement it can be unassigned/returned.
 - Published courses are editable in place and edits affect learners already in progress.
 - Server-side LMS logic owns progress, grading and unlocking; course-specific non-LMS demonstrations may remain client-side.
-- Course media is private filesystem data with PostgreSQL metadata.
+- Local Course Item files are immutable Resource Library files in private instance storage with PostgreSQL metadata; remote URIs and YouTube IDs are not Resources.
 - Publication states are `draft`, `published`, `retired`, `archived`.
 - Course HTML import rules live in `COURSE-SPECIFICATION.md`.
 

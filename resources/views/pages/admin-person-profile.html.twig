@@ -232,6 +232,21 @@
 {% block surface_body %}
 
 			{{ ui('layout.section-head', {heading: 'Courses in library', summary: 'Current learner access.'}) }}
+			{% if can_manage_enrolments %}
+				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'grant_courses', ds_label: 'Find a course to grant', ds_value: grant_course_search, ds_action: '/admin/people/' ~ target_user_id, ds_push_url: true} %}
+				<div id="grant_courses-region"><div id="grant_courses-results">
+				{% if grant_course_search|length >= 2 %}
+					<form action="/admin/people/{{ target_user_id }}/courses/grant" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{% if grant_courses %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'person-grant-course', required: true})} %}{% block control %}<select id="person-grant-course" name="course_id" required {{ ui_field_attrs(props) }}>{% for grant_course in grant_courses %}<option value="{{ grant_course.id }}">{{ grant_course.label }} · {{ grant_course.detail }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'person-grant-days', required: true, help: 'The countdown begins when access is granted.'})} %}{% block control %}<input id="person-grant-days" type="number" name="access_days" min="1" max="24855" value="30" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant course access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+						{% else %}<p>No courses match this search.</p>{% endif %}
+					</form>
+				{% endif %}
+				</div></div>
+			{% endif %}
 			{% if library_courses %}
 				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}
@@ -242,7 +257,7 @@
 
 								<strong>{{ course.title }}</strong>
 								<p>
-									{{ course.status }} · {{ course.progress_percentage }}% progress
+									{{ course.status }} · {{ course.progress_percentage }}% progress{% if course.expires_at %} · until {{ course.expires_at|date('j M Y H:i') }}{% endif %}
 								</p>
 
 {% endblock %}

@@ -1,16 +1,22 @@
 # Catto Learning Development Roadmap
 
-## Course Components update — current working tree
+## Current delivery order — 2026/09/23
+
+The owner approved this sequence, with a review break after each step: (1) update stale documentation, (2) finish tester administration, (3) implement company credit purchasing, and (4) implement payment administration and refunds. The documentation correction and initial ADMIN grant workflow are included in the owner-authorized v0.8.6.1 release. The remainder of tester administration is the next coding step. Pause after each step for owner review; later Git pushes and version choices require explicit owner instruction.
+
+Tester administration should finish the course-first and person-first grant workflow by making grant status and expiry clear, putting an explicit revoke action in the grant context using the existing enrolment-removal rule, and providing a deliberate invitation/notification path. Grants to draft courses and immediate access expiry remain the active contract in `COURSE-SPECIFICATION.md` section 18. Company credit purchasing follows against the existing course/access-period credit model and individual Dummy-backed commerce foundation; it must make both direct company purchase and request-approval-to-purchase usable. Payment administration and refunds follow, including evidence-backed manual bank confirmation, refund/credit-note records and the required access effect. The full funds, gifts and real-provider programmes remain separate later work unless the owner expands scope.
+
+## Course Components release and local update
 
 The owner-approved Course Components v2 redesign is released as v0.8.6. The disposable database was dropped and recreated from `20260906110000_create_v085_course_components_baseline.php`, then populated with the requested 100,000-record seed dataset. The runtime uses reusable Course Items, separate course placements, sections, tracked shortcode references and immutable Resources. Module/content-block/media/progress tables were removed. No production-data migration or compatibility layer is intended.
 
 Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
 
-**Current LMS version:** 0.8.6 **Date time:** 2026/09/22 SAST **Current stage:** v0.8.6 delivers Course Components and retains v0.8.5’s canonical page construction, trusted authored SVG/HTML/CSS and passwordless account corrections. Continue the remaining commerce stages in `COMMERCE-IMPLEMENTATION-PLAN.md`; 0.5.8.3 remains installed on the VPS and needs an update to the latest codebase in due course when the owner asks for it.
+**Current LMS version:** 0.8.6.1 **Date time:** 2026/09/23 SAST **Current stage:** v0.8.6.1 adds the initial ADMIN test-access workflow and current documentation to the v0.8.6 Course Components release. Individual carts, checkout, Dummy payments, invoices and enrolment fulfilment are already implemented. Continue the approved sequence above using `COMMERCE-IMPLEMENTATION-PLAN.md` for its current-status map and remaining domain rules; 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it.
 
 Only the project owner decides future release numbers.
 
-**Reading the stage records below.** Sections 1 to 1c record what was decided and delivered at the time, and several of them specify the REAL/SEED universe in detail: seed-aware tables, `seed_token`, constraint triggers, the `SEED_*` role family, the All/Real/Seed control. **All of that was removed in v0.7** and none of it describes the platform now — `PROJECT-INSTRUCTIONS.md` section 5 is the current statement, and it is deliberately short. The stage records are kept because how a decision was reached stays useful after the decision is reversed, not because they are still in force.
+**Reading the stage records below.** Sections 1 to 2, and historical paragraphs in later sections, record decisions and implementation states at their original dates; their “next”, “pending” and REAL/SEED instructions are not current tasks. The REAL/SEED universe, `seed_token`, constraint triggers, `SEED_*` roles and All/Real/Seed control were removed in v0.7. The current state is the delivery order above, `PROJECT-INSTRUCTIONS.md` section 5 and the current-status sections of `COMMERCE-IMPLEMENTATION-PLAN.md`. Historical text remains for decision provenance only.
 
 ## Current UI design system
 
@@ -179,10 +185,8 @@ The rules, in the owner's own terms:
 - **A company that owns a course trains its own staff on it for free.** Ownership is the entitlement; no credit is involved and none should be looked for.
 - **A company that does not own a course must hold a credit for it** before its staff can be enrolled.
 - Two workflows reach an enrolment, and both are legitimate:
-  1. the staff member requests the course, and the company administrator buys what is needed and
-     approves, or rejects;
-  2. the administrator buys credits and assigns courses to staff directly, telling them outside the
-     LMS.
+  1. the staff member requests the course, and the company administrator buys what is needed and approves, or rejects;
+  2. the administrator buys credits and assigns courses to staff directly, telling them outside the LMS.
 
 ### The three decisions taken with it
 
@@ -192,11 +196,9 @@ The rules, in the owner's own terms:
 
 **An individual buying for themselves is enrolled on payment.** No credit is created. A credit is a company mechanism for buying access it will hand to someone else later; a person buying their own course has nobody to hand it to, and giving them a balance to understand would be machinery for its own sake.
 
-### What is missing today, measured against those rules
+### Current implementation gap, measured against those rules
 
-- Approval looks for a credit whatever the course is, so a company approving a request for its **own** course finds none and leaves the request approved with nobody enrolled. The ownership rule is not implemented at all.
-- `/company/credits` only displays the ledger. Request approval is the single code path that allocates a credit, so workflow 2 has no route.
-- No enrolment notification exists. The mailer sends magic links, staff-added notices and request decisions, and nothing that tells a learner they are on a course.
+The owned-course rule and direct assignment of an existing exact-match credit are implemented. `/company/credits` displays existing credits but has no company purchase checkout. A request that lacks the necessary credit still needs a purchase-and-return flow before approval can fulfil it. The company credit purchasing phase should complete both purchase entry points and learner notification; do not reintroduce the old state in which approval appears successful without an enrolment.
 
 ---
 
@@ -255,7 +257,9 @@ Doing the first is worth little on its own if the catalogue stays in one languag
 
 ---
 
-## 3. Commerce — after taxonomy, company lifecycle and favourites
+## 3. Commerce — individual foundation built; company and administration work remains
+
+The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. `src/Commerce/` and its integration tests are the implementation source. The bullets below are the original domain target, not a claim that none of Commerce exists. The approved next commerce coding steps are company credit purchasing, then payment administration and refunds, after tester administration and a review break at each step.
 
 Implement one coherent commerce domain:
 
@@ -278,7 +282,7 @@ The reserved ACL keys in section 1 should be reused rather than renamed or dupli
 
 Built: `course_categories` carries `parent_id` and `level` with a three-level cap enforced by a CHECK constraint and a trigger, unique `name` and `slug`, and `ON DELETE RESTRICT` on the parent so nobody removes three levels of taxonomy by accident. `tags` and `course_tags` exist, with the slug as the canonical key so casing and spacing cannot produce three versions of one tag. Both are universe-free labels — see PROJECT-INSTRUCTIONS section 5.
 
-Built since, 2026/09/06: **browsing by category.** `/courses/category/<slug>` is the same catalogue body told which branch it is showing. The descendant query is one predicate — self, children, grandchildren — stated once in `CourseRepository::inBranchOf()` and shared by the taxonomy rollup, the browse count and the browse rows, so a faceted count cannot disagree with its own list. The breadcrumb is a recursive ancestry walk bounded by the depth cap, and each child category offers the count of the whole branch behind it. Only active categories are addressable. Every count takes an explicit `DataUniverse`, and `CategoryBrowseIntegrationTest` proves the same branch reports a different population in REAL and in SEED.
+Built since, 2026/09/06: **browsing by category.** `/courses/category/<slug>` is the same catalogue body told which branch it is showing. The descendant query is one predicate — self, children, grandchildren — shared by taxonomy rollup, browse count and browse rows, so a faceted count cannot disagree with its own list. The breadcrumb is a recursive ancestry walk bounded by the depth cap, and each child category offers the count of the whole branch behind it. Only active categories are addressable. The original universe-scoped count rules and their REAL/SEED test were removed in v0.7; current reads use one data population.
 
 Built since, 2026/09/07: **tag management, tag pages and keyword search.** Administration → Courses → Course Tags is a searched, paginated list on the three shared controls, guarded by its own `COURSE.TAG.MANAGE`. The slug is derived from the name rather than typed, so casing and spacing cannot make three tags out of one, and a clash is refused rather than silently suffixed. Deleting a tag needs no replacement, unlike a category: a course with one fewer tag is still classified, a course with no category is not. `/courses/tag/<slug>` browses it, tag chips appear on every card, and the catalogue's client-side box that filtered rendered rows was replaced by the shared server-side search over title, subtitle and summary.
 
@@ -336,9 +340,9 @@ Counts and row queries must use identical filter semantics — the v0.5.7.6 rule
 
 ---
 
-## 3c. Favourites — before Commerce
+## 3c. Favourites — implemented before Commerce
 
-Planning only.
+Learner and company favourites are implemented; the bullets below record their accepted purpose and behavior. Favourites do not grant course access.
 
 **Terminology.** *Favourites* is the wishlist. *Library* and *Learning* mean courses the learner actually has access to. The two must not be conflated, and `Library` must not be reused as a wishlist name.
 
@@ -348,7 +352,7 @@ Planning only.
 - toggle from catalogue and search result lists;
 - toggle from course detail;
 - a dedicated paginated Favourites list, with removal directly from it;
-- ordinary REAL/SEED isolation throughout.
+- ordinary account and course scope rules throughout; the former REAL/SEED split no longer exists.
 
 ### Company favourites
 
@@ -360,7 +364,7 @@ This is a **company-to-course** relationship in its own right, not a user favour
 
 ## 3d. Company course lifecycle — the split is built
 
-**Done, 2026/09/07.** The five concepts are five sections. What is still owed to this section is the buying, which is Commerce.
+**The five-section split is done.** What is still owed is company credit purchasing and its integration with request approval.
 
 | Section | Route | What it holds |
 |---|---|---|
@@ -372,7 +376,7 @@ This is a **company-to-course** relationship in its own right, not a user favour
 
 `COMPANY_OWNED_WHERE` and `COMPANY_TRAINING_WHERE` are two constants and never recombined; one resolver picks between them and is shared by the rows and the count. The old single predicate flat- tened a course a company both owned and had bought into one row, so the two figures could not even be recovered by subtraction.
 
-`company_favourites` is a company-to-course table with its own cross-universe trigger. It is not a user favourite: staff favouriting a course for themselves changes nothing here, and the company's interest outlives whoever added it — owner decision, 2026/09/07. It carries no `seed_token`, for the same reason `course_tags` does not: the company already carries the universe and the row cascades with it.
+`company_favourites` is a company-to-course table. It is not a user favourite: staff favouriting a course for themselves changes nothing here, and the company's interest outlives whoever added it — owner decision, 2026/09/07. The former cross-universe trigger and `seed_token` behavior were removed in v0.7.
 
 ### Still outstanding
 
@@ -443,33 +447,29 @@ Not started. Requested so that a company can be classified by what it does, whic
 - whether an industry is required on a company or optional. Required is better data and worse onboarding; optional produces a reporting bucket called "unspecified" that never empties.
 - whether it is one level or two - Mining, then Coal, Gold, Platinum - which matters more for reporting than for the form.
 
-**Not a data universe.** An industry classifies a company the way a category classifies a course: it is shared vocabulary, so it carries no seed token. What is *counted* under an industry is still filtered to the reader's universe, which is the same trap categories already carry.
+An industry would classify a company the way a category classifies a course: it is shared vocabulary, not a second data universe. The old seed-token and reader-universe rules in the original proposal were removed in v0.7.
 
 ---
 
-## 3h. Symfony UX trial run — owner decision, 2026/09/09
+## 3h. Symfony UX tag-cloud trial — implemented
 
-The owner wants one page styled with Symfony UX before deciding whether it earns a place in the platform. `/courses/tags` is the trial: an animated tag cloud driven by a Stimulus controller over TagCloud.js, with a chosen tag listing its courses in the canonical 24-card workspace. The current component and progressive-enhancement contracts are recorded in `ux-ui-rules.md` section 8.
+The `/courses/tags` trial is implemented: a Stimulus controller enhances the server-rendered tag browser with TagCloud.js, while normal links remain available without JavaScript. The current component and progressive-enhancement contracts are recorded in `ux-ui-rules.md` section 8.
 
-The page is deliberately chosen. It is public, it is not on any critical path, and it has a real interaction to judge - if UX cannot make a tag cloud pleasant it will not earn the rest of the LMS.
+The page was deliberately chosen because it is public, outside critical paths and has a real interaction to judge.
 
-What the trial has to answer:
+The criteria used to judge the trial were:
 
 - does a Stimulus controller stay inside the platform's rules? The page must still render server-side first and still work with JavaScript off, because that is not negotiable for a public catalogue page and it is what tells us whether UX fits this codebase or fights it;
 - what does it cost to ship? AssetMapper carries no npm toolchain, which is the whole reason it is the chosen path - a build step would be a second thing to keep working on the VPS;
 - can a theme still restyle it? A Stimulus controller that hard-codes its own appearance would take the page out of the theme layer, and no amount of interactivity is worth that.
 
-If the answer is yes on all three, the candidates after it are the course player, the assessment screens and the administration tables - the three places where the current htmx enhancement is doing the most work.
+Later UX enhancements remain subject to the canonical component system and the owner-approved work order above.
 
 ## 4. Course/media portability
 
-- canonical `.clcourse` import/export package;
-- private filesystem media metadata;
-- audio narration and inline audio/video blocks;
-- Nginx X-Accel-Redirect for protected media;
-- MP3/MP4 first, transcripts/captions and range requests;
-- SVG and owner-authored HTML are preserved by the current trusted course workflow; no sanitisation prerequisite applies. See `COURSE-SPECIFICATION.md` section 1.1;
-- formal course-access terms/acceptance before commercial launch.
+Structured JSON 2.0 course import/export and trusted standalone HTML import are implemented. Local files belong to the immutable Resource Library in private instance storage; Course Items reference Resources and the Core delivery route checks access before returning a file. Export describes Resource identities but does not bundle physical files. Authored SVG, HTML, CSS and embedded code are preserved. See `COURSE-SPECIFICATION.md` sections 1.1 and 18.
+
+Future portability/media work, outside the approved immediate sequence, includes a self-contained package if separately specified, protected-file delivery optimisations such as Nginx X-Accel-Redirect where useful, fuller caption/transcript and range-request acceptance, and formal course-access terms before commercial launch. Do not replace the current Resource Library with the obsolete `course_media` model.
 
 ## 5. Learner identity and communication
 
@@ -511,7 +511,7 @@ Late-project work, once the public catalogue is stable. `public_html/robots.txt`
 - Use a narrow slug/`updated_at` projection rather than `publishedCourses()`, which selects far more per row than a sitemap needs.
 - Absolute URLs from `APP_URL`; `<lastmod>` from `courses.updated_at`.
 - Cache the rendered document. It does not need to be live.
-- REAL-only. A SEED course appearing in the sitemap would be the most damaging form of universe leak, so this must respect the Seed Database scope rules.
+- Include only published courses that are publicly addressable; the retired REAL/SEED split supplies no sitemap filter.
 - Add the `Sitemap:` line to `robots.txt` in the same change, not before.
 
 ## 9b. Analytics — after Commerce, and never ahead of it

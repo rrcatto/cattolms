@@ -1,18 +1,34 @@
 # Commerce Implementation Plan
 
-Date: 12 September 2026
+Original plan: 12 September 2026; current-status update: 23 September 2026
 Target: `code/cattolms-v0.8`
-Status: Discovery complete; proposed implementation sequence. Commerce code is not yet implemented.
+Status: Individual purchase foundation implemented; the remaining delivery sequence below was approved by the owner on 23 September 2026.
+
+## Current implementation and approved next steps
+
+Individual commerce exists in the v0.8.6.1 code: guest and signed-in carts; staged checkout; persisted orders, invoices and payment attempts; Omnipay Dummy card outcomes; manual EFT instructions; account order/document pages; idempotent fulfilment into access entitlements; free-course direct access; and scheduled deadline/outbox maintenance. The implementation is in `src/Commerce/`, `src/Commerce/Http/CommerceController.php`, the `20260912210000_add_commerce_foundation.php` and `20260913010000_add_checkout_details.php` migrations, and `tests/Integration/CommercePurchaseIntegrationTest.php`. A manual EFT instruction is not an ADMIN payment-confirmation workflow, and Dummy payment is not a live processor.
+
+The owner approved four ordered work steps, with a break for review after each: documentation correction; completion of tester administration; company credit purchasing; payment administration and refunds. The documentation correction and initial tester grant workflow are included in the owner-authorized v0.8.6.1 release; tester administration still needs the follow-up controls below. Later release/version choices and Git pushes require explicit owner instruction. Company credit purchases should use the existing exact course/access-period credit rules and the current Dummy-backed payment foundation. This step includes a direct company purchase and a request-approval path that purchases missing credit before fulfilling the request. Payment administration and refunds then add evidence-backed manual bank confirmation, payment review/reconciliation, refund and credit-note records, and the specified access effect. Account Funds, payouts, debt, gifts, real processors and the other longer-range items in the original plan remain later decisions/work; do not silently bundle them into these two stages.
+
+| Area | Current state | Next required boundary |
+| --- | --- | --- |
+| Individual checkout and access | Implemented for guest/signed-in carts, Dummy card simulation, manual EFT instructions, orders, invoices and access entitlements | Preserve and extend the existing services and tests; do not rebuild this foundation |
+| Tester grants | Course-first and person-first draft/published grants included in v0.8.6.1 | Finish grant visibility, explicit revocation in context and deliberate learner invitation/notification; pause for owner review |
+| Company credits | Existing credits can be assigned to staff and owned courses require no credit | Buy exact-match credits and complete request approval through purchase and fulfilment; pause for owner review |
+| Payment operations | Payment attempts and invoice delivery exist; EFT instructions leave payment pending | ADMIN evidence and confirmation, reconciliation, refunds/credit notes and access revocation where required; pause for owner review |
+| Later commerce | Real gateway, funds, payouts, debt, gifts and broader academic history are not implemented | Scope separately after the approved steps |
 
 ## 1. Scope and authority
 
-Implement the five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents: the specification, implementation plan, policy defaults, workflows, and test matrix. The current user instruction requests discovery and a plan before implementation.
+The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remain the detailed domain input for unfinished commerce work. The sections below preserve the original design map and acceptance rules; their September 12 discovery statements are historical. Use the current-status map and owner-approved order above to decide what to build now.
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in v0.8. Older version directories are historical references. Directory selection does not itself change application version metadata: the copied code still identifies as 0.7, consistent with the brief's instruction not to bump it. Do not commit, push, release, or reset the database as part of this plan.
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.6.1. Older version directories are historical references. The owner authorized the v0.8.6.1 release; later releases and pushes still require explicit instruction. Do not reset the database merely to implement this plan.
 
-## 2. Verified development baseline
+## 2. Original discovery baseline — historical, 12 September 2026
+
+The following bullets describe the pre-commerce discovery day. They are retained as a validation record, not as the current code or test status.
 
 - `code/current` now resolves to `code/cattolms-v0.8`, on both host and container.
 - Existing Podman PHP and Nginx containers were restarted. The shared Symfony cache contained absolute v0.7 paths and caused duplicate class loading; it was archived to `runtime/storage/cache/symfony-before-v08-20260912` and regenerated.
@@ -22,9 +38,9 @@ All implementation belongs in v0.8. Older version directories are historical ref
 - `COMPOSER_PROCESS_TIMEOUT=0 composer qa` passed in the development container: **562 tests, 8,890 assertions**, PHPStan level 6, architecture, runtime, UI contracts, and release validation. This is local Podman validation, not VPS validation.
 - A Composer dry run for `symfony/workflow:8.1.*`, `league/omnipay:^3`, and `omnipay/dummy:^3` succeeded: 14 proposed additions, no existing package updates/removals. It resolved Workflow 8.1.0, league/omnipay 3.2.1, omnipay/common 3.5.1, and Dummy 3.0.0. This proves dependency resolution, not runtime compatibility; adapter tests must prove that next. No dependencies were installed or manifest/lock changes retained.
 
-## 3. Reuse and change map
+## 3. Original reuse and change map — reassess each row against v0.8.6
 
-Paths below are relative to this code root.
+Paths below are relative to this code root. “Currently” in this original table means 12 September 2026; the current-status map above takes precedence where implementation has since landed.
 
 | Existing component | Implementation decision |
 | --- | --- |
@@ -40,11 +56,11 @@ Paths below are relative to this code root.
 | `AuditRepository`, `Event/EventDispatcher` | Reuse normal activity reporting. Add protected commerce audit/payment/ledger events. The existing plugin dispatcher catches listener failures, so it must not be responsible for essential fulfilment. |
 | Workspace registries, `ThemeRenderer`, core Twig pages | Extend the existing account/company/admin workspaces, shared controls and navigation. Follow `docs/ux-ui-rules.md`; retain server-rendered forms and progressive enhancement. |
 
-## 4. Commerce architecture
+## 4. Commerce architecture — original design, partially implemented
 
-Create `src/Commerce/{Contract,Domain,Application,Policy,Workflow,Event,Infrastructure,Http}`. Domain objects describe commerce state; they do not duplicate Course, User, Company or learning records. Repositories hydrate workflow subjects without introducing ORM entities.
+`src/Commerce/` now contains Contract, Domain, Application, Policy, Workflow, Infrastructure and Http code for individual purchasing. The remaining domain work should extend this existing structure. Domain objects describe commerce state; they do not duplicate Course, User, Company or learning records. Repositories hydrate workflow subjects without introducing ORM entities.
 
-Register services explicitly in `config/services.yaml`, excluding DTOs/value objects. Add attribute route discovery for Commerce controllers in `config/routes.yaml`. Import adapted workflows into `config/packages/workflow.yaml`; load policy defaults through a typed configuration service, with effective-dated overrides and purchased policy snapshots.
+The current Commerce controller uses attribute routes and the application has service wiring and transitions. Further services should follow the existing Symfony wiring and routing conventions; policy defaults, effective-dated overrides and purchased policy snapshots remain broader plan requirements where not yet implemented.
 
 The payment boundary is:
 
@@ -62,9 +78,9 @@ Omnipay Dummy supports deterministic successful/failed purchases. Use its docume
 
 Sources checked: [Omnipay Dummy](https://github.com/thephpleague/omnipay-dummy), [Omnipay dependency manifest](https://github.com/thephpleague/omnipay/blob/master/composer.json), and [Symfony Workflow](https://symfony.com/doc/current/workflow.html). Implement against the installed 8.1 component API, rather than assuming every feature in current documentation is available.
 
-## 5. Persistence and transaction design
+## 5. Persistence and transaction design — implemented foundation plus remaining rules
 
-Use additive Phinx migrations grouped by feature. Never rewrite the baseline. Add tables for offers/policy history; carts/orders/item snapshots; documents and numbering; payment attempts/events; fulfilment records and entitlements; funds accounts/ledger/reservations, refunds, payouts, debt and disputes; credit units/invitations; gifts; retake allowances; completion and verification history.
+Use additive Phinx migrations for new commerce features. The current code already has carts, orders/item snapshots, documents/numbering, payment attempts/events, audit/outbox and entitlements. Offers/policy history, funds accounts/ledger/reservations, refunds, payouts, debt, disputes, purchased credit units/invitations, gifts, retake allowances and broader completion/verification history remain future work according to the approved order and later owner decisions. Do not recreate existing commerce tables.
 
 Use BIGINT minor units with currency and TIMESTAMPTZ. Snapshot purchaser/billing identity, course/revision policy, duration, tax, discounts, consent wording/version and terms. Issued document content is immutable; lifecycle/payment summaries are separate mutable projections. Allocate permanent invoice numbers transactionally, with uniqueness and no reuse of issued numbers.
 
@@ -82,9 +98,9 @@ Lock funds accounts in a consistent order. Record linked ledger movements for of
 
 Backfill legacy enrolments, lots and allocations with explicit legacy/grant provenance; do not invent historical payments, paid prices or consent. Preserve existing deadlines/history. Reconcile quantities and allocations before enforcing unit-level constraints; report inconsistent data rather than discarding it. New default policies must not retroactively start or expire legacy access.
 
-## 6. Delivery sequence and acceptance
+## 6. Original broad delivery sequence and acceptance — superseded for scheduling
 
-Security, audit, concurrency protection and tests accompany every phase; phase 7 completes administration rather than introducing safeguards late.
+The table below is the original full-domain sequence, not the next-work order. Phases 1–3 have an implemented individual-purchase foundation but are not a claim of complete coverage of every listed product and policy. The owner-approved order at the top of this document governs the next three coding steps and their review breaks. Security, audit, concurrency protection and tests accompany each step; they do not wait for a later administration phase.
 
 | Phase | Deliverable and acceptance |
 | --- | --- |
@@ -94,15 +110,15 @@ Security, audit, concurrency protection and tests accompany every phase; phase 7
 | 4 — Money lifecycle | Account Funds, full/mixed settlement, refunds/credit notes, immediate full-refund revocation, payouts/reservations, transfers behind the supplied gate, debt, disputes, reversals and reconciliation. No negative available funds or duplicate receipts/fulfilment. |
 | 5 — Company credits | Purchase lots and units, batch purchase, provisional allocation, 24-hour consumption, 24-hour invitations, warning notices, reversal and conversion, LIFO refund valuation. Preserve consumed learner access after departure/company dispute. Keep the supplied expiry gate effective. |
 | 6 — Gifts and learning products | Token + purchaser PIN, hashed secrets, claim throttling, correction/reissue; original gift activation deadline; extensions, reopenings, one purchased graded attempt and scoped review access; audited pause applications and expiry adjustments. |
-| 6b — Academic history | Completion independent of passing, immutable completion certificates, all graded attempts including failures, exclusion of practice attempts, and one public learner-course verification identity. Preserve existing certificate links/snapshots. Address diagnostic auto-completion explicitly against the new required-assessments rule. |
+| 6b — Academic history | Completion independent of passing, immutable completion certificates, all graded attempts including failures, exclusion of practice attempts, and one public learner-course verification identity. Preserve existing certificate links/snapshots. Diagnostics do not complete a course under the current Course Components contract. |
 | 7 — Administration | Complete purchaser/company/admin screens, private offers and discounts, manual EFT/PayShap confirmation, refunds, payouts, grants, debt waivers, deadline overrides, reconciliation, audit and manual review. Require actor/reason/evidence for financial overrides. |
 | 8 — Acceptance | All supplied scenarios and workflow transitions, race-condition tests, new-commerce coverage target, complete existing QA, fresh-install and populated-database migration rehearsals, and browser checks across bundled themes. Update operations/handoff documentation and demonstrate Dummy-only end-to-end flows. |
 
-The first usable milestone spans phases 1–3: choose an existing course offer, place an order/invoice, attempt Dummy payment, retry failure, confirm once, create exactly one entitlement, start learning and demonstrate automatic activation/expiry with a controlled clock.
+The individual-course version of the original first usable milestone is implemented and covered by Commerce integration tests. Company purchases and ADMIN payment confirmation/refunds still require their own acceptance paths.
 
 ## 7. Timed work and workflow reconciliation
 
-Initially use a Symfony command, e.g. `commerce:process-deadlines`, scheduled by the existing Podman environment. This avoids requiring an additional queue service solely for clocks. Use injected `ClockInterface`, bounded batches, locks and idempotent transitions; schedule outbox dispatch/retries too. Calculate access from the actual deadline, not a delayed worker's execution time. Request-time checks enforce due access changes even if the worker is delayed.
+The current command is `commerce:maintain`, scheduled by the local Podman worker and documented in `OPERATIONS.md`. It advances overdue orders/access and retries requested invoice delivery. Extend that bounded maintenance path for new deadlines where appropriate. Use injected `ClockInterface`, locks and idempotent transitions. Calculate access from the actual deadline, not a delayed worker's execution time. Request-time checks enforce due access changes even if the worker is delayed.
 
 Adapt the supplied YAML before implementing it:
 

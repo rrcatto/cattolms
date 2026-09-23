@@ -95,7 +95,7 @@ final class ThemeUiContractTest extends TestCase
         self::assertStringContainsString('modal.hidden = false', $platformJs);
 
         $renderer = (string) file_get_contents(__DIR__ . '/../../src/View/ThemeRenderer.php');
-        self::assertStringContainsString("PLATFORM_ASSET_VERSION = '0.8.6'", $renderer);
+        self::assertStringContainsString("PLATFORM_ASSET_VERSION = '0.8.6.1'", $renderer);
         self::assertStringContainsString("platformAsset('/js/platform-overrides.js')", $renderer);
         self::assertStringContainsString("platformAsset('/css/catto-platform.css')", $renderer);
     }

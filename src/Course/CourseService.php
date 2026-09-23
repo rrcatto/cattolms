@@ -1084,26 +1084,66 @@ final class CourseService
             return;
         }
         $seconds = max(1, (int) $course['default_access_period_seconds']);
-        $enrolmentId = $this->courses->grantCourse($targetUserId, $courseId, $seconds, $userId);
+        $enrolmentId = $this->courses->grantCourse($targetUserId, $courseId, $seconds, $userId, true);
         $this->courses->recordHistory($courseId, $userId, 'course.granted_for_testing', 'enrolment', $enrolmentId, 'Course added to the administrator library for testing.');
         $this->audit->record($userId, 'course.granted_for_testing', ['course_id' => $courseId, 'user_id' => $targetUserId]);
     }
 
     public function grantByEmail(int $courseId, string $email, int $days, int $userId): void
     {
+        $this->grantByEmails($courseId, [$email], $days, $userId);
+    }
+
+    /**
+     * @param list<string> $emails
+     * @return array{count:int,expires_at:string}
+     */
+    public function grantByEmails(int $courseId, array $emails, int $days, int $userId): array
+    {
         $course = $this->courses->findById($courseId);
         if ($course === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
-        $email = EmailAddress::normalize($email);
-        $user = $this->courses->findUserByEmail($email);
-        if ($user === null) {
-            throw new InvalidArgumentException('No verified user account exists for that email address.');
+        if ($days < 1 || $days > intdiv(2147483647, 86400)) {
+            throw new InvalidArgumentException('Enter a valid positive number of access days.');
         }
-        $seconds = max(1, $days) * 86400;
-        $enrolmentId = $this->courses->grantCourse((int) $user['id'], $courseId, $seconds, $userId);
-        $this->courses->recordHistory($courseId, $userId, 'course.granted', 'enrolment', $enrolmentId, 'Course granted to ' . $email . '.', ['days' => $days]);
-        $this->audit->record($userId, 'course.granted', ['course_id' => $courseId, 'user_id' => (int) $user['id'], 'days' => $days]);
+        if ($emails === [] || count($emails) > 100) { throw new InvalidArgumentException('Choose between 1 and 100 people.'); }
+        $users = []; $seen = []; $seenUsers = [];
+        foreach ($emails as $value) {
+            $email = EmailAddress::normalize($value);
+            if (isset($seen[$email])) { throw new InvalidArgumentException('An email address was entered more than once: ' . $email . '.'); }
+            $seen[$email] = true;
+            $user = $this->courses->findUserByEmail($email);
+            if ($user === null) { throw new InvalidArgumentException('No active verified account exists for ' . $email . '.'); }
+            if (isset($seenUsers[(int) $user['id']])) { throw new InvalidArgumentException('One person was selected more than once.'); }
+            $seenUsers[(int) $user['id']] = true;
+            $this->courses->expireElapsedEnrolment((int) $user['id'], $courseId);
+            if ($this->courses->enrolment((int) $user['id'], $courseId) !== null) { throw new InvalidArgumentException($email . ' already has this course in their library.'); }
+            $users[] = ['id' => (int) $user['id'], 'email' => $email];
+        }
+        $seconds = $days * 86400;
+        $this->transactions->run(function () use ($courseId, $users, $seconds, $userId, $days): void {
+            foreach ($users as $recipient) {
+                $enrolmentId = $this->courses->grantCourse($recipient['id'], $courseId, $seconds, $userId, true);
+                $this->courses->recordHistory($courseId, $userId, 'course.granted', 'enrolment', $enrolmentId, 'Course granted to ' . $recipient['email'] . '.', ['days' => $days]);
+            }
+        });
+        foreach ($users as $recipient) { $this->audit->record($userId, 'course.granted', ['course_id' => $courseId, 'user_id' => $recipient['id'], 'days' => $days]); }
+        return ['count' => count($users), 'expires_at' => gmdate('Y-m-d H:i:s \U\T\C', time() + $seconds)];
+    }
+
+    /** @return array{count:int,expires_at:string} */
+    public function grantToPerson(int $courseId, int $targetUserId, int $days, int $actorUserId): array
+    {
+        $user = $this->courses->grantRecipient($targetUserId);
+        if ($user === null) { throw new InvalidArgumentException('This person needs an active account with a verified email address.'); }
+        return $this->grantByEmails($courseId, [(string) $user['email']], $days, $actorUserId);
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function courseTestGrants(int $courseId): array
+    {
+        return $this->courses->courseTestGrants($courseId);
     }
 
     /**

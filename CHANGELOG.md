@@ -1,6 +1,15 @@
 # Changelog
 
-**LMS version:** 0.8.6 **Date time:** 2026/09/22 SAST
+**LMS version:** 0.8.6.1 **Date time:** 2026/09/23 SAST
+
+## 2026-09-23 SAST — v0.8.6.1 ADMIN test access and current documentation
+
+- Grant draft or published courses to active verified accounts from the course page or person profile. Course-first grants accept multiple email addresses; the positive whole-day access period begins at assignment, and Start Course does not extend it. Open grants are rejected as duplicates and elapsed grants may be issued again.
+- Allow started testers to continue receiving course edits and availability changes. Replacement import clears ordinary grants, attempts, results and certificates; purchased entitlements retain their financial links while their old course work is cleared.
+- Update the roadmap, commerce plan, handoff, project guide, operations guide and README to distinguish completed individual commerce from pending tester administration, company credit purchasing, payment administration and refunds. Preserve historical release records as history.
+- Align Composer, platform asset URLs, REST and MCP application-version responses and release/UI contract assertions to 0.8.6.1. No database schema or bundled theme version changes are part of this release.
+
+Validation: full `composer qa`, Composer manifest/lock validation, Twig lint of all 179 templates and `git diff --check` pass. Both all-theme browser matrices and a no-JavaScript grant-form smoke check passed before the version-only release edits. No schema or bundled-theme version changes.
 
 ## 2026-09-22 SAST — v0.8.6 Course Components
 

@@ -165,10 +165,8 @@ final class CourseItemService
         $course = $this->courses->findById($courseId);
         if ($course === null) { throw new InvalidArgumentException('The course does not exist.'); }
         $course['structure'] = $this->availability($courseId, null, false);
-        $course['availability_locked'] = $this->items->hasActiveLearners($courseId);
         $siblings = [];
         foreach ($course['structure'] as $row) { $siblings[(int) ($row['parent_node_id'] ?? 0)][] = $row; }
-        $scheduled = count(array_filter($course['structure'], static fn(array $row): bool => (int) $row['relative_delay_minutes'] > 0)) > 0;
         $sectionDepth = [];
         foreach (array_reverse($course['structure']) as $row) {
             $id = (int) $row['id'];
@@ -179,11 +177,10 @@ final class CourseItemService
             $group = $siblings[(int) ($row['parent_node_id'] ?? 0)];
             $index = array_search($row['id'], array_column($group, 'id'), true);
             $previous = $index !== false && $index > 0 ? $group[$index - 1] : null;
-            $locked = $course['availability_locked'] && $scheduled;
-            $row['can_up'] = !$locked && $index !== false && $index > 0;
-            $row['can_down'] = !$locked && $index !== false && isset($group[$index + 1]);
-            $row['can_indent'] = !$locked && $previous !== null && (int) $previous['depth'] < 3;
-            $row['can_unindent'] = !$locked && $row['parent_node_id'] !== null;
+            $row['can_up'] = $index !== false && $index > 0;
+            $row['can_down'] = $index !== false && isset($group[$index + 1]);
+            $row['can_indent'] = $previous !== null && (int) $previous['depth'] < 3;
+            $row['can_unindent'] = $row['parent_node_id'] !== null;
         }
         unset($row);
         $course['publication_validation'] = $this->publicationValidation($courseId);
@@ -206,7 +203,6 @@ final class CourseItemService
         $item = $this->item($itemId);
         $parent = $this->nullableId($input['parent_node_id'] ?? null);
         $data = $this->placementData($courseId, $item, $input);
-        if ($data['relative_delay_minutes'] > 0 && $this->items->hasActiveLearners($courseId)) { throw new InvalidArgumentException('Availability cannot be changed while this course has active learners.'); }
         $position = $this->items->nextPosition($courseId, $parent);
         $node = $this->items->createPlacement($courseId, $itemId, $parent, $position, $data);
         $this->audit->record($userId, 'course_item.placed', ['course_id' => $courseId, 'course_item_id' => $itemId, 'node_id' => $node]);
@@ -220,7 +216,6 @@ final class CourseItemService
         if ($title === '') { throw new InvalidArgumentException('A section needs a title.'); }
         $parent = $this->nullableId($input['parent_node_id'] ?? null);
         $delay = $this->delay($input);
-        if ($delay > 0 && $this->items->hasActiveLearners($courseId)) { throw new InvalidArgumentException('Availability cannot be changed while this course has active learners.'); }
         $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay);
         $this->audit->record($userId, 'course_section.created', ['course_id' => $courseId, 'node_id' => $id]);
         return $id;
@@ -230,7 +225,6 @@ final class CourseItemService
     {
         $node = $this->items->node($courseId, $nodeId);
         if ($node === null || (string) $node['node_type'] !== 'item') { throw new InvalidArgumentException('The Course Item placement does not exist.'); }
-        if ((int) $node['relative_delay_minutes'] > 0 && $this->items->hasActiveLearners($courseId)) { throw new InvalidArgumentException('Removing this scheduled row would change availability while learners are active.'); }
         $this->items->removeNode($courseId, $nodeId);
         $this->audit->record($userId, 'course_item.removed', ['course_id' => $courseId, 'node_id' => $nodeId]);
     }
@@ -243,7 +237,6 @@ final class CourseItemService
         $item = $this->item((int) $placement['course_item_id']);
         $hasDelayInput = array_intersect(['relative_delay_minutes','delay_weeks','delay_days','delay_hours','delay_minutes'], array_keys($input)) !== [];
         if (!$hasDelayInput) { $input['relative_delay_minutes'] = (int) $placement['relative_delay_minutes']; }
-        if ($this->items->hasActiveLearners($courseId) && $this->delay($input) !== (int) $placement['relative_delay_minutes']) { throw new InvalidArgumentException('Availability cannot be changed while this course has active learners.'); }
         $this->items->updatePlacement($nodeId, $this->placementData($courseId, $item, $input));
         $this->audit->record($userId, 'course_item.placement_updated', ['course_id' => $courseId, 'course_item_id' => (int) $placement['course_item_id'], 'node_id' => $nodeId]);
     }
@@ -252,9 +245,6 @@ final class CourseItemService
     {
         $node = $this->items->node($courseId, $nodeId);
         if ($node === null || !in_array($direction, ['up','down','indent','unindent'], true)) { throw new InvalidArgumentException('Select a valid Course Content move.'); }
-        if ($this->items->hasActiveLearners($courseId)) {
-            foreach ($this->items->structure($courseId) as $row) { if ((int) $row['relative_delay_minutes'] > 0) { throw new InvalidArgumentException('Reordering scheduled Course Content would change availability while learners are active.'); } }
-        }
         $parent = $node['parent_node_id'] === null ? null : (int) $node['parent_node_id'];
         $siblings = $this->items->siblings($courseId, $parent);
         $index = array_search($nodeId, array_map(static fn(array $row): int => (int) $row['id'], $siblings), true);
@@ -324,7 +314,6 @@ final class CourseItemService
         if ($title === '') { throw new InvalidArgumentException('A section needs a title.'); }
         $hasDelay = array_intersect(['relative_delay_minutes','delay_weeks','delay_days','delay_hours','delay_minutes'], array_keys($input)) !== [];
         $delay = $hasDelay ? $this->delay($input) : (int) $node['relative_delay_minutes'];
-        if ($delay !== (int) $node['relative_delay_minutes'] && $this->items->hasActiveLearners($courseId)) { throw new InvalidArgumentException('Availability cannot be changed while this course has active learners.'); }
         $this->transactions->run(fn() => $this->items->updateSection($nodeId, $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay));
         $this->audit->record($userId, 'course_section.updated', ['course_id' => $courseId, 'node_id' => $nodeId]);
     }

@@ -150,7 +150,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         self::assertTrue($rows[3]['is_final_assessment']);
     }
 
-    public function testAvailabilityCannotBeClearedForAnActiveLearner(): void
+    public function testAvailabilityCanBeChangedWhileADevelopmentTesterIsActive(): void
     {
         $id = $this->lesson('locked');
         $node = $this->items->addExisting($this->course, $id, ['delay_days' => 1], $this->owner);
@@ -159,8 +159,38 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->db->executeStatement('UPDATE course_enrolments SET started_at=NOW(),expires_at=NOW()+INTERVAL \'1 year\' WHERE id=:id', ['id' => $enrolment]);
         $this->items->updatePlacement($this->course, $node, ['display_title_override' => 'Allowed title edit'], $this->owner);
         self::assertSame(1440, (int) $this->records->node($this->course, $node)['relative_delay_minutes']);
-        $this->expectException(InvalidArgumentException::class);
         $this->items->updatePlacement($this->course, $node, ['relative_delay_minutes' => 0], $this->owner);
+        self::assertSame(0, (int) $this->records->node($this->course, $node)['relative_delay_minutes']);
+    }
+
+    public function testReplacingAStartedTestCourseRemovesItsGrantAndCourseWork(): void
+    {
+        $itemId = $this->lesson('before-reimport');
+        $this->items->addExisting($this->course, $itemId, [], $this->owner);
+        $fixture = new DevelopmentFixture($this->db);
+        $enrolmentId = $fixture->createEnrolment($this->owner, $this->course, $this->owner, 86400, false, 'active');
+        $this->db->executeStatement("UPDATE course_enrolments SET started_at=NOW(),expires_at=NOW()+INTERVAL '1 day' WHERE id=:id", ['id' => $enrolmentId]);
+        (new \CattoLearning\Course\CoursePortabilityRepository($this->db))->resetCourseContent($this->course);
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE course_id=:id', ['id' => $this->course]));
+        self::assertSame([], $this->records->structure($this->course));
+        self::assertNotNull($this->db->fetchOne('SELECT id FROM courses WHERE id=:id', ['id' => $this->course]));
+    }
+
+    public function testReplacementClearsPurchasedCourseWorkWithoutDeletingItsEntitlement(): void
+    {
+        $itemId = $this->lesson('purchased-before-reimport');
+        $this->items->addExisting($this->course, $itemId, [], $this->owner);
+        $fixture = new DevelopmentFixture($this->db);
+        $enrolmentId = $fixture->createEnrolment($this->owner, $this->course, $this->owner, 86400, false, 'completed');
+        $this->db->executeStatement("UPDATE course_enrolments SET started_at=NOW(),expires_at=NOW()+INTERVAL '1 day',completed_at=NOW() WHERE id=:id", ['id' => $enrolmentId]);
+        $this->db->executeStatement("INSERT INTO commerce_entitlements(enrolment_id,state,source,snapshot,created_at,activation_deadline_at,access_started_at,access_expires_at) VALUES (:id,'active','free','{}'::jsonb,NOW(),NOW()+INTERVAL '1 day',NOW(),NOW()+INTERVAL '1 day')", ['id' => $enrolmentId]);
+        $this->db->executeStatement("INSERT INTO course_results(enrolment_id,module_percentage,final_percentage,overall_percentage,grade_code,passed) VALUES (:id,50,50,50,'PASS',TRUE)", ['id' => $enrolmentId]);
+
+        (new \CattoLearning\Course\CoursePortabilityRepository($this->db))->resetCourseContent($this->course);
+
+        self::assertSame('active', $this->db->fetchOne('SELECT status FROM course_enrolments WHERE id=:id', ['id' => $enrolmentId]));
+        self::assertNotNull($this->db->fetchOne('SELECT id FROM commerce_entitlements WHERE enrolment_id=:id', ['id' => $enrolmentId]));
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_results WHERE enrolment_id=:id', ['id' => $enrolmentId]));
     }
 
     public function testCycleIsPublicationErrorAndRendererTerminates(): void
