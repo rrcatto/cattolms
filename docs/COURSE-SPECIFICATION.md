@@ -457,7 +457,7 @@ The owner-approved Course Components v2 specification supersedes module-centric 
 
 ### Identity, sharing and author control
 
-A Course Item is an independent reusable record. A course placement supplies its structural position, optional title/description overrides, public-preview flag and assessment role. Sections form a mixed ordered tree with at most three section levels. Assessments and diagnostics have the same sharing, Save, Save As and deletion lifecycle as other Course Items.
+A Course Item is an independent reusable record. A course placement supplies its structural position, optional title/description overrides, public-preview flag and assessment role. Course Items and sections form a mixed ordered tree with at most three levels. An item or section may parent another Course Item or section. Assessments and diagnostics have the same sharing, Save, Save As and deletion lifecycle as other Course Items. The Course Content editor previews Up, Down, Indent and Unindent moves in the ADMIN session; only Save arrangement writes the order, and Cancel changes discards the preview. Unindenting places the child immediately after its former parent in the outer sibling list. Other placement and section forms have their own explicit Save actions. Removing a parent placement with children is blocked until ADMIN explicitly moves or removes those children.
 
 Course Item keys are unique and case-sensitive, accept ASCII letters, numbers, dots, underscores and hyphens, begin with a letter or number, and contain at most 120 characters. ADMIN may change a key. Changing it never rewrites authored content. `[course-item:My-Key]` remains stored as source and is resolved at display time by the referenced item's type renderer. Broken draft references are allowed; unresolved or circular references block publication. The library shows standalone and embedded usages. Permanent deletion requires zero placements and zero live embedding references.
 
@@ -481,7 +481,7 @@ The course reader and assessment pages use the Core-owned full-screen white pres
 
 ### HTML import mapping
 
-Existing conforming HTML remains valid input. Teaching modules become HTML Course Items and placements. Separately represented graded assessments, diagnostics, finals and review components become their own Course Items. Author identifiers/titles produce deterministic keys; existing/imported key collisions are reported and block commit pending explicit resolution. Existing authored media remains embedded. Shortcodes may refer to definitions in the package or an existing Course Item by exact key. Missing references are import errors. Commit is transactional; technical failures do not leave half-created courses.
+Existing conforming HTML remains valid input. Teaching modules become HTML Course Items and placements. Separately represented graded assessments, diagnostics, finals and review components become their own Course Items. A module assessment is placed as a child of its source HTML module; final assessments remain top-level. Author identifiers/titles produce deterministic keys; existing/imported key collisions are reported and block commit pending explicit resolution. Existing authored media remains embedded. Shortcodes may refer to definitions in the package or an existing Course Item by exact key. Missing references are import errors. Commit is transactional; technical failures do not leave half-created courses.
 
 ### Structured interchange 2.0
 

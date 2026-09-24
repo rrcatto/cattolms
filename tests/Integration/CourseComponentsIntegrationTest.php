@@ -250,6 +250,26 @@ final class CourseComponentsIntegrationTest extends TestCase
         $this->items->move($this->course, $first, 'indent', $this->owner);
     }
 
+    public function testArrangementIsOnlyPersistedOnSaveAndUnindentStaysBesideItsModule(): void
+    {
+        $module = $this->items->addExisting($this->course, $this->lesson('module-one'), [], $this->owner);
+        $assessment = $this->items->addExisting($this->course, $this->assessment('module-one-assessment'), ['assessment_role' => 'graded'], $this->owner);
+        $nextModule = $this->items->addExisting($this->course, $this->lesson('module-two'), [], $this->owner);
+        $baseline = $this->items->currentStructureSignature($this->course);
+        $draft = $this->items->moveDraft($this->items->structureDraft($this->course), $assessment, 'indent');
+        self::assertNull($this->records->node($this->course, $assessment)['parent_node_id']);
+        self::assertSame($module, $this->items->previewStructureDraft($this->course, $draft)['structure'][1]['parent_node_id']);
+        $this->items->saveStructureDraft($this->course, $draft, $baseline, $this->owner);
+        self::assertSame($module, (int) $this->records->node($this->course, $assessment)['parent_node_id']);
+
+        $draft = $this->items->moveDraft($this->items->structureDraft($this->course), $assessment, 'unindent');
+        self::assertSame([$module, $assessment, $nextModule], array_column($draft, 'id'));
+        self::assertSame($module, (int) $this->records->node($this->course, $assessment)['parent_node_id']);
+        $this->items->saveStructureDraft($this->course, $draft, $this->items->currentStructureSignature($this->course), $this->owner);
+        self::assertSame([$module, $assessment, $nextModule], array_column($this->records->structure($this->course), 'id'));
+        self::assertNull($this->records->node($this->course, $assessment)['parent_node_id']);
+    }
+
     public function testPublicAssessmentPreviewDoesNotCreateActivityRecords(): void
     {
         $fixture = new DevelopmentFixture($this->db);

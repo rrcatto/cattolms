@@ -10,6 +10,38 @@ use PHPUnit\Framework\TestCase;
 /** Enforces canonical structural ownership across core views and all bundled theme templates. */
 final class UiComponentContractTest extends TestCase
 {
+    public function testCourseAvailabilityFieldsRenderWithoutAnObsoleteCourseLock(): void
+    {
+        $html = RenderHarness::render('partials/course-availability-fields', [
+            'course' => ['id' => 1],
+            'delay_total' => 1501,
+            'delay_prefix' => 'section-1',
+        ]);
+        self::assertStringContainsString('name="delay_days"', $html);
+        self::assertStringContainsString('name="delay_minutes"', $html);
+        self::assertStringNotContainsString('disabled', $html);
+    }
+
+    public function testCourseContentEditorRendersWithoutAnObsoleteCourseLock(): void
+    {
+        $html = RenderHarness::render('pages/admin-course-content', RenderHarness::hiveWith([
+            'course' => ['id' => 1, 'slug' => 'example', 'title' => 'Example', 'structure' => [], 'publication_validation' => ['errors' => [], 'warnings' => []]],
+            'library_items' => [],
+            'item_search' => '',
+            'csrf' => 'test-csrf',
+            'arrangement_pending' => false,
+        ]));
+        self::assertStringContainsString('Course Content', $html);
+        self::assertStringContainsString('name="delay_weeks"', $html);
+        $pending = RenderHarness::render('pages/admin-course-content', RenderHarness::hiveWith([
+            'course' => ['id' => 1, 'slug' => 'example', 'title' => 'Example', 'structure' => [], 'publication_validation' => ['errors' => [], 'warnings' => []]],
+            'library_items' => [], 'item_search' => '', 'csrf' => 'test-csrf', 'arrangement_pending' => true,
+        ]));
+        self::assertStringContainsString('/content/save-arrangement', $pending);
+        self::assertStringContainsString('/content/cancel-arrangement', $pending);
+        self::assertStringNotContainsString('/content/sections', $pending);
+    }
+
     public function testComponentTextIsEscapedByTheSameTwigEnvironmentAsRuntime(): void
     {
         $html = \CattoLearning\Tests\Support\ComponentHarness::render('feedback.empty', ['heading' => '<script>bad()</script>', 'summary' => 'A & B']);

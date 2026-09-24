@@ -257,12 +257,32 @@ final class CourseItemRepository
         $this->db->executeStatement('DELETE FROM course_structure_nodes WHERE id=:id AND course_id=:course', ['id' => $nodeId, 'course' => $courseId]);
     }
 
+    public function hasChildren(int $courseId, int $nodeId): bool
+    {
+        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_structure_nodes WHERE course_id=:course AND parent_node_id=:parent', ['course' => $courseId, 'parent' => $nodeId]) > 0;
+    }
+
     public function moveNode(int $courseId, int $nodeId, ?int $parentId, int $position): void
     {
         $this->db->executeStatement(
             'UPDATE course_structure_nodes SET parent_node_id=:parent,position=:position,updated_at=NOW() WHERE id=:id AND course_id=:course',
             ['parent' => $parentId, 'position' => $position, 'id' => $nodeId, 'course' => $courseId]
         );
+    }
+
+    /** @param list<array{id:int,parent_node_id:int|null}> $draft */
+    public function saveStructureOrder(int $courseId, array $draft): void
+    {
+        $offset = (int) $this->db->fetchOne('SELECT COALESCE(MAX(position),0) FROM course_structure_nodes WHERE course_id=:course', ['course' => $courseId]) + count($draft) + 1;
+        foreach ($draft as $index => $row) {
+            $this->moveNode($courseId, $row['id'], null, $offset + $index);
+        }
+        $positions = [];
+        foreach ($draft as $row) {
+            $parent = $row['parent_node_id']; $key = $parent ?? 0;
+            $positions[$key] = ($positions[$key] ?? 0) + 1;
+            $this->moveNode($courseId, $row['id'], $parent, $positions[$key]);
+        }
     }
 
     /** @return array<string,mixed>|null */

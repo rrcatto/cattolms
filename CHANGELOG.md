@@ -1,6 +1,15 @@
 # Changelog
 
-**LMS version:** 0.8.7 **Date time:** 2026/09/24 SAST
+**LMS version:** 0.8.7.1 **Date time:** 2026/09/24 SAST
+
+## 2026-09-24 SAST — v0.8.7.1 Course Content arrangement and import grouping
+
+- Stage Course Content moves in the current session. Save arrangement commits the hierarchy; Cancel changes discards the preview. Unindent keeps a child immediately after its former parent instead of moving it to the course end. Existing placement and Course Item identities remain stable.
+- Nest assessments from legacy HTML modules under their matching module during import. Correct the eight matching module assessments in the existing Foundations of Property Law and Conveyancing Admin development course without changing its review aid or final assessment.
+- Repair the Course Content editor availability partial so missing course-level `availability_locked` data does not cause a 500 error.
+- Align Composer, platform asset URLs, API/MCP responses, validation assertions and current documentation with v0.8.7.1. No schema migration, dataset reset or theme-version change.
+
+Validation: `SHELL_VERBOSITY=-1 composer qa`, Twig lint of all 184 templates, AssetMapper compilation, Composer manifest/lock validation, a no-JavaScript Course Content stage/Cancel browser check and `git diff --check` pass.
 
 ## 2026-09-24 SAST — v0.8.7 Tester administration, company credits and payment operations
 

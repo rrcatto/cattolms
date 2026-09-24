@@ -16,6 +16,42 @@ use PHPUnit\Framework\TestCase;
 
 final class TrustedCourseImportTest extends TestCase
 {
+    public function testLegacyModuleAssessmentIsImportedAsItsModuleChild(): void
+    {
+        $boot = CliBootstrap::boot();
+        $container = $boot['container'];
+        /** @var Database $db */
+        $db = $container->get(Database::class);
+        /** @var CoursePortabilityService $portability */
+        $portability = $container->get(CoursePortabilityService::class);
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        $temporary = tempnam(sys_get_temp_dir(), 'grouped-course-');
+        self::assertNotFalse($temporary);
+        $key = null;
+        try {
+            $owner = $fixture->createUser('Grouped import ' . $suffix);
+            $company = $fixture->createCompany($owner, 'Grouped author ' . $suffix, $suffix . '.example.test');
+            $course = $fixture->createCourse($owner, $company, 'grouped-' . $suffix, 'Grouped course');
+            $html = '<!doctype html><html><head><title>Grouped ' . $suffix . ' - Interactive Course</title></head><body><header class="masthead"><h1>Grouped ' . $suffix . '</h1><p>Summary.</p></header><section class="module" id="mod-m1"><span class="m-name">First module</span><div class="module-body"><p>Lesson.</p></div></section><script>const QUIZ={"m1":[{"q":"Question?","o":["Yes","No"],"a":0}],"final":[{"q":"Final?","o":["Yes","No"],"a":0}]};</script></body></html>';
+            file_put_contents($temporary, $html);
+            $analysis = $portability->stageImport(['error' => UPLOAD_ERR_OK, 'size' => filesize($temporary), 'tmp_name' => $temporary, 'name' => 'grouped.html'], $owner);
+            $key = $analysis['import_key'];
+            self::assertSame($analysis['structure'][0]['node_key'], $analysis['structure'][1]['parent_node_key']);
+            $portability->commitImport($key, 0, $owner, $course);
+            $rows = $container->get(\CattoLearning\Course\CourseItemRepository::class)->structure($course);
+            self::assertSame('assessment', $rows[1]['item_type']);
+            self::assertSame((int) $rows[0]['id'], (int) $rows[1]['parent_node_id']);
+        } finally {
+            @unlink($temporary);
+            if ($key !== null) {
+                @unlink($boot['instance_root'] . '/storage/imports/' . $key . '.html');
+                @unlink($boot['instance_root'] . '/storage/imports/' . $key . '.meta.json');
+            }
+            $fixture->cleanup();
+        }
+    }
+
     public function testStageCommitEditExportAndSvgMediaRetainAuthoredContent(): void
     {
         $boot = CliBootstrap::boot();

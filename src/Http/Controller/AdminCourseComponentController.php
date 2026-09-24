@@ -47,6 +47,7 @@ final class AdminCourseComponentController extends BaseController
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
         if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->blankItem((string) ($_POST['item_type'] ?? 'assessment'))), $courseId, '/admin/course-items'); }
         return $this->handle(function () use ($user, $courseId): void {
+            if ($courseId > 0) { $this->assertArrangementFinished($courseId); }
             $id = $courseId > 0 ? $this->items->createAttached($courseId, $_POST, $user->id) : $this->items->create($_POST, $user->id);
             $this->flash('success', 'The Course Item was created.');
             $this->redirect($courseId > 0 ? '/admin/courses/' . $courseId . '/content' : '/admin/course-items/' . $id);
@@ -101,56 +102,97 @@ final class AdminCourseComponentController extends BaseController
         $library = $this->items->library($search); $libraryItems = [];
         foreach ($library['unused'] as $item) { $libraryItems[(int) $item['id']] = $item; }
         foreach ($library['groups'] as $group) { foreach ($group['items'] as $item) { $libraryItems[(int) $item['id']] = $item; } }
-        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $this->items->courseContent($courseId), 'library_items' => array_values($libraryItems), 'item_search' => $search]);
+        $draft = $this->contentDraft($courseId);
+        if ($draft !== null && $draft['baseline'] !== $this->items->currentStructureSignature($courseId)) {
+            $this->clearContentDraft($courseId);
+            $this->flash('warning', 'Course Content changed elsewhere. Your unsaved arrangement was discarded; review the current course before editing.');
+            $draft = null;
+        }
+        $course = $draft === null ? $this->items->courseContent($courseId) : $this->items->previewStructureDraft($courseId, $draft['rows']);
+        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $course, 'arrangement_pending' => $draft !== null, 'library_items' => array_values($libraryItems), 'item_search' => $search]);
     }
 
     #[Route('/admin/courses/{id}/content/sections', name: 'admin_course_content_section', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function addSection(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void { $this->items->addSection($courseId, $_POST, $user->id); $this->flash('success', 'The section was added.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        return $this->handle(function () use ($user, $courseId): void { $this->assertArrangementFinished($courseId); $this->items->addSection($courseId, $_POST, $user->id); $this->flash('success', 'The section was added.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/courses/{id}/content/placements', name: 'admin_course_content_placement', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function addPlacement(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void { $this->items->addExisting($courseId, (int) ($_POST['course_item_id'] ?? 0), $_POST, $user->id); $this->flash('success', 'The existing Course Item was added to this course.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        return $this->handle(function () use ($user, $courseId): void { $this->assertArrangementFinished($courseId); $this->items->addExisting($courseId, (int) ($_POST['course_item_id'] ?? 0), $_POST, $user->id); $this->flash('success', 'The existing Course Item was added to this course.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/courses/{id}/content/{node_id}/placement', name: 'admin_course_content_placement_update', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
     public function updatePlacement(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->updatePlacement($courseId, $nodeId, $_POST, $user->id); $this->flash('success', 'The placement was saved.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->assertArrangementFinished($courseId); $this->items->updatePlacement($courseId, $nodeId, $_POST, $user->id); $this->flash('success', 'The placement was saved.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/courses/{id}/content/{node_id}/section', name: 'admin_course_content_section_update', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
     public function updateSection(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->updateSection($courseId, $nodeId, $_POST, $user->id); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->assertArrangementFinished($courseId); $this->items->updateSection($courseId, $nodeId, $_POST, $user->id); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/courses/{id}/content/move-selection', name: 'admin_course_content_move_selection', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function moveSelection(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void { $this->items->moveSelection($courseId, array_values(array_map('intval', (array) ($_POST['node_ids'] ?? []))), (string) ($_POST['direction'] ?? ''), $user->id); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        return $this->handle(function () use ($courseId): void {
+            $draft = $this->contentDraft($courseId) ?? $this->newContentDraft($courseId);
+            $selected = array_values(array_unique(array_map('intval', (array) ($_POST['node_ids'] ?? []))));
+            $draft['rows'] = $this->items->moveSelectionDraft($draft['rows'], $selected, (string) ($_POST['direction'] ?? ''));
+            $this->setContentDraft($courseId, $draft);
+            $this->redirect('/admin/courses/' . $courseId . '/content');
+        }, '/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/courses/{id}/content/{node_id}/move', name: 'admin_course_content_move', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
     public function move(): Response
     {
-        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->move($courseId, $nodeId, (string) ($_POST['direction'] ?? ''), $user->id); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        $this->requireCsrf(); $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
+        return $this->handle(function () use ($courseId, $nodeId): void {
+            $draft = $this->contentDraft($courseId) ?? $this->newContentDraft($courseId);
+            $draft['rows'] = $this->items->moveDraft($draft['rows'], $nodeId, (string) ($_POST['direction'] ?? ''));
+            $this->setContentDraft($courseId, $draft);
+            $this->redirect('/admin/courses/' . $courseId . '/content');
+        }, '/admin/courses/' . $courseId . '/content');
+    }
+
+    #[Route('/admin/courses/{id}/content/save-arrangement', name: 'admin_course_content_save_arrangement', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function saveArrangement(): Response
+    {
+        $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
+        return $this->handle(function () use ($courseId, $user): void {
+            $draft = $this->contentDraft($courseId);
+            if ($draft === null) { throw new InvalidArgumentException('There are no unsaved Course Content moves.'); }
+            $this->items->saveStructureDraft($courseId, $draft['rows'], $draft['baseline'], $user->id);
+            $this->clearContentDraft($courseId);
+            $this->flash('success', 'Course Content arrangement saved.');
+            $this->redirect('/admin/courses/' . $courseId . '/content');
+        }, '/admin/courses/' . $courseId . '/content');
+    }
+
+    #[Route('/admin/courses/{id}/content/cancel-arrangement', name: 'admin_course_content_cancel_arrangement', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function cancelArrangement(): Response
+    {
+        $this->requireCsrf(); $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
+        $this->clearContentDraft($courseId);
+        $this->flash('success', 'Unsaved Course Content moves were discarded.');
+        $this->redirect('/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/courses/{id}/content/{node_id}/remove', name: 'admin_course_content_remove', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
     public function remove(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId); $nodeId = $this->nodeId();
-        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->items->removeFromCourse($courseId, $nodeId, $user->id); $this->flash('success', 'The placement was removed. The shared Course Item remains in the library.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        return $this->handle(function () use ($user, $courseId, $nodeId): void { $this->assertArrangementFinished($courseId); $this->items->removeFromCourse($courseId, $nodeId, $user->id); $this->flash('success', 'The placement was removed. The shared Course Item remains in the library.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
     }
 
     #[Route('/admin/resources', name: 'admin_resource_library', methods: ['GET'])]
@@ -214,4 +256,33 @@ final class AdminCourseComponentController extends BaseController
     private function courseId(): int { $id = (int) $this->param('id'); if ($id < 1) { throw new InvalidArgumentException('Invalid course identifier.'); } return $id; }
     private function itemId(): int { $id = (int) $this->param('item_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Item identifier.'); } return $id; }
     private function nodeId(): int { $id = (int) $this->param('node_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Content row.'); } return $id; }
+
+    /** @return array{baseline:string,rows:list<array{id:int,parent_node_id:int|null}>}|null */
+    private function contentDraft(int $courseId): ?array
+    {
+        $draft = $_SESSION['course_content_draft_' . $courseId] ?? null;
+        return is_array($draft) && isset($draft['baseline'], $draft['rows']) && is_string($draft['baseline']) && is_array($draft['rows']) ? $draft : null;
+    }
+
+    /** @return array{baseline:string,rows:list<array{id:int,parent_node_id:int|null}>} */
+    private function newContentDraft(int $courseId): array
+    {
+        return ['baseline' => $this->items->currentStructureSignature($courseId), 'rows' => $this->items->structureDraft($courseId)];
+    }
+
+    /** @param array{baseline:string,rows:list<array{id:int,parent_node_id:int|null}>} $draft */
+    private function setContentDraft(int $courseId, array $draft): void
+    {
+        $_SESSION['course_content_draft_' . $courseId] = $draft;
+    }
+
+    private function clearContentDraft(int $courseId): void
+    {
+        unset($_SESSION['course_content_draft_' . $courseId]);
+    }
+
+    private function assertArrangementFinished(int $courseId): void
+    {
+        if ($this->contentDraft($courseId) !== null) { throw new InvalidArgumentException('Save or cancel the pending Course Content arrangement before making another edit.'); }
+    }
 }

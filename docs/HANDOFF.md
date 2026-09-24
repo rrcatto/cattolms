@@ -1,6 +1,8 @@
-# Catto Learning 0.8.7 — Development Handoff
+# Catto Learning 0.8.7.1 — Development Handoff
 
 ## Current development handoff — 2026/09/24
+
+The owner authorized v0.8.7.1 for the Course Content editor correction after v0.8.7. Move controls now stage a native PHP-session preview, with explicit Save arrangement and Cancel changes; unindent preserves the neighboring module position. Legacy HTML import places each module assessment under its module. The existing Foundations of Property Law and Conveyancing Admin development course received a one-time correction of its eight matching module assessments; the review aid and final assessment remain top-level. The `availability_locked` Twig 500 fix is included. No schema migration, dataset reset or theme-version change is needed. The owner authorized a commit, `main` push and tag for this release; later releases require a new instruction.
 
 The owner authorized the v0.8.7 version, direct `main` push and annotated tag. Final Composer validation, Twig lint of 184 templates, AssetMapper compilation and `SHELL_VERBOSITY=-1 composer qa` pass; PHPUnit reports 688 tests and 38,733 assertions. The two all-theme browser matrices and targeted no-JavaScript tester, company checkout and ADMIN orders flows passed during implementation. The local database received five additive migrations without a reset. Git publication does not deploy the VPS.
 
