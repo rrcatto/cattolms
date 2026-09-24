@@ -464,7 +464,7 @@
 						{% if test_grants %}
 							<h3 class="h5">Current direct grants</h3>
 							{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
-								{% for grant in test_grants %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ grant.learner_name }}</strong><p>{{ grant.email }} · {{ grant.status }} · {% if grant.expires_at %}until {{ grant.expires_at|date('j M Y H:i') }}{% else %}clock begins on Start course{% endif %}</p>{% endblock %}{% endembed %}{% endfor %}
+								{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'course'} %}{% endfor %}
 							{% endblock %}{% endembed %}
 						{% endif %}
 						{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}

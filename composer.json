@@ -135,7 +135,7 @@
             "role": "Project creator and maintainer"
         }
     ],
-    "version": "0.8.6.1",
+    "version": "0.8.7",
     "extra": {
         "public-dir": "public_html"
     }

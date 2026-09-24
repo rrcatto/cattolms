@@ -71,6 +71,11 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendCourseEnrolmentNotice($this->router->deliveryAddress($email), $courseTitle, $courseSlug);
     }
 
+    public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void
+    {
+        $this->mailer->sendCourseTestInvitation($this->router->deliveryAddress($email), $courseTitle, $courseSlug, $expiresAt);
+    }
+
     /**
      * The contact form's address identifies who wrote in, and the message goes to the platform.
      * Rewriting it would corrupt the reply-to of a genuine enquiry.

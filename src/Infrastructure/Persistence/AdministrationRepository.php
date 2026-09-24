@@ -560,7 +560,7 @@ SQL;
         'holder' => "COALESCE(co.name, NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''), u.display_name, ue.email)",
         'course' => 'c.title',
         'period' => 'cc.access_period_seconds',
-        'available' => "GREATEST(cc.quantity - (SELECT COUNT(*) FROM course_credit_allocations sca
+        'available' => "GREATEST(cc.quantity - cc.refunded_quantity - (SELECT COUNT(*) FROM course_credit_allocations sca
                                                  WHERE sca.credit_id=cc.id AND sca.status IN ('assigned','consumed')),0)",
         'assigned' => "(SELECT COUNT(*) FROM course_credit_allocations sca WHERE sca.credit_id=cc.id AND sca.status='assigned')",
         'consumed' => "(SELECT COUNT(*) FROM course_credit_allocations sca WHERE sca.credit_id=cc.id AND sca.status='consumed')",
@@ -812,12 +812,12 @@ SQL;
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE' . $where;
 
         $detail = 'SELECT cc.id, cc.public_id, cc.company_id, cc.user_id, cc.course_id, cc.access_period_seconds,
-                    cc.quantity, cc.source_type, cc.note, cc.created_at,
+                    cc.quantity, cc.refunded_quantity, cc.source_type, cc.note, cc.created_at,
                     c.title AS course_title,
                     COALESCE(co.name, NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS holder_name,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'assigned\')::int AS assigned_count,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'consumed\')::int AS consumed_count,
-                    GREATEST(cc.quantity - COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
+                    GREATEST(cc.quantity - cc.refunded_quantity - COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
              FROM page
              JOIN course_credits cc ON cc.id=page.id
              JOIN courses c ON c.id=cc.course_id
@@ -1034,11 +1034,11 @@ SQL;
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE cc.company_id=:company_id' . '' . $match;
 
-        $detail = 'SELECT cc.id,cc.public_id,cc.company_id,cc.course_id,cc.access_period_seconds,cc.quantity,cc.source_type,cc.note,cc.created_at,
+        $detail = 'SELECT cc.id,cc.public_id,cc.company_id,cc.course_id,cc.access_period_seconds,cc.quantity,cc.refunded_quantity,cc.source_type,cc.note,cc.created_at,
                     c.title AS course_title,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'assigned\')::int AS assigned_count,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'consumed\')::int AS consumed_count,
-                    GREATEST(cc.quantity-COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
+                    GREATEST(cc.quantity-cc.refunded_quantity-COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
              FROM page
              JOIN course_credits cc ON cc.id=page.id
              JOIN courses c ON c.id=cc.course_id
@@ -1788,7 +1788,7 @@ SQL;
              WHERE cc.company_id=:company_id
                AND cc.course_id=:course_id
                AND cc.access_period_seconds=:period
-               AND cc.quantity > (
+               AND cc.quantity - cc.refunded_quantity > (
                     SELECT COUNT(*) FROM course_credit_allocations cca
                     WHERE cca.credit_id=cc.id AND cca.status IN (\'assigned\',\'consumed\')
                )

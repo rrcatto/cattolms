@@ -25,9 +25,12 @@ final class InvoicePdfRenderer
         $html .= '<p>'.$escape($snapshot['billing_name']).'<br>'.nl2br($escape($snapshot['billing_address'])).'<br>'.$escape($snapshot['purchaser_email']).'</p>';
         $html .= '<table><thead><tr><th>Course</th><th>Access</th><th>Amount</th></tr></thead><tbody>';
         foreach ($snapshot['items'] as $item) {
-            $html .= '<tr><td>'.$escape($item['course_title']).'</td><td>'.((int) $item['access_period_seconds']/86400).' days</td><td>'.$escape(Money::strictMinorUnits((int) $item['line_total_minor'], (string) $item['currency'])->format()).'</td></tr>';
+            $quantity = (int)($item['quantity'] ?? 1);
+            $html .= '<tr><td>'.$escape($item['course_title']).($quantity > 1 ? ' × '.$quantity.' credits' : '').'</td><td>'.((int) $item['access_period_seconds']/86400).' days</td><td>'.$escape(Money::strictMinorUnits((int) $item['line_total_minor'], (string) $item['currency'])->format()).'</td></tr>';
         }
-        $html .= '</tbody></table><h2>Total: '.$escape(Money::strictMinorUnits((int) $snapshot['total_minor'], (string) $snapshot['currency'])->format()).'</h2><p>Tax is not charged. An invoice is not proof of payment.</p></body></html>';
+        $html .= '</tbody></table><h2>'.($document['kind']==='credit_note'?'Amount credited: ':'Total: ').$escape(Money::strictMinorUnits((int) $snapshot['total_minor'], (string) $snapshot['currency'])->format()).'</h2>';
+        $html .= $document['kind']==='credit_note' ? '<p>Refund basis: '.$escape($snapshot['refund_basis'] ?? '').'. Amount credited to Account Funds; this document does not record a bank payout.</p>' : '<p>Tax is not charged. An invoice is not proof of payment.</p>';
+        $html .= '</body></html>';
         $pdf = new Dompdf(new Options(['isRemoteEnabled'=>false,'isPhpEnabled'=>false,'isJavascriptEnabled'=>false]));
         $pdf->loadHtml($html, 'UTF-8');
         $pdf->setPaper('A4');

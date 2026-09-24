@@ -1,0 +1,25 @@
+{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+    <strong>{{ grant.course_title is defined ? grant.course_title : grant.learner_name }}</strong>
+    <p>{% if grant.email is defined %}{{ grant.email }} · {% endif %}{{ grant.display_status|capitalize }} · granted {{ grant.assigned_at|date('j M Y H:i', 'UTC') }} UTC · access ends {{ grant.expires_at|date('j M Y H:i', 'UTC') }} UTC</p>
+    {% if grant.access_removed_at %}<p>Revoked {{ grant.access_removed_at|date('j M Y H:i', 'UTC') }} UTC</p>{% endif %}
+{% endblock %}
+{% block actions %}
+    {% if grant.display_status in ['assigned', 'active', 'completed'] %}
+        <form action="/admin/test-grants/{{ grant.id }}/invite" method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="course_id" value="{{ grant.course_id is defined ? grant.course_id : course.id }}">
+            <input type="hidden" name="person_id" value="{{ grant.user_id }}">
+            <input type="hidden" name="context" value="{{ context }}">
+            {{ ui('action.button', {label: 'Send invitation', variant: 'secondary', size: 'small', type: 'submit'}) }}
+        </form>
+        <form action="/admin/test-grants/{{ grant.id }}/revoke" method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="course_id" value="{{ grant.course_id is defined ? grant.course_id : course.id }}">
+            <input type="hidden" name="person_id" value="{{ grant.user_id }}">
+            <input type="hidden" name="context" value="{{ context }}">
+            {{ ui('action.button', {label: 'Revoke access', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this test grant? Progress and results will be kept.'}) }}
+        </form>
+    {% endif %}
+{% endblock %}
+{% endembed %}

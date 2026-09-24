@@ -73,6 +73,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Seed\SeedGenerationPlan;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
+use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
 use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Course\LearningService;
@@ -118,7 +119,8 @@ final class AdminController extends BaseController
         private readonly CourseService $courses,
         private readonly MailerInterface $mailer,
         private readonly RoleAdministrationService $roleAdministration,
-        private readonly SelectedCompanyContext $companyContext
+        private readonly SelectedCompanyContext $companyContext,
+        private readonly CompanyCreditPurchaseService $creditPurchases
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -429,6 +431,7 @@ final class AdminController extends BaseController
             'sessions' => $sessions,
             'grant_course_search' => $courseSearch,
             'grant_courses' => $grantCourses,
+            'test_grants' => $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE') ? $this->courses->personTestGrants($target) : [],
         ]);
     }
 
@@ -443,6 +446,38 @@ final class AdminController extends BaseController
             $this->flash('success', 'Course access granted until ' . $result['expires_at'] . '.');
             $this->redirect('/admin/people/' . $personId);
         }, '/admin/people/' . $personId);
+    }
+
+    #[Route('/admin/test-grants/{id}/revoke', name: 'admin_revoke_test_grant', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function revokeTestGrant(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
+        $id = max(1, (int) $this->param('id'));
+        $courseId = (int) ($_POST['course_id'] ?? 0);
+        $personId = (int) ($_POST['person_id'] ?? 0);
+        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '#test-access';
+        return $this->handle(function () use ($id, $courseId, $personId, $user, $back): void {
+            $this->platformAdministration->revokeTestGrant($id, $courseId, $personId, $user->id);
+            $this->flash('success', 'Test access was revoked. Progress and results were retained.');
+            $this->redirect($back);
+        }, $back);
+    }
+
+    #[Route('/admin/test-grants/{id}/invite', name: 'admin_invite_test_grant', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function inviteTestGrant(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.ENROLMENT.MANAGE');
+        $id = max(1, (int) $this->param('id'));
+        $courseId = (int) ($_POST['course_id'] ?? 0);
+        $personId = (int) ($_POST['person_id'] ?? 0);
+        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '#test-access';
+        return $this->handle(function () use ($id, $courseId, $personId, $user, $back): void {
+            $this->platformAdministration->inviteTestLearner($id, $courseId, $personId, $user->id);
+            $this->flash('success', 'Test invitation sent.');
+            $this->redirect($back);
+        }, $back);
     }
 
     #[Route('/admin/people', name: 'admin_create_person', methods: ['POST'])]
@@ -582,7 +617,17 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $approve = (string) ($_POST['decision'] ?? '') === 'approve';
         return $this->handle(function () use ($user, $id, $approve): void {
-            $this->platformAdministration->decideRequest($id, $approve, (string) ($_POST['note'] ?? ''), $user->id, null);
+            $result = $this->platformAdministration->decideRequest($id, $approve, (string) ($_POST['note'] ?? ''), $user->id, null);
+            if ($result['decision'] === 'purchase_required') {
+                $this->companyContext->select($user, (int)$result['company_id']);
+                $existing = $this->creditPurchases->startForRequest($user,(int)$result['company_id'],$id);
+                if ($existing !== null) {
+                    $this->flash('info','A company purchase for this request is already in progress.');
+                    $this->redirect('/account/orders/'.$existing);
+                }
+                $this->flash('info', 'A matching company credit is needed. Complete checkout to approve and enrol this learner.');
+                $this->redirect('/company/credits/buy');
+            }
             $this->flash('success', $approve ? 'The request was approved.' : 'The request was rejected.');
             $this->redirect('/admin/course/enrolments');
         }, '/admin/course/enrolments');

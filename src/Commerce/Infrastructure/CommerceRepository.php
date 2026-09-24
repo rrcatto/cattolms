@@ -36,7 +36,38 @@ final class CommerceRepository
     /** @return array<string,mixed> */
     public function offer(int $variantId): array
     {
-        return $this->db->fetchAssociative('SELECT v.*,c.title,c.slug,c.status AS course_status FROM course_price_variants v JOIN courses c ON c.id=v.course_id WHERE v.id=:id', ['id'=>$variantId]) ?: throw new RuntimeException('The offer does not exist.');
+        return $this->db->fetchAssociative('SELECT v.*,c.title,c.slug,c.status AS course_status,c.owner_company_id FROM course_price_variants v JOIN courses c ON c.id=v.course_id WHERE v.id=:id', ['id'=>$variantId]) ?: throw new RuntimeException('The offer does not exist.');
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function companyOffers(int $companyId, string $search = '', int $limit = 30): array
+    {
+        return $this->db->fetchAllAssociative(
+            "SELECT v.*,c.title,c.slug,c.status AS course_status,c.owner_company_id FROM course_price_variants v
+             JOIN courses c ON c.id=v.course_id
+             WHERE v.is_active=TRUE AND c.status='published' AND v.price_minor_units>0 AND v.currency_code='ZAR'
+               AND (c.owner_company_id IS NULL OR c.owner_company_id<>:company)
+               AND (:search='' OR c.title ILIKE :pattern)
+             ORDER BY c.title,v.access_period_seconds,v.id LIMIT :limit",
+            ['company'=>$companyId,'search'=>$search,'pattern'=>'%'.str_replace(['%','_'],['\\%','\\_'],$search).'%','limit'=>$limit]
+        );
+    }
+
+    /** @return array<string,mixed>|null */
+    public function companyOfferForRequest(int $requestId, int $companyId): ?array
+    {
+        return $this->db->fetchAssociative(
+            "SELECT cr.id AS request_id,cr.status AS request_status,cr.user_id,cr.course_id,
+                    cr.access_period_seconds,v.id AS variant_id,v.price_minor_units,v.currency_code,
+                    c.title,c.slug,c.owner_company_id
+             FROM course_requests cr JOIN courses c ON c.id=cr.course_id
+             JOIN course_price_variants v ON v.course_id=c.id AND v.access_period_seconds=cr.access_period_seconds
+             WHERE cr.id=:request AND cr.company_id=:company AND cr.status='pending'
+               AND c.status='published' AND v.is_active=TRUE AND v.price_minor_units>0 AND v.currency_code='ZAR'
+               AND (c.owner_company_id IS NULL OR c.owner_company_id<>:company)
+             ORDER BY v.is_default DESC,v.id LIMIT 1",
+            ['request'=>$requestId,'company'=>$companyId]
+        ) ?: null;
     }
 
     public function changeCart(int $cartId, int $variantId, bool $remove): void
@@ -53,6 +84,61 @@ final class CommerceRepository
     public function orderForCart(int $cartId, int $userId): ?array
     {
         return $this->db->fetchAssociative('SELECT * FROM commerce_orders WHERE cart_id=:cart AND purchaser_user_id=:user', ['cart'=>$cartId,'user'=>$userId]) ?: null;
+    }
+
+    /** @return array<string,mixed>|null */
+    public function companyOrderForKey(int $userId, string $key): ?array
+    {
+        return $this->db->fetchAssociative('SELECT * FROM commerce_orders WHERE purchaser_user_id=:user AND company_purchase_key=:key', ['user'=>$userId,'key'=>$key]) ?: null;
+    }
+
+    /** @return array<string,mixed>|null */
+    public function activeCompanyOrderForRequest(int $requestId, int $companyId): ?array
+    {
+        return $this->db->fetchAssociative(
+            "SELECT id,state,purchaser_user_id FROM commerce_orders WHERE request_id=:request AND company_id=:company
+             AND state IN ('placed','awaiting_payment','manual_review','paid','fulfilled') ORDER BY id DESC LIMIT 1",
+            ['request'=>$requestId,'company'=>$companyId]
+        ) ?: null;
+    }
+
+    /** @param array<string,mixed> $snapshot */
+    public function placeCompany(int $userId, int $companyId, ?int $requestId, string $key, int $total, string $currency, array $snapshot, string $now, string $due): int
+    {
+        return (int) $this->db->fetchOne(
+            "INSERT INTO commerce_orders(public_id,purchaser_user_id,company_id,request_id,company_purchase_key,state,total_minor,currency,snapshot,placed_at,payment_due_at)
+             VALUES (:public,:user,:company,:request,:key,'placed',:total,:currency,:snapshot,:now,:due) RETURNING id",
+            ['public'=>Uuid::v4(),'user'=>$userId,'company'=>$companyId,'request'=>$requestId,'key'=>$key,'total'=>$total,'currency'=>$currency,'snapshot'=>self::json($snapshot),'now'=>$now,'due'=>$due]
+        );
+    }
+
+    /** @param array<string,mixed> $snapshot */
+    public function addCompanyOrderItem(int $orderId, int $companyId, array $snapshot): int
+    {
+        return (int) $this->db->fetchOne(
+            "INSERT INTO commerce_order_items(order_id,variant_id,course_id,beneficiary_user_id,company_id,quantity,product_type,amount_minor,access_period_seconds,snapshot)
+             VALUES (:order,:variant,:course,NULL,:company,:quantity,'company_credit',:amount,:duration,:snapshot) RETURNING id",
+            ['order'=>$orderId,'variant'=>$snapshot['variant_id'],'course'=>$snapshot['course_id'],'company'=>$companyId,
+             'quantity'=>$snapshot['quantity'],'amount'=>$snapshot['line_total_minor'],'duration'=>$snapshot['access_period_seconds'],'snapshot'=>self::json($snapshot)]
+        );
+    }
+
+    public function purchasedCredit(int $itemId): ?int
+    {
+        $id = $this->db->fetchOne('SELECT id FROM course_credits WHERE commerce_order_item_id=:item', ['item'=>$itemId]);
+        return $id === false ? null : (int) $id;
+    }
+
+    public function createPurchasedCredit(int $itemId, int $companyId, int $courseId, int $period, int $quantity, int $actorId, string $now): int
+    {
+        $created = $this->db->fetchOne(
+            "INSERT INTO course_credits(public_id,company_id,course_id,access_period_seconds,quantity,source_type,source_reference,commerce_order_item_id,created_by_user_id,created_at)
+             VALUES (:public,:company,:course,:period,:quantity,'purchase',:reference,:item,:actor,:now)
+             ON CONFLICT(commerce_order_item_id) DO NOTHING RETURNING id",
+            ['public'=>Uuid::v4(),'company'=>$companyId,'course'=>$courseId,'period'=>$period,'quantity'=>$quantity,
+             'reference'=>(string)$itemId,'item'=>$itemId,'actor'=>$actorId,'now'=>$now]
+        );
+        return $created === false ? ($this->purchasedCredit($itemId) ?? throw new RuntimeException('Purchased credit lot unavailable.')) : (int) $created;
     }
 
     /** @param array<string,mixed> $snapshot */
@@ -104,7 +190,8 @@ final class CommerceRepository
         if ($this->db->fetchOne('SELECT id FROM commerce_documents WHERE source_key=:key', ['key'=>$sourceKey])) return;
         $number = $this->db->fetchOne('UPDATE commerce_document_numbers SET next_number=next_number+1 WHERE kind=:kind RETURNING next_number-1', ['kind'=>$kind]);
         if ($number === false) throw new RuntimeException('Unknown financial document type.');
-        $this->db->executeStatement('INSERT INTO commerce_documents(public_id,order_id,kind,number,source_key,snapshot,issued_at) VALUES (:public,:order,:kind,:number,:key,:snapshot,:now)', ['public'=>Uuid::v4(),'order'=>$orderId,'kind'=>$kind,'number'=>($kind==='invoice'?'INV-':'REC-').str_pad((string)$number,8,'0',STR_PAD_LEFT),'key'=>$sourceKey,'snapshot'=>self::json($snapshot),'now'=>$now]);
+        $prefix = match ($kind) { 'invoice'=>'INV-', 'receipt'=>'REC-', 'credit_note'=>'CN-', default=>throw new RuntimeException('Unknown financial document type.') };
+        $this->db->executeStatement('INSERT INTO commerce_documents(public_id,order_id,kind,number,source_key,snapshot,issued_at) VALUES (:public,:order,:kind,:number,:key,:snapshot,:now)', ['public'=>Uuid::v4(),'order'=>$orderId,'kind'=>$kind,'number'=>$prefix.str_pad((string)$number,8,'0',STR_PAD_LEFT),'key'=>$sourceKey,'snapshot'=>self::json($snapshot),'now'=>$now]);
     }
     /** @param array<string,mixed> $payload */
     public function audit(?int $orderId, ?int $actor, string $event, array $payload, string $now): void
@@ -200,6 +287,13 @@ final class CommerceRepository
     {
         return $this->db->fetchAssociative("SELECT * FROM commerce_outbox WHERE event='invoice.email_requested' AND delivered_at IS NULL AND (last_error IS NULL OR created_at + attempts * INTERVAL '5 minutes' < NOW()) ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED") ?: null;
     }
+    /** @return array<string,mixed>|null */
+    public function nextCompanyCourseNotice(): ?array
+    {
+        return $this->db->fetchAssociative("SELECT * FROM commerce_outbox WHERE event IN ('company.request_decision','company.request_enrolment')
+            AND delivered_at IS NULL AND (last_error IS NULL OR created_at + attempts * INTERVAL '5 minutes' < NOW())
+            ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED") ?: null;
+    }
     public function emailDelivered(int $id, ?string $error): void
     {
         $this->db->executeStatement('UPDATE commerce_outbox SET attempts=attempts+1,last_error=:error,delivered_at=CASE WHEN :ok THEN NOW() ELSE NULL END WHERE id=:id', ['id'=>$id,'error'=>$error,'ok'=>$error===null]);
@@ -212,6 +306,74 @@ final class CommerceRepository
     public function paymentMethod(int $orderId): string
     {
         return (string) ($this->db->fetchOne('SELECT payment_method FROM commerce_order_preferences WHERE order_id=:id', ['id'=>$orderId]) ?: 'dummy');
+    }
+    /** @return list<array<string,mixed>> */
+    public function administrationOrders(string $search = '', int $limit = 100): array
+    {
+        return $this->db->fetchAllAssociative("SELECT o.id,o.state,o.total_minor,o.currency,o.placed_at,o.company_id,o.request_id,u.display_name AS purchaser_name,ue.email AS purchaser_email FROM commerce_orders o JOIN users u ON u.id=o.purchaser_user_id LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE WHERE (:search='' OR o.id::text=:search OR ue.email ILIKE :pattern) ORDER BY o.id DESC LIMIT :limit", ['search'=>$search,'pattern'=>'%'.str_replace(['%','_'],['\\%','\\_'],$search).'%','limit'=>$limit]);
+    }
+    /** @return array<string,mixed>|null */
+    public function manualEvidence(string $paymentId): ?array
+    {
+        return $this->db->fetchAssociative('SELECT * FROM commerce_manual_payment_evidence WHERE payment_id=:id', ['id'=>$paymentId]) ?: null;
+    }
+    public function recordManualEvidence(string $paymentId, int $orderId, int $amount, string $currency, string $receivedAt, string $reference, string $reason, int $actorId, string $now): void
+    {
+        $this->db->executeStatement('INSERT INTO commerce_manual_payment_evidence(payment_id,order_id,amount_minor,currency,received_at,bank_reference,reason,actor_user_id,confirmed_at) VALUES (:payment,:order,:amount,:currency,:received,:reference,:reason,:actor,:now)', ['payment'=>$paymentId,'order'=>$orderId,'amount'=>$amount,'currency'=>$currency,'received'=>$receivedAt,'reference'=>$reference,'reason'=>$reason,'actor'=>$actorId,'now'=>$now]);
+    }
+    public function paidTotal(int $orderId): int
+    {
+        return (int)$this->db->fetchOne("SELECT COALESCE(SUM(amount_minor),0) FROM commerce_payments WHERE order_id=:id AND state IN ('paid','partially_refunded','refunded')", ['id'=>$orderId]);
+    }
+    /** @return list<array<string,mixed>> */
+    public function refunds(int $orderId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT r.*,u.display_name AS actor_name FROM commerce_refunds r JOIN users u ON u.id=r.approved_by_user_id WHERE r.order_id=:id ORDER BY r.id', ['id'=>$orderId]);
+    }
+    public function refundedAmount(int $orderId, ?int $itemId = null): int
+    {
+        return (int)$this->db->fetchOne('SELECT COALESCE(SUM(amount_minor),0) FROM commerce_refunds WHERE order_id=:order'.($itemId===null?'':' AND order_item_id=:item'),$itemId===null?['order'=>$orderId]:['order'=>$orderId,'item'=>$itemId]);
+    }
+    /** @return array<string,mixed>|null */
+    public function refundByKey(string $key): ?array
+    {
+        return $this->db->fetchAssociative('SELECT id,order_id,order_item_id FROM commerce_refunds WHERE request_key=:key', ['key'=>$key]) ?: null;
+    }
+    /** @return array<string,mixed> */
+    public function orderItem(int $itemId, int $orderId): array
+    {
+        return $this->db->fetchAssociative('SELECT * FROM commerce_order_items WHERE id=:item AND order_id=:order', ['item'=>$itemId,'order'=>$orderId]) ?: throw new RuntimeException('This order item is unavailable.');
+    }
+    /** @return array<string,mixed>|null */
+    public function latestRefundableCredit(int $companyId, int $courseId, int $period, bool $lock = false): ?array
+    {
+        return $this->db->fetchAssociative("SELECT cc.*,i.order_id,i.amount_minor,i.quantity AS purchased_quantity,cc.quantity-cc.refunded_quantity-(SELECT COUNT(*) FROM course_credit_allocations a WHERE a.credit_id=cc.id AND a.status IN ('assigned','consumed')) AS available_count FROM course_credits cc JOIN commerce_order_items i ON i.id=cc.commerce_order_item_id WHERE cc.company_id=:company AND cc.course_id=:course AND cc.access_period_seconds=:period AND cc.quantity-cc.refunded_quantity>(SELECT COUNT(*) FROM course_credit_allocations a WHERE a.credit_id=cc.id AND a.status IN ('assigned','consumed')) ORDER BY i.id DESC LIMIT 1".($lock?' FOR UPDATE OF cc':''), ['company'=>$companyId,'course'=>$courseId,'period'=>$period]) ?: null;
+    }
+    public function refundCreditUnits(int $creditId, int $quantity): void
+    {
+        $this->db->executeStatement('UPDATE course_credits SET refunded_quantity=refunded_quantity+:quantity WHERE id=:id', ['quantity'=>$quantity,'id'=>$creditId]);
+    }
+    public function creditAllocationCount(int $creditId): int
+    {
+        return (int)$this->db->fetchOne("SELECT COUNT(*) FROM course_credit_allocations WHERE credit_id=:id AND status IN ('assigned','consumed')", ['id'=>$creditId]);
+    }
+    public function createRefund(string $key, int $orderId, int $itemId, int $quantity, int $amount, string $currency, string $basis, string $reason, int $actorId, string $now): int
+    {
+        return (int)$this->db->fetchOne('INSERT INTO commerce_refunds(public_id,request_key,order_id,order_item_id,quantity,amount_minor,currency,basis,reason,approved_by_user_id,approved_at) VALUES (:public,:key,:order,:item,:quantity,:amount,:currency,:basis,:reason,:actor,:now) RETURNING id', ['public'=>Uuid::v4(),'key'=>$key,'order'=>$orderId,'item'=>$itemId,'quantity'=>$quantity,'amount'=>$amount,'currency'=>$currency,'basis'=>$basis,'reason'=>$reason,'actor'=>$actorId,'now'=>$now]);
+    }
+    public function creditRefundFunds(int $refundId, ?int $userId, ?int $companyId, string $currency, int $amount, string $now): void
+    {
+        $this->db->executeStatement('INSERT INTO commerce_fund_accounts(owner_user_id,owner_company_id,currency) VALUES (:user,:company,:currency) ON CONFLICT DO NOTHING', ['user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
+        $this->db->executeStatement('INSERT INTO commerce_fund_entries(account_id,refund_id,amount_minor,created_at) SELECT id,:refund,:amount,:now FROM commerce_fund_accounts WHERE owner_user_id IS NOT DISTINCT FROM :user AND owner_company_id IS NOT DISTINCT FROM :company AND currency=:currency', ['refund'=>$refundId,'amount'=>$amount,'now'=>$now,'user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
+    }
+    public function fundBalance(?int $userId, ?int $companyId, string $currency): int
+    {
+        return (int)$this->db->fetchOne('SELECT COALESCE(SUM(e.amount_minor),0) FROM commerce_fund_accounts a LEFT JOIN commerce_fund_entries e ON e.account_id=a.id WHERE a.owner_user_id IS NOT DISTINCT FROM CAST(:user AS BIGINT) AND a.owner_company_id IS NOT DISTINCT FROM CAST(:company AS BIGINT) AND a.currency=:currency', ['user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
+    }
+    public function revokeRefundedEntitlement(int $itemId, string $now): void
+    {
+        $this->db->executeStatement("UPDATE commerce_entitlements SET state='revoked' WHERE order_item_id=:item AND state<>'revoked'", ['item'=>$itemId]);
+        $this->db->executeStatement("UPDATE course_enrolments SET status='cancelled',updated_at=:now WHERE id IN (SELECT enrolment_id FROM commerce_entitlements WHERE order_item_id=:item) AND status IN ('assigned','active')", ['item'=>$itemId,'now'=>$now]);
     }
     public function pdf(int $documentId): ?string
     {

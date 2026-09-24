@@ -209,7 +209,7 @@ final class EntityLookupRepository
                     OR EXISTS (
                         SELECT 1 FROM course_credits cr
                          WHERE cr.course_id = c.id AND cr.company_id = :company_id
-                           AND cr.quantity > (
+                           AND cr.quantity - cr.refunded_quantity > (
                                 SELECT COUNT(*) FROM course_credit_allocations cca
                                  WHERE cca.credit_id = cr.id AND cca.status IN ('assigned','consumed')
                            )

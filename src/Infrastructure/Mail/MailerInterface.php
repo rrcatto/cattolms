@@ -44,11 +44,12 @@ interface MailerInterface
     /**
      * Tells a learner they are on a course and where to start it.
      *
-     * Sent for every enrolment, whether it came from an approved request or from an administrator
-     * assigning it directly. An operator may well tell their staff in person as well; the platform
-     * does not rely on that having happened - owner decision, ROADMAP section 2c.
+     * Sent by the ordinary assignment/request workflows. Test grants have a separate explicit
+     * invitation action so ADMIN decides when the learner is notified.
      */
     public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void;
+
+    public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void;
 
     public function sendContactMessage(string $name, string $email, string $subject, string $message): void;
 

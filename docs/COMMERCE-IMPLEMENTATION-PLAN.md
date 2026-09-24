@@ -1,21 +1,21 @@
 # Commerce Implementation Plan
 
-Original plan: 12 September 2026; current-status update: 23 September 2026
+Original plan: 12 September 2026; current-status update: 24 September 2026
 Target: `code/cattolms-v0.8`
-Status: Individual purchase foundation implemented; the remaining delivery sequence below was approved by the owner on 23 September 2026.
+Status: Individual purchase foundation, tester administration, company credit purchasing, and payment administration/refunds are included through v0.8.7.
 
 ## Current implementation and approved next steps
 
-Individual commerce exists in the v0.8.6.1 code: guest and signed-in carts; staged checkout; persisted orders, invoices and payment attempts; Omnipay Dummy card outcomes; manual EFT instructions; account order/document pages; idempotent fulfilment into access entitlements; free-course direct access; and scheduled deadline/outbox maintenance. The implementation is in `src/Commerce/`, `src/Commerce/Http/CommerceController.php`, the `20260912210000_add_commerce_foundation.php` and `20260913010000_add_checkout_details.php` migrations, and `tests/Integration/CommercePurchaseIntegrationTest.php`. A manual EFT instruction is not an ADMIN payment-confirmation workflow, and Dummy payment is not a live processor.
+Individual commerce exists in the v0.8.7 code: guest and signed-in carts; staged checkout; persisted orders, invoices and payment attempts; Omnipay Dummy card outcomes; manual EFT instructions; account order/document pages; idempotent fulfilment into access entitlements; free-course direct access; and scheduled deadline/outbox maintenance. The implementation is in `src/Commerce/`, `src/Commerce/Http/CommerceController.php`, the `20260912210000_add_commerce_foundation.php` and `20260913010000_add_checkout_details.php` migrations, and `tests/Integration/CommercePurchaseIntegrationTest.php`. A manual EFT instruction alone does not confirm payment; the ADMIN confirmation workflow records independent bank evidence. Dummy payment is not a live processor.
 
-The owner approved four ordered work steps, with a break for review after each: documentation correction; completion of tester administration; company credit purchasing; payment administration and refunds. The documentation correction and initial tester grant workflow are included in the owner-authorized v0.8.6.1 release; tester administration still needs the follow-up controls below. Later release/version choices and Git pushes require explicit owner instruction. Company credit purchases should use the existing exact course/access-period credit rules and the current Dummy-backed payment foundation. This step includes a direct company purchase and a request-approval path that purchases missing credit before fulfilling the request. Payment administration and refunds then add evidence-backed manual bank confirmation, payment review/reconciliation, refund and credit-note records, and the specified access effect. Account Funds, payouts, debt, gifts, real processors and the other longer-range items in the original plan remain later decisions/work; do not silently bundle them into these two stages.
+The owner approved four ordered work steps, with a break for review after each: documentation correction; completion of tester administration; company credit purchasing; payment administration and refunds. The documentation correction and initial tester grant workflow are included in the owner-authorized v0.8.6.1 release; the remaining three phases are included in v0.8.7. Future release/version choices and Git pushes require explicit owner instruction. Company purchase uses exact course/access-period credits, published paid offers and the current Dummy-backed payment foundation. Direct purchase supports quantities and multiple course/access-period variants; request approval with missing credit starts a linked purchase, and confirmed simulated card payment allocates the matching credit and enrols the learner. Direct EFT company orders remain unpaid and issue no credits until ADMIN records an exact full bank receipt with independent reference, received time, identity and reason. Late or changed paid orders remain in manual review for an explicit, reasoned release. ADMIN refund decisions credit an append-only Account Funds ledger and issue a credit note; full individual item refunds revoke that item's access immediately, and company credit refunds use unused purchased units and historical LIFO value. Account Funds spending, payouts, debt, gifts, real processors and longer-range items remain later decisions/work; do not silently bundle them into this phase.
 
 | Area | Current state | Next required boundary |
 | --- | --- | --- |
 | Individual checkout and access | Implemented for guest/signed-in carts, Dummy card simulation, manual EFT instructions, orders, invoices and access entitlements | Preserve and extend the existing services and tests; do not rebuild this foundation |
-| Tester grants | Course-first and person-first draft/published grants included in v0.8.6.1 | Finish grant visibility, explicit revocation in context and deliberate learner invitation/notification; pause for owner review |
-| Company credits | Existing credits can be assigned to staff and owned courses require no credit | Buy exact-match credits and complete request approval through purchase and fulfilment; pause for owner review |
-| Payment operations | Payment attempts and invoice delivery exist; EFT instructions leave payment pending | ADMIN evidence and confirmation, reconciliation, refunds/credit notes and access revocation where required; pause for owner review |
+| Tester grants | Course-first and person-first grants show status/expiry and history; ADMIN can revoke in context or deliberately email an invitation | Preserve the released workflow |
+| Company credits | Company checkout buys exact-match course/access-period credits; paid lines create credit lots; a linked request receives one allocation, enrolment and notices on successful immediate payment | Do not issue credits from unconfirmed EFT orders |
+| Payment operations | ADMIN can confirm exact full EFT payment with immutable evidence, review/release paid exceptions, and approve individual or unused company-credit refunds; credit notes and Account Funds entries are append-only, with immediate full individual item access revocation | Account Funds spending, payout, partial bank settlement and real gateways remain later work |
 | Later commerce | Real gateway, funds, payouts, debt, gifts and broader academic history are not implemented | Scope separately after the approved steps |
 
 ## 1. Scope and authority
@@ -24,7 +24,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.6.1. Older version directories are historical references. The owner authorized the v0.8.6.1 release; later releases and pushes still require explicit instruction. Do not reset the database merely to implement this plan.
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.7. Older version directories are historical references. The owner authorized the v0.8.7 release; later releases and pushes still require explicit instruction. Do not reset the database merely to implement this plan.
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 
@@ -80,7 +80,7 @@ Sources checked: [Omnipay Dummy](https://github.com/thephpleague/omnipay-dummy),
 
 ## 5. Persistence and transaction design — implemented foundation plus remaining rules
 
-Use additive Phinx migrations for new commerce features. The current code already has carts, orders/item snapshots, documents/numbering, payment attempts/events, audit/outbox and entitlements. Offers/policy history, funds accounts/ledger/reservations, refunds, payouts, debt, disputes, purchased credit units/invitations, gifts, retake allowances and broader completion/verification history remain future work according to the approved order and later owner decisions. Do not recreate existing commerce tables.
+Use additive Phinx migrations for new commerce features. The current code has carts, orders/item snapshots, documents/numbering, payment attempts/events, audit/outbox, entitlements, manual bank evidence, refunds, credit notes and a refund-credit Account Funds ledger. Account Funds spending/reservations, payouts, debt, disputes, purchased credit invitations, gifts, retake allowances and broader completion/verification history remain later work according to owner decisions. Do not recreate existing commerce tables.
 
 Use BIGINT minor units with currency and TIMESTAMPTZ. Snapshot purchaser/billing identity, course/revision policy, duration, tax, discounts, consent wording/version and terms. Issued document content is immutable; lifecycle/payment summaries are separate mutable projections. Allocate permanent invoice numbers transactionally, with uniqueness and no reuse of issued numbers.
 
@@ -114,7 +114,7 @@ The table below is the original full-domain sequence, not the next-work order. P
 | 7 — Administration | Complete purchaser/company/admin screens, private offers and discounts, manual EFT/PayShap confirmation, refunds, payouts, grants, debt waivers, deadline overrides, reconciliation, audit and manual review. Require actor/reason/evidence for financial overrides. |
 | 8 — Acceptance | All supplied scenarios and workflow transitions, race-condition tests, new-commerce coverage target, complete existing QA, fresh-install and populated-database migration rehearsals, and browser checks across bundled themes. Update operations/handoff documentation and demonstrate Dummy-only end-to-end flows. |
 
-The individual-course version of the original first usable milestone is implemented and covered by Commerce integration tests. Company purchases and ADMIN payment confirmation/refunds still require their own acceptance paths.
+The individual-course milestone, company credit purchasing and ADMIN bank-confirmation/refund paths are released in v0.8.7 and covered by Commerce integration tests. The broader original phases above remain a domain map, not a claim that funds spending, payouts, gifts or real gateways are present.
 
 ## 7. Timed work and workflow reconciliation
 

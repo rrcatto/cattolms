@@ -1,0 +1,43 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_back_href = '/company/credits' %}{% set ph_back_label = 'Company credits' %}
+    {% set ph_kicker = 'Company purchasing' %}{% set ph_title = 'Buy course credits' %}
+    {% set ph_lead = 'Select courses, access periods and quantities for ' ~ basket.company.name ~ '. Credits become available only after payment is confirmed.' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section container py-5">
+        {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}{% block body %}
+            {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+                {{ ui('layout.section-head', {heading: 'Available course access', heading_level: 2, summary: 'Search published paid courses. Each access period is a separate credit type.'}) }}
+                <form action="/company/credits/buy" method="get">
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Find a course', for: 'credit-course-search'})} %}{% block control %}<input id="credit-course-search" name="search" value="{{ search }}" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                    {{ ui('action.button', {label: 'Search', variant: 'secondary', size: 'small', type: 'submit'}) }}
+                </form>
+                {% if offers %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+                    {% for offer in offers %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
+                        <strong>{{ offer.title }}</strong><p>{{ offer.days }} days · {{ offer.price_label }} per credit</p>
+                    {% endblock %}{% block actions %}
+                        <form action="/company/credits/buy/add" method="post">
+                            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ offer.id }}">
+                            <label for="credit-quantity-{{ offer.id }}">Quantity</label> <input id="credit-quantity-{{ offer.id }}" type="number" name="quantity" min="1" max="10000" value="1" required>
+                            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add credits', variant: 'secondary', size: 'small', type: 'submit'}) }}{% endblock %}{% endembed %}
+                        </form>
+                    {% endblock %}{% endembed %}{% endfor %}
+                {% endblock %}{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'No paid course offers match this search.'}) }}{% endif %}
+            {% endblock %}{% endembed %}
+            {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+                {{ ui('layout.section-head', {heading: 'Selected credits', heading_level: 2, summary: basket.request_id ? 'This purchase will also fulfil the selected learner request after payment.' : 'Review every credit before checkout.'}) }}
+                {% if basket_error %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}{% block body %}{{ basket_error }} Cancel this purchase and start again, or ask an administrator to restore the offer.{% endblock %}{% endembed %}{% endif %}
+                {% if basket.items %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+                    {% for item in basket.items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
+                        <strong>{{ item.course_title }}</strong><p>{{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} × {{ item.unit_label }} = {{ item.line_label }}</p>
+                    {% endblock %}{% block actions %}
+                        <form action="/company/credits/buy/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.variant_id }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit'}) }}</form>
+                    {% endblock %}{% endembed %}{% endfor %}
+                {% endblock %}{% endembed %}<p><strong>Total: {{ basket.total_label }}</strong></p>
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'Review and pay', variant: 'primary', size: 'normal', href: '/company/credits/checkout'}) }}{% endblock %}{% endembed %}
+                {% else %}{{ ui('feedback.empty', {summary: 'No credits selected yet.'}) }}{% endif %}
+                <form action="/company/credits/buy/cancel" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Cancel this purchase', variant: 'quiet', size: 'small', type: 'submit'}) }}</form>
+            {% endblock %}{% endembed %}
+        {% endblock %}{% endembed %}
+    </section>
+{% endblock %}

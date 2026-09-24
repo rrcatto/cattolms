@@ -1,6 +1,16 @@
 # Changelog
 
-**LMS version:** 0.8.6.1 **Date time:** 2026/09/23 SAST
+**LMS version:** 0.8.7 **Date time:** 2026/09/24 SAST
+
+## 2026-09-24 SAST — v0.8.7 Tester administration, company credits and payment operations
+
+- Complete ADMIN test-grant history on course and person pages, with effective status/expiry, explicit invitation and scoped revocation. Invitations use the learner's current verified email; grant creation does not send mail.
+- Add company purchases for exact course/access-period credit variants and quantities. Confirmed paid orders create immutable credit lots; request-linked simulated card payments allocate one matching credit, enrol the learner and queue notices. Unconfirmed EFT orders issue no credits.
+- Add ADMIN Orders & Payments for independent exact-full bank evidence, audited manual-review release, item-level refunds, numbered credit notes and append-only Account Funds entries. Full individual item refunds revoke access; company refunds consume only unused purchased units at their historical LIFO prices.
+- Add five additive migrations for company order/credit settlement and payment/refund integrity. Preserve the existing development dataset; no database reset or theme-version change.
+- Align Composer, platform asset URLs, REST/MCP version responses, release checks and current developer documentation with v0.8.7. Account Funds spending, bank payouts and live payment gateways remain outside this release.
+
+Validation: full `SHELL_VERBOSITY=-1 composer qa` passes after the release edits, with 688 PHPUnit tests and 38,733 assertions. Composer validation, Twig lint of all 184 templates, AssetMapper compilation and `git diff --check` pass. Both all-theme browser matrices and no-JavaScript tester, company checkout and ADMIN orders flows passed during implementation.
 
 ## 2026-09-23 SAST — v0.8.6.1 ADMIN test access and current documentation
 

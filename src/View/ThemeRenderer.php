@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.6.1';
+    private const PLATFORM_ASSET_VERSION = '0.8.7';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -507,11 +507,7 @@ final class ThemeRenderer
         $adminGroups = [
             'catalogue' => ['label' => 'Courses', 'icon' => 'courses', 'sections' => ['courses', 'requests', 'enrolments']],
             'directory' => ['label' => 'People & Companies', 'icon' => 'people', 'sections' => ['people', 'companies']],
-            // Orders is not here because there are no orders: no order, invoice, payment or refund
-            // table exists yet. A credit is a seat a company holds; an order is the record of a
-            // purchase. Naming the group after both made the platform claim a history it does not
-            // keep, and the two arrive together with commerce.
-            'commerce' => ['label' => 'Credits', 'icon' => 'credits', 'sections' => ['credits']],
+            'commerce' => ['label' => 'Credits & Orders', 'icon' => 'credits', 'sections' => ['credits']],
             'insights' => ['label' => 'Insights', 'icon' => 'reports', 'sections' => ['activity', 'reports', 'company_report']],
             'system' => ['label' => 'System', 'icon' => 'settings', 'sections' => ['themes', 'roles', 'seed', 'settings', 'ui_components']],
         ];
@@ -561,6 +557,9 @@ final class ThemeRenderer
                 if ($sectionKey === 'companies' && isset($visibleSections['company_creators'])) {
                     $grandchildren[] = $child('admin-company-creators', 'Course Creators', '/admin/companies/creators', 'companies');
                 }
+            }
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
+                $grandchildren[] = $child('admin-commerce-orders', 'Orders & Payments', '/admin/commerce/orders', 'credits');
             }
             if ($grandchildren === []) {
                 continue;

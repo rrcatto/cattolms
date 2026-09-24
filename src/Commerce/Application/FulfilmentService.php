@@ -13,13 +13,19 @@ use RuntimeException;
 /** The only commerce writer of paid learning entitlements; payment service holds purchaser/order locks. */
 final class FulfilmentService
 {
-    public function __construct(private readonly CommerceRepository $records, private readonly TransitionService $transitions, private readonly AccessService $access, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly ClockInterface $clock) {}
+    public function __construct(private readonly CommerceRepository $records, private readonly TransitionService $transitions, private readonly AccessService $access, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly ClockInterface $clock, private readonly CompanyCreditFulfilment $companyCredits) {}
 
     /** @param array<string,mixed> $order */
     public function fulfil(array $order): bool
     {
         if ($order['state']!=='paid') throw new RuntimeException('Only a fully paid order can be fulfilled.');
         $items=$this->records->items((int)$order['id']);
+        if ($order['company_id'] !== null) {
+            if (!$this->companyCredits->ready($order,$items)) return false;
+            $this->companyCredits->fulfil($order,$items);
+            $this->records->setOrderState((int)$order['id'],$this->transitions->apply('order','paid','fulfil'));
+            return true;
+        }
         foreach($items as $item) {
             if (!$this->records->fulfilledItem((int)$item['id']) && $this->records->hasOpenEnrolment((int)$item['beneficiary_user_id'],(int)$item['course_id'])) return false;
         }

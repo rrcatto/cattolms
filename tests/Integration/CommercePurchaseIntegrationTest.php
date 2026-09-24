@@ -7,14 +7,15 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer;
 use CattoLearning\Tests\Support\FakeMailer;
-use CattoLearning\Commerce\Application\{AccessService,FulfilmentService,OrderService,PaymentService,CartService,CheckoutService,CommerceMaintenance};
+use CattoLearning\Commerce\Application\{AccessService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,PaymentAdministrationService,RefundAdministrationService,CartService,CheckoutService,CommerceMaintenance};
 use CattoLearning\Commerce\Contract\PaymentGatewayInterface;
 use CattoLearning\Commerce\Domain\{PaymentRequest,PaymentResult};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
-use CattoLearning\Infrastructure\Persistence\{Database,TransactionManager};
+use CattoLearning\Course\CourseRepository;
+use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
 use CattoLearning\Support\{Money,Uuid};
 use CattoLearning\Tests\Support\{DevelopmentFixture,IntegrationContainer};
 use PHPUnit\Framework\Attributes\Group;
@@ -53,7 +54,8 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $transitions=$container->get(TransitionService::class);
         $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock);
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
-        $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock);
+        $companyCredits=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
+        $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits);
         $this->payments=$this->paymentService(new OmnipayPaymentGatewayAdapter('test',$this->clock));
     }
     protected function tearDown(): void
@@ -294,5 +296,80 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertNull($checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true));
         self::assertSame(0, $this->records->orderCount($this->actor->id));
         self::assertSame([], $this->orders->cart($this->actor)['items']);
+    }
+
+    private function financeAdmin(): CurrentUser
+    {
+        return new CurrentUser($this->actor->id,Uuid::v4(),'finance@example.invalid','Finance ADMIN',[],
+            ['PLATFORM.ORDER.VIEW','PLATFORM.PAYMENT.MANAGE','PLATFORM.PAYMENT.RECONCILE','PLATFORM.REFUND.MANAGE'],Uuid::v4());
+    }
+
+    public function testBankEvidenceConfirmsFullPaymentAndIdempotentApproval(): void
+    {
+        $id=$this->place(); $this->records->selectPaymentMethod($id,'eft');
+        $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $admin=$this->financeAdmin(); $key=Uuid::v4();
+        $payment=$service->confirmBank($admin,$id,$key,12345,'2026-09-12T11:00:00+02:00','BANK-QA-'.Uuid::v4(),'Matched bank statement and order.');
+        self::assertSame($payment,$service->confirmBank($admin,$id,$key,12345,'2026-09-12T11:00:00+02:00','BANK-QA-'.Uuid::v4(),'Matched bank statement and order.'));
+        self::assertSame('fulfilled',$this->records->order($id)['state']);
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_manual_payment_evidence WHERE order_id=:id',['id'=>$id]));
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
+        self::assertCount(2,$this->records->documents($id));
+    }
+
+    public function testBankAmountMismatchCannotCreatePaymentOrAccess(): void
+    {
+        $id=$this->place(); $this->records->selectPaymentMethod($id,'eft');
+        $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        try {
+            $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),100,'2026-09-12T11:00:00+02:00','BANK-MISMATCH','Amount did not match invoice.');
+            self::fail('A partial bank receipt cannot fulfil the order.');
+        } catch (\RuntimeException $error) {
+            self::assertStringContainsString('exact order total',$error->getMessage());
+        }
+        self::assertSame([],$this->records->payments($id));
+        self::assertSame('awaiting_payment',$this->records->order($id)['state']);
+    }
+
+    public function testLateBankPaymentNeedsExplicitReconciliationBeforeFulfilment(): void
+    {
+        $id=$this->place(); $this->records->selectPaymentMethod($id,'eft'); $this->clock->modify('+8 days');
+        $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $admin=$this->financeAdmin();
+        $service->confirmBank($admin,$id,Uuid::v4(),12345,'2026-09-20T11:00:00+02:00','BANK-LATE-'.Uuid::v4(),'Late receipt verified against bank.');
+        self::assertSame('manual_review',$this->records->order($id)['state']);
+        self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
+        $service->releasePaidReview($admin,$id,'Late settlement accepted after review.');
+        self::assertSame('fulfilled',$this->records->order($id)['state']);
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
+    }
+
+    public function testBankReceiptAfterAutomaticCancellationIsPreservedForReview(): void
+    {
+        $id=$this->place(); $this->records->selectPaymentMethod($id,'eft'); $this->clock->modify('+8 days');
+        self::assertTrue($this->orders->cancelDue($id));
+        $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),12345,'2026-09-20T11:00:00+02:00','BANK-CANCELLED-'.Uuid::v4(),'Receipt arrived after order cancellation.');
+        self::assertSame('manual_review',$this->records->order($id)['state']);
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_manual_payment_evidence WHERE order_id=:id',['id'=>$id]));
+        self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
+    }
+
+    public function testPartialThenFullRefundCreditsFundsAndRevokesOnlyAfterFullItemRefund(): void
+    {
+        $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
+        $item=$this->records->items($id)[0];
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $admin=$this->financeAdmin(); $key=Uuid::v4();
+        $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
+        self::assertSame($first,$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345));
+        self::assertSame('partially_refunded',$this->records->order($id)['state']);
+        self::assertSame('awaiting_activation',$this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:item',['item'=>$item['id']]));
+        $service->approve($admin,$id,(int)$item['id'],Uuid::v4(),'service_failure','Full remaining remedy.',1,10000);
+        self::assertSame('refunded',$this->records->order($id)['state']);
+        self::assertSame('revoked',$this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:item',['item'=>$item['id']]));
+        self::assertSame(12345,(int)$this->db->fetchOne('SELECT SUM(amount_minor) FROM commerce_fund_entries WHERE account_id IN (SELECT id FROM commerce_fund_accounts WHERE owner_user_id=:user)',['user'=>$this->actor->id]));
+        self::assertSame(2,(int)$this->db->fetchOne("SELECT COUNT(*) FROM commerce_documents WHERE order_id=:id AND kind='credit_note'",['id'=>$id]));
+        self::assertStringStartsWith('%PDF-',(new InvoicePdfRenderer($this->records))->render($this->records->documents($id)[2]));
     }
 }

@@ -4,7 +4,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-		{{ ui('layout.section-head', {heading: 'Credit pools', eyebrow: 'Credits', summary: 'Course and access-period credit pools.'}) }}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Credit pools', eyebrow: 'Credits', summary: 'Course and access-period credit pools.'})} %}{% block section_actions %}{{ ui('action.link', {label: 'Buy credits', variant: 'primary', size: 'small', href: '/company/credits/buy'}) }}{% endblock %}{% endembed %}
 
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'credits', pagination: credits_pagination, search: {ds_name: 'credits', ds_label: 'Search credits', ds_value: credits_search, ds_action: '/company/credits'}})} %}
 {% block results %}

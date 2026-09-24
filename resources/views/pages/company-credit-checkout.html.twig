@@ -1,0 +1,25 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_back_href = '/company/credits/buy' %}{% set ph_back_label = 'Edit credits' %}
+    {% set ph_kicker = 'Company purchasing' %}{% set ph_title = 'Review company credit order' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+        <h2 class="h4">{{ basket.company.name }}</h2>
+        {% if basket.request_id %}<p>After confirmed payment, one matching credit will be allocated to the pending learner request and the learner will be enrolled.</p>{% endif %}
+        {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+            {% for item in basket.items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
+                <strong>{{ item.course_title }}</strong><p>{{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} × {{ item.unit_label }} = {{ item.line_label }}</p>
+            {% endblock %}{% endembed %}{% endfor %}
+        {% endblock %}{% endembed %}
+        <p class="h4">Total: {{ basket.total_label }}</p>
+        <form action="/company/credits/checkout" method="post">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="purchase_key" value="{{ basket.purchase_key }}"><input type="hidden" name="quote" value="{{ basket.quote }}">
+            {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company billing address', for: 'company-billing-address', required: true})} %}{% block control %}<textarea id="company-billing-address" name="billing_address" rows="3" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+            {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: 'dummy', allow_eft: not basket.request_id} %}
+            {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email the invoice to ' ~ user_email})} %}{% block control %}<input type="checkbox" name="invoice_email" value="yes">{% endblock %}{% endembed %}
+            <p>Credits are specific to the course and access period shown. They are issued only after confirmed full payment. An unpaid order is cancelled after 7 days. Tax is not charged. For cancellation or refund assistance, <a href="/contact">contact us</a>.</p>
+            {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I have reviewed this company purchase and accept these terms.'})} %}{% block control %}<input type="checkbox" name="accept_terms" value="yes" required>{% endblock %}{% endembed %}
+            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Place company order', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Edit credits', variant: 'secondary', size: 'normal', href: '/company/credits/buy'}) }}{% endblock %}{% endembed %}
+        </form>
+    {% endblock %}{% endembed %}</section>
+{% endblock %}

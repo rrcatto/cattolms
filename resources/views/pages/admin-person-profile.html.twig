@@ -247,6 +247,12 @@
 				{% endif %}
 				</div></div>
 			{% endif %}
+			{% if can_manage_enrolments and test_grants %}
+				<h3 class="h5">Test access grants</h3>
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+					{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'person'} %}{% endfor %}
+				{% endblock %}{% endembed %}
+			{% endif %}
 			{% if library_courses %}
 				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}

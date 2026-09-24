@@ -2183,6 +2183,35 @@ final class PlatformAdministrationService
         $this->audit->record($actorUserId, 'enrolment.access_removed', ['enrolment_id' => $enrolmentId, 'reason' => $reason]);
     }
 
+    public function revokeTestGrant(int $enrolmentId, int $courseId, int $recipientId, int $actorUserId): void
+    {
+        $grant = $this->courses->testGrant($enrolmentId);
+        if ($grant === null || (int) $grant['course_id'] !== $courseId || (int) $grant['user_id'] !== $recipientId) {
+            throw new InvalidArgumentException('This test grant does not belong to the selected course and person.');
+        }
+        if (!in_array((string) $grant['status'], ['assigned', 'active', 'completed'], true) || $grant['access_removed_at'] !== null) {
+            throw new InvalidArgumentException('This test grant has already ended.');
+        }
+        $this->removeEnrolment($enrolmentId, $actorUserId, 'Test access revoked by platform administrator.');
+        $this->courses->recordHistory($courseId, $actorUserId, 'course.test_access_revoked', 'enrolment', $enrolmentId, 'Test access revoked.');
+    }
+
+    public function inviteTestLearner(int $enrolmentId, int $courseId, int $recipientId, int $actorUserId): void
+    {
+        $grant = $this->courses->testGrant($enrolmentId);
+        if ($grant === null || (int) $grant['course_id'] !== $courseId || (int) $grant['user_id'] !== $recipientId) {
+            throw new InvalidArgumentException('This test grant does not belong to the selected course and person.');
+        }
+        if (!in_array((string) $grant['status'], ['assigned', 'active', 'completed'], true)
+            || $grant['access_removed_at'] !== null
+            || ($grant['expires_at'] !== null && strtotime((string) $grant['expires_at']) <= time())) {
+            throw new InvalidArgumentException('Only a current test grant can be invited.');
+        }
+        $this->mailer->sendCourseTestInvitation((string) $grant['email'], (string) $grant['course_title'], (string) $grant['slug'], (string) $grant['expires_at']);
+        $this->courses->recordHistory($courseId, $actorUserId, 'course.test_invitation_sent', 'enrolment', $enrolmentId, 'Test invitation sent.');
+        $this->audit->record($actorUserId, 'course.test_invitation_sent', ['course_id' => $courseId, 'enrolment_id' => $enrolmentId, 'user_id' => $recipientId]);
+    }
+
     public function restoreEnrolment(int $enrolmentId, int $actorUserId): void
     {
         $this->administration->restoreEnrolmentAccess($enrolmentId, $actorUserId);
@@ -2231,7 +2260,8 @@ final class PlatformAdministrationService
         return $id;
     }
 
-    public function decideRequest(int $requestId, bool $approve, string $note, int $actorUserId, ?int $allowedCompanyId = null): void
+    /** @return array<string,mixed> */
+    public function decideRequest(int $requestId, bool $approve, string $note, int $actorUserId, ?int $allowedCompanyId = null): array
     {
         $request = $this->transactions->run(function () use ($requestId, $approve, $note, $actorUserId, $allowedCompanyId): array {
             $request = $this->administration->requestForUpdate($requestId);
@@ -2289,7 +2319,7 @@ final class PlatformAdministrationService
                     $this->administration->allocateCredit((int) $credit['id'], (int) $request['user_id'], $enrolmentId, $actorUserId);
                     $this->administration->decideRequest($requestId, 'fulfilled', $note, $actorUserId, $enrolmentId);
                 } else {
-                    $this->administration->decideRequest($requestId, 'approved', $note, $actorUserId);
+                    return ['decision' => 'purchase_required'] + $request;
                 }
             } else {
                 $this->administration->decideRequest($requestId, 'approved', $note, $actorUserId);
@@ -2302,6 +2332,7 @@ final class PlatformAdministrationService
             // so the decision has to be on the left or it is discarded by the row's own null.
             return ['decision' => 'approved', 'enrolment_id' => $enrolmentId] + $request;
         });
+        if ($request['decision'] === 'purchase_required') return $request;
         $this->mailer->sendCourseRequestDecision(
             (string) $request['email'],
             (string) $request['course_title'],
@@ -2319,6 +2350,7 @@ final class PlatformAdministrationService
                 (string) ($request['slug'] ?? '')
             );
         }
+        return $request;
     }
 
     /** @param array<string,mixed> $input */

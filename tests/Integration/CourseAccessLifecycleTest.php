@@ -26,15 +26,80 @@ declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Course\CourseService;
+use CattoLearning\Course\CourseRepository;
+use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
+use CattoLearning\Infrastructure\Persistence\AuditRepository;
+use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
+use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
+use CattoLearning\Infrastructure\Persistence\EntityLookupRepository;
+use CattoLearning\Infrastructure\Persistence\OptionRepository;
+use CattoLearning\Infrastructure\Persistence\RoleRepository;
+use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Infrastructure\Persistence\UserRepository;
+use CattoLearning\Support\GeoIpLocator;
 use CattoLearning\Tests\Support\DevelopmentFixture;
+use CattoLearning\Tests\Support\FakeMailer;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class CourseAccessLifecycleTest extends TestCase
 {
+    public function testTestGrantCanBeInvitedAndRevokedInEitherContextWithoutTouchingOrdinaryAccess(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        /** @var Database $db */
+        $db = $container->get(Database::class);
+        /** @var CourseService $courses */
+        $courses = $container->get(CourseService::class);
+        /** @var CourseRepository $repository */
+        $repository = $container->get(CourseRepository::class);
+        $mailer = new FakeMailer();
+        $administration = new PlatformAdministrationService(
+            $container->get(TransactionManager::class), $container->get(AdministrationRepository::class),
+            $container->get(UserRepository::class), $container->get(RoleRepository::class),
+            $container->get(CompanyRepository::class), $repository, $container->get(OptionRepository::class),
+            $container->get(RuntimeSettings::class), $container->get(AuditRepository::class), $mailer,
+            $container->get(GeoIpLocator::class), $container->get(EntityLookupRepository::class),
+            $container->get(AuthSessionRepository::class)
+        );
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        try {
+            $admin = $fixture->createUser('Test grant admin ' . $suffix, 'tg-admin-' . $suffix . '@example.test');
+            $tester = $fixture->createUser('Test grant learner ' . $suffix, 'tg-learner-' . $suffix . '@example.test');
+            $other = $fixture->createUser('Ordinary learner ' . $suffix, 'tg-other-' . $suffix . '@example.test');
+            $company = $fixture->createCompany($admin, 'Test grant ' . $suffix, 'tg-' . $suffix . '.example.test');
+            $course = $fixture->createCourse($admin, $company, 'tg-' . $suffix, 'Draft for testing');
+            $courses->grantToPerson($course, $tester, 2, $admin);
+            $grant = $courses->courseTestGrants($course)[0];
+            self::assertSame((int) $grant['id'], (int) $courses->personTestGrants($tester)[0]['id']);
+            self::assertSame('assigned', $grant['display_status']);
+            $db->executeStatement('UPDATE course_enrolments SET source_reference=NULL WHERE id=:id', ['id' => $grant['id']]);
+            self::assertSame((int) $grant['id'], (int) $courses->courseTestGrants($course)[0]['id'], 'Released test grants remain manageable.');
+            $ordinary = $repository->grantCourse($other, $course, 86400, $admin);
+            self::assertNull($repository->testGrant($ordinary));
+            $db->executeStatement('UPDATE user_emails SET verified_at=NULL WHERE user_id=:user AND is_primary=TRUE', ['user' => $tester]);
+            $secondary = 'tg-secondary-' . $suffix . '@example.test';
+            $db->executeStatement('INSERT INTO user_emails(user_id,email,is_primary,verified_at) VALUES (:user,:email,FALSE,NOW())', ['user' => $tester, 'email' => $secondary]);
+            self::assertSame($secondary, $courses->courseTestGrants($course)[0]['email']);
+            $administration->inviteTestLearner((int) $grant['id'], $course, $tester, $admin);
+            self::assertSame('course_test_invitation', $mailer->messages[0]['type']);
+            self::assertSame($secondary, $mailer->messages[0]['email']);
+            self::assertSame($grant['expires_at'], $mailer->messages[0]['expiresAt']);
+            $administration->revokeTestGrant((int) $grant['id'], $course, $tester, $admin);
+            self::assertSame('cancelled', $courses->courseTestGrants($course)[0]['display_status']);
+            self::assertSame('assigned', $db->fetchOne('SELECT status FROM course_enrolments WHERE id=:id', ['id' => $ordinary]));
+            $this->expectException(InvalidArgumentException::class);
+            $administration->inviteTestLearner((int) $grant['id'], $course, $tester, $admin);
+        } finally {
+            $fixture->cleanup();
+        }
+    }
     public function testAdministratorGrantToDraftExpiresFromAssignmentAndDoesNotResetOnStart(): void
     {
         $container = CliBootstrap::boot()['container'];

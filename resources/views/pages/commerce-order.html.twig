@@ -5,9 +5,9 @@
     <section class="cl-page-section container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 
-        <p><a href="/account/orders">My Orders</a> · <a href="/account/courses">My Courses</a></p>
+        <p><a href="/account/orders">My Orders</a> · {% if order.company_id|default(null) %}<a href="/company/credits">Company credits</a>{% else %}<a href="/account/courses">My Courses</a>{% endif %}</p>
         <p>Status: <strong>{{ order.state|replace({'_':' '})|capitalize }}</strong></p>
-        {% for item in order.details.items %}<p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.price_label }}</p>{% endfor %}
+        {% for item in order.details.items %}<p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {% if order.company_id|default(null) %}{{ item.quantity }} credits · {% endif %}{{ item.price_label }}</p>{% endfor %}
         <p class="h4">Total: {{ total_label }}</p>
         {% for document in order.documents %}
             <p>{{ ui('action.link', {label: 'View ' ~ (document.kind), variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
@@ -24,7 +24,7 @@
         {% if can_pay %}
             <p>Unpaid orders are automatically cancelled after 7 days. Please pay by {{ order.payment_due_at|date('d M Y H:i') }}.</p>
             {% if payment_method == 'eft' %}
-                <p>Your courses will be available once your payment is confirmed.</p>
+                <p>{{ order.company_id|default(null) ? 'Company credits will be issued once payment is confirmed.' : 'Your courses will be available once your payment is confirmed.' }}</p>
             {% elseif order.payments and (order.payments|last).state == 'failed' %}
                 {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
 {% block body %}
@@ -35,7 +35,7 @@
             {% if change_method or payment_method != 'eft' %}
                 <form action="/account/orders/{{ order.id }}/pay" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="payment_key" value="{{ payment_key }}">
-                    {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method} %}
+                    {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method, allow_eft: not order.request_id|default(null)} %}
                     {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.button', {label: 'Use this payment method', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'I’ll sort it out later', variant: 'secondary', size: 'normal', href: '/account/orders'}) }}
@@ -49,7 +49,7 @@
 {% endblock %}
 {% endembed %}
             {% endif %}
-        {% elseif order.state == 'fulfilled' %}<p>Your courses are ready in <a href="/account/courses">My Courses</a>.</p>
+        {% elseif order.state == 'fulfilled' %}{% if order.company_id|default(null) %}<p>Company credits are ready in <a href="/company/credits">Company credits</a>.{% if order.request_id|default(null) %} The linked learner request was fulfilled and the learner was enrolled.{% endif %}</p>{% else %}<p>Your courses are ready in <a href="/account/courses">My Courses</a>.</p>{% endif %}
         {% elseif order.state == 'manual_review' %}<p>Your payment has been recorded and needs an administrator’s review.</p>
         {% elseif order.state == 'cancelled' %}<p>The payment window has ended and this order has been cancelled. Your invoice remains available for your records.</p>
         {% else %}<p>Your payment is being processed. Check this order again before making another payment. <a href="/account/orders">I’ll check later</a>.</p>{% endif %}

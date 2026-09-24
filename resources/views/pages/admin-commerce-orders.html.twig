@@ -1,0 +1,19 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_back_href = '/admin' %}{% set ph_back_label = 'Administration' %}
+    {% set ph_kicker = 'Payment administration' %}{% set ph_title = 'Orders and payments' %}
+    {% set ph_lead = 'Review settlement, bank evidence, refunds and orders requiring attention.' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section container-fluid cl-container-wide py-5">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+            <form action="/admin/commerce/orders" method="get">
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Find order number or purchaser email', for: 'commerce-order-search'})} %}{% block control %}<input id="commerce-order-search" name="search" value="{{ search }}" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Search orders', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+            <p>The most recent 100 matching orders are shown. A bank receipt requires recorded evidence and a matching full amount before access or credits are issued.</p>
+            {% if orders %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}{% block header %}<tr><th>Order</th><th>Purchaser</th><th>Placed</th><th>Amount</th><th>Status</th><th>Action</th></tr>{% endblock %}{% block body %}
+                {% for order in orders %}<tr><td>CL-{{ '%08d'|format(order.id) }}</td><td>{{ order.purchaser_name ?: order.purchaser_email ?: 'Account' }}{% if order.company_id %} · Company{% endif %}</td><td>{{ order.placed_at|date('d M Y H:i') }}</td><td>{{ order.total_label }}</td><td>{{ ui('feedback.badge', {label: order.state|replace({'_':' '})|capitalize, tone: order.state == 'manual_review' ? 'warning' : (order.state == 'fulfilled' ? 'success' : 'neutral')}) }}</td><td>{{ ui('action.link', {label: 'Review', variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id}) }}</td></tr>{% endfor %}
+            {% endblock %}{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'No orders match this search.'}) }}{% endif %}
+        {% endblock %}{% endembed %}
+    </section>
+{% endblock %}

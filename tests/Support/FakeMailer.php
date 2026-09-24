@@ -61,6 +61,11 @@ final class FakeMailer implements MailerInterface
         $this->record('course_enrolment_notice', compact('email', 'courseTitle', 'courseSlug'));
     }
 
+    public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void
+    {
+        $this->record('course_test_invitation', compact('email', 'courseTitle', 'courseSlug', 'expiresAt'));
+    }
+
     public function sendContactMessage(string $name, string $email, string $subject, string $message): void
     {
         $this->record('contact', compact('name', 'email', 'subject', 'message'));
