@@ -12,7 +12,7 @@ The owner-approved Course Components v2 redesign is released as v0.8.6. The disp
 
 Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
 
-**Current LMS version:** 0.8.7 **Date time:** 2026/09/24 SAST **Current stage:** The approved tester, company credit purchasing and payment administration/refund sequence is released in v0.8.7. `COMMERCE-IMPLEMENTATION-PLAN.md` records the implemented boundaries. Account Funds spending, payouts and live payment gateways are not implemented. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it.
+**Current LMS version:** 0.8.7.1 **Date time:** 2026/09/24 SAST **Current stage:** Course Content arrangement, imported assessment grouping and the editor availability fix follow the tester, company credit purchasing and payment administration/refund sequence released in v0.8.7. `COMMERCE-IMPLEMENTATION-PLAN.md` records the implemented commerce boundaries. Account Funds spending, payouts and live payment gateways are not implemented. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it.
 
 Only the project owner decides future release numbers.
 

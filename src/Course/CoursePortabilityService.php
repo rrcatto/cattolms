@@ -591,9 +591,9 @@ final class CoursePortabilityService
                 $nodeKey = (string) ($placement['node_key'] ?? ''); $parentKey = (string) ($placement['parent_node_key'] ?? '');
                 $nodeType = (string) ($placement['node_type'] ?? 'item');
                 if (!in_array($nodeType, ['section','item'], true)) { $conflicts[] = 'Invalid structure row type: ' . $nodeType . '.'; }
-                if ($parentKey !== '' && (!isset($nodeKeys[$parentKey]) || $nodeKeys[$parentKey]['type'] !== 'section')) { $conflicts[] = 'A structure parent must be an earlier section: ' . $parentKey . '.'; }
+                if ($parentKey !== '' && !isset($nodeKeys[$parentKey])) { $conflicts[] = 'A structure parent must be an earlier Course Item or section: ' . $parentKey . '.'; }
                 $depth = $parentKey === '' ? 1 : (int) ($nodeKeys[$parentKey]['depth'] ?? 0) + 1;
-                if ($nodeType === 'section' && $depth > 3) { $conflicts[] = 'The import exceeds three section levels.'; }
+                if ($depth > 3) { $conflicts[] = 'The import exceeds three Course Content levels.'; }
                 if ($nodeKey !== '' && isset($nodeKeys[$nodeKey])) { $conflicts[] = 'Duplicate structure node key: ' . $nodeKey . '.'; }
                 if ($nodeKey !== '') { $nodeKeys[$nodeKey] = ['type' => $nodeType, 'depth' => $depth]; }
                 if ((int) ($placement['relative_delay_minutes'] ?? 0) < 0) { $conflicts[] = 'Availability delays cannot be negative.'; }
@@ -623,8 +623,8 @@ final class CoursePortabilityService
         foreach ((array) ($analysis['modules'] ?? []) as $index => $module) {
             if (!is_array($module)) { continue; }
             $moduleKey = $key((string) ($module['module_key'] ?? 'content-' . ($index + 1))); $moduleKeys[(string) ($module['module_key'] ?? 'content-' . ($index + 1))] = $moduleKey; $summary = trim((string) ($module['summary_html'] ?? '')); $content = (string) ($module['content_html'] ?? '') . ($summary === '' ? '' : '<section><h2>Summary</h2>' . $summary . '</section>'); $isReview = !empty($module['is_review']);
-            $items[] = ['item_key' => $moduleKey, 'item_type' => 'html_lesson', 'title' => $isReview ? 'Review Study Aid' : (string) ($module['title'] ?? 'Course content'), 'description_html' => (string) ($module['subtitle'] ?? ''), 'content_source' => $content, 'type_config' => $isReview ? ['presentation_role' => 'review_study_aid'] : [], 'resource_id' => null]; $structure[] = ['item_key' => $moduleKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
-            if (is_array($module['assessment'] ?? null)) { $assessmentKey = $key((string) ($module['module_key'] ?? 'assessment-' . ($index + 1)) . '-assessment'); $items[] = $this->importAssessmentItem((array) $module['assessment'], $assessmentKey, 'assessment'); $structure[] = ['item_key' => $assessmentKey, 'assessment_role' => !empty($module['assessment_required']) ? 'graded' : 'content', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
+            $items[] = ['item_key' => $moduleKey, 'item_type' => 'html_lesson', 'title' => $isReview ? 'Review Study Aid' : (string) ($module['title'] ?? 'Course content'), 'description_html' => (string) ($module['subtitle'] ?? ''), 'content_source' => $content, 'type_config' => $isReview ? ['presentation_role' => 'review_study_aid'] : [], 'resource_id' => null]; $structure[] = ['node_key' => $moduleKey, 'item_key' => $moduleKey, 'assessment_role' => 'content', 'public_preview' => false, 'relative_delay_minutes' => 0];
+            if (is_array($module['assessment'] ?? null)) { $assessmentKey = $key((string) ($module['module_key'] ?? 'assessment-' . ($index + 1)) . '-assessment'); $items[] = $this->importAssessmentItem((array) $module['assessment'], $assessmentKey, 'assessment'); $structure[] = ['item_key' => $assessmentKey, 'parent_node_key' => $moduleKey, 'assessment_role' => !empty($module['assessment_required']) ? 'graded' : 'content', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
         }
         if (is_array($analysis['final_assessment'] ?? null)) { $finalKey = $key('final-assessment'); $items[] = $this->importAssessmentItem((array) $analysis['final_assessment'], $finalKey, 'assessment'); $structure[] = ['item_key' => $finalKey, 'assessment_role' => 'final', 'public_preview' => false, 'relative_delay_minutes' => 0]; }
         foreach ($items as &$item) {

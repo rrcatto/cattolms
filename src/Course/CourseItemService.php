@@ -20,11 +20,13 @@ final class CourseItemService
         private readonly CourseRepository $courses,
         private readonly CourseHtml $html,
         private readonly AuditRepository $audit,
-        private readonly ResourceLibraryService $resources
+        private readonly ResourceLibraryService $resources,
+        private readonly CourseStructureDraft $structureDraft
     ) {
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * @return array<string,mixed> */
     public function item(int $id): array
     {
         $item = $this->items->item($id);
@@ -35,7 +37,8 @@ final class CourseItemService
         return $item;
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * @return array<string,mixed> */
     public function library(string $search = '', string $type = ''): array
     {
         if ($type !== '' && !in_array($type, self::TYPES, true)) { throw new InvalidArgumentException('Select a valid Course Item type.'); }
@@ -60,6 +63,7 @@ final class CourseItemService
      * Rebuilds the explicit unsaved editor form for native POST controls.
      * @param array<string,mixed> $input
      * @param array<string,mixed> $before
+     *
      * @return array<string,mixed>
      */
     public function editorDraft(array $input, array $before): array
@@ -159,7 +163,8 @@ final class CourseItemService
         return false;
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * @return array<string,mixed> */
     public function courseContent(int $courseId): array
     {
         $course = $this->courses->findById($courseId);
@@ -167,11 +172,11 @@ final class CourseItemService
         $course['structure'] = $this->availability($courseId, null, false);
         $siblings = [];
         foreach ($course['structure'] as $row) { $siblings[(int) ($row['parent_node_id'] ?? 0)][] = $row; }
-        $sectionDepth = [];
+        $subtreeDepth = [];
         foreach (array_reverse($course['structure']) as $row) {
             $id = (int) $row['id'];
-            $sectionDepth[$id] = max($sectionDepth[$id] ?? 0, $row['node_type'] === 'section' ? (int) $row['depth'] : 0);
-            if ($row['parent_node_id'] !== null) { $parent = (int) $row['parent_node_id']; $sectionDepth[$parent] = max($sectionDepth[$parent] ?? 0, $sectionDepth[$id]); }
+            $subtreeDepth[$id] = max($subtreeDepth[$id] ?? 0, (int) $row['depth']);
+            if ($row['parent_node_id'] !== null) { $parent = (int) $row['parent_node_id']; $subtreeDepth[$parent] = max($subtreeDepth[$parent] ?? 0, $subtreeDepth[$id]); }
         }
         foreach ($course['structure'] as &$row) {
             $group = $siblings[(int) ($row['parent_node_id'] ?? 0)];
@@ -179,12 +184,67 @@ final class CourseItemService
             $previous = $index !== false && $index > 0 ? $group[$index - 1] : null;
             $row['can_up'] = $index !== false && $index > 0;
             $row['can_down'] = $index !== false && isset($group[$index + 1]);
-            $row['can_indent'] = $previous !== null && (int) $previous['depth'] < 3;
+            $row['can_indent'] = $previous !== null && (int) $previous['depth'] + $subtreeDepth[(int) $row['id']] - (int) $row['depth'] + 1 <= 3;
             $row['can_unindent'] = $row['parent_node_id'] !== null;
+            $row['has_children'] = isset($siblings[(int) $row['id']]);
         }
         unset($row);
         $course['publication_validation'] = $this->publicationValidation($courseId);
         return $course;
+    }
+
+    /**
+     * @return list<array{id:int,parent_node_id:int|null}> */
+    public function structureDraft(int $courseId): array
+    {
+        return $this->structureDraft->fromStructure($this->items->structure($courseId));
+    }
+
+    /** @param list<array{id:int,parent_node_id:int|null}> $draft
+     * @return list<array{id:int,parent_node_id:int|null}> */
+    public function moveDraft(array $draft, int $nodeId, string $direction): array
+    {
+        return $this->structureDraft->move($draft, $nodeId, $direction);
+    }
+
+    /** @param list<array{id:int,parent_node_id:int|null}> $draft
+     * @param list<int> $nodeIds
+     * @return list<array{id:int,parent_node_id:int|null}> */
+    public function moveSelectionDraft(array $draft, array $nodeIds, string $direction): array
+    {
+        return $this->structureDraft->moveSelection($draft, $nodeIds, $direction);
+    }
+
+    /** @param list<array{id:int,parent_node_id:int|null}> $draft
+     * @return array<string,mixed> */
+    public function previewStructureDraft(int $courseId, array $draft): array
+    {
+        $course = $this->courseContent($courseId);
+        $course['structure'] = $this->structureDraft->preview($course['structure'], $draft);
+        return $course;
+    }
+
+    /** @param list<array{id:int,parent_node_id:int|null}> $draft */
+    public function saveStructureDraft(int $courseId, array $draft, string $baseline, int $userId): void
+    {
+        $this->transactions->run(function () use ($courseId, $draft, $baseline, $userId): void {
+            $current = $this->items->structure($courseId);
+            if ($baseline !== $this->structureSignature($current)) { throw new InvalidArgumentException('Course Content changed after you began editing. Cancel and reopen it before saving.'); }
+            $this->structureDraft->preview($current, $draft);
+            $this->items->saveStructureOrder($courseId, $draft);
+            $this->audit->record($userId, 'course_content.reordered', ['course_id' => $courseId]);
+        });
+    }
+
+    public function currentStructureSignature(int $courseId): string
+    {
+        return $this->structureSignature($this->items->structure($courseId));
+    }
+
+    /** @param list<array<string,mixed>> $structure */
+    private function structureSignature(array $structure): string
+    {
+        return hash('sha256', json_encode(array_map(static fn(array $row): array => [(int) $row['id'], $row['parent_node_id'], (int) $row['position'], (string) $row['updated_at']], $structure), JSON_THROW_ON_ERROR));
     }
 
     /** @param array<string,mixed> $input */
@@ -225,6 +285,7 @@ final class CourseItemService
     {
         $node = $this->items->node($courseId, $nodeId);
         if ($node === null || (string) $node['node_type'] !== 'item') { throw new InvalidArgumentException('The Course Item placement does not exist.'); }
+        if ($this->items->hasChildren($courseId, $nodeId)) { throw new InvalidArgumentException('Move or remove child Course Content before removing this placement.'); }
         $this->items->removeNode($courseId, $nodeId);
         $this->audit->record($userId, 'course_item.removed', ['course_id' => $courseId, 'node_id' => $nodeId]);
     }
@@ -243,66 +304,18 @@ final class CourseItemService
 
     public function move(int $courseId, int $nodeId, string $direction, int $userId): void
     {
-        $node = $this->items->node($courseId, $nodeId);
-        if ($node === null || !in_array($direction, ['up','down','indent','unindent'], true)) { throw new InvalidArgumentException('Select a valid Course Content move.'); }
-        $parent = $node['parent_node_id'] === null ? null : (int) $node['parent_node_id'];
-        $siblings = $this->items->siblings($courseId, $parent);
-        $index = array_search($nodeId, array_map(static fn(array $row): int => (int) $row['id'], $siblings), true);
-        if ($index === false) { return; }
-        if ($direction === 'up' || $direction === 'down') {
-            $target = $index + ($direction === 'up' ? -1 : 1);
-            if (isset($siblings[$target])) { $this->transactions->run(fn() => $this->items->swapPositions($courseId, $nodeId, (int) $siblings[$target]['id'])); }
-            return;
-        }
-        if ($direction === 'indent') {
-            $previous = $siblings[$index - 1] ?? null;
-            $previousDepth = 0;
-            foreach ($this->items->structure($courseId) as $row) { if ($previous !== null && (int) $row['id'] === (int) $previous['id']) { $previousDepth = (int) $row['depth']; break; } }
-            if ($previous === null || $previousDepth >= 3) { throw new InvalidArgumentException('Indent requires a preceding Course Item or section below the three-level limit.'); }
-            $newParent = (int) $previous['id'];
-        } else {
-            if ($parent === null) { throw new InvalidArgumentException('This row is already at the outer level.'); }
-            $parentNode = $this->items->node($courseId, $parent);
-            $newParent = $parentNode['parent_node_id'] === null ? null : (int) $parentNode['parent_node_id'];
-        }
-        $structure = $this->items->structure($courseId);
-        $nodeDepth = 1; $parentDepth = 0; $subtreeDepth = 0; $inside = false;
-        foreach ($structure as $row) {
-            if ((int) $row['id'] === $newParent) { $parentDepth = (int) $row['depth']; }
-            if ((int) $row['id'] === $nodeId) { $nodeDepth = (int) $row['depth']; $inside = true; }
-            elseif ($inside && (int) $row['depth'] <= $nodeDepth) { $inside = false; }
-            if ($inside && $row['node_type'] === 'section') { $subtreeDepth = max($subtreeDepth, (int) $row['depth'] - $nodeDepth + 1); }
-        }
-        if ($parentDepth + $subtreeDepth > 3) { throw new InvalidArgumentException('Moving this Course Content subtree would exceed three levels.'); }
-        $position = $this->items->nextPosition($courseId, $newParent);
-        $this->items->moveNode($courseId, $nodeId, $newParent, $position);
-        $this->audit->record($userId, 'course_content.moved', ['course_id' => $courseId, 'node_id' => $nodeId, 'direction' => $direction]);
+        $baseline = $this->currentStructureSignature($courseId);
+        $draft = $this->structureDraft->move($this->structureDraft($courseId), $nodeId, $direction);
+        $this->saveStructureDraft($courseId, $draft, $baseline, $userId);
     }
 
-    /** @param list<int> $nodeIds */
+    /**
+     * @param list<int> $nodeIds */
     public function moveSelection(int $courseId, array $nodeIds, string $direction, int $userId): void
     {
-        $selected = array_fill_keys($nodeIds, true); $ordered = []; $selectedAncestors = [];
-        foreach ($this->items->structure($courseId) as $row) {
-            $id = (int) $row['id']; $parent = (int) ($row['parent_node_id'] ?? 0);
-            $nested = isset($selectedAncestors[$parent]);
-            if ($nested || isset($selected[$id])) { $selectedAncestors[$id] = true; }
-            if (isset($selected[$id]) && !$nested) { $ordered[] = $id; }
-        }
-        if ($ordered === []) { throw new InvalidArgumentException('Select one or more Course Content rows.'); }
-        if ($direction === 'down') { $ordered = array_reverse($ordered); }
-        $this->transactions->run(function () use ($courseId, $ordered, $direction, $userId): void {
-            foreach ($ordered as $id) {
-                if (in_array($direction, ['up','down'], true)) {
-                    $node = $this->items->node($courseId, $id);
-                    $siblings = $this->items->siblings($courseId, $node['parent_node_id'] === null ? null : (int) $node['parent_node_id']);
-                    $index = array_search($id, array_map(static fn(array $row): int => (int) $row['id'], $siblings), true);
-                    $next = $index === false ? null : ($siblings[$index + ($direction === 'up' ? -1 : 1)] ?? null);
-                    if ($next === null || in_array((int) $next['id'], $ordered, true)) { continue; }
-                }
-                $this->move($courseId, $id, $direction, $userId);
-            }
-        });
+        $baseline = $this->currentStructureSignature($courseId);
+        $draft = $this->structureDraft->moveSelection($this->structureDraft($courseId), $nodeIds, $direction);
+        $this->saveStructureDraft($courseId, $draft, $baseline, $userId);
     }
 
     /** @param array<string,mixed> $input */
@@ -318,7 +331,8 @@ final class CourseItemService
         $this->audit->record($userId, 'course_section.updated', ['course_id' => $courseId, 'node_id' => $nodeId]);
     }
 
-    /** @return array{errors:list<string>,warnings:list<string>} */
+    /**
+     * @return array{errors:list<string>,warnings:list<string>} */
     public function publicationValidation(int $courseId): array
     {
         $course = $this->courses->findById($courseId);
@@ -377,7 +391,8 @@ final class CourseItemService
         foreach ($this->shortcodes((string) $item['content_source']) as $reference) { $this->validateReferences($reference, [...$path, $key], $errors); }
     }
 
-    /** @return list<array<string,mixed>> */
+    /**
+     * @return list<array<string,mixed>> */
     public function availability(int $courseId, ?string $startedAt, bool $publicOnly): array
     {
         $rows = $this->items->structure($courseId, $publicOnly);
@@ -424,7 +439,8 @@ final class CourseItemService
         return sprintf('%02d weeks %02d days %02d hours %02d minutes', $weeks, $days, $hours, $minutes);
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string> */
     public function shortcodes(string $source): array
     {
         preg_match_all('/\[course-item:([a-zA-Z0-9][a-zA-Z0-9._-]{0,119})\]/', $source, $matches);
@@ -433,6 +449,7 @@ final class CourseItemService
 
     /**
      * @param array<string,mixed> $input
+     *
      * @return array<string,mixed>
      */
     private function validateItem(array $input, int $currentId = 0): array
@@ -473,6 +490,7 @@ final class CourseItemService
 
     /**
      * @param array<string,mixed> $input
+     *
      * @return list<array<string,mixed>>
      */
     private function questionEditorInput(array $input): array
@@ -511,6 +529,7 @@ final class CourseItemService
     /**
      * @param array<string,mixed> $item
      * @param array<string,mixed> $input
+     *
      * @return array<string,mixed>
      */
     private function placementData(int $courseId, array $item, array $input): array
