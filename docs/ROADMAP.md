@@ -1,18 +1,18 @@
 # Catto Learning Development Roadmap
 
-## Current delivery order — 2026/09/23
+## Current delivery position — 2026/09/24
 
-The owner approved this sequence, with a review break after each step: (1) update stale documentation, (2) finish tester administration, (3) implement company credit purchasing, and (4) implement payment administration and refunds. The documentation correction and initial ADMIN grant workflow are included in the owner-authorized v0.8.6.1 release. The remainder of tester administration is the next coding step. Pause after each step for owner review; later Git pushes and version choices require explicit owner instruction.
+The owner approved this sequence, with a review break after each step: (1) update stale documentation, (2) finish tester administration, (3) implement company credit purchasing, and (4) implement payment administration and refunds. The documentation correction and initial ADMIN grant workflow are included in the owner-authorized v0.8.6.1 release. Tester administration, company credit purchasing, and payment administration/refunds are included in the owner-authorized v0.8.7 release. Future scope, versions and Git publication require another explicit owner instruction.
 
-Tester administration should finish the course-first and person-first grant workflow by making grant status and expiry clear, putting an explicit revoke action in the grant context using the existing enrolment-removal rule, and providing a deliberate invitation/notification path. Grants to draft courses and immediate access expiry remain the active contract in `COURSE-SPECIFICATION.md` section 18. Company credit purchasing follows against the existing course/access-period credit model and individual Dummy-backed commerce foundation; it must make both direct company purchase and request-approval-to-purchase usable. Payment administration and refunds follow, including evidence-backed manual bank confirmation, refund/credit-note records and the required access effect. The full funds, gifts and real-provider programmes remain separate later work unless the owner expands scope.
+Tester administration uses the course-first and person-first grant workflow with visible status and expiry, explicit revocation using the existing enrolment-removal rule, and an ADMIN-chosen invitation email. The course and person lists show the most recent 100 test grants; the complete enrolment administration remains available separately. Grants to draft courses and immediate access expiry remain the active contract in `COURSE-SPECIFICATION.md` section 18. Company administrators can buy exact course/access-period credits directly or purchase a missing credit while approving a learner request. Confirmed payment issues a historical company credit lot; request-linked simulated payment also allocates one credit, enrols the learner and queues notices. ADMIN payment administration now records exact full EFT evidence before fulfilment, preserves late payments for review, supports explicit release of safe paid orders and records refund decisions, credit notes and Account Funds credits. Full individual item refunds revoke access immediately while preserving learning history; company refunds use unused units and historical LIFO price. Account Funds spending/payouts, gifts and real-provider programmes remain separate later work unless the owner expands scope.
 
-## Course Components release and local update
+## Course Components release and commerce update
 
 The owner-approved Course Components v2 redesign is released as v0.8.6. The disposable database was dropped and recreated from `20260906110000_create_v085_course_components_baseline.php`, then populated with the requested 100,000-record seed dataset. The runtime uses reusable Course Items, separate course placements, sections, tracked shortcode references and immutable Resources. Module/content-block/media/progress tables were removed. No production-data migration or compatibility layer is intended.
 
 Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
 
-**Current LMS version:** 0.8.6.1 **Date time:** 2026/09/23 SAST **Current stage:** v0.8.6.1 adds the initial ADMIN test-access workflow and current documentation to the v0.8.6 Course Components release. Individual carts, checkout, Dummy payments, invoices and enrolment fulfilment are already implemented. Continue the approved sequence above using `COMMERCE-IMPLEMENTATION-PLAN.md` for its current-status map and remaining domain rules; 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it.
+**Current LMS version:** 0.8.7 **Date time:** 2026/09/24 SAST **Current stage:** The approved tester, company credit purchasing and payment administration/refund sequence is released in v0.8.7. `COMMERCE-IMPLEMENTATION-PLAN.md` records the implemented boundaries. Account Funds spending, payouts and live payment gateways are not implemented. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it.
 
 Only the project owner decides future release numbers.
 
@@ -198,7 +198,7 @@ The rules, in the owner's own terms:
 
 ### Current implementation gap, measured against those rules
 
-The owned-course rule and direct assignment of an existing exact-match credit are implemented. `/company/credits` displays existing credits but has no company purchase checkout. A request that lacks the necessary credit still needs a purchase-and-return flow before approval can fulfil it. The company credit purchasing phase should complete both purchase entry points and learner notification; do not reintroduce the old state in which approval appears successful without an enrolment.
+The owned-course rule, direct assignment of an existing exact-match credit and `/company/credits/buy` purchase checkout are included in v0.8.7. A request that lacks the necessary credit remains pending while the company administrator buys the exact-match credit; confirmed simulated payment then allocates it, enrols the learner and queues notices. Direct company purchases may use EFT, but credits are not issued until ADMIN confirms bank settlement with independent evidence; request-linked purchases require immediate simulated card payment in this phase. Never restore the old state in which approval appears successful without enrolment.
 
 ---
 
@@ -259,7 +259,7 @@ Doing the first is worth little on its own if the catalogue stays in one languag
 
 ## 3. Commerce — individual foundation built; company and administration work remains
 
-The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. `src/Commerce/` and its integration tests are the implementation source. The bullets below are the original domain target, not a claim that none of Commerce exists. The approved next commerce coding steps are company credit purchasing, then payment administration and refunds, after tester administration and a review break at each step.
+The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. Local subsequent work adds company credit purchasing, ADMIN bank evidence confirmation, manual-review reconciliation and refund/credit-note/Account Funds records. `src/Commerce/` and its integration tests are the implementation source. The bullets below are the original broader domain target, not a claim that none of Commerce exists. Further commerce work requires a scope decision after owner review.
 
 Implement one coherent commerce domain:
 

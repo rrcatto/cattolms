@@ -43,6 +43,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Company\SelectedCompanyContext;
+use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -59,7 +60,8 @@ final class CompanyController extends BaseController
         private readonly CompanyService $companies,
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanySectionRegistry $sections,
-        private readonly SelectedCompanyContext $companyContext
+        private readonly SelectedCompanyContext $companyContext,
+        private readonly CompanyCreditPurchaseService $creditPurchases
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -287,7 +289,16 @@ final class CompanyController extends BaseController
             // Scoped to the company in context even for a platform administrator. Deciding a
             // request from the Company workspace means deciding it for the company being
             // administered; the unrestricted path belongs to Administration, not here.
-            $this->platformAdministration->decideRequest($requestId, $approve, (string) ($_POST['note'] ?? ''), $user->id, $this->contextCompanyId($user));
+            $result = $this->platformAdministration->decideRequest($requestId, $approve, (string) ($_POST['note'] ?? ''), $user->id, $this->contextCompanyId($user));
+            if ($result['decision'] === 'purchase_required') {
+                $existing = $this->creditPurchases->startForRequest($user,$this->contextCompanyId($user),$requestId);
+                if ($existing !== null) {
+                    $this->flash('info','A company purchase for this request is already in progress.');
+                    $this->redirect('/account/orders/'.$existing);
+                }
+                $this->flash('info', 'A matching company credit is needed. Complete checkout to approve and enrol this learner.');
+                $this->redirect('/company/credits/buy');
+            }
             $this->flash('success', $approve ? 'The course request was approved.' : 'The course request was rejected.');
             $this->redirect('/company/requests');
         }, '/company/requests');

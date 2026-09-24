@@ -22,6 +22,7 @@ final class CommerceMaintenance
         foreach ($this->records->dueOrders($now, 200) as $id) $this->orders->cancelDue($id);
         foreach ($this->records->dueEntitlements($now, 200) as $id) $this->access->reconcile($id);
         $this->deliverInvoices();
+        $this->deliverCompanyCourseNotices();
     }
 
     public function deliverInvoices(int $limit = 20): void
@@ -40,6 +41,29 @@ final class CommerceMaintenance
                     $this->records->emailDelivered((int) $event['id'], null);
                 } catch (\Throwable) {
                     $this->records->emailDelivered((int) $event['id'], 'Invoice delivery failed; retry scheduled.');
+                }
+                return true;
+            });
+            if (!$found) return;
+        }
+    }
+
+    public function deliverCompanyCourseNotices(int $limit = 20): void
+    {
+        for ($i=0; $i<$limit; $i++) {
+            $found = $this->transactions->run(function (): bool {
+                $event = $this->records->nextCompanyCourseNotice();
+                if ($event === null) return false;
+                try {
+                    $payload = CommerceRepository::decode((string)$event['payload']);
+                    if ($event['event'] === 'company.request_decision') {
+                        $this->mailer->sendCourseRequestDecision((string)$payload['email'], (string)$payload['course_title'], true);
+                    } else {
+                        $this->mailer->sendCourseEnrolmentNotice((string)$payload['email'], (string)$payload['course_title'], (string)$payload['slug']);
+                    }
+                    $this->records->emailDelivered((int)$event['id'], null);
+                } catch (\Throwable) {
+                    $this->records->emailDelivered((int)$event['id'], 'Company course notice delivery failed; retry scheduled.');
                 }
                 return true;
             });

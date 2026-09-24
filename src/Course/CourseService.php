@@ -1146,6 +1146,12 @@ final class CourseService
         return $this->courses->courseTestGrants($courseId);
     }
 
+    /** @return list<array<string,mixed>> */
+    public function personTestGrants(int $userId): array
+    {
+        return $this->courses->personTestGrants($userId);
+    }
+
     /**
      * @param array<string,mixed> $uploadedFile
      * @return array<string,mixed>

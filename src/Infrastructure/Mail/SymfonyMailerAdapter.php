@@ -128,6 +128,20 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void
+    {
+        $url = rtrim(Env::string('APP_URL'), '/') . '/learn/' . rawurlencode($courseSlug);
+        $expiry = (new \DateTimeImmutable($expiresAt))->setTimezone(new \DateTimeZone('UTC'))->format('j M Y H:i') . ' UTC';
+        $this->send(
+            $email,
+            'Invitation to test: ' . $courseTitle,
+            '<p>You have access to test <strong>' . $this->escape($courseTitle) . '</strong>.</p>'
+            . '<p>Sign in with this email address and <a href="' . $this->escape($url) . '">open the course</a>.</p>'
+            . '<p>Your access ends on ' . $this->escape($expiry) . '. Please share your feedback with the person who invited you.</p>',
+            "You have access to test {$courseTitle}.\n\nSign in with this email address and open the course: {$url}\n\nYour access ends on {$expiry}. Please share your feedback with the person who invited you."
+        );
+    }
+
     public function sendContactMessage(string $name, string $email, string $subject, string $message): void
     {
         $configuration = $this->settings->mailConfiguration();

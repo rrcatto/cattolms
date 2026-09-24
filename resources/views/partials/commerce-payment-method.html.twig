@@ -3,7 +3,7 @@
 
     <select id="payment-method" name="payment_method" required {{ ui_field_attrs(props) }}>
         <option value="dummy" {{ selected_method == 'dummy' ? 'selected' : '' }}>Card (simulated)</option>
-        <option value="eft" {{ selected_method == 'eft' ? 'selected' : '' }}>EFT / bank transfer</option>
+        {% if allow_eft|default(true) %}<option value="eft" {{ selected_method == 'eft' ? 'selected' : '' }}>EFT / bank transfer</option>{% endif %}
     </select>
 
 {% endblock %}
@@ -18,4 +18,4 @@
 
 {% endblock %}
 {% endembed %}
-<p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>
+{% if allow_eft|default(true) %}<p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>{% endif %}

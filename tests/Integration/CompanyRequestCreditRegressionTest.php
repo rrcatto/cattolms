@@ -80,10 +80,11 @@ final class CompanyRequestCreditRegressionTest extends TestCase
             $fixture->rememberRequest($requestId);
 
             $service = $this->service($container, $mailer);
-            $service->decideRequest($requestId, true, 'Approved without matching credit', $adminId, $companyId);
+            $decision = $service->decideRequest($requestId, true, 'Approval needs payment', $adminId, $companyId);
 
             $request = $db->fetchAllAssociative('SELECT status,enrolment_id FROM course_requests WHERE id=:id', ['id' => $requestId])[0];
-            self::assertSame('approved', (string) $request['status']);
+            self::assertSame('purchase_required', $decision['decision']);
+            self::assertSame('pending', (string) $request['status']);
             self::assertSame('', trim((string) ($request['enrolment_id'] ?? '')));
             $allocations = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM course_credit_allocations WHERE credit_id=:id', ['id' => $wrongPeriodCredit]);
             self::assertSame(0, (int) $allocations[0]['total']);
@@ -119,7 +120,7 @@ final class CompanyRequestCreditRegressionTest extends TestCase
             self::assertSame('consumed', (string) $allocationAfterStart['status']);
             self::assertNotSame('', trim((string) ($allocationAfterStart['consumed_at'] ?? '')));
 
-            self::assertCount(2, array_values(array_filter(
+            self::assertCount(1, array_values(array_filter(
                 $mailer->messages,
                 static fn(array $message): bool => $message['type'] === 'course_request_decision'
             )));

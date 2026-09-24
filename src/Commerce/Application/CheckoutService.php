@@ -88,6 +88,7 @@ final class CheckoutService
             $this->records->lockPurchaser($actor->id);
             $order = $this->records->order($orderId, true);
             if ($order['state'] !== 'awaiting_payment') throw new RuntimeException('This order is no longer awaiting payment.');
+            if ($order['request_id'] !== null && $method !== 'dummy') throw new RuntimeException('A request purchase needs immediate confirmed payment to enrol the learner. Use the simulated card payment.');
             foreach ($this->records->payments($orderId) as $attempt) {
                 if (in_array($attempt['state'], ['created','pending','paid'], true)) throw new RuntimeException('A payment is already being processed.');
             }

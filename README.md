@@ -1,6 +1,6 @@
 # Catto Learning LMS
 
-Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.8.6.1** (the application package remains on the 0.8 code line). Development data is disposable; no production data or upgrade compatibility is assumed.
+Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.8.7** (the application package remains on the 0.8 code line). Development data is disposable; no production data or upgrade compatibility is assumed.
 
 ## Course Components development update
 
@@ -10,7 +10,7 @@ The learner reader is Core-owned, full-screen and white. Public previews require
 
 The disposable development database has been rebuilt from `20260906110000_create_v085_course_components_baseline.php` and populated using the 100,000-record seed plan. See [Course specification](docs/COURSE-SPECIFICATION.md) and [handoff](docs/HANDOFF.md) for the active contract and validation status. Reports are kept in workspace `cattolms/REPORTS`, outside the repository.
 
-v0.8.6.1 adds ADMIN test grants for friends from course and person pages, including draft courses, with expiry from grant time. The owner-approved sequence after this release is to finish tester administration, implement company credit purchasing, then implement payment administration and refunds, with a review break after each step. See the [roadmap](docs/ROADMAP.md) and [commerce plan](docs/COMMERCE-IMPLEMENTATION-PLAN.md) for current boundaries. Later release numbers and Git pushes require explicit owner instruction.
+v0.8.7 includes ADMIN test-grant history, deliberate invitations and scoped revocation, company credit purchasing at `/company/credits/buy`, and payment/refund administration at `/admin/commerce/orders`. Company purchases create immutable paid credit lots for exact course/access-period variants; a linked request is fulfilled only after confirmed payment. ADMIN bank confirmation requires exact full settlement, receipt time, unique bank reference and a written reason. Late or changed paid orders require explicit manual-review release. Approved refunds create credit notes and Account Funds entries; full individual item refunds revoke access while retaining learning history, and company refunds consume unused purchased units at historical LIFO prices. Account Funds spending, payouts and live payment gateways remain future work. See the [roadmap](docs/ROADMAP.md) and [commerce plan](docs/COMMERCE-IMPLEMENTATION-PLAN.md) for current boundaries. Git publication does not deploy the VPS.
 
 ## What is in the current release
 
@@ -75,7 +75,7 @@ The complete quality gate is:
 podman exec -u cattotest env_php_1 sh -lc 'composer qa'
 ```
 
-It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and release validation. The v0.8.6.1 release passes `composer qa`; Twig lint passes for all 179 application and theme templates. Browser checks for the tester-grant forms with JavaScript disabled and both all-theme matrices passed before release preparation. A Chromium check of content produced by the real importer and renderer verifies SVG gradients, namespaces and embedded interactions. The browser regression matrix is documented in `tests/Browser/README.md`. JavaScript changed in the repository should also pass `node --check`.
+It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and release validation. The v0.8.7 release passes `composer qa` and Twig lint. Both all-theme browser matrices and no-JavaScript smoke checks of the ADMIN tester, company checkout and ADMIN orders flows passed during implementation. A Chromium check of content produced by the real importer and renderer verifies SVG gradients, namespaces and embedded interactions. The browser regression matrix is documented in `tests/Browser/README.md`. JavaScript changed in the repository should also pass `node --check`.
 
 ## Documentation
 
@@ -89,7 +89,7 @@ It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownershi
 
 ## Current boundaries
 
-The development checkout does not include live payment processors, bank-payment confirmation administration, company credit purchases, account funds, gifts, refunds or debt workflows. Company credit purchasing and payment administration/refunds are the approved next commerce steps; the other areas remain later work in [docs/COMMERCE-IMPLEMENTATION-PLAN.md](docs/COMMERCE-IMPLEMENTATION-PLAN.md).
+The development checkout does not include live payment processors, bank payouts, Account Funds spending, gifts or debt workflows. Company credit purchasing, evidence-backed bank confirmation and approved refunds are included in v0.8.7; the other areas remain later work in [docs/COMMERCE-IMPLEMENTATION-PLAN.md](docs/COMMERCE-IMPLEMENTATION-PLAN.md).
 
 The database is development data. `composer smoke:install` resets it and should only be used when a deliberate reset is intended.
 

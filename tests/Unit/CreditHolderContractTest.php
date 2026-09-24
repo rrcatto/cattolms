@@ -64,17 +64,13 @@ final class CreditHolderContractTest extends TestCase
         self::assertStringNotContainsString("lk_name='user_id'", $form, 'The individual holder control must not return.');
     }
 
-    /**
-     * The section is Credits, not "Credits & Orders".
-     *
-     * No order, invoice, payment or refund table exists. Naming the section after both made the
-     * platform claim a purchase history it does not keep; an order is the record of a transaction
-     * and a credit is what one leaves behind, and the two arrive together with commerce.
-     */
-    public function testTheSectionDoesNotClaimAnOrderHistoryThatDoesNotExist(): void
+    /** The commerce navigation may advertise Orders because persisted orders and ADMIN routes now exist. */
+    public function testTheOrdersNavigationOpensTheProtectedFinancialWorkspace(): void
     {
-        foreach (['src/Application/AdministrationSectionRegistry.php', 'src/View/ThemeRenderer.php'] as $file) {
-            self::assertStringNotContainsString("'Credits & Orders'", self::read($file), $file . ' still advertises Orders.');
-        }
+        $navigation = self::read('src/View/ThemeRenderer.php');
+        self::assertStringContainsString("'Credits & Orders'", $navigation);
+        self::assertStringContainsString("'PLATFORM.ORDER.VIEW'", $navigation);
+        self::assertStringContainsString("'/admin/commerce/orders'", $navigation);
+        self::assertStringContainsString("#[Route('/admin/commerce/orders'", self::read('src/Commerce/Http/PaymentAdministrationController.php'));
     }
 }

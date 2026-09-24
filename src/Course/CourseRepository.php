@@ -334,7 +334,7 @@ final class CourseRepository
                     -- sub-selects rather than joined aggregates: credits, allocations and
                     -- enrolments are three independent one-to-many relationships on the same
                     -- course, so joining them multiplies before anything is counted.
-                    (SELECT COALESCE(SUM(cr.quantity),0)::int FROM course_credits cr
+                    (SELECT COALESCE(SUM(cr.quantity-cr.refunded_quantity),0)::int FROM course_credits cr
                       WHERE cr.course_id = c.id AND cr.company_id = :company_id) AS credits_bought,
                     (SELECT COUNT(*)::int FROM course_credit_allocations cca
                         JOIN course_credits cr ON cr.id = cca.credit_id
@@ -2102,11 +2102,12 @@ final class CourseRepository
             "INSERT INTO course_enrolments
                  (public_id,user_id,course_id,source_type,source_reference,status,
                   access_period_seconds,assigned_at,expires_at,assigned_by_user_id,created_at,updated_at)
-             VALUES (:public_id,:user_id,:course_id,'administrator',NULL,'assigned',
+             VALUES (:public_id,:user_id,:course_id,'administrator',:source_reference,'assigned',
                      :access_period_seconds,:assigned_at,:expires_at,:assigned_by,:created_at,:updated_at)
              RETURNING id",
             [
                 'public_id' => Uuid::v4(),
+                'source_reference' => $expiresFromGrant ? 'test_grant' : null,
                 // The learner and the course must be in the same universe. forPair() refuses a
                 // mismatch by name rather than leaving the trigger to report a column.
                 'user_id' => $userId,
@@ -2457,15 +2458,59 @@ final class CourseRepository
     public function courseTestGrants(int $courseId): array
     {
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT ce.id,ce.user_id,ce.status,ce.assigned_at,ce.expires_at,ue.email,
+            "SELECT ce.id,ce.user_id,ce.status,ce.assigned_at,ce.expires_at,ce.access_removed_at,ue.email,
+                    CASE WHEN ce.status IN ('assigned','active','completed') AND ce.expires_at<=NOW() THEN 'expired' ELSE ce.status END AS display_status,
                     COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email) AS learner_name
              FROM course_enrolments ce JOIN users u ON u.id=ce.user_id
-             JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
-             WHERE ce.course_id=:course AND ce.source_type='administrator' AND ce.is_preview=FALSE
-               AND ce.status IN ('assigned','active','completed') AND (ce.expires_at IS NULL OR ce.expires_at>NOW())
+             LEFT JOIN LATERAL (SELECT email FROM user_emails WHERE user_id=u.id
+                                ORDER BY (verified_at IS NOT NULL) DESC,is_primary DESC,id LIMIT 1) ue ON TRUE
+             WHERE ce.course_id=:course AND ce.is_preview=FALSE AND ce.source_type='administrator'
+               AND (ce.source_reference='test_grant' OR (ce.source_reference IS NULL AND ce.expires_at IS NOT NULL
+                    AND ABS(EXTRACT(EPOCH FROM (ce.expires_at-ce.assigned_at))-ce.access_period_seconds)<=2
+                    AND NOT EXISTS (SELECT 1 FROM course_requests cr WHERE cr.enrolment_id=ce.id)
+                    AND NOT EXISTS (SELECT 1 FROM course_credit_allocations ca WHERE ca.enrolment_id=ce.id)))
              ORDER BY ce.assigned_at DESC,ce.id DESC LIMIT 100",
             ['course' => $courseId]
         ));
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function personTestGrants(int $userId): array
+    {
+        return $this->normaliseRows($this->db->fetchAllAssociative(
+            "SELECT ce.id,ce.course_id,ce.user_id,ce.status,ce.assigned_at,ce.expires_at,ce.access_removed_at,
+                    CASE WHEN ce.status IN ('assigned','active','completed') AND ce.expires_at<=NOW() THEN 'expired' ELSE ce.status END AS display_status,
+                    c.title AS course_title,c.slug
+             FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id
+             WHERE ce.user_id=:user AND ce.is_preview=FALSE AND ce.source_type='administrator'
+               AND (ce.source_reference='test_grant' OR (ce.source_reference IS NULL AND ce.expires_at IS NOT NULL
+                    AND ABS(EXTRACT(EPOCH FROM (ce.expires_at-ce.assigned_at))-ce.access_period_seconds)<=2
+                    AND NOT EXISTS (SELECT 1 FROM course_requests cr WHERE cr.enrolment_id=ce.id)
+                    AND NOT EXISTS (SELECT 1 FROM course_credit_allocations ca WHERE ca.enrolment_id=ce.id)))
+             ORDER BY ce.assigned_at DESC,ce.id DESC LIMIT 100",
+            ['user' => $userId]
+        ));
+    }
+
+    /** @return array<string,mixed>|null */
+    public function testGrant(int $enrolmentId): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT ce.id,ce.course_id,ce.user_id,ce.status,ce.expires_at,ce.access_removed_at,
+                    c.title AS course_title,c.slug,ue.email
+             FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id
+             JOIN users u ON u.id=ce.user_id
+             JOIN LATERAL (SELECT email FROM user_emails WHERE user_id=u.id AND verified_at IS NOT NULL
+                           ORDER BY is_primary DESC,id LIMIT 1) ue ON TRUE
+             WHERE ce.id=:id AND ce.is_preview=FALSE AND ce.source_type='administrator'
+               AND u.status='active'
+               AND (ce.source_reference='test_grant' OR (ce.source_reference IS NULL AND ce.expires_at IS NOT NULL
+                    AND ABS(EXTRACT(EPOCH FROM (ce.expires_at-ce.assigned_at))-ce.access_period_seconds)<=2
+                    AND NOT EXISTS (SELECT 1 FROM course_requests cr WHERE cr.enrolment_id=ce.id)
+                    AND NOT EXISTS (SELECT 1 FROM course_credit_allocations ca WHERE ca.enrolment_id=ce.id)))",
+            ['id' => $enrolmentId]
+        );
+        return $row === false ? null : $this->normaliseRow($row);
     }
 
 

@@ -1,0 +1,67 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_back_href = '/admin/commerce/orders' %}{% set ph_back_label = 'Orders and payments' %}
+    {% set ph_kicker = 'Payment administration' %}{% set ph_title = 'Order CL-' ~ '%08d'|format(order.id) %}
+    {% set ph_lead = snapshot.billing_name ~ ' · ' ~ total_label ~ ' · ' ~ order.state|replace({'_':' '}) %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section container-fluid cl-container-wide py-5">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Order history', heading_level: 2, summary: 'The invoice and payment records remain intact when a refund is approved.'}) }}
+            <p><strong>Placed:</strong> {{ order.placed_at|date('d M Y H:i') }} · <strong>Payment due:</strong> {{ order.payment_due_at|date('d M Y H:i') }} · <strong>Method:</strong> {{ payment_method|upper }}</p>
+            {% if fund_balance_label is not null %}<p><strong>Current Account Funds balance:</strong> {{ fund_balance_label }}. This value records refunds credited to the purchaser or company; payout and spending controls are a separate phase.</p>{% endif %}
+            {% for item in items %}<p><strong>{{ item.title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} {{ item.product_type == 'company_credit' ? 'credits' : 'course access' }} · {{ item.amount_label }} · Refunded: {{ item.refunded_minor / 100 }} {{ order.currency }}</p>{% endfor %}
+            <h3 class="h5">Financial documents</h3>
+            {% for document in documents %}<p>{{ ui('action.link', {label: document.kind|replace({'_':' '})|capitalize ~ ' ' ~ document.number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id ~ '/documents/' ~ document.id, new_window: true}) }}</p>{% endfor %}
+            {% if can_view_payments %}<h3 class="h5">Payments and evidence</h3>
+            {% if payments %}{% for payment in payments %}<p><strong>{{ payment.gateway }}</strong> · {{ payment.state }} · {{ payment.created_at|date('d M Y H:i') }}{% if payment.provider_reference %} · {{ payment.provider_reference }}{% endif %}{% if payment.evidence %}<br>Received {{ payment.evidence.received_at|date('d M Y H:i') }}; ADMIN reason: {{ payment.evidence.reason }}{% endif %}</p>{% endfor %}{% else %}<p>No payment has been confirmed.</p>{% endif %}{% endif %}
+            {% if refunds %}<h3 class="h5">Approved refunds</h3>{% for refund in refunds %}<p>{{ refund.amount_label }} · {{ refund.quantity }} unit(s) · {{ refund.basis }} · {{ refund.actor_name }} · {{ refund.approved_at|date('d M Y H:i') }}<br>{{ refund.reason }}</p>{% endfor %}{% endif %}
+        {% endblock %}{% endembed %}
+        {% if can_confirm and payment_method == 'eft' and order.state in ['awaiting_payment','cancelled'] %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Confirm bank payment', heading_level: 2, summary: 'Use independent bank evidence. A matching full payment is required.'}) }}
+            <form action="/admin/commerce/orders/{{ order.id }}/confirm-bank" method="post">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="request_key" value="{{ confirmation_key }}">
+                {% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount received (' ~ order.currency ~ ')', for: 'bank-amount', required: true})} %}{% block control %}<input id="bank-amount" name="amount" inputmode="decimal" value="{{ '%d.%02d'|format(order.total_minor // 100, order.total_minor % 100) }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bank reference', for: 'bank-reference', required: true})} %}{% block control %}<input id="bank-reference" name="bank_reference" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date/time received with timezone', for: 'bank-received', required: true, help: 'Example: 2026-09-23T14:30+02:00'})} %}{% block control %}<input id="bank-received" name="received_at" placeholder="2026-09-23T14:30+02:00" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'ADMIN reason and evidence source', for: 'bank-reason', required: true})} %}{% block control %}<textarea id="bank-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                {% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Confirm received payment', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+        {% endblock %}{% endembed %}
+        {% endif %}
+        {% if can_reconcile and order.state == 'manual_review' %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Manual review', heading_level: 2, summary: 'Release only after verifying the paid order and its learner or company relationship.'}) }}
+            <form action="/admin/commerce/orders/{{ order.id }}/release-review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reconciliation reason', for: 'review-reason', required: true})} %}{% block control %}<textarea id="review-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Release paid order', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+        {% endblock %}{% endembed %}
+        {% endif %}
+        {% if can_refund and order.state in ['paid','fulfilled','manual_review','partially_refunded'] %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Approve a refund', heading_level: 2, summary: 'Approved value enters Account Funds and creates a credit note. No bank payout occurs here.'}) }}
+            <p>Record the legal or discretionary basis and a specific decision reason. Full individual item refunds revoke that course access immediately; learning history remains.</p>
+            {% for item in items %}
+                {% if item.refunded_minor < item.amount_minor %}
+                <h3 class="h5">{{ item.title }} · {{ item.remaining_label }} remaining</h3>
+                {% if order.company_id and not item.unissued and (not item.latest_refundable or item.latest_refundable.commerce_order_item_id != item.id) %}<p>Refund newer unused credits for this course and period first.</p>{% else %}
+                <form action="/admin/commerce/orders/{{ order.id }}/refund" method="post">
+                    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="request_key" value="{{ item.refund_key }}"><input type="hidden" name="item_id" value="{{ item.id }}">
+                    {% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Refund basis', for: 'refund-basis-' ~ item.id, required: true})} %}{% block control %}<select id="refund-basis-{{ item.id }}" name="basis" required {{ ui_field_attrs(props) }}><option value="voluntary">Voluntary</option><option value="statutory">Statutory right</option><option value="service_failure">Service failure</option><option value="goodwill">Goodwill</option></select>{% endblock %}{% endembed %}
+                        {% if order.company_id %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: item.unissued ? 'Unissued credit units' : 'Unused credit units', for: 'refund-quantity-' ~ item.id, required: true})} %}{% block control %}<input id="refund-quantity-{{ item.id }}" type="number" name="quantity" min="1" max="{{ item.refundable_quantity }}" value="1" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}{% else %}
+                        <input type="hidden" name="quantity" value="1">{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount (' ~ order.currency ~ ')', for: 'refund-amount-' ~ item.id, required: true})} %}{% block control %}<input id="refund-amount-{{ item.id }}" name="amount" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}{% endif %}
+                        {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Decision reason', for: 'refund-reason-' ~ item.id, required: true})} %}{% block control %}<textarea id="refund-reason-{{ item.id }}" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                    {% endblock %}{% endembed %}
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Approve refund and issue credit note', variant: 'danger', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+                </form>
+                {% endif %}
+                {% endif %}
+            {% endfor %}
+        {% endblock %}{% endembed %}
+        {% endif %}
+    </section>
+{% endblock %}
