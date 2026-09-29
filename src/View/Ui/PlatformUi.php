@@ -18,18 +18,19 @@ final class PlatformUi
         'layout.section-head' => ['template' => 'layout/section-head', 'defaults' => ['eyebrow' => '', 'heading' => null, 'summary' => '', 'heading_level' => 2]],
         'layout.toolbar' => ['template' => 'layout/toolbar', 'defaults' => []],
         'layout.breadcrumb' => ['template' => 'layout/breadcrumb', 'defaults' => ['items' => null, 'aria_label' => 'Breadcrumb']],
+        'layout.tabs' => ['template' => 'layout/tabs', 'defaults' => ['items' => null, 'current' => '', 'aria_label' => null]],
         'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
         'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
         'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false]],
         'form.grid' => ['template' => 'forms/form-grid', 'defaults' => ['columns' => 'auto']],
-        'form.field' => ['template' => 'forms/field', 'defaults' => ['label' => null, 'for' => '', 'required' => false, 'full_width' => false, 'help' => '', 'error' => '']],
+        'form.field' => ['template' => 'forms/field', 'defaults' => ['label' => null, 'for' => '', 'required' => false, 'full_width' => false, 'span' => '', 'help' => '', 'error' => '']],
         'form.actions' => ['template' => 'forms/form-actions', 'defaults' => []],
-        'form.choice' => ['template' => 'forms/choice-field', 'defaults' => ['label' => null, 'help' => '', 'full_width' => false]],
+        'form.choice' => ['template' => 'forms/choice-field', 'defaults' => ['label' => null, 'help' => '', 'full_width' => false, 'span' => '']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
-        'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => ['columns' => 'auto'], 'props' => ['columns' => ['auto', 1, 2, 3, 4]]],
+        'data.stat-grid' => ['template' => 'data/stat-grid', 'defaults' => ['columns' => 'auto', 'density' => 'normal'], 'props' => ['columns' => ['auto', 1, 2, 3, 4]]],
         'data.stat-card' => ['template' => 'data/stat-card', 'defaults' => ['value' => null, 'label' => null, 'note' => '']],
         'data.list' => ['template' => 'data/item-list', 'defaults' => []],
         'data.list-item' => ['template' => 'data/list-item', 'defaults' => []],
@@ -105,7 +106,8 @@ final class PlatformUi
             'variant' => $component === 'layout.surface' ? ['standard', 'compact'] : ['primary', 'secondary', 'quiet', 'danger'],
             'size' => $component === 'overlay.modal' ? ['normal', 'wide'] : ($component === 'feedback.badge' ? ['small', 'normal'] : ($component === 'feedback.progress' ? ['normal', 'large'] : ['small', 'normal', 'large'])),
             'type' => ['button', 'submit', 'reset'], 'method' => ['get', 'post'],
-            'columns' => $component === 'form.grid' ? ['auto', 1, 2] : ['auto', 1, 2, 3, 4],
+            'columns' => $component === 'form.grid' ? ['auto', 1, 2, 'wide'] : ['auto', 1, 2, 3, 4],
+            'span' => ['', 'quarter', 'third', 'half', 'two-thirds'],
             'heading_level' => [2, 3], 'density' => ['normal', 'compact'],
         ];
         if ($component === 'overlay.accordion-section') {
@@ -123,6 +125,14 @@ final class PlatformUi
             }
             if ($values['max'] <= $values['min']) throw new InvalidArgumentException('Invalid progress range.');
             $values['value'] = max($values['min'], min($values['max'], $values['value']));
+        }
+        if ($component === 'layout.tabs') {
+            if (!is_array($values['items']) || $values['items'] === [] || !is_string($values['current'])) throw new InvalidArgumentException('Tabs need a non-empty item list and a current key.');
+            foreach ($values['items'] as $item) {
+                if (!is_array($item) || array_keys($item) !== ['key', 'label', 'href'] || array_filter($item, static fn(mixed $value): bool => !is_string($value) || $value === '') !== []) {
+                    throw new InvalidArgumentException('Each tab has exactly a key, label and href.');
+                }
+            }
         }
         if ($component === 'icon' && (preg_match('/^[a-z][a-z0-9-]*$/', (string) $values['name']) !== 1 || (!$values['decorative'] && !$values['label']))) {
             throw new InvalidArgumentException('Icons need a sprite name and meaningful icons need a label.');

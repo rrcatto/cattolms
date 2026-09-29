@@ -12,7 +12,9 @@ use InvalidArgumentException;
 final class CourseItemService
 {
     public const TYPES = ['html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','document'];
-    private const RESOURCE_TYPES = ['pdf','image_graphic','uploaded_video','markdown','document'];
+    public const TYPE_LABELS = ['html_lesson' => 'HTML lesson', 'assessment' => 'Assessment', 'diagnostic' => 'Diagnostic', 'pdf' => 'PDF', 'image_graphic' => 'Image or graphic', 'uploaded_video' => 'Uploaded video', 'youtube' => 'YouTube video', 'audio' => 'Audio', 'markdown' => 'Markdown', 'document' => 'Document'];
+    public const TYPE_PLURAL_LABELS = ['html_lesson' => 'HTML lessons', 'assessment' => 'Assessments', 'diagnostic' => 'Diagnostics', 'pdf' => 'PDFs', 'image_graphic' => 'Images and graphics', 'uploaded_video' => 'Uploaded videos', 'youtube' => 'YouTube videos', 'audio' => 'Audio items', 'markdown' => 'Markdown items', 'document' => 'Documents'];
+    private const RESOURCE_TYPES =['pdf','image_graphic','uploaded_video','markdown','document'];
 
     public function __construct(
         private readonly TransactionManager $transactions,

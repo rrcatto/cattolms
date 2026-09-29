@@ -174,7 +174,8 @@ final class LearningService
         if (!($this->commerceAccess?->assertAccess((int)$enrolment['id']) ?? false)) {
             $this->assertNotExpired($enrolment);
         }
-        $course['grade_bands'] = $this->courses->gradeBands((int) $course['id']);
+        $course['grade_bands'] = GradeScale::ranges($this->courses->gradeBands((int) $course['id']));
+        $course['introduction_html'] = GradeScale::resolve((string) ($course['introduction_html'] ?? ''), $course['grade_bands']);
         $course['enrolment'] = $enrolment;
         $course['structure'] = $this->courseItems->availability((int) $course['id'], empty($enrolment['started_at']) ? null : (string) $enrolment['started_at'], false);
         $course['progress'] = $this->courseItemRecords->assessmentProgress((int) $enrolment['id'], (int) $course['id']);
@@ -226,6 +227,7 @@ final class LearningService
         $node['previous_node'] = $index !== false && $index > 0 ? $items[$index - 1] : null;
         $node['next_node'] = $index !== false && isset($items[$index + 1]) ? $items[$index + 1] : null;
         $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], $nodeId, false);
+        $node['rendered_html'] = GradeScale::resolve($node['rendered_html'], (array) $course['grade_bands']);
         if ($preview) { $node['rendered_html'] = preg_replace('/(href="\/learn\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['item'] = $node;
         $course['current_node_id'] = $nodeId;

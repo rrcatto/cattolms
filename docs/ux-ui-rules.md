@@ -46,7 +46,7 @@ The test is what the reader is doing: filling several things in and then committ
 
 **1.4 Equivalent surfaces expose equivalent actions.** If a row has a Manage action in the standalone list, the same row has a Manage action in the workspace accordion, the dashboard preview and every theme. An action that exists on one surface and is missing on its equivalent is a defect, not a design difference. → Enforced by `RowActionParityTest`.
 
-**1.5 Accordions, not tabs.** Grouped settings and multi-section screens use the `<details>` accordion pattern. `/admin?tab=…` is not to be reintroduced.
+**1.5 Withdrawn 2026/09/25.** An earlier version of this rule banned tabs in favour of accordions everywhere. That generalised an owner remark about one situation into a global rule the owner never intended. There is no rule against tabs: choose tabs or accordions to suit the screen. The course editor (`/admin/courses/{id}?tab=…`) uses the canonical `layout.tabs` component. Top-level Administration, Account and Company sections still have their own semantic routes rather than `?tab=` (see PROJECT-INSTRUCTIONS.md).
 
 **1.6 Never restyle an accepted design for variety.** Visual change happens because the owner asked for it or because a rule here demands it.
 

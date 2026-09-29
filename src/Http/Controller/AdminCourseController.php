@@ -44,6 +44,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Attribute\Route;
 
+use CattoLearning\Course\GradeScale;
 use CattoLearning\Course\CoursePortabilityService;
 
 use CattoLearning\Course\CourseService;
@@ -108,9 +109,41 @@ final class AdminCourseController extends BaseController
         $course = $this->requireManagedCourse($courseId);
         $course['access_days'] = max(1, (int) round((int) $course['default_access_period_seconds'] / 86400));
         $course['has_started_learners'] = $this->portability->hasStartedLearners($courseId);
-        $people = [];
-        $companies = [];
-        if ($user->hasPermission('COURSE.OWNERSHIP.MANAGE')) {
+        $tabs = [];
+        foreach (self::EDIT_TABS as $key => [$label, $permission]) {
+            if ($permission === null || $user->hasPermission($permission)) {
+                $tabs[] = ['key' => $key, 'label' => $label, 'href' => self::tabUrl($courseId, $key)];
+            }
+        }
+        $activeTab = (string) ($_GET['tab'] ?? 'overview');
+        if (!in_array($activeTab, array_column($tabs, 'key'), true)) {
+            $activeTab = 'overview';
+        }
+        $data = [
+            'title' => 'Edit ' . (string) $course['title'],
+            'course' => $course,
+            'course_tabs' => $tabs,
+            'active_tab' => $activeTab,
+            'tab_url' => self::tabUrl($courseId, $activeTab),
+            'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,
+            'categories' => [],
+            'course_states' => ['draft', 'published', 'retired', 'archived'],
+            'owner_people' => [],
+            'owner_companies' => [],
+            'test_grants' => [],
+            'editing_price_id' => (int) ($_GET['edit_price'] ?? 0),
+            'load_ckeditor' => $activeTab === 'overview',
+        ];
+        if ($activeTab === 'overview') {
+            $categoryOptions = $this->courses->categories(true);
+            $currentCategoryId = (int) ($course['category_id'] ?? 0);
+            if ($currentCategoryId > 0 && !array_filter($categoryOptions, static fn(array $category): bool => (int) $category['id'] === $currentCategoryId)) {
+                $categoryOptions[] = $this->courses->category($currentCategoryId);
+            }
+            $data['categories'] = $categoryOptions;
+        }
+        if ($activeTab === 'people') {
+            // People and companies are loaded only for this tab; the development dataset is large.
             $peopleData = $this->platformAdministration->sectionData('people', $user->id);
             $companyData = $this->platformAdministration->sectionData('companies', $user->id);
             $editorIds = array_map(static fn(array $editor): int => (int) $editor['id'], (array) ($course['editors'] ?? []));
@@ -119,23 +152,32 @@ final class AdminCourseController extends BaseController
                 $person['selected_editor'] = in_array((int) $person['id'], $editorIds, true);
             }
             unset($person);
-            $companies = (array) ($companyData['companies'] ?? []);
+            $data['owner_people'] = $people;
+            $data['owner_companies'] = (array) ($companyData['companies'] ?? []);
         }
-        $categoryOptions = $this->courses->categories(true);
-        $currentCategoryId = (int) ($course['category_id'] ?? 0);
-        if ($currentCategoryId > 0 && !array_filter($categoryOptions, static fn(array $category): bool => (int) $category['id'] === $currentCategoryId)) {
-            $categoryOptions[] = $this->courses->category($currentCategoryId);
+        if ($activeTab === 'test-access') {
+            $data['test_grants'] = $this->courses->courseTestGrants($courseId);
         }
-        return $this->render('admin-course-edit', [
-            'title' => 'Edit ' . (string) $course['title'],
-            'course' => $course,
-            'categories' => $categoryOptions,
-            'course_states' => ['draft', 'published', 'retired', 'archived'],
-            'owner_people' => $people,
-            'owner_companies' => $companies,
-            'test_grants' => $user->hasPermission('PLATFORM.ENROLMENT.MANAGE') ? $this->courses->courseTestGrants($courseId) : [],
-            'load_ckeditor' => true,
-        ]);
+        return $this->render('admin-course-edit', $data);
+    }
+
+    /** Course editor tabs in display order: key => [label, required permission beyond COURSE.EDIT]. */
+    private const EDIT_TABS = [
+        'overview' => ['Overview', null],
+        'test-access' => ['Test access', 'PLATFORM.ENROLMENT.MANAGE'],
+        'people' => ['Owner & editors', 'COURSE.OWNERSHIP.MANAGE'],
+        'pricing' => ['Pricing', 'COURSE.PRICING.MANAGE'],
+        'content' => ['Course content', null],
+        'presentation' => ['Presentation', null],
+        'grades' => ['Grades', null],
+        'publication' => ['Publication', null],
+        'history' => ['History', null],
+        'danger' => ['Reset / delete', 'COURSE.DELETE'],
+    ];
+
+    private static function tabUrl(int $courseId, string $tab): string
+    {
+        return '/admin/courses/' . $courseId . ($tab === 'overview' ? '' : '?tab=' . $tab);
     }
 
 
@@ -158,7 +200,7 @@ final class AdminCourseController extends BaseController
         $this->requireManagedCourse($courseId);
         $this->portability->resetPreview($user->id, $courseId);
         $this->flash('success', 'The preview progress and scores were reset.');
-        $this->redirect('/admin/courses/' . $courseId);
+        $this->redirect(self::tabUrl($courseId, 'test-access'));
     }
 
 
@@ -221,8 +263,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->updateCoursePeople($courseId, $_POST, $user->id);
             $this->flash('success', 'The course owner and Course Editors were updated.');
-            $this->redirect('/admin/courses/' . $courseId . '#people');
-        }, '/admin/courses/' . $courseId);
+            $this->redirect(self::tabUrl($courseId, 'people'));
+        }, self::tabUrl($courseId, 'people'));
     }
 
 
@@ -236,8 +278,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->createPriceVariant($courseId, $_POST, $user->id);
             $this->flash('success', 'The course price option was added.');
-            $this->redirect('/admin/courses/' . $courseId . '#pricing');
-        }, '/admin/courses/' . $courseId . '#pricing');
+            $this->redirect(self::tabUrl($courseId, 'pricing'));
+        }, self::tabUrl($courseId, 'pricing'));
     }
 
 
@@ -252,8 +294,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->updatePriceVariant($courseId, $variantId, $_POST, $user->id);
             $this->flash('success', 'The course price option was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '#pricing');
-        }, '/admin/courses/' . $courseId . '#pricing');
+            $this->redirect(self::tabUrl($courseId, 'pricing'));
+        }, self::tabUrl($courseId, 'pricing'));
     }
 
 
@@ -268,8 +310,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->setDefaultPriceVariant($courseId, $variantId, $user->id);
             $this->flash('success', 'The default catalogue price was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '#pricing');
-        }, '/admin/courses/' . $courseId . '#pricing');
+            $this->redirect(self::tabUrl($courseId, 'pricing'));
+        }, self::tabUrl($courseId, 'pricing'));
     }
 
 
@@ -283,8 +325,8 @@ final class AdminCourseController extends BaseController
         $variantId = $this->priceVariantId();
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->movePriceVariant($courseId, $variantId, (string) ($_POST['direction'] ?? ''), $user->id);
-            $this->redirect('/admin/courses/' . $courseId . '#pricing');
-        }, '/admin/courses/' . $courseId . '#pricing');
+            $this->redirect(self::tabUrl($courseId, 'pricing'));
+        }, self::tabUrl($courseId, 'pricing'));
     }
 
 
@@ -299,8 +341,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $variantId): void {
             $this->courses->deletePriceVariant($courseId, $variantId, $user->id);
             $this->flash('success', 'The course price option was removed.');
-            $this->redirect('/admin/courses/' . $courseId . '#pricing');
-        }, '/admin/courses/' . $courseId . '#pricing');
+            $this->redirect(self::tabUrl($courseId, 'pricing'));
+        }, self::tabUrl($courseId, 'pricing'));
     }
 
 
@@ -315,8 +357,8 @@ final class AdminCourseController extends BaseController
             $status = trim((string) ($_POST['status'] ?? ''));
             $this->courses->changeStatus($courseId, $status, $user->id, !empty($_POST['override_publication_warnings']));
             $this->flash('success', 'The course status is now ' . $status . '.');
-            $this->redirect('/admin/courses/' . $courseId);
-        }, '/admin/courses/' . $courseId);
+            $this->redirect(self::tabUrl($courseId, 'publication'));
+        }, self::tabUrl($courseId, 'publication'));
     }
 
 
@@ -330,8 +372,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->submitForApproval($courseId, $user->id, !empty($_POST['override_publication_warnings']));
             $this->flash('success', 'The course was submitted for platform approval.');
-            $this->redirect('/admin/courses/' . $courseId);
-        }, '/admin/courses/' . $courseId);
+            $this->redirect(self::tabUrl($courseId, 'publication'));
+        }, self::tabUrl($courseId, 'publication'));
     }
 
 
@@ -345,8 +387,8 @@ final class AdminCourseController extends BaseController
         return $this->handle(function () use ($user, $courseId): void {
             $this->courses->replaceGradeBands($courseId, $_POST, $user->id);
             $this->flash('success', 'The course grade bands were updated.');
-            $this->redirect('/admin/courses/' . $courseId . '#grading');
-        }, '/admin/courses/' . $courseId . '#grading');
+            $this->redirect(self::tabUrl($courseId, 'grades'));
+        }, self::tabUrl($courseId, 'grades'));
     }
 
 
@@ -422,6 +464,8 @@ final class AdminCourseController extends BaseController
             $analysis['display_final_question_count'] = $finalQuestionCount;
             $analysis['display_question_count'] = (int) ($analysis['statistics']['question_count'] ?? ($moduleQuestionCount + $diagnosticQuestionCount + $finalQuestionCount));
             $analysis['display_format'] = strtoupper((string) ($analysis['format'] ?? 'HTML'));
+            $analysis['display_grade_scale'] = GradeScale::ranges(array_values((array) ($analysis['grade_bands'] ?? [])));
+            $analysis['grade_scale'] = (array) ($analysis['grade_scale'] ?? []) + ['source' => 'package', 'function_agrees' => null, 'placeholder_inserted' => false, 'reset_button_removed' => false, 'storage_sentences_removed' => 0];
             $analysis['display_presentation_css_bytes'] = strlen((string) ($analysis['course']['presentation_css'] ?? ''));
             $parser = is_array($analysis['parser_diagnostics'] ?? null) ? $analysis['parser_diagnostics'] : [];
             $analysis['parser_compatibility_count'] = (int) ($parser['compatibility_notice_count'] ?? 0);
@@ -478,7 +522,7 @@ final class AdminCourseController extends BaseController
             $this->courses->grantForTesting($courseId, $user->id, $user->id);
             $this->flash('success', 'The course is in your library. It has not started yet.');
             $this->redirect('/learn/' . rawurlencode((string) $course['slug']));
-        }, '/admin/courses/' . $courseId);
+        }, self::tabUrl($courseId, 'test-access'));
     }
 
 
@@ -498,8 +542,8 @@ final class AdminCourseController extends BaseController
                 $user->id
             );
             $this->flash('success', 'Course access granted to ' . $result['count'] . ' people until ' . $result['expires_at'] . '.');
-            $this->redirect('/admin/courses/' . $courseId);
-        }, '/admin/courses/' . $courseId);
+            $this->redirect(self::tabUrl($courseId, 'test-access'));
+        }, self::tabUrl($courseId, 'test-access'));
     }
 
 
@@ -521,8 +565,23 @@ final class AdminCourseController extends BaseController
                 'Course presentation imported from ' . (string) $result['source_filename']
                 . ' (' . number_format((int) $result['css_bytes']) . ' CSS bytes).'
             );
-            $this->redirect('/admin/courses/' . $courseId . '#presentation');
-        }, '/admin/courses/' . $courseId . '#presentation');
+            $this->redirect(self::tabUrl($courseId, 'presentation'));
+        }, self::tabUrl($courseId, 'presentation'));
+    }
+
+
+    #[Route('/admin/courses/{id}/presentation-css', name: 'admin_course_update_presentation_css', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function updatePresentationCss(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.EDIT');
+        $courseId = $this->courseId();
+        $this->requireManagedCourse($courseId);
+        return $this->handle(function () use ($user, $courseId): void {
+            $this->courses->updatePresentationCss($courseId, (string) ($_POST['presentation_css'] ?? ''), $user->id);
+            $this->flash('success', 'The course presentation stylesheet was saved.');
+            $this->redirect(self::tabUrl($courseId, 'presentation'));
+        }, self::tabUrl($courseId, 'presentation'));
     }
 
 

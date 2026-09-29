@@ -105,6 +105,8 @@ final class UiComponentContractTest extends TestCase
             'cl-category-grid' => 'ui/catalogue/category-grid',
             'cl-filter-rail' => 'ui/catalogue/filter-rail',
             'cl-tag-browser' => 'ui/catalogue/tag-browser',
+            'cl-group-nav' => 'ui/layout/tabs',
+            'cl-group-tab' => 'ui/layout/tabs',
         ];
         $found = [];
         foreach (self::templates() as $path => $source) {

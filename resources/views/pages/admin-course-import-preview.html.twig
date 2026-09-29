@@ -100,6 +100,35 @@
 {% endblock %}
 {% endembed %}
 				{% endif %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+					{% set scale = analysis.grade_scale %}
+					{{ ui('layout.section-head', {heading: 'Grading scale', heading_level: 2, summary: 'These bands become the course grade bands. You can change them on the Grades tab after import.'}) }}
+					{% if scale.source == 'list' %}
+						{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'Grading scale read from the file'})} %}{% block body %}Taken from the scale list the file shows.{% if scale.function_agrees is same as(true) %} The file's grading script agrees with it.{% elseif scale.function_agrees is same as(false) %} The file's grading script does not match it; check the bands after import.{% endif %}{% endblock %}{% endembed %}
+					{% elseif scale.source == 'function' %}
+						{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', heading: 'Grading scale read from the file'})} %}{% block body %}Taken from the file's grading script; the file shows no scale list.{% endblock %}{% endembed %}
+					{% elseif scale.source == 'default' %}
+						{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'No grading scale found in the file'})} %}{% block body %}The standard five bands below will be used. Check them on the Grades tab after import.{% endblock %}{% endembed %}
+					{% endif %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+						<tr>
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Label'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Code'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Range'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Passing'}} %}
+						</tr>
+{% endblock %}
+{% block body %}
+						{% for band in analysis.display_grade_scale %}<tr><td>{{ band.grade_label }}</td><td>{{ band.grade_code }}</td><td>{{ band.range_label }}</td><td>{{ band.is_passing ? 'Yes' : 'No' }}</td></tr>{% endfor %}
+{% endblock %}
+{% endembed %}
+					{% if scale.placeholder_inserted or scale.reset_button_removed or scale.storage_sentences_removed %}
+						{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Course introduction changes', section_spacing: true})} %}{% block body %}<ul>{% if scale.placeholder_inserted %}<li>The static scale list is replaced with [grading-scale], which always shows the bands above.</li>{% endif %}{% if scale.reset_button_removed %}<li>The Reset all saved progress button is left out; it only worked in the standalone file.</li>{% endif %}{% if scale.storage_sentences_removed %}<li>{{ scale.storage_sentences_removed }} sentence{{ scale.storage_sentences_removed == 1 ? '' : 's' }} saying progress is kept in the browser {{ scale.storage_sentences_removed == 1 ? 'is' : 'are' }} left out; the LMS saves progress to your account.</li>{% endif %}</ul>{% endblock %}{% endembed %}
+					{% endif %}
+{% endblock %}
+{% endembed %}
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 

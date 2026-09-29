@@ -456,7 +456,7 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $courseId = (int) ($_POST['course_id'] ?? 0);
         $personId = (int) ($_POST['person_id'] ?? 0);
-        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '#test-access';
+        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '?tab=test-access';
         return $this->handle(function () use ($id, $courseId, $personId, $user, $back): void {
             $this->platformAdministration->revokeTestGrant($id, $courseId, $personId, $user->id);
             $this->flash('success', 'Test access was revoked. Progress and results were retained.');
@@ -472,7 +472,7 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $courseId = (int) ($_POST['course_id'] ?? 0);
         $personId = (int) ($_POST['person_id'] ?? 0);
-        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '#test-access';
+        $back = ($_POST['context'] ?? '') === 'person' ? '/admin/people/' . $personId : '/admin/courses/' . $courseId . '?tab=test-access';
         return $this->handle(function () use ($id, $courseId, $personId, $user, $back): void {
             $this->platformAdministration->inviteTestLearner($id, $courseId, $personId, $user->id);
             $this->flash('success', 'Test invitation sent.');

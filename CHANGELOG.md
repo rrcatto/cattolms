@@ -1,6 +1,22 @@
 # Changelog
 
-**LMS version:** 0.8.7.1 **Date time:** 2026/09/24 SAST
+**LMS version:** 0.8.7.2 **Date time:** 2026/09/29 SAST
+
+## 2026-09-29 SAST — v0.8.7.2 Tabbed course editor and grading scale
+
+- Replace the crowded course edit page with a tabbed editor: Overview, Test access, Owner & editors, Pricing, Course content, Presentation, Grades, Publication, History and Reset / delete. Each tab is its own GET page (`/admin/courses/{id}?tab=…`) using the full container width, works without JavaScript, and ends in one Save / Cancel changes row; every save returns to its tab. Course tools (Edit Course Content, Preview, Certificate, Export, Import) sit above the tabs. Publication status and checks have their own tab. People and companies load only on the Owner & editors tab. Reset / delete now requires `COURSE.DELETE`, the permission its actions already enforce.
+- Overview shows a count for each of the ten Course Item types, plus item, section and question totals, above the full-width course details form.
+- Pricing uses one table; Edit turns a row into inputs with Save and Cancel (`?tab=pricing&edit_price={id}`).
+- Presentation shows the stored course stylesheet in a plain textarea for editing, saved exactly as written; importing from the original HTML file still replaces it.
+- Grades is a working grading-scale editor: Label, Code, From %, a derived To %, Passing and Remove per band, an empty row to add a band, clear validation messages and a learner preview. Grade bands remain the only definition of the scale and drive assessment bands, the final grade, pass/fail and certificates. The public course page shows ranges.
+- Add the `[grading-scale]` placeholder, resolved at display time from the current bands in course and section introductions, lessons and public previews.
+- Legacy HTML import reads the grading scale from the file (`ul.scale-list`, then the `bandFor()`/`gradeBand()` script), falls back to the standard five bands with a warning, replaces the introduction's static scale with `[grading-scale]` and, on the owner's instruction, removes the standalone reset-progress button and browser-storage sentences. The import review shows the detected scale and each introduction change. The assessment pass mark is labelled as diagnostics-only for graded and final assessments.
+- Fix the course details "+ New" category control, whose markup lacked the hooks the inline-create script needs; a contract test now guards every hook. Fix the grade-band Minimum column, which rendered 15px wide in Gilded Noir.
+- Add the canonical `layout.tabs` component (37 components), now also used for the Courses and Companies group navigation. The strip is one internally scrolling row on phones and wraps above 720px. `form.grid` gains a twelve-column `wide` layout with `span` on `form.field`/`form.choice`; `data.stat-grid` gains `density: compact`.
+- Withdraw UX rule 1.5 ("accordions, not tabs"), an LLM generalisation of an owner remark; document the grading scale in the course specification.
+- No schema migration, dataset reset or theme-version change. `public_html/css/catto-platform.css` changed and must be published to the served web root.
+
+Validation: `SHELL_VERBOSITY=-1 composer qa` (PHPUnit 701 tests, 38,368 assertions), Twig lint of all 185 templates, Composer validation, `git diff --check`, an all-theme course-editor browser check at 1440px and 390px (101 checks, including native tab navigation with JavaScript disabled) and an end-to-end legacy import, Grades tab and learner-introduction check. Both all-theme browser matrices (component and canonical page, including native no-JavaScript navigation) pass.
 
 ## 2026-09-24 SAST — v0.8.7.1 Course Content arrangement and import grouping
 

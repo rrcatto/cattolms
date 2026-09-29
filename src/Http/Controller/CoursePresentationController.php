@@ -6,6 +6,7 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseItemRenderer;
+use CattoLearning\Course\GradeScale;
 use CattoLearning\Course\AssessmentService;
 use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\CourseRepository;
@@ -48,7 +49,7 @@ final class CoursePresentationController extends BaseController
         if (in_array((string) ($node['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) {
             throw $this->notFound('Assessments open from their direct assessment route.');
         }
-        $node['rendered_html'] = $this->renderer->render($node, (string) $course['slug'], $nodeId, true);
+        $node['rendered_html'] = GradeScale::resolve($this->renderer->render($node, (string) $course['slug'], $nodeId, true), $this->courses->gradeBands((int) $course['id']));
         if ($course['public_preview_query'] !== '') { $node['rendered_html'] = preg_replace('/(href="\/courses\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['current_node_id'] = $nodeId;
         return $this->render('course-public-preview-item', ['title' => (string) ($node['display_title_override'] ?: $node['item_title']), 'course' => $course, 'item' => $node, 'course_content_mode' => true, 'is_public_preview' => true]);
