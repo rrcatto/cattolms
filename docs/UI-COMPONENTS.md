@@ -36,6 +36,7 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 | `layout.section-head` | `layout/section-head.html.twig` | `section_actions` |
 | `layout.toolbar` | `layout/toolbar.html.twig` | `toolbar_primary`, `toolbar_actions` |
 | `layout.breadcrumb` | `layout/breadcrumb.html.twig` | — |
+| `layout.tabs` | `layout/tabs.html.twig` | — |
 | `action.link` | `actions/link.html.twig` | — |
 | `action.button` | `actions/button.html.twig` | — |
 | `action.group` | `actions/group.html.twig` | `body` |
@@ -70,10 +71,10 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 
 ## Semantic contracts
 
-- Surfaces: standard or compact; optional section spacing, stable ID, sticky placement and semantic tone. Section grids: auto or one to four columns; form grids: auto, one or two. Headings: h2 or h3.
+- Surfaces: standard or compact; optional section spacing, stable ID, sticky placement and semantic tone. Section grids: auto or one to four columns; form grids: auto, one, two or `wide`. A wide grid has twelve columns; `form.field` and `form.choice` take `span` (`quarter`, `third`, `half` or `two-thirds`), default to half the row, and use `full_width` for the whole row. Spans collapse at tablet and phone widths. Headings: h2 or h3. Tabs are native links, one per `{key, label, href}` item, with `aria-current="page"` on the current key; each tab is its own GET URL, so they work without JavaScript. The strip stays on one row and scrolls inside itself when narrow.
 - Actions: primary, secondary, quiet or danger; small, normal or large; optional sprite icon. Links retain href; buttons retain native type, form, name/value and disabled state. Explicit behaviour properties support the existing htmx, confirmation, modal and Stimulus hooks without arbitrary attribute maps. `action.row` is for record actions; `action.group` is for page/section actions.
 - Fields own labels, required markers, help/error text and full-width placement. The control slot holds native inputs/selects/textareas. Match `for` with the control ID and associate help/error IDs exclusively through `ui_field_attrs(props)`; errors also mark the control aria-invalid. Choice fields wrap native checkbox/radio controls. `form.actions` owns one save row and its secondary-action region; `form.compact-action` is only for an immediate one-value operation. Modal footers are not nested inside form action rows.
-- Tables own the wrapper, table, head and body. Rows/cells remain authored slots and column headers delegate to sortable-header. Datasets own the stable region/results IDs and delegate search and paired pagers to existing partials. A preview slot supports bounded workspace previews.
+- Stat grids take `density: compact` for many small counts, keeping two or more per row on a phone. Tables own the wrapper, table, head and body. Rows/cells remain authored slots and column headers delegate to sortable-header. Datasets own the stable region/results IDs and delegate search and paired pagers to existing partials. A preview slot supports bounded workspace previews.
 - Badges: neutral, info, success, warning, danger or permanent; small or normal. Notices: info, success, warning or danger, with heading/body and optional canonical flash dismissal. Empty states support heading, summary, body and actions. Progress validates finite min/max/value, rejects an invalid range, clamps value, and derives the only inline width from that validated number.
 - Modals: normal or wide, one title/body/footer and optional native form. Without JavaScript the same content is inline; core adds visibility, focus trapping/restoration and Escape dismissal. Accordions are native details/summary. Explicit workspace semantics retain existing lazy section GET navigation and server-rendered content.
 - Icons use the platform SVG sprite. Decorative icons are hidden from assistive technology; meaningful icons require a label. Catalogue icon artwork remains trusted data from the existing icon service, not a general-purpose HTML property.
@@ -126,7 +127,7 @@ Each shell places `main.cl-main` and `footer.cl-footer` beside one another insid
 
 ### Shared page ownership in v0.8.5
 
-The registry remains 36 components; canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
+The registry has 37 components (the tabbed course editor added `layout.tabs`, which now also renders the Courses and Companies group navigation); canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
 
 | Concern | Core source |
 | --- | --- |

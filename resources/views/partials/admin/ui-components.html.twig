@@ -14,7 +14,7 @@
 {% endblock %}
 {% endembed %}
 {% endblock %}
-{% endembed %}{{ ui('layout.breadcrumb', {items: [{label: 'Administration', href: '/admin', current: false}, {label: 'System', href: null, current: false}, {label: 'UI Components', href: null, current: true}]}) }}
+{% endembed %}{{ ui('layout.breadcrumb', {items: [{label: 'Administration', href: '/admin', current: false}, {label: 'System', href: null, current: false}, {label: 'UI Components', href: null, current: true}]}) }}{{ ui('layout.tabs', {items: [{key: 'overview', label: 'Overview', href: '/admin/system/ui-components'}, {key: 'pricing', label: 'Pricing', href: '/admin/system/ui-components?sample=pricing'}, {key: 'history', label: 'History', href: '/admin/system/ui-components?sample=history'}], current: 'overview', aria_label: 'Sample tabs'}) }}
 {% endblock %}
 {% endembed %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}

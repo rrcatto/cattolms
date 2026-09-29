@@ -73,7 +73,7 @@
 
 							<tr>
 								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Grade'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Minimum'}} %}
+								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Range'}} %}
 								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Result'}} %}
 							</tr>
 
@@ -86,7 +86,7 @@
 										<strong>{{ band.grade_label }}</strong>
 									</td>
 									<td>
-										{{ band.minimum_percentage }}%
+										{{ band.range_label }}
 									</td>
 									<td>
 										{{ band.is_passing ? 'Pass' : 'Fail' }}

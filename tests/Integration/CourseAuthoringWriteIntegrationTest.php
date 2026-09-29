@@ -125,6 +125,32 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
             $repository->updatePresentationCss($courseId, '.from-css-editor{}', $ownerId);
             self::assertSame('.from-css-editor{}', (string) $repository->findById($courseId)['presentation_css']);
 
+            // The Presentation tab saves authored CSS verbatim (trusted content) and records the edit.
+            $authored = ".cards > .info::before{content:\"</style>\"}\r\n.hero{background:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22/>')}";
+            $container->get(\CattoLearning\Course\CourseService::class)->updatePresentationCss($courseId, $authored, $ownerId);
+            self::assertSame(str_replace("\r\n", "\n", $authored), (string) $repository->findById($courseId)['presentation_css']);
+            self::assertSame(1, (int) $db->fetchOne("SELECT COUNT(*) FROM course_edit_history WHERE course_id=:id AND event_key='course.presentation_edited'", ['id' => $courseId]));
+            // Remove it again: the history assertion below reads the newest entry, and both land in the same second.
+            $db->executeStatement("DELETE FROM course_edit_history WHERE course_id=:id AND event_key='course.presentation_edited'", ['id' => $courseId]);
+
+            // The Grades tab form: a ticked Remove drops a band, the empty last row adds one, rows are sorted.
+            $service = $container->get(\CattoLearning\Course\CourseService::class);
+            $service->replaceGradeBands($courseId, [
+                'grade_label' => ['Pass', 'Old merit', 'Fail', 'Distinction'],
+                'grade_code' => ['P', 'M', 'F', 'D'],
+                'minimum_percentage' => ['50', '65', '0', '80'],
+                'is_passing' => ['0' => '1', '1' => '1', '3' => '1'],
+                'remove_band' => ['1' => '1'],
+            ], $ownerId);
+            self::assertSame(['D', 'P', 'F'], array_column($repository->gradeBands($courseId), 'grade_code'));
+            try {
+                $service->replaceGradeBands($courseId, ['grade_label' => ['Pass', 'Fail'], 'grade_code' => ['P', 'F'], 'minimum_percentage' => ['', '0']], $ownerId);
+                self::fail('A band without a From % was accepted.');
+            } catch (\InvalidArgumentException $exception) {
+                self::assertStringContainsString('needs a From %', $exception->getMessage());
+            }
+            $db->executeStatement("DELETE FROM course_edit_history WHERE course_id=:id AND event_key='grade_bands.updated'", ['id' => $courseId]);
+
             $repository->updateCertificateSettings($courseId, [
                 'certificate_enabled' => true,
                 'certificate_title' => 'QA Certificate',

@@ -2,599 +2,432 @@
 {% block page_body %}
 	{% set ph_back_href = '/admin/courses' %}
 	{% set ph_back_label = 'Course administration' %}
-	{% set ph_kicker = course.status %}
+	{% set ph_kicker = course.status|capitalize ~ ' · approval ' ~ course.publication_approval_status %}
 	{% set ph_title = course.title %}
 	{% set ph_lead = '/'~(course.slug) %}
-	{% set ph_action_href = '/admin/courses/'~(course.id)~'/content' %}
-	{% set ph_action_label = 'Edit Course Content' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section container-fluid cl-container-wide py-5">
-		<nav aria-label="Course administration sections">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+		<nav aria-label="Course tools">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-
-			{{ ui('action.link', {label: 'Overview', href: '#overview', size: 'small'}) }}
-			{% if can_manage_enrolments %}{{ ui('action.link', {label: 'Test access', href: '#test-access', size: 'small'}) }}{% endif %}
-			{% if can_manage_course_ownership %}
-				{{ ui('action.link', {label: 'Owner & Editors', href: '#people', size: 'small'}) }}
-			{% endif %}
-			{% if can_manage_course_pricing %}
-				{{ ui('action.link', {label: 'Pricing', href: '#pricing', size: 'small'}) }}
-			{% endif %}
-			{{ ui('action.link', {label: 'Course Content', href: '#course-content', size: 'small'}) }}{{ ui('action.link', {label: 'Presentation', href: '#presentation', size: 'small'}) }}{{ ui('action.link', {label: 'Grades', href: '#grading', size: 'small'}) }}{{ ui('action.link', {label: 'History', href: '#history', size: 'small'}) }}{{ ui('action.link', {label: 'Reset / delete', href: '#danger', size: 'small'}) }}
-
+			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content'}) }}
+			{% if can_preview_courses %}{{ ui('action.link', {label: 'Preview as student', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview'}) }}{% endif %}
+			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate'}) }}{% endif %}
+			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export'}) }}
+			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import'}) }}
 {% endblock %}
 {% endembed %}</nav>
-		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
-{% block body %}
-
-			<div>
-				<form action="/admin/courses/{{ course.id }}" method="post">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'overview'})} %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'course-editor'})} %}
 {% block surface_body %}
+			{{ ui('layout.tabs', {items: course_tabs, current: active_tab, aria_label: 'Course editor sections'}) }}
 
+			{% if active_tab == 'overview' %}
+				{{ ui('data.key-value-list', {items: [
+					{label: 'Status', value: course.status|capitalize},
+					{label: 'Approval', value: course.publication_approval_status|capitalize},
+					{label: 'Owning company', value: course.owner_company_name ?: 'Not assigned'},
+					{label: 'Owning person', value: course.owner_person_name ?: 'Not assigned'},
+					{label: 'JSON schema', value: course.interchange_schema_version}
+				]}) }}
+				{{ ui('layout.section-head', {heading: 'What this course contains', heading_level: 2, summary: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '') ~ ' · ' ~ content_summary.question_count ~ ' questions across assessments and diagnostics.'}) }}
+				{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact'})} %}
+{% block body %}
+					{% for type in content_summary.type_counts %}{{ ui('data.stat-card', {value: type.count, label: type.label}) }}{% endfor %}
+{% endblock %}
+{% endembed %}
+				<form action="/admin/courses/{{ course.id }}" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course details', heading_level: 2, summary: 'Owning company: ' ~ (course.owner_company_name ?: 'Not assigned') ~ ' · owning person: ' ~ (course.owner_person_name ?: 'Not assigned') ~ ' · approval: ' ~ (course.publication_approval_status)})} %}
-{% block section_actions %}
-{{ ui('feedback.badge', {label: 'JSON schema ' ~ (course.interchange_schema_version), tone: 'neutral'}) }}
-{% endblock %}
+					{{ ui('layout.section-head', {heading: 'Course details', heading_level: 2, summary: 'These details appear in the catalogue and on the course introduction page.'}) }}
+					{% include '@platform/partials/admin-course-fields.html.twig' %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save course details', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
 {% endembed %}
+				</form>
+			{% endif %}
 
-						{% include '@platform/partials/admin-course-fields.html.twig' %}{{ ui('action.button', {label: 'Save course details', variant: 'primary', size: 'normal', type: 'submit'}) }}
-
-{% endblock %}
-{% endembed %}</form>
-				{% if can_manage_course_ownership %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'people'})} %}
-{% block surface_body %}
-
-						{{ ui('layout.section-head', {heading: 'Course ownership and Course Editors', heading_level: 2, summary: 'Every course has both an owning company and an owning person. Editors may work only on courses assigned to them.'}) }}
-
-							<form action="/admin/courses/{{ course.id }}/people" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+			{% if active_tab == 'test-access' %}
+				{{ ui('layout.section-head', {heading: 'Test access', heading_level: 2, summary: 'Add existing people to this course, including while it is a draft. Access expires counted from the time you grant it.'}) }}
+				<form action="/admin/courses/{{ course.id }}/grant" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
-
-								<input type="hidden" name="csrf" value="{{ csrf }}">
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', full_width: false, for: 'field-admin-course-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Newly imported courses default to the System Company.'})} %}
-{% block control %}
-
-									<select name="owner_company_id" required id="field-admin-course-edit-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-									{% for ownerCompany in owner_companies %}
-										<option value="{{ ownerCompany.id }}" {{ ownerCompany.id==course.owner_company_id ? 'selected' : '' }}>{{ ownerCompany.name }}</option>
-									{% endfor %}
-									</select>
-
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Verified account emails', for: 'test-access-emails', span: 'two-thirds', required: true, help: 'Enter one email per line. Every person must have an active, verified account.'})} %}
+{% block control %}<textarea class="form-control" id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'test-access-days', span: 'third', required: true, help: 'The countdown begins when you grant access.'})} %}
+{% block control %}<input class="form-control" id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
 {% endblock %}
 {% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning person', full_width: false, for: 'field-admin-course-edit-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true, help: 'Newly imported courses default to the administrator who performed the import.'})} %}
-{% block control %}
-
-									<select name="owner_user_id" required id="field-admin-course-edit-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-									{% for ownerPerson in owner_people %}
-										<option value="{{ ownerPerson.id }}" {{ ownerPerson.id==course.owner_user_id ? 'selected' : '' }}>{{ ownerPerson.name }} · {{ ownerPerson.email }}</option>
-									{% endfor %}
-									</select>
-
-{% endblock %}
-{% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Editors', full_width: true, for: 'field-admin-course-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-									<div class="editor-choice-grid">
-										{% for editorPerson in owner_people %}
-											{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (editorPerson.name) ~ (editorPerson.email) ~ ' · ' ~ (editorPerson.company_name)})} %}
-{% block control %}
-<input type="checkbox" name="editor_user_ids[]" value="{{ editorPerson.id }}" {{ editorPerson.selected_editor ? 'checked' : '' }} id="field-admin-course-edit-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}">
-{% endblock %}
-{% endembed %}
-										{% endfor %}
-									</div>
-
-{% endblock %}
-{% endembed %}
-								{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-									{{ ui('action.button', {label: 'Save ownership and editors', variant: 'primary', size: 'normal', type: 'submit'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}</form>
-
-{% endblock %}
-{% endembed %}
+				</form>
+				<div class="mt-4">{{ ui('layout.section-head', {heading: 'Current direct grants', heading_level: 2, summary: test_grants|length ~ (test_grants|length == 1 ? ' grant.' : ' grants.')}) }}</div>
+				{% if test_grants %}
+					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+						{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'course'} %}{% endfor %}
+					{% endblock %}{% endembed %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: 'No direct grants', summary: 'Nobody has been given test access to this course yet.'}) }}
 				{% endif %}
-				{% if can_manage_course_pricing %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'pricing'})} %}
-{% block surface_body %}
-
-						{{ ui('layout.section-head', {heading: 'Pricing and access periods', heading_level: 2, summary: 'Define the access periods customers can buy. The active default is the catalogue price.'}) }}
-
-							{% if course.price_variants %}
-								<div class="vstack gap-3 mb-4">
-									{% for price_index, price in course.price_variants %}
-										<div class="border rounded p-3">
-											<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-												<div>
-													<strong>{{ price.price_label }}</strong> · {{ price.access_period_label }}
-													{% if price.label %}
-														<span class="text-body-secondary"> · {{ price.label }}</span>
-													{% endif %}
-												</div>
-												<div class="d-flex gap-2">
-													{% if price.is_default %}
-														{{ ui('feedback.badge', {label: 'Default', tone: 'info'}) }}
-													{% endif %}
-													{{ ui('feedback.badge', {label: (price.is_active ? 'Active' : 'Inactive'), tone: price.is_active ? 'success' : 'neutral'}) }}
-												</div>
-											</div>
-											<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+				<div class="mt-4">{{ ui('layout.section-head', {heading: 'Your own testing', heading_level: 2, summary: 'Preview uses the real course player without affecting learner records. Adding the course to your library gives you a persistent, non-preview enrolment.'}) }}</div>
+				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-
-												<input type="hidden" name="csrf" value="{{ csrf }}">
-												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'field-admin-course-edit-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-													<input class="form-control" type="number" min="1" name="access_period_value" value="{{ price.access_period_value }}" required id="field-admin-course-edit-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
+					{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
+					{% if can_preview_courses %}
+						<form action="/admin/courses/{{ course.id }}/preview/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset my preview progress', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+						<form action="/admin/courses/{{ course.id }}/grant-self" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Add to my library', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-add'}) }}</form>
+					{% endif %}
 {% endblock %}
 {% endembed %}
-												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', full_width: false, for: 'field-admin-course-edit-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
+			{% endif %}
 
-													<select class="form-select" name="access_period_unit" id="field-admin-course-edit-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="days" {{ price.access_period_unit=='days' ? 'selected' : '' }}>Days</option><option value="weeks" {{ price.access_period_unit=='weeks' ? 'selected' : '' }}>Weeks</option><option value="months" {{ price.access_period_unit=='months' ? 'selected' : '' }}>Months</option><option value="years" {{ price.access_period_unit=='years' ? 'selected' : '' }}>Years</option></select>
-
-{% endblock %}
-{% endembed %}
-												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', full_width: false, for: 'field-admin-course-edit-6-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-													<input class="form-control" name="price" value="{{ price.price_input }}" inputmode="decimal" required id="field-admin-course-edit-6-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', full_width: false, for: 'field-admin-course-edit-7-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-													<input class="form-control text-uppercase" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required id="field-admin-course-edit-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-												{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', full_width: false, for: 'field-admin-course-edit-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-													<input class="form-control" name="label" value="{{ price.label }}" maxlength="120" id="field-admin-course-edit-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-												<div>
-													{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}
-{% block control %}
-<input class="form-check-input" type="checkbox" name="is_active" value="1" {{ price.is_active ? 'checked' : '' }}>
-{% endblock %}
-{% endembed %}
-												</div>
-												<div>
-													{{ ui('action.button', {label: 'Save', variant: 'secondary', size: 'normal', full_width: true, type: 'submit'}) }}
-												</div>
-
-{% endblock %}
-{% endembed %}</form>
-											<div class="d-flex flex-wrap gap-2 mt-3">
-												{% if not price.is_default %}
-													<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/default" method="post">
-														<input type="hidden" name="csrf" value="{{ csrf }}">
-														{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', type: 'submit'}) }}
-													</form>
-												{% endif %}
-												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													<input type="hidden" name="direction" value="up">
-													{{ ui('action.button', {label: '↑', variant: 'secondary', size: 'small', type: 'submit', disabled: price_index==0}) }}
-												</form>
-												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													<input type="hidden" name="direction" value="down">
-													{{ ui('action.button', {label: '↓', variant: 'secondary', size: 'small', type: 'submit', disabled: price_index+1==course.price_variants|length}) }}
-												</form>
-												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/delete" method="post">
-													<input type="hidden" name="csrf" value="{{ csrf }}">
-													{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this price option?', icon: 'action-remove'}) }}
-												</form>
-											</div>
-										</div>
-									{% endfor %}
-								</div>
-							{% endif %}
-							<div class="border-top pt-4">
-								<h3 class="h5">
-									Add price option
-								</h3>
-								<form action="/admin/courses/{{ course.id }}/pricing" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+			{% if active_tab == 'people' %}
+				{{ ui('layout.section-head', {heading: 'Owner & editors', heading_level: 2, summary: 'Every course has both an owning company and an owning person. Course Editors may work only on courses assigned to them.'}) }}
+				<form action="/admin/courses/{{ course.id }}/people" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
-
-									<input type="hidden" name="csrf" value="{{ csrf }}">
-									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'field-admin-course-edit-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', for: 'owner-company', required: true, help: 'Newly imported courses default to the System Company.'})} %}
 {% block control %}
-
-										<input class="form-control" type="number" min="1" name="access_period_value" value="12" required id="field-admin-course-edit-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
+							<select class="form-select" name="owner_company_id" required id="owner-company" {{ ui_field_attrs(props) }}>
+							{% for ownerCompany in owner_companies %}<option value="{{ ownerCompany.id }}" {{ ownerCompany.id==course.owner_company_id ? 'selected' : '' }}>{{ ownerCompany.name }}</option>{% endfor %}
+							</select>
 {% endblock %}
 {% endembed %}
-									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', full_width: false, for: 'field-admin-course-edit-10-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning person', for: 'owner-person', required: true, help: 'Newly imported courses default to the administrator who performed the import.'})} %}
 {% block control %}
-
-										<select class="form-select" name="access_period_unit" id="field-admin-course-edit-10-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="months" selected>Months</option><option value="days">Days</option><option value="weeks">Weeks</option><option value="years">Years</option></select>
-
+							<select class="form-select" name="owner_user_id" required id="owner-person" {{ ui_field_attrs(props) }}>
+							{% for ownerPerson in owner_people %}<option value="{{ ownerPerson.id }}" {{ ownerPerson.id==course.owner_user_id ? 'selected' : '' }}>{{ ownerPerson.name }} · {{ ownerPerson.email }}</option>{% endfor %}
+							</select>
 {% endblock %}
 {% endembed %}
-									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', full_width: false, for: 'field-admin-course-edit-11-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course Editors', full_width: true, help: (course.editors|length) ~ ' currently assigned.'})} %}
 {% block control %}
-
-										<input class="form-control" name="price" placeholder="5000.00" inputmode="decimal" required id="field-admin-course-edit-11-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
+							<div class="editor-choice-grid">
+								{% for editorPerson in owner_people %}
+									{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: editorPerson.name ~ ' · ' ~ editorPerson.email ~ ' · ' ~ editorPerson.company_name})} %}
+{% block control %}<input type="checkbox" name="editor_user_ids[]" value="{{ editorPerson.id }}" {{ editorPerson.selected_editor ? 'checked' : '' }}>{% endblock %}
 {% endembed %}
-									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', full_width: false, for: 'field-admin-course-edit-12-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-										<input class="form-control text-uppercase" name="currency_code" value="ZAR" maxlength="3" required id="field-admin-course-edit-12-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-									{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', full_width: false, for: 'field-admin-course-edit-13-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-										<input class="form-control" name="label" placeholder="12-month access" maxlength="120" id="field-admin-course-edit-13-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-									<div>
-										{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}
-{% block control %}
-<input class="form-check-input" type="checkbox" name="is_active" value="1" checked>
-{% endblock %}
-{% endembed %}
-									</div>
-									<div>
-										{{ ui('action.button', {label: 'Add', variant: 'primary', size: 'normal', full_width: true, type: 'submit'}) }}
-									</div>
-									<div>
-										{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Make this the default catalogue price'})} %}
-{% block control %}
-<input class="form-check-input" type="checkbox" name="is_default" value="1">
-{% endblock %}
-{% endembed %}
-									</div>
-
-{% endblock %}
-{% endembed %}</form>
-							</div>
-
-{% endblock %}
-{% endembed %}
-				{% endif %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'course-content'})} %}
-{% block surface_body %}
-					{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course Content', heading_level: 2, summary: 'Build the nested course structure from reusable Course Items and course-specific placements.'})} %}
-{% block section_actions %}
-{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/content'}) }}
-{% endblock %}
-{% endembed %}
-					<p>{{ course.structure|length }} structure rows. Assessments and diagnostics use the same Course Item lifecycle and sharing model as every other item.</p>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'presentation'})} %}
-{% block surface_body %}
-
-					{{ ui('layout.section-head', {heading: 'Course presentation', heading_level: 2, summary: 'Preserve the visual styling from the original self-contained HTML course without allowing it to restyle the LMS navigation or theme.'}) }}
-
-						{% if course.presentation_css %}
-							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'success', section_spacing: false})} %}
-{% block body %}
-
-								<strong>Presentation stylesheet installed.</strong> A course-specific stylesheet is currently stored for this course.
-
-{% endblock %}
-{% endembed %}
-						{% else %}
-							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
-{% block body %}
-
-								<strong>No imported presentation stylesheet is stored.</strong> Imported HTML classes will therefore use only the standard LMS styling.
-
-{% endblock %}
-{% endembed %}
-						{% endif %}
-						<p>
-							For an already imported course, upload its original HTML file here. Only its presentation CSS and authored stylesheet imports are refreshed; modules, assessments, grades, enrolments and course IDs are not changed.
-						</p>
-						<form action="/admin/courses/{{ course.id }}/presentation" method="post" enctype="multipart/form-data">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Original HTML course file', full_width: false, for: 'field-admin-course-edit-14-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-								<input class="form-control" type="file" name="course_html" accept=".html,.htm,text/html" required id="field-admin-course-edit-14-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-							{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
-{% block body %}
-
-								{{ ui('action.button', {label: 'Import / refresh presentation', variant: 'secondary', size: 'normal', full_width: true, type: 'submit'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}</form>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'grading'})} %}
-{% block surface_body %}
-
-					{{ ui('layout.section-head', {heading: 'Overall grade bands', heading_level: 2, summary: 'The learner receives the highest grade whose minimum percentage was reached.'}) }}
-
-						<form action="/admin/courses/{{ course.id }}/grade-bands" method="post">
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-
-								{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-{% block header %}
-
-										<tr>
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Code'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Label'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Minimum'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Passing'}} %}
-										</tr>
-
-{% endblock %}
-{% block body %}
-
-										{% for band_index, band in course.grade_bands %}
-											<tr>
-												<td>
-													<input class="form-control" name="grade_code[{{ band_index }}]" value="{{ band.grade_code }}" maxlength="24" required>
-												</td>
-												<td>
-													<input class="form-control" name="grade_label[{{ band_index }}]" value="{{ band.grade_label }}" maxlength="120" required>
-												</td>
-												<td>
-													<div class="input-group">
-														<input class="form-control" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ band_index }}]" value="{{ band.minimum_percentage }}" required>
-														<span class="input-group-text">%</span>
-													</div>
-												</td>
-												<td class="text-center">
-													<input class="form-check-input" type="checkbox" name="is_passing[{{ band_index }}]" value="1" {{ band.is_passing ? 'checked' : '' }}>
-												</td>
-											</tr>
-										{% endfor %}
-
-{% endblock %}
-{% endembed %}
-
-							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-							{{ ui('action.button', {label: 'Save grade bands', variant: 'secondary', size: 'normal', type: 'submit'}) }}
-
-{% endblock %}
-{% endembed %}
-						</form>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'history'})} %}
-{% block surface_body %}
-
-					{{ ui('layout.section-head', {heading: 'Edit history', heading_level: 2}) }}
-					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-						{% for event in course.history %}
-							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-								<strong>{{ event.summary }}</strong>
-								<br>
-								<small>{{ event.created_at }} · {{ event.user_email ? event.user_email : 'System' }}</small>
-
-{% endblock %}
-{% endembed %}
-						{% endfor %}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-				{% if can_manage_enrolments %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'danger', tone: 'danger'})} %}
-{% block surface_body %}
-
-						{{ ui('layout.section-head', {heading: 'Reset or delete course', heading_level: 2, summary: 'During development, Platform Administrator actions are deliberately direct. No title typing or backup is required.'}) }}
-
-							{% if course.has_started_learners %}
-								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
-{% block body %}
-
-									Learners currently have or have used access to this course. Reset or deletion will remove their course data. The confirmation below is the only override required.
-
-{% endblock %}
-{% endembed %}
-							{% endif %}
-							<div class="row g-3">
-								<div class="col-lg-6">
-									<form action="/admin/courses/{{ course.id }}/reset" method="post">
-										<input type="hidden" name="csrf" value="{{ csrf }}">
-										{{ ui('action.button', {label: 'Reset course content', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reset this course now? Course content and learner test data will be removed, but the empty course shell will remain for re-import.', icon: 'action-remove'}) }}
-									</form>
-								</div>
-								<div class="col-lg-6">
-									<form action="/admin/courses/{{ course.id }}/delete" method="post">
-										<input type="hidden" name="csrf" value="{{ csrf }}">
-										{{ ui('action.button', {label: 'Delete course permanently', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this course and scrub all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}
-									</form>
-								</div>
-							</div>
-
-{% endblock %}
-{% endembed %}
-				{% endif %}
-			</div>
-			<aside>
-				{% if can_manage_enrolments %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'test-access'})} %}
-{% block surface_body %}
-						{{ ui('layout.section-head', {heading: 'Grant test access', heading_level: 2, summary: 'Add existing people to this course, including while it is a draft. Access expires from the time you grant it.'}) }}
-						<form action="/admin/courses/{{ course.id }}/grant" method="post">
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Verified account emails', for: 'test-access-emails', required: true, help: 'Enter one email per line. Every person must have an active, verified account.'})} %}
-{% block control %}<textarea id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}
-{% endembed %}
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'test-access-days', required: true, help: 'The countdown begins when you grant access.'})} %}
-{% block control %}<input id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
-{% endembed %}
-							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
-						</form>
-						{% if test_grants %}
-							<h3 class="h5">Current direct grants</h3>
-							{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
-								{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'course'} %}{% endfor %}
-							{% endblock %}{% endembed %}
-						{% endif %}
-						{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
-{% endblock %}
-{% endembed %}
-				{% endif %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, sticky: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Student-view preview
-						</h2>
-						<p>
-							Use the real course player, quizzes, grades and progress bar without affecting real learner records.
-						</p>
-						{{ ui('action.link', {label: 'Preview as student', variant: 'primary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/preview'}) }}
-						<form action="/admin/courses/{{ course.id }}/preview/reset" method="post">
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{{ ui('action.button', {label: 'Reset preview progress', variant: 'secondary', size: 'normal', full_width: true, type: 'submit'}) }}
-						</form>
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Import and portability
-						</h2>
-						<p>
-							Export the complete course as structured JSON, or replace its content through the import screen.
-						</p>
-						{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/export'}) }}{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/import'}) }}
-
-{% endblock %}
-{% endembed %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Certificate
-						</h2>
-						<p>
-							Edit the certificate HTML and CSS, insert placeholders and preview the result.
-						</p>
-						{{ ui('action.link', {label: 'Edit certificate template', variant: 'secondary', size: 'normal', full_width: true, href: '/admin/courses/' ~ (course.id) ~ '/certificate'}) }}
-
-{% endblock %}
-{% endembed %}
-				{% if not can_publish_courses %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-							<h2 class="h4">
-								Publication approval
-							</h2>
-							<p>
-								Submit the course to the platform administrator when it is ready for publication.
-							</p>
-							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
-{% block body %}
-
-								<strong>Publication checks:</strong> Courses may omit assessments. Assessed courses require exactly one final assessment and valid question banks. Unresolved Course Item references, missing Resources and invalid availability schedules block publication. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.
-
-{% endblock %}
-{% endembed %}
-							<p>
-								<strong>Current approval:</strong> {{ course.publication_approval_status|ucfirst }}
-							</p>
-							<form action="/admin/courses/{{ course.id }}/submit-for-approval" method="post">
-								<input type="hidden" name="csrf" value="{{ csrf }}">
-								{{ ui('action.button', {label: 'Submit for approval', variant: 'primary', size: 'normal', full_width: true, type: 'submit'}) }}
-							</form>
-
-{% endblock %}
-{% endembed %}
-				{% endif %}
-				{% if can_publish_courses %}
-					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-
-							<h2 class="h4">
-								Publication status
-							</h2>
-							<p>
-								Course Editors submit work for approval; only a platform administrator changes publication status.
-							</p>
-							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
-{% block body %}
-
-								<strong>Publication checks:</strong> Courses may omit assessments. Assessed courses require exactly one final assessment and valid question banks. Unresolved Course Item references, missing Resources and invalid availability schedules block publication. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.
-
-{% endblock %}
-{% endembed %}
-							<form action="/admin/courses/{{ course.id }}/status" method="post">{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
-{% block body %}
-
-								<input type="hidden" name="csrf" value="{{ csrf }}">
-								{% for error in course.publication_validation.errors %}<p>{{ error }}</p>{% endfor %}{% for warning in course.publication_validation.warnings %}<p>{{ warning }}</p>{% endfor %}
-{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:'Override publication warnings'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
-<select class="form-select mb-3" name="status">
-								{% for state in course_states %}
-									<option value="{{ state }}" {{ state == course.status ? 'selected' : '' }}>{{ state|ucfirst }}</option>
 								{% endfor %}
-								</select>{{ ui('action.button', {label: 'Change status', variant: 'primary', size: 'normal', full_width: true, type: 'submit'}) }}
-
-{% endblock %}
-{% endembed %}</form>
-
+							</div>
 {% endblock %}
 {% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save owner & editors', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				</form>
+			{% endif %}
+
+			{% if active_tab == 'pricing' %}
+				{{ ui('layout.section-head', {heading: 'Pricing & access periods', heading_level: 2, summary: 'The access periods customers can buy. The active default is the catalogue price.'}) }}
+				{% if course.price_variants %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+						<tr>
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Order'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Period'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Price'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Label'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'Actions'}} %}
+						</tr>
+{% endblock %}
+{% block body %}
+						{% for price_index, price in course.price_variants %}
+							{% set price_form = 'price-edit-' ~ price.id %}
+							<tr id="price-{{ price.id }}">
+								<td>
+									{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: '↑', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', disabled: price_index==0}) }}</form>
+										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: '↓', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', disabled: price_index+1==course.price_variants|length}) }}</form>
+{% endblock %}
+{% endembed %}
+								</td>
+								{% if editing_price_id == price.id %}
+									<td>
+										<input class="form-control" form="{{ price_form }}" type="number" min="1" name="access_period_value" value="{{ price.access_period_value }}" required aria-label="Period">
+										<select class="form-select" form="{{ price_form }}" name="access_period_unit" aria-label="Unit">{% for unit in ['days', 'weeks', 'months', 'years'] %}<option value="{{ unit }}" {{ price.access_period_unit==unit ? 'selected' : '' }}>{{ unit|capitalize }}</option>{% endfor %}</select>
+									</td>
+									<td>
+										<input class="form-control" form="{{ price_form }}" name="price" value="{{ price.price_input }}" inputmode="decimal" required aria-label="Price">
+										<input class="form-control text-uppercase" form="{{ price_form }}" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required aria-label="Currency">
+									</td>
+									<td><input class="form-control" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label"></td>
+									<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}{% block control %}<input type="checkbox" form="{{ price_form }}" name="is_active" value="1" {{ price.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}</td>
+									<td>
+										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+											<form id="{{ price_form }}" action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit'}) }}</form>
+											{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'small', href: tab_url ~ '#price-' ~ price.id}) }}
+{% endblock %}
+{% endembed %}
+									</td>
+								{% else %}
+									<td>{{ price.access_period_label }}</td>
+									<td>{{ price.price_label }}</td>
+									<td>{{ price.label }}</td>
+									<td>
+										{% if price.is_default %}{{ ui('feedback.badge', {label: 'Default', tone: 'info', size: 'small'}) }}{% endif %}
+										{{ ui('feedback.badge', {label: (price.is_active ? 'Active' : 'Inactive'), tone: price.is_active ? 'success' : 'neutral', size: 'small'}) }}
+									</td>
+									<td>
+										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: tab_url ~ '&edit_price=' ~ price.id ~ '#price-' ~ price.id}) }}
+											{% if not price.is_default %}
+												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+											{% endif %}
+											<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this price option?', icon: 'action-remove'}) }}</form>
+{% endblock %}
+{% endembed %}
+									</td>
+								{% endif %}
+							</tr>
+						{% endfor %}
+{% endblock %}
+{% endembed %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: 'No price options', summary: 'A course needs at least one active price option and exactly one active default price before it can be published.'}) }}
 				{% endif %}
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-
-						<h2 class="h4">
-							Full learner test
-						</h2>
-						<p>
-							Add the course to your own normal library for a persistent non-preview enrolment.
-						</p>
-						<form action="/admin/courses/{{ course.id }}/grant-self" method="post">
-							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{{ ui('action.button', {label: 'Add to my library', variant: 'secondary', size: 'normal', full_width: true, type: 'submit', icon: 'action-add'}) }}
-						</form>
-
+				<form class="mt-4" action="/admin/courses/{{ course.id }}/pricing" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('layout.section-head', {heading: 'Add a price option', heading_level: 2}) }}
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
+{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', for: 'new-price-period', span: 'quarter', required: true})} %}
+{% block control %}<input class="form-control" id="new-price-period" type="number" min="1" name="access_period_value" value="12" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'new-price-unit', span: 'quarter'})} %}
+{% block control %}<select class="form-select" id="new-price-unit" name="access_period_unit" {{ ui_field_attrs(props) }}><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', for: 'new-price-amount', span: 'quarter', required: true})} %}
+{% block control %}<input class="form-control" id="new-price-amount" name="price" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', for: 'new-price-currency', span: 'quarter', required: true})} %}
+{% block control %}<input class="form-control text-uppercase" id="new-price-currency" name="currency_code" value="ZAR" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', for: 'new-price-label'})} %}
+{% block control %}<input class="form-control" id="new-price-label" name="label" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_active" value="1" checked>{% endblock %}{% endembed %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Make this the default catalogue price', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_default" value="1">{% endblock %}{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Add price option', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
 {% endblock %}
 {% endembed %}
-			</aside>
+				</form>
+			{% endif %}
 
+			{% if active_tab == 'content' %}
+				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course content', heading_level: 2, summary: 'The nested course structure, built from reusable Course Items and course-specific placements. This outline is read-only; arrange the course in the Course Content editor.'})} %}
+{% block section_actions %}{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content'}) }}{% endblock %}
+{% endembed %}
+				{% if content_summary.outline %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '')})} %}
+{% block header %}
+						<tr>
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Position'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Title'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Type'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Placement'}} %}
+						</tr>
+{% endblock %}
+{% block body %}
+						{% for row in content_summary.outline %}
+							<tr>
+								<td><code>{{ row.number }}</code></td>
+								<td>{% if row.is_section %}<strong>{{ row.title }}</strong>{% else %}{{ row.title }}{% endif %}</td>
+								<td>{{ row.type_label }}</td>
+								<td>
+									{% if row.assessment_role == 'final' %}{{ ui('feedback.badge', {label: 'Final assessment', tone: 'warning', size: 'small'}) }}{% elseif row.assessment_role == 'graded' %}{{ ui('feedback.badge', {label: 'Graded', tone: 'info', size: 'small'}) }}{% endif %}
+									{% if row.public_preview %}{{ ui('feedback.badge', {label: 'Public preview', tone: 'neutral', size: 'small'}) }}{% endif %}
+								</td>
+							</tr>
+						{% endfor %}
+{% endblock %}
+{% endembed %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: 'No course content yet', summary: 'Open the Course Content editor to add sections and Course Items, or import the course.'}) }}
+				{% endif %}
+			{% endif %}
+
+			{% if active_tab == 'presentation' %}
+				{{ ui('layout.section-head', {heading: 'Presentation', heading_level: 2, summary: 'The course-specific stylesheet that keeps the visual styling of the original self-contained HTML course. It styles course content only, never the LMS navigation or theme.'}) }}
+				<form action="/admin/courses/{{ course.id }}/presentation-css" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
+{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Presentation stylesheet (CSS)', for: 'presentation-css', full_width: true, help: course.presentation_css ? (course.presentation_css|length) ~ ' characters stored. Edit the CSS directly; it is saved exactly as written. Clear the box and save to remove it.' : 'No stylesheet is stored, so imported HTML classes use only the standard LMS styling. Paste CSS here or import it from the original HTML file below.'})} %}
+{% block control %}<textarea class="form-control font-monospace" id="presentation-css" name="presentation_css" rows="24" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{{ course.presentation_css }}</textarea>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save stylesheet', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				</form>
+				<form class="mt-4" action="/admin/courses/{{ course.id }}/presentation" method="post" enctype="multipart/form-data">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{{ ui('layout.section-head', {heading: 'Import from the original HTML file', heading_level: 2, summary: 'Replaces the stylesheet above with the presentation CSS and authored stylesheet imports found in the file. Modules, assessments, grades, enrolments and course IDs are not changed.'}) }}
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
+{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Original HTML course file', for: 'presentation-file', span: 'two-thirds', required: true})} %}
+{% block control %}<input class="form-control" id="presentation-file" type="file" name="course_html" accept=".html,.htm,text/html" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Import and replace stylesheet', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+				</form>
+			{% endif %}
+
+			{% if active_tab == 'grades' %}
+				{{ ui('layout.section-head', {heading: 'Grading scale', heading_level: 2, summary: 'These bands decide every grade in this course. Changes apply to every result recorded after you save.'}) }}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'What the bands control', section_spacing: true})} %}
+{% block body %}<ul><li><strong>Assessment results:</strong> each graded module assessment and the final show the band its score falls in.</li><li><strong>Final course grade:</strong> 50% module assessments plus 50% final assessment, placed in a band.</li><li><strong>Pass or fail:</strong> the course is passed when the final grade lands in a band marked Passing.</li><li><strong>Certificate:</strong> issued only for a passing band.</li></ul>{% endblock %}
+{% endembed %}
+				<form action="/admin/courses/{{ course.id }}/grade-bands" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+{% block header %}
+						<tr>
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Label'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Code'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'From %'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'To %'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Passing'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Remove'}} %}
+						</tr>
+{% endblock %}
+{% block body %}
+						{% for band_index, band in course.grade_bands %}
+							<tr>
+								<td><input class="form-control" name="grade_label[{{ band_index }}]" value="{{ band.grade_label }}" maxlength="120" aria-label="Label"></td>
+								<td><input class="form-control" name="grade_code[{{ band_index }}]" value="{{ band.grade_code }}" maxlength="24" aria-label="Code"></td>
+								<td><input class="form-control" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ band_index }}]" value="{{ band.minimum_label }}" aria-label="From percentage"></td>
+								<td>{{ band.maximum_label }}%</td>
+								<td><input class="form-check-input" type="checkbox" name="is_passing[{{ band_index }}]" value="1" {{ band.is_passing ? 'checked' : '' }} aria-label="Passing"></td>
+								<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove'})} %}{% block control %}<input type="checkbox" name="remove_band[{{ band_index }}]" value="1">{% endblock %}{% endembed %}</td>
+							</tr>
+						{% endfor %}
+						{% set new_index = course.grade_bands|length %}
+						<tr>
+							<td><input class="form-control" name="grade_label[{{ new_index }}]" maxlength="120" placeholder="New band label" aria-label="New band label"></td>
+							<td><input class="form-control" name="grade_code[{{ new_index }}]" maxlength="24" placeholder="Code" aria-label="New band code"></td>
+							<td><input class="form-control" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ new_index }}]" placeholder="From" aria-label="New band from percentage"></td>
+							<td>—</td>
+							<td><input class="form-check-input" type="checkbox" name="is_passing[{{ new_index }}]" value="1" checked aria-label="New band passing"></td>
+							<td></td>
+						</tr>
+{% endblock %}
+{% endembed %}
+					<p class="cl-ui-field-help">To add a band, fill in the empty last row; leave it empty to skip it. You only set where each band starts: To % is worked out from the band above, and rows are sorted when you save. The lowest band must start at 0%.</p>
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save grading scale', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
+				</form>
+				<div class="mt-4">{{ ui('layout.section-head', {heading: 'What learners see', heading_level: 2, summary: 'Shown on the public course page and wherever [grading-scale] appears in course content.'}) }}</div>
+				{% set learner_scale = [] %}
+				{% for band in course.grade_bands %}{% set learner_scale = learner_scale|merge([{label: band.grade_label ~ (band.is_passing ? '' : ' (not passing)'), value: band.range_label}]) %}{% endfor %}
+				{{ ui('data.key-value-list', {items: learner_scale}) }}
+			{% endif %}
+
+			{% if active_tab == 'publication' %}
+				{{ ui('layout.section-head', {heading: 'Publication', heading_level: 2, summary: can_publish_courses ? 'Course Editors submit work for approval; only a platform administrator changes publication status.' : 'Submit the course to the platform administrator when it is ready for publication.'}) }}
+				{% if course.publication_validation.errors %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: course.publication_validation.errors|length ~ ' problems block publication'})} %}{% block body %}<ul>{% for error in course.publication_validation.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}
+				{% endif %}
+				{% if course.publication_validation.warnings %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: course.publication_validation.warnings|length ~ ' warnings before publishing'})} %}{% block body %}<ul>{% for warning in course.publication_validation.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}
+				{% endif %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Publication checks'})} %}
+{% block body %}Courses may omit assessments. Assessed courses require exactly one final assessment and valid question banks. Unresolved Course Item references, missing Resources and invalid availability schedules block publication. The course must also have at least one active access/price option and exactly one active default price; a free course may use a zero price.{% endblock %}
+{% endembed %}
+				{% if can_publish_courses %}
+					<form action="/admin/courses/{{ course.id }}/status" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
+{% block body %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', for: 'course-status', span: 'third'})} %}
+{% block control %}<select class="form-select" id="course-status" name="status" {{ ui_field_attrs(props) }}>{% for state in course_states %}<option value="{{ state }}" {{ state == course.status ? 'selected' : '' }}>{{ state|capitalize }}</option>{% endfor %}</select>{% endblock %}
+{% endembed %}
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings', span: 'two-thirds'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
+							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Change status', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+					</form>
+				{% else %}
+					<form action="/admin/courses/{{ course.id }}/submit-for-approval" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{{ ui('data.key-value-list', {items: [{label: 'Current approval', value: course.publication_approval_status|capitalize}]}) }}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Submit for approval', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% endembed %}
+					</form>
+				{% endif %}
+			{% endif %}
+
+			{% if active_tab == 'history' %}
+				{{ ui('layout.section-head', {heading: 'Edit history', heading_level: 2, summary: 'Every recorded change to this course, newest first.'}) }}
+				{% if course.history %}
+					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact'})} %}
+{% block header %}
+						<tr>
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'When'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 53, label: 'Change'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'By'}} %}
+						</tr>
+{% endblock %}
+{% block body %}
+						{% for event in course.history %}
+							<tr><td>{{ event.created_at }}</td><td>{{ event.summary }}</td><td>{{ event.user_email ? event.user_email : 'System' }}</td></tr>
+						{% endfor %}
+{% endblock %}
+{% endembed %}
+				{% else %}
+					{{ ui('feedback.empty', {heading: 'No history yet', summary: 'Changes to this course are recorded here.'}) }}
+				{% endif %}
+			{% endif %}
+
+			{% if active_tab == 'danger' %}
+				{{ ui('layout.section-head', {heading: 'Reset or delete course', heading_level: 2, summary: 'During development these actions run immediately after one confirmation. No title typing or backup is required.'}) }}
+				{% if course.has_started_learners %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}Learners currently have or have used access to this course. Reset or deletion removes their course data.{% endblock %}{% endembed %}
+				{% endif %}
+				{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2})} %}
+{% block body %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact', tone: 'danger'})} %}
+{% block surface_body %}
+						{{ ui('layout.section-head', {heading: 'Reset course content', heading_level: 3, summary: 'Removes course content and learner test data. The empty course shell remains for re-import.'}) }}
+						<form action="/admin/courses/{{ course.id }}/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset course content', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reset this course now? Course content and learner test data will be removed, but the empty course shell will remain for re-import.', icon: 'action-remove'}) }}</form>
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact', tone: 'danger'})} %}
+{% block surface_body %}
+						{{ ui('layout.section-head', {heading: 'Delete course permanently', heading_level: 3, summary: 'Deletes the course and removes all associated learner access, progress, attempts and results.'}) }}
+						<form action="/admin/courses/{{ course.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete course permanently', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this course and scrub all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}</form>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+			{% endif %}
 {% endblock %}
 {% endembed %}
 	</section>

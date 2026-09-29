@@ -127,6 +127,17 @@ final class LegacyHtmlCourseImporter
         $modules = [];
         $warnings = [];
         $position = 1;
+
+        // The file's grading scale becomes the course's grade bands, and the introduction's static
+        // copy of it becomes a [grading-scale] placeholder the LMS fills from those bands.
+        $gradeScale = $this->gradeScale($xpath, $html);
+        $gradeBands = $gradeScale['bands'];
+        if ($gradeScale['source'] === 'default') {
+            $warnings[] = 'No grading scale was found in the file, so the standard five grade bands were used. Check them on the Grades tab.';
+        } elseif ($gradeScale['function_agrees'] === false) {
+            $warnings[] = 'The grading scale shown in the file does not match its grading script. The shown scale was used; check it on the Grades tab.';
+        }
+        [$introductionHtml, $standalone] = $this->withoutStandaloneParts($introductionHtml, $gradeScale['source'] !== 'default');
         foreach ($moduleNodes as $node) {
             if (!$node instanceof DOMElement) {
                 continue;
@@ -324,13 +335,6 @@ final class LegacyHtmlCourseImporter
             $warnings[] = 'No final assessment was detected.';
         }
 
-        $gradeBands = [
-            ['grade_code' => 'A', 'grade_label' => 'First Class (A)', 'minimum_percentage' => 75, 'is_passing' => true],
-            ['grade_code' => 'B+', 'grade_label' => 'Second Class (B+)', 'minimum_percentage' => 70, 'is_passing' => true],
-            ['grade_code' => 'B', 'grade_label' => 'Second Class (B)', 'minimum_percentage' => 60, 'is_passing' => true],
-            ['grade_code' => 'C', 'grade_label' => 'Third (C)', 'minimum_percentage' => 50, 'is_passing' => true],
-            ['grade_code' => 'Fail', 'grade_label' => 'Fail', 'minimum_percentage' => 0, 'is_passing' => false],
-        ];
 
         $questionCount = 0;
         $maximumPoints = 0;
@@ -398,6 +402,7 @@ final class LegacyHtmlCourseImporter
                 'questions' => $finalQuestions,
             ],
             'grade_bands' => $gradeBands,
+            'grade_scale' => ['source' => $gradeScale['source'], 'function_agrees' => $gradeScale['function_agrees']] + $standalone,
             'statistics' => [
                 'module_count' => count(array_filter($modules, static fn(array $m): bool => !$m['is_review'])),
                 'assessed_module_count' => count(array_filter($modules, static fn(array $m): bool => (bool) $m['assessment_required'])),
@@ -409,6 +414,98 @@ final class LegacyHtmlCourseImporter
             'warnings' => array_values(array_unique($warnings)),
             'parser_diagnostics' => $parserDiagnostics,
         ];
+    }
+
+    /** Standard scale used by the original courses; applied only when a file shows none. */
+    private const DEFAULT_GRADE_BANDS = [
+        ['grade_code' => 'A', 'grade_label' => 'First Class (A)', 'minimum_percentage' => 75, 'is_passing' => true],
+        ['grade_code' => 'B+', 'grade_label' => 'Second Class (B+)', 'minimum_percentage' => 70, 'is_passing' => true],
+        ['grade_code' => 'B', 'grade_label' => 'Second Class (B)', 'minimum_percentage' => 60, 'is_passing' => true],
+        ['grade_code' => 'C', 'grade_label' => 'Third (C)', 'minimum_percentage' => 50, 'is_passing' => true],
+        ['grade_code' => 'Fail', 'grade_label' => 'Fail', 'minimum_percentage' => 0, 'is_passing' => false],
+    ];
+
+    /**
+     * Read the grading scale from the file: the shown scale list first, the grading script otherwise.
+     * @return array{bands:list<array<string,mixed>>,source:string,function_agrees:?bool}
+     */
+    private function gradeScale(DOMXPath $xpath, string $html): array
+    {
+        $listed = [];
+        foreach ($xpath->query('//ul[contains(concat(" ", normalize-space(@class), " "), " scale-list ")][1]/li') as $item) {
+            if (!$item instanceof DOMElement) { continue; }
+            $label = ''; $minimum = null;
+            foreach ($item->childNodes as $child) {
+                $text = trim((string) preg_replace('/\s+/u', ' ', (string) $child->textContent));
+                if ($text === '') { continue; }
+                if ($minimum === null && preg_match('/^(\d+(?:\.\d+)?)\s*[-–—]\s*\d+(?:\.\d+)?\s*%$/u', $text, $range) === 1) { $minimum = (float) $range[1]; }
+                elseif ($label === '') { $label = $text; }
+            }
+            if ($label !== '' && $minimum !== null) { $listed[] = ['label' => $label, 'minimum' => $minimum]; }
+        }
+        $scripted = $this->scriptedGradeScale($html);
+        $codes = [];
+        foreach ($scripted as $band) { if ($band['code'] !== null) { $codes[mb_strtolower($band['label'])] = $band['code']; } }
+        $chosen = $listed !== [] ? $listed : $scripted;
+        $source = $listed !== [] ? 'list' : ($scripted !== [] ? 'function' : 'default');
+        if ($chosen === [] || !in_array(0.0, array_map(static fn(array $band): float => (float) $band['minimum'], $chosen), true)) {
+            return ['bands' => self::DEFAULT_GRADE_BANDS, 'source' => 'default', 'function_agrees' => null];
+        }
+        $bands = [];
+        foreach ($chosen as $band) {
+            $label = mb_substr((string) $band['label'], 0, 120);
+            $code = $codes[mb_strtolower($label)] ?? (preg_match('/\(([^()]{1,24})\)\s*$/u', $label, $match) === 1 ? $match[1] : mb_substr($label, 0, 24));
+            $bands[] = ['grade_code' => $code, 'grade_label' => $label, 'minimum_percentage' => (float) $band['minimum'], 'is_passing' => preg_match('/\bfail/iu', $label) !== 1];
+        }
+        usort($bands, static fn(array $a, array $b): int => $b['minimum_percentage'] <=> $a['minimum_percentage']);
+        $agrees = null;
+        if ($listed !== [] && $scripted !== []) {
+            $shape = static fn(array $rows): array => array_map(static fn(array $row): string => mb_strtolower((string) $row['label']) . '@' . (float) $row['minimum'], $rows);
+            $left = $shape($listed); $right = $shape($scripted); sort($left); sort($right);
+            $agrees = $left === $right;
+        }
+        return ['bands' => $bands, 'source' => $source, 'function_agrees' => $agrees];
+    }
+
+    /**
+     * The grading function of a standalone course, e.g. bandFor(pct) or gradeBand(p):
+     * a run of "if (x >= N) return <label>" followed by a final return for 0%.
+     * @return list<array{label:string,code:?string,minimum:float}>
+     */
+    private function scriptedGradeScale(string $html): array
+    {
+        if (preg_match('/function\s+(?:bandFor|gradeBand)\s*\([^)]*\)\s*\{/u', $html, $start, PREG_OFFSET_CAPTURE) !== 1) { return []; }
+        $body = substr($html, $start[0][1] + strlen($start[0][0]), 1500);
+        $returned = '(?:\{\s*label\s*:\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*code\s*:\s*[\'"]([^\'"]+)[\'"])?|\[\s*[\'"]([^\'"]+)[\'"])';
+        $bands = []; $end = 0;
+        preg_match_all('/>=\s*(\d+(?:\.\d+)?)\s*\)\s*return\s*' . $returned . '/u', $body, $conditions, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+        foreach ($conditions as $condition) {
+            $label = ($condition[2][0] ?? '') !== '' ? $condition[2][0] : (string) ($condition[4][0] ?? '');
+            $bands[] = ['label' => $label, 'code' => ($condition[3][0] ?? '') !== '' ? $condition[3][0] : null, 'minimum' => (float) $condition[1][0]];
+            $end = $condition[0][1] + strlen($condition[0][0]);
+        }
+        // The first return after the last condition is the band for everything below it.
+        if ($bands !== [] && preg_match('/\breturn\s*' . $returned . '/u', substr($body, $end), $last) === 1) {
+            $bands[] = ['label' => $last[1] !== '' ? $last[1] : $last[3], 'code' => $last[2] !== '' ? $last[2] : null, 'minimum' => 0.0];
+        }
+        return $bands;
+    }
+
+    /**
+     * Parts of a standalone course that only worked with its own script, removed on the owner's
+     * instruction (2026/09/25): the static scale list (replaced by the [grading-scale] placeholder),
+     * the reset-progress button and sentences saying progress is kept in the browser.
+     * @return array{0:string,1:array{placeholder_inserted:bool,reset_button_removed:bool,storage_sentences_removed:int}}
+     */
+    private function withoutStandaloneParts(string $html, bool $replaceScale): array
+    {
+        $placeholders = 0; $buttons = 0; $sentences = 0;
+        if ($replaceScale) {
+            $html = (string) preg_replace('/<ul\b[^>]*class="[^"]*\bscale-list\b[^"]*"[^>]*>.*?<\/ul>/su', GradeScale::PLACEHOLDER, $html, 1, $placeholders);
+        }
+        $html = (string) preg_replace('/\s*<button\b[^>]*\bid="resetBtn"[^>]*>.*?<\/button>/su', '', $html, -1, $buttons);
+        $html = (string) preg_replace('/\s*(?:Your )?[Pp]rogress is (?:saved|stored)(?: only)? in (?:this|your) browser\b[^.<]*\./u', '', $html, -1, $sentences);
+        return [$html, ['placeholder_inserted' => $placeholders > 0, 'reset_button_removed' => $buttons > 0, 'storage_sentences_removed' => $sentences]];
     }
 
     private function booleanDataAttribute(DOMElement $element, string $attribute, bool $default): bool

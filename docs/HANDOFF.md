@@ -1,6 +1,12 @@
-# Catto Learning 0.8.7.1 — Development Handoff
+# Catto Learning 0.8.7.2 — Development Handoff
 
-## Current development handoff — 2026/09/24
+## Current development handoff — 2026/09/29
+
+The owner authorized v0.8.7.2, a commit, a direct `main` push and an annotated tag. The course edit page at `/admin/courses/{id}` is now a tabbed editor: each tab is a server-rendered GET page (`?tab=overview|test-access|people|pricing|content|presentation|grades|publication|history|danger`) with its own Save / Cancel changes row, and every POST handler redirects back to its tab. Tabs render through the new canonical `layout.tabs` component, which also draws the Courses and Companies group navigation. UX rule 1.5 ("accordions, not tabs") was withdrawn as an LLM generalisation; tabs and accordions are both available.
+
+Grade bands are the only definition of a course's grading scale (see `COURSE-SPECIFICATION.md`, "Grading scale"). `GradeScale` derives each band's range and resolves `[grading-scale]` in introductions, lessons and public previews. Legacy HTML import reads the scale from the file and removes the standalone reset-progress button and browser-storage sentences from the introduction on the owner's instruction. The existing Foundations of Property Law and Conveyancing Admin development course (id 9810) was imported earlier and still holds a static scale and reset button in its introduction; re-import it or edit the introduction on the Overview tab. The learner assessment overview and the public assessment preview still use an assessment's `pass_mark` for graded assessments; aligning them with the lowest passing band is an open owner decision. No schema migration, dataset reset or theme-version change was needed; the core stylesheet was republished to the served web root.
+
+## v0.8.7.1 handoff — 2026/09/24
 
 The owner authorized v0.8.7.1 for the Course Content editor correction after v0.8.7. Move controls now stage a native PHP-session preview, with explicit Save arrangement and Cancel changes; unindent preserves the neighboring module position. Legacy HTML import places each module assessment under its module. The existing Foundations of Property Law and Conveyancing Admin development course received a one-time correction of its eight matching module assessments; the review aid and final assessment remain top-level. The `availability_locked` Twig 500 fix is included. No schema migration, dataset reset or theme-version change is needed. The owner authorized a commit, `main` push and tag for this release; later releases require a new instruction.
 

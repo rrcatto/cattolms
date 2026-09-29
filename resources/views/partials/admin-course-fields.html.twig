@@ -1,17 +1,14 @@
-{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 
-{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Course introduction',for:'course-introduction',full_width:true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="course-introduction" name="introduction_html" rows="6" {{ ui_field_attrs(props) }}>{{ course.introduction_html|default('') }}</textarea>{% endblock %}{% endembed %}
-<input type="hidden" name="show_outline_on_intro" value="0">
-{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:'Show generated outline on introduction'})} %}{% block control %}<input type="checkbox" name="show_outline_on_intro" value="1" {{ course.show_outline_on_intro|default(false) ? 'checked' : '' }}>{% endblock %}{% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course title', full_width: false, for: 'title', required: true})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course title', span: 'two-thirds', for: 'title', required: true})} %}
 {% block control %}
 
 		<input class="form-control" id="title" name="title" value="{{ course.title }}" maxlength="240" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', full_width: false, for: 'slug'})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', span: 'third', for: 'slug'})} %}
 {% block control %}
 
 		<input class="form-control" id="slug" name="slug" value="{{ course.slug }}" placeholder="generated-from-title" {{ ui_field_attrs(props) }}>
@@ -25,52 +22,64 @@
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Category', full_width: false, for: 'category'})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Category', for: 'category'})} %}
 {% block control %}
 
-		<div class="input-group">
-			<select class="form-select" id="category" name="category_id" data-category-select {{ ui_field_attrs(props) }}><option value="0">Uncategorised</option>
-			{% for category in categories %}
-				<option value="{{ category.id }}" {{ category.id == course.category_id ? 'selected' : '' }}>{{ category.name }}</option>
-			{% endfor %}
-			</select>
+		{# data-category-picker scopes the inline create script to this select, toggle and panel. #}
+		<div data-category-picker>
+			<div class="input-group">
+				<select class="form-select" id="category" name="category_id" data-category-select {{ ui_field_attrs(props) }}><option value="0">Uncategorised</option>
+				{% for category in categories %}
+					<option value="{{ category.id }}" {{ category.id == course.category_id ? 'selected' : '' }}>{{ category.name }}</option>
+				{% endfor %}
+				</select>
+				{% if can_manage_categories %}
+					{{ ui('action.button', {label: '+ New', variant: 'secondary', size: 'normal', type: 'button', category_create_toggle: true, expanded: false, controls: 'category-create-panel'}) }}
+				{% endif %}
+			</div>
 			{% if can_manage_categories %}
-				{{ ui('action.button', {label: '+ New', variant: 'secondary', size: 'normal', type: 'button'}) }}
-			{% endif %}
-		</div>
-		{% if can_manage_categories %}
-			<div class="border rounded p-3 mt-2 d-none" data-category-create-panel data-create-url="/admin/courses/categories/inline" data-csrf="{{ csrf }}">
-				<strong class="d-block mb-2">Create category</strong>
-				<input class="form-control mb-2" data-category-name maxlength="120" placeholder="Category name" {{ ui_field_attrs(props) }}>
-				<textarea class="form-control mb-2" data-category-description rows="2" placeholder="Description (optional)" {{ ui_field_attrs(props) }}></textarea>
-				<div class="small text-danger mb-2 d-none" data-category-error>
-				</div>
-				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+				<div class="border rounded p-3 mt-2 d-none" id="category-create-panel" data-category-create-panel data-create-url="/admin/courses/categories/inline" data-csrf="{{ csrf }}">
+					<strong class="d-block mb-2">Create category</strong>
+					<input class="form-control mb-2" data-category-name maxlength="120" placeholder="Category name" aria-label="New category name">
+					<textarea class="form-control mb-2" data-category-description rows="2" placeholder="Description (optional)" aria-label="New category description"></textarea>
+					<div class="small text-danger mb-2 d-none" data-category-error role="alert">
+					</div>
+					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 
-					{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add'}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button'}) }}
+						{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true}) }}
 
 {% endblock %}
 {% endembed %}
-			</div>
-		{% endif %}
+				</div>
+			{% endif %}
+		</div>
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Level', full_width: false, for: 'level'})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Level', span: 'quarter', for: 'level'})} %}
 {% block control %}
 
 		<input class="form-control" id="level" name="level" value="{{ course.level }}" placeholder="Beginner" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Estimated minutes', full_width: false, for: 'minutes'})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Estimated minutes', span: 'quarter', for: 'minutes'})} %}
 {% block control %}
 
 		<input class="form-control" id="minutes" type="number" min="0" name="estimated_minutes" value="{{ course.estimated_minutes }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Default access period in days', span: 'third', for: 'access-days', required: true})} %}
+{% block control %}
+
+		<input class="form-control" id="access-days" type="number" min="1" name="access_days" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+<input type="hidden" name="show_outline_on_intro" value="0">
+{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label:'Show generated outline on introduction', span: 'two-thirds'})} %}{% block control %}<input type="checkbox" name="show_outline_on_intro" value="1" {{ course.show_outline_on_intro|default(false) ? 'checked' : '' }}>{% endblock %}{% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Catalogue summary', full_width: true, for: 'summary'})} %}
 {% block control %}
 
@@ -78,17 +87,11 @@
 
 {% endblock %}
 {% endembed %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Course introduction',for:'course-introduction',full_width:true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="course-introduction" name="introduction_html" rows="6" {{ ui_field_attrs(props) }}>{{ course.introduction_html|default('') }}</textarea>{% endblock %}{% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Full description', full_width: true, for: 'description'})} %}
 {% block control %}
 
 		<textarea class="form-control cl-rich-editor" id="description" name="description_html" rows="10" {{ ui_field_attrs(props) }}>{{ course.description_html }}</textarea>
-
-{% endblock %}
-{% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Default access period in days', full_width: false, for: 'access-days', required: true})} %}
-{% block control %}
-
-		<input class="form-control" id="access-days" type="number" min="1" name="access_days" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

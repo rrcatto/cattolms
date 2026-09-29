@@ -756,7 +756,7 @@ final class CourseService
             return null;
         }
         $course['structure'] = $this->courseItems->availability((int) $course['id'], null, false);
-        $course['grade_bands'] = $this->courses->gradeBands((int) $course['id']);
+        $course['grade_bands'] = GradeScale::ranges($this->courses->gradeBands((int) $course['id']));
         $course['item_count'] = 0;
         $course['question_count'] = 0;
         $course['has_public_preview'] = false;
@@ -780,12 +780,54 @@ final class CourseService
             throw new InvalidArgumentException('The course does not exist.');
         }
         $course['structure'] = $this->courseItems->availability($courseId, null, false);
-        $course['grade_bands'] = $this->courses->gradeBands($courseId);
+        $course['grade_bands'] = GradeScale::ranges($this->courses->gradeBands($courseId));
         $course['history'] = $this->courses->history($courseId);
         $course['editors'] = $this->courses->courseEditors($courseId);
         $course['price_variants'] = $this->normalisePriceVariants($this->courses->priceVariants($courseId));
         $course['publication_validation'] = $this->courseItems->publicationValidation($courseId);
         return $course;
+    }
+
+    /**
+     * Course-editor overview: a count for every Course Item type in canonical order, section and
+     * question totals, and an outline number ("2.1.3") for each structure row.
+     * @param list<array<string,mixed>> $structure
+     * @return array{type_counts:list<array{type:string,label:string,count:int}>,item_count:int,section_count:int,question_count:int,outline:list<array<string,mixed>>}
+     */
+    public function contentSummary(array $structure): array
+    {
+        $counts = array_fill_keys(CourseItemService::TYPES, 0);
+        $itemCount = 0; $sectionCount = 0; $questionCount = 0; $numbers = []; $outline = [];
+        foreach ($structure as $node) {
+            $depth = max(1, (int) ($node['depth'] ?? 1));
+            $numbers = array_slice($numbers, 0, $depth);
+            $numbers[$depth - 1] = ($numbers[$depth - 1] ?? 0) + 1;
+            $isSection = ($node['node_type'] ?? '') === 'section';
+            $type = (string) ($node['item_type'] ?? '');
+            if ($isSection) {
+                $sectionCount++;
+            } else {
+                $itemCount++;
+                if (isset($counts[$type])) $counts[$type]++;
+                if (in_array($type, ['assessment', 'diagnostic'], true)) {
+                    $questionCount += count((array) ($this->courseItems->item((int) $node['course_item_id'])['questions'] ?? []));
+                }
+            }
+            $outline[] = [
+                'number' => implode('.', $numbers),
+                'depth' => $depth,
+                'is_section' => $isSection,
+                'title' => $isSection ? (string) ($node['section_title'] ?? '') : ((string) ($node['display_title_override'] ?? '') ?: (string) ($node['item_title'] ?? '')),
+                'type_label' => $isSection ? 'Section' : (CourseItemService::TYPE_LABELS[$type] ?? $type),
+                'assessment_role' => (string) ($node['assessment_role'] ?? ''),
+                'public_preview' => (bool) ($node['public_preview'] ?? false),
+            ];
+        }
+        $typeCounts = [];
+        foreach ($counts as $type => $count) {
+            $typeCounts[] = ['type' => $type, 'label' => CourseItemService::TYPE_PLURAL_LABELS[$type], 'count' => $count];
+        }
+        return ['type_counts' => $typeCounts, 'item_count' => $itemCount, 'section_count' => $sectionCount, 'question_count' => $questionCount, 'outline' => $outline];
     }
 
     /**
@@ -997,43 +1039,51 @@ final class CourseService
         $labels = (array) ($input['grade_label'] ?? []);
         $minimums = (array) ($input['minimum_percentage'] ?? []);
         $passing = (array) ($input['is_passing'] ?? []);
+        $removed = (array) ($input['remove_band'] ?? []);
         $bands = [];
         $seen = [];
         foreach ($codes as $index => $codeValue) {
+            if (array_key_exists((string) $index, $removed) || array_key_exists($index, $removed)) {
+                continue;
+            }
             $code = trim((string) $codeValue);
             $label = trim((string) ($labels[$index] ?? ''));
+            $minimum = trim((string) ($minimums[$index] ?? ''));
             if ($code === '' && $label === '') {
                 continue;
             }
             if ($code === '' || $label === '') {
-                throw new InvalidArgumentException('Every grade band requires a code and label.');
+                throw new InvalidArgumentException('Every grade band needs both a label and a code.');
+            }
+            if ($minimum === '' || !is_numeric($minimum)) {
+                throw new InvalidArgumentException('Grade band "' . $label . '" needs a From % between 0 and 100.');
             }
             if (isset($seen[strtolower($code)])) {
-                throw new InvalidArgumentException('Grade codes must be unique.');
+                throw new InvalidArgumentException('Each grade code must be unique; "' . $code . '" is used twice.');
             }
             $seen[strtolower($code)] = true;
             $bands[] = [
                 'grade_code' => mb_substr($code, 0, 24),
                 'grade_label' => mb_substr($label, 0, 120),
-                'minimum_percentage' => $this->percentage($minimums[$index] ?? 0),
+                'minimum_percentage' => $this->percentage($minimum),
                 'is_passing' => array_key_exists((string) $index, $passing) || array_key_exists($index, $passing),
             ];
         }
         if ($bands === []) {
-            throw new InvalidArgumentException('Define at least one grade band.');
+            throw new InvalidArgumentException('Keep at least one grade band.');
         }
         usort($bands, static fn(array $a, array $b): int => $b['minimum_percentage'] <=> $a['minimum_percentage']);
         $lastMinimum = null;
         foreach ($bands as $band) {
             $minimum = (float) $band['minimum_percentage'];
             if ($lastMinimum !== null && abs($minimum - $lastMinimum) < 0.0001) {
-                throw new InvalidArgumentException('Grade-band minimum percentages must be unique.');
+                throw new InvalidArgumentException('Two grade bands start at ' . GradeScale::number($minimum) . '%. Each band needs its own From %.');
             }
             $lastMinimum = $minimum;
         }
         $lowestBand = $bands[array_key_last($bands)];
         if ((float) $lowestBand['minimum_percentage'] !== 0.0) {
-            throw new InvalidArgumentException('The lowest grade band must begin at 0%.');
+            throw new InvalidArgumentException('The lowest grade band must start at 0%, so every score has a grade.');
         }
         $this->courses->replaceGradeBands($courseId, $bands);
         $this->courses->recordHistory($courseId, $userId, 'grade_bands.updated', 'course', $courseId, 'Course grade bands updated.', ['bands' => $bands]);
@@ -1199,6 +1249,26 @@ final class CourseService
             'css_bytes' => strlen($css),
         ]);
         return ['source_filename' => $original, 'css_bytes' => strlen($css)];
+    }
+
+    /** Save an edited presentation stylesheet exactly as authored; an empty value removes it. */
+    public function updatePresentationCss(int $courseId, string $css, int $userId): void
+    {
+        if ($this->courses->findById($courseId) === null) {
+            throw new InvalidArgumentException('The course does not exist.');
+        }
+        $css = str_replace("\r\n", "\n", $css);
+        $this->courses->updatePresentationCss($courseId, $css, $userId);
+        $this->courses->recordHistory(
+            $courseId,
+            $userId,
+            'course.presentation_edited',
+            'course',
+            $courseId,
+            trim($css) === '' ? 'Course presentation stylesheet removed.' : 'Course presentation stylesheet edited.',
+            ['css_bytes' => strlen($css)]
+        );
+        $this->audit->record($userId, 'course.presentation_edited', ['course_id' => $courseId, 'css_bytes' => strlen($css)]);
     }
 
     /**
