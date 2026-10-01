@@ -117,7 +117,7 @@
 									<input type="hidden" name="course_id" value="{{ course.id }}">
 									<div class="vstack gap-2 mb-3">
 										{% for price_index, price in course.price_variants %}
-											{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (price.price_label) ~ ' ' ~ (price.access_period_label) ~ ' access {% if price.label %} ' ~ (price.label) ~ ' {% endif %} {% if price.is_default %} ' ~ (ui('feedback.badge', {label: 'Default', tone: 'info'})) ~ ' {% endif %}'})} %}
+											{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: price.price_label ~ ' · ' ~ price.access_period_label ~ ' access' ~ (price.label ? ' · ' ~ price.label : '')})} %}
 {% block control %}
 <input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.is_default ? 'checked' : '' }} required>
 {% endblock %}

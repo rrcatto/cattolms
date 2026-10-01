@@ -47,8 +47,8 @@ final class UiComponentContractTest extends TestCase
         $html = \CattoLearning\Tests\Support\ComponentHarness::render('feedback.empty', ['heading' => '<script>bad()</script>', 'summary' => 'A & B']);
         self::assertStringContainsString('&lt;script&gt;', $html);
         self::assertStringNotContainsString('<script>', $html);
-        $grid = \CattoLearning\Tests\Support\ComponentHarness::render('catalogue.category-grid', ['navigation' => ['roots' => []]]);
-        self::assertStringContainsString('cl-category-grid', $grid);
+        $tree = \CattoLearning\Tests\Support\ComponentHarness::render('form.tree-select', ['id' => 'picker', 'name' => 'category', 'selected' => '', 'list_label' => 'Categories', 'items' => [['value' => '', 'label' => '<All>', 'depth' => 0, 'path' => '<All>']]]);
+        self::assertStringContainsString('&lt;All&gt;', $tree);
     }
 
     /** @return array<string,string> */
@@ -98,12 +98,9 @@ final class UiComponentContractTest extends TestCase
             'cl-ui-modal' => 'ui/overlay/modal',
             'cl-ui-accordion-section' => 'ui/overlay/accordion-section',
             'cl-ui-icon' => 'ui/helpers/icon',
-            'cl-category-tile' => 'ui/catalogue/category-tile',
-            'cl-filter-pill' => 'ui/catalogue/filter-pill',
             'cl-course-cards' => 'ui/catalogue/course-grid',
             'cl-tag-chip' => 'ui/catalogue/tag-chip',
-            'cl-category-grid' => 'ui/catalogue/category-grid',
-            'cl-filter-rail' => 'ui/catalogue/filter-rail',
+            'cl-ui-tree-select' => 'ui/forms/tree-select',
             'cl-tag-browser' => 'ui/catalogue/tag-browser',
             'cl-group-nav' => 'ui/layout/tabs',
             'cl-group-tab' => 'ui/layout/tabs',
@@ -173,12 +170,11 @@ final class UiComponentContractTest extends TestCase
     public function testNavigationKeepsRealUrlsAndServerAuthoritativePersistentState(): void
     {
         $templates = self::templates();
-        foreach (['category-tile', 'filter-pill'] as $component) {
-            $source = $templates['resources/views/ui/catalogue/' . $component . '.html.twig'];
-            foreach (['href="{{ item.href }}"', 'hx-get="{{ item.href }}"', 'hx-target="#catalogue-region"', 'hx-select="#catalogue-results"', 'hx-swap="innerHTML"', 'hx-push-url="true"', 'hx-select-oob="#catalogue-categories,#catalogue-search"', 'aria-current='] as $contract) {
-                self::assertStringContainsString($contract, $source, $component . ' must preserve ' . $contract);
-            }
+        $picker = $templates['resources/views/ui/forms/tree-select.html.twig'];
+        foreach (['popovertarget="{{ props.id }}-options"', ' popover>', 'type="submit"', 'name="{{ props.name }}"', 'value="{{ item.value }}"', 'aria-current="true"', 'autofocus'] as $contract) {
+            self::assertStringContainsString($contract, $picker, 'The category picker must keep ' . $contract . ' so it works without JavaScript.');
         }
+        self::assertStringNotContainsString('<script', $picker);
         $tagBrowser = $templates['resources/views/ui/catalogue/tag-browser.html.twig'];
         self::assertStringNotContainsString('<details', $tagBrowser);
         self::assertStringNotContainsString('|slice', $tagBrowser, 'The server must emit the complete tag vocabulary.');

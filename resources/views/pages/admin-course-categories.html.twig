@@ -8,6 +8,8 @@
 	{% set ph_action_href = '/admin/courses' %}
 	{% set ph_action_label = 'Courses' %}
 	{% include '@platform/partials/page-head.html.twig' %}
+	{# Loads the Stimulus app for the category-tree controller. After the page head: themes style the page head as the first element of main. #}
+	{{ importmap() }}
 	{#
 		The wrapper Courses, Requests and Enrolments use, which is the plain section that
 		admin-section.html.twig puts round a section body - no container of its own.
@@ -30,72 +32,20 @@
 {% endblock %}
 {% endembed %}
 
-					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-{% block header %}
-
-							<tr>
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Category'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'With sub-categories'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Order'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
-							</tr>
-
-{% endblock %}
-{% block body %}
-
-							{% for category_index, category in categories %}
-								<tr data-category-row>
-									<td>
-										<span class="cl-category-depth cl-category-depth-{{ category.level }}"><span class="cl-category-level" title="Level {{ category.level }}">L{{ category.level }}</span>{{ category.name }}</span>
-										{% if category.parent_name %}
-											<div class="small text-body-secondary cl-category-depth cl-category-depth-{{ category.level }}" style="border:0">
-												in {{ category.grandparent_name ? category.grandparent_name ~ ' › ' : '' }}{{ category.parent_name }}
-											</div>
-										{% endif %}
-										{% if category.description %}
-											<div class="small text-body-secondary mt-1">
-												{{ category.description }}
-											</div>
-										{% endif %}
-									</td>
-									<td>
-										{{ category.course_count }}
-									</td>
-									<td>
-										{{ category.descendant_course_count }}
-										{% if category.child_count %}
-											<div class="small text-body-secondary">
-												{{ category.child_count }} sub
-											</div>
-										{% endif %}
-									</td>
-									<td class="cell-actions">
-										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
-{% block body %}
-
-											<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
-												<input type="hidden" name="csrf" value="{{ csrf }}">
-												<input type="hidden" name="direction" value="up">
-												{{ ui('action.button', {label: '↑', variant: 'secondary', size: 'small', type: 'submit', disabled: category_index==0}) }}
-											</form>
-											<form action="/admin/courses/categories/{{ category.id }}/move" method="post">
-												<input type="hidden" name="csrf" value="{{ csrf }}">
-												<input type="hidden" name="direction" value="down">
-												{{ ui('action.button', {label: '↓', variant: 'secondary', size: 'small', type: 'submit', disabled: category_index+1==categories|length}) }}
-											</form>
-
-{% endblock %}
+					<div class="cl-category-tree-wrap" data-controller="category-tree">
+						<div data-category-tree-target="controls" hidden>
+							{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}{{ ui('action.button', {label: 'Expand all', variant: 'secondary', size: 'small', type: 'button', stimulus_action: 'category-tree#expandAll', icon: 'action-chevron'}) }}{{ ui('action.button', {label: 'Collapse all', variant: 'secondary', size: 'small', type: 'button', stimulus_action: 'category-tree#collapseAll', icon: 'action-chevron'}) }}{% endblock %}
 {% endembed %}
-									</td>
-									<td class="cell-actions">
-										{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/categories/' ~ (category.id)}) }}
-									</td>
-								</tr>
-							{% endfor %}
-
-{% endblock %}
-{% endembed %}
+						</div>
+						{% if category_tree %}
+							<ul class="cl-category-tree" aria-label="Course categories">
+								{% for node in category_tree %}{% include '@platform/partials/admin/category-tree-node.html.twig' with {node: node} %}{% endfor %}
+							</ul>
+						{% else %}
+							{{ ui('feedback.empty', {heading: 'No categories yet', summary: 'Create a top-level category to start the catalogue taxonomy.'}) }}
+						{% endif %}
+					</div>
 
 {% endblock %}
 {% endembed %}
@@ -118,16 +68,8 @@
 
 {% endblock %}
 {% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'field-admin-course-categories-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'Categories go three levels deep, so a sub-sub-category cannot hold children of its own.'})} %}
-{% block control %}
-
-							<select class="form-select" name="parent_id" id="field-admin-course-categories-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="0">None — a top-level category</option>
-							{% for parent_option in parent_options %}
-								<option value="{{ parent_option.id }}">{{ parent_option.parent_name ? parent_option.parent_name ~ ' › ' : '' }}{{ parent_option.name }}</option>
-							{% endfor %}
-							</select>
-
-{% endblock %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'new-category-parent-picker', help: 'Categories go three levels deep, so a level-3 category cannot hold children of its own.'})} %}
+{% block control %}{{ ui('form.tree-select', {id: 'new-category-parent-picker', name: 'parent_id', mode: 'field', items: parent_picker.items, selected: parent_picker.selected, placeholder: 'No parent', list_label: 'Possible parent categories'}) }}{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug optional', full_width: false, for: 'field-admin-course-categories-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}

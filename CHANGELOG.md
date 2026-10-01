@@ -1,6 +1,19 @@
 # Changelog
 
-**LMS version:** 0.8.7.2 **Date time:** 2026/09/29 SAST
+**LMS version:** 0.8.7.3 **Date time:** 2026/10/02 SAST
+
+## 2026-10-02 SAST — v0.8.7.3 Category pickers, category tree and one-row Gilded Noir navbar
+
+- `/courses` reads top to bottom: one card holding a compact category picker, then the search field, then the courses. The new canonical `form.tree-select` is one form-control row showing the chosen path (`Root › Branch › Leaf`) and opens a native popover listing the whole three-level tree, indented by level, with the current category highlighted and focused. Choosing submits the category ID; `/courses?category={id}` redirects to `/courses/category/{slug}`. The category grid, tile, filter rail and filter pill components and their CSS are removed (34 components).
+- `/admin/courses/categories` shows the taxonomy as a nested `ul`/`li` tree that opens at top level, with chevron disclosure buttons (`aria-expanded`/`aria-controls`), Expand all / Collapse all, Up/Down and Manage outside the disclosure, and open branches remembered for the browser session. A small Stimulus controller toggles server-rendered lists; without JavaScript every category stays visible.
+- The category Parent control (edit page and Create category modal) uses `form.tree-select` in field mode: radio options sent with the form's own Save. It offers No parent and level-1/level-2 categories only, and when editing excludes the category, its descendants and any parent that would push its sub-categories past level 3. The service now enforces the same depth rule and re-levels descendants in the same transaction when a category moves.
+- Gilded Noir keeps the brand and whole navigation on one centred row on desktop (above 1120px). The row may extend beyond the boxed container and tightens spacing on narrower desktops.
+- Fix the Course access options on the course page, which printed raw Twig tags and badge HTML, and the Platform name badge in Settings; a contract test rejects Twig tags inside strings and rendered components joined into labels.
+- Add up, down and chevron symbols to the core icon sprite; move buttons read Up/Down with arrows instead of a save tick.
+- Set PHPUnit's `memory_limit` to 512M in `phpunit.xml`; with a cold cache the suite exceeded PHP's default 128M and failed intermittently in `CourseComponentsIntegrationTest`.
+- No schema migration or dataset reset. Publish `public_html/css/catto-platform.css`, `public_html/js/platform-overrides.js`, `public_html/img/nav-icons.svg` and the compiled `public_html/assets/` to the served web root, and reinstall Gilded Noir with `composer themes:install -- --force` (its version stays 2.0.2).
+
+Validation: `SHELL_VERBOSITY=-1 composer qa` with a cold cache (PHPUnit 714 tests, 38,813 assertions), Twig lint of all 183 templates, Composer validation, AssetMapper compilation, `git diff --check`, both all-theme browser matrices, and all-theme browser checks of the catalogue picker, category tree, parent picker and Gilded Noir navbar, including native no-JavaScript use.
 
 ## 2026-09-29 SAST — v0.8.7.2 Tabbed course editor and grading scale
 

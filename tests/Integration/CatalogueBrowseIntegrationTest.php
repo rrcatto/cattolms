@@ -416,25 +416,66 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         }
     }
 
-    public function testFlatNavigationRetainsBothRailsAndActiveAncestors(): void
+    public function testCategoryPickerListsTheWholeTreeWithPathsAndTheChosenCategory(): void
     {
-        $model = $this->service->catalogueNavigation($this->service->category($this->leafId));
-        self::assertSame($this->rootId, (int) $model['active_root']['id']);
-        self::assertSame($this->branchId, (int) $model['active_tier_2']['id']);
-        self::assertSame($this->leafId, (int) $model['active_tier_3']['id']);
-        self::assertSame([$this->branchId], array_map('intval', array_column($model['tier_2'], 'id')));
-        self::assertSame([$this->leafId], array_map('intval', array_column($model['tier_3'], 'id')));
-        self::assertTrue($model['tier_2'][0]['is_active']);
-        self::assertTrue($model['tier_3'][0]['is_active']);
-        foreach (['roots', 'tier_2', 'tier_3'] as $rail) {
-            foreach ($model[$rail] as $item) {
-                self::assertArrayNotHasKey('children', $item, 'The view model must not offer recursive rendering.');
-                self::assertSame('/courses/category/' . $item['slug'], $item['href']);
+        $picker = $this->service->catalogueCategoryPicker($this->service->category($this->leafId));
+        self::assertSame((string) $this->leafId, $picker['selected']);
+        self::assertSame(['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories'], $picker['items'][0]);
+        $values = array_column($picker['items'], 'value');
+        $item = static function (int $id) use ($picker, $values): array {
+            $index = array_search((string) $id, $values, true);
+            self::assertIsInt($index, 'Category ' . $id . ' is offered by the picker.');
+            return $picker['items'][$index];
+        };
+        $root = $this->service->category($this->rootId); $branch = $this->service->category($this->branchId); $leaf = $this->service->category($this->leafId);
+        self::assertSame(1, $item($this->rootId)['depth']);
+        self::assertSame(2, $item($this->branchId)['depth']);
+        self::assertSame(3, $item($this->leafId)['depth']);
+        self::assertSame($root['name'] . ' › ' . $branch['name'] . ' › ' . $leaf['name'], $item($this->leafId)['path']);
+        $position = static fn(int $id): int|false => array_search((string) $id, $values, true);
+        self::assertLessThan($position($this->branchId), $position($this->rootId), 'A parent is listed before its children.');
+        self::assertLessThan($position($this->leafId), $position($this->branchId));
+        self::assertSame('', $this->service->catalogueCategoryPicker(null)['selected']);
+    }
+
+    public function testManagementTreeNestsEachCategoryUnderItsParent(): void
+    {
+        $find = static function (array $nodes, int $id) use (&$find): ?array {
+            foreach ($nodes as $node) {
+                if ((int) $node['id'] === $id) return $node;
+                $found = $find($node['children'], $id);
+                if ($found !== null) return $found;
             }
-        }
-        $root = $this->service->catalogueNavigation($this->service->category($this->rootId));
-        self::assertNotEmpty($root['tier_2']);
-        self::assertSame([], $root['tier_3']);
+            return null;
+        };
+        $tree = $this->service->categoryManagementTree();
+        $root = $find($tree, $this->rootId);
+        self::assertNotNull($root);
+        self::assertContains($this->rootId, array_map(static fn(array $node): int => (int) $node['id'], $tree), 'Top-level categories are the roots.');
+        self::assertSame([$this->branchId], array_map(static fn(array $node): int => (int) $node['id'], $root['children']));
+        self::assertSame([$this->leafId], array_map(static fn(array $node): int => (int) $node['id'], $root['children'][0]['children']));
+        self::assertSame([], $root['children'][0]['children'][0]['children']);
+        self::assertTrue($root['children'][0]['is_first_sibling']);
+        self::assertTrue($root['children'][0]['is_last_sibling']);
+        self::assertTrue($tree[0]['is_first_sibling']);
+        self::assertTrue($tree[array_key_last($tree)]['is_last_sibling']);
+    }
+
+    public function testChoosingACategorySubmitsItsIdAndLandsOnItsCategoryUrl(): void
+    {
+        self::assertSame('/courses/category/' . $this->rootSlug, $this->redirectTarget('/courses?category=' . $this->rootId));
+        self::assertSame('/courses', $this->redirectTarget('/courses/category/' . $this->rootSlug . '?category='));
+        $page = $this->page('/courses/category/' . $this->rootSlug);
+        $toggle = $page->query('//form[@id="catalogue-category" and @method="get" and @action="/courses"]//button[@popovertarget="catalogue-category-picker-options"]');
+        self::assertSame(1, $toggle->length);
+        $leaf = $this->service->category($this->rootId);
+        self::assertSame($leaf['name'], trim((string) $toggle->item(0)?->textContent));
+        self::assertSame(1, $page->query('//*[@popover and @id="catalogue-category-picker-options"]//button[@type="submit" and @name="category" and @value="' . $this->rootId . '" and @aria-current="true" and @autofocus]')->length);
+        self::assertSame(0, $page->query('//*[contains(@class,"cl-category-tile") or contains(@class,"cl-filter-rail")]')->length);
+        $form = $page->query('//form[@id="catalogue-category"]')->item(0);
+        $search = $page->query('//form[@data-server-search]')->item(0);
+        self::assertNotNull($form); self::assertNotNull($search);
+        self::assertTrue(($form->compareDocumentPosition($search) & 4) === 4, 'The category picker comes before the search field.');
     }
 
     public function testLiveCategoryRouteUsesDirectCoursesAndSearchUsesDescendants(): void
@@ -442,7 +483,7 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         $base = '/courses/category/' . $this->rootSlug;
         $normal = $this->page($base);
         self::assertSame(1, $normal->query('//article[contains(@class,"cl-course-card")]')->length);
-        self::assertSame(1, $normal->query('//a[contains(@class,"cl-category-tile") and @aria-current]')->length);
+        self::assertSame(1, $normal->query('//button[@name="category" and @value="' . $this->rootId . '" and @aria-current="true"]')->length);
         self::assertSame(1, $normal->query('//form[@action="' . $base . '" and @data-server-search]')->length);
         $search = $this->page($base . '?catalogue_q=Browse%20Seed%20Course');
         self::assertSame(3, $search->query('//article[contains(@class,"cl-course-card")]')->length);
@@ -471,8 +512,8 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     public function testVocabularyIncludesUnusedTagsAndEmptyCategories(): void
     {
         $empty = $this->fixture->createCategory('Empty ' . $this->fixture->suffix(), 'empty-' . $this->fixture->suffix());
-        $navigation = $this->service->catalogueNavigation($this->service->category($empty));
-        self::assertContains($empty, array_map('intval', array_column($navigation['roots'], 'id')));
+        $picker = $this->service->catalogueCategoryPicker(null);
+        self::assertContains((string) $empty, array_column($picker['items'], 'value'));
         $this->db->executeStatement('DELETE FROM course_tags WHERE tag_id = :tag', ['tag' => $this->tagId]);
         $tags = array_column($this->service->tagIndex(), null, 'id');
         self::assertArrayHasKey($this->tagId, $tags);
@@ -534,6 +575,19 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     }
 
     /** Actual route dispatch and strict Twig rendering, with no client-side rendering involved. */
+    private function redirectTarget(string $url): string
+    {
+        $boot = \CattoLearning\Application\CliBootstrap::boot();
+        $kernel = new \CattoLearning\Kernel('test', true, $boot['instance_root']);
+        try {
+            $response = $kernel->handle(\Symfony\Component\HttpFoundation\Request::create($url, 'GET'));
+            self::assertContains($response->getStatusCode(), [302, 303], $url . ' must redirect.');
+            return (string) $response->headers->get('Location');
+        } finally {
+            $kernel->shutdown();
+        }
+    }
+
     private function page(string $url, bool $htmx = false): \DOMXPath
     {
         $boot = \CattoLearning\Application\CliBootstrap::boot();

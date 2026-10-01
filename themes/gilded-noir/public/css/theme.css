@@ -2620,3 +2620,33 @@ body.gn-body.cl-page-texture {
 .cl-footer .cl-footer-nav{display:block}
 .cl-footer .cl-footer-social{display:flex}
 .cl-page-context{color:var(--gn-on-dark-muted);margin-top:0;margin-bottom:26px}
+
+/* One-row navbar (owner instruction, 2026/10/02). On desktop the brand and the whole navigation stay
+   on a single row, centred over the page. The row sizes to its content and may extend beyond the
+   boxed container, but never past the viewport; spacing tightens step by step on narrower desktops so
+   it still fits down to the width where core switches to the Menu button (1120px). */
+@media (min-width: 1121px) {
+  .cl-header-inner {
+    width: max-content;
+    min-width: min(var(--gn-shell-width), calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
+  .cl-navigation { flex-wrap: nowrap; margin-left: 0; }
+  .cl-nav-link { white-space: nowrap; }
+}
+@media (min-width: 1121px) and (max-width: 1700px) {
+  .cl-navigation { gap: 2px; }
+  .cl-nav-link { gap: 6px; padding: 8px 10px; letter-spacing: .02em; }
+}
+@media (min-width: 1121px) and (max-width: 1440px) {
+  .cl-header-inner { gap: 12px; }
+  .cl-nav-link { padding: 7px 8px; font-size: .8rem; }
+  .cl-identity-compact { max-width: 13rem; }
+}
+@media (min-width: 1121px) and (max-width: 1300px) {
+  .cl-brand-copy small { display: none; }
+  .cl-nav-link .cl-nav-icon { display: none; }
+  .cl-identity-roles { display: none; }
+}

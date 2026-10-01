@@ -6,6 +6,6 @@
 		{{ importmap() }}
 		{{ ui('catalogue.tag-browser', {tags: tag_index, selected_slug: selected_tag.slug|default('')}) }}
 		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}
-		{{ ui('catalogue.workspace', {workspace: workspace, navigation: {}, courses: courses, catalogue_pagination: catalogue_pagination}) }}
+		{{ ui('catalogue.workspace', {workspace: workspace, courses: courses, catalogue_pagination: catalogue_pagination}) }}
 	</section>
 {% endblock %}

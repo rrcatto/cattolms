@@ -1,12 +1,20 @@
-{# The catalogue composes canonical platform controls and keeps the category grid above the workspace. #}
+{# The catalogue reads top to bottom: choose a category (optional), search, then the courses. #}
 {% extends layout %}
 {% block page_body %}
-	{% include '@platform/partials/page-head.html.twig' with {ph_kicker: 'Course catalogue', ph_title: 'Browse by category', ph_lead: 'Choose a subject or search for a course.', ph_action_href: '/courses/tags', ph_action_label: 'Browse by tag'} %}
+	{% include '@platform/partials/page-head.html.twig' with {ph_kicker: 'Course catalogue', ph_title: 'Browse by category', ph_lead: 'Choose a category, search, or both.', ph_action_href: '/courses/tags', ph_action_label: 'Browse by tag'} %}
 	<section class="cl-page-section container-fluid cl-container-wide py-4">
-		<div id="catalogue-search">
-			{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}
-		</div>
-		{{ ui('catalogue.category-grid', {navigation: catalogue_navigation}) }}
-		{{ ui('catalogue.workspace', {workspace: workspace, navigation: catalogue_navigation, courses: courses, catalogue_pagination: catalogue_pagination}) }}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			<form id="catalogue-category" class="cl-catalogue-category" method="get" action="/courses">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Category', for: 'catalogue-category-picker', help: 'Courses filed in the category you choose are shown below. Searching includes its subcategories.'})} %}
+{% block control %}{{ ui('form.tree-select', {id: 'catalogue-category-picker', name: 'category', items: category_picker.items, selected: category_picker.selected, placeholder: 'All categories', list_label: 'Course categories'}) }}{% endblock %}
+{% endembed %}
+			</form>
+			<div id="catalogue-search">
+				{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'catalogue', ds_label: 'Search courses', ds_value: catalogue_search, ds_action: catalogue_pagination.base, ds_push_url: true} %}
+			</div>
+{% endblock %}
+{% endembed %}
+		{{ ui('catalogue.workspace', {workspace: workspace, courses: courses, catalogue_pagination: catalogue_pagination}) }}
 	</section>
 {% endblock %}

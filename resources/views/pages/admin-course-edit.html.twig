@@ -145,8 +145,8 @@
 								<td>
 									{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
-										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: '↑', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', disabled: price_index==0}) }}</form>
-										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: '↓', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', disabled: price_index+1==course.price_variants|length}) }}</form>
+										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: price_index==0}) }}</form>
+										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: price_index+1==course.price_variants|length}) }}</form>
 {% endblock %}
 {% endembed %}
 								</td>

@@ -296,35 +296,23 @@ final class CourseService
     }
 
     /**
-     * Non-recursive navigation for the three-level public taxonomy. No course rows are loaded.
-     * Each rail is one bounded repository read; ancestors orient copied category URLs.
+     * The catalogue's category picker: every category in tree order with its depth and full
+     * "Root › Branch › Leaf" path, preceded by an All categories choice. Values are category IDs.
      *
-     * @param array<string,mixed>|null $category
-     * @return array<string,mixed>
+     * @param array<string,mixed>|null $selected
+     * @return array{items:list<array{value:string,label:string,depth:int,path:string}>,selected:string}
      */
-    public function catalogueNavigation(?array $category): array
+    public function catalogueCategoryPicker(?array $selected): array
     {
-        $trail = $category === null ? [] : $this->courses->categoryAncestry((int) $category['id']);
-        $activeRoot = $trail[0] ?? null;
-        $activeTier2 = $trail[1] ?? null;
-        $activeTier3 = $trail[2] ?? null;
-        $items = static function (array $rows, ?array $active): array {
-            return array_map(static fn(array $row): array => $row + [
-                'href' => '/courses/category/' . (string) $row['slug'],
-                'is_active' => $active !== null && (int) $row['id'] === (int) $active['id'],
-                'icon_svg' => '',
-            ], $rows);
-        };
-
-        return [
-            'roots' => $items($this->courses->browsableChildCategories(null), $activeRoot),
-            'active_root' => $activeRoot,
-            'tier_2' => $activeRoot === null ? [] : $items($this->courses->browsableChildCategories((int) $activeRoot['id']), $activeTier2),
-            'active_tier_2' => $activeTier2,
-            'tier_3' => $activeTier2 === null ? [] : $items($this->courses->browsableChildCategories((int) $activeTier2['id']), $activeTier3),
-            'active_tier_3' => $activeTier3,
-            'trail' => $items($trail, $category),
-        ];
+        $items = [['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories']];
+        $paths = [];
+        foreach ($this->courses->categoryTree() as $category) {
+            $parent = $category['parent_id'] === null ? null : (int) $category['parent_id'];
+            $path = ($parent !== null && isset($paths[$parent]) ? $paths[$parent] . ' › ' : '') . (string) $category['name'];
+            $paths[(int) $category['id']] = $path;
+            $items[] = ['value' => (string) $category['id'], 'label' => (string) $category['name'], 'depth' => max(1, min(3, (int) $category['level'])), 'path' => $path];
+        }
+        return ['items' => $items, 'selected' => $selected === null ? '' : (string) $selected['id']];
     }
 
     /**
@@ -622,13 +610,41 @@ final class CourseService
     }
 
     /**
-     * The categories a category may be filed under.
+     * The Parent category picker: "No parent", then every level-1 and level-2 category in tree
+     * order that the category may legally sit under. When editing, the category itself, its
+     * descendants and any parent that would push its own sub-categories past level 3 are left out.
      *
-     * @return list<array<string,mixed>>
+     * @return array{items:list<array{value:string,label:string,depth:int,path:string}>,selected:string}
      */
-    public function categoryParentOptions(int $excludeId = 0): array
+    public function categoryParentPicker(?int $categoryId = null): array
     {
-        return $this->courses->categoryParentOptions($excludeId);
+        $tree = $this->courses->categoryTree();
+        $paths = []; $parents = []; $levels = [];
+        foreach ($tree as $row) {
+            $id = (int) $row['id'];
+            $parent = $row['parent_id'] === null ? 0 : (int) $row['parent_id'];
+            $parents[$id] = $parent;
+            $levels[$id] = (int) $row['level'];
+            $paths[$id] = ($parent > 0 && isset($paths[$parent]) ? $paths[$parent] . ' › ' : '') . (string) $row['name'];
+        }
+        $excluded = []; $height = 0;
+        if ($categoryId !== null) {
+            $excluded[$categoryId] = true;
+            foreach ($parents as $id => $parent) {
+                // A category is beneath this one when walking up its (at most three) ancestors meets it.
+                for ($walk = $parent, $steps = 1; $walk > 0 && $steps <= 3; $walk = $parents[$walk] ?? 0, $steps++) {
+                    if ($walk === $categoryId) { $excluded[$id] = true; $height = max($height, $steps); break; }
+                }
+            }
+        }
+        $items = [['value' => '0', 'label' => 'No parent (top-level category)', 'depth' => 0, 'path' => 'No parent']];
+        foreach ($tree as $row) {
+            $id = (int) $row['id'];
+            if (isset($excluded[$id]) || $levels[$id] >= 3 || $levels[$id] + 1 + $height > 3) { continue; }
+            $items[] = ['value' => (string) $id, 'label' => (string) $row['name'], 'depth' => $levels[$id], 'path' => $paths[$id]];
+        }
+        $current = $categoryId === null ? 0 : ($parents[$categoryId] ?? 0);
+        return ['items' => $items, 'selected' => (string) $current];
     }
 
     /** @return array<string,mixed> */
@@ -668,13 +684,50 @@ final class CourseService
     {
         $existing = $this->category($categoryId);
         $data = $this->validateCategoryInput($input, $categoryId);
-        $this->courses->updateCategory($categoryId, $data);
+        // One transaction: moving a category re-levels its descendants, and a half-applied move
+        // would leave rows the depth trigger rejects on their next save.
+        $this->transactions->run(fn() => $this->courses->updateCategory($categoryId, $data));
         $this->audit->record($userId, 'course_category.updated', [
             'category_id' => $categoryId,
             'name' => $data['name'],
             'slug' => $data['slug'],
             'previous_name' => (string) $existing['name'],
         ]);
+    }
+
+    /**
+     * The category list nested into its three-level tree for the management page. Each node keeps
+     * its counts, gains its children in tree order, and knows whether it is the first or last of
+     * its siblings, which is the range the move buttons work within.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function categoryManagementTree(): array
+    {
+        $nodes = [];
+        $roots = [];
+        foreach ($this->courses->categories() as $category) {
+            $id = (int) $category['id'];
+            $nodes[$id] = $category + ['children' => []];
+            $parent = $category['parent_id'] === null ? 0 : (int) $category['parent_id'];
+            if ($parent > 0 && isset($nodes[$parent])) {
+                $nodes[$parent]['children'][] = $id;
+            } else {
+                $roots[] = $id;
+            }
+        }
+        $build = static function (array $ids) use (&$build, $nodes): array {
+            $branch = [];
+            foreach (array_values($ids) as $index => $id) {
+                $node = $nodes[$id];
+                $node['children'] = $build($node['children']);
+                $node['is_first_sibling'] = $index === 0;
+                $node['is_last_sibling'] = $index === count($ids) - 1;
+                $branch[] = $node;
+            }
+            return $branch;
+        };
+        return $build($roots);
     }
 
     public function moveCategory(int $categoryId, string $direction, int $userId): void
@@ -1437,6 +1490,7 @@ final class CourseService
         // explanation; the database refuses it as well, but a constraint violation is not a
         // sentence anybody can act on.
         $parentId = max(0, (int) ($input['parent_id'] ?? 0));
+        $parentLevel = 0;
         if ($parentId > 0) {
             if ($parentId === (int) $existingCategoryId) {
                 throw new InvalidArgumentException('A course category cannot be filed under itself.');
@@ -1445,13 +1499,22 @@ final class CourseService
             if ($parent === null) {
                 throw new InvalidArgumentException('Choose a parent category that exists.');
             }
-            if ((int) $parent['level'] >= 3) {
+            $parentLevel = (int) $parent['level'];
+            if ($parentLevel >= 3) {
                 throw new InvalidArgumentException(
                     'Course categories go three levels deep, so "' . (string) $parent['name'] . '" cannot hold sub-categories.'
                 );
             }
             if ($existingCategoryId !== null && $this->categoryIsDescendantOf($parentId, $existingCategoryId)) {
                 throw new InvalidArgumentException('A course category cannot be filed under one of its own sub-categories.');
+            }
+        }
+        // Its own sub-categories move with it, so the deepest of them must still land on level 3 or above.
+        if ($existingCategoryId !== null) {
+            $below = $this->courses->categoryDescendantDepth($existingCategoryId);
+            $newLevel = $parentLevel + 1;
+            if ($newLevel + $below > 3) {
+                throw new InvalidArgumentException('Moving this category there would push its sub-categories below the third level. Choose a higher parent, or move its sub-categories first.');
             }
         }
 

@@ -173,7 +173,7 @@ focus restoration. Theme stacking contexts must never cover an open modal.
 Tables use the core width/row system. Row menus must escape their cells without clipping. Do not
 hide totals, pagers, actions or columns to create a different functional screen. Search and paired
 pagination retain real GET URLs; themes do not rebuild either control. Catalogue grids retain core
-responsive columns, persistent Tier 1 tiles, flat Tier 2/Tier 3 rails and the shared results workspace.
+responsive columns, the compact `form.tree-select` category picker and the shared results workspace.
 
 The Contact `website` field inside `cl-honeypot` is deliberately invisible and non-interactive.
 Never style it as a human-facing field or override its hidden treatment.

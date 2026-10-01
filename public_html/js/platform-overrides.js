@@ -212,6 +212,26 @@
       create.addEventListener('click',async()=>{ const categoryName=name.value.trim(); if(!categoryName){if(error){error.textContent='Enter a category name.';error.classList.remove('d-none');}name.focus();return;} create.disabled=true; const form=new FormData(); form.append('csrf',panel.dataset.csrf||''); form.append('category_name',categoryName); form.append('category_description',description?description.value.trim():''); form.append('is_active','1'); try{const response=await fetch(panel.dataset.createUrl||'/admin/courses/categories/inline',{method:'POST',body:form,credentials:'same-origin',headers:{Accept:'application/json'}});const data=await response.json().catch(()=>({}));if(!response.ok||!data.category)throw new Error(data.error||'The category could not be created.');const option=document.createElement('option');option.value=String(data.category.id);option.textContent=String(data.category.name);option.selected=true;select.append(option);name.value='';if(description)description.value='';setOpen(false);}catch(exception){if(error){error.textContent=exception instanceof Error?exception.message:'The category could not be created.';error.classList.remove('d-none');}}finally{create.disabled=false;} });
     });
 
+    /* Tree select in field mode: the options are radios in a native popover, so the choice already
+       submits with the form. This shows the chosen path in the closed control and closes the list
+       on a pointer choice, Enter or Space. Arrow keys move the choice and leave the list open. */
+    document.querySelectorAll('[data-tree-select="field"]').forEach(select => {
+      const panel = select.querySelector('[popover]'), value = select.querySelector('.cl-ui-tree-select-value');
+      if (!panel || !value) return;
+      const show = radio => { value.textContent = radio.dataset.treeSelectPath || ''; };
+      const close = () => { if (panel.matches(':popover-open')) panel.hidePopover(); };
+      panel.addEventListener('change', event => { if (event.target.matches('input[type="radio"]')) show(event.target); });
+      panel.addEventListener('click', event => { if (event.detail > 0 && event.target.closest('label')) close(); });
+      panel.addEventListener('keydown', event => {
+        if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('input[type="radio"]')) {
+          event.preventDefault();
+          event.target.checked = true;
+          show(event.target);
+          close();
+        }
+      });
+    });
+
     const passwordInput=document.querySelector('form[action="/admin/settings/mail"] input[name="smtp_password"]');
     if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const toggle=document.getElementById('smtp-password-toggle');if(!(toggle instanceof HTMLButtonElement))return;toggle.hidden=false;toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.querySelector('span').textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
 

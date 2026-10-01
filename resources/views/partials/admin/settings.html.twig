@@ -20,7 +20,7 @@
 {% block body %}
 
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Platform name ' ~ (ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info'})), full_width: true, for: 'field-settings-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Platform name', full_width: true, for: 'field-settings-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
 				<input name="platform_name" value="{{ platform_name }}" id="field-settings-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
@@ -28,7 +28,7 @@
 {% endblock %}
 {% block help_content %}
 
-					Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
+					{{ ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info', size: 'small'}) }} Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
 
 {% endblock %}
 {% endembed %}
