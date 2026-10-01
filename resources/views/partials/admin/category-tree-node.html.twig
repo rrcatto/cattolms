@@ -1,0 +1,25 @@
+{# One category in the management tree. The disclosure button holds the chevron and the name; the move and Manage actions sit beside it, outside the button. Child lists are rendered open, so every category is reachable without JavaScript; the category-tree controller collapses them. #}
+<li class="cl-category-tree-item" data-level="{{ node.level }}">
+	<div class="cl-category-tree-row">
+		<div class="cl-category-tree-label">
+			{% if node.children %}
+				<button type="button" class="cl-category-tree-toggle" aria-expanded="true" aria-controls="category-branch-{{ node.id }}" data-action="category-tree#toggle">{{ ui('icon', {name: 'action-chevron', decorative: true}) }}<span class="cl-category-tree-name">{{ node.name }}</span></button>
+			{% else %}
+				<span class="cl-category-tree-leaf"><span class="cl-category-tree-spacer" aria-hidden="true"></span><span class="cl-category-tree-name">{{ node.name }}</span></span>
+			{% endif %}
+			<span class="cl-category-tree-meta">{{ node.course_count }} course{{ node.course_count == 1 ? '' : 's' }}{% if node.children %} · {{ node.descendant_course_count }} with sub-categories · {{ node.children|length }} sub-categor{{ node.children|length == 1 ? 'y' : 'ies' }}{% endif %}</span>
+		</div>
+		{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+{% block body %}
+			<form action="/admin/courses/categories/{{ node.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move ' ~ node.name ~ ' up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: node.is_first_sibling}) }}</form>
+			<form action="/admin/courses/categories/{{ node.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move ' ~ node.name ~ ' down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: node.is_last_sibling}) }}</form>
+			{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/categories/' ~ node.id, aria_label: 'Manage ' ~ node.name}) }}
+{% endblock %}
+{% endembed %}
+	</div>
+	{% if node.children %}
+		<ul class="cl-category-tree-children" id="category-branch-{{ node.id }}" aria-label="Sub-categories of {{ node.name }}">
+			{% for child in node.children %}{% include '@platform/partials/admin/category-tree-node.html.twig' with {node: child} %}{% endfor %}
+		</ul>
+	{% endif %}
+</li>

@@ -1,0 +1,12 @@
+{# A one-row control that opens a native popover listing a hierarchy.
+   submit mode: each option is a submit button carrying its value, so choosing one submits the enclosing form.
+   field mode: each option is a radio input, so the choice is stored and sent with the form's own Save; core script closes the list and shows the chosen path. Both work without JavaScript. #}
+{% set chosen = props.items|filter(item => item.value == props.selected)|first %}
+<div class="cl-ui-tree-select"{% if props.mode == 'field' %} data-tree-select="field"{% endif %}>
+<button type="button" class="form-select cl-ui-tree-select-toggle" id="{{ props.id }}" popovertarget="{{ props.id }}-options" aria-haspopup="true"><span class="cl-ui-tree-select-value">{{ chosen ? chosen.path : props.placeholder }}</span></button>
+<div class="cl-ui-tree-select-panel" id="{{ props.id }}-options" popover>
+<ul class="cl-ui-tree-select-list"{% if props.mode == 'field' %} role="radiogroup"{% endif %} aria-label="{{ props.list_label }}">
+{% for item in props.items %}{% set is_chosen = item.value == props.selected %}<li>{% if props.mode == 'field' %}<label class="cl-ui-tree-select-option" data-depth="{{ item.depth }}"><input type="radio" name="{{ props.name }}" value="{{ item.value }}" data-tree-select-path="{{ item.path }}"{% if item.depth > 1 %} aria-label="{{ item.path }}"{% endif %}{% if is_chosen %} checked autofocus{% endif %}><span>{{ item.label }}</span></label>{% else %}<button type="submit" class="cl-ui-tree-select-option{% if is_chosen %} is-selected{% endif %}" name="{{ props.name }}" value="{{ item.value }}" data-depth="{{ item.depth }}"{% if item.depth > 1 %} aria-label="{{ item.path }}"{% endif %}{% if is_chosen %} aria-current="true" autofocus{% endif %}>{{ item.label }}</button>{% endif %}</li>{% endfor %}
+</ul>
+</div>
+</div>

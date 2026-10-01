@@ -771,30 +771,19 @@ final class CourseRepository
     }
 
     /**
-     * The categories a category may be filed under: every active category above the deepest level.
-     *
-     * A category being edited cannot become its own parent, nor the child of one of its own
-     * descendants - that would make a cycle the depth trigger cannot see, because the trigger only
-     * compares a row against its immediate parent.
-     *
-     * @return list<array<string,mixed>>
+     * How many levels sit beneath a category: 0 with no children, 1 with children, 2 with
+     * grandchildren. The three-level cap bounds this to two joins.
      */
-    public function categoryParentOptions(int $excludeId = 0): array
+    public function categoryDescendantDepth(int $categoryId): int
     {
-        return $this->normaliseRows($this->db->fetchAllAssociative(
-            'SELECT cc.id, cc.name, cc.level, parent.name AS parent_name
-             FROM course_categories cc
-             LEFT JOIN course_categories parent ON parent.id = cc.parent_id
-             WHERE cc.level < 3
-               AND cc.id <> :exclude
-               AND cc.parent_id IS DISTINCT FROM :exclude_parent
-               AND NOT EXISTS (
-                   SELECT 1 FROM course_categories a
-                   WHERE a.id = cc.parent_id AND a.parent_id = :exclude_grandparent
-               )
-             ORDER BY cc.level, cc.position, cc.name',
-            ['exclude' => $excludeId, 'exclude_parent' => $excludeId, 'exclude_grandparent' => $excludeId]
-        ));
+        return (int) $this->db->fetchOne(
+            'SELECT CASE
+                      WHEN EXISTS (SELECT 1 FROM course_categories c JOIN course_categories g ON g.parent_id = c.id WHERE c.parent_id = :id) THEN 2
+                      WHEN EXISTS (SELECT 1 FROM course_categories c WHERE c.parent_id = :id) THEN 1
+                      ELSE 0
+                    END',
+            ['id' => $categoryId]
+        );
     }
 
     /** @return array<string,mixed>|null */
@@ -854,6 +843,28 @@ final class CourseRepository
         );
 
         return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
+    }
+
+    /**
+     * The whole three-level taxonomy in tree order (each parent immediately before its children),
+     * with no counts, for the catalogue's category picker.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function categoryTree(): array
+    {
+        return $this->normaliseRows($this->db->fetchAllAssociative(
+            "SELECT cc.id, cc.parent_id, cc.level, cc.name, cc.slug
+             FROM course_categories cc
+             LEFT JOIN course_categories parent ON parent.id = cc.parent_id
+             LEFT JOIN course_categories grandparent ON grandparent.id = parent.parent_id
+             ORDER BY COALESCE(grandparent.position, parent.position, cc.position),
+                      COALESCE(grandparent.name, parent.name, cc.name),
+                      CASE cc.level WHEN 1 THEN -1 WHEN 2 THEN cc.position ELSE parent.position END,
+                      CASE cc.level WHEN 1 THEN '' WHEN 2 THEN cc.name ELSE parent.name END,
+                      CASE cc.level WHEN 3 THEN cc.position ELSE -1 END,
+                      cc.name"
+        ));
     }
 
     /**
@@ -1405,6 +1416,15 @@ final class CourseRepository
         }
 
         $this->db->executeStatement('UPDATE course_categories SET ' . $set . ' WHERE id=:id', $params);
+        if (array_key_exists('parent_id', $data)) {
+            // Descendants follow their parent's new level, children first so the depth trigger
+            // always compares a row against an already re-levelled parent.
+            $this->db->executeStatement('UPDATE course_categories SET level = :level WHERE parent_id = :id', ['level' => $params['level'] + 1, 'id' => $categoryId]);
+            $this->db->executeStatement(
+                'UPDATE course_categories SET level = :level WHERE parent_id IN (SELECT id FROM course_categories WHERE parent_id = :id)',
+                ['level' => $params['level'] + 2, 'id' => $categoryId]
+            );
+        }
     }
 
     /**

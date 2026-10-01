@@ -45,6 +45,7 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 | `form.field` | `forms/field.html.twig` | `control`, `help_content` |
 | `form.actions` | `forms/form-actions.html.twig` | `primary_actions`, `secondary_actions` |
 | `form.choice` | `forms/choice-field.html.twig` | `control` |
+| `form.tree-select` | `forms/tree-select.html.twig` | — |
 | `form.compact-action` | `forms/compact-action.html.twig` | `body` |
 | `data.table` | `data/data-table.html.twig` | `columns`, `header`, `body`, `footer`, `empty` |
 | `data.dataset` | `data/dataset-layout.html.twig` | `toolbar`, `results`, `preview` |
@@ -60,10 +61,6 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 | `overlay.modal` | `overlay/modal.html.twig` | `modal_body`, `modal_actions`, `additional_forms` |
 | `overlay.accordion-section` | `overlay/accordion-section.html.twig` | `actions`, `body` |
 | `icon` | `helpers/icon.html.twig` | — |
-| `catalogue.category-grid` | `catalogue/category-grid.html.twig` | `surface_body` |
-| `catalogue.category-tile` | `catalogue/category-tile.html.twig` | — |
-| `catalogue.filter-rail` | `catalogue/filter-rail.html.twig` | — |
-| `catalogue.filter-pill` | `catalogue/filter-pill.html.twig` | — |
 | `catalogue.course-grid` | `catalogue/course-grid.html.twig` | — |
 | `catalogue.workspace` | `catalogue/catalogue-workspace.html.twig` | `surface_body` |
 | `catalogue.tag-browser` | `catalogue/tag-browser.html.twig` | `surface_body` |
@@ -74,7 +71,7 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 - Surfaces: standard or compact; optional section spacing, stable ID, sticky placement and semantic tone. Section grids: auto or one to four columns; form grids: auto, one, two or `wide`. A wide grid has twelve columns; `form.field` and `form.choice` take `span` (`quarter`, `third`, `half` or `two-thirds`), default to half the row, and use `full_width` for the whole row. Spans collapse at tablet and phone widths. Headings: h2 or h3. Tabs are native links, one per `{key, label, href}` item, with `aria-current="page"` on the current key; each tab is its own GET URL, so they work without JavaScript. The strip stays on one row and scrolls inside itself when narrow.
 - Actions: primary, secondary, quiet or danger; small, normal or large; optional sprite icon. Links retain href; buttons retain native type, form, name/value and disabled state. Explicit behaviour properties support the existing htmx, confirmation, modal and Stimulus hooks without arbitrary attribute maps. `action.row` is for record actions; `action.group` is for page/section actions.
 - Fields own labels, required markers, help/error text and full-width placement. The control slot holds native inputs/selects/textareas. Match `for` with the control ID and associate help/error IDs exclusively through `ui_field_attrs(props)`; errors also mark the control aria-invalid. Choice fields wrap native checkbox/radio controls. `form.actions` owns one save row and its secondary-action region; `form.compact-action` is only for an immediate one-value operation. Modal footers are not nested inside form action rows.
-- Stat grids take `density: compact` for many small counts, keeping two or more per row on a phone. Tables own the wrapper, table, head and body. Rows/cells remain authored slots and column headers delegate to sortable-header. Datasets own the stable region/results IDs and delegate search and paired pagers to existing partials. A preview slot supports bounded workspace previews.
+- A tree select (`form.tree-select`) is one form-control row opening a native `popover` that lists `{value, label, depth 0–3, path}` options indented by depth; the closed control shows the chosen path, the chosen option carries `aria-current` and `autofocus`, and in the default `mode: submit` each option is a submit button carrying its value, so choosing one submits the enclosing form without JavaScript (the catalogue category picker). `mode: field` renders the options as radios in a `radiogroup`, so the choice is stored and sent with the form's own Save (the category Parent picker); core script shows the chosen path, closes the list on a pointer choice, Enter or Space, and leaves it open while arrow keys move the choice. The panel anchors below its toggle where CSS anchor positioning exists. Stat grids take `density: compact` for many small counts, keeping two or more per row on a phone. Tables own the wrapper, table, head and body. Rows/cells remain authored slots and column headers delegate to sortable-header. Datasets own the stable region/results IDs and delegate search and paired pagers to existing partials. A preview slot supports bounded workspace previews.
 - Badges: neutral, info, success, warning, danger or permanent; small or normal. Notices: info, success, warning or danger, with heading/body and optional canonical flash dismissal. Empty states support heading, summary, body and actions. Progress validates finite min/max/value, rejects an invalid range, clamps value, and derives the only inline width from that validated number.
 - Modals: normal or wide, one title/body/footer and optional native form. Without JavaScript the same content is inline; core adds visibility, focus trapping/restoration and Escape dismissal. Accordions are native details/summary. Explicit workspace semantics retain existing lazy section GET navigation and server-rendered content.
 - Icons use the platform SVG sprite. Decorative icons are hidden from assistive technology; meaningful icons require a label. Catalogue icon artwork remains trusted data from the existing icon service, not a general-purpose HTML property.
@@ -127,7 +124,7 @@ Each shell places `main.cl-main` and `footer.cl-footer` beside one another insid
 
 ### Shared page ownership in v0.8.5
 
-The registry has 37 components (the tabbed course editor added `layout.tabs`, which now also renders the Courses and Companies group navigation); canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
+The registry has 34 components (the tabbed course editor added `layout.tabs`, which also renders the Courses and Companies group navigation; the catalogue's `form.tree-select` replaced the category grid, tile, filter rail and filter pill); canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
 
 | Concern | Core source |
 | --- | --- |

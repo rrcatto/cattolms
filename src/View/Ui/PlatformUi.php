@@ -27,6 +27,7 @@ final class PlatformUi
         'form.field' => ['template' => 'forms/field', 'defaults' => ['label' => null, 'for' => '', 'required' => false, 'full_width' => false, 'span' => '', 'help' => '', 'error' => '']],
         'form.actions' => ['template' => 'forms/form-actions', 'defaults' => []],
         'form.choice' => ['template' => 'forms/choice-field', 'defaults' => ['label' => null, 'help' => '', 'full_width' => false, 'span' => '']],
+        'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
         'data.dataset' => ['template' => 'data/dataset-layout', 'defaults' => ['name' => null, 'heading' => '', 'summary' => '', 'search' => [], 'pagination' => null]],
@@ -42,12 +43,8 @@ final class PlatformUi
         'overlay.modal' => ['template' => 'overlay/modal', 'defaults' => ['id' => null, 'title' => null, 'size' => 'normal', 'action' => '', 'method' => 'post']],
         'overlay.accordion-section' => ['template' => 'overlay/accordion-section', 'defaults' => ['id' => '', 'heading' => null, 'summary' => '', 'open' => false, 'workspace' => '', 'section_key' => '', 'load_url' => '']],
         'icon' => ['template' => 'helpers/icon', 'defaults' => ['name' => null, 'label' => '', 'decorative' => true, 'size' => 'normal']],
-        'catalogue.category-grid' => ['template' => 'catalogue/category-grid', 'defaults' => ['navigation' => []]],
-        'catalogue.category-tile' => ['template' => 'catalogue/category-tile', 'defaults' => ['item' => []]],
-        'catalogue.filter-rail' => ['template' => 'catalogue/filter-rail', 'defaults' => ['label' => [], 'items' => []]],
-        'catalogue.filter-pill' => ['template' => 'catalogue/filter-pill', 'defaults' => ['item' => []]],
         'catalogue.course-grid' => ['template' => 'catalogue/course-grid', 'defaults' => ['courses' => []]],
-        'catalogue.workspace' => ['template' => 'catalogue/catalogue-workspace', 'defaults' => ['workspace' => [], 'navigation' => [], 'courses' => [], 'catalogue_pagination' => []]],
+        'catalogue.workspace' => ['template' => 'catalogue/catalogue-workspace', 'defaults' => ['workspace' => [], 'courses' => [], 'catalogue_pagination' => []]],
         'catalogue.tag-browser' => ['template' => 'catalogue/tag-browser', 'defaults' => ['tags' => [], 'selected_slug' => '']],
         'catalogue.tag-chip' => ['template' => 'catalogue/tag-chip', 'defaults' => ['tag' => [], 'selected' => false, 'compact' => false]],
     ];
@@ -125,6 +122,18 @@ final class PlatformUi
             }
             if ($values['max'] <= $values['min']) throw new InvalidArgumentException('Invalid progress range.');
             $values['value'] = max($values['min'], min($values['max'], $values['value']));
+        }
+        if ($component === 'form.tree-select') {
+            if (!is_string($values['id']) || preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1 || !is_string($values['name']) || $values['name'] === '' || !is_string($values['selected'])) {
+                throw new InvalidArgumentException('A tree select needs an element ID, a field name and a selected value.');
+            }
+            if (!in_array($values['mode'], ['submit', 'field'], true)) throw new InvalidArgumentException('A tree select mode is submit or field.');
+            if (!is_array($values['items']) || $values['items'] === []) throw new InvalidArgumentException('A tree select needs at least one option.');
+            foreach ($values['items'] as $item) {
+                if (!is_array($item) || array_keys($item) !== ['value', 'label', 'depth', 'path'] || !is_string($item['value']) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['path']) || !in_array($item['depth'], [0, 1, 2, 3], true)) {
+                    throw new InvalidArgumentException('Each tree select option has exactly a string value, label and path and a depth from 0 to 3.');
+                }
+            }
         }
         if ($component === 'layout.tabs') {
             if (!is_array($values['items']) || $values['items'] === [] || !is_string($values['current'])) throw new InvalidArgumentException('Tabs need a non-empty item list and a current key.');

@@ -4,6 +4,11 @@
          bootstrap="tests/bootstrap.php"
          cacheDirectory=".phpunit.cache"
          colors="true">
+  <php>
+    <!-- The whole suite runs in one process. With a cold Symfony/Twig cache it compiles the container
+         and templates as it goes and exceeds PHP's default 128M; give it explicit headroom. -->
+    <ini name="memory_limit" value="512M"/>
+  </php>
   <testsuites>
     <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>
     <testsuite name="Architecture"><directory>tests/Architecture</directory></testsuite>

@@ -182,12 +182,10 @@ Example list item without actions.
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Catalogue'}) }}
-{% set sample_item = {name: 'Sample category', description: 'Static example', href: '#gallery-actions', is_active: true, icon_svg: ''} %}
 {% set sample_tag = {name: 'Sample tag', slug: 'sample', course_count: 1, weight: 3} %}
 {% set sample_course = {title: 'Example course', slug: 'example', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', item_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
-{% set sample_navigation = {roots: [sample_item], tier_2: [sample_item], tier_3: [], trail: []} %}
 
-{{ ui('catalogue.category-grid', {navigation: sample_navigation}) }}{{ ui('catalogue.category-tile', {item: sample_item}) }}{{ ui('catalogue.filter-rail', {label: 'Example filters', items: [sample_item]}) }}{{ ui('catalogue.filter-pill', {item: sample_item}) }}{{ ui('catalogue.tag-browser', {tags: [sample_tag], selected_slug: 'sample'}) }}{{ ui('catalogue.tag-chip', {tag: sample_tag}) }}{{ ui('catalogue.course-grid', {courses: [sample_course]}) }}{{ ui('catalogue.workspace', {navigation: {tier_2: [], tier_3: [], trail: []}, courses: [], workspace: {heading: 'Sample workspace', summary: 'The existing catalogue composition.', paginated: false, empty_heading: 'No sample courses', empty_summary: 'This is static reference content.'}}) }}
+<form method="get" action="/admin/system/ui-components">{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Sample tree select', for: 'gallery-tree-select'})} %}{% block control %}{{ ui('form.tree-select', {id: 'gallery-tree-select', name: 'sample_category', items: [{value: '', label: 'All categories', depth: 0, path: 'All categories'}, {value: '1', label: 'Business', depth: 1, path: 'Business'}, {value: '2', label: 'Management', depth: 2, path: 'Business › Management'}, {value: '3', label: 'Project Management', depth: 3, path: 'Business › Management › Project Management'}], selected: '3', placeholder: 'All categories', list_label: 'Sample categories'}) }}{% endblock %}{% endembed %}</form>{{ ui('catalogue.tag-browser', {tags: [sample_tag], selected_slug: 'sample'}) }}{{ ui('catalogue.tag-chip', {tag: sample_tag}) }}{{ ui('catalogue.course-grid', {courses: [sample_course]}) }}{{ ui('catalogue.workspace', {courses: [], workspace: {heading: 'Sample workspace', summary: 'The existing catalogue composition.', paginated: false, empty_heading: 'No sample courses', empty_summary: 'This is static reference content.'}}) }}
 {% endblock %}
 {% endembed %}
 

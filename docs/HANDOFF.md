@@ -1,6 +1,10 @@
-# Catto Learning 0.8.7.2 — Development Handoff
+# Catto Learning 0.8.7.3 — Development Handoff
 
-## Current development handoff — 2026/09/29
+## Current development handoff — 2026/10/02
+
+The owner authorized v0.8.7.3, a commit, a direct `main` push and an annotated tag. The catalogue at `/courses` uses the canonical `form.tree-select` category picker (submit mode) above the search field; the old category grid, tiles, rails and pills are removed. `/admin/courses/categories` renders a nested, collapsible tree through `partials/admin/category-tree-node.html.twig` and the `category-tree` Stimulus controller, which the page loads with `importmap()` after its page head (themes style the page head as the first element of main). The Parent category control uses `form.tree-select` in field mode, fed by `CourseService::categoryParentPicker()`; `validateCategoryInput()` refuses parents that would push a category's descendants past level 3, and `CourseRepository::updateCategory()` re-levels descendants inside the service's transaction. Gilded Noir's header is one centred row above 1120px. `phpunit.xml` sets `memory_limit=512M`; the previous intermittent `CourseComponentsIntegrationTest` failure was the suite exhausting 128M after a cache clear. Development course 9810 still has its static grading scale and reset button in its introduction until it is re-imported or edited, and graded-assessment `pass_mark` display remains an open owner decision.
+
+## v0.8.7.2 handoff — 2026/09/29
 
 The owner authorized v0.8.7.2, a commit, a direct `main` push and an annotated tag. The course edit page at `/admin/courses/{id}` is now a tabbed editor: each tab is a server-rendered GET page (`?tab=overview|test-access|people|pricing|content|presentation|grades|publication|history|danger`) with its own Save / Cancel changes row, and every POST handler redirects back to its tab. Tabs render through the new canonical `layout.tabs` component, which also draws the Courses and Companies group navigation. UX rule 1.5 ("accordions, not tabs") was withdrawn as an LLM generalisation; tabs and accordions are both available.
 

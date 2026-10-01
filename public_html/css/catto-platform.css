@@ -696,18 +696,49 @@
 .cl-ui-section-head h2{margin:0;font-size:1.3rem}
 .cl-ui-section-head p{margin:.5rem 0 0}
 .cl-ui-empty-state{padding:1rem;text-align:center}
-.cl-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem}
-.cl-category-tile{display:flex;flex-direction:column;align-items:center;gap:.6rem;padding:1rem;min-width:0;text-align:center;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;color:inherit;text-decoration:none}
-.cl-category-tile-icon{display:block;width:clamp(64px,6vw,96px);height:clamp(64px,6vw,96px);flex-shrink:0}
-.cl-category-tile-icon svg{display:block;width:100%;height:100%}
-.cl-category-tile-name{font-weight:700;overflow-wrap:anywhere}
-.cl-category-tile-description{font-size:.85rem;line-height:1.4}
-.cl-category-tile.is-active,.cl-filter-pill.is-active{border-color:currentColor;box-shadow:inset 0 0 0 2px currentColor}
-.cl-category-tile:hover,.cl-filter-pill:hover{background:var(--cl-page-muted,rgba(127,127,127,.08));color:inherit}
-.cl-category-tile:focus-visible,.cl-filter-pill:focus-visible,.cl-tag-chip:focus-visible{outline:3px solid currentColor;outline-offset:3px}
-.cl-filter-rail{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
-.cl-filter-rail-label{flex-basis:100%;font-weight:700}
-.cl-filter-pill{display:inline-flex;align-items:center;min-height:44px;padding:.45rem .85rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:999px;text-decoration:none;color:inherit}
+.cl-tag-chip:focus-visible{outline:3px solid currentColor;outline-offset:3px}
+/* Tree select: a one-row control opening a native popover that lists a hierarchy. Each option is a
+   submit button, so choosing one submits the enclosing form without JavaScript. The panel anchors
+   below its toggle where CSS anchor positioning exists and is centred by the browser elsewhere. */
+.cl-catalogue-category{margin-bottom:1rem}
+.cl-ui-tree-select{min-width:0}
+.cl-ui-tree-select-toggle{display:block;width:100%;text-align:start;cursor:pointer}
+.cl-ui-tree-select-value{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cl-ui-tree-select-panel{box-sizing:border-box;margin:auto;padding:.35rem;width:min(40rem,calc(100vw - 2rem));max-height:min(60vh,28rem);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--cl-border,#dfe4ea);border-radius:.6rem;background:var(--cl-page-surface,#fff);color:var(--cl-page-text,#212529);box-shadow:0 14px 36px rgba(0,0,0,.22)}
+/* Opens downward, shrinking to the space below the control; flips above only when under 14rem is free there. */
+@supports (position-area:block-end){.cl-ui-tree-select-panel{inset:0;height:auto;margin:.25rem 0 .5rem;position-area:block-end span-inline-end;align-self:stretch;position-try-fallbacks:--cl-tree-select-above;width:anchor-size(width);min-width:min(22rem,calc(100vw - 2rem));max-width:calc(100vw - 2rem);min-height:min(14rem,60vh);max-height:28rem}}
+/* The browser's popover style sets height:fit-content, which would stop the panel stretching into the space below. */
+@position-try --cl-tree-select-above{position-area:block-start span-inline-end;align-self:end;margin:.5rem 0 .25rem}
+.cl-ui-tree-select-list{list-style:none;margin:0;padding:0}
+.cl-ui-tree-select-option{display:block;width:100%;min-height:40px;margin:0;padding:.45rem .75rem;border:0;border-radius:.4rem;background:transparent;color:inherit;font:inherit;line-height:1.35;text-align:start;cursor:pointer;box-shadow:none}
+.cl-ui-tree-select-option[data-depth="1"]{font-weight:700}
+.cl-ui-tree-select-option[data-depth="2"]{padding-inline-start:2rem}
+.cl-ui-tree-select-option[data-depth="3"]{padding-inline-start:3.25rem}
+.cl-ui-tree-select-option:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-ui-tree-select-option:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+.cl-ui-tree-select-option.is-selected,.cl-ui-tree-select-option:has(input:checked){background:color-mix(in srgb,currentColor 14%,transparent);font-weight:700;box-shadow:inset 3px 0 0 currentColor}
+/* Field mode: the radio stays focusable and announced, but the row itself shows the choice. */
+label.cl-ui-tree-select-option{position:relative}
+.cl-ui-tree-select-option input[type=radio]{position:absolute;inset-inline-start:0;width:1px;height:1px;margin:0;opacity:0}
+.cl-ui-tree-select-option:has(input:focus-visible){outline:2px solid currentColor;outline-offset:-2px}
+/* Category management tree: nested lists indented one step per level, a chevron disclosure button
+   per parent and the row actions outside it. The category-tree controller hides child lists. */
+.cl-category-tree,.cl-category-tree-children{list-style:none;margin:0;padding:0}
+.cl-category-tree-children{margin-inline-start:.85rem;padding-inline-start:1rem;border-inline-start:2px solid var(--cl-border,#dfe4ea)}
+.cl-category-tree-wrap>[data-category-tree-target="controls"]{margin-bottom:.75rem}
+.cl-category-tree-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.35rem 1rem;padding:.4rem .25rem;border-bottom:1px solid var(--cl-border,#dfe4ea)}
+.cl-category-tree-label{display:flex;flex-wrap:wrap;align-items:center;gap:.15rem .75rem;flex:1 1 18rem;min-width:0}
+.cl-category-tree-toggle,.cl-category-tree-leaf{display:inline-flex;align-items:center;gap:.35rem;min-height:36px;margin:0;padding:.2rem .4rem .2rem .2rem;border:0;border-radius:.4rem;background:transparent;color:inherit;font:inherit;text-align:start}
+.cl-category-tree-toggle{cursor:pointer}
+.cl-category-tree-toggle:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-category-tree-toggle:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.cl-category-tree-toggle .cl-ui-icon{flex:0 0 auto;width:1.1rem;height:1.1rem;transition:transform .15s ease}
+.cl-category-tree-toggle[aria-expanded="true"] .cl-ui-icon{transform:rotate(90deg)}
+.cl-category-tree-spacer{flex:0 0 auto;width:1.1rem}
+.cl-category-tree-name{overflow-wrap:anywhere}
+.cl-category-tree-item[data-level="1"]>.cl-category-tree-row .cl-category-tree-name{font-weight:700}
+.cl-category-tree-meta{font-size:.82rem;opacity:.75}
+@media(prefers-reduced-motion:reduce){.cl-category-tree-toggle .cl-ui-icon{transition:none}}
 .cl-tag-chip{min-height:44px;max-width:100%;overflow-wrap:anywhere}
 .cl-tag-chip-compact{min-height:32px}
 .cl-tag-browser{display:grid;gap:1.5rem;align-items:start}
@@ -720,10 +751,7 @@
 .cl-tag-cloud-shell .tagcloud{display:inline-block;font-weight:700;color:inherit}
 .cl-tag-cloud-shell .tagcloud--item{cursor:pointer;padding:.1rem .25rem;border-radius:6px;color:inherit}
 .cl-tag-cloud-shell .tagcloud--item:hover{background:color-mix(in srgb,currentColor 14%,transparent)}
-@media(max-width:1000px){.cl-category-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){
- .cl-category-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
- .cl-category-tile{padding:.65rem}
  .cl-tag-cloud-shell.is-animated{grid-template-columns:minmax(0,1fr)}
 }
 @media(prefers-reduced-motion:reduce){

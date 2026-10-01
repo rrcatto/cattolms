@@ -72,8 +72,8 @@ final class AdminCourseCategoryController extends BaseController
             // Counted in the reader's universe. The label is shared; what is filed under it is
             // not, so a genuine administrator viewing REAL must not be shown generated courses in
             // the tally beside a category name.
-            'categories' => $this->courses->categories(),
-            'parent_options' => $this->courses->categoryParentOptions(),
+            'category_tree' => $this->courses->categoryManagementTree(),
+            'parent_picker' => $this->courses->categoryParentPicker(),
         ]);
     }
 
@@ -107,8 +107,9 @@ final class AdminCourseCategoryController extends BaseController
             'category' => $category,
             'replacement_categories' => $replacementCategories,
             // Everything this category may be filed under: never itself, never one of its own
-            // sub-categories, and never a category that is already at the deepest level.
-            'parent_options' => $this->courses->categoryParentOptions($categoryId),
+            // sub-categories, never a level-3 category, and never a parent that would push its own
+            // sub-categories past level 3.
+            'parent_picker' => $this->courses->categoryParentPicker($categoryId),
         ]);
     }
 

@@ -47,6 +47,19 @@ final class CourseController extends BaseController
     #[Route('/courses/category/{slug}', name: 'course_catalogue_2', requirements: ['slug' => '[a-zA-Z0-9_-]+'], methods: ['GET'])]
     public function catalogue(): Response
     {
+        // The category picker submits a category ID; browsing keeps the readable category URL.
+        if ($this->request()->query->has('category')) {
+            $chosen = (int) $this->request()->query->get('category', '0');
+            $target = '/courses';
+            if ($chosen > 0) {
+                try {
+                    $target = '/courses/category/' . rawurlencode((string) $this->courses->category($chosen)['slug']);
+                } catch (\InvalidArgumentException) {
+                    throw $this->notFound('The course category was not found.');
+                }
+            }
+            $this->redirect($target);
+        }
         $category = $this->courses->browsableCategory(trim((string) $this->param('slug')));
         $search = trim((string) ($this->request()->query->get(PlatformAdministrationService::searchParam(self::DATASET), '')));
         $filter = new CatalogueFilter($category === null ? null : (int) $category['id'], [], $search);
@@ -62,7 +75,7 @@ final class CourseController extends BaseController
 
         return $this->render('courses', [
             'title' => $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses',
-            'catalogue_navigation' => $this->courses->catalogueNavigation($category),
+            'category_picker' => $this->courses->catalogueCategoryPicker($category),
             'catalogue_search' => $search,
             'courses' => $this->withFavourites($courses),
             'can_favourite' => $this->currentUser() !== null,
@@ -71,7 +84,7 @@ final class CourseController extends BaseController
                 'heading' => $search !== '' ? 'Search results' : ($category['name'] ?? 'Featured courses'),
                 'summary' => $search !== ''
                     ? ($category === null ? 'Searching all published courses.' : 'Searching ' . $category['name'] . ' and all its subcategories.')
-                    : ($showcase ? 'A selection to get you started. Choose a category to explore further.' : 'Courses filed directly in this category. Choose a subcategory to explore further.'),
+                    : ($showcase ? 'A selection to get you started. Choose a category above to explore further.' : 'Courses filed directly in this category. Choose a subcategory above to explore further.'),
                 'paginated' => !$showcase,
                 'empty_heading' => $search !== '' ? 'No courses match your search' : 'No courses to show here yet',
                 'empty_summary' => $search !== '' ? 'Try another term or clear the search.' : 'Choose a category or subcategory to find a course.',
