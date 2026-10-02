@@ -7,6 +7,7 @@ namespace CattoLearning\Http\Controller;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseItemService;
 use CattoLearning\Course\CourseService;
+use CattoLearning\Course\CourseStructureArrangement;
 use CattoLearning\Course\ResourceLibraryService;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
@@ -44,12 +45,18 @@ final class AdminCourseComponentController extends BaseController
             $types = CourseItemService::itemTypesForResource((string) $resource['resource_type']);
         }
         // "+ Add here" passes the exact place in the course through the type choice to the item form.
-        $placement = $courseId > 0 ? ['parent_node_id' => max(0, (int) ($_GET['parent_node_id'] ?? 0)) ?: '', 'insert_index' => ctype_digit((string) ($_GET['insert_index'] ?? '')) ? (string) $_GET['insert_index'] : ''] : ['parent_node_id' => '', 'insert_index' => ''];
+        $placement = ['parent_node_id' => '', 'insert_index' => ''];
+        if ($courseId > 0 && isset($_GET['insert_index'])) {
+            try { $place = $this->insertPlace($courseId, (string) ($_GET['parent_node_id'] ?? ''), (string) $_GET['insert_index']); }
+            catch (InvalidArgumentException $exception) { return $this->insertRefused($courseId, $exception->getMessage()); }
+            $placement = ['parent_node_id' => $place['parent'], 'insert_index' => $place['index']];
+        }
         $type = (string) ($_GET['type'] ?? '');
         if (!in_array($type, $types, true)) {
             if (count($types) === 1) { $type = $types[0]; }
             else {
-                return $this->render('admin-course-item-type', ['title' => $resource === null ? 'Create new Course Item' : 'Create a Course Item from ' . $resource['title'], 'course_id' => $courseId, 'resource' => $resource, 'type_choices' => $this->typeChoices($types), 'placement' => $placement]);
+                $data = ['title' => $resource === null ? 'Create new Course Item' : 'Create a Course Item from ' . $resource['title'], 'course_id' => $courseId, 'resource' => $resource, 'type_choices' => $this->typeChoices($types), 'placement' => $placement];
+                return $this->inModal($courseId) ? $this->renderFragment('partials/admin/course-item-type-choice', $data + ['in_modal' => true]) : $this->render('admin-course-item-type', $data);
             }
         }
         $item = $this->blankItem($type) + $placement;
@@ -64,12 +71,24 @@ final class AdminCourseComponentController extends BaseController
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
         if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->blankItem((string) ($_POST['item_type'] ?? 'assessment'))), $courseId, '/admin/course-items'); }
         if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->blankItem((string) ($_POST['item_type'] ?? 'downloadable_file')), $courseId, '/admin/course-items', $user->id); }
-        return $this->handle(function () use ($user, $courseId): void {
-            $input = $this->withUploadedResource($_POST, $user->id);
-            $id = $courseId > 0 ? $this->items->createAttached($courseId, $input, $user->id) : $this->items->create($input, $user->id);
+        if ($courseId > 0) {
+            // Created from Course Content: create, attach and place in one transaction. A refusal
+            // shows the same form again with everything entered, in the modal or on the page.
+            $input = $_POST;
+            try {
+                $input = $this->withUploadedResource($_POST, $user->id);
+                $created = $this->items->createAndPlace($courseId, $input, $user->id);
+            } catch (InvalidArgumentException|\RuntimeException $exception) {
+                $draft = $this->items->editorDraft($input, $this->blankItem((string) ($input['item_type'] ?? 'html_lesson')));
+                return $this->itemForm($draft, $courseId, '/admin/course-items', ['tone' => 'danger', 'text' => $exception->getMessage()], 422);
+            }
+            return $this->inserted($courseId, $created['node'], 'The Course Item was created and added to this course.');
+        }
+        return $this->handle(function () use ($user): void {
+            $id = $this->items->create($this->withUploadedResource($_POST, $user->id), $user->id);
             $this->flash('success', 'The Course Item was created.');
-            $this->redirect($courseId > 0 ? '/admin/courses/' . $courseId . '/content' : '/admin/course-items/' . $id);
-        }, $courseId > 0 ? '/admin/course-items/new?course_id=' . $courseId : '/admin/course-items/new');
+            $this->redirect('/admin/course-items/' . $id);
+        }, '/admin/course-items/new');
     }
 
     #[Route('/admin/course-items/{item_id}', name: 'admin_course_item_edit', requirements: ['item_id' => '\\d+'], methods: ['GET'])]
@@ -117,27 +136,44 @@ final class AdminCourseComponentController extends BaseController
     public function content(): Response
     {
         $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
-        $search = trim((string) ($_GET['q'] ?? ''));
-        $library = $this->items->library($search); $libraryItems = [];
-        foreach ($library['unused'] as $item) { $libraryItems[(int) $item['id']] = $item; }
-        foreach ($library['groups'] as $group) { foreach ($group['items'] as $item) { $libraryItems[(int) $item['id']] = $item; } }
-        // "+ Add here" names the exact parent and position; the Add item panels carry them through.
-        $insert = ['parent' => max(0, (int) ($_GET['insert_parent'] ?? 0)), 'index' => isset($_GET['insert_index']) && ctype_digit((string) $_GET['insert_index']) ? (int) $_GET['insert_index'] : null];
-        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $this->items->courseContent($courseId), 'library_items' => array_values($libraryItems), 'item_search' => $search, 'type_choices' => $this->typeChoices(CourseItemService::TYPES), 'insert' => $insert]);
+        // The modal's Create new item form uses the same rich-text and question editors as its page.
+        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $this->items->courseContent($courseId), 'load_ckeditor' => true, 'load_question_editor' => true]);
+    }
+
+    /** The tree alone, which the editor swaps in after an insertion. */
+    #[Route('/admin/courses/{id}/content/tree', name: 'admin_course_content_tree', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function tree(): Response
+    {
+        $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
+        return $this->renderFragment('partials/admin/course-content-tree', ['course' => $this->items->courseContent($courseId), 'tree_error' => '']);
+    }
+
+    /** "+ Add here" → Add existing item or Add section: the modal body, or a page without JavaScript. */
+    #[Route('/admin/courses/{id}/content/insert/{kind}', name: 'admin_course_content_insert', requirements: ['id' => '\\d+', 'kind' => 'existing|section'], methods: ['GET'])]
+    public function insertForm(): Response
+    {
+        $courseId = $this->courseId(); $this->requirePermission('COURSE.EDIT'); $this->requireManagedCourse($courseId);
+        try { $place = $this->insertPlace($courseId, (string) ($_GET['insert_parent'] ?? ''), (string) ($_GET['insert_index'] ?? '')); }
+        catch (InvalidArgumentException $exception) { return $this->insertRefused($courseId, $exception->getMessage()); }
+        return $this->insertPanel($courseId, $this->param('kind'), $place, ['q' => trim((string) ($_GET['q'] ?? ''))]);
     }
 
     #[Route('/admin/courses/{id}/content/sections', name: 'admin_course_content_section', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function addSection(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void { $this->items->addSection($courseId, $_POST, $user->id); $this->flash('success', 'The section was added.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        try { $node = $this->items->addSection($courseId, $_POST, $user->id); }
+        catch (InvalidArgumentException $exception) { return $this->insertPanel($courseId, 'section', $this->postedPlace(), $_POST, $exception->getMessage()); }
+        return $this->inserted($courseId, $node, 'The section was added.');
     }
 
     #[Route('/admin/courses/{id}/content/placements', name: 'admin_course_content_placement', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function addPlacement(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = $this->courseId(); $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void { $this->items->addExisting($courseId, (int) ($_POST['course_item_id'] ?? 0), $_POST, $user->id); $this->flash('success', 'The existing Course Item was added to this course.'); $this->redirect('/admin/courses/' . $courseId . '/content'); }, '/admin/courses/' . $courseId . '/content');
+        try { $node = $this->items->addExisting($courseId, (int) ($_POST['course_item_id'] ?? 0), $_POST, $user->id); }
+        catch (InvalidArgumentException $exception) { return $this->insertPanel($courseId, 'existing', $this->postedPlace(), $_POST, $exception->getMessage()); }
+        return $this->inserted($courseId, $node, 'The existing Course Item was added to this course.');
     }
 
     #[Route('/admin/courses/{id}/content/{node_id}/placement', name: 'admin_course_content_placement_update', requirements: ['id' => '\\d+', 'node_id' => '\\d+'], methods: ['POST'])]
@@ -306,7 +342,7 @@ final class AdminCourseComponentController extends BaseController
      * @param array<string,mixed> $item
      * @param array{tone:string,text:string}|null $notice
      */
-    private function itemForm(array $item, int $courseId, string $action, ?array $notice = null): Response
+    private function itemForm(array $item, int $courseId, string $action, ?array $notice = null, int $status = 200): Response
     {
         $type = (string) $item['item_type'];
         // null means any file (Downloadable File); a type absent from the map uses no Resource.
@@ -314,7 +350,9 @@ final class AdminCourseComponentController extends BaseController
         $resources = array_values(array_filter($this->resources->library(), static fn(array $resource): bool => $accepted === null || in_array((string) $resource['resource_type'], $accepted, true)));
         $course = $courseId > 0 ? $this->items->courseContent($courseId) : null;
         $creating = (int) ($item['id'] ?? 0) === 0;
-        return $this->render('admin-course-item-form', ['title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item', 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? []), 'load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true)]);
+        $data = ['title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item', 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])];
+        if ($creating && $this->inModal($courseId)) { return $this->renderFragment('partials/admin/course-item-form', $data + ['in_modal' => true], $status); }
+        return $this->render('admin-course-item-form', $data + ['load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true)], $status);
     }
 
     /** @return array<string,mixed> */
@@ -344,6 +382,92 @@ final class AdminCourseComponentController extends BaseController
     private function courseId(): int { $id = (int) $this->param('id'); if ($id < 1) { throw new InvalidArgumentException('Invalid course identifier.'); } return $id; }
     private function itemId(): int { $id = (int) $this->param('item_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Item identifier.'); } return $id; }
     private function nodeId(): int { $id = (int) $this->param('node_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Content row.'); } return $id; }
+
+    /** A Course Content insertion asked from the editor's modal, which wants the form alone. */
+    private function inModal(int $courseId): bool
+    {
+        return $courseId > 0 && $this->isHtmxRequest();
+    }
+
+    /**
+     * The "+ Add here" place: a parent in this course that can take another level (empty for the
+     * outer level) and a position from 0 to the parent's current number of rows. The service
+     * checks the same rules again when it saves.
+     *
+     * @return array{parent:string,index:string}
+     */
+    private function insertPlace(int $courseId, string $parent, string $index): array
+    {
+        $parent = trim($parent); $index = trim($index);
+        if (($parent !== '' && !ctype_digit($parent)) || !ctype_digit($index)) { throw new InvalidArgumentException('Choose a valid place in Course Content.'); }
+        $structure = $this->items->courseContent($courseId)['structure'];
+        $rows = 0; $depth = 0; $found = $parent === '';
+        foreach ($structure as $row) {
+            if ($parent !== '' && (int) $row['id'] === (int) $parent) { $found = true; $depth = (int) $row['depth']; }
+            if ((string) ($row['parent_node_id'] ?? '') === $parent) { $rows++; }
+        }
+        if (!$found) { throw new InvalidArgumentException('That place is no longer in this course. Reload Course Content and try again.'); }
+        if ($depth >= CourseStructureArrangement::MAX_DEPTH) { throw new InvalidArgumentException('Course Content may have at most ' . CourseStructureArrangement::MAX_DEPTH . ' levels.'); }
+        if ((int) $index > $rows) { throw new InvalidArgumentException('Choose a valid place in Course Content.'); }
+        return ['parent' => $parent === '' ? '' : (string) (int) $parent, 'index' => (string) (int) $index];
+    }
+
+    /** @return array{parent:string,index:string} */
+    private function postedPlace(): array
+    {
+        return ['parent' => trim((string) ($_POST['parent_node_id'] ?? '')), 'index' => trim((string) ($_POST['insert_index'] ?? ''))];
+    }
+
+    /**
+     * The Add existing item or Add section form for one place, with any entered values and the
+     * reason a submission was refused.
+     *
+     * @param array{parent:string,index:string} $place
+     * @param array<string,mixed> $values
+     */
+    private function insertPanel(int $courseId, string $kind, array $place, array $values = [], string $error = ''): Response
+    {
+        $course = $this->items->courseContent($courseId);
+        $data = ['title' => $kind === 'section' ? 'Add section' : 'Add existing item', 'course' => $course, 'kind' => $kind, 'place' => $place, 'insert_error' => $error,
+            'values' => ['course_item_id' => (string) ($values['course_item_id'] ?? ''), 'title' => (string) ($values['title'] ?? ''), 'introduction_html' => (string) ($values['introduction_html'] ?? ''), 'show_outline' => !empty($values['show_outline']), 'delay_total' => $this->delayTotal($values)]];
+        if ($kind === 'existing') {
+            $search = trim((string) ($values['q'] ?? ''));
+            $library = $this->items->library($search); $items = [];
+            foreach ($library['unused'] as $item) { $items[(int) $item['id']] = $item; }
+            foreach ($library['groups'] as $group) { foreach ($group['items'] as $item) { $items[(int) $item['id']] = $item; } }
+            $data += ['library_items' => array_values($items), 'item_search' => $search];
+        }
+        $status = $error === '' ? 200 : 422;
+        $fragment = $kind === 'section' ? 'partials/admin/course-content-insert-section' : 'partials/admin/course-content-insert-existing';
+        return $this->inModal($courseId) ? $this->renderFragment($fragment, $data + ['in_modal' => true], $status) : $this->render('admin-course-content-insert', $data + ['in_modal' => false], $status);
+    }
+
+    /** @param array<string,mixed> $values */
+    private function delayTotal(array $values): int
+    {
+        return max(0, (int) ($values['delay_weeks'] ?? 0)) * 10080 + max(0, (int) ($values['delay_days'] ?? 0)) * 1440 + max(0, (int) ($values['delay_hours'] ?? 0)) * 60 + max(0, (int) ($values['delay_minutes'] ?? 0));
+    }
+
+    /** A place that cannot be used: shown in the modal, or as a message on Course Content. */
+    private function insertRefused(int $courseId, string $message): Response
+    {
+        if ($this->isHtmxRequest()) { return $this->renderFragment('partials/admin/course-content-insert-refused', ['message' => $message], 422); }
+        $this->flash('danger', $message);
+        $this->redirect('/admin/courses/' . $courseId . '/content');
+    }
+
+    /**
+     * After an insertion: the modal is told which row was added (204, nothing to swap) and the
+     * editor refreshes its tree; a plain form post returns to Course Content at the new row.
+     */
+    private function inserted(int $courseId, int $nodeId, string $message): Response
+    {
+        if ($this->isHtmxRequest()) {
+            return new Response('', 204, ['HX-Trigger' => json_encode(['course-content-inserted' => ['target' => '#course-content-insert', 'node' => $nodeId, 'message' => $message]], JSON_THROW_ON_ERROR)]);
+        }
+        $this->flash('success', $message);
+        $this->redirect('/admin/courses/' . $courseId . '/content#course-node-' . $nodeId);
+    }
 
     /** @return list<int> */
     private function postedNodeIds(): array

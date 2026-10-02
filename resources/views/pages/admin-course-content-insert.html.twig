@@ -1,0 +1,7 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/courses/' ~ course.id ~ '/content' %}{% set ph_back_label = 'Course Content' %}{% set ph_kicker = course.title %}{% set ph_title = title %}{% set ph_lead = 'Adds at the place you chose with + Add here in Course Content.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}{% if kind == 'section' %}{% include '@platform/partials/admin/course-content-insert-section.html.twig' %}{% else %}{% include '@platform/partials/admin/course-content-insert-existing.html.twig' %}{% endif %}{% endblock %}{% endembed %}
+</section>
+{% endblock %}

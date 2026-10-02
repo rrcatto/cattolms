@@ -79,7 +79,8 @@ TWIG;
     public function testQuestionPrototypesAndExistingQuestionsShareCanonicalControls(): void
     {
         $root = dirname(__DIR__, 2);
-        foreach (['pages/admin-course-item-form'] as $caller) {
+        // The Course Item form is one partial, shared by its page and the Course Content insert modal.
+        foreach (['partials/admin/course-item-form'] as $caller) {
             self::assertStringContainsString("include '@platform/partials/question-editor.html.twig'", (string) file_get_contents($root . '/resources/views/' . $caller . '.html.twig'));
         }
         $javascript = (string) preg_replace('~/\*.*?\*/|//[^\n]*~s', '', (string) file_get_contents($root . '/public_html/js/question-editor.js'));

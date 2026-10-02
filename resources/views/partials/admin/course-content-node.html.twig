@@ -41,9 +41,9 @@
 	</div>
 	{% if node.depth < 3 %}
 		<ol class="cl-course-tree-children" id="course-branch-{{ node.id }}" data-parent="{{ node.id }}" aria-label="Inside {{ title }}"{% if not container %} hidden{% endif %}>
-			{% if container %}{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'li', course_id: course.id, parent: node.id, index: 0, place_label: 'first inside ' ~ title} %}{% endif %}
+			{% if container %}{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'li', course_id: course.id, parent: node.id, index: 0, depth: node.depth + 1, place_label: 'first inside ' ~ title} %}{% endif %}
 			{% for child in node.children %}{% include '@platform/partials/admin/course-content-node.html.twig' with {node: child} %}{% endfor %}
 		</ol>
 	{% endif %}
-	{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'div', course_id: course.id, parent: node.parent_node_id ?? '', index: node.sibling_index + 1, place_label: 'after ' ~ title} %}
+	{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'div', course_id: course.id, parent: node.parent_node_id ?? '', index: node.sibling_index + 1, depth: node.depth, place_label: 'after ' ~ title} %}
 </li>

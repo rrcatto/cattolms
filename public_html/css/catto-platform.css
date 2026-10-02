@@ -67,6 +67,7 @@
 .company-context p{margin:.15rem 0 0;font-size:.82rem;opacity:.75}
 
 .cl-ui-modal-card--wide{max-width:60rem;width:100%}
+.cl-ui-modal-foot:empty{display:none}
 .company-picker-results{margin-top:.75rem}
 .company-picker-results .cl-ui-table{max-height:26rem;overflow-y:auto}
 .company-picker-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem;margin:0}
@@ -310,10 +311,12 @@
 .cl-ui-row-menu>summary.cl-ui-row-trigger::after{content:none!important}
 .cl-ui-row-menu[open]>summary.cl-ui-row-trigger{outline:1px solid var(--cl-border,#dfe4ea)}
 .cl-ui-row-menu>.cl-ui-row-panel{padding:6px!important;margin:0!important}
-/* A theme may give <main> and the footer the same z-index (Gilded Noir does), and the footer, later
-   in the document, then paints over a menu that opens past the bottom of <main>. While a dropdown
-   is open, <main> sits above the footer. */
-.cl-main:has(details[data-cl-dropdown][open]){z-index:2}/* A row menu can open again now the wrapper does not clip. */
+/* A theme may give <main> its own stacking level (Gilded Noir gives it and the footer z-index 1),
+   which traps everything inside it beneath the header and the footer that follows it: a menu that
+   opens past the bottom of <main> went under the footer, and a modal under both. While a dropdown
+   is open <main> sits above the footer; while a modal is open it sits above the whole page. */
+.cl-main:has(details[data-cl-dropdown][open]){z-index:2}
+.cl-main:has(div.cl-ui-modal.open[role="dialog"]){z-index:10000}/* outranks the dropdown rule above *//* A row menu can open again now the wrapper does not clip. */
 
 .cl-ui-row-menu>summary{list-style:none;cursor:pointer}
 .cl-ui-row-menu>summary::-webkit-details-marker{display:none}
@@ -800,6 +803,13 @@ label.cl-ui-tree-select-option{position:relative}
 .cl-course-tree-node[data-drop="invalid"]>.cl-course-tree-row::after{content:"Not allowed";background:var(--cl-danger,#b42318)}
 .cl-course-insert-position{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.5rem 0;padding:.5rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:.4rem}
 .cl-course-insert-position>p{margin:0}
+.cl-course-insert-panel{display:grid;gap:1rem}
+/* Without JavaScript a modal shows inline; the insert modal has nothing to show until "+ Add here"
+   loads a form into it, and every "+ Add here" link then opens that form on its own page. */
+.cl-ui-modal:not(.open):has(.cl-course-insert-body:empty){display:none}
+.cl-course-insert-panel>form{display:grid;gap:.75rem}
+.cl-course-insert-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem}
+.cl-course-insert-search>.cl-ui-field{flex:1 1 16rem;margin:0}
 .cl-course-move-destinations{display:grid;gap:.25rem;margin:0 0 1rem;padding:0;border:0}
 .cl-course-move-destination[data-depth="2"]{margin-inline-start:1.5rem}
 .cl-course-move-destination[data-depth="3"]{margin-inline-start:3rem}

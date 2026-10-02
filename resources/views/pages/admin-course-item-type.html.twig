@@ -3,10 +3,5 @@
 {% set ph_back_href = course_id ? '/admin/courses/' ~ course_id ~ '/content' : (resource ? '/admin/resources' : '/admin/course-items') %}{% set ph_back_label = course_id ? 'Course Content' : (resource ? 'Resource Library' : 'Course Item Library') %}{% set ph_kicker = course_id ? 'Add item · Create new item' : 'New reusable content' %}{% set ph_title = title %}{% set ph_lead = resource ? 'Choose what kind of Course Item to build from ' ~ resource.original_filename ~ '. Only types that can use this file are listed.' : 'Choose the kind of Course Item to create. You configure it on the next page.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section container-fluid cl-container-wide py-5">
 {% embed ui_template('layout.surface') with {props:ui_props('layout.surface',{})} %}{% block surface_body %}
-<form action="/admin/course-items/new" method="get"><input type="hidden" name="course_id" value="{{ course_id }}">{% if placement.insert_index != '' %}<input type="hidden" name="parent_node_id" value="{{ placement.parent_node_id }}"><input type="hidden" name="insert_index" value="{{ placement.insert_index }}">{% endif %}{% if resource %}<input type="hidden" name="resource_id" value="{{ resource.id }}">{% endif %}
-<fieldset class="cl-item-type-choices"><legend class="cl-ui-field-label">Course Item type</legend>
-{% for choice in type_choices %}{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label: choice.label, help: choice.description})} %}{% block control %}<input type="radio" name="type" value="{{ choice.value }}" required{% if loop.first %} checked{% endif %}>{% endblock %}{% endembed %}{% endfor %}
-</fieldset>
-{% embed ui_template('form.actions') with {props:ui_props('form.actions',{})} %}{% block primary_actions %}{{ ui('action.button',{label:'Continue',type:'submit',variant:'primary'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link',{label:'Cancel',href:ph_back_href}) }}{% endblock %}{% endembed %}
-</form>{% endblock %}{% endembed %}</section>
+{% include '@platform/partials/admin/course-item-type-choice.html.twig' with {cancel_href: ph_back_href} %}{% endblock %}{% endembed %}</section>
 {% endblock %}

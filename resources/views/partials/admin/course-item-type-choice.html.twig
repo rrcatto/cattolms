@@ -1,0 +1,8 @@
+{# Choosing a Course Item type, shared by its full page and the Course Content insert modal. #}
+{% if in_modal|default(false) %}{{ ui('layout.section-head', {heading: 'Create new item', heading_level: 3, summary: 'Choose the kind of Course Item to create. You configure it next.'}) }}{% endif %}
+<form action="/admin/course-items/new" method="get"{% if in_modal|default(false) %} hx-get="/admin/course-items/new" hx-target="#course-content-insert-body" hx-swap="innerHTML"{% endif %}><input type="hidden" name="course_id" value="{{ course_id }}">{% if placement.insert_index != '' %}<input type="hidden" name="parent_node_id" value="{{ placement.parent_node_id }}"><input type="hidden" name="insert_index" value="{{ placement.insert_index }}">{% endif %}{% if resource %}<input type="hidden" name="resource_id" value="{{ resource.id }}">{% endif %}
+<fieldset class="cl-item-type-choices"><legend class="cl-ui-field-label">Course Item type</legend>
+{% for choice in type_choices %}{% embed ui_template('form.choice') with {props:ui_props('form.choice',{label: choice.label, help: choice.description})} %}{% block control %}<input type="radio" name="type" value="{{ choice.value }}" required{% if loop.first %} checked{% endif %}>{% endblock %}{% endembed %}{% endfor %}
+</fieldset>
+{% embed ui_template('form.actions') with {props:ui_props('form.actions',{})} %}{% block primary_actions %}{{ ui('action.button',{label:'Continue',type:'submit',variant:'primary'}) }}{% endblock %}{% block secondary_actions %}{% if in_modal|default(false) %}{{ ui('action.button', {label: 'Cancel', type: 'button', close_modal: true}) }}{% else %}{{ ui('action.link', {label: 'Cancel', href: cancel_href}) }}{% endif %}{% endblock %}{% endembed %}
+</form>

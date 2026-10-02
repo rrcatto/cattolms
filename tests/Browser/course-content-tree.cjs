@@ -217,25 +217,145 @@ async function scenario(name, browserName, run) {
             assert.equal(await savedTree(page, state), 'A[a3,a1,a2],B[b1[b1x]],c');
         });
 
-        await scenario('+ Add here inserts a section at that exact place', browserName, async () => {
+        const modal = () => page.locator('#course-content-insert');
+        const modalBody = () => page.locator('#course-content-insert-body');
+        // Opens "+ Add here" at a slot and chooses one of its actions; the form loads in the modal.
+        async function insertAt(slot, action) {
+            await slot.locator('summary').click();
+            await slot.getByRole('link', {name: action}).click();
+            await modal().waitFor({state: 'visible'});
+            await modalBody().locator('.cl-course-insert-panel, form').first().waitFor();
+        }
+        const afterRow = (id) => page.locator(`#course-node-${id} > .cl-course-tree-add`);
+        const firstInside = (id) => page.locator(`#course-branch-${id} > li.cl-course-tree-add`);
+        const courseStart = () => page.locator('#course-content-tree > .cl-course-tree-list > li.cl-course-tree-add');
+
+        await scenario('the top Add item area is gone; + Add here is the way in', browserName, async () => {
             state = reset();
             await page.goto(url());
-            const slot = page.locator(`#course-node-${n().a1} > .cl-course-tree-add`);
-            await slot.locator('summary').click();
-            await slot.getByRole('link', {name: 'Add section'}).click();
-            await page.waitForURL(/insert_index=1/);
-            await page.locator('#new-section-title').fill('Inserted');
-            await page.locator('#add-section').getByRole('button', {name: 'Save new section'}).click();
-            await page.waitForURL(/\/content$/);
-            const tree = await renderedTree(page, state);
-            assert.match(tree, /^A\[a1,\d+,a2,a3\]/, tree);
+            assert.equal(await page.locator('#add-item, #add-new, #add-existing, #add-section').count(), 0);
+            assert.ok(await page.locator('.cl-course-tree-add').count() >= 9, 'A slot at the start of each list and after each row.');
+            assert.equal(await modal().isHidden(), true, 'The insert modal starts closed.');
+        });
+
+        await scenario('Add section in the modal lands between rows, in place, keeping scroll and collapsed sections', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await page.evaluate(() => { window.__sameDocument = true; });
+            await row(page, n().B).locator('.cl-course-tree-toggle').click();
+            await page.locator('#course-content-tree').evaluate((tree) => tree.scrollIntoView({block: 'start', behavior: 'instant'}));
+            const scrollBefore = await page.evaluate(() => window.scrollY);
+            await insertAt(afterRow(n().a1), 'Add section');
+            assert.equal(await page.evaluate(() => document.activeElement.id), 'insert-section-title', 'The first field takes the focus.');
+            assert.match(await modalBody().innerText(), /inside “Section A”, as row 2/);
+            await page.screenshot({path: `${output}/${browserName}-modal-section.png`});
+            await page.locator('#insert-section-title').fill('Inserted section');
+            await modalBody().getByRole('button', {name: 'Save new section'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await saved(page);
+            assert.match(await renderedTree(page, state), /^A\[a1,\d+,a2,a3\],B\[b1\[b1x\]\],c$/);
+            assert.equal(await page.evaluate(() => window.__sameDocument === true), true, 'No page load.');
+            assert.equal(await row(page, n().B).locator('.cl-course-tree-toggle').getAttribute('aria-expanded'), 'false', 'Collapsed sections stay collapsed.');
+            assert.ok(Math.abs(await page.evaluate(() => window.scrollY) - scrollBefore) < 120, 'The editor does not jump to the top.');
+            assert.equal(await page.evaluate(() => document.activeElement.closest('li[data-node-id]')?.querySelector('.cl-course-tree-name')?.textContent), 'Inserted section', 'The new row takes the focus.');
+            assert.match(await savedTree(page, state), /^A\[a1,\d+,a2,a3\],B\[b1\[b1x\]\],c$/, 'It persisted.');
+            await row(page, n().B).locator('.cl-course-tree-toggle').click();
+        });
+
+        await scenario('Add existing item in the modal lands at the start of the course', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await insertAt(courseStart(), 'Add existing item');
+            await modalBody().locator('#insert-existing-search').fill('Item b1x');
+            await modalBody().getByRole('button', {name: 'Search items'}).click();
+            // The full list already contains the item; wait for the filtered list to replace it.
+            await page.waitForFunction(() => document.querySelectorAll('#insert-existing-item option').length === 2);
+            await modalBody().locator('#insert-existing-item').selectOption({label: (await modalBody().locator('#insert-existing-item option', {hasText: 'Item b1x'}).first().textContent()).trim()});
+            await modalBody().getByRole('button', {name: 'Add to course'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await saved(page);
+            const first = page.locator('#course-content-tree > .cl-course-tree-list > li[data-node-id]').first();
+            assert.equal(await first.locator(':scope > .cl-course-tree-row .cl-course-tree-name').textContent(), 'Item b1x', 'The shared item is placed first.');
+            assert.match(await savedTree(page, state), /^\d+,A\[a1,a2,a3\],B\[b1\[b1x\]\],c$/);
+        });
+
+        await scenario('Create new item in the modal: a refused key keeps the entry, then it lands inside the section', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await insertAt(firstInside(n().B), 'Create new item');
+            await modalBody().getByLabel('HTML lesson').check();
+            await modalBody().getByRole('button', {name: 'Continue'}).click();
+            await page.locator('#item-key').waitFor();
+            await page.waitForFunction(() => document.querySelectorAll('#course-content-insert-body .ck-editor').length === 2);
+            await page.evaluate(() => { for (const [element, editor] of window.CattoLearningEditors.instances) if (element.id === 'item-source') editor.setData('<p>Kept lesson body</p>'); });
+            const takenKey = await page.evaluate((id) => document.querySelector(`#course-node-${id} .cl-course-tree-meta code`).textContent, n().a1);
+            await page.locator('#item-key').fill(takenKey);
+            await page.locator('#item-title').fill('Created in the modal');
+            await modalBody().getByRole('button', {name: 'Create and add to course'}).click();
+            await modalBody().getByText('Another Course Item already uses that key.').waitFor();
+            await page.waitForFunction(() => document.querySelectorAll('#course-content-insert-body .ck-editor').length === 2);
+            assert.equal(await page.locator('#item-title').inputValue(), 'Created in the modal', 'The title is kept.');
+            assert.match(await page.evaluate(() => { for (const [element, editor] of window.CattoLearningEditors.instances) if (element.id === 'item-source') return editor.getData(); return ''; }), /Kept lesson body/, 'The rich text is kept.');
+            assert.equal(await page.locator('#course-content-insert-body textarea.cl-rich-editor').evaluateAll((all) => all.filter((e) => getComputedStyle(e).display !== 'none').length), 0, 'Each rich-text field shows its editor only.');
+            await page.screenshot({path: `${output}/${browserName}-modal-error.png`});
+            await page.locator('#item-key').fill(`created-${Date.now()}`);
+            await modalBody().getByRole('button', {name: 'Create and add to course'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await saved(page);
+            const created = page.locator(`#course-branch-${n().B} > li[data-node-id]`).first();
+            assert.equal(await created.locator(':scope > .cl-course-tree-row .cl-course-tree-name').textContent(), 'Created in the modal');
+            assert.match(await savedTree(page, state), /^A\[a1,a2,a3\],B\[\d+,b1\[b1x\]\],c$/, 'Created, attached and placed in one step.');
+        });
+
+        await scenario('Escape, Cancel and the close button change nothing', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await insertAt(afterRow(n().a2), 'Add section');
+            await page.locator('#insert-section-title').fill('Never saved');
+            await page.keyboard.press('Escape');
+            await modal().waitFor({state: 'hidden'});
+            await insertAt(afterRow(n().c), 'Add existing item');
+            await modalBody().getByRole('button', {name: 'Cancel'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await insertAt(afterRow(n().a1), 'Create new item');
+            assert.equal(await afterRow(n().a1).locator('details').getAttribute('open'), null, 'Choosing an action closes the + Add here menu.');
+            await modal().locator('.cl-ui-close').click();
+            await modal().waitFor({state: 'hidden'});
+            assert.equal(await savedTree(page, state), 'A[a1,a2,a3],B[b1[b1x]],c');
+        });
+
+        await scenario('an inserted row can be dragged straight away', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await insertAt(afterRow(n().a3), 'Add section');
+            await page.locator('#insert-section-title').fill('Then dragged');
+            await modalBody().getByRole('button', {name: 'Save new section'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await saved(page);
+            const id = await page.evaluate(() => document.activeElement.closest('li[data-node-id]').dataset.nodeId);
+            assert.equal(await drag(page, id, n().a1, 0.15), 'before');
+            await saved(page);
+            assert.match(await savedTree(page, state), /^A\[\d+,a1,a2,a3\],B\[b1\[b1x\]\],c$/);
+        });
+
+        await scenario('an empty course still offers + Add here', browserName, async () => {
+            state = JSON.parse(php('empty').trim().split('\n').pop());
+            await page.goto(url());
+            assert.match(await page.locator('#course-content-tree').innerText(), /No Course Content yet/);
+            await insertAt(courseStart(), 'Add section');
+            await page.locator('#insert-section-title').fill('First section');
+            await modalBody().getByRole('button', {name: 'Save new section'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await saved(page);
+            assert.equal(await page.locator('#course-content-tree > .cl-course-tree-list > li[data-node-id]').count(), 1);
+            assert.match(await savedTree(page, state), /^\d+$/);
         });
 
         assert.deepEqual(pageErrors, [], `No script errors in ${browserName}.`);
         await browser.close();
     }
 
-    await scenario('without JavaScript the ⋯ menu and Move into page work', 'chromium-nojs', async () => {
+    await scenario('without JavaScript the ⋯ menu, Move into page and + Add here work', 'chromium-nojs', async () => {
         state = reset();
         const browser = await playwright.chromium.launch();
         const context = await browser.newContext({ignoreHTTPSErrors: true, javaScriptEnabled: false});
@@ -243,6 +363,7 @@ async function scenario(name, browserName, run) {
         const page = await context.newPage();
         await page.goto(`${base}/admin/courses/${state.course}/content`);
         assert.equal(await handle(page, state.nodes.a1).isHidden(), true, 'No drag handle without JavaScript.');
+        assert.equal(await page.locator('#course-content-insert').isHidden(), true, 'The empty insert modal is not shown without JavaScript.');
         await row(page, state.nodes.a3).locator('summary.cl-ui-row-trigger').click();
         await row(page, state.nodes.a3).getByRole('button', {name: 'Move to top'}).click();
         await page.waitForURL(/\/content$/);
@@ -253,6 +374,15 @@ async function scenario(name, browserName, run) {
         await page.getByRole('button', {name: 'Move here'}).click();
         await page.waitForURL(/\/content$/);
         assert.equal(await renderedTree(page, state), 'A[a3,a1,a2],B[b1[b1x],c]');
+        const slot = page.locator(`#course-node-${state.nodes.a1} > .cl-course-tree-add`);
+        await slot.locator('summary').click();
+        await slot.getByRole('link', {name: 'Add section'}).click();
+        await page.waitForURL(/content\/insert\/section/);
+        assert.equal(await page.locator('#course-content-insert').count(), 0, 'The form page has no modal.');
+        await page.locator('#insert-section-title').fill('Added without script');
+        await page.locator('#insert-section-title').press('Enter');
+        await page.waitForURL(/\/content#course-node-\d+$/);
+        assert.match(await renderedTree(page, state), /^A\[a3,a1,\d+,a2\],B\[b1\[b1x\],c\]$/, 'Without JavaScript + Add here opens the form on its own page.');
         await browser.close();
     });
 

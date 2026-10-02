@@ -1,6 +1,13 @@
 # Changelog
 
-**LMS version:** 0.8.7.5 **Date time:** 2026/10/02 SAST
+**LMS version:** 0.8.7.6 **Date time:** 2026/10/03 SAST
+
+## 2026-10-03 SAST — v0.8.7.6 "+ Add here" insert modal
+
+- Remove the top Add item area from Course Content. "+ Add here" in the tree is the one way to add content: Create new item, Add existing item and Add section open their forms in an insert modal (the existing `overlay.modal`, loaded with htmx) and insert at that exact parent and position. Success closes the modal and swaps in the refreshed tree, keeping scroll position, collapsed branches and the drag-and-drop behaviour, and focuses the new row; a refusal keeps the form open with the reason and everything entered (including rich text and an uploaded Resource). Escape, Cancel and the close button change nothing.
+- An empty course and every empty section have a "+ Add here". Add section is offered only where the new section stays within three levels.
+- The Course Item form and type choice are shared partials used by their pages and by the modal; creation from Course Content goes through `CourseItemService::createAndPlace()` (create, attach and place in one transaction). The create, Add existing item and Add section endpoints answer htmx with `204` and an `HX-Trigger` naming the new row, or with the form and `422`; without JavaScript they redirect to the new row. `GET /admin/courses/{id}/content/insert/{existing|section}` serves the form as a modal fragment or a page; `GET /admin/courses/{id}/content/tree` serves the tree.
+- The question editor script can start on forms loaded after the page (`window.CattoQuestionEditor.initialise`). While a modal is open, `<main>` is lifted above the header and footer, so a theme that gives `<main>` its own stacking level (Gilded Noir) no longer covers modals; the empty insert modal is hidden without JavaScript.
 
 ## 2026-10-02 SAST — v0.8.7.5 Course Content drag-and-drop tree
 

@@ -1,90 +1,98 @@
 (() => {
   'use strict';
-  const editor = document.getElementById('question-editor');
-  const addQuestionButton = document.getElementById('add-question');
-  const questionTemplate = document.getElementById('question-editor-question-template');
-  const optionTemplate = document.getElementById('question-editor-option-template');
-  if (!editor || !addQuestionButton || !(questionTemplate instanceof HTMLTemplateElement)
-      || !(optionTemplate instanceof HTMLTemplateElement)) return;
 
   // Twig owns all structure. Only indices and ID references change after cloning or removal.
-  function renumber() {
-    const selected = [...editor.querySelectorAll('input[type="radio"]:checked')];
-    editor.querySelectorAll('[data-question]').forEach((question, qi) => {
-      question.dataset.questionIndex = String(qi);
-      question.querySelector('[data-question-number]').textContent = String(qi + 1);
-      question.querySelectorAll('[name]').forEach((control) => {
-        control.name = control.name.replace(/\[[^\]]+\]/, `[${qi}]`);
-      });
-      question.querySelectorAll('[id], [for], [aria-describedby]').forEach((element) => {
-        for (const attribute of ['id', 'for', 'aria-describedby']) {
-          const value = element.getAttribute(attribute);
-          if (value) element.setAttribute(attribute, value.replace(/question-[^-\s]+-/g, `question-${qi}-`));
-        }
-      });
-      question.querySelectorAll('button[name="question_action"]').forEach(button => { button.value = `${button.value.split(':')[0]}:${qi}`; });
-      question.querySelectorAll('[data-option]').forEach((option, oi) => {
-        option.dataset.optionIndex = String(oi);
-        const remove = option.querySelector('button[name="question_action"]');
-        if (remove) remove.value = `remove-option:${qi}:${oi}`;
-        option.querySelector('input[type="radio"]').value = String(oi);
-        option.querySelector('input[name^="option_html["]').name = `option_html[${qi}][${oi}]`;
-        const identity = option.querySelector('input[name^="option_id["]');
-        if (identity) identity.name = `option_id[${qi}][${oi}]`;
-        option.querySelectorAll('[id], [for], [aria-describedby]').forEach((element) => {
+  // Started for the page's editor on load, and again by the Course Content insert modal for an
+  // assessment form it loads; an editor is set up once.
+  function initialise(root = document) {
+    const editor = root.querySelector('#question-editor');
+    const addQuestionButton = root.querySelector('#add-question');
+    const questionTemplate = root.querySelector('#question-editor-question-template');
+    const optionTemplate = root.querySelector('#question-editor-option-template');
+    if (!editor || !addQuestionButton || !(questionTemplate instanceof HTMLTemplateElement)
+        || !(optionTemplate instanceof HTMLTemplateElement) || editor.dataset.questionEditorReady === '1') return;
+    editor.dataset.questionEditorReady = '1';
+    function renumber() {
+      const selected = [...editor.querySelectorAll('input[type="radio"]:checked')];
+      editor.querySelectorAll('[data-question]').forEach((question, qi) => {
+        question.dataset.questionIndex = String(qi);
+        question.querySelector('[data-question-number]').textContent = String(qi + 1);
+        question.querySelectorAll('[name]').forEach((control) => {
+          control.name = control.name.replace(/\[[^\]]+\]/, `[${qi}]`);
+        });
+        question.querySelectorAll('[id], [for], [aria-describedby]').forEach((element) => {
           for (const attribute of ['id', 'for', 'aria-describedby']) {
             const value = element.getAttribute(attribute);
-            if (value) element.setAttribute(attribute, value.replace(/-option-[^-\s]+/g, `-option-${oi}`));
+            if (value) element.setAttribute(attribute, value.replace(/question-[^-\s]+-/g, `question-${qi}-`));
           }
         });
+        question.querySelectorAll('button[name="question_action"]').forEach(button => { button.value = `${button.value.split(':')[0]}:${qi}`; });
+        question.querySelectorAll('[data-option]').forEach((option, oi) => {
+          option.dataset.optionIndex = String(oi);
+          const remove = option.querySelector('button[name="question_action"]');
+          if (remove) remove.value = `remove-option:${qi}:${oi}`;
+          option.querySelector('input[type="radio"]').value = String(oi);
+          option.querySelector('input[name^="option_html["]').name = `option_html[${qi}][${oi}]`;
+          const identity = option.querySelector('input[name^="option_id["]');
+          if (identity) identity.name = `option_id[${qi}][${oi}]`;
+          option.querySelectorAll('[id], [for], [aria-describedby]').forEach((element) => {
+            for (const attribute of ['id', 'for', 'aria-describedby']) {
+              const value = element.getAttribute(attribute);
+              if (value) element.setAttribute(attribute, value.replace(/-option-[^-\s]+/g, `-option-${oi}`));
+            }
+          });
+        });
       });
+      // Changing radio group names must not discard the author's current answer selections.
+      selected.forEach((radio) => { radio.checked = true; });
+  }
+
+    function addQuestion() {
+      editor.append(questionTemplate.content.cloneNode(true));
+      renumber();
+      editor.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+    addQuestionButton.addEventListener('click', event => { event.preventDefault(); addQuestion(); });
+    editor.addEventListener('click', (event) => {
+      if (!(event.target instanceof Element)) return;
+      const action = event.target.closest('button[name="question_action"]');
+      const question = action?.closest('[data-question]');
+      if (!action || !question) return;
+      event.preventDefault();
+      const operation = action.value.split(':')[0];
+      if (operation === 'remove-question') {
+        if (confirm('Remove this question?')) { question.remove(); renumber(); }
+      } else if (operation === 'add-option') {
+        question.querySelector('[data-options]').append(optionTemplate.content.cloneNode(true));
+        renumber();
+      } else if (operation === 'remove-option') {
+        const options = question.querySelector('[data-options]');
+        if (options.querySelectorAll('[data-option]').length <= 2) {
+          alert('Every question requires at least two options.');
+          return;
+        }
+        action.closest('[data-option]').remove();
+        renumber();
+      }
     });
-    // Changing radio group names must not discard the author's current answer selections.
-    selected.forEach((radio) => { radio.checked = true; });
+
+    editor.closest('form')?.addEventListener('submit', (event) => {
+      renumber();
+      for (const question of editor.querySelectorAll('[data-question]')) {
+        if (!question.querySelector('input[type="radio"]:checked')) {
+          event.preventDefault();
+          question.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          alert('Select the correct option for every question.');
+          return;
+        }
+      }
+    });
+
+    if (!editor.querySelector('[data-question]')) addQuestion();
+    renumber();
   }
 
-  function addQuestion() {
-    editor.append(questionTemplate.content.cloneNode(true));
-    renumber();
-    editor.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  addQuestionButton.addEventListener('click', event => { event.preventDefault(); addQuestion(); });
-  editor.addEventListener('click', (event) => {
-    if (!(event.target instanceof Element)) return;
-    const action = event.target.closest('button[name="question_action"]');
-    const question = action?.closest('[data-question]');
-    if (!action || !question) return;
-    event.preventDefault();
-    const operation = action.value.split(':')[0];
-    if (operation === 'remove-question') {
-      if (confirm('Remove this question?')) { question.remove(); renumber(); }
-    } else if (operation === 'add-option') {
-      question.querySelector('[data-options]').append(optionTemplate.content.cloneNode(true));
-      renumber();
-    } else if (operation === 'remove-option') {
-      const options = question.querySelector('[data-options]');
-      if (options.querySelectorAll('[data-option]').length <= 2) {
-        alert('Every question requires at least two options.');
-        return;
-      }
-      action.closest('[data-option]').remove();
-      renumber();
-    }
-  });
-
-  document.getElementById('question-editor-form')?.addEventListener('submit', (event) => {
-    renumber();
-    for (const question of editor.querySelectorAll('[data-question]')) {
-      if (!question.querySelector('input[type="radio"]:checked')) {
-        event.preventDefault();
-        question.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        alert('Select the correct option for every question.');
-        return;
-      }
-    }
-  });
-
-  if (!editor.querySelector('[data-question]')) addQuestion();
-  renumber();
+  window.CattoQuestionEditor = { initialise };
+  initialise(document);
 })();

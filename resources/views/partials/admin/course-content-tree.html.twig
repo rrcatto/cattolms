@@ -1,11 +1,10 @@
-{# The Course Content tree. The course-content controller swaps this whole region for the server's copy after every move: the saved tree, or the authoritative tree with the reason in data-error when a move was refused. #}
+{# The Course Content tree. The course-content controller swaps this whole region for the server's copy after every move or insertion: the saved tree, or the authoritative tree with the reason in data-error when a move was refused. An empty course still has one "+ Add here", so there is always a way to add content. #}
 <div class="cl-course-tree" id="course-content-tree" data-course-content-target="tree" data-error="{{ tree_error|default('') }}">
-	{% if course.tree %}
-		<ol class="cl-course-tree-list" data-parent="" aria-label="Course Content">
-			{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'li', course_id: course.id, parent: '', index: 0, place_label: 'first at the outer level'} %}
-			{% for node in course.tree %}{% include '@platform/partials/admin/course-content-node.html.twig' with {node: node} %}{% endfor %}
-		</ol>
-	{% else %}
-		{{ ui('feedback.empty', {heading: 'No Course Content yet', summary: 'Create a Course Item, add an existing one, or add a section.'}) }}
+	{% if not course.tree %}
+		{{ ui('feedback.empty', {heading: 'No Course Content yet', summary: 'Use + Add here to create a Course Item, add an existing one, or add a section.'}) }}
 	{% endif %}
+	<ol class="cl-course-tree-list" data-parent="" aria-label="Course Content">
+		{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'li', course_id: course.id, parent: '', index: 0, depth: 1, place_label: course.tree ? 'first at the outer level' : 'in this empty course'} %}
+		{% for node in course.tree %}{% include '@platform/partials/admin/course-content-node.html.twig' with {node: node} %}{% endfor %}
+	</ol>
 </div>
