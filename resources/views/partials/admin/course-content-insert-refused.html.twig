@@ -1,0 +1,2 @@
+{# The insert modal's body when its "+ Add here" place cannot be used, for example after the tree changed elsewhere. #}
+<div class="cl-course-insert-panel">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'Cannot add here'})} %}{% block body %}<p>{{ message }}</p>{% endblock %}{% endembed %}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Close', type: 'button', close_modal: true}) }}{% endblock %}{% endembed %}</div>

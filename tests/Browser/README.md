@@ -75,8 +75,12 @@ navigation as a regression for that behaviour.
 with JavaScript disabled: drag before, after and inside rows, section and subtree moves, refused
 drops (depth and into-itself), the three drop indicators, keyboard moves on the handle, ⋯ menu
 moves without a page load, collapse state kept for the session, a failed save restoring the tree,
-"+ Add here" inserting at the exact place, and the no-JavaScript ⋯ menu and Move into page. Each
-scenario resets the fixture course and reads the saved tree back from the server.
+"+ Add here" through the insert modal (Add section, Add existing item and Create new item at exact
+places, a refused key keeping the entry and rich text, Escape/Cancel/close changing nothing, an
+empty course, dragging a just-inserted row), and the no-JavaScript ⋯ menu, Move into page and
+"+ Add here" form pages. Each
+scenario resets the fixture course (`reset`; `empty` removes every row) and reads the saved tree back
+from the server.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-content-fixture.php create'

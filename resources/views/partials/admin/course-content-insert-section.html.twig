@@ -1,0 +1,13 @@
+{# Add section at one "+ Add here" place: the insert modal's body, or the form on its own page without JavaScript. A refused submission returns here with the reason and everything entered. #}
+<div class="cl-course-insert-panel">
+{{ ui('layout.section-head', {heading: 'Add section', heading_level: 3}) }}
+{% if insert_error %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger'})} %}{% block body %}<p>{{ insert_error }}</p>{% endblock %}{% endembed %}{% endif %}
+<form action="/admin/courses/{{ course.id }}/content/sections" method="post"{% if in_modal %} hx-post="/admin/courses/{{ course.id }}/content/sections" hx-target="#course-content-insert-body" hx-swap="innerHTML"{% endif %}><input type="hidden" name="csrf" value="{{ csrf }}">
+{% include '@platform/partials/admin/course-insert-position.html.twig' with {structure: course.structure, parent: place.parent, index: place.index} %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Section title', for: 'insert-section-title', required: true})} %}{% block control %}<input class="form-control" id="insert-section-title" name="title" value="{{ values.title }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Optional introduction', for: 'insert-section-intro'})} %}{% block control %}<textarea class="form-control" id="insert-section-intro" name="introduction_html" {{ ui_field_attrs(props) }}>{{ values.introduction_html }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show section outline'})} %}{% block control %}<input type="checkbox" name="show_outline" value="1"{% if values.show_outline %} checked{% endif %}>{% endblock %}{% endembed %}
+<div class="mt-3">{% include '@platform/partials/course-availability-fields.html.twig' with {delay_total: values.delay_total, delay_prefix: 'insert-section'} %}</div>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save new section', variant: 'primary', type: 'submit'}) }}{% endblock %}{% block secondary_actions %}{% if in_modal %}{{ ui('action.button', {label: 'Cancel', type: 'button', close_modal: true}) }}{% else %}{{ ui('action.link', {label: 'Cancel', href: '/admin/courses/' ~ course.id ~ '/content'}) }}{% endif %}{% endblock %}{% endembed %}
+</form>
+</div>

@@ -323,10 +323,21 @@ final class CourseItemService
     /** @param array<string,mixed> $input */
     public function createAttached(int $courseId, array $input, int $userId): int
     {
-        return $this->transactions->run(function () use ($courseId, $input, $userId): int {
+        return $this->createAndPlace($courseId, $input, $userId)['item'];
+    }
+
+    /**
+     * Creates a Course Item and places it in the course in one transaction, at `insert_index` under
+     * `parent_node_id` when given: nothing is kept if either step is refused.
+     *
+     * @param array<string,mixed> $input
+     * @return array{item:int,node:int}
+     */
+    public function createAndPlace(int $courseId, array $input, int $userId): array
+    {
+        return $this->transactions->run(function () use ($courseId, $input, $userId): array {
             $itemId = $this->create($input, $userId);
-            $this->addExisting($courseId, $itemId, $input, $userId);
-            return $itemId;
+            return ['item' => $itemId, 'node' => $this->addExisting($courseId, $itemId, $input, $userId)];
         });
     }
 
