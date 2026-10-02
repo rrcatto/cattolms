@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_back_href = '/admin/courses' %}{% set ph_back_label = 'Courses' %}{% set ph_kicker = 'Reusable course content' %}{% set ph_title = 'Course Item Library' %}{% set ph_lead = 'Edit shared Course Items and see every course placement. Items without placements remain available under Not currently in use.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = '/admin/courses' %}{% set ph_back_label = 'Courses' %}{% set ph_kicker = 'Reusable course content' %}{% set ph_title = 'Course Item Library' %}{% set ph_lead = 'Edit shared Course Items and see every course placement. Items without placements remain available under Not currently in use.' %}{% set ph_action_href = '/admin/course-items/new' %}{% set ph_action_label = 'Create item' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section container-fluid cl-container-wide py-5">
 <form method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', for: 'course-item-search'})} %}{% block control %}<input class="form-control" id="course-item-search" name="q" value="{{ item_library.search }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}

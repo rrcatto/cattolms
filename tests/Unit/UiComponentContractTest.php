@@ -28,6 +28,7 @@ final class UiComponentContractTest extends TestCase
             'course' => ['id' => 1, 'slug' => 'example', 'title' => 'Example', 'structure' => [], 'publication_validation' => ['errors' => [], 'warnings' => []]],
             'library_items' => [],
             'item_search' => '',
+            'type_choices' => [['value' => 'downloadable_file', 'label' => 'Downloadable file', 'description' => 'Any file learners download.']],
             'csrf' => 'test-csrf',
             'arrangement_pending' => false,
         ]));
@@ -35,7 +36,7 @@ final class UiComponentContractTest extends TestCase
         self::assertStringContainsString('name="delay_weeks"', $html);
         $pending = RenderHarness::render('pages/admin-course-content', RenderHarness::hiveWith([
             'course' => ['id' => 1, 'slug' => 'example', 'title' => 'Example', 'structure' => [], 'publication_validation' => ['errors' => [], 'warnings' => []]],
-            'library_items' => [], 'item_search' => '', 'csrf' => 'test-csrf', 'arrangement_pending' => true,
+            'library_items' => [], 'item_search' => '', 'type_choices' => [], 'csrf' => 'test-csrf', 'arrangement_pending' => true,
         ]));
         self::assertStringContainsString('/content/save-arrangement', $pending);
         self::assertStringContainsString('/content/cancel-arrangement', $pending);

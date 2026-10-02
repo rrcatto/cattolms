@@ -10,10 +10,55 @@ use RuntimeException;
 /** Manages immutable files in the single Resource Library directory and their database records. */
 final class ResourceLibraryService
 {
-    public const TYPES = ['pdf','image_graphic','uploaded_video','audio','markdown','document'];
+    public const TYPES = ['pdf','image_graphic','uploaded_video','audio','markdown','document','archive','file'];
 
-    public function __construct(private readonly CourseItemRepository $records, private readonly string $storageRoot)
+    /** Readable names for common downloadable formats, keyed by lower-case extension. Anything else is "EXT file". */
+    private const FORMAT_LABELS = [
+        'zip' => 'ZIP archive', '7z' => '7-Zip archive', 'rar' => 'RAR archive', 'tar' => 'TAR archive', 'gz' => 'GZip archive', 'tgz' => 'GZip archive',
+        'pdf' => 'PDF document', 'doc' => 'Word document', 'docx' => 'Word document', 'odt' => 'OpenDocument text', 'rtf' => 'Rich Text document', 'txt' => 'Text file',
+        'xls' => 'Excel workbook', 'xlsx' => 'Excel workbook', 'ods' => 'OpenDocument spreadsheet', 'csv' => 'CSV file',
+        'ppt' => 'PowerPoint presentation', 'pptx' => 'PowerPoint presentation', 'odp' => 'OpenDocument presentation',
+    ];
+    private const ARCHIVE_EXTENSIONS = ['zip', '7z', 'rar', 'tar', 'gz', 'tgz'];
+    private const DOCUMENT_EXTENSIONS = ['doc', 'docx', 'odt', 'rtf', 'txt', 'xls', 'xlsx', 'ods', 'csv', 'ppt', 'pptx', 'odp'];
+
+    /** @var \Closure(string):bool */
+    private readonly \Closure $isUploadedFile;
+
+    /** @param (\Closure(string):bool)|null $isUploadedFile tests replace PHP's upload check, which is always false on the CLI */
+    public function __construct(private readonly CourseItemRepository $records, private readonly string $storageRoot, ?\Closure $isUploadedFile = null)
     {
+        $this->isUploadedFile = $isUploadedFile ?? static fn(string $path): bool => is_uploaded_file($path);
+    }
+
+    /** The Resource classification for a file added without one: archives, documents, PDFs, otherwise a general file. */
+    public static function classify(string $filename): string
+    {
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        return match (true) {
+            in_array($extension, self::ARCHIVE_EXTENSIONS, true) => 'archive',
+            $extension === 'pdf' => 'pdf',
+            in_array($extension, self::DOCUMENT_EXTENSIONS, true) => 'document',
+            default => 'file',
+        };
+    }
+
+    /** "ZIP archive", "Word document" or, for an unlisted extension, "EXT file". */
+    public static function formatLabel(string $filename): string
+    {
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        return self::FORMAT_LABELS[$extension] ?? ($extension === '' ? 'File' : strtoupper($extension) . ' file');
+    }
+
+    /** A file size for learners: bytes below 1 KB, then KB, MB and GB to one decimal place. */
+    public static function sizeLabel(int $bytes): string
+    {
+        if ($bytes < 1024) { return $bytes . ' bytes'; }
+        $units = ['KB', 'MB', 'GB'];
+        $value = $bytes / 1024;
+        $unit = 0;
+        while ($value >= 1024 && $unit < count($units) - 1) { $value /= 1024; $unit++; }
+        return rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.') . ' ' . $units[$unit];
     }
 
     /** @return list<array<string,mixed>> */
@@ -23,7 +68,10 @@ final class ResourceLibraryService
             throw new InvalidArgumentException('Select a valid Resource type.');
         }
         $resources = $this->records->resources(trim($search), $type);
-        foreach ($resources as &$resource) { $resource['usage'] = $this->records->resourceUsage((int) $resource['id']); }
+        foreach ($resources as &$resource) {
+            $resource['usage'] = $this->records->resourceUsage((int) $resource['id']);
+            $resource['size_label'] = self::sizeLabel((int) $resource['byte_size']);
+        }
         unset($resource);
         return $resources;
     }
@@ -34,7 +82,7 @@ final class ResourceLibraryService
      */
     public function upload(array $upload, array $input, int $userId): int
     {
-        if ((int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) ($upload['tmp_name'] ?? ''))) {
+        if ((int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !($this->isUploadedFile)((string) ($upload['tmp_name'] ?? ''))) {
             throw new InvalidArgumentException('Select a file to upload.');
         }
         $filename = $this->filename((string) ($upload['name'] ?? ''));
@@ -61,6 +109,50 @@ final class ResourceLibraryService
             @unlink($target);
             throw $exception;
         }
+    }
+
+    /**
+     * Course Items using this file, as its own file or as a video poster or captions.
+     * @return list<array<string,mixed>>
+     */
+    public function usage(int $id): array
+    {
+        return $this->records->resourceUsage($id);
+    }
+
+    /**
+     * One Resource record with its usage count, or null.
+     * @return array<string,mixed>|null
+     */
+    public function resource(int $id): ?array
+    {
+        return $id > 0 ? $this->records->resource($id) : null;
+    }
+
+    /**
+     * Change a Resource's title, description or classification. The file is immutable. A new
+     * classification must still suit every Course Item that uses the file as its own.
+     *
+     * @param array<string,mixed> $input
+     */
+    public function update(int $id, array $input): void
+    {
+        $resource = $this->records->resource($id);
+        if ($resource === null) { throw new InvalidArgumentException('The Resource does not exist.'); }
+        $title = trim((string) ($input['title'] ?? ''));
+        $type = trim((string) ($input['resource_type'] ?? ''));
+        if ($title === '' || mb_strlen($title) > 240 || !in_array($type, self::TYPES, true)) {
+            throw new InvalidArgumentException('Resource title and type are required.');
+        }
+        if ($this->records->resourceTitleTaken($title, $id)) {
+            throw new InvalidArgumentException('Another Resource is already titled "' . $title . '".');
+        }
+        foreach ($this->records->resourcePrimaryUsage($id) as $item) {
+            if (!CourseItemService::acceptsResource((string) $item['item_type'], $type)) {
+                throw new InvalidArgumentException('“' . $item['title'] . '” is a ' . CourseItemService::TYPE_LABELS[(string) $item['item_type']] . ' item and cannot use a ' . str_replace('_', ' ', $type) . ' Resource.');
+            }
+        }
+        $this->records->updateResource($id, $title, trim((string) ($input['description'] ?? '')), $type);
     }
 
     /** @param array<string,mixed> $input */
@@ -116,6 +208,9 @@ final class ResourceLibraryService
         $type = trim((string) ($input['resource_type'] ?? ''));
         if ($title === '' || !in_array($type, self::TYPES, true)) {
             throw new InvalidArgumentException('Resource title and type are required.');
+        }
+        if ($this->records->resourceTitleTaken($title)) {
+            throw new InvalidArgumentException('Another Resource is already titled "' . $title . '".');
         }
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($source) ?: 'application/octet-stream';
         return [

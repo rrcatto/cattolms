@@ -1,6 +1,10 @@
-# Catto Learning 0.8.7.3 — Development Handoff
+# Catto Learning 0.8.7.4 — Development Handoff
 
-## Current development handoff — 2026/10/02
+## Current development handoff — 2026/10/02 (v0.8.7.4)
+
+The owner authorized v0.8.7.4, a commit, a direct `main` push and an annotated tag. `downloadable_file` is the one generic download item type; `document` items were folded into it. `LearningService::download()` enforces enrolment, placement, unlock and item checks for `LearningController::download()`, which answers through `Http\FileDownload`; `ResourceUnavailable` maps to 404 and refusals to 403. `CourseItemService::RESOURCE_COMPATIBILITY` decides which Resource classifications each item type accepts and drives validation, the item form's selector and the Resource Library's Create course item. Course Content's Add item area creates through `createAttached()`; item forms upload with `resource_action=upload` and redisplay the draft. `ResourceLibraryService` takes an optional upload check so CLI tests can upload. Apply migrations `20261002100000` and `20261002110000` on any other instance. The `/course-resources/` route still serves administrators and media items; Downloadable Files never go through it for learners.
+
+## v0.8.7.3 handoff — 2026/10/02
 
 The owner authorized v0.8.7.3, a commit, a direct `main` push and an annotated tag. The catalogue at `/courses` uses the canonical `form.tree-select` category picker (submit mode) above the search field; the old category grid, tiles, rails and pills are removed. `/admin/courses/categories` renders a nested, collapsible tree through `partials/admin/category-tree-node.html.twig` and the `category-tree` Stimulus controller, which the page loads with `importmap()` after its page head (themes style the page head as the first element of main). The Parent category control uses `form.tree-select` in field mode, fed by `CourseService::categoryParentPicker()`; `validateCategoryInput()` refuses parents that would push a category's descendants past level 3, and `CourseRepository::updateCategory()` re-levels descendants inside the service's transaction. Gilded Noir's header is one centred row above 1120px. `phpunit.xml` sets `memory_limit=512M`; the previous intermittent `CourseComponentsIntegrationTest` failure was the suite exhausting 128M after a cache clear. Development course 9810 still has its static grading scale and reset button in its introduction until it is re-imported or edited, and graded-assessment `pass_mark` display remains an open owner decision.
 

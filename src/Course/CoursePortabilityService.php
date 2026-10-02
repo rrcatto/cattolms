@@ -573,7 +573,7 @@ final class CoursePortabilityService
                 if (trim((string) ($item['title'] ?? '')) === '') { $conflicts[] = 'Course Item ' . $itemKey . ' needs a title.'; }
                 $resourcePublicId = trim((string) ($item['resource_public_id'] ?? ''));
                 if ($resourcePublicId !== '') { $resource = $this->courseItemRecords->resourceByPublicId($resourcePublicId); if ($resource === null) { $conflicts[] = 'Course Item ' . $itemKey . ' references a Resource that is not installed: ' . $resourcePublicId . '.'; } else { $item['resource_id'] = (int) $resource['id']; } }
-                if (in_array((string) ($item['item_type'] ?? ''), ['pdf','image_graphic','uploaded_video','markdown','document'], true) && empty($item['resource_id'])) { $conflicts[] = 'Course Item ' . $itemKey . ' needs an installed Resource.'; }
+                if (in_array((string) ($item['item_type'] ?? ''), CourseItemService::RESOURCE_TYPES, true) && empty($item['resource_id'])) { $conflicts[] = 'Course Item ' . $itemKey . ' needs an installed Resource.'; }
                 foreach (['poster_resource_id','subtitle_resource_id'] as $field) {
                     $publicField = str_replace('_id', '_public_id', $field);
                     if (!empty($item['type_config'][$publicField])) {

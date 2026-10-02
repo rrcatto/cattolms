@@ -37,6 +37,9 @@ use CattoLearning\Application\AccountSectionRegistry;
 use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Course\LearningService;
+use CattoLearning\Course\ResourceUnavailable;
+use CattoLearning\Http\FileDownload;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use CattoLearning\Course\CourseRepository;
 
 use CattoLearning\View\ThemeRenderer;
@@ -208,6 +211,25 @@ final class LearningController extends BaseController
                 'preview_query' => $preview ? '?preview=1' : '',
             ]);
         }, '/learn/' . rawurlencode($slug));
+    }
+
+    /**
+     * A Downloadable File, sent only to a signed-in learner who may open this placement now. The URL
+     * names the course, the placement and the item key, so a copied link is useless to anyone the
+     * same checks would refuse.
+     */
+    #[Route('/learn/{slug}/item/{node_id}/download/{item_key}', name: 'learning_course_download', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'item_key' => '[a-zA-Z0-9][a-zA-Z0-9._-]{0,119}'], methods: ['GET'])]
+    public function download(): Response
+    {
+        $user = $this->requirePermission('LEARNING.COURSE.VIEW');
+        try {
+            $file = $this->learning->download($user->id, (string) $this->param('slug'), (int) $this->param('node_id'), (string) $this->param('item_key'), $this->previewMode());
+        } catch (ResourceUnavailable $exception) {
+            throw $this->notFound($exception->getMessage());
+        } catch (\InvalidArgumentException $exception) {
+            throw new AccessDeniedHttpException($exception->getMessage());
+        }
+        return FileDownload::attachment($file['path'], $file['filename'], $file['mime_type']);
     }
 
     private function previewMode(): bool

@@ -58,6 +58,7 @@ final class LearningService
         private readonly CourseItemRenderer $courseItemRenderer,
         private readonly AuditRepository $audit,
         private readonly AdministrationRepository $administration,
+        private readonly ResourceLibraryService $resources,
         private readonly ?AccessService $commerceAccess = null
     ) {
     }
@@ -204,6 +205,61 @@ final class LearningService
                 'enrolment_id' => (int) $enrolment['id'],
             ]);
         }
+    }
+
+    /**
+     * The file behind a Downloadable File, for one learner at one course placement. The placement
+     * must belong to the course, the learner's enrolment must be started, current and not removed,
+     * and the placement must be unlocked. The item is the placement's own, or a Downloadable File the
+     * placement's HTML lesson embeds with [course-item:key].
+     *
+     * @return array{path:string,filename:string,mime_type:string}
+     * @throws InvalidArgumentException when this learner may not download it here
+     * @throws ResourceUnavailable when the Resource or its stored file is missing
+     */
+    public function download(int $userId, string $slug, int $nodeId, string $itemKey, bool $preview = false): array
+    {
+        $course = $this->courseHome($userId, $slug, $preview);
+        $enrolment = (array) $course['enrolment'];
+        if (empty($enrolment['started_at'])) {
+            throw new InvalidArgumentException('Start the course before downloading its files.');
+        }
+        if (!$preview && (!in_array((string) ($enrolment['status'] ?? ''), ['active', 'completed'], true) || !empty($enrolment['access_removed_at']))) {
+            throw new InvalidArgumentException('Your access to this course has ended.');
+        }
+        $node = null;
+        foreach ((array) $course['structure'] as $row) {
+            if ((int) $row['id'] === $nodeId && ($row['node_type'] ?? '') === 'item') { $node = $row; break; }
+        }
+        if ($node === null) {
+            throw new InvalidArgumentException('That download is not part of this course.');
+        }
+        if (!empty($node['is_locked']) && !$preview) {
+            throw new InvalidArgumentException('This file is not available yet.');
+        }
+        if ((string) $node['item_key'] === $itemKey) {
+            $item = $this->courseItemRecords->item((int) $node['course_item_id']);
+        } elseif (($node['item_type'] ?? '') === 'html_lesson' && $this->courseItemRecords->itemReferencesKey((int) $node['course_item_id'], $itemKey)) {
+            $item = $this->courseItemRecords->itemByKey($itemKey);
+        } else {
+            throw new InvalidArgumentException('That download is not part of this course.');
+        }
+        if ($item === null || ($item['item_type'] ?? '') !== 'downloadable_file') {
+            throw new InvalidArgumentException('That download is not part of this course.');
+        }
+        $resource = $this->courseItemRecords->resource((int) ($item['resource_id'] ?? 0));
+        if ($resource === null) {
+            throw new ResourceUnavailable('The file for this download is missing.');
+        }
+        $path = $this->resources->path($resource);
+        if (!is_file($path) || !is_readable($path)) {
+            throw new ResourceUnavailable('The file for this download is missing.');
+        }
+        return [
+            'path' => $path,
+            'filename' => (string) ($resource['original_filename'] ?: $resource['filename']),
+            'mime_type' => (string) ($resource['mime_type'] ?: 'application/octet-stream'),
+        ];
     }
 
     /** @return array<string,mixed> */

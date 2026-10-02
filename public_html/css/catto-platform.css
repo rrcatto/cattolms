@@ -1052,6 +1052,17 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-course-reader-progress{padding:.7rem clamp(1rem,3vw,2.5rem);background:#fff;border-bottom:1px solid #d9e0e8}.cl-course-reader-progress .ps-inner{max-width:1200px;margin:0 auto}.cl-course-reader-progress .ps-row{display:flex;justify-content:space-between;gap:1rem;font-size:.88rem;color:#516174}.cl-course-reader-progress .cl-ui-progress-group{margin:.4rem 0 0}.cl-course-reader-progress .cl-ui-progress{height:.55rem;border-radius:999px;background:#e5ebf2}.cl-course-reader-progress .cl-ui-progress-bar{border-radius:inherit;background:linear-gradient(90deg,#145da0,#2d8ac7);transition:width .25s ease}
 .cl-course-reader-progress{position:sticky;top:4.5rem;z-index:19;box-shadow:0 2px 8px rgba(22,34,51,.06)}.cl-course-outline-title{margin:.2rem .6rem .9rem;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:#718096}.cl-course-presentation-intro{margin:3rem auto!important}.cl-course-presentation-intro .course-introduction-copy{max-width:72ch;margin-inline:auto}
 .cl-course-presentation-shell .cl-ui-action--primary{background:#145da0;color:#fff}.cl-course-presentation-shell .cl-ui-action--primary:hover{background:#0e467a;color:#fff}
+/* Course Item type choice: a plain fieldset whose radio choices stack with their one-line help. */
+.cl-item-type-choices{display:grid;gap:.75rem;margin:0 0 1rem;padding:0;border:0;min-width:0}
+/* Downloadable File card in the Core reader: a bordered panel, the file line and the reader's blue primary action. */
+.cl-course-item-download{display:grid;gap:.5rem;margin:1rem 0;padding:1rem 1.15rem;border:1px solid #d9e0e8;border-radius:.6rem;background:#fff}
+.cl-course-item-download>*{margin:0}
+.cl-course-item-download-title{font-size:1.05rem;font-weight:700}
+.cl-course-item-download-meta{font-size:.9rem;color:#475467;overflow-wrap:anywhere}
+.cl-course-item-download-note{font-size:.9rem;color:#475467;font-style:italic}
+.cl-course-item-download-link{display:inline-flex;align-items:center;min-height:44px;padding:.55rem 1.1rem;border-radius:.5rem;background:#145da0;color:#fff;font-weight:600;text-decoration:none}
+.cl-course-item-download-link:hover{background:#0e467a;color:#fff}
+.cl-course-item-download-link:focus-visible{outline:3px solid #145da0;outline-offset:3px}
 .cl-course-assessment-scoring-heading{margin-top:2rem}
 .cl-course-assessment-action-cards .cl-ui-section-grid{align-items:stretch}.cl-course-assessment-action-cards .cl-ui-surface{display:flex;flex-direction:column}.cl-course-assessment-action-cards .cl-ui-surface form{margin-top:auto}
 body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader="1"] .cl-palette-show{display:none!important}

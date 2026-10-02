@@ -1,6 +1,17 @@
 # Changelog
 
-**LMS version:** 0.8.7.3 **Date time:** 2026/10/02 SAST
+**LMS version:** 0.8.7.4 **Date time:** 2026/10/02 SAST
+
+## 2026-10-02 SAST — v0.8.7.4 Downloadable File items and the Add item workflow
+
+- Add the generic Downloadable File Course Item (`downloadable_file`): title, description and one Resource Library file, placed, ordered, sectioned, drip-fed and reused like any other item, with one stored file for every course that uses it. Learners download only through `/learn/{slug}/item/{node_id}/download/{item_key}`, which requires a signed-in learner with a started, current, unremoved enrolment in that course, an unlocked placement of that course, and the item at that placement or embedded in its lesson. Files are sent as attachments with the stored MIME type, a safe filename with ASCII fallback, `nosniff` and private `no-store` caching; missing files return 404 and refused access 403. The general `/course-resources/` route no longer serves files reached only through a Downloadable File. The learner card shows filename, format and size.
+- Fold the `document` item type, which only offered an unscoped download link, into Downloadable File. The Resource Library gains `archive` and `file` classifications; `document` remains a Resource classification.
+- Course Content has one Add item area: Create new item (type, configuration, placement parent and availability, then Create and add to course in one transaction), Add existing item and Add section. The Course Item Library has Create item for unassigned items.
+- Resource-backed item forms offer Choose existing resource (compatible files only) and Upload new resource; Upload and select stores the file once, selects it and redisplays the form with entered values. The server accepts a Resource only if it exists and suits the item type.
+- The Resource Library shows readable sizes, edits title, description and classification (refusing one that no longer suits an item using the file), shows usage, and offers Create course item with only the item types that can use the file.
+- Migrations `20261002100000_add_downloadable_file_items.php` and `20261002110000_fold_document_items_into_downloadable_file.php` widen the type constraints and convert document items. No dataset reset.
+
+Validation: `SHELL_VERBOSITY=-1 composer qa` with a cold cache (PHPUnit 730 tests, 39,411 assertions), Twig lint of all 184 templates, Composer validation, AssetMapper compilation, `git diff --check`, both all-theme browser matrices, and browser checks of item creation with upload, learner download, refusals for locked placements, wrong keys and signed-out requests, and the Add item, Create course item and Resource edit screens.
 
 ## 2026-10-02 SAST — v0.8.7.3 Category pickers, category tree and one-row Gilded Noir navbar
 

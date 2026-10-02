@@ -32,10 +32,33 @@ final class CourseItemRenderer
             'audio' => '<section class="cl-course-item-media"><audio controls src="' . ($item['resource_id'] ? $this->resourceUrl($item) : self::escape((string) ($config['remote_uri'] ?? ''))) . '"></audio>' . $description . '<p>' . self::escape((string) ($config['caption'] ?? '')) . '</p>' . $this->transcript($config) . '</section>',
             'pdf' => '<section class="cl-course-item-document"><object data="' . $this->resourceUrl($item) . '" type="application/pdf"><a href="' . $this->resourceUrl($item) . '">Open PDF</a></object><p><a href="' . $this->resourceUrl($item) . '" download>Download ' . self::escape((string) ($item['title'] ?? 'PDF')) . '</a></p>' . $description . '</section>',
             'markdown' => '<article class="cl-course-item-markdown">' . $this->markdown($this->resourceSource($item)) . '<p><a href="' . $this->resourceUrl($item) . '" download>Download source</a></p></article>',
-            'document' => '<section class="cl-course-item-document">' . $description . '<p><a href="' . $this->resourceUrl($item) . '" download>Download ' . self::escape((string) ($item['title'] ?? 'document')) . '</a></p></section>',
+            'downloadable_file' => $this->download($item, $courseSlug, $contextNodeId, $publicPreview, count($stack) > 1),
             'assessment','diagnostic' => '<section class="cl-course-item-assessment"><h2>' . self::escape((string) ($item['title'] ?? $item['item_title'] ?? 'Assessment')) . '</h2>' . $description . '<p><a href="' . ($publicPreview ? '/courses/' . rawurlencode($courseSlug) . '/preview/' : '/learn/' . rawurlencode($courseSlug) . '/item/') . $contextNodeId . '/assessment/' . rawurlencode($key) . '">' . ($publicPreview ? 'Try assessment' : 'Open assessment') . '</a></p></section>',
             default => '<aside class="cl-course-item-error">Unsupported Course Item type.</aside>',
         };
+    }
+
+    /**
+     * A Downloadable File card. The link goes to the placement-scoped learner download route, never
+     * to the Resource itself; a public preview shows the card without a link. The title is printed
+     * only when the file is embedded in a lesson, because an item page already heads it.
+     *
+     * @param array<string,mixed> $item
+     */
+    private function download(array $item, string $slug, int $contextNodeId, bool $public, bool $embedded): string
+    {
+        $filename = (string) (($item['original_filename'] ?? '') ?: ($item['resource_filename'] ?? ''));
+        $title = (string) ($item['display_title_override'] ?? '') ?: (string) ($item['title'] ?? $item['item_title'] ?? 'Download');
+        $meta = $filename === '' ? 'File not yet attached' : $filename . ' · ' . ResourceLibraryService::formatLabel($filename) . ' · ' . ResourceLibraryService::sizeLabel((int) ($item['byte_size'] ?? 0));
+        $action = $public || $filename === ''
+            ? '<p class="cl-course-item-download-note">' . ($filename === '' ? 'This file is not available yet.' : 'Available to download after you start the course.') . '</p>'
+            : '<p><a class="cl-course-item-download-link" href="/learn/' . rawurlencode($slug) . '/item/' . $contextNodeId . '/download/' . rawurlencode((string) ($item['item_key'] ?? '')) . '" download>Download<span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
+        return '<section class="cl-course-item-download">'
+            . ($embedded ? '<h3 class="cl-course-item-download-title">' . self::escape($title) . '</h3>' : '')
+            . (string) ($item['description_html'] ?? '')
+            . '<p class="cl-course-item-download-meta">' . self::escape($meta) . '</p>'
+            . $action
+            . '</section>';
     }
 
     /** @param list<string> $stack */
