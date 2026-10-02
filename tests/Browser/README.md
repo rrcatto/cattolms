@@ -68,3 +68,22 @@ also accounts for margins and the desktop sidebar width, including on the galler
 With JavaScript disabled, mobile top navigation stays in normal flow so its expanded links cannot
 cover pagination or other page controls. The component matrix exercises native Next and jump
 navigation as a regression for that behaviour.
+
+## Course Content tree
+
+`course-content-tree.cjs` drives the Course Content editor in Chromium and Firefox, then Chromium
+with JavaScript disabled: drag before, after and inside rows, section and subtree moves, refused
+drops (depth and into-itself), the three drop indicators, keyboard moves on the handle, ⋯ menu
+moves without a page load, collapse state kept for the session, a failed save restoring the tree,
+"+ Add here" inserting at the exact place, and the no-JavaScript ⋯ menu and Move into page. Each
+scenario resets the fixture course and reads the saved tree back from the server.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-content-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-content-tree.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-content-fixture.php cleanup'
+```
+
+The runner reads the fixture state and resets the tree through `podman exec` (`CATTO_PHP_CONTAINER`,
+default `env_php_1`). `CATTO_BROWSERS` (default `chromium,firefox`) and `CATTO_BROWSER_OUTPUT`
+(default `/tmp/catto-course-content-tree`) override the browsers and screenshot directory.

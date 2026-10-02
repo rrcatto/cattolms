@@ -73,7 +73,9 @@ services:
     CattoLearning\View\Artwork\:
         resource: '../src/View/Artwork/'
 
-    CattoLearning\View\Ui\PlatformUi: ~
+    CattoLearning\View\Ui\PlatformUi:
+        arguments:
+            $publicRoot: '%catto.public_root%'
 
     # The Twig theme layer.
     CattoLearning\View\Twig\:

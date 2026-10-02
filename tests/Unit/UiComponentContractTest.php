@@ -22,25 +22,32 @@ final class UiComponentContractTest extends TestCase
         self::assertStringNotContainsString('disabled', $html);
     }
 
-    public function testCourseContentEditorRendersWithoutAnObsoleteCourseLock(): void
+    public function testCourseContentEditorTemplatesDeclareTheTreeContract(): void
     {
-        $html = RenderHarness::render('pages/admin-course-content', RenderHarness::hiveWith([
-            'course' => ['id' => 1, 'slug' => 'example', 'title' => 'Example', 'structure' => [], 'publication_validation' => ['errors' => [], 'warnings' => []]],
-            'library_items' => [],
-            'item_search' => '',
-            'type_choices' => [['value' => 'downloadable_file', 'label' => 'Downloadable file', 'description' => 'Any file learners download.']],
-            'csrf' => 'test-csrf',
-            'arrangement_pending' => false,
-        ]));
-        self::assertStringContainsString('Course Content', $html);
-        self::assertStringContainsString('name="delay_weeks"', $html);
-        $pending = RenderHarness::render('pages/admin-course-content', RenderHarness::hiveWith([
-            'course' => ['id' => 1, 'slug' => 'example', 'title' => 'Example', 'structure' => [], 'publication_validation' => ['errors' => [], 'warnings' => []]],
-            'library_items' => [], 'item_search' => '', 'type_choices' => [], 'csrf' => 'test-csrf', 'arrangement_pending' => true,
-        ]));
-        self::assertStringContainsString('/content/save-arrangement', $pending);
-        self::assertStringContainsString('/content/cancel-arrangement', $pending);
-        self::assertStringNotContainsString('/content/sections', $pending);
+        // The page itself calls importmap(), which this harness lacks, so the rendered page is
+        // covered by CourseContentEditorPageTest through the live kernel. Here: the source contract.
+        $root = dirname(__DIR__, 2);
+        $page = (string) file_get_contents($root . '/resources/views/pages/admin-course-content.html.twig');
+        self::assertGreaterThan(strpos($page, 'page-head.html.twig'), strpos($page, '{{ importmap() }}'), 'Scripts come after the page head.');
+        self::assertStringContainsString('data-controller="course-content"', $page);
+        self::assertStringNotContainsString('save-arrangement', $page, 'Moves save at once; there is no staged arrangement.');
+        $node = (string) file_get_contents($root . '/resources/views/partials/admin/course-content-node.html.twig');
+        foreach (['data-course-content-target="handle"', 'aria-controls="course-branch-', 'data-course-content-direction=', 'compact: true', '/move-into?'] as $contract) {
+            self::assertStringContainsString($contract, $node);
+        }
+        self::assertStringContainsString('id="course-content-tree"', (string) file_get_contents($root . '/resources/views/partials/admin/course-content-tree.html.twig'));
+    }
+
+    public function testCompactRowMenuShowsTheIconWithAnAccessibleName(): void
+    {
+        $html = \CattoLearning\Tests\Support\ComponentHarness::render('action.row', ['menu' => true, 'compact' => true, 'icon' => 'action-more', 'aria_label' => 'Actions for Lesson']);
+        self::assertStringContainsString('aria-label="Actions for Lesson"', $html);
+        self::assertStringContainsString('#action-more', $html);
+        self::assertStringContainsString('cl-ui-row-menu--compact', $html);
+        self::assertStringNotContainsString('cl-ui-row-label', $html);
+        $default = \CattoLearning\Tests\Support\ComponentHarness::render('action.row', ['menu' => true]);
+        self::assertStringContainsString('aria-label="Actions"', $default);
+        self::assertStringContainsString('<span class="cl-ui-row-label">Actions</span>', $default);
     }
 
     public function testComponentTextIsEscapedByTheSameTwigEnvironmentAsRuntime(): void

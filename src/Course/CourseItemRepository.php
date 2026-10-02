@@ -270,19 +270,54 @@ final class CourseItemRepository
         );
     }
 
-    /** @param list<array{id:int,parent_node_id:int|null}> $draft */
-    public function saveStructureOrder(int $courseId, array $draft): void
+    /**
+     * Persists a complete tree-ordered arrangement. Positions are renumbered 1..n per parent, and
+     * only rows whose parent or position changes are written. Changed rows first step aside to
+     * free positions above every existing and final one, because (course, parent, position) is unique.
+     *
+     * @param list<array{id:int,parent_node_id:int|null}> $rows
+     */
+    public function saveStructureOrder(int $courseId, array $rows): void
     {
-        $offset = (int) $this->db->fetchOne('SELECT COALESCE(MAX(position),0) FROM course_structure_nodes WHERE course_id=:course', ['course' => $courseId]) + count($draft) + 1;
-        foreach ($draft as $index => $row) {
-            $this->moveNode($courseId, $row['id'], null, $offset + $index);
+        $current = [];
+        foreach ($this->db->fetchAllAssociative('SELECT id,parent_node_id,position FROM course_structure_nodes WHERE course_id=:course', ['course' => $courseId]) as $row) {
+            $current[(int) $row['id']] = [$row['parent_node_id'] === null ? null : (int) $row['parent_node_id'], (int) $row['position']];
         }
-        $positions = [];
-        foreach ($draft as $row) {
-            $parent = $row['parent_node_id']; $key = $parent ?? 0;
-            $positions[$key] = ($positions[$key] ?? 0) + 1;
-            $this->moveNode($courseId, $row['id'], $parent, $positions[$key]);
+        $counts = []; $changed = [];
+        foreach ($rows as $row) {
+            $parent = $row['parent_node_id'];
+            $position = $counts[$parent ?? 0] = ($counts[$parent ?? 0] ?? 0) + 1;
+            if (($current[$row['id']] ?? null) !== [$parent, $position]) { $changed[] = [$row['id'], $parent, $position]; }
         }
+        if ($changed === []) { return; }
+        $offset = max(array_merge([count($rows)], array_map(static fn(array $place): int => $place[1], $current))) + 1;
+        foreach ($changed as $index => [$id]) {
+            $this->db->executeStatement('UPDATE course_structure_nodes SET position=:position WHERE id=:id AND course_id=:course', ['position' => $offset + $index, 'id' => $id, 'course' => $courseId]);
+        }
+        foreach ($changed as [$id, $parent, $position]) {
+            $this->moveNode($courseId, $id, $parent, $position);
+        }
+    }
+
+    /** Holds the course's rows until the surrounding transaction ends, so two moves cannot interleave. */
+    public function lockStructure(int $courseId): void
+    {
+        $this->db->fetchAllAssociative('SELECT id FROM course_structure_nodes WHERE course_id=:course ORDER BY id FOR UPDATE', ['course' => $courseId]);
+    }
+
+    /** Depth of a row in this course (outer level is 1), or null when the row is not in it. */
+    public function nodeDepth(int $courseId, int $nodeId): ?int
+    {
+        $depth = $this->db->fetchOne(
+            'WITH RECURSIVE up AS (
+                SELECT id,parent_node_id,1 AS depth FROM course_structure_nodes WHERE id=:id AND course_id=:course
+                UNION ALL
+                SELECT n.id,n.parent_node_id,up.depth+1 FROM course_structure_nodes n JOIN up ON n.id=up.parent_node_id
+             )
+             SELECT MAX(depth) FROM up',
+            ['id' => $nodeId, 'course' => $courseId]
+        );
+        return $depth === null || $depth === false ? null : (int) $depth;
     }
 
     /** @return array<string,mixed>|null */
@@ -299,16 +334,6 @@ final class CourseItemRepository
             'SELECT * FROM course_structure_nodes WHERE course_id=:course AND parent_node_id IS NOT DISTINCT FROM :parent ORDER BY position,id',
             ['course' => $courseId, 'parent' => $parentId]
         );
-    }
-
-    public function swapPositions(int $courseId, int $firstId, int $secondId): void
-    {
-        $first = $this->node($courseId, $firstId); $second = $this->node($courseId, $secondId);
-        if ($first === null || $second === null || ($first['parent_node_id'] ?? null) !== ($second['parent_node_id'] ?? null)) { return; }
-        $temporary = $this->nextPosition($courseId, $first['parent_node_id'] === null ? null : (int) $first['parent_node_id']);
-        $this->db->executeStatement('UPDATE course_structure_nodes SET position=:position WHERE id=:id', ['position' => $temporary, 'id' => $firstId]);
-        $this->db->executeStatement('UPDATE course_structure_nodes SET position=:position WHERE id=:id', ['position' => (int) $first['position'], 'id' => $secondId]);
-        $this->db->executeStatement('UPDATE course_structure_nodes SET position=:position WHERE id=:id', ['position' => (int) $second['position'], 'id' => $firstId]);
     }
 
     public function updateSection(int $nodeId, string $title, string $introduction, bool $outline, int $delay): void

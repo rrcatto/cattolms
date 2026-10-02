@@ -1,6 +1,15 @@
 # Changelog
 
-**LMS version:** 0.8.7.4 **Date time:** 2026/10/02 SAST
+**LMS version:** 0.8.7.5 **Date time:** 2026/10/02 SAST
+
+## 2026-10-02 SAST — v0.8.7.5 Course Content drag-and-drop tree
+
+- Course Content is a nested tree: a drag handle on every row with before, after and inside drop indicators and refused drops marked; collapsible sections and parents whose open/closed state is kept for the browser session; keyboard moves on the handle (↑ ↓ Home End ← →); a ⋯ menu per row with Move to top, Move up, Move down, Move to bottom, Move into section…, Move out of section, Edit shared item and Remove from course; and "+ Add here" between rows, which passes the exact parent and position to Create new item, Add existing item and Add section.
+- Every move is saved at once by one validated service operation (`CourseItemService::arrange`/`move`) that checks course ownership, destination, cycles, the three-level limit and the position, locks the course's rows, renumbers positions and writes only changed rows. The tree shows a move straight away and swaps in the server's tree when the save returns; a refused move returns the authoritative tree and the reason, and a failed request restores the previous tree with an error. The staged Save arrangement / Cancel changes flow and its session draft are removed.
+- New parents are validated when adding a section or placement: the parent must be in the course and leave room for another level.
+- `action.row` menus take `label`, `aria_label`, `icon` and `compact` (icon-only ⋯ trigger). The sprite gains `action-drag` and `action-more`. While a dropdown is open, `<main>` sits above the footer, so a menu near the end of a page is no longer covered by it in Gilded Noir.
+- Icons rendered by the `icon` component now use the content-fingerprinted sprite URL that the navigation already used (`/img/nav-icons.svg?v=…`), so a symbol added to the sprite is not hidden by a browser's cached copy of the old file. The drag handle has a visible outline.
+- Tests: `CourseContentArrangementIntegrationTest`, `CourseContentEditorPageTest` (live kernel render and the save endpoint), and the `course-content-tree.cjs` browser check.
 
 ## 2026-10-02 SAST — v0.8.7.4 Downloadable File items and the Add item workflow
 
