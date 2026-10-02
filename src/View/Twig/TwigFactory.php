@@ -61,7 +61,7 @@ final class TwigFactory
             'autoescape' => 'html',
         ]);
         $twig->addExtension(new PlatformExtension());
-        $twig->addExtension(new PlatformUiExtension(new \CattoLearning\View\Ui\PlatformUi()));
+        $twig->addExtension(new PlatformUiExtension(new \CattoLearning\View\Ui\PlatformUi(rtrim($codeRoot, '/') . '/public_html')));
 
         return $twig;
     }

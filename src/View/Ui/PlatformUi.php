@@ -11,6 +11,13 @@ use Twig\Markup;
 /** Canonical presentation registry: bounded semantic properties and Twig-owned structure/slots. */
 final class PlatformUi
 {
+    private ?string $iconSprite = null;
+
+    /** @param string|null $publicRoot The served web root, for the icon sprite's fingerprint. */
+    public function __construct(private readonly ?string $publicRoot = null)
+    {
+    }
+
     /** Sole logical-name to template/property ownership map. No aliases or dynamic paths. */
     public const COMPONENTS = [
         'layout.surface' => ['template' => 'layout/surface', 'defaults' => ['variant' => 'standard', 'section_spacing' => false, 'id' => '', 'sticky' => false, 'tone' => 'neutral']],
@@ -22,7 +29,7 @@ final class PlatformUi
         'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
         'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
-        'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false]],
+        'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false, 'label' => 'Actions', 'aria_label' => '', 'icon' => 'action-open', 'compact' => false]],
         'form.grid' => ['template' => 'forms/form-grid', 'defaults' => ['columns' => 'auto']],
         'form.field' => ['template' => 'forms/field', 'defaults' => ['label' => null, 'for' => '', 'required' => false, 'full_width' => false, 'span' => '', 'help' => '', 'error' => '']],
         'form.actions' => ['template' => 'forms/form-actions', 'defaults' => []],
@@ -156,6 +163,22 @@ final class PlatformUi
     public function render(Environment $twig, array $context, string $component, array $properties = []): Markup
     {
         $behaviour = array_intersect_key($context, array_flip(['csrf', 'can_favourite', 'favourite_return']));
-        return new Markup($twig->render($this->template($component), ['props' => $this->properties($component, $properties)] + $behaviour), 'UTF-8');
+        $shared = $component === 'icon' ? ['icon_sprite' => $this->iconSprite()] : [];
+        return new Markup($twig->render($this->template($component), ['props' => $this->properties($component, $properties)] + $shared + $behaviour), 'UTF-8');
+    }
+
+    /**
+     * The sprite URL, fingerprinted by content exactly as ThemeManager fingerprints platform assets,
+     * so an icon added to the sprite reaches a browser that cached the previous file. A component is
+     * rendered in its own context and cannot see the page's `platform.icon_sprite`.
+     */
+    public function iconSprite(): string
+    {
+        if ($this->iconSprite === null) {
+            $file = $this->publicRoot === null ? '' : rtrim($this->publicRoot, '/') . '/img/nav-icons.svg';
+            $hash = $file !== '' && is_file($file) ? hash_file('sha256', $file) : false;
+            $this->iconSprite = '/img/nav-icons.svg' . ($hash === false ? '' : '?v=' . substr($hash, 0, 16));
+        }
+        return $this->iconSprite;
     }
 }

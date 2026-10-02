@@ -24,7 +24,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.7.4. Older version directories are historical references. The owner authorized the v0.8.7 release; later releases and pushes still require explicit instruction. Do not reset the database merely to implement this plan.
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.7.5. Older version directories are historical references. The owner authorized the v0.8.7 release; later releases and pushes still require explicit instruction. Do not reset the database merely to implement this plan.
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 

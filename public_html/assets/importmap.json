@@ -4,11 +4,15 @@
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-YK0_PU_.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-dovuwYP.js",
         "type": "js"
     },
     "\/assets\/controllers\/category_tree_controller.js": {
         "path": "\/assets\/controllers\/category_tree_controller-q4f48nV.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/course_content_controller.js": {
+        "path": "\/assets\/controllers\/course_content_controller-4h-8Zhn.js",
         "type": "js"
     },
     "\/assets\/controllers\/profile_image_controller.js": {

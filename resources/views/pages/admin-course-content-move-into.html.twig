@@ -1,0 +1,16 @@
+{% extends layout %}
+{% block page_body %}
+{% set content_href = '/admin/courses/' ~ course.id ~ '/content' %}{% set ph_back_href = content_href %}{% set ph_back_label = 'Course Content' %}{% set ph_kicker = course.title %}{% set ph_title = 'Move into a section' %}{% set ph_lead = 'Choose where the rows go. They move with everything inside them and are placed last in the destination. Destinations that would exceed three levels, or that are inside the rows being moved, are not offered.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Moving', heading_level: 2}) }}
+<ul>{% for row in moving %}<li>{{ row.node_type == 'section' ? row.section_title : (row.display_title_override ?: row.item_title) }}</li>{% endfor %}</ul>
+<form action="{{ content_href }}/arrange" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{% for row in moving %}<input type="hidden" name="node_ids[]" value="{{ row.id }}">{% endfor %}
+<fieldset class="cl-course-move-destinations"><legend class="cl-ui-field-label">Destination</legend>
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Outer level of the course'})} %}{% block control %}<input type="radio" name="parent_node_id" value="" required>{% endblock %}{% endembed %}
+{% for row in choices %}<div class="cl-course-move-destination" data-depth="{{ row.depth }}">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (row.node_type == 'section' ? 'Section · ' ~ row.section_title : 'Item · ' ~ (row.display_title_override ?: row.item_title)), help: row.child_count ? row.child_count ~ ' inside' : ''})} %}{% block control %}<input type="radio" name="parent_node_id" value="{{ row.id }}" required>{% endblock %}{% endembed %}</div>{% endfor %}
+</fieldset>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Move here', variant: 'primary', type: 'submit'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: content_href}) }}{% endblock %}{% endembed %}
+</form>{% endblock %}{% endembed %}
+</section>
+{% endblock %}

@@ -309,7 +309,11 @@
 .cl-ui-row-menu>summary.cl-ui-row-trigger::marker{content:""}
 .cl-ui-row-menu>summary.cl-ui-row-trigger::after{content:none!important}
 .cl-ui-row-menu[open]>summary.cl-ui-row-trigger{outline:1px solid var(--cl-border,#dfe4ea)}
-.cl-ui-row-menu>.cl-ui-row-panel{padding:6px!important;margin:0!important}/* A row menu can open again now the wrapper does not clip. */
+.cl-ui-row-menu>.cl-ui-row-panel{padding:6px!important;margin:0!important}
+/* A theme may give <main> and the footer the same z-index (Gilded Noir does), and the footer, later
+   in the document, then paints over a menu that opens past the bottom of <main>. While a dropdown
+   is open, <main> sits above the footer. */
+.cl-main:has(details[data-cl-dropdown][open]){z-index:2}/* A row menu can open again now the wrapper does not clip. */
 
 .cl-ui-row-menu>summary{list-style:none;cursor:pointer}
 .cl-ui-row-menu>summary::-webkit-details-marker{display:none}
@@ -739,6 +743,68 @@ label.cl-ui-tree-select-option{position:relative}
 .cl-category-tree-item[data-level="1"]>.cl-category-tree-row .cl-category-tree-name{font-weight:700}
 .cl-category-tree-meta{font-size:.82rem;opacity:.75}
 @media(prefers-reduced-motion:reduce){.cl-category-tree-toggle .cl-ui-icon{transition:none}}
+/* Course Content tree: nested lists indented one step per level. Each row has a selection box, a
+   drag handle, a disclosure button for a branch, its type and availability, and a compact ⋯ menu.
+   The course-content controller reveals the handle and the tools, and marks the row under a drag
+   with data-drop: a line above the row (before), a line below its whole subtree (after), an
+   outline (inside), or a dashed danger outline where a drop is refused. */
+.cl-course-tree-wrap{display:grid;gap:.6rem}
+.cl-course-tree-tools{display:grid;gap:.5rem}
+.cl-course-tree-help{margin:0;font-size:.88rem;opacity:.8}
+.cl-course-tree-status{min-height:1.3em;margin:0;font-size:.88rem;opacity:.85}
+.cl-course-tree-status[data-state="saved"]{color:var(--cl-success,#1e7d4f);opacity:1}
+.cl-course-tree-error{margin:0;padding:.5rem .75rem;border:1px solid var(--cl-danger,#b42318);border-radius:.4rem;color:var(--cl-danger,#b42318)}
+.cl-course-tree-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem}
+.cl-course-tree-bulk-label{font-weight:600;margin-inline-end:.25rem}
+.cl-course-tree-list,.cl-course-tree-children{list-style:none;margin:0;padding:0}
+.cl-course-tree-children{margin-inline-start:1.1rem;padding-inline-start:.9rem;border-inline-start:2px solid var(--cl-border,#dfe4ea)}
+.cl-course-tree-node{position:relative}
+.cl-course-tree-node[data-dragging="true"]{opacity:.45}
+.cl-course-tree[aria-busy="true"] .cl-course-tree-row>.cl-course-tree-handle{cursor:progress}
+.cl-course-tree-row{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .6rem;padding:.4rem .25rem;border-bottom:1px solid var(--cl-border,#dfe4ea)}
+.cl-course-tree-select{flex:0 0 auto;width:1.1rem;height:1.1rem;margin:0}
+.cl-course-tree-row>.cl-course-tree-handle{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:36px;min-height:36px;margin:0;padding:0;border:1px solid var(--cl-border,#dfe4ea);border-radius:.4rem;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;cursor:grab;touch-action:none}
+.cl-course-tree-row>.cl-course-tree-handle[hidden]{display:none}
+.cl-course-tree-row>.cl-course-tree-handle:hover{border-color:color-mix(in srgb,currentColor 40%,transparent);background:color-mix(in srgb,currentColor 10%,transparent)}
+.cl-course-tree-row>.cl-course-tree-handle:active{cursor:grabbing}
+.cl-course-tree-handle:focus-visible,.cl-course-tree-toggle:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.cl-course-tree-handle .cl-ui-icon{width:1.4rem;height:1.4rem}
+.cl-course-tree-label{display:flex;flex-wrap:wrap;align-items:center;gap:.1rem .75rem;flex:1 1 16rem;min-width:0}
+.cl-course-tree-toggle,.cl-course-tree-leaf{display:inline-flex;align-items:center;gap:.35rem;min-height:36px;margin:0;padding:.2rem .4rem .2rem .2rem;border:0;border-radius:.4rem;background:transparent;color:inherit;font:inherit;text-align:start}
+.cl-course-tree-toggle{cursor:pointer}
+.cl-course-tree-toggle:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-course-tree-toggle .cl-ui-icon{flex:0 0 auto;width:1.1rem;height:1.1rem;transition:transform .15s ease}
+.cl-course-tree-toggle[aria-expanded="true"] .cl-ui-icon{transform:rotate(90deg)}
+.cl-course-tree-spacer{flex:0 0 auto;width:1.1rem}
+.cl-course-tree-name{overflow-wrap:anywhere}
+.cl-course-tree-node[data-node-type="section"]>.cl-course-tree-row .cl-course-tree-name{font-weight:700}
+.cl-course-tree-meta{font-size:.82rem;opacity:.75;overflow-wrap:anywhere}
+.cl-course-tree-row>.cl-course-tree-edit{flex:0 0 auto;margin:0;padding:0;border:0;background:transparent;box-shadow:none;font-size:.85rem}
+.cl-course-tree-row>.cl-course-tree-edit>summary{cursor:pointer;width:max-content;padding:.25rem .4rem;border-radius:.4rem}
+.cl-course-tree-row>.cl-course-tree-edit>summary:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-course-tree-row>.cl-course-tree-edit[open]{order:1;flex:1 1 100%;padding:.5rem 0 .75rem 2.6rem}
+.cl-course-tree-add{display:flex;margin:0;padding:0 0 0 2.6rem;opacity:.45}
+.cl-course-tree-add:hover,.cl-course-tree-add:focus-within{opacity:1}
+.cl-course-tree-add>.cl-ui-row-menu>summary.cl-ui-row-trigger{min-height:0;padding:.05rem .35rem;border:0;background:transparent;box-shadow:none;font-size:.78rem;line-height:1.5}
+.cl-course-tree-add>.cl-ui-row-menu>summary.cl-ui-row-trigger:hover,.cl-course-tree-add>.cl-ui-row-menu[open]>summary.cl-ui-row-trigger{text-decoration:underline}
+.cl-course-tree-add .cl-ui-row-panel{right:auto;left:0}
+.cl-ui-row-menu--compact>summary.cl-ui-row-trigger{justify-content:center;min-width:36px;min-height:36px}
+.cl-course-tree-node[data-drop]>.cl-course-tree-row::after{position:absolute;inset-inline-end:.4rem;top:50%;transform:translateY(-50%);padding:.05rem .45rem;border-radius:.3rem;background:var(--cl-accent,#2563eb);color:#fff;font-size:.75rem;line-height:1.4;pointer-events:none}
+.cl-course-tree-node[data-drop="before"]>.cl-course-tree-row{box-shadow:inset 0 3px 0 var(--cl-accent,#2563eb)}
+.cl-course-tree-node[data-drop="before"]>.cl-course-tree-row::after{content:"Before"}
+.cl-course-tree-node[data-drop="after"]{box-shadow:inset 0 -3px 0 var(--cl-accent,#2563eb)}
+.cl-course-tree-node[data-drop="after"]>.cl-course-tree-row::after{content:"After"}
+.cl-course-tree-node[data-drop="inside"]>.cl-course-tree-row{outline:2px solid var(--cl-accent,#2563eb);outline-offset:-2px;background:color-mix(in srgb,var(--cl-accent,#2563eb) 10%,transparent)}
+.cl-course-tree-node[data-drop="inside"]>.cl-course-tree-row::after{content:"Inside"}
+.cl-course-tree-node[data-drop="invalid"]>.cl-course-tree-row{outline:2px dashed var(--cl-danger,#b42318);outline-offset:-2px}
+.cl-course-tree-node[data-drop="invalid"]>.cl-course-tree-row::after{content:"Not allowed";background:var(--cl-danger,#b42318)}
+.cl-course-insert-position{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.5rem 0;padding:.5rem .75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:.4rem}
+.cl-course-insert-position>p{margin:0}
+.cl-course-move-destinations{display:grid;gap:.25rem;margin:0 0 1rem;padding:0;border:0}
+.cl-course-move-destination[data-depth="2"]{margin-inline-start:1.5rem}
+.cl-course-move-destination[data-depth="3"]{margin-inline-start:3rem}
+@media(prefers-reduced-motion:reduce){.cl-course-tree-toggle .cl-ui-icon{transition:none}}
+@media(max-width:575.98px){.cl-course-tree-children{margin-inline-start:.4rem;padding-inline-start:.5rem}.cl-course-tree-row>.cl-course-tree-edit[open],.cl-course-tree-add{padding-inline-start:.5rem}.cl-course-tree-label{flex-basis:calc(100% - 5.5rem)}.cl-course-tree-row>.cl-course-tree-edit{margin-inline-start:auto}}
 .cl-tag-chip{min-height:44px;max-width:100%;overflow-wrap:anywhere}
 .cl-tag-chip-compact{min-height:32px}
 .cl-tag-browser{display:grid;gap:1.5rem;align-items:start}

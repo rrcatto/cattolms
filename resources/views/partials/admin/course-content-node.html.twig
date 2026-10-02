@@ -1,0 +1,49 @@
+{# One Course Content row and its subtree. The row's settings disclosure sits on the row's line and opens full-width beneath it. The drag handle, the disclosure state and the move shortcuts are enhancements from the course-content controller; without JavaScript every row is open and the ⋯ menu's forms move it. Rows below the third level cannot hold children, so they have no child list. #}
+{% set title = node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) %}
+{% set container = node.node_type == 'section' or node.has_children %}
+{% set content_href = '/admin/courses/' ~ course.id ~ '/content' %}
+<li class="cl-course-tree-node" id="course-node-{{ node.id }}" data-node-id="{{ node.id }}" data-node-type="{{ node.node_type }}" data-depth="{{ node.depth }}" data-height="{{ node.height }}">
+	<div class="cl-course-tree-row">
+		<input type="checkbox" class="cl-course-tree-select" name="node_ids[]" value="{{ node.id }}" form="move-selection" aria-label="Select {{ title }}">
+		<button type="button" class="cl-course-tree-handle" aria-label="Move {{ title }}" aria-describedby="course-tree-keys" data-course-content-target="handle" data-action="pointerdown->course-content#arm keydown->course-content#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>
+		<div class="cl-course-tree-label">
+			{% if container and node.depth < 3 %}
+				<button type="button" class="cl-course-tree-toggle" aria-expanded="true" aria-controls="course-branch-{{ node.id }}" data-course-content-target="toggle" data-action="course-content#toggle">{{ ui('icon', {name: 'action-chevron'}) }}<span class="cl-course-tree-name">{{ title }}</span></button>
+			{% else %}
+				<span class="cl-course-tree-leaf"><span class="cl-course-tree-spacer" aria-hidden="true"></span><span class="cl-course-tree-name">{{ title }}</span></span>
+			{% endif %}
+			<span class="cl-course-tree-meta">{{ node.node_type == 'section' ? 'Section' : 'Item' }}{% if node.item_key %} · <code>{{ node.item_key }}</code> · {{ node.item_type|replace({'_': ' '}) }}{% endif %}{% if node.child_count %} · {{ node.child_count }} inside{% endif %}{% if node.public_preview %} · Public preview{% endif %}{% if node.assessment_role and node.assessment_role != 'content' %} · {{ node.assessment_role|title }}{% endif %}{% if node.delay_label != '00 weeks 00 days 00 hours 00 minutes' %} · after {{ node.delay_label }}{% endif %}</span>
+		</div>
+		{% if node.node_type == 'section' %}
+			<details class="cl-course-tree-edit"><summary>Edit section</summary><form action="{{ content_href }}/{{ node.id }}/section" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Section title', for: 'section-title-' ~ node.id, required: true})} %}{% block control %}<input class="form-control" id="{{ props.for }}" name="title" value="{{ node.section_title }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Introduction', for: 'section-intro-' ~ node.id})} %}{% block control %}<textarea class="form-control" id="{{ props.for }}" name="introduction_html" {{ ui_field_attrs(props) }}>{{ node.section_introduction_html }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show section outline'})} %}{% block control %}<input type="checkbox" name="show_outline" value="1" {{ node.show_outline ? 'checked' : '' }}>{% endblock %}{% endembed %}
+{% include '@platform/partials/course-availability-fields.html.twig' with {delay_total: node.relative_delay_minutes, delay_prefix: 'section-' ~ node.id} %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save section', type: 'submit', size: 'small'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: content_href}) }}{% endblock %}{% endembed %}</form></details>
+		{% else %}
+			<details class="cl-course-tree-edit"><summary>Placement settings</summary><form action="{{ content_href }}/{{ node.id }}/placement" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{% for field in [{name: 'display_title_override', label: 'Display title override'}, {name: 'display_description_override', label: 'Display description override'}] %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: field.name ~ '-' ~ node.id})} %}{% block control %}<input class="form-control" id="{{ props.for }}" name="{{ field.name }}" value="{{ attribute(node, field.name) }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}{% endfor %}
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Public preview'})} %}{% block control %}<input type="checkbox" name="public_preview" value="1" {{ node.public_preview ? 'checked' : '' }}>{% endblock %}{% endembed %}{% if node.item_type == 'assessment' %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Assessment role', for: 'assessment-role-' ~ node.id})} %}{% block control %}<select class="form-select" id="{{ props.for }}" name="assessment_role" {{ ui_field_attrs(props) }}><option value="content" {{ node.assessment_role == 'content' ? 'selected' : '' }}>Practice/content</option><option value="graded" {{ node.assessment_role == 'graded' ? 'selected' : '' }}>Graded</option><option value="final" {{ node.assessment_role == 'final' ? 'selected' : '' }}>Final</option></select>{% endblock %}{% endembed %}{% endif %}{% include '@platform/partials/course-availability-fields.html.twig' with {delay_total: node.relative_delay_minutes, delay_prefix: 'placement-' ~ node.id} %}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save placement', type: 'submit', size: 'small'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: content_href}) }}{% endblock %}{% endembed %}</form></details>
+		{% endif %}
+		{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'Actions for ' ~ title})} %}
+{% block body %}
+			{% for move in [{direction: 'top', label: 'Move to top', allowed: node.has_previous}, {direction: 'up', label: 'Move up', allowed: node.has_previous}, {direction: 'down', label: 'Move down', allowed: node.has_next}, {direction: 'bottom', label: 'Move to bottom', allowed: node.has_next}] %}
+				<form action="{{ content_href }}/{{ node.id }}/move" method="post" data-course-content-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed}) }}</form>
+			{% endfor %}
+			{{ ui('action.link', {label: 'Move into section…', href: content_href ~ '/move-into?' ~ {node_ids: [node.id]}|url_encode, size: 'small', variant: 'quiet'}) }}
+			<form action="{{ content_href }}/{{ node.id }}/move" method="post" data-course-content-direction="out"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="out">{{ ui('action.button', {label: 'Move out of section', type: 'submit', size: 'small', variant: 'quiet', disabled: not node.has_parent}) }}</form>
+			{% if node.node_type == 'item' %}
+				{{ ui('action.link', {label: 'Edit shared item', href: '/admin/course-items/' ~ node.course_item_id, size: 'small', variant: 'quiet'}) }}
+				<form action="{{ content_href }}/{{ node.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove from course', variant: 'danger', type: 'submit', size: 'small', disabled: node.has_children, title: node.has_children ? 'Move or remove the rows inside it first.' : '', confirm: 'Remove this placement? The shared Course Item will remain.'}) }}</form>
+			{% endif %}
+{% endblock %}
+		{% endembed %}
+	</div>
+	{% if node.depth < 3 %}
+		<ol class="cl-course-tree-children" id="course-branch-{{ node.id }}" data-parent="{{ node.id }}" aria-label="Inside {{ title }}"{% if not container %} hidden{% endif %}>
+			{% if container %}{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'li', course_id: course.id, parent: node.id, index: 0, place_label: 'first inside ' ~ title} %}{% endif %}
+			{% for child in node.children %}{% include '@platform/partials/admin/course-content-node.html.twig' with {node: child} %}{% endfor %}
+		</ol>
+	{% endif %}
+	{% include '@platform/partials/admin/course-content-add-here.html.twig' with {element: 'div', course_id: course.id, parent: node.parent_node_id ?? '', index: node.sibling_index + 1, place_label: 'after ' ~ title} %}
+</li>
