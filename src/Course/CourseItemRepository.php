@@ -49,13 +49,13 @@ final class CourseItemRepository
     public function resourceContexts(int $resourceId): array
     {
         return $this->db->fetchAllAssociative(
-            "WITH RECURSIVE uses(id,item_key) AS (
-                SELECT id,item_key FROM course_items WHERE resource_id=:resource
+            "WITH RECURSIVE uses(id,item_key,download_only) AS (
+                SELECT id,item_key,(item_type='downloadable_file' AND resource_id=:resource) FROM course_items WHERE resource_id=:resource
                    OR type_config->>'poster_resource_id'=:resource_text OR type_config->>'subtitle_resource_id'=:resource_text
                 UNION
-                SELECT source.id,source.item_key FROM uses u JOIN course_item_references r ON r.referenced_key=u.item_key
+                SELECT source.id,source.item_key,u.download_only FROM uses u JOIN course_item_references r ON r.referenced_key=u.item_key
                 JOIN course_items source ON source.id=r.source_course_item_id WHERE source.item_type='html_lesson'
-             ) SELECT DISTINCT p.course_id,p.node_id,p.public_preview,c.status FROM uses u
+             ) SELECT DISTINCT p.course_id,p.node_id,p.public_preview,c.status,u.download_only FROM uses u
              JOIN course_item_placements p ON p.course_item_id=u.id JOIN courses c ON c.id=p.course_id",
             ['resource' => $resourceId, 'resource_text' => (string) $resourceId]
         );
@@ -520,10 +520,40 @@ final class CourseItemRepository
         return (int) ($row['id'] ?? 0);
     }
 
+    /** A Resource with this title, ignoring case, other than the given one. */
+    public function resourceTitleTaken(string $title, int $exceptId = 0): bool
+    {
+        return (bool) $this->db->fetchOne('SELECT EXISTS (SELECT 1 FROM resources WHERE LOWER(title) = LOWER(:title) AND id <> :id)', ['title' => $title, 'id' => $exceptId]);
+    }
+
+    /** Title, description and classification only; the stored file and its filename never change. */
+    public function updateResource(int $id, string $title, string $description, string $type): void
+    {
+        $this->db->executeStatement('UPDATE resources SET title=:title, description=:description, resource_type=:type, updated_at=NOW() WHERE id=:id', ['title' => $title, 'description' => $description, 'type' => $type, 'id' => $id]);
+    }
+
+    /**
+     * Course Items that reference this Resource as their own file (not as a poster or caption).
+     * @return list<array<string,mixed>>
+     */
+    public function resourcePrimaryUsage(int $id): array
+    {
+        return $this->db->fetchAllAssociative('SELECT id,item_key,title,item_type FROM course_items WHERE resource_id=:id ORDER BY title,id', ['id' => $id]);
+    }
+
     /** @return list<array<string,mixed>> */
     public function resourceUsage(int $id): array
     {
         return $this->db->fetchAllAssociative("SELECT id,item_key,title,item_type FROM course_items WHERE resource_id=:id OR type_config->>'poster_resource_id'=:text_id OR type_config->>'subtitle_resource_id'=:text_id ORDER BY title,id", ['id' => $id, 'text_id' => (string) $id]);
+    }
+
+    /** Whether an item's own source contains [course-item:key] for this exact key. */
+    public function itemReferencesKey(int $sourceItemId, string $key): bool
+    {
+        return (bool) $this->db->fetchOne(
+            'SELECT EXISTS (SELECT 1 FROM course_item_references WHERE source_course_item_id = :source AND referenced_key = :key)',
+            ['source' => $sourceItemId, 'key' => $key]
+        );
     }
 
     public function deleteResource(int $id): void

@@ -11,10 +11,51 @@ use InvalidArgumentException;
 /** Owns Course Item lifecycle, placements, structure, availability and publication validation. */
 final class CourseItemService
 {
-    public const TYPES = ['html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','document'];
-    public const TYPE_LABELS = ['html_lesson' => 'HTML lesson', 'assessment' => 'Assessment', 'diagnostic' => 'Diagnostic', 'pdf' => 'PDF', 'image_graphic' => 'Image or graphic', 'uploaded_video' => 'Uploaded video', 'youtube' => 'YouTube video', 'audio' => 'Audio', 'markdown' => 'Markdown', 'document' => 'Document'];
-    public const TYPE_PLURAL_LABELS = ['html_lesson' => 'HTML lessons', 'assessment' => 'Assessments', 'diagnostic' => 'Diagnostics', 'pdf' => 'PDFs', 'image_graphic' => 'Images and graphics', 'uploaded_video' => 'Uploaded videos', 'youtube' => 'YouTube videos', 'audio' => 'Audio items', 'markdown' => 'Markdown items', 'document' => 'Documents'];
-    private const RESOURCE_TYPES =['pdf','image_graphic','uploaded_video','markdown','document'];
+    public const TYPES = ['html_lesson','assessment','diagnostic','pdf','image_graphic','uploaded_video','youtube','audio','markdown','downloadable_file'];
+    public const TYPE_LABELS = ['html_lesson' => 'HTML lesson', 'assessment' => 'Assessment', 'diagnostic' => 'Diagnostic', 'pdf' => 'PDF', 'image_graphic' => 'Image or graphic', 'uploaded_video' => 'Video (uploaded)', 'youtube' => 'Video (YouTube)', 'audio' => 'Audio', 'markdown' => 'Markdown', 'downloadable_file' => 'Downloadable file'];
+    public const TYPE_PLURAL_LABELS = ['html_lesson' => 'HTML lessons', 'assessment' => 'Assessments', 'diagnostic' => 'Diagnostics', 'pdf' => 'PDFs', 'image_graphic' => 'Images and graphics', 'uploaded_video' => 'Uploaded videos', 'youtube' => 'YouTube videos', 'audio' => 'Audio items', 'markdown' => 'Markdown items', 'downloadable_file' => 'Downloadable files'];
+    /** One line per type for the "Create new item" choice. */
+    public const TYPE_DESCRIPTIONS = [
+        'html_lesson' => 'Authored lesson content; may embed other items with [course-item:key].',
+        'assessment' => 'Graded or practice questions.',
+        'diagnostic' => 'Ungraded readiness check.',
+        'pdf' => 'A PDF shown in the course.',
+        'image_graphic' => 'An image or graphic with caption and transcript.',
+        'uploaded_video' => 'A video file from the Resource Library.',
+        'youtube' => 'A YouTube video by ID.',
+        'audio' => 'An audio file, or a remote audio address.',
+        'markdown' => 'A Markdown file rendered as content.',
+        'downloadable_file' => 'Any file learners download: Word, Excel, OpenDocument, ZIP and more.',
+    ];
+    /** Item types that need a Resource Library file. */
+    public const RESOURCE_TYPES = ['pdf','image_graphic','uploaded_video','markdown','downloadable_file'];
+    /** Resource classifications each resource-backed item type accepts; null accepts any file. */
+    public const RESOURCE_COMPATIBILITY = [
+        'pdf' => ['pdf'], 'image_graphic' => ['image_graphic'], 'uploaded_video' => ['uploaded_video'],
+        'audio' => ['audio'], 'markdown' => ['markdown'], 'downloadable_file' => null,
+    ];
+
+    /**
+     * The item types that can be built from a Resource of this classification.
+     * @return list<string>
+     */
+    public static function itemTypesForResource(string $resourceType): array
+    {
+        return array_keys(array_filter(self::RESOURCE_COMPATIBILITY, static fn(?array $accepted): bool => $accepted === null || in_array($resourceType, $accepted, true)));
+    }
+
+    /** The classification for a file uploaded from an item form: the item type's own, or inferred from the name for a download. */
+    public static function resourceTypeForUpload(string $itemType, string $filename): string
+    {
+        $accepted = self::RESOURCE_COMPATIBILITY[$itemType] ?? null;
+        return $accepted === null ? ResourceLibraryService::classify($filename) : $accepted[0];
+    }
+
+    /** Whether an item type may reference a Resource of this classification. */
+    public static function acceptsResource(string $itemType, string $resourceType): bool
+    {
+        return array_key_exists($itemType, self::RESOURCE_COMPATIBILITY) && in_array($itemType, self::itemTypesForResource($resourceType), true);
+    }
 
     public function __construct(
         private readonly TransactionManager $transactions,
@@ -151,6 +192,8 @@ final class CourseItemService
     {
         if ($administrator) { return true; }
         foreach ($this->items->resourceContexts($resourceId) as $context) {
+            // A Downloadable File is served only by the placement-scoped learner download route.
+            if ((bool) $context['download_only']) { continue; }
             if ((bool) $context['public_preview'] && $context['status'] === 'published') { return true; }
             if ($userId === null) { continue; }
             $courseId = (int) $context['course_id'];
@@ -462,6 +505,18 @@ final class CourseItemService
         if ($existing !== null && (int) $existing['id'] !== $currentId) { throw new InvalidArgumentException('Another Course Item already uses that key.'); }
         if (!in_array($type, self::TYPES, true) || $title === '') { throw new InvalidArgumentException('Course Item type and title are required.'); }
         $resource = $this->nullableId($input['resource_id'] ?? null);
+        if ($resource !== null) {
+            if (!array_key_exists($type, self::RESOURCE_COMPATIBILITY)) {
+                throw new InvalidArgumentException(self::TYPE_LABELS[$type] . ' items do not use a Resource Library file.');
+            }
+            $file = $this->items->resource($resource);
+            if ($file === null) {
+                throw new InvalidArgumentException('Choose a Resource that exists in the Resource Library.');
+            }
+            if (!self::acceptsResource($type, (string) $file['resource_type'])) {
+                throw new InvalidArgumentException('A ' . self::TYPE_LABELS[$type] . ' item cannot use a ' . str_replace('_', ' ', (string) $file['resource_type']) . ' Resource.');
+            }
+        }
         $config = $input['type_config'] ?? [];
         if (!is_array($config)) { $config = []; }
         foreach (['youtube_id','remote_uri','caption','transcript','poster_resource_id','subtitle_resource_id'] as $field) {

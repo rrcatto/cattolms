@@ -36,8 +36,23 @@ final class AdminCourseComponentController extends BaseController
         $this->requirePermission('COURSE.EDIT');
         $courseId = max(0, (int) ($_GET['course_id'] ?? 0));
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
-        if (!isset($_GET['type'])) { return $this->render('admin-course-item-type', ['title' => 'Choose Course Item type', 'course_id' => $courseId, 'item_types' => CourseItemService::TYPES]); }
-        return $this->itemForm($this->blankItem((string) $_GET['type']), $courseId, '/admin/course-items');
+        // Started from a Resource: offer only the item types that can use that file.
+        $resource = null; $types = CourseItemService::TYPES;
+        if (isset($_GET['resource_id'])) {
+            $resource = $this->resources->resource(max(0, (int) $_GET['resource_id']));
+            if ($resource === null) { throw $this->notFound('The Resource does not exist.'); }
+            $types = CourseItemService::itemTypesForResource((string) $resource['resource_type']);
+        }
+        $type = (string) ($_GET['type'] ?? '');
+        if (!in_array($type, $types, true)) {
+            if (count($types) === 1) { $type = $types[0]; }
+            else {
+                return $this->render('admin-course-item-type', ['title' => $resource === null ? 'Create new Course Item' : 'Create a Course Item from ' . $resource['title'], 'course_id' => $courseId, 'resource' => $resource, 'type_choices' => $this->typeChoices($types)]);
+            }
+        }
+        $item = $this->blankItem($type);
+        if ($resource !== null) { $item['resource_id'] = (int) $resource['id']; $item['title'] = (string) $resource['title']; }
+        return $this->itemForm($item, $courseId, '/admin/course-items');
     }
 
     #[Route('/admin/course-items', name: 'admin_course_item_create', methods: ['POST'])]
@@ -46,9 +61,11 @@ final class AdminCourseComponentController extends BaseController
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $courseId = max(0, (int) ($_POST['course_id'] ?? 0));
         if ($courseId > 0) { $this->requireManagedCourse($courseId); }
         if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->blankItem((string) ($_POST['item_type'] ?? 'assessment'))), $courseId, '/admin/course-items'); }
+        if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->blankItem((string) ($_POST['item_type'] ?? 'downloadable_file')), $courseId, '/admin/course-items', $user->id); }
         return $this->handle(function () use ($user, $courseId): void {
             if ($courseId > 0) { $this->assertArrangementFinished($courseId); }
-            $id = $courseId > 0 ? $this->items->createAttached($courseId, $_POST, $user->id) : $this->items->create($_POST, $user->id);
+            $input = $this->withUploadedResource($_POST, $user->id);
+            $id = $courseId > 0 ? $this->items->createAttached($courseId, $input, $user->id) : $this->items->create($input, $user->id);
             $this->flash('success', 'The Course Item was created.');
             $this->redirect($courseId > 0 ? '/admin/courses/' . $courseId . '/content' : '/admin/course-items/' . $id);
         }, $courseId > 0 ? '/admin/course-items/new?course_id=' . $courseId : '/admin/course-items/new');
@@ -67,6 +84,7 @@ final class AdminCourseComponentController extends BaseController
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
         if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id); }
+        if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->items->item($id), 0, '/admin/course-items/' . $id, $user->id); }
         return $this->handle(function () use ($user, $id): void {
             if (($_POST['item_action'] ?? '') === 'save_as') {
                 $input = array_replace($_POST, ['item_key' => (string) ($_POST['copy_key'] ?? ''), 'title' => (string) ($_POST['copy_title'] ?? '')]);
@@ -74,7 +92,7 @@ final class AdminCourseComponentController extends BaseController
                 $this->flash('success', 'An independent Course Item was created.');
                 $this->redirect('/admin/course-items/' . $copy);
             }
-            $this->items->update($id, $_POST, $user->id);
+            $this->items->update($id, $this->withUploadedResource($_POST, $user->id), $user->id);
             $this->flash('success', 'The shared Course Item was saved.');
             $this->redirect('/admin/course-items/' . $id);
         }, '/admin/course-items/' . $id);
@@ -109,7 +127,7 @@ final class AdminCourseComponentController extends BaseController
             $draft = null;
         }
         $course = $draft === null ? $this->items->courseContent($courseId) : $this->items->previewStructureDraft($courseId, $draft['rows']);
-        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $course, 'arrangement_pending' => $draft !== null, 'library_items' => array_values($libraryItems), 'item_search' => $search]);
+        return $this->render('admin-course-content', ['title' => 'Course Content', 'course' => $course, 'arrangement_pending' => $draft !== null, 'library_items' => array_values($libraryItems), 'item_search' => $search, 'type_choices' => $this->typeChoices(CourseItemService::TYPES)]);
     }
 
     #[Route('/admin/courses/{id}/content/sections', name: 'admin_course_content_section', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -216,6 +234,22 @@ final class AdminCourseComponentController extends BaseController
         return $this->handle(function () use ($user): void { $this->resources->register($_POST, $user->id); $this->flash('success', 'The existing Resource file was registered.'); $this->redirect('/admin/resources'); }, '/admin/resources');
     }
 
+    #[Route('/admin/resources/{resource_id}', name: 'admin_resource_edit', requirements: ['resource_id' => '\\d+'], methods: ['GET'])]
+    public function editResource(): Response
+    {
+        $this->requirePermission('COURSE.EDIT');
+        $resource = $this->resources->resource(max(0, (int) $this->param('resource_id')));
+        if ($resource === null) { throw $this->notFound('The Resource does not exist.'); }
+        return $this->render('admin-resource-edit', ['title' => 'Resource · ' . $resource['title'], 'resource' => $resource, 'size_label' => ResourceLibraryService::sizeLabel((int) $resource['byte_size']), 'usage' => $this->resources->usage((int) $resource['id']), 'resource_types' => ResourceLibraryService::TYPES]);
+    }
+
+    #[Route('/admin/resources/{resource_id}', name: 'admin_resource_update', requirements: ['resource_id' => '\\d+'], methods: ['POST'])]
+    public function updateResource(): Response
+    {
+        $this->requireCsrf(); $this->requirePermission('COURSE.EDIT'); $id = max(1, (int) $this->param('resource_id'));
+        return $this->handle(function () use ($id): void { $this->resources->update($id, $_POST); $this->flash('success', 'The Resource details were saved.'); $this->redirect('/admin/resources/' . $id); }, '/admin/resources/' . $id);
+    }
+
     #[Route('/admin/resources/{resource_id}/delete', name: 'admin_resource_delete', requirements: ['resource_id' => '\\d+'], methods: ['POST'])]
     public function deleteResource(): Response
     {
@@ -223,10 +257,71 @@ final class AdminCourseComponentController extends BaseController
         return $this->handle(function () use ($id): void { $this->resources->delete($id); $this->flash('success', 'The unused Resource was deleted.'); $this->redirect('/admin/resources'); }, '/admin/resources');
     }
 
-    /** @param array<string,mixed> $item */
-    private function itemForm(array $item, int $courseId, string $action): Response
+    /**
+     * A Downloadable File may arrive with a new file instead of a chosen Resource. The upload goes
+     * into the Resource Library once, classified from its name, and the item then references it.
+     *
+     * @param array<string,mixed> $input
+     * @return array<string,mixed>
+     */
+    private function withUploadedResource(array $input, int $userId): array
     {
-        return $this->render('admin-course-item-form', ['title' => ((int) ($item['id'] ?? 0) > 0 ? 'Edit ' : 'Create ') . 'Course Item', 'item' => $item, 'course_id' => $courseId, 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'resources' => $this->resources->library(), 'editor_questions' => (array) ($item['questions'] ?? []), 'load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true)]);
+        $upload = (array) ($_FILES['resource_upload'] ?? []);
+        $type = (string) ($input['item_type'] ?? '');
+        if (!array_key_exists($type, CourseItemService::RESOURCE_COMPATIBILITY) || (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return $input;
+        }
+        $filename = basename((string) ($upload['name'] ?? ''));
+        $title = trim((string) ($input['resource_upload_title'] ?? '')) ?: $filename;
+        $input['resource_id'] = (string) $this->resources->upload($upload, ['title' => $title, 'resource_type' => CourseItemService::resourceTypeForUpload($type, $filename), 'original_filename' => $filename], $userId);
+        return $input;
+    }
+
+    /**
+     * "Upload and select": store the file in the Resource Library, select it, and show the same
+     * form again with everything already entered. Nothing else is saved yet.
+     *
+     * @param array<string,mixed> $before
+     */
+    private function uploadIntoForm(array $before, int $courseId, string $action, int $userId): Response
+    {
+        if ($courseId > 0) { $this->requireManagedCourse($courseId); }
+        $draft = $this->items->editorDraft($_POST, $before);
+        try {
+            if ((int) (($_FILES['resource_upload'] ?? [])['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                throw new \InvalidArgumentException('Choose a file to upload first.');
+            }
+            $draft['resource_id'] = (int) $this->withUploadedResource($_POST, $userId)['resource_id'];
+            $file = $this->resources->resource((int) $draft['resource_id']);
+            $notice = ['tone' => 'success', 'text' => 'Uploaded ' . ($file['original_filename'] ?? 'the file') . ' to the Resource Library and selected it. Save the item to keep this choice.'];
+        } catch (\InvalidArgumentException|\RuntimeException $exception) {
+            $notice = ['tone' => 'danger', 'text' => $exception->getMessage()];
+        }
+        return $this->itemForm($draft, $courseId, $action, $notice);
+    }
+
+    /**
+     * @param list<string> $types
+     * @return list<array{value:string,label:string,description:string}>
+     */
+    private function typeChoices(array $types): array
+    {
+        return array_map(static fn(string $type): array => ['value' => $type, 'label' => CourseItemService::TYPE_LABELS[$type], 'description' => CourseItemService::TYPE_DESCRIPTIONS[$type]], $types);
+    }
+
+    /**
+     * @param array<string,mixed> $item
+     * @param array{tone:string,text:string}|null $notice
+     */
+    private function itemForm(array $item, int $courseId, string $action, ?array $notice = null): Response
+    {
+        $type = (string) $item['item_type'];
+        // null means any file (Downloadable File); a type absent from the map uses no Resource.
+        $accepted = array_key_exists($type, CourseItemService::RESOURCE_COMPATIBILITY) ? CourseItemService::RESOURCE_COMPATIBILITY[$type] : [];
+        $resources = array_values(array_filter($this->resources->library(), static fn(array $resource): bool => $accepted === null || in_array((string) $resource['resource_type'], $accepted, true)));
+        $course = $courseId > 0 ? $this->items->courseContent($courseId) : null;
+        $creating = (int) ($item['id'] ?? 0) === 0;
+        return $this->render('admin-course-item-form', ['title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item', 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? []), 'load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true)]);
     }
 
     /** @return array<string,mixed> */
