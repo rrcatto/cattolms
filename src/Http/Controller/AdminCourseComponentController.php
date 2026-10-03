@@ -461,7 +461,7 @@ final class AdminCourseComponentController extends BaseController
     {
         $course = $this->items->courseContent($courseId);
         $data = ['title' => $kind === 'section' ? 'Add section' : 'Add existing item', 'course' => $course, 'kind' => $kind, 'place' => $place, 'insert_error' => $error,
-            'values' => ['course_item_id' => (string) ($values['course_item_id'] ?? ''), 'title' => (string) ($values['title'] ?? ''), 'introduction_html' => (string) ($values['introduction_html'] ?? ''), 'show_outline' => !empty($values['show_outline']), 'delay_total' => $this->delayTotal($values)]];
+            'values' => ['course_item_id' => (string) ($values['course_item_id'] ?? ''), 'title' => (string) ($values['title'] ?? ''), 'introduction_html' => (string) ($values['introduction_html'] ?? ''), 'show_outline' => !empty($values['show_outline']), 'public_preview' => !empty($values['public_preview']), 'delay_total' => $this->delayTotal($values)]];
         if ($kind === 'existing') {
             $search = trim((string) ($values['q'] ?? ''));
             $library = $this->items->library($search); $items = [];

@@ -173,7 +173,8 @@ final class CourseItemRepository
     /** @return list<array<string,mixed>> */
     public function structure(int $courseId, bool $publicOnly = false): array
     {
-        $public = $publicOnly ? ' AND (n.node_type=\'section\' OR p.public_preview=TRUE)' : '';
+        // A section and an item placement each opt into the public preview with their own flag.
+        $public = $publicOnly ? ' AND COALESCE(p.public_preview, s.public_preview) = TRUE' : '';
         $rows = $this->db->fetchAllAssociative(
             "WITH RECURSIVE tree AS (
                 SELECT n.*,1 AS depth,ARRAY[n.position,n.id::int] AS order_path FROM course_structure_nodes n WHERE n.course_id=:course_id AND n.parent_node_id IS NULL
@@ -181,7 +182,7 @@ final class CourseItemRepository
                 SELECT n.*,t.depth+1,t.order_path||ARRAY[n.position,n.id::int] FROM course_structure_nodes n JOIN tree t ON t.id=n.parent_node_id
              )
              SELECT n.*,s.title AS section_title,s.introduction_html AS section_introduction_html,s.show_outline,
-                    p.course_item_id,p.display_title_override,p.display_description_override,p.public_preview,p.assessment_role,
+                    p.course_item_id,p.display_title_override,p.display_description_override,COALESCE(p.public_preview, s.public_preview) AS public_preview,p.assessment_role,
                     ci.item_key,ci.item_type,ci.title AS item_title,ci.description_html,ci.content_source,ci.type_config,ci.resource_id,
                     r.public_id AS resource_public_id,r.filename AS resource_filename,r.original_filename,r.resource_type,r.mime_type,r.byte_size,r.description AS resource_description,
                     a.instructions_html,a.result_pass_html,a.result_fail_html,a.pass_mark,a.practice,a.practice_enabled,a.practice_pool_mode,
@@ -213,7 +214,7 @@ final class CourseItemRepository
         );
     }
 
-    public function createSection(int $courseId, ?int $parentId, int $position, string $title, string $introduction, bool $showOutline, int $delay): int
+    public function createSection(int $courseId, ?int $parentId, int $position, string $title, string $introduction, bool $showOutline, int $delay, bool $publicPreview = false): int
     {
         $row = $this->db->fetchAssociative(
             "INSERT INTO course_structure_nodes (public_id,course_id,parent_node_id,position,node_type,relative_delay_minutes) VALUES (:public_id,:course,:parent,:position,'section',:delay) RETURNING id",
@@ -221,8 +222,8 @@ final class CourseItemRepository
         );
         $id = (int) ($row['id'] ?? 0);
         $this->db->executeStatement(
-            'INSERT INTO course_sections (node_id,title,introduction_html,show_outline) VALUES (:id,:title,:intro,:outline)',
-            ['id' => $id, 'title' => $title, 'intro' => $introduction, 'outline' => $showOutline]
+            'INSERT INTO course_sections (node_id,title,introduction_html,show_outline,public_preview) VALUES (:id,:title,:intro,:outline,:public)',
+            ['id' => $id, 'title' => $title, 'intro' => $introduction, 'outline' => $showOutline, 'public' => $publicPreview]
         );
         return $id;
     }
@@ -336,9 +337,9 @@ final class CourseItemRepository
         );
     }
 
-    public function updateSection(int $nodeId, string $title, string $introduction, bool $outline, int $delay): void
+    public function updateSection(int $nodeId, string $title, string $introduction, bool $outline, int $delay, bool $publicPreview = false): void
     {
-        $this->db->executeStatement('UPDATE course_sections SET title=:title,introduction_html=:intro,show_outline=:outline WHERE node_id=:id', ['title' => $title, 'intro' => $introduction, 'outline' => $outline, 'id' => $nodeId]);
+        $this->db->executeStatement('UPDATE course_sections SET title=:title,introduction_html=:intro,show_outline=:outline,public_preview=:public WHERE node_id=:id', ['title' => $title, 'intro' => $introduction, 'outline' => $outline, 'public' => $publicPreview, 'id' => $nodeId]);
         $this->db->executeStatement('UPDATE course_structure_nodes SET relative_delay_minutes=:delay,updated_at=NOW() WHERE id=:id', ['delay' => $delay, 'id' => $nodeId]);
     }
 

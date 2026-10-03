@@ -1,6 +1,11 @@
 # Changelog
 
-**LMS version:** 0.8.7.8 **Date time:** 2026/10/03 SAST
+**LMS version:** 0.8.7.9 **Date time:** 2026/10/03 SAST
+
+## 2026-10-03 SAST — v0.8.7.9 Public sections and category statistics
+
+- A section can be shown in the public course preview: Edit section and Add section have a Public preview setting (`course_sections.public_preview`, migration `20261003100000_add_public_preview_to_course_sections.php`, off by default). A public section appears in the public outline as "Section: <title>", opens with its introduction and an outline of its public rows, and takes part in Previous/Next; its Course Items still appear only when they are public previews themselves. Course export carries the setting. Like a public Course Item, a public section is never locked for learners.
+- The category management page shows Main categories, Subcategories, Sub-subcategories and Total categories above the tree, plus categories With courses and Empty categories (courses filed directly in the category). `CourseService::categoryStatistics()` derives them from the one categories query the tree already uses: levels follow `parent_id`, not the stored level, and any category deeper than level 3, in a parent loop or under a missing parent is listed in a warning rather than counted.
 
 ## 2026-10-03 SAST — v0.8.7.8 Outline indentation, "+ Add here" after refreshes, Next to sections
 

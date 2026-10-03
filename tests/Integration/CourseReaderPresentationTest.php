@@ -177,17 +177,29 @@ final class CourseReaderPresentationTest extends TestCase
         self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content', $week['Next →'] ?? null, "A section's Next goes to its first row.");
     }
 
-    public function testThePublicPreviewStepsThroughItsPublicItemsOnly(): void
+    public function testASectionAppearsInThePublicPreviewOnlyWhenMarkedPublic(): void
     {
-        // The public preview shows only public Course Items, and no sections, so its reading order is
-        // those items: the same rule over the structure it is allowed to show.
         $_COOKIE = $this->cookies;
-        $lesson = $this->paging('/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/content');
-        self::assertSame('/courses/' . $this->slug . '/preview/' . $this->nodes['pack'] . '/content', $lesson['Next →'] ?? null);
+        $base = '/courses/' . $this->slug . '/preview/';
+        $pack = $this->page($base . $this->nodes['pack'] . '/content');
+        self::assertSame(0, $pack->query('//nav[contains(@class, "cl-course-outline")]//*[starts-with(normalize-space(), "Section:")]')->length, 'Sections are not public by default.');
+        self::assertSame(404, $this->send($base . $this->nodes['week'] . '/content')->getStatusCode());
+        $lesson = $this->paging($base . $this->nodes['lesson'] . '/content');
         self::assertArrayNotHasKey('← Previous', $lesson);
-        $pack = $this->page('/courses/' . $this->slug . '/preview/' . $this->nodes['pack'] . '/content');
-        self::assertSame(0, $pack->query('//nav[contains(@class, "cl-course-outline")]//*[starts-with(normalize-space(), "Section:")]')->length, 'No section entries in the public outline.');
-        self::assertSame(404, $this->send('/courses/' . $this->slug . '/preview/' . $this->nodes['week'] . '/content')->getStatusCode(), 'Sections are not part of the public preview.');
+
+        $this->items->updateSection($this->course, $this->nodes['week'], ['title' => 'Week one', 'introduction_html' => '<p>Welcome to week one.</p>', 'show_outline' => '1', 'public_preview' => '1'], $this->owner);
+        $section = $this->page($base . $this->nodes['week'] . '/content');
+        $html = $section->document->saveHTML() ?: '';
+        self::assertStringContainsString('Welcome to week one.', $html, 'A public section opens with its introduction.');
+        self::assertSame('Week one', trim($section->query('//article//h1')->item(0)->textContent ?? ''));
+        self::assertSame(['Lesson', 'Precedent pack'], array_map(static fn(\DOMNode $li): string => trim($li->textContent), iterator_to_array($section->query('//article//ol/li'))), 'Its outline lists only what the public may see.');
+        $link = $section->query('//nav[contains(@class, "cl-course-outline")]//a[normalize-space()="Section: Week one"]')->item(0);
+        self::assertInstanceOf(\DOMElement::class, $link, 'The public outline shows and links the section.');
+        self::assertSame($base . $this->nodes['week'] . '/content', $link->getAttribute('href'));
+        self::assertSame($base . $this->nodes['lesson'] . '/content', $this->paging($base . $this->nodes['week'] . '/content')['Next →'] ?? null);
+        self::assertSame($base . $this->nodes['week'] . '/content', $this->paging($base . $this->nodes['lesson'] . '/content')['← Previous'] ?? null, 'Previous and Next include the public section.');
+        self::assertSame(404, $this->send($base . $this->nodes['later'] . '/content')->getStatusCode(), 'A section not marked public stays out.');
+        self::assertTrue((bool) $this->db->fetchOne('SELECT public_preview FROM course_sections WHERE node_id=:id', ['id' => $this->nodes['week']]));
     }
 
     /** @return array<string,string> Paging link label => href. */

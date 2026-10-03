@@ -365,7 +365,7 @@ final class CourseItemService
         $delay = $this->delay($input);
         return $this->transactions->run(function () use ($courseId, $parent, $title, $delay, $input, $userId): int {
             $this->assertNewParent($courseId, $parent);
-            $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay);
+            $id = $this->items->createSection($courseId, $parent, $this->items->nextPosition($courseId, $parent), $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview']));
             $this->placeNew($courseId, $id, $parent, $input, $userId);
             $this->audit->record($userId, 'course_section.created', ['course_id' => $courseId, 'node_id' => $id]);
             return $id;
@@ -412,7 +412,7 @@ final class CourseItemService
         if ($title === '') { throw new InvalidArgumentException('A section needs a title.'); }
         $hasDelay = array_intersect(['relative_delay_minutes','delay_weeks','delay_days','delay_hours','delay_minutes'], array_keys($input)) !== [];
         $delay = $hasDelay ? $this->delay($input) : (int) $node['relative_delay_minutes'];
-        $this->transactions->run(fn() => $this->items->updateSection($nodeId, $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay));
+        $this->transactions->run(fn() => $this->items->updateSection($nodeId, $title, $this->html->preserve((string) ($input['introduction_html'] ?? '')), !empty($input['show_outline']), $delay, !empty($input['public_preview'])));
         $this->audit->record($userId, 'course_section.updated', ['course_id' => $courseId, 'node_id' => $nodeId]);
     }
 
@@ -481,7 +481,6 @@ final class CourseItemService
     public function availability(int $courseId, ?string $startedAt, bool $publicOnly): array
     {
         $rows = $this->items->structure($courseId, $publicOnly);
-        if ($publicOnly) { $rows = array_values(array_filter($rows, static fn(array $row): bool => $row['node_type'] === 'item')); }
         $availableByNode = []; $lastByParent = []; $scheduledAncestor = []; $moduleNumber = 0; $assessmentModuleNumber = null;
         foreach ($rows as &$row) {
             $parent = $row['parent_node_id'] === null ? 0 : (int) $row['parent_node_id'];

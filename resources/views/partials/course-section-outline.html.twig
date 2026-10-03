@@ -1,0 +1,4 @@
+{# A section page's outline of what the section holds, when the section shows one. Shared by the learner reader and the public preview; each passes the structure it may show, so the public outline lists only public rows. #}
+{% if item.node_type == 'section' and item.show_outline %}
+<ol>{% set in_section = false %}{% for node in course.structure %}{% if node.id == item.id %}{% set in_section = true %}{% elseif in_section and node.depth <= item.depth %}{% set in_section = false %}{% elseif in_section %}<li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>{% endif %}{% endfor %}</ol>
+{% endif %}
