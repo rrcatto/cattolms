@@ -33,7 +33,7 @@
 			{{ ui('action.link', {label: 'Move into section…', href: content_href ~ '/move-into?' ~ {node_ids: [node.id]}|url_encode, size: 'small', variant: 'quiet'}) }}
 			<form action="{{ content_href }}/{{ node.id }}/move" method="post" data-course-content-direction="out"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="out">{{ ui('action.button', {label: 'Move out of section', type: 'submit', size: 'small', variant: 'quiet', disabled: not node.has_parent}) }}</form>
 			{% if node.node_type == 'item' %}
-				{{ ui('action.link', {label: 'Edit shared item', href: '/admin/course-items/' ~ node.course_item_id, size: 'small', variant: 'quiet'}) }}
+				{{ ui('action.link', {label: 'Edit shared item', href: '/admin/course-items/' ~ node.course_item_id ~ '?' ~ {return_to: content_href ~ '#course-node-' ~ node.id}|url_encode, size: 'small', variant: 'quiet'}) }}
 				<form action="{{ content_href }}/{{ node.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove from course', variant: 'danger', type: 'submit', size: 'small', disabled: node.has_children, title: node.has_children ? 'Move or remove the rows inside it first.' : '', confirm: 'Remove this placement? The shared Course Item will remain.'}) }}</form>
 			{% endif %}
 {% endblock %}

@@ -1,6 +1,13 @@
 # Changelog
 
-**LMS version:** 0.8.7.6 **Date time:** 2026/10/03 SAST
+**LMS version:** 0.8.7.7 **Date time:** 2026/10/03 SAST
+
+## 2026-10-03 SAST — v0.8.7.7 Course reader presentation and edit return context
+
+- Course Modules outline: a section reads "Section: <title>", bold and 2pt larger than an item, through the `cl-course-outline-section` hook on its entry (link, plain or locked). Stored titles are unchanged; items are not prefixed.
+- Descriptions are rendered once, by `CourseItemRenderer` for every type: inside the figure, card or section where a type has one, and above the content of an HTML lesson or Markdown item (`cl-course-item-description`). A placement's description override replaces the item's. The learner item page no longer prints a second copy, so a Downloadable File's description now appears only inside its card, and the public preview shows lesson descriptions the same way as learner mode.
+- Download, Previous and Next are the shared primary action (`cl-ui-action cl-ui-action--primary cl-ui-action--normal`, plus `cl-course-item-download-link` for Download's 44px height). The reader's primary action is declared once, on the component's own classes under the reader shell, with white text in every state; authored course CSS such as `.cl-course-presentation a{color:inherit}` no longer turns it dark. The bespoke Download and paging button rules are removed.
+- Editing a shared Course Item returns to where editing began. Course Content's Edit shared item passes `return_to=/admin/courses/{id}/content#course-node-{node}`; the form carries it through re-displays, refused saves (which now show the form again with what was entered instead of redirecting) and Save As, and Save, Back and Cancel return there. Without it the Course Item Library defaults apply. Only that Course Content path and `/admin/course-items` are accepted (`AdminCourseComponentController::safeReturn()`); external, protocol-relative, malformed and other paths are ignored.
 
 ## 2026-10-03 SAST — v0.8.7.6 "+ Add here" insert modal
 

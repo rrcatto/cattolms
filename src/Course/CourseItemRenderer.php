@@ -7,6 +7,9 @@ namespace CattoLearning\Course;
 /** Resolves stored Course Item source at display time and delegates output to bounded type renderers. */
 final class CourseItemRenderer
 {
+    /** The shared primary action's classes plus the Download-specific hook. */
+    public const DOWNLOAD_ACTION_CLASSES = 'cl-ui-action cl-ui-action--primary cl-ui-action--normal cl-course-item-download-link';
+
     public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources)
     {
     }
@@ -22,40 +25,53 @@ final class CourseItemRenderer
             return '<aside class="cl-course-item-error">Circular Course Item reference: ' . self::escape($key) . '</aside>';
         }
         $stack[] = $key;
-        $description = (string) ($item['description_html'] ?? '');
+        // The renderer owns the description for every type, so a page prints it exactly once: inside
+        // the figure, card or section where a type has one, and above the content of a lesson or
+        // Markdown item. A placement's description override replaces the item's own. A lesson or
+        // Markdown item embedded in another lesson shows its content only, as before.
+        $embedded = count($stack) > 1;
+        $description = (string) (($item['display_description_override'] ?? '') ?: ($item['description_html'] ?? ''));
         $config = is_array($item['type_config'] ?? null) ? $item['type_config'] : [];
         return match ((string) ($item['item_type'] ?? '')) {
-            'html_lesson' => $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack),
+            'html_lesson' => $this->leadDescription($description, $embedded) . $this->renderHtml((string) ($item['content_source'] ?? ''), $courseSlug, $contextNodeId, $publicPreview, $stack),
             'image_graphic' => '<figure class="cl-course-item-media"><img src="' . $this->resourceUrl($item) . '" alt="' . self::escape((string) ($item['resource_description'] ?? '')) . '"><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>',
             'youtube' => '<figure class="cl-course-item-media"><iframe src="https://www.youtube-nocookie.com/embed/' . rawurlencode((string) ($config['youtube_id'] ?? '')) . '" title="' . self::escape((string) ($item['title'] ?? 'Video')) . '" allowfullscreen></iframe><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>' . $this->transcript($config),
             'uploaded_video' => '<figure class="cl-course-item-media"><video controls src="' . $this->resourceUrl($item) . '"' . $this->poster($config) . '>' . $this->subtitles($config) . '</video><figcaption>' . $description . self::escape((string) ($config['caption'] ?? '')) . '</figcaption></figure>' . $this->transcript($config),
             'audio' => '<section class="cl-course-item-media"><audio controls src="' . ($item['resource_id'] ? $this->resourceUrl($item) : self::escape((string) ($config['remote_uri'] ?? ''))) . '"></audio>' . $description . '<p>' . self::escape((string) ($config['caption'] ?? '')) . '</p>' . $this->transcript($config) . '</section>',
             'pdf' => '<section class="cl-course-item-document"><object data="' . $this->resourceUrl($item) . '" type="application/pdf"><a href="' . $this->resourceUrl($item) . '">Open PDF</a></object><p><a href="' . $this->resourceUrl($item) . '" download>Download ' . self::escape((string) ($item['title'] ?? 'PDF')) . '</a></p>' . $description . '</section>',
-            'markdown' => '<article class="cl-course-item-markdown">' . $this->markdown($this->resourceSource($item)) . '<p><a href="' . $this->resourceUrl($item) . '" download>Download source</a></p></article>',
-            'downloadable_file' => $this->download($item, $courseSlug, $contextNodeId, $publicPreview, count($stack) > 1),
+            'markdown' => $this->leadDescription($description, $embedded) . '<article class="cl-course-item-markdown">' . $this->markdown($this->resourceSource($item)) . '<p><a href="' . $this->resourceUrl($item) . '" download>Download source</a></p></article>',
+            'downloadable_file' => $this->download($item, $description, $courseSlug, $contextNodeId, $publicPreview, $embedded),
             'assessment','diagnostic' => '<section class="cl-course-item-assessment"><h2>' . self::escape((string) ($item['title'] ?? $item['item_title'] ?? 'Assessment')) . '</h2>' . $description . '<p><a href="' . ($publicPreview ? '/courses/' . rawurlencode($courseSlug) . '/preview/' : '/learn/' . rawurlencode($courseSlug) . '/item/') . $contextNodeId . '/assessment/' . rawurlencode($key) . '">' . ($publicPreview ? 'Try assessment' : 'Open assessment') . '</a></p></section>',
             default => '<aside class="cl-course-item-error">Unsupported Course Item type.</aside>',
         };
     }
 
+    private function leadDescription(string $description, bool $embedded): string
+    {
+        return $embedded || trim($description) === '' ? '' : '<div class="cl-course-item-description">' . $description . '</div>';
+    }
+
     /**
-     * A Downloadable File card. The link goes to the placement-scoped learner download route, never
-     * to the Resource itself; a public preview shows the card without a link. The title is printed
-     * only when the file is embedded in a lesson, because an item page already heads it.
+     * A Downloadable File card holding its description, the file details and the Download action.
+     * The link goes to the placement-scoped learner download route, never to the Resource itself; a
+     * public preview shows the card without a link. The title is printed only when the file is
+     * embedded in a lesson, because an item page already heads it. Download is the shared primary
+     * action (the classes `ui('action.link', {variant: 'primary', size: 'normal'})` emits), so it
+     * takes the reader's primary-action colours rather than restating them.
      *
      * @param array<string,mixed> $item
      */
-    private function download(array $item, string $slug, int $contextNodeId, bool $public, bool $embedded): string
+    private function download(array $item, string $description, string $slug, int $contextNodeId, bool $public, bool $embedded): string
     {
         $filename = (string) (($item['original_filename'] ?? '') ?: ($item['resource_filename'] ?? ''));
         $title = (string) ($item['display_title_override'] ?? '') ?: (string) ($item['title'] ?? $item['item_title'] ?? 'Download');
         $meta = $filename === '' ? 'File not yet attached' : $filename . ' · ' . ResourceLibraryService::formatLabel($filename) . ' · ' . ResourceLibraryService::sizeLabel((int) ($item['byte_size'] ?? 0));
         $action = $public || $filename === ''
             ? '<p class="cl-course-item-download-note">' . ($filename === '' ? 'This file is not available yet.' : 'Available to download after you start the course.') . '</p>'
-            : '<p><a class="cl-course-item-download-link" href="/learn/' . rawurlencode($slug) . '/item/' . $contextNodeId . '/download/' . rawurlencode((string) ($item['item_key'] ?? '')) . '" download>Download<span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
+            : '<p><a class="' . self::DOWNLOAD_ACTION_CLASSES . '" href="/learn/' . rawurlencode($slug) . '/item/' . $contextNodeId . '/download/' . rawurlencode((string) ($item['item_key'] ?? '')) . '" download><span>Download</span><span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
         return '<section class="cl-course-item-download">'
             . ($embedded ? '<h3 class="cl-course-item-download-title">' . self::escape($title) . '</h3>' : '')
-            . (string) ($item['description_html'] ?? '')
+            . $description
             . '<p class="cl-course-item-download-meta">' . self::escape($meta) . '</p>'
             . $action
             . '</section>';
