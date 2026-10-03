@@ -105,24 +105,30 @@ final class AdminCourseComponentController extends BaseController
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
         if (isset($_POST['question_action'])) { return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id); }
         if (($_POST['resource_action'] ?? '') === 'upload') { return $this->uploadIntoForm($this->items->item($id), 0, '/admin/course-items/' . $id, $user->id); }
-        return $this->handle(function () use ($user, $id): void {
+        // A refused save shows the form again with what was entered and where editing began.
+        try {
             if (($_POST['item_action'] ?? '') === 'save_as') {
                 $input = array_replace($_POST, ['item_key' => (string) ($_POST['copy_key'] ?? ''), 'title' => (string) ($_POST['copy_title'] ?? '')]);
                 $copy = $this->items->saveAs($id, $input, $user->id);
-                $this->flash('success', 'An independent Course Item was created.');
-                $this->redirect('/admin/course-items/' . $copy);
+            } else {
+                $this->items->update($id, $this->withUploadedResource($_POST, $user->id), $user->id);
             }
-            $this->items->update($id, $this->withUploadedResource($_POST, $user->id), $user->id);
-            $this->flash('success', 'The shared Course Item was saved.');
-            $this->redirect('/admin/course-items/' . $id);
-        }, '/admin/course-items/' . $id);
+        } catch (InvalidArgumentException|\RuntimeException $exception) {
+            return $this->itemForm($this->items->editorDraft($_POST, $this->items->item($id)), 0, '/admin/course-items/' . $id, ['tone' => 'danger', 'text' => $exception->getMessage()], 422);
+        }
+        if (isset($copy)) {
+            $this->flash('success', 'An independent Course Item was created.');
+            $this->redirect($this->editPath($copy));
+        }
+        $this->flash('success', 'The shared Course Item was saved.');
+        $this->redirect($this->editReturn() ?? '/admin/course-items/' . $id);
     }
 
     #[Route('/admin/course-items/{item_id}/save-as', name: 'admin_course_item_save_as', requirements: ['item_id' => '\\d+'], methods: ['POST'])]
     public function saveAs(): Response
     {
         $this->requireCsrf(); $user = $this->requirePermission('COURSE.EDIT'); $id = $this->itemId(); $this->requireManagedItem($id);
-        return $this->handle(function () use ($user, $id): void { $copy = $this->items->saveAs($id, $_POST, $user->id); $this->flash('success', 'An independent Course Item was created.'); $this->redirect('/admin/course-items/' . $copy); }, '/admin/course-items/' . $id);
+        return $this->handle(function () use ($user, $id): void { $copy = $this->items->saveAs($id, $_POST, $user->id); $this->flash('success', 'An independent Course Item was created.'); $this->redirect($this->editPath($copy)); }, $this->editPath($id));
     }
 
     #[Route('/admin/course-items/{item_id}/delete', name: 'admin_course_item_delete', requirements: ['item_id' => '\\d+'], methods: ['POST'])]
@@ -350,7 +356,8 @@ final class AdminCourseComponentController extends BaseController
         $resources = array_values(array_filter($this->resources->library(), static fn(array $resource): bool => $accepted === null || in_array((string) $resource['resource_type'], $accepted, true)));
         $course = $courseId > 0 ? $this->items->courseContent($courseId) : null;
         $creating = (int) ($item['id'] ?? 0) === 0;
-        $data = ['title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item', 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])];
+        $returnTo = $creating ? null : $this->editReturn();
+        $data = ['return_to' => $returnTo ?? '', 'title' => $creating ? ($course !== null ? 'Create and add to ' . $course['title'] : 'Create ' . CourseItemService::TYPE_LABELS[$type] . ' item') : 'Edit Course Item', 'item' => $item, 'course_id' => $courseId, 'course_structure' => $course['structure'] ?? [], 'form_action' => $action, 'item_types' => CourseItemService::TYPES, 'type_label' => CourseItemService::TYPE_LABELS[$type], 'resources' => $resources, 'all_resources' => $this->resources->library(), 'resource_notice' => $notice, 'editor_questions' => (array) ($item['questions'] ?? [])];
         if ($creating && $this->inModal($courseId)) { return $this->renderFragment('partials/admin/course-item-form', $data + ['in_modal' => true], $status); }
         return $this->render('admin-course-item-form', $data + ['load_ckeditor' => true, 'load_question_editor' => in_array((string) $item['item_type'], ['assessment','diagnostic'], true)], $status);
     }
@@ -382,6 +389,31 @@ final class AdminCourseComponentController extends BaseController
     private function courseId(): int { $id = (int) $this->param('id'); if ($id < 1) { throw new InvalidArgumentException('Invalid course identifier.'); } return $id; }
     private function itemId(): int { $id = (int) $this->param('item_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Item identifier.'); } return $id; }
     private function nodeId(): int { $id = (int) $this->param('node_id'); if ($id < 1) { throw new InvalidArgumentException('Invalid Course Content row.'); } return $id; }
+
+    /**
+     * Where editing a Course Item began, carried as `return_to` from the link that opened the editor
+     * through every re-display of the form to the save: the Course Content page of a course (and the
+     * row being edited), or the Course Item Library. Anything else (another site, a protocol-relative
+     * or malformed path, any other page) is ignored, and the editor's own defaults apply.
+     */
+    private function editReturn(): ?string
+    {
+        $value = $_POST['return_to'] ?? $_GET['return_to'] ?? null;
+        return is_string($value) ? self::safeReturn($value) : null;
+    }
+
+    public static function safeReturn(string $value): ?string
+    {
+        if (preg_match('~\A/admin/courses/[1-9][0-9]{0,17}/content(?:#course-node-[1-9][0-9]{0,17})?\z~', $value) === 1) { return $value; }
+        return $value === '/admin/course-items' ? $value : null;
+    }
+
+    /** The editor for an item, keeping the return context of the edit that led there. */
+    private function editPath(int $id): string
+    {
+        $returnTo = $this->editReturn();
+        return '/admin/course-items/' . $id . ($returnTo === null ? '' : '?' . http_build_query(['return_to' => $returnTo]));
+    }
 
     /** A Course Content insertion asked from the editor's modal, which wants the form alone. */
     private function inModal(int $courseId): bool

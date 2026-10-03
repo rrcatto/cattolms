@@ -43,7 +43,7 @@ final class ApiStatusController
             'data' => [
                 'name' => $this->settings->platformName(),
                 'api_version' => 'v1',
-                'application_version' => '0.8.7.6',
+                'application_version' => '0.8.7.7',
                 'authentication' => 'Bearer token',
             ],
         ]);
