@@ -89,8 +89,7 @@ export default class extends Controller {
             const response = await fetch(`/admin/courses/${this.courseValue}/content/tree`, { headers: { 'HX-Request': 'true' }, credentials: 'same-origin' });
             const fresh = response.ok && !response.redirected ? this.parse(await response.text()) : null;
             if (!fresh) throw new MoveFailed('');
-            this.prepare(fresh);
-            this.treeTarget.replaceWith(fresh);
+            this.swapTree(fresh);
         } catch {
             // The insertion is saved; only the refresh failed. A reload shows it.
             window.location.reload();
@@ -335,18 +334,26 @@ export default class extends Controller {
             }
             const fresh = response.redirected ? null : this.parse(await response.text());
             if (!fresh) throw new MoveFailed('The move could not be saved. The previous order is shown; reload the page to check the current course.');
-            this.prepare(fresh);
-            this.treeTarget.replaceWith(fresh);
+            this.swapTree(fresh);
             if (!response.ok || fresh.dataset.error) this.say('error', fresh.dataset.error || 'The move could not be saved. The saved order is shown.');
             else this.say('saved', 'Saved');
         } catch (problem) {
-            this.treeTarget.replaceWith(snapshot);
+            this.swapTree(snapshot);
             this.say('error', problem instanceof MoveFailed ? problem.message : 'The move could not be saved. The previous order is shown.');
         } finally {
             this.busy = false;
             this.treeTarget.removeAttribute('aria-busy');
             if (focusId) this.focusHandle(focusId);
         }
+    }
+
+    // Every tree this controller puts in the page goes through here. htmx wires up only content it
+    // swapped in itself, so the tree's "+ Add here" links (hx-get into the insert modal) are handed
+    // to it; without that, a link in a refreshed tree opened an empty modal.
+    swapTree(tree) {
+        this.prepare(tree);
+        this.treeTarget.replaceWith(tree);
+        if (window.htmx) window.htmx.process(tree);
     }
 
     // Reveal the handles and restore collapsed branches before the tree is shown, so it does not

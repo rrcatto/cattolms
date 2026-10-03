@@ -95,6 +95,21 @@ final class CourseReaderContractTest extends TestCase
         self::assertStringContainsString('font-size:calc(1em + 2pt)', $rule[1]);
     }
 
+    public function testOutlineEntriesAreIndentedByDepth(): void
+    {
+        $css = $this->css();
+        $shorthand = strpos($css, '.cl-course-outline-item{margin:');
+        $indent = strpos($css, '.cl-course-outline .cl-course-outline-item{margin-inline-start:var(--cl-outline-indent,0)}');
+        self::assertNotFalse($shorthand);
+        self::assertNotFalse($indent, 'Each outline entry is indented by its depth.');
+        self::assertGreaterThan($shorthand, $indent, 'The indent follows, and so outlives, the entry margin shorthand that reset it.');
+        self::assertGreaterThan(self::specificity('.cl-course-outline-item'), self::specificity('.cl-course-outline .cl-course-outline-item'));
+        self::assertStringContainsString('.cl-course-outline .cl-course-depth-2{--cl-outline-indent:1.1rem}', $css);
+        self::assertStringContainsString('.cl-course-outline .cl-course-depth-3{--cl-outline-indent:2.2rem}', $css);
+        self::assertSame(1, preg_match('/\.cl-course-outline-assessment\{([^}]*)\}/', $css, $assessment));
+        self::assertStringNotContainsString('margin', $assessment[1], 'An assessment is indented by its depth, not by an extra fixed margin.');
+    }
+
     private function renderer(): CourseItemRenderer
     {
         $db = $this->createStub(Database::class);

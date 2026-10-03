@@ -338,6 +338,46 @@ async function scenario(name, browserName, run) {
             assert.match(await savedTree(page, state), /^A\[\d+,a1,a2,a3\],B\[b1\[b1x\]\],c$/);
         });
 
+        await scenario('+ Add here keeps working after every tree refresh, in one page load', browserName, async () => {
+            state = reset();
+            await page.goto(url());
+            await page.evaluate(() => { window.__sameDocument = true; });
+            // Waits for the new row itself: the previous "Saved" status can still be showing.
+            const addSection = async (slot, title) => {
+                const rows = await page.locator('#course-content-tree li[data-node-id]').count();
+                await insertAt(slot, 'Add section');
+                await page.locator('#insert-section-title').waitFor();
+                await page.locator('#insert-section-title').fill(title);
+                await modalBody().getByRole('button', {name: 'Save new section'}).click();
+                await modal().waitFor({state: 'hidden'});
+                await page.waitForFunction((count) => document.querySelectorAll('#course-content-tree li[data-node-id]').length === count, rows + 1);
+            };
+            await addSection(afterRow(n().a1), 'First added');
+            await addSection(afterRow(n().a3), 'Second added');
+            const twice = await renderedTree(page, state);
+            assert.match(twice, /^A\[a1,\d+,a2,a3,\d+\],B\[b1\[b1x\]\],c$/, `Two sections in a row, no reload: ${twice}`);
+            assert.equal(await drag(page, n().c, n().A, 0.15), 'before');
+            await saved(page);
+            await addSection(afterRow(n().c), 'After a drag');
+            await row(page, n().a2).locator('summary.cl-ui-row-trigger').click();
+            await row(page, n().a2).getByRole('button', {name: 'Move to top'}).click();
+            await saved(page);
+            await insertAt(courseStart(), 'Add existing item');
+            await modalBody().locator('#insert-existing-item').waitFor();
+            await modalBody().getByRole('button', {name: 'Cancel'}).click();
+            await modal().waitFor({state: 'hidden'});
+            await page.route('**/content/arrange', (route) => route.abort());
+            await drag(page, n().a3, n().a2, 0.15);
+            await page.locator('.cl-course-tree-error:not([hidden])').waitFor();
+            await page.unroute('**/content/arrange');
+            await insertAt(afterRow(n().b1), 'Create new item');
+            await modalBody().locator('input[name="type"]').first().waitFor();
+            await modalBody().getByRole('button', {name: 'Cancel'}).click();
+            await modal().waitFor({state: 'hidden'});
+            assert.equal(await page.evaluate(() => window.__sameDocument === true), true, 'All in one page load.');
+            assert.match(await savedTree(page, state), /^c,\d+,A\[a2,a1,\d+,a3,\d+\],B\[b1\[b1x\]\]$/);
+        });
+
         await scenario('an empty course still offers + Add here', browserName, async () => {
             state = JSON.parse(php('empty').trim().split('\n').pop());
             await page.goto(url());

@@ -6,6 +6,7 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseItemRenderer;
+use CattoLearning\Course\CourseNavigation;
 use CattoLearning\Course\GradeScale;
 use CattoLearning\Course\AssessmentService;
 use CattoLearning\Course\CourseItemService;
@@ -42,10 +43,10 @@ final class CoursePresentationController extends BaseController
         $course['structure'] = $this->items->availability((int) $course['id'], null, true);
         foreach ($course['structure'] as $candidate) { if ((int) $candidate['id'] === $nodeId && ($candidate['node_type'] ?? '') === 'item') { $node = $candidate; break; } }
         if ($node === null || !(bool) ($node['public_preview'] ?? false)) { throw $this->notFound('The public Course Item preview was not found.'); }
-        $sequence = array_values(array_filter($course['structure'], static fn(array $row): bool => $row['node_type'] === 'item'));
-        $index = array_search($nodeId, array_column($sequence, 'id'), true);
-        $node['previous_node'] = $index !== false && $index > 0 ? $sequence[$index - 1] : null;
-        $node['next_node'] = $index !== false && isset($sequence[$index + 1]) ? $sequence[$index + 1] : null;
+        // The public structure holds only public Course Items, so the shared reading order is theirs.
+        $around = CourseNavigation::neighbours($course['structure'], $nodeId);
+        $node['previous_node'] = $around['previous'];
+        $node['next_node'] = $around['next'];
         if (in_array((string) ($node['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) {
             throw $this->notFound('Assessments open from their direct assessment route.');
         }
@@ -64,11 +65,11 @@ final class CoursePresentationController extends BaseController
         $course = $this->publicCourse();
         $data = $this->assessments->publicPreview($this->param('slug'), (int) $this->param('node_id'), $this->param('key'), $submitted ? (array) ($_POST['answers'] ?? []) : null, !empty($course['public_preview_query']));
         $data['course']['public_preview_query'] = $course['public_preview_query'];
-        $sequence = array_values(array_filter((array) $data['course']['structure'], static fn(array $node): bool => ($node['node_type'] ?? '') === 'item'));
-        $nodeId = (int) $this->param('node_id'); $index = array_search($nodeId, array_map(static fn(array $node): int => (int) $node['id'], $sequence), true);
+        $nodeId = (int) $this->param('node_id');
+        $around = CourseNavigation::neighbours((array) $data['course']['structure'], $nodeId);
         $data['course']['current_node_id'] = $nodeId;
-        $data['assessment']['previous_node'] = $index !== false && $index > 0 ? $sequence[$index - 1] : null;
-        $data['assessment']['next_node'] = $index !== false && isset($sequence[$index + 1]) ? $sequence[$index + 1] : null;
+        $data['assessment']['previous_node'] = $around['previous'];
+        $data['assessment']['next_node'] = $around['next'];
         return $this->render('assessment-public-preview', $data + ['title' => $data['assessment']['title'], 'is_public_preview' => true, 'node_id' => (int) $this->param('node_id')]);
     }
 

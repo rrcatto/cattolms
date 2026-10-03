@@ -270,18 +270,16 @@ final class LearningService
         if (empty($enrolment['started_at'])) {
             throw new InvalidArgumentException('Click Start course before opening Course Content.');
         }
-        $node = null; $items = [];
-        foreach ((array) $course['structure'] as $row) {
-            if (($row['node_type'] ?? '') !== 'item' && empty($row['section_introduction_html']) && empty($row['show_outline'])) { continue; }
-            $items[] = $row;
+        $node = null;
+        foreach (CourseNavigation::sequence((array) $course['structure']) as $row) {
             if ((int) $row['id'] === $nodeId) { $node = $row; }
         }
         if ($node === null) { throw new InvalidArgumentException('The Course Item placement does not exist.'); }
         if (!empty($node['is_locked']) && !$preview) { throw new InvalidArgumentException('This Course Item is not available yet.'); }
         if (($node['assessment_role'] ?? '') === 'final' && !$preview && !$this->courseItemRecords->precedingGradedAssessmentsSubmitted((int) $enrolment['id'], (int) $course['id'], $nodeId)) { throw new InvalidArgumentException('Submit every preceding graded assessment before opening the final assessment.'); }
-        $index = array_search($nodeId, array_map(static fn(array $row): int => (int) $row['id'], $items), true);
-        $node['previous_node'] = $index !== false && $index > 0 ? $items[$index - 1] : null;
-        $node['next_node'] = $index !== false && isset($items[$index + 1]) ? $items[$index + 1] : null;
+        $around = CourseNavigation::neighbours((array) $course['structure'], $nodeId);
+        $node['previous_node'] = $around['previous'];
+        $node['next_node'] = $around['next'];
         $node['rendered_html'] = $node['node_type'] === 'section' ? (string) $node['section_introduction_html'] : $this->courseItemRenderer->render($node, (string) $course['slug'], $nodeId, false);
         $node['rendered_html'] = GradeScale::resolve($node['rendered_html'], (array) $course['grade_bands']);
         if ($preview) { $node['rendered_html'] = preg_replace('/(href="\/learn\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
