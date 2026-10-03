@@ -66,13 +66,16 @@ final class AdminCourseCategoryController extends BaseController
         // shared and the courses filed under it are not, so a screen with no selector counts REAL
         // only and reports zero against every category of a generated catalogue.
 
+        // One load of the taxonomy for both the tree and its counts.
+        $categories = $this->courses->categories();
         return $this->render('admin-course-categories', [
             'title' => 'Course categories',
             'course_group' => 'categories',
             // Counted in the reader's universe. The label is shared; what is filed under it is
             // not, so a genuine administrator viewing REAL must not be shown generated courses in
             // the tally beside a category name.
-            'category_tree' => $this->courses->categoryManagementTree(),
+            'category_tree' => $this->courses->categoryManagementTree($categories),
+            'category_statistics' => CourseService::categoryStatistics($categories),
             'parent_picker' => $this->courses->categoryParentPicker(),
         ]);
     }

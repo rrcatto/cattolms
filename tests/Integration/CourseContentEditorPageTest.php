@@ -181,6 +181,17 @@ final class CourseContentEditorPageTest extends TestCase
         self::assertSame($placed, $this->children(null)[0]);
     }
 
+    public function testASectionCanBeMarkedForThePublicPreview(): void
+    {
+        $node = $this->insertedNode($this->post('/admin/courses/' . $this->course . '/content/sections', ['title' => 'Open to all', 'public_preview' => '1', 'parent_node_id' => '', 'insert_index' => '0']));
+        self::assertTrue((bool) $this->db->fetchOne('SELECT public_preview FROM course_sections WHERE node_id=:id', ['id' => $node]));
+        $html = $this->ok('/admin/courses/' . $this->course . '/content');
+        self::assertMatchesRegularExpression('~action="/admin/courses/' . $this->course . '/content/' . $node . '/section".*?name="public_preview" value="1" checked~s', $html, 'Edit section shows the flag, so saving it keeps it.');
+        self::assertStringNotContainsString('name="public_preview" value="1" checked', substr($html, (int) strpos($html, 'action="/admin/courses/' . $this->course . '/content/' . $this->section . '/section"'), 4000), 'A section not marked public is unchecked.');
+        $form = $this->ok('/admin/courses/' . $this->course . '/content/insert/section?insert_parent=&insert_index=0', true);
+        self::assertStringContainsString('name="public_preview"', $form, 'Add section offers the flag too.');
+    }
+
     public function testRefusedInsertionsChangeNothingAndKeepWhatWasEntered(): void
     {
         $before = $this->snapshot();

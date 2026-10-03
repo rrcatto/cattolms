@@ -700,13 +700,14 @@ final class CourseService
      * its counts, gains its children in tree order, and knows whether it is the first or last of
      * its siblings, which is the range the move buttons work within.
      *
+     * @param list<array<string,mixed>>|null $categories The rows of categories(), when already loaded.
      * @return list<array<string,mixed>>
      */
-    public function categoryManagementTree(): array
+    public function categoryManagementTree(?array $categories = null): array
     {
         $nodes = [];
         $roots = [];
-        foreach ($this->courses->categories() as $category) {
+        foreach ($categories ?? $this->courses->categories() as $category) {
             $id = (int) $category['id'];
             $nodes[$id] = $category + ['children' => []];
             $parent = $category['parent_id'] === null ? 0 : (int) $category['parent_id'];
@@ -728,6 +729,42 @@ final class CourseService
             return $branch;
         };
         return $build($roots);
+    }
+
+    /**
+     * Counts for the category management page, from the rows of categories() (one query, already
+     * loaded for the tree). A category's level is its depth along parent_id, not the stored level
+     * column: a category with no parent is a main category, one whose parent is a main category is
+     * a sub-category, and one whose parent is a sub-category is a sub-sub-category. A category that
+     * would sit deeper than level 3, in a parent loop or under a missing parent is not counted at
+     * any level; it is listed under invalid with the reason, so total exceeds the three level counts
+     * only when the hierarchy is broken. A category has courses when courses are filed directly in
+     * it; an empty category has none filed directly, whatever its sub-categories hold.
+     *
+     * @param list<array<string,mixed>> $categories
+     * @return array{main:int,sub:int,sub_sub:int,total:int,with_courses:int,empty:int,invalid:list<string>}
+     */
+    public static function categoryStatistics(array $categories): array
+    {
+        $parents = []; $names = [];
+        foreach ($categories as $category) {
+            $id = (int) $category['id'];
+            $parents[$id] = $category['parent_id'] === null ? null : (int) $category['parent_id'];
+            $names[$id] = (string) $category['name'];
+        }
+        $levels = [1 => 0, 2 => 0, 3 => 0]; $invalid = [];
+        foreach ($parents as $id => $parent) {
+            $depth = 1; $seen = [$id => true]; $problem = '';
+            for ($current = $parent; $current !== null; $current = $parents[$current]) {
+                if (!array_key_exists($current, $parents)) { $problem = 'its parent is missing'; break; }
+                if (isset($seen[$current])) { $problem = 'it is in a parent loop'; break; }
+                $seen[$current] = true;
+                if (++$depth > 3) { $problem = 'it is deeper than level 3'; break; }
+            }
+            if ($problem === '') { $levels[$depth]++; } else { $invalid[] = $names[$id] . ': ' . $problem; }
+        }
+        $withCourses = count(array_filter($categories, static fn(array $category): bool => (int) ($category['course_count'] ?? 0) > 0));
+        return ['main' => $levels[1], 'sub' => $levels[2], 'sub_sub' => $levels[3], 'total' => count($categories), 'with_courses' => $withCourses, 'empty' => count($categories) - $withCourses, 'invalid' => $invalid];
     }
 
     public function moveCategory(int $categoryId, string $direction, int $userId): void

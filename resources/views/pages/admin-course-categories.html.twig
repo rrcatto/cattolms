@@ -32,6 +32,13 @@
 {% endblock %}
 {% endembed %}
 
+					{# Levels follow parent_id; a category counts as having courses when courses are filed directly in it. #}
+					{% set stats = category_statistics %}
+					{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact'})} %}
+{% block body %}{{ ui('data.stat-card', {label: 'Main categories', value: stats.main}) }}{{ ui('data.stat-card', {label: 'Subcategories', value: stats.sub}) }}{{ ui('data.stat-card', {label: 'Sub-subcategories', value: stats.sub_sub}) }}{{ ui('data.stat-card', {label: 'Total categories', value: stats.total}) }}{{ ui('data.stat-card', {label: 'With courses', value: stats.with_courses}) }}{{ ui('data.stat-card', {label: 'Empty categories', value: stats.empty}) }}{% endblock %}
+					{% endembed %}
+					<p class="cl-category-stats-note">With courses and Empty count only courses filed directly in a category; an empty category's sub-categories may still hold courses.</p>
+					{% if stats.invalid %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Categories outside the three-level hierarchy'})} %}{% block body %}<p>These categories are not counted at any level until they are moved:</p><ul>{% for problem in stats.invalid %}<li>{{ problem }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}{% endif %}
 					<div class="cl-category-tree-wrap" data-controller="category-tree">
 						<div data-category-tree-target="controls" hidden>
 							{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}

@@ -187,7 +187,7 @@ final class CoursePortabilityService
         $courseItems = []; $resources = []; $structure = [];
         foreach ($rows as $row) {
             $node = ['node_key' => (string) $row['public_id'], 'parent_node_key' => $row['parent_node_id'] === null ? null : ($byNode[(int) $row['parent_node_id']] ?? null), 'position' => (int) $row['position'], 'node_type' => (string) $row['node_type'], 'relative_delay_minutes' => (int) $row['relative_delay_minutes']];
-            if ($row['node_type'] === 'section') { $node += ['title' => (string) $row['section_title'], 'introduction_html' => (string) $row['section_introduction_html'], 'show_outline' => (bool) $row['show_outline']]; }
+            if ($row['node_type'] === 'section') { $node += ['title' => (string) $row['section_title'], 'introduction_html' => (string) $row['section_introduction_html'], 'show_outline' => (bool) $row['show_outline'], 'public_preview' => (bool) $row['public_preview']]; }
             else {
                 $key = (string) $row['item_key']; $node += ['item_key' => $key, 'display_title_override' => $row['display_title_override'], 'display_description_override' => $row['display_description_override'], 'public_preview' => (bool) $row['public_preview'], 'assessment_role' => (string) $row['assessment_role']];
                 foreach ($this->courseItemRecords->reachableItems((int) $row['course_item_id']) as $reachable) {

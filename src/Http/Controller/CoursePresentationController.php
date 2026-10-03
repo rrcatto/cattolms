@@ -41,19 +41,21 @@ final class CoursePresentationController extends BaseController
     {
         $course = $this->publicCourse(); $nodeId = (int) $this->param('node_id'); $node = null;
         $course['structure'] = $this->items->availability((int) $course['id'], null, true);
-        foreach ($course['structure'] as $candidate) { if ((int) $candidate['id'] === $nodeId && ($candidate['node_type'] ?? '') === 'item') { $node = $candidate; break; } }
+        // The public structure holds only the sections and Course Items marked for public preview. A
+        // public section opens here when it has a page of its own (an introduction or an outline).
+        foreach (CourseNavigation::sequence($course['structure']) as $candidate) { if ((int) $candidate['id'] === $nodeId) { $node = $candidate; break; } }
         if ($node === null || !(bool) ($node['public_preview'] ?? false)) { throw $this->notFound('The public Course Item preview was not found.'); }
-        // The public structure holds only public Course Items, so the shared reading order is theirs.
+        $isSection = ($node['node_type'] ?? '') === 'section';
         $around = CourseNavigation::neighbours($course['structure'], $nodeId);
         $node['previous_node'] = $around['previous'];
         $node['next_node'] = $around['next'];
         if (in_array((string) ($node['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) {
             throw $this->notFound('Assessments open from their direct assessment route.');
         }
-        $node['rendered_html'] = GradeScale::resolve($this->renderer->render($node, (string) $course['slug'], $nodeId, true), $this->courses->gradeBands((int) $course['id']));
+        $node['rendered_html'] = GradeScale::resolve($isSection ? (string) $node['section_introduction_html'] : $this->renderer->render($node, (string) $course['slug'], $nodeId, true), $this->courses->gradeBands((int) $course['id']));
         if ($course['public_preview_query'] !== '') { $node['rendered_html'] = preg_replace('/(href="\/courses\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['current_node_id'] = $nodeId;
-        return $this->render('course-public-preview-item', ['title' => (string) ($node['display_title_override'] ?: $node['item_title']), 'course' => $course, 'item' => $node, 'course_content_mode' => true, 'is_public_preview' => true]);
+        return $this->render('course-public-preview-item', ['title' => (string) ($isSection ? $node['section_title'] : ($node['display_title_override'] ?: $node['item_title'])), 'course' => $course, 'item' => $node, 'course_content_mode' => true, 'is_public_preview' => true]);
     }
 
     #[Route('/courses/{slug}/preview/{node_id}/assessment/{key}', name: 'public_course_assessment', requirements: ['slug' => '[a-zA-Z0-9_-]+', 'node_id' => '\\d+', 'key' => '[a-zA-Z0-9._-]+'], methods: ['GET','POST'])]
