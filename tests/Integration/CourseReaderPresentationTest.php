@@ -27,8 +27,9 @@ use Symfony\Component\HttpFoundation\Request;
  * the Course Modules outline, a Downloadable File whose description appears once inside its card,
  * and the Download and paging actions as the shared primary action.
  *
- * Course: Week one (section with an introduction) > Lesson, Pack; Plain (section, no introduction);
- * Later (section three days after the previous one, so locked for a new learner) > Locked lesson.
+ * Course: Week one (section with an introduction) > Lesson, Pack, Quiz (graded assessment); Plain
+ * (section, no introduction, so not a reading stop); Later (section three days after the previous
+ * one, so locked for a new learner) > Locked lesson.
  */
 final class CourseReaderPresentationTest extends TestCase
 {
@@ -76,6 +77,8 @@ final class CourseReaderPresentationTest extends TestCase
         $this->nodes['lesson'] = $this->items->addExisting($this->course, $lesson, ['parent_node_id' => (string) $this->nodes['week'], 'public_preview' => '1'], $this->owner);
         $pack = $this->items->create(['item_key' => 'reader-pack-' . $this->suffix, 'item_type' => 'downloadable_file', 'title' => 'Precedent pack', 'description_html' => '<p>' . self::DESCRIPTION . '</p>', 'resource_id' => (string) $resource], $this->owner);
         $this->nodes['pack'] = $this->items->addExisting($this->course, $pack, ['parent_node_id' => (string) $this->nodes['week'], 'public_preview' => '1'], $this->owner);
+        $quiz = $this->items->create(['item_key' => 'reader-quiz-' . $this->suffix, 'item_type' => 'assessment', 'title' => 'Quiz'], $this->owner);
+        $this->nodes['quiz'] = $this->items->addExisting($this->course, $quiz, ['parent_node_id' => (string) $this->nodes['week']], $this->owner);
         $this->nodes['plain'] = $this->items->addSection($this->course, ['title' => 'Plain'], $this->owner);
         $this->nodes['later'] = $this->items->addSection($this->course, ['title' => 'Later', 'introduction_html' => '<p>Later.</p>', 'delay_days' => '3'], $this->owner);
         $locked = $this->items->create(['item_key' => 'reader-locked-' . $this->suffix, 'item_type' => 'html_lesson', 'title' => 'Locked lesson', 'content_source' => '<p>Later body.</p>'], $this->owner);
@@ -159,6 +162,54 @@ final class CourseReaderPresentationTest extends TestCase
         self::assertStringContainsString('Available to download after you start the course.', $html);
         $lesson = $this->page('/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/content')->document->saveHTML() ?: '';
         self::assertSame(1, substr_count($lesson, 'Lesson summary.'), 'Preview and learner mode present descriptions the same way.');
+    }
+
+    public function testNextAndPreviousStopAtSectionsEverywhereTheLearnerReads(): void
+    {
+        $assessment = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix);
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['later'] . '/content', $assessment['Next →'] ?? null, "An assessment's Next goes to the following section with a page, skipping a heading-only section.");
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content', $assessment['← Previous'] ?? null);
+        $pack = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content');
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix, $pack['Next →'] ?? null);
+        $lesson = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content', $lesson['← Previous'] ?? null, "A content page's Previous goes to its section.");
+        $week = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content');
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content', $week['Next →'] ?? null, "A section's Next goes to its first row.");
+    }
+
+    public function testThePublicPreviewStepsThroughItsPublicItemsOnly(): void
+    {
+        // The public preview shows only public Course Items, and no sections, so its reading order is
+        // those items: the same rule over the structure it is allowed to show.
+        $_COOKIE = $this->cookies;
+        $lesson = $this->paging('/courses/' . $this->slug . '/preview/' . $this->nodes['lesson'] . '/content');
+        self::assertSame('/courses/' . $this->slug . '/preview/' . $this->nodes['pack'] . '/content', $lesson['Next →'] ?? null);
+        self::assertArrayNotHasKey('← Previous', $lesson);
+        $pack = $this->page('/courses/' . $this->slug . '/preview/' . $this->nodes['pack'] . '/content');
+        self::assertSame(0, $pack->query('//nav[contains(@class, "cl-course-outline")]//*[starts-with(normalize-space(), "Section:")]')->length, 'No section entries in the public outline.');
+        self::assertSame(404, $this->send('/courses/' . $this->slug . '/preview/' . $this->nodes['week'] . '/content')->getStatusCode(), 'Sections are not part of the public preview.');
+    }
+
+    /** @return array<string,string> Paging link label => href. */
+    private function paging(string $url): array
+    {
+        $links = [];
+        foreach ($this->page($url)->query('//nav[contains(@class, "cl-course-item-paging")]/a') as $link) {
+            if ($link instanceof \DOMElement) { $links[trim($link->textContent)] = $link->getAttribute('href'); }
+        }
+        return $links;
+    }
+
+    private function send(string $url): \Symfony\Component\HttpFoundation\Response
+    {
+        $kernel = new Kernel('test', true, CliBootstrap::boot()['instance_root']);
+        $_GET = Request::create($url)->query->all();
+        try {
+            return $kernel->handle(Request::create($url, 'GET'));
+        } finally {
+            $kernel->shutdown();
+            $_GET = [];
+        }
     }
 
     private function page(string $url): DOMXPath

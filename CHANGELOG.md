@@ -1,6 +1,12 @@
 # Changelog
 
-**LMS version:** 0.8.7.7 **Date time:** 2026/10/03 SAST
+**LMS version:** 0.8.7.8 **Date time:** 2026/10/03 SAST
+
+## 2026-10-03 SAST — v0.8.7.8 Outline indentation, "+ Add here" after refreshes, Next to sections
+
+- Course Modules outline: entries are indented by their depth with a guide line, so what a section (or a module) holds sits visibly inside it. The depth indents existed but a later `margin` shorthand on outline entries reset them; graded assessments, which had their own fixed indent, now indent by depth like everything else.
+- "+ Add here" works after the tree is refreshed. htmx 4 wires up only content it swapped in, and the course-content controller replaced the tree itself after inserts, moves and failed saves, so the new tree's "+ Add here" links opened an empty modal until the page was reloaded. Every tree swap now goes through `swapTree()`, which hands the new tree to `htmx.process()`.
+- Previous and Next follow one reading order everywhere (`CourseNavigation`: every item and every section with an introduction or outline). Assessment pages used an items-only order, so an assessment's Next skipped a following section while the next module's Previous included it. The public preview, which shows no sections, uses the same rule over its public items.
 
 ## 2026-10-03 SAST — v0.8.7.7 Course reader presentation and edit return context
 

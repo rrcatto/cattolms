@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Course\CourseNavigation;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\AssessmentService;
 use CattoLearning\Course\LearningService;
@@ -72,10 +73,9 @@ final class AssessmentController extends BaseController
      */
     private function withCourseNavigation(array $item, array $course, int $nodeId): array
     {
-        $sequence = array_values(array_filter((array) ($course['structure'] ?? []), static fn(array $node): bool => ($node['node_type'] ?? '') === 'item'));
-        $index = array_search($nodeId, array_map(static fn(array $node): int => (int) $node['id'], $sequence), true);
-        $item['previous_node'] = $index !== false && $index > 0 ? $sequence[$index - 1] : null;
-        $item['next_node'] = $index !== false && isset($sequence[$index + 1]) ? $sequence[$index + 1] : null;
+        $around = CourseNavigation::neighbours((array) ($course['structure'] ?? []), $nodeId);
+        $item['previous_node'] = $around['previous'];
+        $item['next_node'] = $around['next'];
         return $item;
     }
 }
