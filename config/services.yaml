@@ -104,7 +104,7 @@ services:
 
     CattoLearning\Course\:
         resource: '../src/Course/'
-        exclude: '../src/Course/{CatalogueFilter.php,*Exception.php}'
+        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php}'
 
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'

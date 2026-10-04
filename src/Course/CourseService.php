@@ -86,7 +86,8 @@ final class CourseService
         private readonly OptionRepository $options,
         private readonly CourseHtml $courseHtml,
         private readonly LegacyHtmlCourseImporter $importer,
-        private readonly CourseItemService $courseItems
+        private readonly CourseItemService $courseItems,
+        private readonly CourseReviewRepository $reviews
     ) {
     }
 
@@ -577,9 +578,13 @@ final class CourseService
         if ($courses === []) {
             return $courses;
         }
-        $tags = $this->courses->tagsForCourses(array_map(static fn(array $row): int => (int) $row['id'], $courses));
+        $ids = array_map(static fn(array $row): int => (int) $row['id'], $courses);
+        $tags = $this->courses->tagsForCourses($ids);
+        // Approved-review ratings for the whole page in one query.
+        $ratings = $this->reviews->ratingSummaries($ids);
         foreach ($courses as &$course) {
             $course['tags'] = $tags[(int) $course['id']] ?? [];
+            $course['rating'] = ($ratings[(int) $course['id']] ?? CourseRatingSummary::fromDistribution([]))->toArray();
             $course['category_path'] = $this->categoryPath((int) ($course['category_id'] ?? 0));
         }
         unset($course);

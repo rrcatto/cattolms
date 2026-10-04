@@ -1,0 +1,17 @@
+{#
+	A five-star rating as five real radio buttons in one fieldset, so it is a single tab stop that the
+	arrow keys move through, and each choice is announced as "1 star" to "5 stars". The stars are the
+	visible labels; the radios are visually hidden but stay focusable, and the focused star shows a ring.
+#}
+<fieldset class="cl-rating-input">
+	<legend class="form-label">{{ rating_legend|default('Your rating') }} <span class="cl-visually-hidden">(required)</span></legend>
+	<div class="cl-rating-options">
+		{% for stars in 1..5 %}
+			<label class="cl-rating-option">
+				<input class="cl-rating-radio" type="radio" name="rating" value="{{ stars }}" {{ rating_value|default(0) == stars ? 'checked' : '' }} required>
+				<span class="cl-rating-star" aria-hidden="true">★</span>
+				<span class="cl-visually-hidden">{{ stars }} {{ stars == 1 ? 'star' : 'stars' }}</span>
+			</label>
+		{% endfor %}
+	</div>
+</fieldset>

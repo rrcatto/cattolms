@@ -91,3 +91,21 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 The runner reads the fixture state and resets the tree through `podman exec` (`CATTO_PHP_CONTAINER`,
 default `env_php_1`). `CATTO_BROWSERS` (default `chromium,firefox`) and `CATTO_BROWSER_OUTPUT`
 (default `/tmp/catto-course-content-tree`) override the browsers and screenshot directory.
+
+## Course reviews
+
+`course-reviews.cjs` checks course ratings and moderated reviews in Chromium and Firefox and
+without JavaScript (9 checks): the public course page shows only the approved review, its rating
+summary and the reviewer's first name and initial; the five-star control is one labelled radio
+group that the arrow keys move through, with the chosen stars filled and a visible focus ring; a
+submitted review shows as pending and stays off the public page until ADMIN approves it on
+`/admin/course-reviews`; both pages fit a 390px phone without sideways scrolling; and the form
+submits with JavaScript disabled. `course-review-fixture.php` creates a published course, an
+entitled learner, a second learner with an approved review and an ADMIN; the runner resets the
+learner's review through `podman exec` before each scenario.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-review-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-reviews.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-review-fixture.php cleanup'
+```

@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.1';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -83,7 +83,8 @@ final class ThemeRenderer
         private readonly AdministrationSectionRegistry $adminSections,
         private readonly AccountSectionRegistry $accountSections,
         private readonly CompanySectionRegistry $companySections,
-        private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null
+        private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null,
+        private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null
     ) {
     }
 
@@ -549,6 +550,12 @@ final class ThemeRenderer
                 }
                 if ($sectionKey === 'courses' && $this->can($data, 'COURSE.TAG.MANAGE')) {
                     $grandchildren[] = $child('admin-course-tags', 'Course Tags', '/admin/courses/tags', 'courses');
+                }
+                // Reviews waiting for a decision are counted in the label, so the queue is visible
+                // from anywhere in Administration without opening it.
+                if ($sectionKey === 'courses' && $this->can($data, 'COURSE.REVIEW.MANAGE')) {
+                    $pendingReviews = isset($this->reviews) ? $this->reviews->pendingCount() : 0;
+                    $grandchildren[] = $child('admin-course-reviews', 'Course Reviews' . ($pendingReviews > 0 ? ' (' . $pendingReviews . ' pending)' : ''), '/admin/course-reviews', 'courses');
                 }
                 // Companies keeps the name it has always had in the menu. Its second view sits
                 // beneath it rather than replacing it: renaming the entry to "Course Consumers"

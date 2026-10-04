@@ -33,6 +33,9 @@
 		{% if course.category_path is defined and course.category_path %}
 			{% set course_path_items = [] %}{% for step in course.category_path %}{% set course_path_items = course_path_items|merge([{label: step.name, href: '/courses/category/' ~ step.slug, current: false}]) %}{% endfor %}{{ ui('layout.breadcrumb', {items: course_path_items, aria_label: 'Category'}) }}
 		{% endif %}
+		{% if course.rating is defined and course.rating.count > 0 %}
+			{% include '@platform/partials/course-rating-summary.html.twig' with {rating: course.rating, rating_compact: true} %}
+		{% endif %}
 		{% if course.summary %}
 			<p class="cl-course-card-summary">
 				{{ course.summary }}

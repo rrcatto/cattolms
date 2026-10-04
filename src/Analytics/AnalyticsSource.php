@@ -16,5 +16,7 @@ enum AnalyticsSource: string
     case LearnerReader = 'learner_reader';
     case Account = 'account';
     case Checkout = 'checkout';
+    /** The learner's rate-and-review form. */
+    case CourseReview = 'course_review';
     case Admin = 'admin';
 }

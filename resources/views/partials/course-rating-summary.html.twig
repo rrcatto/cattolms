@@ -1,0 +1,14 @@
+{#
+	A course's rating from approved reviews: the stars, the mean and how many reviews it comes from.
+	rating is CourseRatingSummary::toArray(). With no approved reviews it says so rather than showing
+	an empty row of stars, which would read as a rating of zero.
+#}
+<p class="cl-rating-summary{{ rating_compact|default(false) ? ' is-compact' : '' }}">
+	{% if rating.count > 0 %}
+		<span class="cl-rating-stars" aria-hidden="true">{% for stars in 1..5 %}<span class="{{ stars <= rating.filled_stars ? 'is-filled' : '' }}">{{ stars <= rating.filled_stars ? '★' : '☆' }}</span>{% endfor %}</span>
+		<span class="cl-visually-hidden">Rated {{ rating.average_label }} out of 5 from {{ rating.count }} {{ rating.count == 1 ? 'review' : 'reviews' }}</span>
+		<span class="cl-rating-figures" aria-hidden="true"><strong>{{ rating.average_label }}</strong> · {{ rating.count }} {{ rating.count == 1 ? 'review' : 'reviews' }}</span>
+	{% else %}
+		<span class="cl-rating-none">No reviews yet</span>
+	{% endif %}
+</p>
