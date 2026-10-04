@@ -117,10 +117,89 @@ final class AnalyticsEventRepository
         return $counts;
     }
 
+    /**
+     * Distinct viewers per course in [since, until), counting only views from the given sources.
+     * Viewers are counted as uniqueViewers() counts them: signed-in people by user, anonymous
+     * visitors by visitor id. Courses with no views are absent.
+     *
+     * @param list<AnalyticsSource> $sources
+     * @return array<int,int> viewers keyed by course id
+     */
+    public function uniqueViewersByCourse(DateTimeImmutable $since, DateTimeImmutable $until, array $sources): array
+    {
+        if ($sources === []) { return []; }
+        $viewers = [];
+        foreach ($this->db->fetchAllAssociative(
+            'SELECT course_id, COUNT(DISTINCT user_id) + COUNT(DISTINCT visitor_id) FILTER (WHERE user_id IS NULL) AS viewers
+               FROM analytics_events
+              WHERE event_type = :type AND occurred_at >= :since AND occurred_at < :until AND course_id IS NOT NULL
+                AND source IN (:sources)
+              GROUP BY course_id',
+            ['type' => AnalyticsEventType::CourseView->value, 'since' => $since->format(self::TIME), 'until' => $until->format(self::TIME),
+                'sources' => array_map(static fn(AnalyticsSource $source): string => $source->value, $sources)]
+        ) as $row) {
+            $viewers[(int) $row['course_id']] = (int) $row['viewers'];
+        }
+        return $viewers;
+    }
+
+    /**
+     * Purchases and refunds per course in [since, until).
+     *
+     * purchases is the number of paid order lines (each one buying decision); purchased_units adds
+     * up their quantities (a company credit line may buy many). refunded_units measures each refund
+     * in units of the line it refunds: its amount over the line's unit price, at most its quantity,
+     * so a partial refund of an individual course is a fraction of one unit and a company credit
+     * refund is the units it returned. A refund whose order line is gone counts its quantity.
+     *
+     * @return array<int,array{purchases:int,purchased_units:int,refunds:int,refunded_units:float}> keyed by course id
+     */
+    public function purchaseTotalsByCourse(DateTimeImmutable $since, DateTimeImmutable $until): array
+    {
+        $totals = [];
+        foreach ($this->db->fetchAllAssociative(
+            "SELECT e.course_id,
+                    COUNT(*) FILTER (WHERE e.event_type = :purchased) AS purchases,
+                    COALESCE(SUM(GREATEST(1, COALESCE((e.metadata->>'quantity')::int, 1))) FILTER (WHERE e.event_type = :purchased), 0) AS purchased_units,
+                    COUNT(*) FILTER (WHERE e.event_type = :refunded) AS refunds,
+                    COALESCE(SUM(CASE
+                        WHEN oi.id IS NOT NULL AND (e.metadata->>'amount_minor') IS NOT NULL
+                            THEN LEAST(GREATEST(1, COALESCE((e.metadata->>'quantity')::int, 1))::numeric,
+                                       (e.metadata->>'amount_minor')::numeric * oi.quantity / oi.amount_minor)
+                        ELSE GREATEST(1, COALESCE((e.metadata->>'quantity')::int, 1))::numeric
+                    END) FILTER (WHERE e.event_type = :refunded), 0) AS refunded_units
+               FROM analytics_events e
+               LEFT JOIN commerce_order_items oi ON oi.id = e.order_item_id
+              WHERE e.event_type IN (:purchased, :refunded) AND e.occurred_at >= :since AND e.occurred_at < :until AND e.course_id IS NOT NULL
+              GROUP BY e.course_id",
+            ['purchased' => AnalyticsEventType::CoursePurchased->value, 'refunded' => AnalyticsEventType::CourseRefunded->value,
+                'since' => $since->format(self::TIME), 'until' => $until->format(self::TIME)]
+        ) as $row) {
+            $totals[(int) $row['course_id']] = ['purchases' => (int) $row['purchases'], 'purchased_units' => (int) $row['purchased_units'],
+                'refunds' => (int) $row['refunds'], 'refunded_units' => (float) $row['refunded_units']];
+        }
+        return $totals;
+    }
+
     /** How many people favourite a course now. The favourites table is the authority; events are history. */
     public function currentFavouriteCount(int $courseId): int
     {
         return (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_favourites WHERE course_id=:course', ['course' => $courseId]);
+    }
+
+    /**
+     * How many people favourite each course now, from the favourites table. Courses nobody
+     * favourites are absent.
+     *
+     * @return array<int,int> keyed by course id
+     */
+    public function currentFavouriteCounts(): array
+    {
+        $counts = [];
+        foreach ($this->db->fetchAllAssociative('SELECT course_id, COUNT(*) AS favourites FROM course_favourites GROUP BY course_id') as $row) {
+            $counts[(int) $row['course_id']] = (int) $row['favourites'];
+        }
+        return $counts;
     }
 
     /**

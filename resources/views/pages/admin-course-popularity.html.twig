@@ -1,0 +1,60 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/reports' %}{% set ph_back_label = 'Course Performance' %}{% set ph_kicker = 'Reports' %}{% set ph_title = 'Course popularity' %}{% set ph_lead = 'The stored popularity ranking of published courses, with the signals and points behind every score. Open a course for its full breakdown. The ranking is recalculated by the popularity:recalculate console command.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% if run %}
+{% set weights = run.parameters.weights %}
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 4})} %}{% block body %}
+{{ ui('data.stat-card', {label: 'Calculated', value: run.calculated_at|date('j M Y'), note: 'At ' ~ run.calculated_at|date('H:i')}) }}
+{{ ui('data.stat-card', {label: 'Window', value: run.parameters.window_days ~ ' days', note: run.window_start|date('j M Y') ~ ' to ' ~ run.window_end|date('j M Y')}) }}
+{{ ui('data.stat-card', {label: 'Courses ranked', value: run.course_count, note: 'Published when calculated'}) }}
+{{ ui('data.stat-card', {label: 'Rating prior', value: run.parameters.rating_prior is null ? '—' : run.parameters.rating_prior|number_format(2), note: 'Mean of all approved reviews'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'How the score is calculated', summary: 'A score out of 100 is the sum of five weighted components, each between 0 and its weight.'}) }}
+{{ ui('data.key-value-list', {items: [
+	{label: 'Discovery interest · ' ~ (weights.views * 100)|round ~ ' points', value: 'Distinct viewers of the course page and public preview in the window. Learner-reader views are shown on the course breakdown but not scored.'},
+	{label: 'Favourites · ' ~ (weights.favourites * 100)|round ~ ' points', value: 'People who favourite the course now, from the favourites table.'},
+	{label: 'Purchases · ' ~ (weights.purchases * 100)|round ~ ' points', value: 'Paid order lines in the window, reduced by the refund ratio: refunded units ÷ (purchased units + ' ~ run.parameters.refund_smoothing ~ '), at most 1. Free courses have no purchases.'},
+	{label: 'Rating · ' ~ (weights.rating * 100)|round ~ ' points', value: 'Approved reviews only. Quality is the Bayesian average (' ~ run.parameters.rating_confidence ~ ' reviews at the platform mean added) on a 0–1 scale, multiplied by confidence: reviews ÷ (reviews + ' ~ run.parameters.rating_confidence ~ ').'},
+	{label: 'Momentum · ' ~ (weights.momentum * 100)|round ~ ' points', value: 'Discovery viewers in the latest ' ~ run.parameters.momentum_days ~ ' days against the ' ~ run.parameters.momentum_days ~ ' before, smoothed by ' ~ run.parameters.momentum_smoothing ~ '. Growth only; full points at ×' ~ run.parameters.full_momentum_growth ~ '.'},
+	{label: 'Normalisation', value: 'Views, favourites and purchases are scaled as ln(1 + value) ÷ ln(1 + highest value among ranked courses), so the leader scores 1, none scores 0 and outliers are compressed.'},
+]}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+<nav class="cl-filter-chips" aria-label="Filter by offer">
+{% for chip in offer_filters %}<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {% if chip.active %}aria-current="true"{% endif %}>{{ chip.label }}</a>{% endfor %}
+</nav>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'popularity', pagination: popularity_pagination, search: {ds_name: 'popularity', ds_label: 'Search courses', ds_value: popularity_search, ds_action: '/admin/reports/popularity'}})} %}
+{% block results %}
+{% if courses %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Courses by popularity', density: 'compact'})} %}
+{% block header %}<tr>{% for sh in popularity_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: popularity_region, sort_results: popularity_results} %}{% endfor %}</tr>{% endblock %}
+{% block body %}
+{% for row in courses %}
+<tr>
+	<td>{{ row.rank }}</td>
+	<td><a href="/admin/reports/popularity/{{ row.course_id }}"><strong>{{ row.title }}</strong></a>{% if row.offer != 'paid' %} {{ ui('feedback.badge', {label: row.offer == 'free' ? 'Free' : 'No active price', tone: 'info', size: 'small'}) }}{% endif %}</td>
+	<td><strong>{{ row.score|number_format(1) }}</strong></td>
+	<td>{{ row.unique_views }}</td>
+	<td>{{ row.favourites }}</td>
+	<td>{{ row.purchases }}{% if row.purchased_units != row.purchases %} <small>({{ row.purchased_units }} units)</small>{% endif %}</td>
+	<td>{{ row.refunds }}{% if row.refunds %} <small>(−{{ row.refund_penalty_points|number_format(1) }} pts)</small>{% endif %}</td>
+	<td>{% if row.average_rating is null %}—{% else %}{{ row.average_rating|number_format(1) }} <small>(weighted {{ row.weighted_rating|number_format(2) }})</small>{% endif %}</td>
+	<td>{{ row.approved_reviews }}</td>
+	<td>{{ row.recent_views }} vs {{ row.previous_views }}{% if row.momentum_points > 0 %} <small>(+{{ row.momentum_points|number_format(1) }} pts)</small>{% endif %}</td>
+</tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'No courses', summary: 'No published course in the ranking matches this filter.'}) }}
+{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Popularity has not been calculated', summary: 'Run php bin/console popularity:recalculate to calculate the ranking from the analytics events, favourites and approved reviews.'}) }}
+{% endif %}
+</section>
+{% endblock %}
