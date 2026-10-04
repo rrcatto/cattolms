@@ -1,6 +1,18 @@
 # Changelog
 
-**LMS version:** 0.8.8.1 **Date time:** 2026/10/04 SAST
+**LMS version:** 0.8.8.2 **Date time:** 2026/10/04 SAST
+
+## 2026-10-04 SAST — v0.8.8.2 Course popularity engine and ADMIN popularity report
+
+- **Snapshot.** Migration `20261004120000_create_course_popularity.php` adds `course_popularity_runs` (calculation time, window, course count and every model parameter as JSONB) and `course_popularity` (one row per eligible course: rank, score, the points each component contributed, and the source metrics behind them). A recalculation replaces the previous run and its rows in one transaction under an advisory lock, so readers see one complete ranking.
+- **Model.** `CattoLearning\Course\Popularity\PopularityModel` holds the window (30 days), momentum periods (7 against the previous 7), weights (discovery views 15%, favourites 20%, purchases 35%, rating 20%, momentum 10%), rating confidence and smoothing, validates them, and scores courses out of 100. Views, favourites and purchases are normalised as ln(1 + x) / ln(1 + max). Purchases are scaled by (1 − refund ratio), where the ratio is refunded units / (purchased units + 5), at most 1. The rating component is Bayesian quality × confidence, from approved reviews only. Momentum rewards smoothed growth of discovery viewers only. Equal scores share a rank.
+- **Signals.** `AnalyticsEventRepository` gains `uniqueViewersByCourse()` (distinct viewers by source; course page and public preview are scored, learner-reader views are kept as context), `purchaseTotalsByCourse()` (paid lines, units, refunds and refunded units, with partial refunds as fractions of a unit from the order line) and `currentFavouriteCounts()` (the favourites table). `CourseReviewRepository::globalRatingSummary()` supplies the prior, and `CourseRatingSummary::weightedAverage()` and `confidence()` are the reusable confidence-aware rating. Only published courses take part; free courses rank without purchases.
+- **Recalculation.** `CoursePopularityCalculator` loads every signal for all eligible courses with a fixed number of aggregate queries. `bin/console popularity:recalculate` runs it, reports how many courses it processed, and fails with a non-zero exit on error. Pages only read the snapshot.
+- **Query API.** `CoursePopularityRepository::popularCourses(limit, saleableOnly)` returns published courses with a score above zero, best first; `forCourse()`, `ranked()`/`rankedCount()` (search, offer, sort, pagination) and `currentRun()` serve ADMIN. Every reader also checks the course's current status.
+- **ADMIN report.** `/admin/reports/popularity` (`PLATFORM.REPORT.VIEW`, linked from Reports) shows the calculation time, window, rating prior and how the score is calculated, then the ranked courses with rank, score, unique views, favourites, purchases, refunds, rating, reviews and momentum. It uses the shared search, offer filter chips, sortable headers and pagination. `/admin/reports/popularity/{id}` breaks a course's score down into each component and the source metrics.
+- **Tests.** `PopularityModelTest` (15), `CoursePopularityIntegrationTest` (9) and `CoursePopularityPageTest` (4).
+- **Release.** Version aligned to 0.8.8.2. `SHELL_VERBOSITY=-1 composer qa` with a cold cache (845 PHPUnit tests, 43,863 assertions), Twig lint of 204 templates, Composer validation, AssetMapper compilation, `git diff --check`, both all-theme browser matrices (72 and 30 checks), `course-reviews.cjs` (9), `course-content-tree.cjs` (41) and a 42-check browser pass of the popularity report and breakdown in all five themes at 1440 and 390px, with and without JavaScript, passed; temporary identities and fixtures were removed.
+- **Operations.** Run the migration as `cattotest`, then `php bin/console popularity:recalculate`; schedule that command (for example hourly) where the ranking should stay current. No asset changes.
 
 ## 2026-10-04 SAST — v0.8.8.1 Course ratings and moderated learner reviews
 

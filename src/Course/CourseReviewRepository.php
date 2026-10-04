@@ -134,6 +134,16 @@ final class CourseReviewRepository
         return array_map(static fn(array $distribution): CourseRatingSummary => CourseRatingSummary::fromDistribution($distribution), $distributions);
     }
 
+    /** Approved-review rating statistics across every course: the platform-wide prior for confidence-weighted ratings. */
+    public function globalRatingSummary(): CourseRatingSummary
+    {
+        $distribution = [];
+        foreach ($this->db->fetchAllAssociative('SELECT published_rating, COUNT(*) AS reviews FROM course_reviews WHERE published_rating IS NOT NULL GROUP BY published_rating') as $row) {
+            $distribution[(int) $row['published_rating']] = (int) $row['reviews'];
+        }
+        return CourseRatingSummary::fromDistribution($distribution);
+    }
+
     /**
      * Published reviews of a course, newest first: only what the public may see.
      *

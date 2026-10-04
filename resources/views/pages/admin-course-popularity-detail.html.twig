@@ -1,0 +1,40 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/reports/popularity' %}{% set ph_back_label = 'Course popularity' %}{% set ph_kicker = 'Course popularity' %}{% set ph_title = course.title %}{% set ph_lead = 'Rank ' ~ course.rank ~ ' with ' ~ course.score|number_format(1) ~ ' of 100 points, calculated ' ~ course.calculated_at|date('j M Y H:i') ~ ' for ' ~ course.window_start|date('j M Y') ~ ' to ' ~ course.window_end|date('j M Y') ~ '.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set p = run.parameters %}
+{% set w = p.weights %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 3})} %}{% block body %}
+{{ ui('data.stat-card', {label: 'Score', value: course.score|number_format(1), note: 'Out of 100'}) }}
+{{ ui('data.stat-card', {label: 'Rank', value: course.rank, note: 'Among ' ~ run.course_count ~ ' courses ranked'}) }}
+{{ ui('data.stat-card', {label: 'Offer', value: course.offer == 'paid' ? 'Paid' : (course.offer == 'free' ? 'Free' : 'No active price'), note: course.offer == 'paid' ? 'Purchases count' : 'No purchases to count'}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Score components', summary: 'Points each component contributed. They add up to the score.'}) }}
+{{ ui('data.key-value-list', {items: [
+	{label: 'View score', value: course.view_points|number_format(2) ~ ' of ' ~ (w.views * 100)|round},
+	{label: 'Favourite score', value: course.favourite_points|number_format(2) ~ ' of ' ~ (w.favourites * 100)|round},
+	{label: 'Purchase score', value: course.purchase_points|number_format(2) ~ ' of ' ~ (w.purchases * 100)|round ~ ' (after the refund penalty)'},
+	{label: 'Refund penalty', value: course.refund_penalty_points > 0 ? '−' ~ course.refund_penalty_points|number_format(2) ~ ' (refund ratio ' ~ (course.refund_ratio * 100)|number_format(1) ~ '%)' : 'None'},
+	{label: 'Rating score', value: course.rating_points|number_format(2) ~ ' of ' ~ (w.rating * 100)|round},
+	{label: 'Momentum score', value: course.momentum_points|number_format(2) ~ ' of ' ~ (w.momentum * 100)|round},
+	{label: 'Final score', value: course.score|number_format(2) ~ ' of 100'},
+]}) }}
+{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Source metrics', summary: 'What the calculation read for this course in the ' ~ p.window_days ~ '-day window.'}) }}
+{{ ui('data.key-value-list', {items: [
+	{label: 'Unique discovery viewers', value: course.unique_views ~ ' (course page and public preview)'},
+	{label: 'Learners in the reader', value: course.learner_readers ~ ' (context only, not scored)'},
+	{label: 'Current favourites', value: course.favourites},
+	{label: 'Purchases', value: course.purchases ~ ' paid order line' ~ (course.purchases == 1 ? '' : 's') ~ ', ' ~ course.purchased_units ~ ' unit' ~ (course.purchased_units == 1 ? '' : 's')},
+	{label: 'Refunds', value: course.refunds ~ ' refund' ~ (course.refunds == 1 ? '' : 's') ~ ', ' ~ course.refunded_units|number_format(2) ~ ' units returned'},
+	{label: 'Approved reviews', value: course.approved_reviews},
+	{label: 'Average rating', value: course.average_rating is null ? 'No approved reviews' : course.average_rating|number_format(2) ~ ' of 5'},
+	{label: 'Weighted rating', value: course.weighted_rating is null ? '—' : course.weighted_rating|number_format(2) ~ ' of 5 (prior ' ~ p.rating_prior|number_format(2) ~ ', confidence ' ~ p.rating_confidence ~ ' reviews)'},
+	{label: 'Momentum', value: course.recent_views ~ ' viewers in the latest ' ~ p.momentum_days ~ ' days, ' ~ course.previous_views ~ ' in the ' ~ p.momentum_days ~ ' before: growth ×' ~ course.momentum_growth|number_format(2)},
+]}) }}
+<p>{{ ui('action.link', {label: 'Course page', href: '/courses/' ~ course.slug, size: 'small'}) }} {{ ui('action.link', {label: 'Analytics events for this course', href: '/admin/analytics/events?course_id=' ~ course.course_id, size: 'small'}) }}</p>
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}
