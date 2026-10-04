@@ -3,6 +3,7 @@
 declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
+use CattoLearning\Analytics\{AnalyticsEventRecorder, AnalyticsEventType, AnalyticsSource};
 use CattoLearning\Auth\{AuthService, CurrentUser};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -15,7 +16,28 @@ final class CheckoutService
     public function __construct(private readonly AuthService $auth,
         private readonly OrderService $orders, private readonly CommerceRepository $records,
         private readonly PaymentService $payments, private readonly FulfilmentService $fulfilment,
-        private readonly TransactionManager $transactions) {}
+        private readonly TransactionManager $transactions, private readonly AnalyticsEventRecorder $analytics) {}
+
+    /**
+     * A signed-in purchaser opened checkout with something in the cart. Recorded once per cart,
+     * however often they move between the checkout steps; viewing a course or the cart is not a
+     * checkout. Course ids and totals only.
+     *
+     * @param array<string,mixed> $cart the cart summary checkout shows
+     */
+    public function begin(CurrentUser $actor, array $cart): void
+    {
+        if ((int) ($cart['id'] ?? 0) < 1 || ($cart['items'] ?? []) === []) return;
+        $courses = []; $total = 0; $currencies = [];
+        foreach ((array) $cart['items'] as $item) {
+            if ((int) ($item['course_id'] ?? 0) > 0) $courses[] = (int) $item['course_id'];
+            $total += (int) ($item['price_minor_units'] ?? 0);
+            $currencies[(string) ($item['currency_code'] ?? '')] = true;
+        }
+        $this->analytics->recordSafely(AnalyticsEventType::CheckoutStarted, AnalyticsSource::Checkout, ['user_id' => $actor->id],
+            ['cart_id' => (int) $cart['id'], 'line_count' => count((array) $cart['items']), 'course_ids' => array_slice(array_values(array_unique($courses)), 0, 50), 'total_minor' => $total, 'currency' => count($currencies) === 1 ? (string) array_key_first($currencies) : null, 'purchaser' => 'individual'],
+            'checkout_started:cart:' . (int) $cart['id']);
+    }
 
     /** @return array<string,mixed> */
     public function state(CurrentUser $actor): array

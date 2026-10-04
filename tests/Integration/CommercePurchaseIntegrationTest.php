@@ -3,6 +3,8 @@
 declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer;
@@ -55,9 +57,15 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock);
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyCredits=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
-        $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits);
+        $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits,$this->analytics());
         $this->payments=$this->paymentService(new OmnipayPaymentGatewayAdapter('test',$this->clock));
     }
+    /** Records into this test's transaction, stamped by this test's clock. */
+    private function analytics(): AnalyticsEventRecorder
+    {
+        return new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock);
+    }
+
     protected function tearDown(): void
     {
         if ($this->db->isTransactionActive()) $this->db->rollBack();
@@ -73,6 +81,89 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $cart=$this->orders->cart($this->actor);
         return $this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Buyer Billing','Billing address',true);
     }
+    public function testCheckoutStartedIsRecordedOncePerCartAndNeverForAnEmptyCart(): void
+    {
+        $checkout=$this->checkoutService();
+        $checkout->begin($this->actor,$this->orders->cart($this->actor));
+        self::assertSame(0,$this->eventCount('checkout_started'),'An empty cart is not a checkout.');
+        $this->orders->changeCart($this->actor,$this->variant);
+        $cart=$this->orders->cart($this->actor);
+        $checkout->begin($this->actor,$cart);
+        $checkout->begin($this->actor,$cart);
+        $events=$this->events('checkout_started');
+        self::assertCount(1,$events,'Moving between checkout steps does not start it again.');
+        self::assertSame([$this->actor->id,'checkout'],[(int)$events[0]['user_id'],$events[0]['source']]);
+        self::assertSame(['cart_id'=>(int)$cart['id'],'course_ids'=>[$this->course],'currency'=>'ZAR','line_count'=>1,'purchaser'=>'individual','total_minor'=>12345],self::sorted($events[0]['metadata']));
+    }
+
+    public function testEachPaidCourseLineIsOnePurchaseHoweverOftenPaymentIsConfirmed(): void
+    {
+        $fixture=new DevelopmentFixture($this->db);
+        $owner=(int)$this->db->fetchOne('SELECT owner_user_id FROM courses WHERE id=:id',['id'=>$this->course]);
+        $company=(int)$this->db->fetchOne('SELECT owner_company_id FROM courses WHERE id=:id',['id'=>$this->course]);
+        $second=$fixture->createCourse($owner,$company,'commerce-second-'.bin2hex(random_bytes(4)),'Second course','published');
+        $secondVariant=(int)$this->db->fetchOne('INSERT INTO course_price_variants(public_id,course_id,access_period_seconds,price_minor_units,currency_code,position,created_by_user_id,updated_by_user_id) VALUES (:public,:course,86400,5000,:currency,1,:user,:user) RETURNING id',['currency'=>'ZAR','public'=>Uuid::v4(),'course'=>$second,'user'=>$owner]);
+        $this->orders->changeCart($this->actor,$this->variant);
+        $this->orders->changeCart($this->actor,$secondVariant);
+        $cart=$this->orders->cart($this->actor);
+        $order=$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Buyer Billing','Billing address',true);
+        $this->payments->purchase($this->actor,$order,Uuid::v4(),'demo_failure');
+        self::assertSame(0,$this->eventCount('course_purchased'),'A failed payment is not a purchase.');
+        $key=Uuid::v4();
+        $payment=$this->payments->purchase($this->actor,$order,$key,'demo_success');
+        $this->payments->purchase($this->actor,$order,$key,'demo_success');
+        $this->payments->confirm('dummy',new PaymentResult($payment,'paid',Money::strictMinorUnits(17345,'ZAR'),(string)$this->records->payment($payment)['provider_reference']));
+        self::assertSame('fulfilled',$this->records->order($order)['state']);
+        $events=$this->events('course_purchased');
+        self::assertCount(2,$events,'One purchase per course line, once.');
+        $items=[]; foreach ($this->records->items($order) as $item) { $items[(int)$item['course_id']]=(int)$item['id']; }
+        foreach ($events as $event) {
+            $course=(int)$event['course_id'];
+            self::assertSame([$order,$items[$course],$this->actor->id,'checkout','course_purchased:order_item:'.$items[$course]],[(int)$event['order_id'],(int)$event['order_item_id'],(int)$event['user_id'],$event['source'],$event['idempotency_key']]);
+            self::assertSame(['access_period_seconds','amount_minor','currency','purchaser','quantity'],array_keys(self::sorted($event['metadata'])),'Only the line\'s own figures: no payment, card or provider details.');
+        }
+        self::assertSame([12345,5000],array_map(static fn(array $e): int => $e['metadata']['amount_minor'],$events));
+    }
+
+    public function testEachApprovedRefundIsRecordedOnce(): void
+    {
+        $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
+        $item=$this->records->items($id)[0];
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
+        $admin=$this->financeAdmin(); $key=Uuid::v4();
+        $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
+        $service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
+        self::assertCount(1,$this->events('course_refunded'),'A replayed refund request is not a second refund.');
+        $last=$service->approve($admin,$id,(int)$item['id'],Uuid::v4(),'service_failure','Full remaining remedy.',1,10000);
+        $events=$this->events('course_refunded');
+        self::assertCount(2,$events);
+        self::assertSame([$id,(int)$item['id'],$this->course,$this->actor->id,'course_refunded:refund:'.$first],[(int)$events[0]['order_id'],(int)$events[0]['order_item_id'],(int)$events[0]['course_id'],(int)$events[0]['user_id'],$events[0]['idempotency_key']]);
+        self::assertSame(['amount_minor'=>2345,'currency'=>'ZAR','full_refund'=>false,'purchaser'=>'individual','quantity'=>1,'refund_id'=>$first],self::sorted($events[0]['metadata']));
+        self::assertSame(['amount_minor'=>10000,'currency'=>'ZAR','full_refund'=>true,'purchaser'=>'individual','quantity'=>1,'refund_id'=>$last],self::sorted($events[1]['metadata']));
+    }
+
+    private function eventCount(string $type): int
+    {
+        return (int)$this->db->fetchOne('SELECT COUNT(*) FROM analytics_events WHERE event_type=:type AND user_id=:user',['type'=>$type,'user'=>$this->actor->id]);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function events(string $type): array
+    {
+        return array_map(static fn(array $row): array => ['metadata'=>json_decode((string)$row['metadata'],true)]+$row,
+            $this->db->fetchAllAssociative('SELECT *, metadata::text AS metadata FROM analytics_events WHERE event_type=:type AND user_id=:user ORDER BY id',['type'=>$type,'user'=>$this->actor->id]));
+    }
+
+    /**
+     * @param array<string,mixed> $metadata
+     * @return array<string,mixed>
+     */
+    private static function sorted(array $metadata): array
+    {
+        ksort($metadata);
+        return $metadata;
+    }
+
     public function testInvoiceSurvivesFailureRetryAndDuplicateConfirmationFulfilsOnce(): void
     {
         $order=$this->place();
@@ -187,7 +278,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
 
     private function checkoutService(): CheckoutService
     {
-        return new CheckoutService($this->auth($this->actor), $this->orders, $this->records, $this->payments, $this->fulfilment, new TransactionManager($this->db));
+        return new CheckoutService($this->auth($this->actor), $this->orders, $this->records, $this->payments, $this->fulfilment, new TransactionManager($this->db), $this->analytics());
     }
 
     /** @return array<string,string> */
@@ -359,7 +450,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
         $admin=$this->financeAdmin(); $key=Uuid::v4();
         $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
         self::assertSame($first,$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345));

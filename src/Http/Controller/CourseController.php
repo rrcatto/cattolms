@@ -11,6 +11,9 @@ use Symfony\Component\Routing\Attribute\Route;
 use CattoLearning\Application\PlatformAdministrationService;
 
 use CattoLearning\Course\CatalogueFilter;
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsSource;
+use CattoLearning\Course\CourseFavouriteService;
 use CattoLearning\Course\CourseService;
 
 use CattoLearning\View\ThemeRenderer;
@@ -35,7 +38,9 @@ final class CourseController extends BaseController
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly LearningService $learning
+        private readonly LearningService $learning,
+        private readonly CourseFavouriteService $favourites,
+        private readonly AnalyticsEventRecorder $analytics
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -154,16 +159,20 @@ final class CourseController extends BaseController
         // the ordinary path no longer refuses one. Provenance can still refuse a write the reader
         // is not entitled to make, and when it does the answer is a message on the page they were
         // on rather than an exception reaching the browser as a 500.
-        $failed = false;
-        $added = false;
-        try {
-            $added = $this->platformAdministration->toggleFavourite($user->id, $courseId);
-        } catch (RuntimeException) {
-            $failed = true;
-        }
-
+        // The form asks for a state rather than a flip, so a repeated or double-submitted request
+        // leaves the favourite as the reader asked and records nothing new.
+        $wanted = (string) ($_POST['favourite'] ?? '');
+        $added = $wanted === '1';
         $return = (string) ($_POST['return'] ?? '/courses');
         $return = str_starts_with($return, '/') ? $return : '/courses';
+        $failed = !in_array($wanted, ['0', '1'], true);
+        if (!$failed) {
+            try {
+                $this->favourites->set($user->id, $courseId, $added, self::favouriteSource($return));
+            } catch (RuntimeException) {
+                $failed = true;
+            }
+        }
 
         // htmx asked for the star, so it gets the star. Swapping one control in place is the whole
         // point of a toggle: a full page reload to fill in a star loses the reader's scroll position
@@ -185,6 +194,14 @@ final class CourseController extends BaseController
         $this->redirect($return);
     }
 
+
+    /** Where a favourite was changed, from the page the star was on. */
+    private static function favouriteSource(string $return): AnalyticsSource
+    {
+        $path = (string) parse_url($return, PHP_URL_PATH);
+        if (preg_match('~^/courses/(?!tags$)[a-zA-Z0-9_-]+$~', $path) === 1) { return AnalyticsSource::CourseDetail; }
+        return str_starts_with($path, '/courses') ? AnalyticsSource::Catalogue : AnalyticsSource::Account;
+    }
 
     #[Route('/courses/request', name: 'course_request_course', methods: ['POST'])]
     public function requestCourse(): Response
@@ -231,6 +248,7 @@ final class CourseController extends BaseController
         // from a card in the catalogue and then open it and find nothing saying so, and no way to
         // change their mind without going back.
         $course = self::first($this->withFavourites([$course]));
+        $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::CourseDetail, $user?->id, $this->analyticsVisitor(), 'course_page');
 
         return $this->render('course-detail', [
             'title' => (string) $course['title'],

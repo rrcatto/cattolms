@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Course\CourseItemRenderer;
 use CattoLearning\Course\CourseNavigation;
 use CattoLearning\Course\GradeScale;
@@ -23,7 +25,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /** Core-owned public Course Item previews and immutable Resource delivery. */
 final class CoursePresentationController extends BaseController
 {
-    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseRepository $courses, private readonly CourseItemService $items, private readonly CourseItemRenderer $renderer, private readonly ResourceLibraryService $resources, private readonly AssessmentService $assessments)
+    public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests, private readonly CourseRepository $courses, private readonly CourseItemService $items, private readonly CourseItemRenderer $renderer, private readonly ResourceLibraryService $resources, private readonly AssessmentService $assessments, private readonly AnalyticsEventRecorder $analytics)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -33,6 +35,7 @@ final class CoursePresentationController extends BaseController
     {
         $course = $this->publicCourse();
         $course['structure'] = $this->items->availability((int) $course['id'], null, true);
+        $this->publicView($course, 'course_page');
         return $this->render('course-public-preview', ['title' => (string) $course['title'] . ' preview', 'course' => $course, 'course_content_mode' => true, 'is_public_preview' => true]);
     }
 
@@ -55,6 +58,7 @@ final class CoursePresentationController extends BaseController
         $node['rendered_html'] = GradeScale::resolve($isSection ? (string) $node['section_introduction_html'] : $this->renderer->render($node, (string) $course['slug'], $nodeId, true), $this->courses->gradeBands((int) $course['id']));
         if ($course['public_preview_query'] !== '') { $node['rendered_html'] = preg_replace('/(href="\/courses\/[^"?]+)(")/', '$1?preview=1$2', $node['rendered_html']) ?? $node['rendered_html']; }
         $course['current_node_id'] = $nodeId;
+        $this->publicView($course, 'item', $nodeId, $isSection ? null : (int) $node['course_item_id']);
         return $this->render('course-public-preview-item', ['title' => (string) ($isSection ? $node['section_title'] : ($node['display_title_override'] ?: $node['item_title'])), 'course' => $course, 'item' => $node, 'course_content_mode' => true, 'is_public_preview' => true]);
     }
 
@@ -88,6 +92,18 @@ final class CoursePresentationController extends BaseController
         $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE, (string) $resource['original_filename']);
         $response->setPrivate();
         return $response;
+    }
+
+    /**
+     * A public preview page view by a visitor. ADMIN's ?preview=1 view of a draft is authoring and
+     * is not counted.
+     *
+     * @param array<string,mixed> $course
+     */
+    private function publicView(array $course, string $context, ?int $nodeId = null, ?int $courseItemId = null): void
+    {
+        if ((string) $course['public_preview_query'] !== '') { return; }
+        $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::PublicPreview, $this->currentUser()?->id, $this->analyticsVisitor(), $context, $nodeId, $courseItemId);
     }
 
     /** @return array<string,mixed> */

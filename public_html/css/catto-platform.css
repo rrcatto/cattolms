@@ -730,6 +730,8 @@ label.cl-ui-tree-select-option{position:relative}
 .cl-ui-tree-select-option:has(input:focus-visible){outline:2px solid currentColor;outline-offset:-2px}
 /* Category management tree: nested lists indented one step per level, a chevron disclosure button
    per parent and the row actions outside it. The category-tree controller hides child lists. */
+.cl-analytics-filter{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem;margin-bottom:1rem}
+.cl-analytics-filter>.cl-ui-field{flex:0 1 16rem;margin:0}
 .cl-category-stats-note{margin:.25rem 0 1rem;font-size:.88rem;opacity:.8}
 .cl-category-tree,.cl-category-tree-children{list-style:none;margin:0;padding:0}
 .cl-category-tree-children{margin-inline-start:.85rem;padding-inline-start:1rem;border-inline-start:2px solid var(--cl-border,#dfe4ea)}

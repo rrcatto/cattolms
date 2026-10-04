@@ -31,6 +31,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Application\PlatformAdministrationService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Application\AccountSectionRegistry;
@@ -66,7 +68,8 @@ final class LearningController extends BaseController
         RequestStack $requests,
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly AccountSectionRegistry $accountSections
+        private readonly AccountSectionRegistry $accountSections,
+        private readonly AnalyticsEventRecorder $analytics
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -164,6 +167,8 @@ final class LearningController extends BaseController
         $preview = $this->previewMode();
         return $this->handle(function () use ($user, $slug, $preview): Response {
             $course = $this->learning->courseHome($user->id, $slug, $preview);
+            // An ADMIN preview is authoring, not reading: it is never a course view.
+            if (!$preview) { $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::LearnerReader, $user->id, $this->analyticsVisitor(), 'course_home'); }
             return $this->render('learn-course', [
                 'title' => (string) $course['title'],
                 'course' => $course,
@@ -201,6 +206,10 @@ final class LearningController extends BaseController
             $course = $this->learning->item($user->id, $slug, $nodeId, $preview);
             if (in_array((string) ($course['item']['item_type'] ?? ''), ['assessment', 'diagnostic'], true)) {
                 throw $this->notFound('Assessments open from their direct assessment route.');
+            }
+            if (!$preview) {
+                $itemId = (int) ($course['item']['course_item_id'] ?? 0);
+                $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::LearnerReader, $user->id, $this->analyticsVisitor(), 'item', $nodeId, $itemId > 0 ? $itemId : null);
             }
             return $this->render('learn-item', [
                 'title' => (string) ($course['item']['display_title_override'] ?: $course['item']['item_title']),

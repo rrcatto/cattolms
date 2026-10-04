@@ -77,6 +77,7 @@ final class CommerceController extends BaseController
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START');
         $cart = $this->carts->summary();
         if ($cart['count'] === 0) $this->redirect('/cart');
+        $this->checkout->begin($actor, $cart);
         $state = $this->checkout->state($actor);
         $step = (string) ($this->request()->attributes->get('step') ?? 'profile');
         if ($step !== 'profile' && !($state['profile_confirmed'] ?? false)) $this->redirect('/checkout/profile');

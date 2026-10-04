@@ -323,6 +323,21 @@ abstract class BaseController
      * Thrown rather than returned so a guard can redirect from the middle of a method without
      * every caller forwarding a response it did not ask for. See HttpRedirect for why.
      */
+    /**
+     * The analytics visitor: a random UUID kept in this browser session, so anonymous course views
+     * can be counted per visitor without a fingerprint, a long-lived tracking cookie, the session
+     * token itself or an IP address. It ends with the browser session.
+     */
+    protected function analyticsVisitor(): string
+    {
+        $visitor = $_SESSION['analytics_visitor'] ?? null;
+        if (!is_string($visitor) || !\CattoLearning\Support\Uuid::isValid($visitor)) {
+            $visitor = \CattoLearning\Support\Uuid::v4();
+            $_SESSION['analytics_visitor'] = $visitor;
+        }
+        return $visitor;
+    }
+
     protected function redirect(string $path): never
     {
         throw new HttpRedirect($path);

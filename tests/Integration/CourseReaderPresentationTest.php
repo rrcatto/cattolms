@@ -101,6 +101,8 @@ final class CourseReaderPresentationTest extends TestCase
     {
         $_COOKIE = $this->cookies;
         $this->db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:id', ['id' => $this->course]);
+        $this->db->executeStatement('DELETE FROM course_favourites WHERE course_id=:id', ['id' => $this->course]);
+        $this->db->executeStatement('DELETE FROM analytics_events WHERE course_id=:id', ['id' => $this->course]);
         $this->db->executeStatement('DELETE FROM courses WHERE id=:id', ['id' => $this->course]);
         $this->db->executeStatement('DELETE FROM course_items WHERE created_by_user_id=:owner', ['owner' => $this->owner]);
         $this->db->executeStatement('DELETE FROM resources WHERE created_by_user_id=:owner', ['owner' => $this->owner]);
@@ -200,6 +202,58 @@ final class CourseReaderPresentationTest extends TestCase
         self::assertSame($base . $this->nodes['week'] . '/content', $this->paging($base . $this->nodes['lesson'] . '/content')['← Previous'] ?? null, 'Previous and Next include the public section.');
         self::assertSame(404, $this->send($base . $this->nodes['later'] . '/content')->getStatusCode(), 'A section not marked public stays out.');
         self::assertTrue((bool) $this->db->fetchOne('SELECT public_preview FROM course_sections WHERE node_id=:id', ['id' => $this->nodes['week']]));
+    }
+
+    public function testCourseViewsAreRecordedWithTheirSourceAndViewer(): void
+    {
+        $this->page('/learn/' . $this->slug);
+        $this->page('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
+        $views = $this->views();
+        self::assertSame(['learner_reader', 'learner_reader'], array_column($views, 'source'));
+        self::assertSame([$this->learner, $this->learner], array_map('intval', array_column($views, 'user_id')), 'A signed-in learner is associated by id.');
+        self::assertSame([['context' => 'course_home'], ['context' => 'item', 'node_id' => $this->nodes['lesson']]], array_map(static fn(array $view): array => json_decode((string) $view['metadata'], true), $views));
+        self::assertNotNull($views[1]['course_item_id'], 'An item view names the Course Item.');
+        self::assertSame($views[0]['visitor_id'], $views[1]['visitor_id'], 'One browser session is one visitor.');
+
+        $_COOKIE = $this->cookies;
+        unset($_SESSION['analytics_visitor']);
+        $this->page('/courses/' . $this->slug);
+        $this->page('/courses/' . $this->slug . '/preview');
+        $anonymous = array_slice($this->views(), 2);
+        self::assertSame(['course_detail', 'public_preview'], array_column($anonymous, 'source'));
+        self::assertSame([null, null], array_column($anonymous, 'user_id'), 'A visitor who is not signed in has no person.');
+        self::assertMatchesRegularExpression('/^[0-9a-f-]{36}$/', (string) $anonymous[0]['visitor_id'], 'Only a random per-session visitor id.');
+        self::assertNotSame($views[0]['visitor_id'], $anonymous[0]['visitor_id']);
+    }
+
+    public function testAFavouriteRequestRecordsOnlyARealChange(): void
+    {
+        $_SESSION['csrf'] = str_repeat('b', 64);
+        foreach (['1', '1', '0', '0'] as $wanted) {
+            $this->favourite($wanted);
+        }
+        self::assertSame(['course_favourite_added', 'course_favourite_removed'], array_column($this->db->fetchAllAssociative("SELECT event_type FROM analytics_events WHERE course_id=:course AND event_type LIKE 'course_favourite%' ORDER BY id", ['course' => $this->course]), 'event_type'), 'Asking twice for the same state records it once.');
+        self::assertSame('course_detail', $this->db->fetchOne("SELECT source FROM analytics_events WHERE course_id=:course AND event_type='course_favourite_added'", ['course' => $this->course]));
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM course_favourites WHERE course_id=:course', ['course' => $this->course]), 'The favourites table holds the current state.');
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function views(): array
+    {
+        return $this->db->fetchAllAssociative("SELECT source, user_id, visitor_id::text AS visitor_id, course_item_id, metadata::text AS metadata FROM analytics_events WHERE course_id=:course AND event_type='course_view' ORDER BY id", ['course' => $this->course]);
+    }
+
+    private function favourite(string $wanted): void
+    {
+        $_POST = ['csrf' => $_SESSION['csrf'], 'course_id' => (string) $this->course, 'favourite' => $wanted, 'return' => '/courses/' . $this->slug];
+        $kernel = new Kernel('test', true, CliBootstrap::boot()['instance_root']);
+        try {
+            $response = $kernel->handle(Request::create('/courses/favourite', 'POST', $_POST));
+            self::assertContains($response->getStatusCode(), [302, 303], 'The favourite form redirects back.');
+        } finally {
+            $kernel->shutdown();
+            $_POST = [];
+        }
     }
 
     /** @return array<string,string> Paging link label => href. */

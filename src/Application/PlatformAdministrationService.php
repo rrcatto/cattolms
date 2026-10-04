@@ -2484,13 +2484,6 @@ final class PlatformAdministrationService
         return $this->administration->userRequestsCount($userId, $search);
     }
 
-    public function toggleFavourite(int $userId, int $courseId): bool
-    {
-        $added = $this->administration->toggleFavourite($userId, $courseId);
-        $this->audit->record($userId, $added ? 'course.favourited' : 'course.unfavourited', ['course_id' => $courseId]);
-        return $added;
-    }
-
     public function requestCourse(int $userId, int $courseId, int $accessPeriodSeconds, string $note): int
     {
         $allowedPeriod = false;

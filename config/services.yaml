@@ -68,6 +68,12 @@ services:
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
 
+    # The first-party analytics event stream: the recorder and its repository. The event type and
+    # source enums are vocabulary, not services.
+    CattoLearning\Analytics\:
+        resource: '../src/Analytics/'
+        exclude: '../src/Analytics/{AnalyticsEventType.php,AnalyticsSource.php}'
+
     # Generated artwork: a course cover, a category icon, a tag icon. Presentation, so it lives
     # beside the theme layer rather than in the persistence graph that calls it.
     CattoLearning\View\Artwork\:

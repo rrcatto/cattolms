@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Application;
 
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsEventType;
+use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Workflow\TransitionService;
@@ -16,7 +19,7 @@ use Symfony\Component\Clock\ClockInterface;
 final class RefundAdministrationService
 {
     public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
-        private readonly TransitionService $transitions, private readonly ClockInterface $clock) {}
+        private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics) {}
 
     public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor): int
     {
@@ -68,14 +71,37 @@ final class RefundAdministrationService
             $snapshot['refund_basis']=$basis;
             $snapshot['refund_reason']=$reason;
             $this->records->document($orderId,'credit_note','refund:'.$id,$snapshot,$now);
-            if ($order['company_id']===null && $this->records->refundedAmount($orderId,$itemId)>=(int)$item['amount_minor']) {
+            $fullyRefunded=$this->records->refundedAmount($orderId,$itemId)>=(int)$item['amount_minor'];
+            if ($order['company_id']===null && $fullyRefunded) {
                 $this->records->revokeRefundedEntitlement($itemId,$now);
             }
+            $this->recordRefund($order,$item,$id,$quantity,$amountMinor,$fullyRefunded);
             $total=$this->records->refundedAmount($orderId);
             $transition=$total>=(int)$order['total_minor']?'mark_refunded':'mark_partially_refunded';
             $this->records->setOrderState($orderId,$this->transitions->apply('order',(string)$order['state'],$transition));
             $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason],$now);
             return $id;
         });
+    }
+
+    /**
+     * One approved refund of one order line, recorded once with the refund; a replayed refund
+     * request returns before reaching here, and the refund id keys the event besides. Ids and the
+     * refunded figures only, never payment or bank details.
+     *
+     * @param array<string,mixed> $order
+     * @param array<string,mixed> $item
+     */
+    private function recordRefund(array $order, array $item, int $refundId, int $quantity, int $amountMinor, bool $fullyRefunded): void
+    {
+        $company=$order['company_id']!==null;
+        try {
+            $this->analytics->record(AnalyticsEventType::CourseRefunded, AnalyticsSource::Admin,
+                ['user_id'=>(int)$order['purchaser_user_id'],'course_id'=>(int)$item['course_id'],'order_id'=>(int)$order['id'],'order_item_id'=>(int)$item['id']],
+                ['refund_id'=>$refundId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'currency'=>(string)$order['currency'],'full_refund'=>$fullyRefunded,'purchaser'=>$company?'company':'individual','company_id'=>$company?(int)$order['company_id']:null],
+                'course_refunded:refund:'.$refundId);
+        } catch (\InvalidArgumentException $exception) {
+            error_log('Refund analytics for refund '.$refundId.' was not recorded: '.$exception->getMessage());
+        }
     }
 }
