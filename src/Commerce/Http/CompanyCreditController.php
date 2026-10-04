@@ -87,7 +87,7 @@ final class CompanyCreditController extends BaseController
     {
         $actor=$this->requirePermission('COMPANY.CREDIT.MANAGE');
         return $this->handle(function() use($actor): Response {
-            $basket=$this->purchases->review($actor,$this->companyId($actor));
+            $basket=$this->purchases->startCheckout($actor,$this->companyId($actor));
             if ($basket['items'] === []) $this->redirect('/company/credits/buy');
             return $this->render('company-credit-checkout',['title'=>'Company credit checkout','active_nav'=>'company','basket'=>$basket]);
         },'/company/credits/buy');

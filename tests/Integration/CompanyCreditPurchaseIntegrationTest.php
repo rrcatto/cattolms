@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\{AccessService,CompanyCreditFulfilment,CompanyCreditPurchaseService,FulfilmentService,OrderService,PaymentService,PaymentAdministrationService,RefundAdministrationService,CommerceMaintenance};
@@ -64,10 +66,16 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $this->orders=new OrderService($this->records,$tx,$policy,$transitions,$this->clock);
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyFulfilment=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
-        $fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyFulfilment);
+        $fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyFulfilment,$this->analytics());
         $this->payments=new PaymentService($this->records,$tx,$this->orders,new OmnipayPaymentGatewayAdapter('test',$this->clock),$fulfilment,$transitions,$this->clock);
         $this->purchases=new CompanyCreditPurchaseService($this->records,$container->get(CompanyRepository::class),
-            $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock);
+            $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock,$this->analytics());
+    }
+
+    /** Records into this test's transaction, stamped by this test's clock. */
+    private function analytics(): AnalyticsEventRecorder
+    {
+        return new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock);
     }
 
     protected function tearDown(): void
@@ -111,6 +119,32 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
         self::assertSame($id,$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true));
         self::assertCount(1,$this->records->payments($id));
+    }
+
+    public function testCompanyCheckoutAndEachPaidCreditLineAreRecordedOnce(): void
+    {
+        $second=$this->variant(172800,22000);
+        $anotherCourse=$this->fixture->createCourse($this->providerUserId,$this->providerCompanyId,'credit-events-'.$this->fixture->suffix(),'Another course','published');
+        $third=$this->variant(86400,5000,$anotherCourse);
+        $this->purchases->add($this->buyer,$this->companyId,$this->variantId,3);
+        $this->purchases->add($this->buyer,$this->companyId,$second,2);
+        $this->purchases->add($this->buyer,$this->companyId,$third,1);
+        $review=$this->purchases->startCheckout($this->buyer,$this->companyId);
+        $this->purchases->startCheckout($this->buyer,$this->companyId);
+        $started=$this->db->fetchAllAssociative("SELECT user_id, metadata::text AS metadata FROM analytics_events WHERE event_type='checkout_started' AND idempotency_key=:key",['key'=>'checkout_started:company_basket:'.$review['purchase_key']]);
+        self::assertCount(1,$started,'Opening the company checkout again does not start it again.');
+        $metadata=json_decode((string)$started[0]['metadata'],true);
+        self::assertSame(['company',$this->companyId,3,86035],[$metadata['purchaser'],$metadata['company_id'],$metadata['line_count'],$metadata['total_minor']]);
+        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $purchases=$this->db->fetchAllAssociative("SELECT course_id, order_item_id, user_id, metadata::text AS metadata FROM analytics_events WHERE event_type='course_purchased' AND order_id=:id ORDER BY order_item_id",['id'=>$id]);
+        self::assertCount(3,$purchases,'One purchase per order line, each attributable to its course.');
+        self::assertSame([$this->courseId,$this->courseId,$anotherCourse],array_map(static fn(array $row): int => (int)$row['course_id'],$purchases));
+        self::assertSame([3,2,1],array_map(static fn(array $row): int => json_decode((string)$row['metadata'],true)['quantity'],$purchases));
+        foreach ($purchases as $row) {
+            self::assertSame($this->buyer->id,(int)$row['user_id']);
+            self::assertSame(['company',$this->companyId],[json_decode((string)$row['metadata'],true)['purchaser'],json_decode((string)$row['metadata'],true)['company_id']]);
+        }
     }
 
     public function testChangedPriceInvalidatesReviewAndForeignCompanyIsRejected(): void
@@ -202,7 +236,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$order]));
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE user_id=:user AND course_id=:course',['user'=>$learner,'course'=>$this->courseId]));
         $item=$this->records->items($order)[0];
-        $refunds=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $refunds=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
         $refunds->approve($this->financeAdmin(),$order,(int)$item['id'],Uuid::v4(),'service_failure','Request changed before fulfilment; refund the unissued credit.',1,0);
         self::assertSame('refunded',$this->records->order($order)['state']);
         self::assertSame((int)$item['amount_minor'],(int)$this->db->fetchOne('SELECT SUM(amount_minor) FROM commerce_fund_entries WHERE account_id IN (SELECT id FROM commerce_fund_accounts WHERE owner_company_id=:company)',['company'=>$this->companyId]));
@@ -222,7 +256,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$id]));
         $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,
             new FulfilmentService($this->records,IntegrationContainer::get()->get(TransitionService::class),$this->access,new TransactionManager($this->db),$this->orders,$this->clock,
-                new CompanyCreditFulfilment($this->records,IntegrationContainer::get()->get(AdministrationRepository::class),IntegrationContainer::get()->get(CourseRepository::class),$this->clock)),
+                new CompanyCreditFulfilment($this->records,IntegrationContainer::get()->get(AdministrationRepository::class),IntegrationContainer::get()->get(CourseRepository::class),$this->clock),$this->analytics()),
             IntegrationContainer::get()->get(TransitionService::class),$this->clock);
         $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),24690,'2026-09-23T11:00:00+02:00','BANK-COMPANY-'.Uuid::v4(),'Matched company bank receipt.');
         self::assertSame('fulfilled',$this->records->order($id)['state']);
@@ -239,7 +273,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $review=$this->purchases->review($this->buyer,$this->companyId);
         $newer=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
         $oldItem=$this->records->items($older)[0]; $newItem=$this->records->items($newer)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
         try {
             $service->approve($this->financeAdmin(),$older,(int)$oldItem['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
             self::fail('LIFO must reject the older eligible lot.');

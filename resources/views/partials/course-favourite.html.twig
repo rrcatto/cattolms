@@ -2,6 +2,8 @@
       hx-post="/courses/favourite" hx-swap="outerHTML" hx-target="this" id="favourite-{{ course.id }}">
 	<input type="hidden" name="csrf" value="{{ csrf }}">
 	<input type="hidden" name="course_id" value="{{ course.id }}">
+	{# The state this button asks for, so a repeated or double-submitted request changes nothing. #}
+	<input type="hidden" name="favourite" value="{{ course.is_favourite is defined and course.is_favourite ? '0' : '1' }}">
 	<input type="hidden" name="return" value="{{ favourite_return|default('/courses') }}">
 	<button class="cl-favourite {{ course.is_favourite is defined and course.is_favourite ? 'is-on' : '' }}" type="submit"
 	        aria-pressed="{{ course.is_favourite is defined and course.is_favourite ? 'true' : 'false' }}"

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CattoLearning\Commerce\Application;
 
+use CattoLearning\Analytics\AnalyticsEventRecorder;
+use CattoLearning\Analytics\AnalyticsEventType;
+use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Policy\CommercePolicy;
@@ -27,8 +30,25 @@ final class CompanyCreditPurchaseService
         private readonly CommercePolicy $policy,
         private readonly TransitionService $transitions,
         private readonly PaymentService $payments,
-        private readonly ClockInterface $clock
+        private readonly ClockInterface $clock,
+        private readonly AnalyticsEventRecorder $analytics
     ) {}
+
+    /**
+     * The company checkout page: its review, and a checkout_started event once per basket.
+     *
+     * @return array<string,mixed>
+     */
+    public function startCheckout(CurrentUser $actor, int $companyId): array
+    {
+        $basket = $this->review($actor, $companyId);
+        if ($basket['items'] !== []) {
+            $this->analytics->recordSafely(AnalyticsEventType::CheckoutStarted, AnalyticsSource::Checkout, ['user_id' => $actor->id],
+                ['line_count' => count($basket['items']), 'course_ids' => array_slice(array_values(array_unique(array_map(static fn(array $item): int => (int) $item['course_id'], $basket['items']))), 0, 50), 'total_minor' => (int) $basket['total_minor'], 'currency' => 'ZAR', 'purchaser' => 'company', 'company_id' => $companyId],
+                'checkout_started:company_basket:' . (string) $basket['purchase_key']);
+        }
+        return $basket;
+    }
 
     /** @return list<array<string,mixed>> */
     public function offers(int $companyId, string $search): array

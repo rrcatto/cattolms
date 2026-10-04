@@ -1,6 +1,13 @@
 # Changelog
 
-**LMS version:** 0.8.7.9 **Date time:** 2026/10/03 SAST
+**LMS version:** 0.8.8 **Date time:** 2026/10/04 SAST
+
+## 2026-10-04 SAST — v0.8.8 First-party analytics event foundation
+
+- One append-only `analytics_events` table (migration `20261004100000_create_analytics_events.php`): event type, source, time, nullable person, visitor, course, Course Item, order and order line references (SET NULL on delete), bounded JSONB metadata and a unique idempotency key, with indexes for course/type/time, type/time, time and person. No IP addresses, fingerprints, session tokens or payment details.
+- `CattoLearning\Analytics`: the `AnalyticsEventType` vocabulary (course_view, course_favourite_added, course_favourite_removed, checkout_started, course_purchased, course_refunded; each declares its required references and the metadata keys and types it may carry), `AnalyticsSource`, `AnalyticsEventRecorder` (validates, stamps the platform clock, records; `recordSafely()` for non-critical events) and `AnalyticsEventRepository` (append, and aggregates: events per course and type over a period, unique viewers split into signed-in people and anonymous visitors, counts by course, by type and by day, the current favourite count, retention anonymisation and deletion).
+- Recorded server-side: course views on the course page, the public preview and the learner reader (never in ADMIN editing or ADMIN previews), with a random per-browser-session visitor id; favourites only when the state changes (the star now posts the state it wants, so a repeated request changes nothing; `CourseFavouriteService` writes the favourite, audit entry and event in one transaction); checkout started once per cart or company basket; one purchase per paid order line in `FulfilmentService` and one refund per approved refund, both inside their transactions and keyed so replays record nothing new.
+- ADMIN can confirm what is recorded at `/admin/analytics/events` (linked from Course Performance): 30-day counts per type and the newest events, filterable by type and course.
 
 ## 2026-10-03 SAST — v0.8.7.9 Public sections and category statistics
 

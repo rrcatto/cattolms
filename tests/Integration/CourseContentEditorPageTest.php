@@ -69,6 +69,7 @@ final class CourseContentEditorPageTest extends TestCase
         $_COOKIE = $this->cookies;
         $_SESSION = $this->session;
         $this->db->executeStatement('DELETE FROM courses WHERE id=:id', ['id' => $this->course]);
+        $this->db->executeStatement('DELETE FROM analytics_events WHERE user_id=:owner OR course_id=:course', ['owner' => $this->owner, 'course' => $this->course]);
         $this->db->executeStatement('DELETE FROM courses WHERE owner_user_id=:owner', ['owner' => $this->owner]);
         $this->db->executeStatement('DELETE FROM course_items WHERE created_by_user_id=:owner', ['owner' => $this->owner]);
         $this->fixture->cleanup();
@@ -232,6 +233,30 @@ final class CourseContentEditorPageTest extends TestCase
         self::assertStringContainsString('no longer in this course', (string) $refused->getContent());
 
         self::assertSame($before, $this->snapshot(), 'Nothing in this course changed.');
+    }
+
+    public function testAdminEditingAndPreviewsAreNotCourseViews(): void
+    {
+        $slug = (string) $this->db->fetchOne('SELECT slug FROM courses WHERE id=:id', ['id' => $this->course]);
+        $this->ok('/admin/courses/' . $this->course . '/content');
+        $this->ok('/admin/course-items/' . $this->itemId);
+        $this->db->executeStatement('UPDATE course_item_placements SET public_preview=TRUE WHERE node_id=:node', ['node' => $this->lesson]);
+        $this->ok('/courses/' . $slug . '/preview?preview=1');
+        $this->ok('/courses/' . $slug . '/preview/' . $this->lesson . '/content?preview=1');
+        $this->send(Request::create('/learn/' . $slug . '?preview=1', 'GET'));
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM analytics_events WHERE course_id=:course', ['course' => $this->course]), 'Authoring and ADMIN previews record no views.');
+    }
+
+    public function testTheAnalyticsEventsPageShowsRecordedEvents(): void
+    {
+        $this->db->executeStatement("INSERT INTO analytics_events (event_type,source,occurred_at,user_id,course_id,metadata) VALUES ('course_view','course_detail',NOW(),:user,:course,'{\"context\":\"course_page\"}')", ['user' => $this->owner, 'course' => $this->course]);
+        $html = $this->ok('/admin/analytics/events?type=course_view&course_id=' . $this->course);
+        self::assertStringContainsString('Analytics events', $html);
+        self::assertStringContainsString('<code>course_view</code>', $html);
+        self::assertStringContainsString('Content Editor ' . $this->suffix, $html, 'The course and person are named.');
+        self::assertStringContainsString('context: course_page', $html);
+        self::assertStringContainsString('1 event match', $html);
+        $this->db->executeStatement('DELETE FROM analytics_events WHERE course_id=:course', ['course' => $this->course]);
     }
 
     public function testTheMoveIntoPageOffersOnlyValidDestinations(): void

@@ -1614,27 +1614,23 @@ SQL;
         ];
     }
 
-    public function toggleFavourite(int $userId, int $courseId): bool
+    /**
+     * Sets whether a person favourites a course, and says whether that changed anything: asking
+     * for the state the course is already in (a repeated or double-submitted request) is a no-op.
+     */
+    public function setFavourite(int $userId, int $courseId, bool $favourite): bool
     {
-        $deleted = $this->db->fetchAllAssociative(
-            'DELETE FROM course_favourites WHERE user_id=:user_id AND course_id=:course_id RETURNING course_id',
-            ['user_id' => $userId, 'course_id' => $courseId]
-        );
-        if ($deleted !== []) {
-            return false;
-        }
-        $this->db->executeStatement(
-            'INSERT INTO course_favourites (user_id,course_id,created_at)
-             VALUES (:user_id,:course_id,NOW()) ON CONFLICT (user_id,course_id) DO NOTHING',
-            [
-                'user_id' => $userId,
-                'course_id' => $courseId,
-                // The row's universe comes from the course, which is the resource it is about;
-                // the identity holding it may be a genuine ADMIN from the other universe, which is
-                // the D4 amendment of 2026/09/09 recorded in SeedTableCatalog.
-            ]
-        );
-        return true;
+        $rows = $favourite
+            ? $this->db->fetchAllAssociative(
+                'INSERT INTO course_favourites (user_id,course_id,created_at)
+                 VALUES (:user_id,:course_id,NOW()) ON CONFLICT (user_id,course_id) DO NOTHING RETURNING course_id',
+                ['user_id' => $userId, 'course_id' => $courseId]
+            )
+            : $this->db->fetchAllAssociative(
+                'DELETE FROM course_favourites WHERE user_id=:user_id AND course_id=:course_id RETURNING course_id',
+                ['user_id' => $userId, 'course_id' => $courseId]
+            );
+        return $rows !== [];
     }
 
     public function createRequest(int $userId, ?int $companyId, int $courseId, int $accessPeriodSeconds, string $note): int
