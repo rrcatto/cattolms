@@ -33,6 +33,7 @@
 							{{ course.subtitle }}
 						</p>
 					{% endif %}
+					{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
 					<p class="lead mt-3 mb-0">
 						{{ course.summary }}
 					</p>
@@ -97,6 +98,20 @@
 {% endblock %}
 {% endembed %}
 
+				<section id="reviews" aria-labelledby="course-reviews-heading">
+					<h2 class="h3 mt-5 mb-3" id="course-reviews-heading">Reviews</h2>
+					{% if rating.count > 0 %}
+						<div class="cl-rating-overview">
+							{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
+							<dl class="cl-rating-distribution">
+								{% for band in rating.distribution %}
+									<div><dt>{{ band.stars }} {{ band.stars == 1 ? 'star' : 'stars' }}</dt><dd>{{ ui('feedback.progress', {value: band.percent, label: band.percent ~ '% of reviews give ' ~ band.stars ~ (band.stars == 1 ? ' star' : ' stars')}) }}<span>{{ band.count }}</span></dd></div>
+								{% endfor %}
+							</dl>
+						</div>
+					{% endif %}
+					{% include '@platform/partials/course-reviews.html.twig' %}
+				</section>
 			</div>
 			<aside>
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
@@ -110,7 +125,20 @@
 								This course is already in your library.
 							</p>
 							{{ ui('action.link', {label: 'Open course', variant: 'primary', size: 'normal', full_width: true, href: '/learn/' ~ (course.slug)}) }}
-						{% else %}
+						{% endif %}
+						{#
+							Reviewing is offered to anyone who has held access to the course, including a
+							learner whose access has expired, so it does not depend on has_access.
+						#}
+						{% if can_review %}
+							<div class="cl-course-review-action">
+								{% if own_review %}
+									<p>Your review: {{ own_review.status == 'approved' ? 'published' : (own_review.status == 'pending' ? 'pending moderation' : 'not published') }}.</p>
+								{% endif %}
+								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review'}) }}
+							</div>
+						{% endif %}
+						{% if not has_access %}
 							{% if course.price_variants %}
 								<form action="/cart/add" method="post">
 									<input type="hidden" name="csrf" value="{{ csrf }}">

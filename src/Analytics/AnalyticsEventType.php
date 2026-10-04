@@ -13,7 +13,7 @@ use InvalidArgumentException;
  * place to copy a profile, a payment or a request into.
  *
  * Planned events are added here when the feature that produces them exists, not before:
- * review_submitted, review_approved, landing_page_view, promo_code_applied, bundle_purchased.
+ * landing_page_view, promo_code_applied, bundle_purchased.
  */
 enum AnalyticsEventType: string
 {
@@ -23,6 +23,10 @@ enum AnalyticsEventType: string
     case CheckoutStarted = 'checkout_started';
     case CoursePurchased = 'course_purchased';
     case CourseRefunded = 'course_refunded';
+    case ReviewSubmitted = 'review_submitted';
+    case ReviewUpdated = 'review_updated';
+    case ReviewApproved = 'review_approved';
+    case ReviewRejected = 'review_rejected';
 
     public static function fromName(string $name): self
     {
@@ -41,13 +45,15 @@ enum AnalyticsEventType: string
             self::CourseFavouriteAdded, self::CourseFavouriteRemoved => ['user_id', 'course_id'],
             self::CheckoutStarted => ['user_id'],
             self::CoursePurchased, self::CourseRefunded => ['course_id', 'order_id', 'order_item_id'],
+            // The reviewer is the user; the review itself is named in metadata.
+            self::ReviewSubmitted, self::ReviewUpdated, self::ReviewApproved, self::ReviewRejected => ['user_id', 'course_id'],
         };
     }
 
     /** Business facts that must never be recorded twice carry an idempotency key. */
     public function requiresIdempotencyKey(): bool
     {
-        return in_array($this, [self::CoursePurchased, self::CourseRefunded, self::CheckoutStarted], true);
+        return in_array($this, [self::CoursePurchased, self::CourseRefunded, self::CheckoutStarted, self::ReviewSubmitted, self::ReviewUpdated, self::ReviewApproved, self::ReviewRejected], true);
     }
 
     /**
@@ -65,6 +71,9 @@ enum AnalyticsEventType: string
             self::CheckoutStarted => ['cart_id' => 'int', 'line_count' => 'int', 'course_ids' => 'int_list', 'total_minor' => 'int', 'currency' => 'string', 'purchaser' => 'string', 'company_id' => 'int'],
             self::CoursePurchased => ['quantity' => 'int', 'access_period_seconds' => 'int', 'amount_minor' => 'int', 'currency' => 'string', 'purchaser' => 'string', 'company_id' => 'int'],
             self::CourseRefunded => ['refund_id' => 'int', 'quantity' => 'int', 'amount_minor' => 'int', 'currency' => 'string', 'full_refund' => 'bool', 'purchaser' => 'string', 'company_id' => 'int'],
+            // Never the review text: its rating, revision and whether it has a comment.
+            self::ReviewSubmitted, self::ReviewUpdated => ['review_id' => 'int', 'rating' => 'int', 'revision' => 'int', 'has_comment' => 'bool', 'previous_status' => 'string'],
+            self::ReviewApproved, self::ReviewRejected => ['review_id' => 'int', 'rating' => 'int', 'revision' => 'int', 'moderator_id' => 'int', 'withdrawn' => 'bool'],
         };
     }
 }

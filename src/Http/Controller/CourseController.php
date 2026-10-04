@@ -14,6 +14,7 @@ use CattoLearning\Course\CatalogueFilter;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Course\CourseFavouriteService;
+use CattoLearning\Course\CourseReviewService;
 use CattoLearning\Course\CourseService;
 
 use CattoLearning\View\ThemeRenderer;
@@ -40,7 +41,8 @@ final class CourseController extends BaseController
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly LearningService $learning,
         private readonly CourseFavouriteService $favourites,
-        private readonly AnalyticsEventRecorder $analytics
+        private readonly AnalyticsEventRecorder $analytics,
+        private readonly CourseReviewService $reviews
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -249,6 +251,12 @@ final class CourseController extends BaseController
         // change their mind without going back.
         $course = self::first($this->withFavourites([$course]));
         $this->analytics->courseViewed((int) $course['id'], AnalyticsSource::CourseDetail, $user?->id, $this->analyticsVisitor(), 'course_page');
+        // The rating and reviews come from approved reviews only. A learner who may review the
+        // course is offered the review page, with where their own review stands.
+        $courseId = (int) $course['id'];
+        $rating = $this->reviews->ratingSummary($courseId);
+        $reviewsPagination = Pagination::fixed($this->request()->query->get('reviews_page'), CourseReviewService::PUBLIC_PAGE_SIZE, $rating->count);
+        $canReview = $user !== null && $user->hasPermission('LEARNING.REVIEW.CREATE') && $this->reviews->canReview($user->id, $courseId);
 
         return $this->render('course-detail', [
             'title' => (string) $course['title'],
@@ -258,6 +266,11 @@ final class CourseController extends BaseController
             'can_favourite' => $user !== null,
             'favourite_return' => '/courses/' . (string) $course['slug'],
             'course_content_mode' => true,
+            'rating' => $rating->toArray(),
+            'reviews' => $this->reviews->publishedReviews($courseId, $reviewsPagination->pageSize, $reviewsPagination->offset),
+            'reviews_pagination' => PlatformAdministrationService::paginationPayload('reviews', $reviewsPagination, '/courses/' . (string) $course['slug'], 'Reviews'),
+            'can_review' => $canReview,
+            'own_review' => $canReview ? $this->reviews->learnerReview($courseId, $user->id) : null,
         ]);
     }
 

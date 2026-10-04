@@ -49,7 +49,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.8.8', 'composer.json version must be 0.8.8.');
+$need(($composer['version'] ?? '') === '0.8.8.1', 'composer.json version must be 0.8.8.1.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bundle','doctrine/dbal'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
@@ -129,12 +129,13 @@ preg_match_all("/->p\\('([A-Z]+(?:\\.[A-Z]+)+)'/", $catalog, $permissionMatches)
 $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // 81 since v0.6: COURSE.TAG.MANAGE. Tags and categories are separate keys because they are separate
 // decisions - a tag is cross-cutting classification, a category is the catalogue's structure - and an
-// installation may well delegate one and not the other.
-$need(count($permissionKeys) === 81, 'PermissionCatalog must define exactly 81 reserved/current secure actions for this release.');
+// installation may well delegate one and not the other. 83 since v0.8.8.1: LEARNING.REVIEW.CREATE (a
+// learner rates and reviews a course) and COURSE.REVIEW.MANAGE (moderating those reviews).
+$need(count($permissionKeys) === 83, 'PermissionCatalog must define exactly 83 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 71, 'ACL catalogue must contain 10 SYSTEM and 71 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 73, 'ACL catalogue must contain 10 SYSTEM and 73 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -205,7 +206,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.8.8'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.8.1'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

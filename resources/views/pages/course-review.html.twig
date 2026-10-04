@@ -1,0 +1,33 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/courses/' ~ course.slug %}{% set ph_back_label = course.title %}{% set ph_kicker = 'Course review' %}{% set ph_title = 'Rate this course' %}{% set ph_lead = course.title %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{% if not eligible %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}Only learners who have had access to this course can review it.{% endblock %}{% endembed %}
+{% else %}
+{% if review %}
+{#
+	Where the learner's review stands. A moderation note is ADMIN's own record and is never shown here.
+#}
+<div class="cl-review-status">
+{% if review.status == 'approved' %}
+{{ ui('feedback.badge', {label: 'Published', tone: 'success'}) }}<p>Your review is published on the course page.</p>
+{% elseif review.status == 'pending' %}
+{{ ui('feedback.badge', {label: 'Pending moderation', tone: 'warning'}) }}
+<p>{{ review.published_rating is not null ? 'Your changes are waiting to be checked. Your earlier review stays published until they are approved.' : 'Your review is waiting to be checked before it is published.' }}</p>
+{% else %}
+{{ ui('feedback.badge', {label: 'Not published', tone: 'danger'}) }}
+<p>{{ review.published_rating is not null ? 'Your latest changes were not published; your earlier review is still published. You can change your review and submit it again.' : 'Your review was not published. You can change it and submit it again.' }}</p>
+{% endif %}
+</div>
+{% endif %}
+<form action="/learn/{{ course.slug }}/review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+{% include '@platform/partials/course-rating-input.html.twig' with {rating_value: review ? review.rating : 0} %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your review', for: 'review-comment', full_width: true, help: 'Optional. Up to ' ~ max_comment ~ ' characters. Reviews are published under your first name and the initial of your surname once they have been checked.'})} %}{% block control %}<textarea class="form-control" id="review-comment" name="comment" rows="6" maxlength="{{ max_comment }}" {{ ui_field_attrs(props) }}>{{ review ? review.comment : '' }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: review ? 'Update review' : 'Submit review', variant: 'primary', type: 'submit'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Back to the course', href: '/courses/' ~ course.slug}) }}{% endblock %}{% endembed %}
+</form>
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

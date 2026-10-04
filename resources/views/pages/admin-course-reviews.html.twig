@@ -1,0 +1,58 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/courses' %}{% set ph_back_label = 'Courses' %}{% set ph_kicker = 'Courses' %}{% set ph_title = 'Course Reviews' %}{% set ph_lead = 'Learner ratings and reviews wait here until they are approved. Only approved reviews are published or counted in a course rating; an edited review keeps its approved version published until the edit is approved.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 3})} %}{% block body %}{{ ui('data.stat-card', {label: 'Pending', value: counts.pending}) }}{{ ui('data.stat-card', {label: 'Approved', value: counts.approved}) }}{{ ui('data.stat-card', {label: 'Rejected', value: counts.rejected}) }}{% endblock %}{% endembed %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+<form class="cl-review-filter" action="/admin/course-reviews" method="get">
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', for: 'review-status'})} %}{% block control %}<select class="form-select" id="review-status" name="status" {{ ui_field_attrs(props) }}>{% for value, label in {pending: 'Pending', approved: 'Approved', rejected: 'Rejected', all: 'All reviews'} %}<option value="{{ value }}"{% if filter.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'review-course'})} %}{% block control %}<select class="form-select" id="review-course" name="course_id" {{ ui_field_attrs(props) }}><option value="">All courses</option>{% for reviewed in courses %}<option value="{{ reviewed.id }}"{% if filter.course_id == reviewed.id ~ '' %} selected{% endif %}>{{ reviewed.title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Rating', for: 'review-rating'})} %}{% block control %}<select class="form-select" id="review-rating" name="rating" {{ ui_field_attrs(props) }}><option value="">Any rating</option>{% for stars in 5..1 %}<option value="{{ stars }}"{% if filter.rating == stars ~ '' %} selected{% endif %}>{{ stars }} {{ stars == 1 ? 'star' : 'stars' }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+{{ ui('action.button', {label: 'Show reviews', type: 'submit'}) }}
+</form>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'reviews', pagination: reviews_pagination})} %}
+{% block results %}
+{% if reviews %}
+<ol class="cl-review-list">
+{% for review in reviews %}
+<li class="cl-review">
+	<div class="cl-review-head">
+		<strong><a href="/courses/{{ review.course_slug }}">{{ review.course_title }}</a></strong>
+		{{ ui('feedback.badge', {label: review.status == 'pending' ? 'Pending' : (review.status == 'approved' ? 'Approved' : 'Rejected'), tone: review.status == 'pending' ? 'warning' : (review.status == 'approved' ? 'success' : 'danger')}) }}
+	</div>
+	<p class="cl-review-byline">{{ review.learner_name }} · published as “{{ review.reviewer }}” · revision {{ review.revision }} · {{ review.updated_at|date('j M Y H:i') }}</p>
+	<p class="cl-review-rating"><span class="cl-rating-stars" aria-hidden="true">{% for stars in 1..5 %}<span class="{{ stars <= review.rating ? 'is-filled' : '' }}">{{ stars <= review.rating ? '★' : '☆' }}</span>{% endfor %}</span> <span>{{ review.rating }} of 5</span></p>
+	{% if review.comment %}<p class="cl-review-comment">{{ review.comment|nl2br }}</p>{% else %}<p class="cl-review-comment"><em>No comment, rating only.</em></p>{% endif %}
+	{% if review.published_rating is not null and (review.published_rating != review.rating or review.published_comment != review.comment) %}
+		<div class="cl-review-published">
+			<p><strong>Currently published:</strong> {{ review.published_rating }} of 5{% if review.published_at %} since {{ review.published_at|date('j M Y') }}{% endif %}</p>
+			{% if review.published_comment %}<p class="cl-review-comment">{{ review.published_comment|nl2br }}</p>{% endif %}
+		</div>
+	{% elseif review.status == 'rejected' and review.published_rating is null %}
+		<p class="cl-review-byline">Not published.</p>
+	{% endif %}
+	{% if review.moderated_at %}<p class="cl-review-byline">Last decision {{ review.moderated_at|date('j M Y H:i') }}{% if review.moderator_name %} by {{ review.moderator_name }}{% endif %}{% if review.moderation_note %} · Note: {{ review.moderation_note }}{% endif %}</p>{% endif %}
+	<form class="cl-review-moderation" action="/admin/course-reviews/{{ review.id }}/moderate" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		<input type="hidden" name="revision" value="{{ review.revision }}">
+		<input type="hidden" name="return" value="{{ return_to }}">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Moderation note (ADMIN only, optional)', for: 'review-note-' ~ review.id, full_width: true})} %}{% block control %}<textarea class="form-control" id="review-note-{{ review.id }}" name="note" rows="2" maxlength="{{ max_note }}" {{ ui_field_attrs(props) }}>{{ review.moderation_note }}</textarea>{% endblock %}{% endembed %}
+		{% if review.status == 'pending' and review.published_rating is not null %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'When rejecting, also take down the version that is published now'})} %}{% block control %}<input class="form-check-input" type="checkbox" name="withdraw" value="1">{% endblock %}{% endembed %}
+		{% endif %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+			{% if review.status != 'approved' %}{{ ui('action.button', {label: 'Approve', variant: 'primary', type: 'submit', name: 'decision', value: 'approve'}) }}{% endif %}
+			{% if review.status != 'rejected' %}{{ ui('action.button', {label: review.status == 'approved' ? 'Reject and unpublish' : 'Reject', type: 'submit', name: 'decision', value: 'reject'}) }}{% elseif review.published_rating is not null %}{{ ui('action.button', {label: 'Unpublish earlier version', type: 'submit', name: 'decision', value: 'withdraw'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	</form>
+</li>
+{% endfor %}
+</ol>
+{% else %}
+{{ ui('feedback.empty', {heading: 'No reviews', summary: filter.status == 'pending' ? 'No reviews are waiting for moderation.' : 'No reviews match this filter.'}) }}
+{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}
