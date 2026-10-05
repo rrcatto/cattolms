@@ -1520,6 +1520,25 @@ SQL;
     }
 
     /**
+     * Which of these courses a person favourites: one bounded query for a page of cards, rather
+     * than loading every favourite they hold.
+     *
+     * @param list<int> $courseIds
+     * @return list<int>
+     */
+    public function favouriteCourseIds(int $userId, array $courseIds): array
+    {
+        $courseIds = array_values(array_unique(array_filter($courseIds, static fn(int $id): bool => $id > 0)));
+        if ($courseIds === []) {
+            return [];
+        }
+        return array_map('intval', $this->db->fetchFirstColumn(
+            'SELECT course_id FROM course_favourites WHERE user_id=:user_id AND course_id IN (:ids)',
+            ['user_id' => $userId, 'ids' => $courseIds]
+        ));
+    }
+
+    /**
      * One page of a learner's favourites.
      *
      * @return list<array<string,mixed>>

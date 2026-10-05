@@ -1,6 +1,17 @@
 # Changelog
 
-**LMS version:** 0.8.8.2 **Date time:** 2026/10/04 SAST
+**LMS version:** 0.8.8.3 **Date time:** 2026/10/05 SAST
+
+## 2026-10-05 SAST — v0.8.8.3 Rotating Popular Courses on the home page
+
+- **Popular Courses replaces the course showcase.** The home page loads one pool of 16 courses (`CourseService::POPULAR_POOL_SIZE`) with the page: `CoursePopularityRepository::popularCourses()` first, in rank order, then the newest published courses when the ranking holds fewer, skipping any already taken. No popularity is calculated on the request, no score is invented for fallback courses, and nothing distinguishes them on the page. `CourseRepository::publishedCoursesByIds()` loads the ranked courses in one query using the catalogue card projection, now one shared `CATALOGUE_DETAIL` constant, and the usual batched decoration adds ratings, tags and category paths.
+- **Rotation in the browser.** The pool renders as four groups (`POPULAR_GROUP_SIZE`) of the shared `catalogue.course-grid`; groups after the first carry `hidden`. The new `popular-courses` Stimulus controller shows the next group every 20 seconds (`POPULAR_ROTATION_SECONDS`) with a short fade and cycles back, with no server request. It waits while the pointer is over the grid, while focus is inside it and while the tab is hidden. Pause and Resume are canonical buttons with new `action-pause`/`action-play` sprite icons, rendered hidden and revealed by the controller; focus stays on the control. `prefers-reduced-motion: reduce` starts paused and swaps without the fade. Without JavaScript the first, highest-ranked group stays. UX rule 6.9 is rewritten for this.
+- **Favourites.** Signed-in readers get the usual favourite stars on home page cards. `CourseFavouriteService::markFavourites()`, backed by the bounded `AdministrationRepository::favouriteCourseIds()`, is now the one implementation, shared with the catalogue.
+- **Removed.** `CourseService::showcaseCourses()`, its constants, `partials/course-showcase.html.twig` and the unused `/courses/showcase` fragment route.
+- **Operations.** `OPERATIONS.md` adds the hourly `popularity:recalculate` schedule beside `commerce:maintain`. Publish `catto-platform.css`, `nav-icons.svg` and the compiled assets. No migration.
+- **Tests.** `PopularCoursePoolIntegrationTest` (6), `HomePopularCoursesPageTest` (5) and the browser check `tests/Browser/popular-courses.cjs` (13 checks).
+- **Compiled assets.** Five stale compiled files that nothing referenced (four earlier Stimulus controller indexes and an earlier `app` entry) were removed from `public_html/assets`.
+- **Release.** Version aligned to 0.8.8.3. `SHELL_VERBOSITY=-1 composer qa` with a cold cache (856 PHPUnit tests, 45,182 assertions), Twig lint of 203 templates, Composer validation, AssetMapper compilation, `git diff --check`, both all-theme browser matrices (72 and 30 checks), `popular-courses.cjs` (13), `course-reviews.cjs` (9) and `course-content-tree.cjs` (41) passed; temporary identities and fixtures were removed.
 
 ## 2026-10-04 SAST — v0.8.8.2 Course popularity engine and ADMIN popularity report
 

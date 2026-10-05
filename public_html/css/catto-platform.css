@@ -667,7 +667,12 @@
 .cl-course-cards{display:grid;gap:1rem;grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:1200px){.cl-course-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.cl-course-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.cl-course-cards{grid-template-columns:minmax(0,1fr)}}/* The body is a column so the foot can be pushed to the bottom of every card in the row: cards in
+@media(max-width:600px){.cl-course-cards{grid-template-columns:minmax(0,1fr)}}
+/* Home page Popular Courses: one group of course cards shows at a time and the next fades in. Hidden groups use the hidden attribute, so they take no space and no focus. */
+.cl-popular-courses{margin-top:1.5rem}.cl-popular-courses .cl-ui-section-actions .cl-ui-action[hidden]{display:none}
+.cl-popular-courses-group.is-entering{animation:cl-popular-courses-fade .35s ease-out}
+@keyframes cl-popular-courses-fade{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.cl-popular-courses-group.is-entering{animation:none}}/* The body is a column so the foot can be pushed to the bottom of every card in the row: cards in
    a grid row are the same height, and without this the action sits directly under the text and no
    two cards in a row agree where it is. */
 

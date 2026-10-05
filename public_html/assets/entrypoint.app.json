@@ -4,6 +4,7 @@
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js",
     "\/assets\/controllers\/category_tree_controller.js",
     "\/assets\/controllers\/course_content_controller.js",
+    "\/assets\/controllers\/popular_courses_controller.js",
     "\/assets\/controllers\/profile_image_controller.js",
     "\/assets\/controllers\/tag_cloud_controller.js",
     "TagCloud"

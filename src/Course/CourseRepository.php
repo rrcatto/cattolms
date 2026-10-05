@@ -146,6 +146,28 @@ final class CourseRepository
         'updated' => 'c.updated_at',
     ];
     private const CATALOGUE_ORDER = 'c.published_at DESC NULLS LAST, c.title, c.id';
+
+    /**
+     * The catalogue card row for every course in the `page` key set: the one projection the
+     * published catalogue and the home page's popular courses share, so a card cannot differ by
+     * where it is shown.
+     */
+    private const CATALOGUE_DETAIL = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
+                    c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
+                    c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
+                    NULL::text AS cover_media_public_id,
+                    (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id = c.id) AS item_count,
+                    (SELECT COUNT(*)::int FROM assessment_questions aq
+                       JOIN course_item_placements cip ON cip.course_item_id = aq.course_item_id
+                      WHERE cip.course_id = c.id) AS question_count,
+                    (SELECT cpv.id FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_variant_id,
+                    (SELECT cpv.price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
+                    (SELECT cpv.currency_code FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code,
+                    (SELECT cpv.access_period_seconds FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_access_period_seconds,
+                    (SELECT COUNT(*)::int FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE) AS active_price_variant_count
+             FROM page
+             JOIN courses c ON c.id = page.id
+             LEFT JOIN course_categories cc ON cc.id = c.category_id";
     private const COMPANY_COURSE_ORDER = 'c.title, c.id';
 
     /** @var array<string,string> */
@@ -177,27 +199,36 @@ final class CourseRepository
         // previously evaluated for the entire published catalogue in order to render one page.
         $keys = "SELECT c.id FROM courses c WHERE c.status = 'published'" . '' . $narrow;
 
-        $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
-                    c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
-                    c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
-                    NULL::text AS cover_media_public_id,
-                    (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id = c.id) AS item_count,
-                    (SELECT COUNT(*)::int FROM assessment_questions aq
-                       JOIN course_item_placements cip ON cip.course_item_id = aq.course_item_id
-                      WHERE cip.course_id = c.id) AS question_count,
-                    (SELECT cpv.id FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_variant_id,
-                    (SELECT cpv.price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
-                    (SELECT cpv.currency_code FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code,
-                    (SELECT cpv.access_period_seconds FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_access_period_seconds,
-                    (SELECT COUNT(*)::int FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE) AS active_price_variant_count
-             FROM page
-             JOIN courses c ON c.id = page.id
-             LEFT JOIN course_categories cc ON cc.id = c.category_id";
+        $detail = self::CATALOGUE_DETAIL;
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, self::CATALOGUE_ORDER, $limit, $offset),
             $bindings
         ));
+    }
+
+    /**
+     * Catalogue card rows for the given courses, in the order given, leaving out any that are not
+     * published now. One bounded query whatever the order: for the home page's popular courses,
+     * whose order comes from the popularity ranking rather than from the catalogue.
+     *
+     * @param list<int> $courseIds
+     * @return list<array<string,mixed>>
+     */
+    public function publishedCoursesByIds(array $courseIds): array
+    {
+        $courseIds = array_values(array_unique(array_filter($courseIds, static fn(int $id): bool => $id > 0)));
+        if ($courseIds === []) {
+            return [];
+        }
+        $rows = [];
+        foreach ($this->normaliseRows($this->db->fetchAllAssociative(
+            'WITH ' . PageQuery::KEYS . " AS (SELECT c.id FROM courses c WHERE c.status = 'published' AND c.id IN (:ids))\n" . self::CATALOGUE_DETAIL,
+            ['ids' => $courseIds]
+        )) as $row) {
+            $rows[(int) $row['id']] = $row;
+        }
+        return array_values(array_filter(array_map(static fn(int $id): ?array => $rows[$id] ?? null, $courseIds)));
     }
 
     /**
