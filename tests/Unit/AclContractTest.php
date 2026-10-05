@@ -55,8 +55,9 @@ final class AclContractTest extends TestCase
         // administration surface. Tags and categories are separate keys because they are separate
         // decisions - a tag is cross-cutting classification and a category is the catalogue's
         // structure - and an installation may well want one delegated and not the other. 73 since
-        // v0.8.8.1: LEARNING.REVIEW.CREATE and COURSE.REVIEW.MANAGE for course reviews.
-        self::assertCount(73, $catalog->businessKeys());
+        // v0.8.8.1: LEARNING.REVIEW.CREATE and COURSE.REVIEW.MANAGE for course reviews; 74 with
+        // COMPANY.BILLING.MANAGE for the company's own billing details.
+        self::assertCount(74, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {

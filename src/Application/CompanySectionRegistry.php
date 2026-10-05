@@ -26,6 +26,7 @@ final class CompanySectionRegistry
             $this->s('training','Courses Bought','courses','/company/training','partials/company/training.html.twig','Courses this company has bought access to for its staff.'),
             $this->s('favourites','Favourites','courses','/company/favourites','partials/company/favourites.html.twig','Courses this company may want for its staff but has not bought.'),
             $this->s('performance','Performance','reports','/company/performance','partials/company/performance.html.twig','How this company\'s staff are doing, course by course.'),
+            $this->s('billing','Billing details','settings','/company/billing','partials/company/billing.html.twig','Who this company\'s invoices are made out to.'),
         ];
     }
     /** @return array{key:string,label:string,icon:string,route:string,template:string,description:string} */

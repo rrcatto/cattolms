@@ -1,0 +1,35 @@
+{#
+	The company's billing details: the reusable profile its invoices are made out to. Company-owned,
+	separate from any administrator's own billing details, and copied into each order when it is
+	placed, so a change here never alters an order or document that already exists.
+#}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Billing details', eyebrow: 'Billing', summary: 'Who this company’s invoices are made out to. Credit purchases are filled in from these details.'}) }}
+		{% if company_billing|default(null) is null %}
+			{{ ui('feedback.notice', {tone: 'info', heading: company_billing_notice|default('Choose the company to administer first.')}) }}
+		{% else %}
+			{% if not company_billing.saved %}
+				{{ ui('feedback.notice', {tone: 'info', heading: 'No billing details saved yet. The company name and the platform’s country are filled in to start from.'}) }}
+			{% endif %}
+			<form action="/company/billing" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% include '@platform/partials/billing-fields.html.twig' with {billing: company_billing, billing_prefix: 'company-billing'} %}
+				<p class="help">Orders already placed keep the billing details they were placed with.</p>
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+					{{ ui('action.button', {label: 'Save billing details', variant: 'primary', size: 'normal', type: 'submit'}) }}
+{% endblock %}
+{% endembed %}
+			</form>
+		{% endif %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}

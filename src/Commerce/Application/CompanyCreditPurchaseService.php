@@ -8,6 +8,7 @@ use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventType;
 use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
@@ -31,7 +32,8 @@ final class CompanyCreditPurchaseService
         private readonly TransitionService $transitions,
         private readonly PaymentService $payments,
         private readonly ClockInterface $clock,
-        private readonly AnalyticsEventRecorder $analytics
+        private readonly AnalyticsEventRecorder $analytics,
+        private readonly BillingProfileService $billing
     ) {}
 
     /**
@@ -163,16 +165,34 @@ final class CompanyCreditPurchaseService
             'total_label'=>$total->format()];
     }
 
-    public function place(CurrentUser $actor, int $companyId, string $key, string $quote, string $billingAddress, string $method, string $token, bool $emailInvoice, bool $accepted): int
+    /**
+     * The company's billing form for checkout: its saved billing profile, or its name and the
+     * installation's country as a starting point.
+     *
+     * @return array{values:array<string,string>,saved:bool}
+     */
+    public function billingForm(CurrentUser $actor, int $companyId): array
+    {
+        $this->requireCompanyScope($actor, $companyId);
+        $company = $this->companies->findById($companyId) ?? throw new RuntimeException('The selected company is unavailable.');
+        return $this->billing->companyForm($companyId, (string) $company['name']);
+    }
+
+    /**
+     * Places the company order. The company is billed, not the administrator placing the order:
+     * the purchaser is the company's administrator, who also manages its billing details, so the
+     * details submitted at checkout are saved as the company's billing profile (audited when they
+     * change) and frozen into the order's snapshot. A replayed placement returns the existing order
+     * without touching either.
+     */
+    public function place(CurrentUser $actor, int $companyId, string $key, string $quote, BillingDetails $billing, string $method, string $token, bool $emailInvoice, bool $accepted): int
     {
         OrderService::requireCapability($actor, 'COMPANY.CREDIT.MANAGE');
         OrderService::requireCapability($actor, 'COMMERCE.CHECKOUT.START');
         CheckoutService::validateMethod($method, $token);
-        if (!$accepted || trim($billingAddress) === '' || mb_strlen($billingAddress) > 2000) {
-            throw new RuntimeException('Enter the company billing address and accept the purchase terms.');
-        }
+        if (!$accepted) throw new RuntimeException('Accept the purchase terms before placing the company order.');
         if (!Uuid::isValid($key)) throw new RuntimeException('Invalid purchase identifier.');
-        [$orderId,$created] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billingAddress,$method,$emailInvoice): array {
+        [$orderId,$created] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billing,$method,$emailInvoice): array {
             $this->records->lockPurchaser($actor->id);
             $existing = $this->records->companyOrderForKey($actor->id, $key);
             if ($existing !== null) return [(int) $existing['id'],false];
@@ -188,10 +208,11 @@ final class CompanyCreditPurchaseService
             if ($requestId !== null && $this->records->activeCompanyOrderForRequest($requestId, $companyId) !== null) {
                 throw new RuntimeException('A purchase for this request is already in progress. Open its order instead.');
             }
+            $this->billing->saveForCompany($actor, $companyId, $billing);
             $now = $this->clock->now();
             $snapshot = ['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,
-                'company_id'=>$companyId,'company_name'=>$review['company']['name'],'billing_name'=>$review['company']['name'],
-                'billing_address'=>trim($billingAddress),'request_id'=>$requestId,'items'=>$review['items'],
+                'company_id'=>$companyId,'company_name'=>$review['company']['name'],'billing'=>$billing->toSnapshot(),
+                'request_id'=>$requestId,'items'=>$review['items'],
                 'total_minor'=>$review['total_minor'],'currency'=>'ZAR','payment_method'=>$method,'invoice_email'=>$emailInvoice,
                 'tax_enabled'=>false,'terms_version'=>$this->policy->termsVersion,
                 'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false]];

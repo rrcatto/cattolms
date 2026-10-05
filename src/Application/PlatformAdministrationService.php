@@ -1570,6 +1570,11 @@ final class PlatformAdministrationService
             return $data + $this->datasetDefaults();
         }
 
+        if ($section === 'billing') {
+            // The billing form's data is the company's billing profile, which the controller adds;
+            // this section has no dataset of its own.
+            return $data + $this->datasetDefaults();
+        }
         if ($section === 'favourites') {
             $sort = $this->sortFor('company_favourites', $request, array_keys(CourseRepository::COMPANY_FAVOURITE_SORTS), 'added', SortOrder::DESCENDING);
             $pagination = $this->paginationFor('company_favourites', $request, $this->courses->companyFavouritesCount($companyId));
@@ -2759,6 +2764,7 @@ final class PlatformAdministrationService
             'enrolment.progress_reset' => 'Learner progress reset',
             'company.created' => 'Company created',
             'company.updated' => 'Company updated',
+            'company.billing_updated' => 'Company billing details updated',
             'company.status_changed' => 'Company status changed',
             'company.context_selected' => 'Administering company changed',
             'company.person_updated' => 'Company person updated',
@@ -2769,6 +2775,7 @@ final class PlatformAdministrationService
             'user.created_by_administrator' => 'Person added by administrator',
             'user.updated_by_administrator' => 'Person updated by administrator',
             'user.profile_updated' => 'Profile updated',
+            'user.billing_profile_updated' => 'Billing details updated',
             'auth.logout' => 'Signed out',
             default => ucfirst(str_replace(['.','_','-'], ' ', $key)),
         };

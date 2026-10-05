@@ -5,18 +5,28 @@ namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Analytics\{AnalyticsEventRecorder, AnalyticsEventType, AnalyticsSource};
 use CattoLearning\Auth\{AuthService, CurrentUser};
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 
-/** Coordinates profile, payment selection and review; payment is attempted only after order commit. */
+/**
+ * Coordinates the purchaser's details, payment selection and review; payment is attempted only
+ * after order commit. The details step keeps two things apart: personal particulars go to the
+ * person's profile, billing details to their reusable billing profile. Placement copies the billing
+ * profile as it is at that moment into the order's immutable snapshot.
+ */
 final class CheckoutService
 {
+    /** Personal particulars the details step collects, with their maximum lengths. */
+    private const PERSONAL = ['first_name'=>120,'last_name'=>120,'mobile_number'=>60];
+
     public function __construct(private readonly AuthService $auth,
         private readonly OrderService $orders, private readonly CommerceRepository $records,
         private readonly PaymentService $payments, private readonly FulfilmentService $fulfilment,
-        private readonly TransactionManager $transactions, private readonly AnalyticsEventRecorder $analytics) {}
+        private readonly TransactionManager $transactions, private readonly AnalyticsEventRecorder $analytics,
+        private readonly BillingProfileService $billing) {}
 
     /**
      * A signed-in purchaser opened checkout with something in the cart. Recorded once per cart,
@@ -45,14 +55,26 @@ final class CheckoutService
         return (array) ($_SESSION['checkout'][$actor->id] ?? []);
     }
 
-    /** @param array<string,mixed> $fields */
+    /**
+     * The details step: personal particulars and billing details, both validated before either is
+     * saved, then saved together.
+     *
+     * @param array<string,mixed> $fields
+     */
     public function saveProfile(CurrentUser $actor, array $fields): void
     {
-        foreach (['first_name'=>120,'last_name'=>120,'mobile_number'=>60,'billing_address'=>2000] as $field=>$limit) {
-            if (trim((string) ($fields[$field] ?? '')) === '' || mb_strlen((string) $fields[$field]) > $limit) throw new RuntimeException('Complete your names, cell number and billing address.');
+        $personal = [];
+        foreach (self::PERSONAL as $field=>$limit) {
+            $personal[$field] = trim((string) ($fields[$field] ?? ''));
+            if ($personal[$field] === '' || mb_strlen($personal[$field]) > $limit) throw new RuntimeException('Complete your names and cell number.');
         }
-        if (preg_match('/^[0-9]{13}$/D', (string) ($fields['identification_number'] ?? '')) !== 1) throw new RuntimeException('Enter your 13-digit RSA ID number.');
-        $this->auth->updateProfile($actor->id, $fields);
+        $personal['identification_number'] = (string) ($fields['identification_number'] ?? '');
+        if (preg_match('/^[0-9]{13}$/D', $personal['identification_number']) !== 1) throw new RuntimeException('Enter your 13-digit RSA ID number.');
+        BillingDetails::forPerson($fields);
+        $this->transactions->run(function () use ($actor, $personal, $fields): void {
+            $this->auth->updateProfile($actor->id, $personal);
+            $this->billing->saveOwn($actor, $fields);
+        });
         $_SESSION['checkout'][$actor->id] = ['profile_confirmed'=>true];
     }
 
@@ -79,8 +101,8 @@ final class CheckoutService
         if (isset($state['completed_cart']) && (int) $state['completed_cart'] === $cartId) return isset($state['order_id']) ? (int) $state['order_id'] : null;
         if (!($state['profile_confirmed'] ?? false) || !isset($state['payment_method'])) throw new RuntimeException('Complete your details and choose a payment method first.');
         if (!$accepted) throw new RuntimeException('Accept the purchase terms before placing your order.');
-        $profile = $this->auth->profile($actor->id);
-        $id = $this->transactions->run(function () use ($actor,$cartId,$quote,$profile,$state): ?int {
+        $billing = $this->billing->forUser($actor->id) ?? throw new RuntimeException('Complete your billing details first.');
+        $id = $this->transactions->run(function () use ($actor,$cartId,$quote,$billing,$state): ?int {
             $this->records->lockPurchaser($actor->id);
             $cart = $this->orders->cart($actor);
             if ((int) $cart['id'] !== $cartId || !hash_equals((string) $cart['quote'], $quote)) throw new RuntimeException('Your cart or prices changed. Review your order again.');
@@ -92,7 +114,7 @@ final class CheckoutService
             }
             $cart = $this->orders->cart($actor);
             if ($cart['items'] === []) return null;
-            return $this->orders->place($actor, $cartId, (string) $cart['quote'], trim($profile['first_name'].' '.$profile['last_name']), (string) $profile['billing_address'], true, $state);
+            return $this->orders->place($actor, $cartId, (string) $cart['quote'], $billing, true, $state);
         });
         $_SESSION['checkout'][$actor->id]['completed_cart'] = $cartId;
         $_SESSION['checkout'][$actor->id]['order_id'] = $id;

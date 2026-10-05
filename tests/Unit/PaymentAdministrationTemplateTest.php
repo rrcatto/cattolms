@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
+use CattoLearning\Tests\Support\BillingFixture;
 use CattoLearning\View\Twig\PlatformUiExtension;
 use CattoLearning\View\Ui\PlatformUi;
 use PHPUnit\Framework\TestCase;
@@ -35,11 +36,14 @@ final class PaymentAdministrationTemplateTest extends TestCase
         $item=['id'=>8,'title'=>'Course','access_period_seconds'=>86400,'quantity'=>1,'product_type'=>'individual_access','amount_label'=>'R 123.45','amount_minor'=>12345,'refunded_minor'=>0,'remaining_label'=>'R 123.45','latest_refundable'=>null,'unissued'=>false,'refund_key'=>'00000000-0000-4000-8000-000000000002'];
         $detail=$this->twig()->render('@platform/pages/admin-commerce-order.html.twig',$base+[
             'order'=>['id'=>12,'state'=>'awaiting_payment','total_minor'=>12345,'currency'=>'ZAR','company_id'=>null,'placed_at'=>'2026-09-23T10:00:00+02:00','payment_due_at'=>'2026-09-30T10:00:00+02:00'],
-            'snapshot'=>['billing_name'=>'Buyer'],'items'=>[$item],'payments'=>[],'refunds'=>[],'documents'=>[],
+            'snapshot'=>['billing'=>BillingFixture::person('Buyer Billing')->toSnapshot(),'purchaser_name'=>'Buyer','purchaser_email'=>'buyer@example.test'],
+            'billing_lines'=>BillingFixture::person('Buyer Billing')->documentLines(),'items'=>[$item],'payments'=>[],'refunds'=>[],'documents'=>[],
             'total_label'=>'R 123.45','fund_balance_label'=>'R 0.00','payment_method'=>'eft','can_confirm'=>true,'can_reconcile'=>true,'can_refund'=>true,'can_view_payments'=>true,
             'confirmation_key'=>'00000000-0000-4000-8000-000000000001']);
         self::assertStringContainsString('/admin/commerce/orders/12/confirm-bank',$detail);
         self::assertStringContainsString('name="bank_reference"',$detail);
         self::assertStringContainsString('name="csrf"',$detail);
+        self::assertStringContainsString('Buyer Billing<br>Nkosi Consulting<br>14 Jacaranda Avenue',$detail,'The order shows its snapshot billing lines.');
+        self::assertStringContainsString('buyer@example.test',$detail,'The purchaser is shown apart from the billed party.');
     }
 }

@@ -1,0 +1,6 @@
+{#
+	Billing details as printed, one line each: the lines BillingDetails::documentLines() made from a
+	billing profile or, on an order or document, from that order's immutable snapshot. Pages never
+	format an address themselves.
+#}
+<address>{% for line in billing_lines %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</address>

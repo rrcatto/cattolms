@@ -7,6 +7,7 @@ namespace CattoLearning\Commerce\Http;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\PaymentAdministrationService;
 use CattoLearning\Commerce\Application\RefundAdministrationService;
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer;
 use CattoLearning\Http\Controller\BaseController;
@@ -70,7 +71,7 @@ final class PaymentAdministrationController extends BaseController
             default=>true,
         }));
         return $this->render('admin-commerce-order',['title'=>'Order CL-'.str_pad((string)$id,8,'0',STR_PAD_LEFT),'active_nav'=>'admin',
-            'order'=>$order,'snapshot'=>$snapshot,'items'=>$items,'payments'=>$payments,'refunds'=>$refunds,'documents'=>$documents,
+            'order'=>$order,'snapshot'=>$snapshot,'billing_lines'=>BillingDetails::fromSnapshot((array)($snapshot['billing'] ?? []))->documentLines(),'items'=>$items,'payments'=>$payments,'refunds'=>$refunds,'documents'=>$documents,
             'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'fund_balance_label'=>$actor->hasPermission('PLATFORM.REFUND.VIEW') ? Money::strictMinorUnits($this->records->fundBalance($order['company_id']===null?(int)$order['purchaser_user_id']:null,$order['company_id']===null?null:(int)$order['company_id'],(string)$order['currency']),(string)$order['currency'])->format() : null,
             'payment_method'=>$this->records->paymentMethod($id),'can_confirm'=>$actor->hasPermission('PLATFORM.PAYMENT.MANAGE') && $actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),

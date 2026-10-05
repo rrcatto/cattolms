@@ -43,7 +43,9 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Company\SelectedCompanyContext;
+use CattoLearning\Commerce\Application\BillingProfileService;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
@@ -61,7 +63,8 @@ final class CompanyController extends BaseController
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanySectionRegistry $sections,
         private readonly SelectedCompanyContext $companyContext,
-        private readonly CompanyCreditPurchaseService $creditPurchases
+        private readonly CompanyCreditPurchaseService $creditPurchases,
+        private readonly BillingProfileService $billing
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -124,6 +127,52 @@ final class CompanyController extends BaseController
      */
     #[Route('/company/training', name: 'company_training', methods: ['GET'])]
     public function training(): Response { return $this->standalone('training', 'COMPANY.COURSE.VIEW'); }
+
+    /**
+     * The company's billing details: who its invoices are made out to. Company-owned data, kept
+     * apart from any administrator's own billing details and unchanged when administrators change.
+     * Orders already placed keep the billing details they were placed with.
+     */
+    #[Route('/company/billing', name: 'company_billing', methods: ['GET'])]
+    public function billing(): Response
+    {
+        $user = $this->requirePermission('COMPANY.BILLING.MANAGE');
+        return $this->standalone('billing', 'COMPANY.BILLING.MANAGE', $this->billingView($user));
+    }
+
+    #[Route('/company/billing', name: 'company_update_billing', methods: ['POST'])]
+    public function updateBilling(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COMPANY.BILLING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            // The company is the one in the reader's trusted context, never one named in the form.
+            $companyId = (int) $this->companyContext->resolve($user)['company_id'];
+            $changed = $this->billing->saveForCompany($user, $companyId, BillingDetails::forCompany($_POST));
+            $this->flash('success', $changed ? 'The company billing details were saved.' : 'The company billing details were already up to date.');
+            $this->redirect('/company/billing');
+        }, '/company/billing');
+    }
+
+    /** @return array<string,mixed> */
+    private function billingView(CurrentUser $user): array
+    {
+        $context = $this->companyContext->resolve($user);
+        $companyId = (int) $context['company_id'];
+        $view = ['billing_fields' => BillingDetails::formFields(false), 'company_billing' => null, 'company_billing_notice' => ''];
+        if ($companyId < 1) {
+            $view['company_billing_notice'] = 'Choose the company to administer first: billing details belong to one company.';
+            return $view;
+        }
+        try {
+            $this->billing->requireCompanyAuthority($user, $companyId);
+        } catch (RuntimeException $exception) {
+            $view['company_billing_notice'] = $exception->getMessage();
+            return $view;
+        }
+        $view['company_billing'] = $this->billing->companyForm($companyId, (string) ($context['company']['name'] ?? ''));
+        return $view;
+    }
 
     /**
      * The bounded pickers the assign form uses, scoped to the company being administered.
@@ -429,7 +478,8 @@ final class CompanyController extends BaseController
      * called the consolidated loader, so opening Company People also fetched requests,
      * enrolments, credits and the entire course list.
      */
-    private function standalone(string $key, string $permission): Response
+    /** @param array<string,mixed> $extra page data a section needs beyond its shared dataset */
+    private function standalone(string $key, string $permission, array $extra = []): Response
     {
         $user = $this->requirePermission($permission);
         $definition = $this->sections->get($key);
@@ -444,6 +494,7 @@ final class CompanyController extends BaseController
                 $this->companyContext->resolve($user),
                 $this->sectionRequest()
             );
+        $data = $extra + $data;
         $data['company_section'] = $definition;
         $data['company_layout'] = 'section';
         return $this->render('company-section', $data + [
@@ -553,6 +604,7 @@ final class CompanyController extends BaseController
         $map = [
             'dashboard'=>'COMPANY.DASHBOARD.VIEW','people'=>'COMPANY.PERSON.VIEW','requests'=>'COMPANY.REQUEST.VIEW',
             'enrolments'=>'COMPANY.ENROLMENT.VIEW','credits'=>'COMPANY.CREDIT.VIEW','courses'=>'COMPANY.COURSE.VIEW',
+            'billing'=>'COMPANY.BILLING.MANAGE',
         ];
         return array_values(array_filter(
             $this->sections->all(),

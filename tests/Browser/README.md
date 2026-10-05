@@ -129,3 +129,21 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/popular-courses.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/popular-courses-fixture.php cleanup'
 ```
+
+## Billing profiles
+
+`billing-profiles.cjs` checks billing profiles in Chromium and Firefox, without JavaScript and in
+every bundled theme (10 checks): a learner's Account billing details and a company administrator's
+company Billing details save and survive a reload; the learner's checkout is filled from the saved
+profile, a correction there is saved to it, and the placed order shows the billing it was placed
+with, still after the profile changes, with its invoice PDF opening; the company credit checkout is
+filled from the company's details and its order is billed to the company; both forms save as
+ordinary forms without JavaScript and fit a 390px phone; and an ADMIN sees both forms in all five
+themes at 1440 and 390px without overflow. Orders are immutable, so each run leaves its two orders,
+their purchasers and the retired fixture course in the disposable development database.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/billing-profiles-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/billing-profiles.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/billing-profiles-fixture.php cleanup'
+```

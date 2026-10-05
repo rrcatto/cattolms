@@ -70,6 +70,7 @@ final class PermissionCatalog
             $this->p('COMPANY.ENROLMENT.MANAGE', 'ManageCompanyEnrolments', 'Company', 'Remove or restore current-company learner access.'),
             $this->p('COMPANY.CREDIT.VIEW', 'ViewCompanyCredits', 'Company', 'View current-company course-credit pools and allocations.'),
             $this->p('COMPANY.CREDIT.MANAGE', 'ManageCompanyCredits', 'Company', 'Allocate, return and manage current-company credits.'),
+            $this->p('COMPANY.BILLING.MANAGE', 'ManageCompanyBilling', 'Company', 'View and change the billing details the current company is invoiced to.'),
             $this->p('COMPANY.COURSE.VIEW', 'ViewCompanyCourses', 'Company', 'View courses owned by or exposed to the current company.'),
             $this->p('COMPANY.COURSE.MANAGE', 'ManageCompanyCourses', 'Company', 'Manage company-owned courses within current-company scope.'),
             $this->p('COMPANY.CATALOGUE.MANAGE', 'ManageCompanyCatalogue', 'Company', 'Choose permitted catalogue courses exposed to the current company.'),

@@ -19,7 +19,7 @@ use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
 use CattoLearning\Support\{Money,Uuid};
-use CattoLearning\Tests\Support\{DevelopmentFixture,IntegrationContainer};
+use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,IntegrationContainer};
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
@@ -79,7 +79,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $this->orders->changeCart($this->actor,$this->variant);
         $cart=$this->orders->cart($this->actor);
-        return $this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Buyer Billing','Billing address',true);
+        return $this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],BillingFixture::person('Buyer Billing'),true);
     }
     public function testCheckoutStartedIsRecordedOncePerCartAndNeverForAnEmptyCart(): void
     {
@@ -106,7 +106,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->orders->changeCart($this->actor,$this->variant);
         $this->orders->changeCart($this->actor,$secondVariant);
         $cart=$this->orders->cart($this->actor);
-        $order=$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Buyer Billing','Billing address',true);
+        $order=$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],BillingFixture::person('Buyer Billing'),true);
         $this->payments->purchase($this->actor,$order,Uuid::v4(),'demo_failure');
         self::assertSame(0,$this->eventCount('course_purchased'),'A failed payment is not a purchase.');
         $key=Uuid::v4();
@@ -185,21 +185,21 @@ final class CommercePurchaseIntegrationTest extends TestCase
     public function testPlacedSnapshotSurvivesLiveEditsAndRepeatedCheckout(): void
     {
         $this->orders->changeCart($this->actor,$this->variant); $cart=$this->orders->cart($this->actor);
-        $order=$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Billing name','Address',true);
+        $order=$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],BillingFixture::person('Billing name'),true);
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=999 WHERE id=:id',['id'=>$this->variant]);
         $this->db->executeStatement("UPDATE courses SET title='Changed course' WHERE id=:id",['id'=>$this->course]);
-        self::assertSame($order,$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Different billing','',true));
+        self::assertSame($order,$this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],BillingFixture::person('Different billing'),true));
         $snapshot=$this->orders->view($this->actor,$order)['details'];
         self::assertSame('Frozen course title',$snapshot['items'][0]['course_title']);
         self::assertSame(12345,$snapshot['total_minor']);
-        self::assertSame('Billing name',$snapshot['billing_name']);
+        self::assertSame('Billing name',$snapshot['billing']['name'],'A replayed placement keeps the original billing snapshot.');
     }
     public function testChangedPriceRequiresAnotherCheckoutReview(): void
     {
         $this->orders->changeCart($this->actor,$this->variant);$cart=$this->orders->cart($this->actor);
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=20000 WHERE id=:id',['id'=>$this->variant]);
         $this->expectException(\RuntimeException::class);
-        $this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],'Buyer','',true);
+        $this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],BillingFixture::person('Buyer'),true);
     }
     public function testUnpaidDeadlineCancelsWithoutDeletingInvoice(): void
     {
@@ -278,13 +278,13 @@ final class CommercePurchaseIntegrationTest extends TestCase
 
     private function checkoutService(): CheckoutService
     {
-        return new CheckoutService($this->auth($this->actor), $this->orders, $this->records, $this->payments, $this->fulfilment, new TransactionManager($this->db), $this->analytics());
+        return new CheckoutService($this->auth($this->actor), $this->orders, $this->records, $this->payments, $this->fulfilment, new TransactionManager($this->db), $this->analytics(), BillingFixture::service($this->db, $this->clock));
     }
 
     /** @return array<string,string> */
     private function profileFields(): array
     {
-        return ['first_name'=>'Invoice', 'last_name'=>'Buyer', 'mobile_number'=>'0821234567', 'billing_address'=>'10 Test Street, Pretoria, 0001', 'identification_number'=>'9001015009087'];
+        return BillingFixture::personFields('Invoice Buyer', '10 Test Street') + ['first_name'=>'Invoice', 'last_name'=>'Buyer', 'mobile_number'=>'0821234567', 'identification_number'=>'9001015009087'];
     }
 
     public function testGuestCartMergesOnceAfterSignIn(): void
@@ -317,7 +317,8 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertSame('awaiting_payment', $this->records->order($id)['state']);
         self::assertSame('eft', $this->records->paymentMethod($id));
         self::assertSame([], $this->records->payments($id));
-        self::assertSame('10 Test Street, Pretoria, 0001', $this->auth($this->actor)->profile($this->actor->id)['billing_address']);
+        self::assertSame('10 Test Street', BillingFixture::service($this->db, $this->clock)->forUser($this->actor->id)?->line1, 'The details step saves the reusable billing profile.');
+        self::assertArrayNotHasKey('billing_address', $this->auth($this->actor)->profile($this->actor->id), 'Billing is not part of the personal profile.');
         $invoice = $this->records->documents($id)[0];
         $details = CommerceRepository::decode((string) $invoice['snapshot']);
         self::assertTrue($details['invoice_email']);
@@ -362,7 +363,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $this->orders->changeCart($this->actor, $this->variant);
         $cart = $this->orders->cart($this->actor);
-        $id = $this->orders->place($this->actor, (int) $cart['id'], (string) $cart['quote'], 'Billing Buyer', 'Address', true, ['invoice_email'=>true]);
+        $id = $this->orders->place($this->actor, (int) $cart['id'], (string) $cart['quote'], BillingFixture::person('Billing Buyer'), true, ['invoice_email'=>true]);
         $invoice = $this->records->documents($id)[0];
         $pdfs = new InvoicePdfRenderer($this->records);
         $bytes = $pdfs->render($invoice);

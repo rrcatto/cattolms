@@ -12,7 +12,7 @@
             <span {% if step == 'review' %}aria-current="step"{% endif %}>4. Review</span>
         </nav>
         {% if step == 'profile' %}
-            <h2 class="h4">My details</h2><p>Signed in as {{ user_email }}. These details are saved to your profile.</p>
+            <h2 class="h4">My details</h2><p>Signed in as {{ user_email }}. Your personal details are saved to your profile and your billing details to your reusable billing profile, which you can also change in Account → Profile.</p>
             <form action="/checkout/profile" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
                 {% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
@@ -38,14 +38,13 @@
 <input id="rsa-id" name="identification_number" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" value="{{ profile.identification_number }}" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
-                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Billing address', full_width: true, for: 'billing-address', required: true})} %}
-{% block control %}
-<textarea id="billing-address" name="billing_address" autocomplete="street-address" maxlength="2000" rows="3" required {{ ui_field_attrs(props) }}>{{ profile.billing_address }}</textarea>
-{% endblock %}
-{% endembed %}
+
 
 {% endblock %}
 {% endembed %}
+                <h3 class="h5 mt-4">Billing details</h3>
+                <p>Who your invoice is made out to. {{ billing.saved ? 'Your saved billing details are filled in; any change you make is saved for next time.' : 'These are saved for your next purchase.' }}</p>
+                {% include '@platform/partials/billing-fields.html.twig' with {billing_prefix: 'checkout-billing'} %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.button', {label: 'Continue to payment', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Back to My Cart</a>
@@ -73,7 +72,9 @@
             <h2 class="h4">Review my order</h2>
             {% for item in cart.items %}<p><strong>{{ item.title }}</strong> · {{ item.days }} days · {{ item.price_label }}</p>{% endfor %}
             <p class="h4">Total: {{ cart.total_label }}</p>
-            <p>{{ profile.first_name }} {{ profile.last_name }}<br>{{ profile.billing_address|nl2br }}</p>
+            <h3 class="h5">Billed to</h3>
+            {% include '@platform/partials/billing-address.html.twig' %}
+            <p><a href="/checkout/profile">Change billing details</a></p>
             <p>Payment: {{ checkout.payment_method == 'eft' ? 'EFT / bank transfer' : 'Card (simulated)' }}. <a href="/checkout/payment">Change</a></p>
             <p>{{ checkout.invoice_email ? 'Email my invoice and make it available in My Orders.' : 'Make my invoice available in My Orders.' }}</p>
             <form action="/checkout/place" method="post">
