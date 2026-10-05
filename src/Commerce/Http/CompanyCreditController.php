@@ -8,6 +8,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
 use CattoLearning\Commerce\Application\CommerceMaintenance;
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\View\ThemeRenderer;
@@ -87,9 +88,11 @@ final class CompanyCreditController extends BaseController
     {
         $actor=$this->requirePermission('COMPANY.CREDIT.MANAGE');
         return $this->handle(function() use($actor): Response {
-            $basket=$this->purchases->startCheckout($actor,$this->companyId($actor));
+            $companyId=$this->companyId($actor);
+            $basket=$this->purchases->startCheckout($actor,$companyId);
             if ($basket['items'] === []) $this->redirect('/company/credits/buy');
-            return $this->render('company-credit-checkout',['title'=>'Company credit checkout','active_nav'=>'company','basket'=>$basket]);
+            return $this->render('company-credit-checkout',['title'=>'Company credit checkout','active_nav'=>'company','basket'=>$basket,
+                'billing'=>$this->purchases->billingForm($actor,$companyId),'billing_fields'=>BillingDetails::formFields(false)]);
         },'/company/credits/buy');
     }
 
@@ -99,7 +102,7 @@ final class CompanyCreditController extends BaseController
         $this->requireCsrf(); $actor=$this->requirePermission('COMPANY.CREDIT.MANAGE');
         return $this->handle(function() use($actor): void {
             $id=$this->purchases->place($actor,$this->companyId($actor),(string)($_POST['purchase_key'] ?? ''),
-                (string)($_POST['quote'] ?? ''),(string)($_POST['billing_address'] ?? ''),
+                (string)($_POST['quote'] ?? ''),BillingDetails::forCompany($_POST),
                 (string)($_POST['payment_method'] ?? ''),(string)($_POST['method_token'] ?? ''),
                 ($_POST['invoice_email'] ?? '') === 'yes',($_POST['accept_terms'] ?? '') === 'yes');
             $this->maintenance->deliverInvoices(1);

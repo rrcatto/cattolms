@@ -16,6 +16,7 @@ The owner approved four ordered work steps, with a break for review after each: 
 | Tester grants | Course-first and person-first grants show status/expiry and history; ADMIN can revoke in context or deliberately email an invitation | Preserve the released workflow |
 | Company credits | Company checkout buys exact-match course/access-period credits; paid lines create credit lots; a linked request receives one allocation, enrolment and notices on successful immediate payment | Do not issue credits from unconfirmed EFT orders |
 | Payment operations | ADMIN can confirm exact full EFT payment with immutable evidence, review/release paid exceptions, and approve individual or unused company-credit refunds; credit notes and Account Funds entries are append-only, with immediate full individual item access revocation | Account Funds spending, payout, partial bank settlement and real gateways remain later work |
+| Billing profiles (Phase F, on 0.8.8.3) | One reusable billing profile per person and per company; both checkouts fill from and save to it; orders and their invoices, receipts and credit notes freeze a structured `billing` snapshot and render only from it | Editable document templates later consume the snapshot fields; VAT stays disabled and the tax number is informational |
 | Later commerce | Real gateway, funds, payouts, debt, gifts and broader academic history are not implemented | Scope separately after the approved steps |
 
 ## 1. Scope and authority

@@ -276,6 +276,8 @@ Implement one coherent commerce domain:
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
+**Billing profiles — Phase F, implemented on the 0.8.8.3 code line (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Editable invoice and receipt templates remain later work, and the structured snapshot is their input. Promo codes (Phase G) have not started.
+
 ## 3b. Course taxonomy and discovery
 
 **Current public architecture:** the platform component library owns the compact category picker (`form.tree-select`), the results workspace, complete tag browser and shared 24-card course results. Ordinary category browsing uses direct membership; keyword search includes descendants. The older stage records below describe how repository filtering developed, not a requirement for recursive public UI. `ux-ui-rules.md` sections 1.2a and 8 are the current implementation contract.

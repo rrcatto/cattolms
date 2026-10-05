@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
@@ -75,19 +76,23 @@ final class OrderService
         if ($this->records->hasPayableCourse($userId,(int)$offer['course_id'])) throw new RuntimeException('An existing order already contains this course.');
     }
 
-    /** Captures billing and consent evidence independently of mutable profile/course data.
+    /**
+     * Captures billing and consent evidence independently of mutable profile/course data. The
+     * billing details are copied into the order's snapshot as they are now; a replayed placement
+     * returns the existing order and its original snapshot.
+     *
      * @param array<string,mixed> $checkout
      */
-    public function place(CurrentUser $actor, int $cartId, string $quote, string $billingName, string $billingAddress, bool $accepted, array $checkout = []): int
+    public function place(CurrentUser $actor, int $cartId, string $quote, BillingDetails $billing, bool $accepted, array $checkout = []): int
     {
         self::requireCapability($actor,'COMMERCE.CHECKOUT.START');
-        return $this->transactions->run(function() use ($actor,$cartId,$quote,$billingName,$billingAddress,$accepted,$checkout): int {
+        return $this->transactions->run(function() use ($actor,$cartId,$quote,$billing,$accepted,$checkout): int {
             $this->records->lockPurchaser($actor->id);
             $existing=$this->records->orderForCart($cartId,$actor->id);
             if ($existing!==null) return (int)$existing['id'];
             $cart=$this->cart($actor);
             if ((int)$cart['id']!==$cartId || !hash_equals((string)$cart['quote'],$quote)) throw new RuntimeException('Your cart or prices changed. Review the updated checkout.');
-            if (!$accepted || trim($billingName)==='' || mb_strlen($billingName)>240 || mb_strlen($billingAddress)>2000) throw new RuntimeException('Enter your billing name and accept the purchase terms.');
+            if (!$accepted) throw new RuntimeException('Accept the purchase terms before placing your order.');
             if ($cart['items']===[]) throw new RuntimeException('Your cart is empty.');
             $total=Money::strictMinorUnits(0,'ZAR'); $lines=[];
             foreach($cart['items'] as $offer) {
@@ -98,7 +103,7 @@ final class OrderService
                 $lines[]=['variant_id'=>(int)$offer['id'],'course_id'=>(int)$offer['course_id'],'course_title'=>(string)$offer['title'],'revision_policy'=>'purchased_course_with_published_edits','access_period_seconds'=>(int)$offer['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>0,'fulfilment_type'=>'individual_access','terms_version'=>$this->policy->termsVersion,'activation_deadline_days'=>$this->policy->activationDeadlineDays];
             }
             $now=$this->clock->now();
-            $snapshot=['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,'billing_name'=>trim($billingName),'billing_address'=>trim($billingAddress),'items'=>$lines,'total_minor'=>$total->minorUnits,'currency'=>$total->currency,'payment_method'=>$checkout['payment_method'] ?? 'dummy','invoice_email'=>$checkout['invoice_email'] ?? false,'tax_enabled'=>false,'terms_version'=>$this->policy->termsVersion,'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false],'activation_deadline_days'=>$this->policy->activationDeadlineDays];
+            $snapshot=['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,'billing'=>$billing->toSnapshot(),'items'=>$lines,'total_minor'=>$total->minorUnits,'currency'=>$total->currency,'payment_method'=>$checkout['payment_method'] ?? 'dummy','invoice_email'=>$checkout['invoice_email'] ?? false,'tax_enabled'=>false,'terms_version'=>$this->policy->termsVersion,'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false],'activation_deadline_days'=>$this->policy->activationDeadlineDays];
             $id=$this->records->place($cartId,$actor->id,$total->minorUnits,$total->currency,$snapshot,$now->format(DATE_ATOM),$now->modify('+'.$this->policy->paymentDueDays.' days')->format(DATE_ATOM));
             foreach($lines as $line) $this->records->addOrderItem($id,$actor->id,$line);
             $this->records->document($id,'invoice','order:'.$id,$snapshot,$now->format(DATE_ATOM));

@@ -33,6 +33,8 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Company\CompanyService;
 use CattoLearning\Course\LearningService;
+use CattoLearning\Commerce\Application\BillingProfileService;
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Infrastructure\Persistence\UserProfileRepository;
 use CattoLearning\Support\ProfileImage;
 use CattoLearning\Support\SocialPlatform;
@@ -52,7 +54,8 @@ final class AccountController extends BaseController
         private readonly PlatformAdministrationService $platformAdministration,
         private readonly CompanyService $companies,
         private readonly AccountSectionRegistry $sections,
-        private readonly UserProfileRepository $profiles
+        private readonly UserProfileRepository $profiles,
+        private readonly BillingProfileService $billing
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -113,6 +116,23 @@ final class AccountController extends BaseController
         }, '/account/profile');
     }
 
+
+    /**
+     * The person's reusable billing details: who their invoices are made out to. Kept apart from
+     * the personal particulars above, and only ever the signed-in person's own: there is no user
+     * to choose. Orders already placed keep the billing details they were placed with.
+     */
+    #[Route('/account/profile/billing', name: 'account_update_billing', methods: ['POST'])]
+    public function updateBilling(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('ACCOUNT.PROFILE.EDIT');
+        return $this->handle(function () use ($user): void {
+            $this->billing->saveOwn($user, $_POST);
+            $this->flash('success', 'Your billing details were saved.');
+            $this->redirect('/account/profile#billing');
+        }, '/account/profile#billing');
+    }
 
     #[Route('/account/emails', name: 'account_emails', methods: ['GET'])]
     public function emails(): Response
@@ -462,8 +482,11 @@ final class AccountController extends BaseController
         // any other image, and the cache key changes when the image does because the address
         // carries the time it was stored.
         $image = $this->profiles->image($userId);
+        $profile = $this->auth->profile($userId);
         return [
-            'profile' => $this->auth->profile($userId),
+            'profile' => $profile,
+            'billing' => $this->billing->userForm($userId, $profile),
+            'billing_fields' => BillingDetails::formFields(true),
             'emails' => $this->auth->emails($userId),
             'company' => $this->companies->forUser($userId),
             'user_roles' => $user->roles,

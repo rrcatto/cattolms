@@ -14,7 +14,9 @@
         <p class="h4">Total: {{ basket.total_label }}</p>
         <form action="/company/credits/checkout" method="post">
             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="purchase_key" value="{{ basket.purchase_key }}"><input type="hidden" name="quote" value="{{ basket.quote }}">
-            {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company billing address', for: 'company-billing-address', required: true})} %}{% block control %}<textarea id="company-billing-address" name="billing_address" rows="3" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+            <h3 class="h5">Company billing details</h3>
+            <p>The invoice is made out to {{ basket.company.name }}, not to you. {{ billing.saved ? 'The company’s saved billing details are filled in; a correction here also updates them.' : 'These become the company’s saved billing details.' }}</p>
+            {% include '@platform/partials/billing-fields.html.twig' with {billing_prefix: 'company-checkout-billing'} %}
             {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: 'dummy', allow_eft: not basket.request_id} %}
             {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email the invoice to ' ~ user_email})} %}{% block control %}<input type="checkbox" name="invoice_email" value="yes">{% endblock %}{% endembed %}
             <p>Credits are specific to the course and access period shown. They are issued only after confirmed full payment. An unpaid order is cancelled after 7 days. Tax is not charged. For cancellation or refund assistance, <a href="/contact">contact us</a>.</p>

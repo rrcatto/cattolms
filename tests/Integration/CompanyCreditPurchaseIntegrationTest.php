@@ -16,7 +16,7 @@ use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,CompanyRepository,Database,TransactionManager};
 use CattoLearning\Support\Uuid;
-use CattoLearning\Tests\Support\{DevelopmentFixture,FakeMailer,IntegrationContainer};
+use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,IntegrationContainer};
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -57,7 +57,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $this->courseId=$this->fixture->createCourse($providerId,$providerIdCompany,'credit-course-'.$suffix,'Credit course','published');
         $this->variantId=$this->variant(86400,12345);
         $this->buyer=new CurrentUser($buyerId,Uuid::v4(),'credit-buyer-'.$suffix.'@example.test','Credit buyer',[],
-            ['COMPANY.CREDIT.MANAGE','COMPANY.REQUEST.MANAGE','COMMERCE.CHECKOUT.START','COMMERCE.ORDER.VIEW'],Uuid::v4());
+            ['COMPANY.CREDIT.MANAGE','COMPANY.REQUEST.MANAGE','COMPANY.BILLING.MANAGE','COMMERCE.CHECKOUT.START','COMMERCE.ORDER.VIEW'],Uuid::v4());
         $this->clock=new MockClock('2026-09-23T12:00:00+02:00');
         $this->records=new CommerceRepository($this->db);
         $tx=new TransactionManager($this->db);
@@ -69,7 +69,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyFulfilment,$this->analytics());
         $this->payments=new PaymentService($this->records,$tx,$this->orders,new OmnipayPaymentGatewayAdapter('test',$this->clock),$fulfilment,$transitions,$this->clock);
         $this->purchases=new CompanyCreditPurchaseService($this->records,$container->get(CompanyRepository::class),
-            $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock,$this->analytics());
+            $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock,$this->analytics(),BillingFixture::service($this->db,$this->clock));
     }
 
     /** Records into this test's transaction, stamped by this test's clock. */
@@ -112,12 +112,12 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $review=$this->purchases->review($this->buyer,$this->companyId);
         self::assertCount(3,$review['items']);
         self::assertSame(86035,$review['total_minor']);
-        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         self::assertSame('fulfilled',$this->records->order($id)['state']);
         self::assertSame(3,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$id]));
         self::assertSame([1,2,3],array_map('intval',$this->db->fetchFirstColumn('SELECT quantity FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id) ORDER BY quantity',['id'=>$id])));
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
-        self::assertSame($id,$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true));
+        self::assertSame($id,$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true));
         self::assertCount(1,$this->records->payments($id));
     }
 
@@ -135,8 +135,8 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertCount(1,$started,'Opening the company checkout again does not start it again.');
         $metadata=json_decode((string)$started[0]['metadata'],true);
         self::assertSame(['company',$this->companyId,3,86035],[$metadata['purchaser'],$metadata['company_id'],$metadata['line_count'],$metadata['total_minor']]);
-        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
-        $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
+        $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         $purchases=$this->db->fetchAllAssociative("SELECT course_id, order_item_id, user_id, metadata::text AS metadata FROM analytics_events WHERE event_type='course_purchased' AND order_id=:id ORDER BY order_item_id",['id'=>$id]);
         self::assertCount(3,$purchases,'One purchase per order line, each attributable to its course.');
         self::assertSame([$this->courseId,$this->courseId,$anotherCourse],array_map(static fn(array $row): int => (int)$row['course_id'],$purchases));
@@ -161,14 +161,14 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=price_minor_units+1 WHERE id=:id',['id'=>$this->variantId]);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('credits or prices changed');
-        $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
     }
 
     public function testUnpaidOrFailedCompanyOrderCreatesNoCredit(): void
     {
         $this->purchases->add($this->buyer,$this->companyId,$this->variantId,1);
         $review=$this->purchases->review($this->buyer,$this->companyId);
-        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','eft','',false,true);
+        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'eft','',false,true);
         self::assertSame('awaiting_payment',$this->records->order($id)['state']);
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$id]));
         $item=$this->records->items($id)[0];
@@ -183,7 +183,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         }
         $this->purchases->add($this->buyer,$this->companyId,$this->variantId,1);
         $review=$this->purchases->review($this->buyer,$this->companyId);
-        $failed=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_failure',false,true);
+        $failed=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_failure',false,true);
         self::assertSame('awaiting_payment',$this->records->order($failed)['state']);
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$failed]));
     }
@@ -202,7 +202,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $review=$this->purchases->review($this->buyer,$this->companyId);
         self::assertSame($request,$review['request_id']);
         self::assertSame($this->variantId,$review['items'][0]['variant_id']);
-        $order=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $order=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         self::assertSame('fulfilled',$this->records->order($order)['state']);
         $row=$this->db->fetchAssociative('SELECT cr.status,cr.enrolment_id,ca.credit_id,cc.commerce_order_item_id FROM course_requests cr JOIN course_credit_allocations ca ON ca.enrolment_id=cr.enrolment_id JOIN course_credits cc ON cc.id=ca.credit_id WHERE cr.id=:id',['id'=>$request]);
         self::assertIsArray($row);
@@ -224,12 +224,12 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $this->purchases->startForRequest($this->buyer,$this->companyId,$request);
         $review=$this->purchases->review($this->buyer,$this->companyId);
         try {
-            $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','eft','',false,true);
+            $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'eft','',false,true);
             self::fail('A request-linked purchase must use immediate payment.');
         } catch (RuntimeException $exception) {
             self::assertStringContainsString('immediate confirmed payment',$exception->getMessage());
         }
-        $order=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_failure',false,true);
+        $order=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_failure',false,true);
         $this->db->executeStatement("UPDATE course_requests SET status='rejected' WHERE id=:id",['id'=>$request]);
         $this->payments->purchase($this->buyer,$order,Uuid::v4(),'demo_success');
         self::assertSame('manual_review',$this->records->order($order)['state']);
@@ -252,7 +252,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
     {
         $this->purchases->add($this->buyer,$this->companyId,$this->variantId,2);
         $review=$this->purchases->review($this->buyer,$this->companyId);
-        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','eft','',false,true);
+        $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'eft','',false,true);
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$id]));
         $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,
             new FulfilmentService($this->records,IntegrationContainer::get()->get(TransitionService::class),$this->access,new TransactionManager($this->db),$this->orders,$this->clock,
@@ -267,11 +267,11 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
     {
         $this->purchases->add($this->buyer,$this->companyId,$this->variantId,2);
         $review=$this->purchases->review($this->buyer,$this->companyId);
-        $older=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $older=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=15000 WHERE id=:id',['id'=>$this->variantId]);
         $this->purchases->add($this->buyer,$this->companyId,$this->variantId,2);
         $review=$this->purchases->review($this->buyer,$this->companyId);
-        $newer=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],'Company address','dummy','demo_success',false,true);
+        $newer=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         $oldItem=$this->records->items($older)[0]; $newItem=$this->records->items($newer)[0];
         $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
         try {

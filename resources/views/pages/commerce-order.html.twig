@@ -9,6 +9,9 @@
         <p>Status: <strong>{{ order.state|replace({'_':' '})|capitalize }}</strong></p>
         {% for item in order.details.items %}<p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {% if order.company_id|default(null) %}{{ item.quantity }} credits · {% endif %}{{ item.price_label }}</p>{% endfor %}
         <p class="h4">Total: {{ total_label }}</p>
+        <h2 class="h5">Billed to</h2>
+        {% include '@platform/partials/billing-address.html.twig' %}
+        <p class="help">As recorded when the order was placed. Changing your billing details later does not change this order or its documents.</p>
         {% for document in order.documents %}
             <p>{{ ui('action.link', {label: 'View ' ~ (document.kind), variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
         {% endfor %}

@@ -434,6 +434,7 @@ final class ThemeRenderer
                 'courses' => 'COMPANY.COURSE.VIEW',
                 'training' => 'COMPANY.COURSE.VIEW',
                 'favourites' => 'COMPANY.COURSE.VIEW',
+                'billing' => 'COMPANY.BILLING.MANAGE',
             ];
 
             // Grouped exactly as Administration is, and for the same reason: eight destinations in
@@ -473,6 +474,12 @@ final class ThemeRenderer
                 if ($grandchildren === []) continue;
                 // The group heads to its own first entry, so the group itself is never a dead link.
                 $companyChildren[] = $child('company-group-'.$groupKey,$group['label'],$grandchildren[0]['href'],$group['icon'],$grandchildren);
+            }
+            // Billing details are about the company itself rather than its people or courses, so
+            // they stand on their own after the two groups.
+            if (isset($visibleCompanySections['billing'])) {
+                $billing = $visibleCompanySections['billing'];
+                $companyChildren[] = $child('company-billing',$billing['label'],$billing['route'],$billing['icon']);
             }
 
             $items[] = $item('company','Company','/company','▤',$active==='company',children:$companyChildren);

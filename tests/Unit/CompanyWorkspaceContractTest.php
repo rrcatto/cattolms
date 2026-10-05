@@ -29,7 +29,9 @@ final class CompanyWorkspaceContractTest extends TestCase
         // Performance joined them in v0.6: the platform course-performance report answers a question
         // about every learner on the platform, which is not a company administrator's to ask or to
         // see, so they have the same report scoped to their own staff.
-        self::assertSame(['dashboard','people','requests','enrolments','credits','courses','training','favourites','performance'], array_column($sections, 'key'));
+        // Billing details joined them in Phase F: who the company's invoices are made out to,
+        // company-owned data with its own capability.
+        self::assertSame(['dashboard','people','requests','enrolments','credits','courses','training','favourites','performance','billing'], array_column($sections, 'key'));
         foreach ($sections as $section) {
             self::assertStringStartsWith('/company/', $section['route']);
             self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);

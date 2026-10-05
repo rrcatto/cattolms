@@ -130,12 +130,13 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // 81 since v0.6: COURSE.TAG.MANAGE. Tags and categories are separate keys because they are separate
 // decisions - a tag is cross-cutting classification, a category is the catalogue's structure - and an
 // installation may well delegate one and not the other. 83 since v0.8.8.1: LEARNING.REVIEW.CREATE (a
-// learner rates and reviews a course) and COURSE.REVIEW.MANAGE (moderating those reviews).
-$need(count($permissionKeys) === 83, 'PermissionCatalog must define exactly 83 reserved/current secure actions for this release.');
+// learner rates and reviews a course) and COURSE.REVIEW.MANAGE (moderating those reviews). 84 with
+// COMPANY.BILLING.MANAGE: a company's billing details are company-owned data with their own authority.
+$need(count($permissionKeys) === 84, 'PermissionCatalog must define exactly 84 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 73, 'ACL catalogue must contain 10 SYSTEM and 73 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 74, 'ACL catalogue must contain 10 SYSTEM and 74 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);

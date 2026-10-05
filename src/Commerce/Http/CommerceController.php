@@ -5,7 +5,8 @@ namespace CattoLearning\Commerce\Http;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Application\PlatformAdministrationService;
-use CattoLearning\Commerce\Application\{OrderService,PaymentService,FulfilmentService,CartService,CheckoutService};
+use CattoLearning\Commerce\Application\{BillingProfileService,OrderService,PaymentService,FulfilmentService,CartService,CheckoutService};
+use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Support\{Csrf,Money,Pagination,Uuid};
@@ -23,7 +24,8 @@ final class CommerceController extends BaseController
         private readonly CartService $carts, private readonly CheckoutService $checkout,
         private readonly \CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer $pdfs,
         private readonly \CattoLearning\Commerce\Application\CommerceMaintenance $maintenance,
-        private readonly \CattoLearning\Configuration\RuntimeSettings $settings)
+        private readonly \CattoLearning\Configuration\RuntimeSettings $settings,
+        private readonly BillingProfileService $billing)
     { parent::__construct($auth,$view,$requests); }
 
     private function csrf(): void
@@ -82,7 +84,12 @@ final class CommerceController extends BaseController
         $step = (string) ($this->request()->attributes->get('step') ?? 'profile');
         if ($step !== 'profile' && !($state['profile_confirmed'] ?? false)) $this->redirect('/checkout/profile');
         if ($step === 'review' && !isset($state['payment_method'])) $this->redirect('/checkout/payment');
-        return $this->render('commerce-checkout', ['title'=>'Checkout', 'step'=>$step, 'cart'=>$cart, 'profile'=>$this->auth->profile($actor->id), 'checkout'=>$state]);
+        $profile = $this->auth->profile($actor->id);
+        $saved = $this->billing->forUser($actor->id);
+        return $this->render('commerce-checkout', ['title'=>'Checkout', 'step'=>$step, 'cart'=>$cart, 'profile'=>$profile, 'checkout'=>$state,
+            'billing'=>$this->billing->userForm($actor->id, $profile), 'billing_fields'=>BillingDetails::formFields(true),
+            // The review shows the billing profile placement will copy into the order.
+            'billing_lines'=>$saved === null ? [] : $saved->documentLines()]);
     }
 
     #[Route('/checkout/profile', name:'commerce_checkout_profile', methods:['POST'])]
@@ -91,7 +98,7 @@ final class CommerceController extends BaseController
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
         return $this->handle(function () use ($actor): void {
             $fields = [];
-            foreach (['first_name','last_name','mobile_number','billing_address','identification_number'] as $field) $fields[$field] = $this->posted($field);
+            foreach (array_merge(['first_name','last_name','mobile_number','identification_number'], array_keys(BillingDetails::LIMITS)) as $field) $fields[$field] = $this->posted($field);
             $this->checkout->saveProfile($actor, $fields);
             $this->redirect('/checkout/payment');
         }, '/checkout/profile');
@@ -141,7 +148,7 @@ final class CommerceController extends BaseController
         foreach($order['payments'] as $p) if (in_array($p['state'],['pending','created','paid'],true)) $canPay=false;
         foreach($order['details']['items'] as &$line) $line['price_label']=Money::strictMinorUnits((int)$line['line_total_minor'],(string)$line['currency'])->format();
         unset($line);
-        return $this->render('commerce-order',['title'=>'Order '.$id,'active_nav'=>'account','order'=>$order,'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->bankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
+        return $this->render('commerce-order',['title'=>'Order '.$id,'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->bankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
     }
 
     #[Route('/account/orders/{id}/pay',name:'commerce_pay',requirements:['id'=>'[0-9]+'],methods:['POST'])]

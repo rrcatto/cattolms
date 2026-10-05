@@ -1,0 +1,21 @@
+{#
+	The billing-profile fields: one definition for the account billing form, the checkout details
+	step, the company billing section and the company credit checkout, so a field cannot be added,
+	renamed or bounded differently on one of them. The field list (labels, lengths, required fields
+	and autocomplete tokens) comes from BillingDetails::formFields(); the server validates the same
+	rules, which is what actually decides.
+
+	Expects billing (values and whether they are saved), billing_fields, and billing_prefix to keep
+	ids unique when a page shows more than one form.
+#}
+{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+	{% for field in billing_fields %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: billing_prefix ~ '-' ~ field.name|replace({'_': '-'}), required: field.required, full_width: field.full_width, help: field.help})} %}
+{% block control %}
+<input id="{{ billing_prefix }}-{{ field.name|replace({'_': '-'}) }}" name="{{ field.name }}" value="{{ billing.values[field.name]|default('') }}" maxlength="{{ field.limit }}" autocomplete="{{ field.autocomplete }}"{% if field.name == 'country_code' %} pattern="[A-Za-z]{2}" size="4"{% endif %}{% if field.required %} required{% endif %} {{ ui_field_attrs(props) }}>
+{% endblock %}
+{% endembed %}
+	{% endfor %}
+{% endblock %}
+{% endembed %}

@@ -24,7 +24,8 @@ final class ProfileImageUiRenderTest extends TestCase
     {
         $profile = array_fill_keys(['first_name', 'middle_names', 'last_name', 'identification_number', 'birthdate', 'gender', 'mobile_number', 'display_name', 'certificate_name', 'full_name'], 'Example');
         $renderer = \CattoLearning\Application\CliBootstrap::boot()['container']->get(\CattoLearning\View\ThemeRenderer::class);
-        $html = $renderer->renderFragment('partials/account/profile', RenderHarness::hiveWith(['profile' => $profile, 'profile_image_size' => 256, 'profile_image_url' => '/example.png']));
+        $html = $renderer->renderFragment('partials/account/profile', RenderHarness::hiveWith(['profile' => $profile, 'profile_image_size' => 256, 'profile_image_url' => '/example.png',
+            'billing' => ['values' => \CattoLearning\Tests\Support\BillingFixture::personFields(), 'saved' => true], 'billing_fields' => \CattoLearning\Commerce\Domain\BillingDetails::formFields(true)]));
         $dom = self::dom($html);
         self::assertSame('change->profile-image#choose', $dom->evaluate('string(//input[@id="profile-image-file"]/@data-action)'));
         self::assertSame('input->profile-image#zoom', $dom->evaluate('string(//input[@id="profile-image-zoom"]/@data-action)'));

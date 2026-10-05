@@ -18,7 +18,7 @@ final class AccountSectionRegistry
             // Particulars, Email Addresses and Social Media, each its own page under a Profile
             // pop-out. They were one screen of three unrelated forms, and the personal particulars
             // form has grown an image since.
-            $this->s('profile','Personal Particulars','account','/account/profile','partials/account/profile.html.twig','Your name, identity details and profile image.'),
+            $this->s('profile','Personal Particulars','account','/account/profile','partials/account/profile.html.twig','Your name, identity details, billing details and profile image.'),
             $this->s('emails','Email Addresses','contact','/account/emails','partials/account/emails.html.twig','The addresses you sign in with.'),
             $this->s('social','Social Media','social','/account/social','partials/account/social.html.twig','Links to your profiles elsewhere.'),
             $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),

@@ -130,11 +130,11 @@ final class UserRepository
         $values = [];
         foreach ([
             'first_name', 'middle_names', 'last_name', 'identification_number', 'gender',
-            'mobile_number', 'display_name', 'certificate_name', 'billing_address'
+            'mobile_number', 'display_name', 'certificate_name'
         ] as $field) {
             if (array_key_exists($field, $data)) {
                 $value = trim((string) $data[$field]);
-                $values[$field] = in_array($field, ['middle_names', 'billing_address'], true)
+                $values[$field] = $field === 'middle_names'
                     ? $value
                     : ($value !== '' ? $value : null);
             }
