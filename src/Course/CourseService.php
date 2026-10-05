@@ -53,6 +53,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Popularity\CoursePopularityRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
@@ -87,7 +88,8 @@ final class CourseService
         private readonly CourseHtml $courseHtml,
         private readonly LegacyHtmlCourseImporter $importer,
         private readonly CourseItemService $courseItems,
-        private readonly CourseReviewRepository $reviews
+        private readonly CourseReviewRepository $reviews,
+        private readonly CoursePopularityRepository $popularity
     ) {
     }
 
@@ -415,61 +417,42 @@ final class CourseService
         return $this->decorateCatalogue($this->courses->featuredPublishedCourses($limit));
     }
 
-    /** How many courses a catalogue may hold before the showcase stops paging and starts sampling. */
-    public const SHOWCASE_LOOP_CEILING = 90;
+    /** How many courses the home page's Popular Courses loads with the page and rotates through. */
+    public const POPULAR_POOL_SIZE = 16;
 
-    /** How many courses the home page showcases at a time. */
-    public const SHOWCASE_SIZE = 9;
+    /** How many of them are shown at a time: one row of the catalogue course grid on a wide screen. */
+    public const POPULAR_GROUP_SIZE = 4;
+
+    /** Seconds each group stays before the next is shown. */
+    public const POPULAR_ROTATION_SECONDS = 20;
 
     /**
-     * The home page showcase: a window onto the published catalogue that moves on each refresh.
+     * The home page's popular-course pool, best first, ready for course cards.
      *
-     * Two behaviours, and which one applies is a property of the catalogue rather than a setting.
-     * Up to SHOWCASE_LOOP_CEILING courses the window pages through them in order and wraps, so a
-     * reader watching for a while sees all of them and sees each one once per lap. Beyond that
-     * paging would take too many laps to be worth calling a showcase, so the window lands somewhere
-     * random instead. Owner's instruction, 2026/09/12.
+     * The stored popularity ranking comes first (CoursePopularityRepository, which only returns
+     * published courses with a score above zero; nothing is calculated here). When it holds fewer
+     * than the pool needs, the newest published courses fill the rest, skipping any already in the
+     * pool. Fallback courses are ordinary cards: no score is invented for them. Two bounded
+     * queries for the course rows, then the usual batched card decoration.
      *
-     * The random case moves the window rather than shuffling rows: `ORDER BY random()` sorts the
-     * whole matching set to take nine of it, which on a large catalogue is a full scan and sort on
-     * every refresh of a public page. Choosing the offset costs nothing and the deferred-join
-     * pagination underneath is already indexed for it.
-     *
-     * @return array{courses:list<array<string,mixed>>,cycle:int,total:int,looping:bool}
+     * @return list<array<string,mixed>>
      */
-    public function showcaseCourses(int $cycle, int $limit = self::SHOWCASE_SIZE): array
+    public function popularCoursePool(int $size = self::POPULAR_POOL_SIZE): array
     {
-        $limit = max(1, $limit);
-        $total = $this->courses->publishedCoursesCount(CatalogueFilter::none());
-        $cycle = max(0, $cycle);
-
-        if ($total <= $limit) {
-            // Everything fits, so there is nothing to move: the same set every time is correct.
-            return [
-                'courses' => $this->decorateCatalogue($this->courses->publishedCourses(CatalogueFilter::none(), $limit, 0)),
-                'cycle' => 0,
-                'total' => $total,
-                'looping' => true,
-            ];
+        $size = max(1, $size);
+        $ranked = array_column($this->popularity->popularCourses($size), 'course_id');
+        $pool = $this->courses->publishedCoursesByIds(array_map('intval', $ranked));
+        if (count($pool) < $size) {
+            $taken = array_flip(array_map(static fn(array $course): int => (int) $course['id'], $pool));
+            // Enough newest courses that, after skipping the ones already taken, the pool can fill.
+            foreach ($this->courses->publishedCourses(CatalogueFilter::none(), $size + count($pool), 0) as $course) {
+                if (count($pool) >= $size) { break; }
+                if (isset($taken[(int) $course['id']])) { continue; }
+                $pool[] = $course;
+                $taken[(int) $course['id']] = true;
+            }
         }
-
-        $looping = $total <= self::SHOWCASE_LOOP_CEILING;
-        if ($looping) {
-            $pages = (int) ceil($total / $limit);
-            $offset = ($cycle % max(1, $pages)) * $limit;
-            // The last page of an uneven division would show fewer than a full row, so it is pulled
-            // back to end flush against the final course instead.
-            $offset = min($offset, max(0, $total - $limit));
-        } else {
-            $offset = random_int(0, $total - $limit);
-        }
-
-        return [
-            'courses' => $this->decorateCatalogue($this->courses->publishedCourses(CatalogueFilter::none(), $limit, $offset)),
-            'cycle' => $cycle + 1,
-            'total' => $total,
-            'looping' => $looping,
-        ];
+        return $this->decorateCards($this->decorateCatalogue(array_slice($pool, 0, $size)));
     }
 
     /**

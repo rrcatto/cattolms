@@ -109,3 +109,23 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-reviews.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-review-fixture.php cleanup'
 ```
+
+## Popular courses
+
+`popular-courses.cjs` checks the home page's rotating Popular Courses in Chromium and Firefox and
+without JavaScript (13 checks): groups change every interval in order and cycle back with no
+request to the server; Pause and Resume work from the keyboard and keep focus on the control; the
+pointer over the grid or focus inside it holds the current group, and Tab never reaches a hidden
+group; reduced motion starts paused and changes groups without the fade; a favourite star keeps
+its state across a full cycle; a card link opens its course; one group is one row of four cards
+at 1440px and the page does not scroll sideways at 390px; and without JavaScript the first group
+is shown and nothing else. Time is Playwright's fake clock, so the 20-second interval is jumped
+rather than waited for. The cards are whatever the development database's popularity snapshot
+holds, so run `php bin/console popularity:recalculate` first on a fresh database.
+`popular-courses-fixture.php` creates the signed-in learner whose favourites it toggles.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/popular-courses-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/popular-courses.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/popular-courses-fixture.php cleanup'
+```

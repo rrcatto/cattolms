@@ -126,28 +126,15 @@ final class CourseController extends BaseController
      *
      * Every catalogue surface needs this and each one was doing it for itself, which is how the
      * category fragment previously omitted it: its stars rendered empty however many
-     * favourites the reader had.
+     * favourites the reader had. CourseFavouriteService::markFavourites() is the one
+     * implementation, shared with the home page.
      *
      * @param list<array<string,mixed>> $courses
      * @return list<array<string,mixed>>
      */
     private function withFavourites(array $courses): array
     {
-        $user = $this->currentUser();
-        if ($user === null || $courses === []) {
-            return $courses;
-        }
-
-        $favourites = [];
-        foreach ($this->platformAdministration->favourites($user->id) as $item) {
-            $favourites[(int) $item['id']] = true;
-        }
-        foreach ($courses as &$course) {
-            $course['is_favourite'] = isset($favourites[(int) $course['id']]);
-        }
-        unset($course);
-
-        return $courses;
+        return $this->favourites->markFavourites($this->currentUser()?->id, $courses);
     }
 
     #[Route('/courses/favourite', name: 'course_toggle_favourite', methods: ['POST'])]

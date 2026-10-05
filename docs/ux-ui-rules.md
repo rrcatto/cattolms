@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8 (development) **Date time:** 2026/09/18 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8 (development) **Date time:** 2026/10/05 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -171,7 +171,7 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.8 Social marks.** Brand glyphs in the core sprite as `social-<key>`, keyed to `SocialPlatform` so a mark and a link cannot disagree about which service they name. These are the one exception to rule 5.3's stroked style: a brand mark is a solid shape, and outlining one leaves the letterforms inside Facebook and LinkedIn with no interior. The sprite carries `symbol[id^="social-"] { fill: currentColor; stroke: none }` for exactly that reason.
 
-**6.9 Course showcase.** The home page shows nine courses and changes them every fifteen seconds, swapping only the showcase region rather than reloading the page. Up to ninety published courses the window pages through them in order and wraps, so every course is seen once per lap; beyond ninety it lands somewhere random instead, because paging would take too many laps to be a showcase. The nine arrive with the page, so a reader without JavaScript sees a full showcase that simply does not move. Core class: `#course-showcase`, partial `partials/course-showcase.html.twig`.
+**6.9 Popular courses.** The home page shows Popular Courses (owner instruction, 2026/10/05, replacing the nine-course showcase). The server loads one pool of sixteen courses with the page: the stored popularity ranking first, topped up with the newest published courses when the ranking holds fewer, never the same course twice and never a course that is not published. The pool arrives whole as four groups of the shared catalogue course grid, each card the ordinary course card with its rating and favourite star. One group shows at a time, the highest-ranked first; the `popular-courses` controller shows the next every twenty seconds with a short fade and cycles back, without requesting anything from the server. Rotation waits while the pointer is over the grid, while focus is inside it and while the tab is in the background, so a card never disappears under a reader; Pause and Resume are real buttons, rendered hidden and revealed by the controller, and focus stays on the control that replaces the one pressed. A reader who prefers reduced motion starts paused and sees groups change without the fade. Groups not shown carry the `hidden` attribute, so they are out of sight, out of the tab order and out of the accessibility tree. Without JavaScript the first group simply stays. A card on the home page is not a course view. Core hooks: `#popular-courses`, `#popular-courses-groups`, `[data-popular-courses-target="group"]`; settings in `CourseService::POPULAR_*`. → Enforced by `HomePopularCoursesPageTest`, `PopularCoursePoolIntegrationTest` and `tests/Browser/popular-courses.cjs`.
 
 **6.10 Tag cloud.** The tags page shows its tags on arrival. Nothing is folded away behind a disclosure or an accordion: the page exists to show the tags, so making the reader open something first is the one thing it must not do. The animated sphere is decoration over the list, never a replacement for it.
 
@@ -274,6 +274,10 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/05 SAST
+
+- 6.9: Popular Courses replaces the nine-course showcase: a sixteen-course pool rotated in the browser four at a time, pausable, held while in use, and still on reduced motion.
 
 2026/09/12 SAST — third pass
 

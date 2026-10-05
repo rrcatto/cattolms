@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.2';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.3';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,

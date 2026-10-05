@@ -76,8 +76,29 @@
 
 {% endblock %}
 {% endembed %}
-		{% if published_course_count > 0 %}
-			{% include '@platform/partials/course-showcase.html.twig' %}
+		{#
+			Popular Courses: every group of the pool arrives with the page and the popular-courses
+			controller shows one at a time. Groups after the first are `hidden`, so they are neither
+			seen nor reachable by keyboard or assistive technology until shown; without JavaScript
+			the first group, the highest ranked, simply stays. Pause and Resume are rendered hidden
+			and the controller reveals whichever applies: without it there is no rotation to pause.
+		#}
+		{% if popular_groups %}
+			{{ importmap() }}
+			<section class="cl-popular-courses" id="popular-courses" aria-roledescription="carousel" aria-label="Popular courses"
+			         data-controller="popular-courses" data-popular-courses-interval-value="{{ popular_rotation_seconds }}">
+				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Popular courses', summary: 'A changing selection of the courses learners are choosing.'})} %}
+{% block section_actions %}{% if popular_groups|length > 1 %}{{ ui('action.button', {label: 'Pause rotation', type: 'button', icon: 'action-pause', hidden: true, id: 'popular-courses-pause', controls: 'popular-courses-groups', stimulus_action: 'popular-courses#pause'}) }}{{ ui('action.button', {label: 'Resume rotation', type: 'button', icon: 'action-play', hidden: true, id: 'popular-courses-resume', controls: 'popular-courses-groups', stimulus_action: 'popular-courses#resume'}) }}{% endif %}{% endblock %}
+{% endembed %}
+				<div id="popular-courses-groups" aria-live="polite"
+				     data-action="mouseenter->popular-courses#suspend mouseleave->popular-courses#release focusin->popular-courses#suspend focusout->popular-courses#release">
+					{% for group in popular_groups %}
+						<div class="cl-popular-courses-group" role="group" aria-roledescription="slide" aria-label="{{ loop.index }} of {{ popular_groups|length }}" data-popular-courses-target="group"{% if not loop.first %} hidden{% endif %}>
+							{{ ui('catalogue.course-grid', {courses: group}) }}
+						</div>
+					{% endfor %}
+				</div>
+			</section>
 		{% else %}
 			{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'Courses are being prepared', summary: 'Published courses will appear here as soon as they are ready.'})} %}
 {% block actions %}

@@ -26,6 +26,26 @@ final class CourseFavouriteService
     ) {
     }
 
+    /**
+     * Marks each course card with whether this person favourites it, for drawing its star. With
+     * nobody signed in every card is left as it is.
+     *
+     * @param list<array<string,mixed>> $courses
+     * @return list<array<string,mixed>>
+     */
+    public function markFavourites(?int $userId, array $courses): array
+    {
+        if ($userId === null || $courses === []) {
+            return $courses;
+        }
+        $favourites = array_flip($this->favourites->favouriteCourseIds($userId, array_map(static fn(array $course): int => (int) $course['id'], $courses)));
+        foreach ($courses as &$course) {
+            $course['is_favourite'] = isset($favourites[(int) $course['id']]);
+        }
+        unset($course);
+        return $courses;
+    }
+
     /** @return bool whether the request changed anything */
     public function set(int $userId, int $courseId, bool $favourite, AnalyticsSource $source): bool
     {

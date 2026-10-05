@@ -1,9 +1,0 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 3, section_spacing: true})} %}
-{% block body %}
-
-	{% for course in showcase_courses %}
-		{% include '@platform/partials/course-card.html.twig' %}
-	{% endfor %}
-
-{% endblock %}
-{% endembed %}

@@ -11,6 +11,8 @@ Description:
 Handles web requests for home operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/04 SAST
+- Popular Courses replaces the course showcase: one bounded pool rotated in the browser, so the unused /courses/showcase fragment route is gone.
 2026/08/23 04:19 SAST
 - Threaded the Seed Database data universe through this file so every business read states which universe it means.
 2026/08/20 20:02 SAST
@@ -29,16 +31,13 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use CattoLearning\Course\CatalogueFilter;
-use Symfony\Component\HttpFoundation\RequestStack;
-use CattoLearning\Course\CourseService;
-use Symfony\Component\Routing\Attribute\Route;
-
-use CattoLearning\View\ThemeRenderer;
-
 use CattoLearning\Auth\AuthService;
-
+use CattoLearning\Course\CourseFavouriteService;
+use CattoLearning\Course\CourseService;
+use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class HomeController extends BaseController
 {
@@ -46,7 +45,8 @@ final class HomeController extends BaseController
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
-        private readonly CourseService $courses
+        private readonly CourseService $courses,
+        private readonly CourseFavouriteService $favourites
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -54,42 +54,25 @@ final class HomeController extends BaseController
     /**
      * Renders the public home page.
      *
-     * The featured set and the published-course total are two separate bounded queries. This
-     * page previously built the entire published catalogue in order to display six cards and a
-     * count, so its cost grew with every course published while its output never changed.
+     * Popular Courses arrives whole with the page: one bounded pool from the stored popularity
+     * ranking, topped up with the newest published courses, split into the groups the browser
+     * rotates through. Rotation is client-side, so the page makes no further request for it, and
+     * without JavaScript the first group (the highest ranked) is simply the one shown. Nothing here
+     * calculates popularity or records a course view: a card on the home page is not a view.
      */
     #[Route('/', name: 'home_index', methods: ['GET'])]
     public function index(): Response
     {
-        $showcase = $this->courses->showcaseCourses(0);
+        $user = $this->currentUser();
+        $pool = $this->favourites->markFavourites($user?->id, $this->courses->popularCoursePool());
 
         return $this->render('home', [
             'title' => 'Practical self-study courses',
-            'showcase_courses' => $showcase['courses'],
-            'showcase_cycle' => $showcase['cycle'],
-            'published_course_count' => $showcase['total'],
-        ]);
-    }
-
-    /**
-     * The showcase region on its own, for the fifteen-second refresh.
-     *
-     * A fragment rather than a page: htmx replaces the region and nothing else, so the rest of the
-     * home page - including anything the reader is part way through - is left alone.
-     *
-     * The cycle arrives in the query string because the region's own markup put it there. It is
-     * untrusted and needs no validation beyond becoming an integer: it only ever decides which
-     * window of the published catalogue is shown, never what a reader may see. Every course in the
-     * result is published, whatever number is supplied.
-     */
-    #[Route('/courses/showcase', name: 'home_course_showcase', methods: ['GET'], priority: 10)]
-    public function courseShowcase(): Response
-    {
-        $showcase = $this->courses->showcaseCourses((int) ($_GET['cycle'] ?? 0));
-
-        return $this->renderFragment('partials/course-showcase', [
-            'showcase_courses' => $showcase['courses'],
-            'showcase_cycle' => $showcase['cycle'],
+            'popular_groups' => array_chunk($pool, CourseService::POPULAR_GROUP_SIZE),
+            'popular_course_count' => count($pool),
+            'popular_rotation_seconds' => CourseService::POPULAR_ROTATION_SECONDS,
+            'can_favourite' => $user !== null,
+            'favourite_return' => '/',
         ]);
     }
 
