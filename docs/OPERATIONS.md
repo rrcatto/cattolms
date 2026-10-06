@@ -1,10 +1,10 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.5 **Date time:** 2026/10/06 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.6 **Date time:** 2026/10/06 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.8.5 operational position
+## Current v0.8.8.6 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.5` is on GitHub `main` and published as a GitHub release with the source zip (v0.8.8.4 has its own release). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.6` is on GitHub `main` and published as a GitHub release with the source zip (v0.8.8.4 and v0.8.8.5 have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
 - **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/06 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 88 permissions (10 `SYSTEM.*`, 78 business) across the five roles.
 - **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below.
@@ -53,6 +53,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.3:** home page Popular Courses. Publish `catto-platform.css`, `nav-icons.svg` (`action-pause`, `action-play`) and compiled `assets/` (the `popular-courses` controller). Without a popularity snapshot it shows the newest published courses.
 - **v0.8.8.4:** billing profiles, promo codes, course bundles and independent entitlement sources, as migrations `20261005100000_create_billing_profiles`, `20261006100000_create_promotions`, `20261007100000_create_bundles` and `20261007110000_create_entitlement_sources`. Publish `catto-platform.css`.
 - **v0.8.8.5:** the 25 migrations above consolidated into the one canonical baseline; rebuild the database (see above).
+- **v0.8.8.6:** copy the new `public_html/index.php` to the served web root. The front controller reads `APP_CODEBASE_PATH` as a `.env` file, so comments in the instance `.env` no longer stop the site loading; before it, a `#` comment containing brackets made every page answer "Application dependencies are missing."
 
 ### Commerce operations
 

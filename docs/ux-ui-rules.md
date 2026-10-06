@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8.8.5 (development) **Date time:** 2026/10/06 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8.8.6 (development) **Date time:** 2026/10/06 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
