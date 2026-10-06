@@ -1,6 +1,6 @@
 # Platform UI component guide
 
-**LMS:** 0.8.8.4 · **Updated:** 2026-10-06 · **Registry:** 34 components in `src/View/Ui/PlatformUi.php`
+**LMS:** 0.8.8.5 · **Updated:** 2026-10-06 · **Registry:** 34 components in `src/View/Ui/PlatformUi.php`
 
 CattoLMS reusable UI structures are platform components. A page may not independently implement a job already represented by a canonical component. Extend the component and its contract test instead of forking markup.
 

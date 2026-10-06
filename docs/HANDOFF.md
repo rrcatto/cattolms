@@ -1,6 +1,10 @@
-# Catto Learning 0.8.8.4 — Development Handoff
+# Catto Learning 0.8.8.5 — Development Handoff
 
-## Current development handoff — 2026/10/06 (v0.8.8.4)
+## Current development handoff — 2026/10/06 (v0.8.8.5)
+
+The owner asked for the migrations to be replaced in Git by the one canonical file and for the released zip to be updated, and chose a new version rather than moving the published `v0.8.8.4` tag. v0.8.8.5 is commit `511627b` (the consolidated baseline and refreshed documentation, pushed to `main`) plus the version alignment. It has an annotated tag and GitHub release `v0.8.8.5` with `cattolms-v0.8.8.5.zip`. v0.8.8.4 and its release are unchanged. The single-baseline details, its equivalence proof and the database rebuild are recorded under "One canonical migration" below. Gates: `composer qa` (926 PHPUnit tests) on the rebuilt database, release and UI-contract validation, Composer validation and `git diff --check`. No UI changed, so no browser checks were rerun.
+
+## v0.8.8.4 handoff — 2026/10/06
 
 The owner authorized v0.8.8.4, a commit, a direct `main` push and an annotated tag. It releases Phase G (promo codes), Phase H (course bundles) and independent entitlement sources, on Phase F (billing profiles), which was already on `main` after the v0.8.8.3 tag. The sections below describe each. Gates: `SHELL_VERBOSITY=-1 composer qa` with a cold cache (926 PHPUnit tests), Twig lint of 215 templates, Composer validation, AssetMapper compilation, `git diff --check`, both all-theme browser matrices (72 and 30 checks), and the Popular Courses (13), course reviews (9), Course Content tree (41), billing profiles (10), promo codes (9) and course bundles (8) browser checks passed. Git publication did not deploy the VPS; 0.5.8.3 remains the accepted VPS version. Reports: workspace `REPORTS/billing-profiles-2026-10-05.md`, `promotions-2026-10-06.md`, `bundles-2026-10-06.md` and `entitlement-sources-2026-10-06.md`. The version is published as the GitHub release `v0.8.8.4` with its source zip (`cattolms-v0.8.8.4.zip`); from now on every pushed version gets a release with its zip (`OPERATIONS.md`, "Publishing a release").
 

@@ -1,8 +1,11 @@
 # Changelog
 
-**LMS version:** 0.8.8.4 **Date time:** 2026/10/06 SAST
+**LMS version:** 0.8.8.5 **Date time:** 2026/10/06 SAST
 
-## 2026-10-06 SAST — One canonical migration and current documentation (on 0.8.8.4)
+## 2026-10-06 SAST — v0.8.8.5 One canonical migration and current documentation
+
+- **Release.** Version aligned to 0.8.8.5 at the owner's choice, so v0.8.8.4 and its release stay as published. `composer qa` (926 PHPUnit tests) passed on a database rebuilt from the canonical baseline, along with release and UI-contract validation and `git diff --check`. Published as GitHub release `v0.8.8.5` with `cattolms-v0.8.8.5.zip`.
+
 
 - **Schema.** On the owner's instruction the 25 development migrations are consolidated into one canonical baseline, `database/migrations/20261006120000_create_v088_baseline.php`.
   - Every table, function, trigger and index is created in its final form, along with the reference data: roles, permissions and grants, app options, document numbers, the System company, and the 369 built-in categories with their generated icons.

@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/06 (v0.8.8.4)
+## Current delivery position — 2026/10/06 (v0.8.8.5)
 
-**Current LMS version:** 0.8.8.4 · **Date:** 2026/10/06 SAST · tag `v0.8.8.4` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.8.5 · **Date:** 2026/10/06 SAST · tag `v0.8.8.5` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.5 | One canonical baseline migration replacing the 25 development migrations; refreshed documentation |
 | 0.8.8.4 | Promo codes (Phase G), course bundles (Phase H) and independent entitlement sources, on billing profiles (Phase F) |
 | 0.8.8.3 | Rotating Popular Courses on the home page |
 | 0.8.8.2 | Course popularity engine and ADMIN popularity report |
