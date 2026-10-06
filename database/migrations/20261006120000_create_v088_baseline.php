@@ -14,6 +14,7 @@ Changelog:
 2026/10/06 SAST
 - Consolidated all 25 development migrations into this one canonical baseline, on the owner's instruction: company favourites, generated artwork, profile images and social links, the removed company type, commerce (carts, orders, documents, payments, entitlements, company credit purchases, payment administration and refunds), authenticated session email, Downloadable File items, public section previews, analytics events, course reviews, course popularity, billing profiles, promo codes, course bundles and independent entitlement sources. Each table is created in its final form; the incremental migrations and their one-off data conversions are gone.
 - Records the bundled Factory Reset 2.0.1 as the default active theme directly.
+- Adds the shared document templates (document_templates, document_template_versions, the immutability guard and the DOCUMENT.TEMPLATE.VIEW/MANAGE permissions) and publishes each document type's source default as its current template (Phase I).
 2026/09/20 SAST
 - Rebased the disposable development schema for first-class reusable Course Items, separate course placements and sections, the Resource Library, tracked shortcodes, placement-relative availability and assessment-only progress.
 - Removed the obsolete module/content-block/course-assessment/course-media/module-progress schema and the unused course revision and editable grading-weight columns.
@@ -58,6 +59,8 @@ Changelog:
 
 declare(strict_types=1);
 
+use CattoLearning\Document\DocumentTemplateDefaults;
+use CattoLearning\Document\DocumentType;
 use CattoLearning\View\Artwork\ArtworkGenerator;
 use Phinx\Migration\AbstractMigration;
 
@@ -345,7 +348,9 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('PLATFORM.PROMOTION.VIEW','ViewPromotions','Commerce · Platform','View promotions, their promo codes and their usage when Commerce is installed.'),
     ('PLATFORM.PROMOTION.MANAGE','ManagePromotions','Commerce · Platform','Create, change, activate and deactivate promotions, and delete unused ones, when Commerce is installed.'),
     ('BUNDLE.MANAGEMENT.VIEW','ViewBundleManagement','Bundles','View course bundles, their composition, offers and sales in Administration.'),
-    ('BUNDLE.MANAGE','ManageBundles','Bundles','Create, compose, price, publish and retire course bundles, and delete unused drafts.');
+    ('BUNDLE.MANAGE','ManageBundles','Bundles','Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
+    ('DOCUMENT.TEMPLATE.VIEW','ViewDocumentTemplates','Documents','View document templates, their versions and previews.'),
+    ('DOCUMENT.TEMPLATE.MANAGE','ManageDocumentTemplates','Documents','Create document templates, edit drafts, publish versions and start drafts from earlier versions.');
 
 CREATE TABLE role_permissions (
     role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
@@ -2657,6 +2662,92 @@ CREATE TABLE course_popularity (
 CREATE INDEX course_popularity_rank_idx ON course_popularity (score DESC, course_id);
 CREATE INDEX course_popularity_run_idx ON course_popularity (run_id);
 
+-- Document templates: ADMIN-editable HTML and CSS for generated documents (certificates, invoices,
+-- receipts, credit notes), in one model for every document type. A template has versions; ADMIN
+-- edits the one draft, and publishing fixes it for ever. Generated documents name the exact
+-- version they were rendered from, so an old document can be rendered again exactly as it was.
+CREATE TABLE document_templates (
+    id BIGSERIAL PRIMARY KEY,
+    document_type VARCHAR(32) NOT NULL CHECK (document_type IN ('certificate','invoice','receipt','credit_note')),
+    name VARCHAR(120) NOT NULL CHECK (btrim(name) <> ''),
+    description VARCHAR(1000) NULL CHECK (description IS NULL OR btrim(description) <> ''),
+    status VARCHAR(16) NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+    -- The template documents of this type are generated from: one per type.
+    is_current BOOLEAN NOT NULL DEFAULT FALSE,
+    -- The latest published version, which is what the current template renders.
+    published_version_id BIGINT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Null for the defaults the installation provides.
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT document_templates_current_is_published CHECK (NOT is_current OR (published_version_id IS NOT NULL AND status = 'active'))
+);
+CREATE UNIQUE INDEX document_templates_one_current_per_type ON document_templates (document_type) WHERE is_current;
+CREATE UNIQUE INDEX document_templates_type_name_key ON document_templates (document_type, lower(name));
+CREATE INDEX document_templates_list_idx ON document_templates (document_type, status, name, id);
+
+CREATE TABLE document_template_versions (
+    id BIGSERIAL PRIMARY KEY,
+    template_id BIGINT NOT NULL REFERENCES document_templates(id) ON DELETE RESTRICT,
+    version_number INTEGER NOT NULL CHECK (version_number > 0),
+    state VARCHAR(16) NOT NULL CHECK (state IN ('draft','published')),
+    html TEXT NOT NULL CHECK (char_length(html) <= 200000),
+    css TEXT NOT NULL DEFAULT '' CHECK (char_length(css) <= 100000),
+    -- Page settings from a controlled list; the renderer turns them into the page box.
+    page_size VARCHAR(16) NOT NULL CHECK (page_size IN ('A4','A5','Letter','Legal')),
+    page_orientation VARCHAR(16) NOT NULL CHECK (page_orientation IN ('portrait','landscape')),
+    margin_top_mm SMALLINT NOT NULL CHECK (margin_top_mm BETWEEN 0 AND 50),
+    margin_right_mm SMALLINT NOT NULL CHECK (margin_right_mm BETWEEN 0 AND 50),
+    margin_bottom_mm SMALLINT NOT NULL CHECK (margin_bottom_mm BETWEEN 0 AND 50),
+    margin_left_mm SMALLINT NOT NULL CHECK (margin_left_mm BETWEEN 0 AND 50),
+    change_note VARCHAR(500) NULL CHECK (change_note IS NULL OR btrim(change_note) <> ''),
+    -- The version this one was started from, when it was.
+    based_on_version_id BIGINT NULL REFERENCES document_template_versions(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    published_at TIMESTAMPTZ NULL,
+    published_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT document_template_versions_number_key UNIQUE (template_id, version_number),
+    CONSTRAINT document_template_versions_published_whole CHECK ((state = 'published') = (published_at IS NOT NULL))
+);
+-- One draft per template: ADMIN edits it until it is published or discarded.
+CREATE UNIQUE INDEX document_template_versions_one_draft ON document_template_versions (template_id) WHERE state = 'draft';
+CREATE INDEX document_template_versions_based_on_fk_idx ON document_template_versions (based_on_version_id);
+
+ALTER TABLE document_templates ADD CONSTRAINT document_templates_published_version_fkey
+    FOREIGN KEY (published_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
+CREATE INDEX document_templates_published_version_fk_idx ON document_templates (published_version_id);
+
+-- A published version never changes and is never deleted: a document generated from it must be
+-- reproducible. A draft may be edited or discarded; publishing it is its last change.
+CREATE FUNCTION document_template_version_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF OLD.state = 'published' THEN
+        -- The one change allowed: a deleted account's reference cleared by its foreign key. The
+        -- version itself - its content, settings, number and dates - stays exactly as published.
+        IF TG_OP = 'UPDATE'
+           AND (to_jsonb(NEW) - ARRAY['created_by_user_id','updated_by_user_id','published_by_user_id'])
+               = (to_jsonb(OLD) - ARRAY['created_by_user_id','updated_by_user_id','published_by_user_id'])
+           AND (NEW.created_by_user_id IS NULL OR NEW.created_by_user_id IS NOT DISTINCT FROM OLD.created_by_user_id)
+           AND (NEW.updated_by_user_id IS NULL OR NEW.updated_by_user_id IS NOT DISTINCT FROM OLD.updated_by_user_id)
+           AND (NEW.published_by_user_id IS NULL OR NEW.published_by_user_id IS NOT DISTINCT FROM OLD.published_by_user_id) THEN
+            RETURN NEW;
+        END IF;
+        RAISE EXCEPTION 'A published document template version cannot be changed or deleted; start a new draft';
+    END IF;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+    IF NEW.template_id IS DISTINCT FROM OLD.template_id OR NEW.version_number IS DISTINCT FROM OLD.version_number THEN
+        RAISE EXCEPTION 'A document template version keeps its template and number';
+    END IF;
+    RETURN NEW;
+END;
+$fn$;
+CREATE TRIGGER document_template_version_immutable BEFORE UPDATE OR DELETE ON document_template_versions
+    FOR EACH ROW EXECUTE FUNCTION document_template_version_guard();
+
 
 SQL);
 
@@ -2701,6 +2792,27 @@ SQL);
             );
         }
 
+        // Each document type's default template, published as version 1 and current, so documents
+        // of every type can be rendered from the moment the platform is installed. The source
+        // files seed the installation; once installed the template lives here.
+        foreach (DocumentType::cases() as $type) {
+            $default = DocumentTemplateDefaults::for($type);
+            $settings = $type->defaultSettings()->toArray();
+            $templateId = (int) $this->fetchRow(
+                'INSERT INTO document_templates (document_type, name, description) VALUES ('
+                . $this->quote($type->value) . ', ' . $this->quote($default['name']) . ', ' . $this->quote($default['description']) . ') RETURNING id'
+            )['id'];
+            $versionId = (int) $this->fetchRow(
+                'INSERT INTO document_template_versions (template_id, version_number, state, html, css, page_size, page_orientation,'
+                . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
+                . $templateId . ", 1, 'published', " . $this->quote($default['html']) . ', ' . $this->quote($default['css']) . ', '
+                . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
+                . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
+                . ", 'Installed default.', NOW()) RETURNING id"
+            )['id'];
+            $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId . ', is_current = TRUE WHERE id = ' . $templateId);
+        }
+
     }
 
     /**
@@ -2711,7 +2823,7 @@ SQL);
     {
         $this->execute(<<<'SQL'
 DROP TABLE IF EXISTS
-    analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
+    document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
     assessment_questions, assessment_responses, assessment_session_questions, assessment_sessions,
     audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_offers, bundles,
     certificates, commerce_audit_events, commerce_bundle_grants, commerce_cart_bundles,
@@ -2729,6 +2841,7 @@ DROP TABLE IF EXISTS
     theme_registry, user_billing_profiles, user_emails, user_profile_images, user_roles,
     user_social_links, users, web_sessions
     CASCADE;
+DROP FUNCTION IF EXISTS document_template_version_guard() CASCADE;
 DROP FUNCTION IF EXISTS commerce_guard_credit_refund_projection() CASCADE;
 DROP FUNCTION IF EXISTS commerce_guard_refunded_credit_allocation() CASCADE;
 DROP FUNCTION IF EXISTS commerce_protect_order_snapshot() CASCADE;

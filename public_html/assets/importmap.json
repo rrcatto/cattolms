@@ -4,7 +4,7 @@
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-QyM-j62.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-QiY84QT.js",
         "type": "js"
     },
     "\/assets\/controllers\/category_tree_controller.js": {
@@ -25,6 +25,10 @@
     },
     "\/assets\/controllers\/tag_cloud_controller.js": {
         "path": "\/assets\/controllers\/tag_cloud_controller-yi-Ny1Y.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/template_placeholders_controller.js": {
+        "path": "\/assets\/controllers\/template_placeholders_controller-HgeEcQA.js",
         "type": "js"
     },
     "@hotwired\/stimulus": {

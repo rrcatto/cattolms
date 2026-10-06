@@ -101,6 +101,8 @@ final class PermissionCatalog
             $this->p('COURSE.PRICING.MANAGE', 'ManageCoursePricing', 'Courses', 'Manage course price and access variants.'),
             $this->p('BUNDLE.MANAGEMENT.VIEW', 'ViewBundleManagement', 'Bundles', 'View course bundles, their composition, offers and sales in Administration.'),
             $this->p('BUNDLE.MANAGE', 'ManageBundles', 'Bundles', 'Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
+            $this->p('DOCUMENT.TEMPLATE.VIEW', 'ViewDocumentTemplates', 'Documents', 'View document templates, their versions and previews.'),
+            $this->p('DOCUMENT.TEMPLATE.MANAGE', 'ManageDocumentTemplates', 'Documents', 'Create document templates, edit drafts, publish versions and start drafts from earlier versions.'),
             $this->p('COURSE.OWNERSHIP.MANAGE', 'ManageCourseOwnership', 'Courses', 'Assign owner company/person and course editors within scope.'),
             $this->p('COURSE.MEDIA.MANAGE', 'ManageCourseMedia', 'Courses', 'Upload and maintain private course media.'),
             $this->p('COURSE.ASSESSMENT.MANAGE', 'ManageCourseAssessments', 'Courses', 'Create and edit diagnostics, module/final assessments and grade bands.'),

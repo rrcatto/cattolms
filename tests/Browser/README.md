@@ -184,3 +184,26 @@ bundle they bought, its retired courses and the promotion used.
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/bundles.cjs
 ```
+
+## Document templates
+
+`document-templates.cjs` checks Administration → System → Document Templates in Chromium and Firefox,
+without JavaScript and in every bundled theme (9 scenarios).
+
+- **List.** The list shows the installed templates and filters by type and status.
+- **Editing a certificate template.** ADMIN creates one, inserts a placeholder from the keyboard, and previews unsaved edits, which render with the sample data in a fully sandboxed frame.
+- **Errors.** An unknown placeholder is named with a suggestion, and the edits are kept. A script is refused.
+- **Saving and publishing.** The saved draft shows in the preview; publishing makes it current. ADMIN opens a sample PDF, starts a new draft from version 1 and reads the version page.
+- **Breadcrumb.** The breadcrumb ends at the template with no crumb repeated.
+- **Phone.** The editor fits 390px, with the landscape preview scrolling in its own box.
+- **No JavaScript.** Insert buttons stay hidden and the syntax is listed to copy. Preview and save work as ordinary posts.
+- **Access.** A learner is refused.
+- **Themes.** The list and editor render in all five themes at 1440 and 390px.
+
+Publishing makes the run's template current; `cleanup` restores the templates that were current before, archives the run's templates (published versions are immutable) and removes the identities.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/document-templates-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/document-templates.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/document-templates-fixture.php cleanup'
+```

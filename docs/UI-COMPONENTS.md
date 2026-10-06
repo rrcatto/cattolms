@@ -1,6 +1,6 @@
 # Platform UI component guide
 
-**LMS:** 0.8.8.7 · **Updated:** 2026-10-06 · **Registry:** 34 components in `src/View/Ui/PlatformUi.php`
+**LMS:** 0.8.8.8 · **Updated:** 2026-10-07 · **Registry:** 34 components in `src/View/Ui/PlatformUi.php`
 
 CattoLMS reusable UI structures are platform components. A page may not independently implement a job already represented by a canonical component. Extend the component and its contract test instead of forking markup.
 
@@ -90,6 +90,8 @@ Supported uses added in v0.8.8.x, each through the existing component rather tha
 - **Totals.** Cart, checkout review and order pages show Subtotal / Promo / Total with `data.key-value-list`, built once by `Commerce\Domain\OrderTotals`.
 - **Promo code.** The checkout's promo code field is a `form.compact-action` (one value, one immediate action); Remove is an `action.button` with an `aria_label` naming the code.
 - **Entity lookup types.** `/admin/lookup/{type}` serves `people`, `companies`, `courses` and `bundles`; the bundle editor adds courses and the promotion editor adds courses and bundles through `partials/entity-lookup.html.twig` (pass `lk_required`). Its search runs on keyup; a selection fills the hidden input.
+- **Several submit actions in one form.** The document template editor's Save draft, Preview and Save and publish are `action.button`s with `name: 'intent'` and their own `value`, all posting the one form, so each action works without JavaScript; there is no `formaction` property.
+- **Rendered documents.** `partials/document-template-preview.html.twig` shows a document renderer's output in an `iframe` with an empty `sandbox` attribute, sized to the document's page, inside `.cl-document-preview`, which scrolls on its own. Template source is edited in native textareas with `.cl-template-source`.
 - **Ordered lists with actions.** The bundle editor's course list uses Move up / Move down / Remove buttons as ordinary forms (`cl-bundle-courses`), the same pattern as course price variants; it is not a second drag-and-drop tree.
 
 ## Themes and review

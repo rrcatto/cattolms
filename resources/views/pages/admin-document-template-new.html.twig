@@ -1,0 +1,18 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/documents/templates' %}{% set ph_back_label = 'Document templates' %}{% set ph_kicker = 'System' %}{% set ph_title = 'New document template' %}{% set ph_lead = 'A new template starts with a draft of the standard template for its document type. It is used for documents only once you publish it.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: 'Create a template', heading_level: 2}) }}
+<form action="/admin/documents/templates" method="post">
+	<input type="hidden" name="csrf" value="{{ csrf }}">
+	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Document type', for: 'template-type', required: true})} %}{% block control %}<select id="template-type" name="document_type" required {{ ui_field_attrs(props) }}><option value="">Choose</option>{% for value, label in types %}<option value="{{ value }}"{% if form.document_type == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', required: true, help: 'Unique among templates of the same type.'})} %}{% block control %}<input id="template-name" name="name" value="{{ form.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', for: 'template-description', full_width: true})} %}{% block control %}<textarea id="template-description" name="description" rows="3" maxlength="1000" {{ ui_field_attrs(props) }}>{{ form.description }}</textarea>{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Create template', variant: 'primary', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/documents/templates'}) }}{% endblock %}{% endembed %}
+</form>
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.7 · **Updated:** 2026-10-06
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.8 · **Updated:** 2026-10-07
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -131,7 +131,7 @@ Course Requests, Enrolments and Performance, a Courses group holding Courses Cre
 Bought and Credits, then Billing details), and Administration in five groups: Courses (courses, the Course Item and Resource
 Libraries, categories, tags, Course Reviews, Bundles, requests, enrolments), People & Companies,
 Credits & Orders (credits, Orders & Payments, Promotions), Insights (activity and reports) and
-System (Themes, Roles & ACL, Seed Database, Settings, UI Components). Third-level entries
+System (Themes, Roles & ACL, Seed Database, Settings, UI Components, Document Templates). Third-level entries
 are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
 these examples do not authorise hard-coded destinations in themes.
 

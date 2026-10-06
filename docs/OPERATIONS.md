@@ -1,12 +1,13 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.7 **Date time:** 2026/10/06 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.8 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.8.7 operational position
+## Current v0.8.8.8 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.7` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.8` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
 - **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/06 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
-- **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 88 permissions (10 `SYSTEM.*`, 78 business) across the five roles.
+- **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 90 permissions (10 `SYSTEM.*`, 80 business) across the five roles.
+- **Document templates (Phase I, v0.8.8.8).** The baseline publishes the source defaults in `resources/documents/` as each document type's current template. After that, templates are edited at System → Document Templates and live in the database; editing a source file changes only new installations, until the database is rebuilt.
 - **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below.
 - **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there as the files' owner (CSS, JS and images from the host as `rrcatto`; compiled `assets/` inside `env_php_1` as `cattotest`), then run `php bin/console cache:clear` as `cattotest`.
 
@@ -55,6 +56,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.5:** the 25 migrations above consolidated into the one canonical baseline; rebuild the database (see above).
 - **v0.8.8.6:** copy the new `public_html/index.php` to the served web root. The front controller reads `APP_CODEBASE_PATH` as a `.env` file, so comments in the instance `.env` no longer stop the site loading; before it, a `#` comment containing brackets made every page answer "Application dependencies are missing."
 - **v0.8.8.7:** code only (Account → Profile → Billing Address at `/account/billing`); no CSS, JavaScript or schema change.
+- **v0.8.8.8:** the baseline gained the document template tables and permissions: rebuild the database (see above). Copy `public_html/index.php` to the served web root (it reads `.env` comments correctly and reports each start-up failure separately; the detail is in the PHP error log), and publish `catto-platform.css` and the compiled `assets/` (the `template_placeholders` controller).
 
 ### Commerce operations
 
@@ -323,7 +325,7 @@ COURSE_OWNER
 
 Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
 
-Since v0.8 the commerce permissions are in use (orders, payments, refunds, promotions, bundles and company billing), and the catalogue has 88 permissions: 10 `SYSTEM.*` and 78 business. `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
+Since v0.8 the commerce permissions are in use (orders, payments, refunds, promotions, bundles and company billing), and the catalogue has 90 permissions: 10 `SYSTEM.*` and 80 business. `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
 
 ## Browser acceptance after clean QA
 

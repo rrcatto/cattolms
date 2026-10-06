@@ -112,6 +112,12 @@ services:
         resource: '../src/Bundle/'
         exclude: '../src/Bundle/BundleRules.php'
 
+    # The shared document template engine. Its types, page settings, rendered documents, sample
+    # data and template definitions are values, not services.
+    CattoLearning\Document\:
+        resource: '../src/Document/'
+        exclude: '../src/Document/{DocumentType.php,DocumentTemplateDefaults.php,PageSettings.php,RenderedDocument.php,DocumentSampleData.php,*Exception.php,Template/PlaceholderKind.php,Template/PlaceholderDefinition.php,Template/CollectionDefinition.php,Template/PlaceholderSet.php}'
+
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'
         # DatabaseSessionHandler is constructed by App::run() before the container exists - the

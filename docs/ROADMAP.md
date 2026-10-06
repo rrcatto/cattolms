@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/06 (v0.8.8.7)
+## Current delivery position — 2026/10/07 (v0.8.8.8)
 
-**Current LMS version:** 0.8.8.7 · **Date:** 2026/10/06 SAST · tag `v0.8.8.7` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.8.8 · **Date:** 2026/10/07 SAST · tag `v0.8.8.8` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.8 | Shared document template engine (Phase I); front controller reads `.env` as phpdotenv does |
 | 0.8.8.7 | Billing Address as its own Account → Profile page |
 | 0.8.8.6 | Front controller reads `.env` comments correctly (`APP_CODEBASE_PATH`) |
 | 0.8.8.5 | One canonical baseline migration replacing the 25 development migrations; refreshed documentation |
@@ -28,7 +29,9 @@
 | 0.8.7 | Tester administration, company credit purchasing, payment administration and refunds |
 | 0.8.6 / 0.8.6.1 | Course Components v2; ADMIN test access |
 
-**What is next.** No phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**Document templates.** Phase I (v0.8.8.8) built the shared engine: ADMIN-edited, versioned HTML/CSS templates with a controlled placeholder language, one renderer for preview, documents and PDFs, and System → Document Templates. Phase J moves certificates onto it (with Classic, Modern and Minimal designs); Phase K moves invoices, receipts and credit notes.
+
+**What is next.** After Phases J and K, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 

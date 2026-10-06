@@ -1,0 +1,50 @@
+<table class="head">
+	<tr>
+		<td>
+			<p class="business">{{ business.name }}</p>
+			{{#if business.legal_name}}<p>{{ business.legal_name }}</p>{{/if}}
+			{{#if business.address}}<p>{{ business.address }}</p>{{/if}}
+			{{#if business.tax_number}}<p>Tax/VAT number: {{ business.tax_number }}</p>{{/if}}
+		</td>
+		<td class="title">
+			<h1>Credit note</h1>
+			<p>Credit note {{ credit_note.number }}</p>
+			<p>Order {{ order.number }}</p>
+			{{#if credit_note.invoice_number}}<p>Credits invoice {{ credit_note.invoice_number }}</p>{{/if}}
+			<p>Issued {{ credit_note.date }}</p>
+		</td>
+	</tr>
+</table>
+
+<h2>Credited to</h2>
+<p class="address">
+	{{ customer.billing_name }}<br>
+	{{#if customer.organisation}}{{ customer.organisation }}<br>{{/if}}
+	{{ customer.billing_address }}
+	{{#if customer.tax_number}}<br>Tax/VAT number: {{ customer.tax_number }}{{/if}}
+</p>
+
+<table class="lines">
+	<thead>
+		<tr><th>Item</th><th class="amount">Price</th><th class="amount">Discount</th><th class="amount">Paid</th><th class="amount">Credited</th></tr>
+	</thead>
+	<tbody>
+		{{#each items}}
+		<tr>
+			<td>{{ item.description }}{{#if item.detail}}<br><small>{{ item.detail }}</small>{{/if}}</td>
+			<td class="amount">{{ item.price }}</td>
+			<td class="amount">{{#if item.discount}}−{{ item.discount }}{{/if}}</td>
+			<td class="amount">{{ item.paid }}</td>
+			<td class="amount">{{ item.credited }}</td>
+		</tr>
+		{{/each}}
+	</tbody>
+</table>
+
+<table class="totals">
+	<tr class="total"><th>Amount credited</th><td>{{ credit_note.amount }}</td></tr>
+</table>
+
+<p>Refund basis: {{ credit_note.basis }}</p>
+{{#if credit_note.reason}}<p>{{ credit_note.reason }}</p>{{/if}}
+<p class="note">The amount is credited to Account Funds. This document does not record a bank payout.</p>
