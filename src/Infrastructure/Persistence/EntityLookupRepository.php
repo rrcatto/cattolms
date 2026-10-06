@@ -48,7 +48,7 @@ final class EntityLookupRepository
     public const MAX_QUERY_LENGTH = 120;
 
     /** The only entity types that may be searched. Anything else is rejected by the caller. */
-    public const TYPES = ['people', 'companies', 'courses', 'assignable_courses'];
+    public const TYPES = ['people', 'companies', 'courses', 'assignable_courses', 'bundles'];
 
     public function __construct(private readonly Database $db)
     {
@@ -81,6 +81,8 @@ final class EntityLookupRepository
             'companies' => $this->searchCompanies($term),
             'courses' => $this->searchCourses($term, $companyId),
             'assignable_courses' => $this->searchAssignableCourses($term, $companyId),
+            // Bundles are platform catalogue offers: only a platform-wide operator searches them.
+            'bundles' => $companyId === 0 ? $this->searchBundles($term) : [],
             default => [],
         };
     }
@@ -124,6 +126,7 @@ final class EntityLookupRepository
                  LIMIT 1',
                 ['id' => $id, 'company_id' => $companyId]
             ),
+            'bundles' => $companyId === 0 ? $this->db->fetchAllAssociative('SELECT b.id, b.title AS label, b.slug AS detail FROM bundles b WHERE b.id=:id LIMIT 1', ['id' => $id]) : [],
             default => [],
         };
 
@@ -160,6 +163,16 @@ final class EntityLookupRepository
              WHERE (c.name ILIKE :term OR c.domain ILIKE :term)' . '' . '
              ORDER BY c.is_system DESC, c.name, c.id
              LIMIT ' . self::MAX_RESULTS,
+            ['term' => $term]
+        ));
+    }
+
+    /** @return list<array{id:int,label:string,detail:string}> */
+    private function searchBundles(string $term): array
+    {
+        return $this->rows($this->db->fetchAllAssociative(
+            'SELECT b.id, b.title AS label, b.slug AS detail FROM bundles b
+             WHERE b.title ILIKE :term OR b.slug ILIKE :term ORDER BY b.title, b.id LIMIT ' . self::MAX_RESULTS,
             ['term' => $term]
         ));
     }

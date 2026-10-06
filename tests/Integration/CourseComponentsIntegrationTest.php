@@ -183,7 +183,7 @@ final class CourseComponentsIntegrationTest extends TestCase
         $fixture = new DevelopmentFixture($this->db);
         $enrolmentId = $fixture->createEnrolment($this->owner, $this->course, $this->owner, 86400, false, 'completed');
         $this->db->executeStatement("UPDATE course_enrolments SET started_at=NOW(),expires_at=NOW()+INTERVAL '1 day',completed_at=NOW() WHERE id=:id", ['id' => $enrolmentId]);
-        $this->db->executeStatement("INSERT INTO commerce_entitlements(enrolment_id,state,source,snapshot,created_at,activation_deadline_at,access_started_at,access_expires_at) VALUES (:id,'active','free','{}'::jsonb,NOW(),NOW()+INTERVAL '1 day',NOW(),NOW()+INTERVAL '1 day')", ['id' => $enrolmentId]);
+        $this->db->executeStatement("INSERT INTO commerce_entitlements(enrolment_id,state,source,snapshot,created_at,activation_deadline_at,access_started_at,access_expires_at,access_period_seconds) VALUES (:id,'active','free','{}'::jsonb,NOW(),NOW()+INTERVAL '1 day',NOW(),NOW()+INTERVAL '1 day',86400)", ['id' => $enrolmentId]);
         $this->db->executeStatement("INSERT INTO course_results(enrolment_id,module_percentage,final_percentage,overall_percentage,grade_code,passed) VALUES (:id,50,50,50,'PASS',TRUE)", ['id' => $enrolmentId]);
 
         (new \CattoLearning\Course\CoursePortabilityRepository($this->db))->resetCourseContent($this->course);

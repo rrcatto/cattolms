@@ -1,0 +1,11 @@
+{#
+	One bundle in the cart or at the checkout review: the bundle is the product, at its own price.
+	What it includes is listed beneath it; owning some of its courses already does not change its price,
+	and the bundle still grants each of them its own access.
+#}
+<div class="cl-bundle-line">
+	<p class="cl-bundle-line-title">{{ ui('feedback.badge', {label: 'Bundle', tone: 'info', size: 'small'}) }} <strong><a href="/bundles/{{ bundle.slug }}">{{ bundle.title }}</a></strong></p>
+	<p>Includes {{ bundle.course_count }} {{ bundle.course_count == 1 ? 'course' : 'courses' }}: {{ bundle.course_titles|join(', ') }}</p>
+	<p>{{ bundle.access_label }} of access to each course · {{ bundle.price_label }}</p>
+	{% if bundle.owned_count %}<p class="help">You already have access to {{ bundle.owned_count }} of the {{ bundle.course_count }} courses in this bundle. The bundle price stays the same, and the bundle still gives each of its courses its own access period alongside the access you have.</p>{% endif %}
+</div>

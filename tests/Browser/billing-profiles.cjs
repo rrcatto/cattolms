@@ -35,7 +35,9 @@ async function scenario(name, browserName, run) {
     }
 }
 async function open(browser, token, options = {}) {
-    const ctx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: options.width || 1280, height: 1400}, javaScriptEnabled: options.js !== false});
+    // Without JavaScript the themes' smooth scrolling never settles under Playwright's own
+    // scrolling, so a click below the fold times out; the themes turn it off for reduced motion.
+    const ctx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: options.width || 1280, height: 1400}, javaScriptEnabled: options.js !== false, reducedMotion: options.js === false ? 'reduce' : 'no-preference'});
     await ctx.addCookies([{name: 'catto_learning_session', value: token, url: base, secure: true}]);
     const page = await ctx.newPage();
     page.on('pageerror', (error) => failures.push(`page error: ${error.message}`));

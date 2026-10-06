@@ -5,8 +5,8 @@ namespace CattoLearning\Commerce\Http;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Application\PlatformAdministrationService;
-use CattoLearning\Commerce\Application\{BillingProfileService,OrderService,PaymentService,FulfilmentService,CartService,CheckoutService};
-use CattoLearning\Commerce\Domain\BillingDetails;
+use CattoLearning\Commerce\Application\{BillingProfileService,OrderService,PaymentService,FulfilmentService,CartService,CheckoutService,PromotionService};
+use CattoLearning\Commerce\Domain\{BillingDetails,OrderTotals,PromotionRejected};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Support\{Csrf,Money,Pagination,Uuid};
@@ -25,7 +25,8 @@ final class CommerceController extends BaseController
         private readonly \CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer $pdfs,
         private readonly \CattoLearning\Commerce\Application\CommerceMaintenance $maintenance,
         private readonly \CattoLearning\Configuration\RuntimeSettings $settings,
-        private readonly BillingProfileService $billing)
+        private readonly BillingProfileService $billing,
+        private readonly PromotionService $promotions)
     { parent::__construct($auth,$view,$requests); }
 
     private function csrf(): void
@@ -66,6 +67,34 @@ final class CommerceController extends BaseController
         $this->csrf();
         return $this->handle(function(): void {
             $this->carts->change((int)$this->posted('variant_id'),true);
+            $this->redirect('/cart');
+        },'/cart');
+    }
+
+    /**
+     * Adds a bundle by its offer. The server checks the bundle can be bought now; a course line the
+     * bundle includes is taken out of the cart and the purchaser is told why.
+     */
+    #[Route('/cart/add-bundle',name:'commerce_select_bundle',methods:['POST'])]
+    public function selectBundle(): Response
+    {
+        $this->csrf();
+        $id = (int) $this->posted('bundle_offer_id');
+        $offer = $this->records->bundleOffer($id);
+        $return = '/bundles/'.rawurlencode((string) $offer['slug']);
+        return $this->handle(function() use($id,$offer,$return): void {
+            $this->carts->changeBundle($id);
+            $this->flash('success', (string) $offer['title'].' was added to My Cart.');
+            $this->redirect($this->posted('action') === 'buy_now' ? '/checkout' : $return);
+        }, $return);
+    }
+
+    #[Route('/cart/remove-bundle',name:'commerce_cart_remove_bundle',methods:['POST'])]
+    public function removeBundle(): Response
+    {
+        $this->csrf();
+        return $this->handle(function(): void {
+            $this->carts->changeBundle((int)$this->posted('bundle_offer_id'),true);
             $this->redirect('/cart');
         },'/cart');
     }
@@ -114,12 +143,40 @@ final class CommerceController extends BaseController
         }, '/checkout/payment');
     }
 
+    /** The browser submits the code and nothing else; the server decides whether it applies and by how much. */
+    #[Route('/checkout/promo', name:'commerce_checkout_promo', methods:['POST'])]
+    public function applyPromo(): Response
+    {
+        $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
+        return $this->handle(function () use ($actor): void {
+            $discount = $this->promotions->apply($actor, $this->posted('promo_code'));
+            $this->flash('success', 'Promo code '.$discount->promotion->code.' applied: '.OrderTotals::negative($discount->discountMinor, $discount->currency).'.');
+        }, '/checkout/review');
+    }
+
+    #[Route('/checkout/promo/remove', name:'commerce_checkout_promo_remove', methods:['POST'])]
+    public function removePromo(): Response
+    {
+        $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
+        return $this->handle(function () use ($actor): void {
+            if ($this->promotions->remove($actor)) $this->flash('success', 'The promo code was removed.');
+        }, '/checkout/review');
+    }
+
     #[Route('/checkout/place', name:'commerce_place_order', methods:['POST'])]
     public function place(): Response
     {
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
         return $this->handle(function () use ($actor): void {
-            $id = $this->checkout->place($actor, (int) $this->posted('cart_id'), $this->posted('quote'), $this->posted('accept_terms') === 'yes');
+            try {
+                $id = $this->checkout->place($actor, (int) $this->posted('cart_id'), $this->posted('quote'), $this->posted('accept_terms') === 'yes');
+            } catch (PromotionRejected $rejected) {
+                // The code stopped applying after the review was shown. It is taken off the cart so the
+                // review shows the corrected total, and nothing is placed until the purchaser confirms it.
+                $this->promotions->remove($actor);
+                $this->flash('warning', 'Promo code '.$rejected->promoCode.' was removed from your order. '.$rejected->getMessage().' Check your new total before placing your order.');
+                return;
+            }
             $this->maintenance->deliverInvoices(1);
             $this->redirect($id === null ? '/account/courses' : '/account/orders/'.$id);
         }, '/checkout/review');
@@ -148,7 +205,7 @@ final class CommerceController extends BaseController
         foreach($order['payments'] as $p) if (in_array($p['state'],['pending','created','paid'],true)) $canPay=false;
         foreach($order['details']['items'] as &$line) $line['price_label']=Money::strictMinorUnits((int)$line['line_total_minor'],(string)$line['currency'])->format();
         unset($line);
-        return $this->render('commerce-order',['title'=>'Order '.$id,'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->bankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
+        return $this->render('commerce-order',['title'=>'Order '.$id,'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->bankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
     }
 
     #[Route('/account/orders/{id}/pay',name:'commerce_pay',requirements:['id'=>'[0-9]+'],methods:['POST'])]

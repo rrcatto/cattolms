@@ -1,0 +1,55 @@
+{% extends layout %}
+{% block page_body %}
+	<section class="cl-page-head cl-course-head">
+		<div class="container py-5">
+			<div class="row g-4 align-items-center">
+				<div class="col-lg-8">
+					<div class="d-flex flex-wrap gap-2 mb-3">{{ ui('feedback.badge', {label: 'Course bundle', tone: 'neutral'}) }}</div>
+					<div class="cl-course-detail-headline"><h1 class="display-4 fw-bold">{{ bundle.title }}</h1></div>
+					{% if bundle.short_description %}<p class="lead mt-3 mb-0">{{ bundle.short_description }}</p>{% endif %}
+				</div>
+				<div class="col-lg-4">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+						{{ ui('data.key-value-list', {items: [{label: 'Courses', value: bundle.course_count}, {label: 'Access to each course', value: bundle.access_label ?? '—'}, {label: 'Access starts', value: 'When you start each course'}]}) }}
+					{% endblock %}{% endembed %}
+				</div>
+			</div>
+		</div>
+	</section>
+	<section class="cl-page-section container py-5">
+		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}{% block body %}
+			<div>
+				{% if bundle.description_html %}<div class="cl-prose mb-5">{{ bundle.description_html|raw }}</div>{% endif %}
+				<h2 class="h3 mb-3" id="bundle-courses-heading">Courses in this bundle</h2>
+				<ol aria-labelledby="bundle-courses-heading">{% for course in bundle.courses %}<li>{{ course.title }}</li>{% endfor %}</ol>
+				{{ ui('catalogue.course-grid', {courses: bundle.course_cards}) }}
+			</div>
+			<aside>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}{% block surface_body %}
+					<h2 class="h4">Bundle price</h2>
+					{% if bundle.price_label %}<p class="h3">{{ bundle.price_label }}</p>{% endif %}
+					{% if bundle.comparison and bundle.price_label %}
+						{# Informational: today's prices for the same courses one by one. The bundle is sold at its own price. #}
+						{{ ui('data.key-value-list', {items: [{label: 'Individual course prices', value: bundle.comparison.individual_label}, {label: 'Bundle price', value: bundle.price_label}]|merge(bundle.comparison.saving_label ? [{label: 'You save', value: bundle.comparison.saving_label}] : [])}) }}
+					{% endif %}
+					{% if bundle.owned_count %}
+						{{ ui('feedback.notice', {tone: 'info', heading: bundle.owned_count == bundle.course_count ? 'You already have access to all ' ~ bundle.course_count ~ ' courses in this bundle.' : 'You already have access to ' ~ bundle.owned_count ~ ' of the ' ~ bundle.course_count ~ ' courses in this bundle.'}) }}
+						<p class="help">The bundle price stays the same. The bundle still gives every one of its courses its own access period, which runs alongside the access you already have.</p>
+					{% endif %}
+					{% if bundle.unavailable %}
+						{{ ui('feedback.notice', {tone: 'warning', heading: bundle.unavailable}) }}
+					{% else %}
+						<form action="/cart/add-bundle" method="post">
+							<input type="hidden" name="csrf" value="{{ csrf }}">
+							<input type="hidden" name="bundle_offer_id" value="{{ bundle.offer_id }}">
+							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+								{{ ui('action.button', {label: 'Add bundle to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-add'}) }}
+								{{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now'}) }}
+							{% endblock %}{% endembed %}
+						</form>
+					{% endif %}
+				{% endblock %}{% endembed %}
+			</aside>
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

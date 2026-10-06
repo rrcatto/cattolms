@@ -57,7 +57,7 @@ final class AclContractTest extends TestCase
         // structure - and an installation may well want one delegated and not the other. 73 since
         // v0.8.8.1: LEARNING.REVIEW.CREATE and COURSE.REVIEW.MANAGE for course reviews; 74 with
         // COMPANY.BILLING.MANAGE for the company's own billing details.
-        self::assertCount(74, $catalog->businessKeys());
+        self::assertCount(78, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {
@@ -92,6 +92,10 @@ final class AclContractTest extends TestCase
             'PLATFORM.PAYMENT.RECONCILE',
             'PLATFORM.REFUND.VIEW',
             'PLATFORM.REFUND.MANAGE',
+            'PLATFORM.PROMOTION.VIEW',
+            'PLATFORM.PROMOTION.MANAGE',
+            'BUNDLE.MANAGEMENT.VIEW',
+            'BUNDLE.MANAGE',
         ] as $permission) {
             self::assertContains($permission, $keys);
         }

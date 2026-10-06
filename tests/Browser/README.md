@@ -147,3 +147,40 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/billing-profiles.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/billing-profiles-fixture.php cleanup'
 ```
+
+## Promo codes
+
+`promotions.cjs` checks promo codes at the checkout review in Chromium and Firefox: a valid code
+typed in lower case and applied with Enter shows the subtotal, the promotion and the discounted total;
+an unknown and an expired code say why and leave the applied code; removing it with the keyboard
+restores the total; placing the order charges the discounted total and the order page and invoice
+keep it; and the review fits a 390px phone. Without JavaScript the code is applied, removed and used
+as ordinary forms. An ADMIN creates a promotion (the code stored upper case), has a rejected value
+kept for correction, edits, deactivates it (checkout then refuses it), reactivates, finds it by search
+and status, and deletes it while unused. The checkout promo section, the promotions list and the
+editor render in all five themes at 1440 and 390px without sideways scrolling.
+`promotions-fixture.php create` makes two paid courses, an ADMIN and two promotions; the script asks
+it for a fresh learner per purchase and runs `create` and `cleanup` itself. Orders are immutable, so
+each run leaves its orders, their learners, the retired courses and the promotion they used.
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/promotions.cjs
+```
+
+## Course bundles
+
+`bundles.cjs` has an ADMIN create a bundle, add four courses through the course lookup, move one up,
+remove one, set the price and publish it. In Chromium and Firefox a learner sees the bundle in
+`/bundles` and on its page (the catalogue course cards, the price, the individual prices and the
+saving), adds it to the cart with the keyboard, applies a promotion for all bundles at checkout,
+places the order and finds every course in the library, with the order page and invoice showing the
+bundle as the item bought; the bundle page and cart fit a 390px phone. A learner who already has one
+of the courses is told so on the bundle page. Without JavaScript a bundle is bought and an ADMIN
+reorders its courses. The bundle catalogue and page, the cart and the ADMIN list and editor render in
+all five themes at 1440 and 390px without sideways scrolling. The script creates and cleans up
+`bundles-fixture.php` itself; orders are immutable, so each run leaves its orders, their learners, the
+bundle they bought, its retired courses and the promotion used.
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/bundles.cjs
+```

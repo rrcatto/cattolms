@@ -37,15 +37,20 @@ final class CheckoutService
      */
     public function begin(CurrentUser $actor, array $cart): void
     {
-        if ((int) ($cart['id'] ?? 0) < 1 || ($cart['items'] ?? []) === []) return;
+        if ((int) ($cart['id'] ?? 0) < 1 || (($cart['items'] ?? []) === [] && ($cart['bundles'] ?? []) === [])) return;
         $courses = []; $total = 0; $currencies = [];
         foreach ((array) $cart['items'] as $item) {
             if ((int) ($item['course_id'] ?? 0) > 0) $courses[] = (int) $item['course_id'];
             $total += (int) ($item['price_minor_units'] ?? 0);
             $currencies[(string) ($item['currency_code'] ?? '')] = true;
         }
+        // A bundle line counts as one line at its own price; its courses are not course lines.
+        foreach ((array) ($cart['bundles'] ?? []) as $bundle) {
+            $total += (int) ($bundle['price_minor_units'] ?? 0);
+            $currencies[(string) ($bundle['currency_code'] ?? '')] = true;
+        }
         $this->analytics->recordSafely(AnalyticsEventType::CheckoutStarted, AnalyticsSource::Checkout, ['user_id' => $actor->id],
-            ['cart_id' => (int) $cart['id'], 'line_count' => count((array) $cart['items']), 'course_ids' => array_slice(array_values(array_unique($courses)), 0, 50), 'total_minor' => $total, 'currency' => count($currencies) === 1 ? (string) array_key_first($currencies) : null, 'purchaser' => 'individual'],
+            ['cart_id' => (int) $cart['id'], 'line_count' => count((array) $cart['items']) + count((array) ($cart['bundles'] ?? [])), 'course_ids' => array_slice(array_values(array_unique($courses)), 0, 50), 'total_minor' => $total, 'currency' => count($currencies) === 1 ? (string) array_key_first($currencies) : null, 'purchaser' => 'individual'],
             'checkout_started:cart:' . (int) $cart['id']);
     }
 
@@ -94,7 +99,12 @@ final class CheckoutService
         if ($method === 'dummy' && !in_array($token, ['demo_success','demo_failure'], true)) throw new RuntimeException('Choose a simulated card outcome.');
     }
 
-    /** A replay of the review submission returns its original order instead of charging again. */
+    /**
+     * A replay of the review submission returns its original order instead of charging again. A
+     * promo code that no longer applies stops placement with a PromotionRejected carrying the reason;
+     * the caller removes it and returns the purchaser to review the corrected total. An order a
+     * promotion discounts to zero is settled at once, with no payment.
+     */
     public function place(CurrentUser $actor, int $cartId, string $quote, bool $accepted): ?int
     {
         $state = $this->state($actor);
@@ -105,20 +115,22 @@ final class CheckoutService
         $id = $this->transactions->run(function () use ($actor,$cartId,$quote,$billing,$state): ?int {
             $this->records->lockPurchaser($actor->id);
             $cart = $this->orders->cart($actor);
+            OrderService::requireValidPromotion($cart);
             if ((int) $cart['id'] !== $cartId || !hash_equals((string) $cart['quote'], $quote)) throw new RuntimeException('Your cart or prices changed. Review your order again.');
-            if ($cart['items'] === []) throw new RuntimeException('Your cart is empty.');
+            if ($cart['items'] === [] && $cart['bundles'] === []) throw new RuntimeException('Your cart is empty.');
             foreach ($cart['items'] as $item) {
                 if ((int) $item['price_minor_units'] !== 0) continue;
                 $this->fulfilment->acceptFree($actor, (int) $item['id']);
                 $this->orders->changeCart($actor, (int) $item['id'], true);
             }
             $cart = $this->orders->cart($actor);
-            if ($cart['items'] === []) return null;
+            if ($cart['items'] === [] && $cart['bundles'] === []) return null;
             return $this->orders->place($actor, $cartId, (string) $cart['quote'], $billing, true, $state);
         });
         $_SESSION['checkout'][$actor->id]['completed_cart'] = $cartId;
         $_SESSION['checkout'][$actor->id]['order_id'] = $id;
-        if ($id !== null && $state['payment_method'] === 'dummy') $this->payments->purchase($actor, $id, (string) $state['payment_key'], (string) $state['method_token']);
+        if ($id !== null && (int) $this->records->order($id)['total_minor'] === 0) $this->payments->settleWithoutPayment($actor, $id);
+        elseif ($id !== null && $state['payment_method'] === 'dummy') $this->payments->purchase($actor, $id, (string) $state['payment_key'], (string) $state['method_token']);
         return $id;
     }
 

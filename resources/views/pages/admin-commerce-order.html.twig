@@ -14,7 +14,9 @@
             <p class="help">Billing and purchaser details are the order's immutable snapshot from placement.</p>
             <p><strong>Placed:</strong> {{ order.placed_at|date('d M Y H:i') }} · <strong>Payment due:</strong> {{ order.payment_due_at|date('d M Y H:i') }} · <strong>Method:</strong> {{ payment_method|upper }}</p>
             {% if fund_balance_label is not null %}<p><strong>Current Account Funds balance:</strong> {{ fund_balance_label }}. This value records refunds credited to the purchaser or company; payout and spending controls are a separate phase.</p>{% endif %}
-            {% for item in items %}<p><strong>{{ item.title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} {{ item.product_type == 'company_credit' ? 'credits' : 'course access' }} · {{ item.amount_label }} · Refunded: {{ item.refunded_minor / 100 }} {{ order.currency }}</p>{% endfor %}
+            {% for item in items %}<p><strong>{{ item.title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} {{ item.product_type == 'company_credit' ? 'credits' : 'course access' }} · {{ item.amount_label }}{% if item.discount_label %} · Promotion share {{ item.discount_label }} · Paid {{ item.paid_label }}{% endif %} · Refunded: {{ item.refunded_label }}</p>{% if item.is_bundle %}<p class="help">Includes: {{ item.includes }}</p>{% if item.grants %}<ul class="help">{% for grant in item.grants %}<li>{{ grant.title }}: {{ grant.outcome }} ({{ grant.state|replace({'_': ' '}) }})</li>{% endfor %}</ul>{% endif %}{% endif %}{% endfor %}
+            {{ ui('data.key-value-list', {items: totals}) }}
+            {% if snapshot.promotion|default(null) %}<p class="help">Promotion {{ snapshot.promotion.code }} ({{ snapshot.promotion.name }}, {{ snapshot.promotion.label }}) was applied to {{ promotion_eligible_label }} of eligible courses. Its discount is shared across those courses in proportion to their prices; each course can be refunded up to what was paid for it.</p>{% endif %}
             <h3 class="h5">Financial documents</h3>
             {% for document in documents %}<p>{{ ui('action.link', {label: document.kind|replace({'_':' '})|capitalize ~ ' ' ~ document.number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id ~ '/documents/' ~ document.id, new_window: true}) }}</p>{% endfor %}
             {% if can_view_payments %}<h3 class="h5">Payments and evidence</h3>
@@ -48,9 +50,9 @@
         {% if can_refund and order.state in ['paid','fulfilled','manual_review','partially_refunded'] %}
         {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
             {{ ui('layout.section-head', {heading: 'Approve a refund', heading_level: 2, summary: 'Approved value enters Account Funds and creates a credit note. No bank payout occurs here.'}) }}
-            <p>Record the legal or discretionary basis and a specific decision reason. Full individual item refunds revoke that course access immediately; learning history remains.</p>
+            <p>Record the legal or discretionary basis and a specific decision reason. Full individual item refunds revoke that course access immediately; learning history remains. Refunding all that was paid for a bundle revokes only the access that bundle granted and no other bundle still covers; courses the learner had from another source are kept.</p>
             {% for item in items %}
-                {% if item.refunded_minor < item.amount_minor %}
+                {% if item.refunded_minor < item.paid_minor %}
                 <h3 class="h5">{{ item.title }} · {{ item.remaining_label }} remaining</h3>
                 {% if order.company_id and not item.unissued and (not item.latest_refundable or item.latest_refundable.commerce_order_item_id != item.id) %}<p>Refund newer unused credits for this course and period first.</p>{% else %}
                 <form action="/admin/commerce/orders/{{ order.id }}/refund" method="post">

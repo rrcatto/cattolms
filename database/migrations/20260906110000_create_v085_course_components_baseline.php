@@ -337,7 +337,11 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('PLATFORM.PAYMENT.MANAGE','ManagePlatformPayments','Commerce · Platform','Perform supported administrative payment operations when Commerce is installed.'),
     ('PLATFORM.PAYMENT.RECONCILE','ReconcilePlatformPayments','Commerce · Platform','Run supported payment reconciliation operations when Commerce is installed.'),
     ('PLATFORM.REFUND.VIEW','ViewPlatformRefunds','Commerce · Platform','View refunds platform-wide when Commerce is installed.'),
-    ('PLATFORM.REFUND.MANAGE','ManagePlatformRefunds','Commerce · Platform','Create and manage supported refunds when Commerce is installed.');
+    ('PLATFORM.REFUND.MANAGE','ManagePlatformRefunds','Commerce · Platform','Create and manage supported refunds when Commerce is installed.'),
+    ('PLATFORM.PROMOTION.VIEW','ViewPromotions','Commerce · Platform','View promotions, their promo codes and their usage when Commerce is installed.'),
+    ('PLATFORM.PROMOTION.MANAGE','ManagePromotions','Commerce · Platform','Create, change, activate and deactivate promotions, and delete unused ones, when Commerce is installed.'),
+    ('BUNDLE.MANAGEMENT.VIEW','ViewBundleManagement','Bundles','View course bundles, their composition, offers and sales in Administration.'),
+    ('BUNDLE.MANAGE','ManageBundles','Bundles','Create, compose, price, publish and retire course bundles, and delete unused drafts.');
 
 CREATE TABLE role_permissions (
     role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,

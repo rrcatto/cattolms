@@ -1,0 +1,112 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/bundles' %}{% set ph_back_label = 'Bundles' %}{% set ph_kicker = 'Courses' %}{% set ph_title = bundle ? bundle.title : 'New bundle' %}{% set ph_lead = bundle ? 'A bundle of ' ~ bundle.course_count ~ ' courses' ~ (bundle.price_label ? ' for ' ~ bundle.price_label : '') ~ '.' : 'Give the bundle a title and description. You add its courses and set its price after creating it.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% if bundle %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Status', heading_level: 2, summary: 'Draft bundles are not shown. Published bundles are sold while their offer is on sale and within their sales period. Retired bundles are no longer sold; courses already bought through them are not affected.'}) }}
+	<p>{% include '@platform/partials/bundle-status.html.twig' with {status: bundle.status, on_sale: bundle.offer_active ?? false} %}{% if bundle.status != 'draft' %} <a href="/bundles/{{ bundle.slug }}">View public page</a>{% endif %}</p>
+	{% if bundle.status == 'published' and bundle.unavailable %}{{ ui('feedback.notice', {tone: 'warning', heading: 'Not purchasable now: ' ~ bundle.unavailable}) }}{% endif %}
+	{% if can_manage %}
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+		{% for target, label in {published: bundle.status == 'retired' ? 'Publish again' : 'Publish', draft: 'Return to draft', retired: 'Retire'} %}
+			{% if bundle.status != target %}<form action="/admin/bundles/{{ bundle.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ target }}">{{ ui('action.button', {label: label, variant: target == 'published' ? 'primary' : 'secondary', type: 'submit'}) }}</form>{% endif %}
+		{% endfor %}
+		{% if bundle.status == 'draft' and not bundle.sold %}<form action="/admin/bundles/{{ bundle.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete bundle', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ bundle.title ~ '? Nobody has bought it.'}) }}</form>{% endif %}
+	{% endblock %}{% endembed %}
+	{% if bundle.sold %}<p class="help">This bundle has been sold, so it is kept for its order history and cannot be deleted. Retire it to stop selling it.</p>{% endif %}
+	{% endif %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	<div id="bundle-courses">{{ ui('layout.section-head', {heading: 'Courses', heading_level: 2, summary: 'The courses a buyer receives, in this order. A change applies to purchases from now on: every earlier order keeps the courses it included.'}) }}</div>
+	{% if bundle.courses %}
+	<ol class="cl-bundle-courses">
+		{% for course in bundle.courses %}
+		<li>
+			<span><strong>{{ course.title }}</strong> <small>{{ course.slug }}</small>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: 'warning', size: 'small'}) }}{% endif %}</span>
+			{% if can_manage %}
+			<span class="cl-bundle-course-actions">
+				{% if not loop.first %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' up'}) }}</form>{% endif %}
+				{% if not loop.last %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' down'}) }}</form>{% endif %}
+				<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Remove ' ~ course.title}) }}</form>
+			</span>
+			{% endif %}
+		</li>
+		{% endfor %}
+	</ol>
+	{% else %}
+	{{ ui('feedback.empty', {heading: 'No courses yet', summary: 'A bundle needs at least two published courses before it can be published.'}) }}
+	{% endif %}
+	{% if can_manage %}
+	<form action="/admin/bundles/{{ bundle.id }}/courses" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_course_id', lk_type: 'courses', lk_label: 'Add a course', lk_empty: 'Search for a course to add', lk_selected: 0, lk_required: 1} %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add course', variant: 'secondary', type: 'submit'}) }}{% endblock %}{% endembed %}
+	</form>
+	{% endif %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	<div id="bundle-offer">{{ ui('layout.section-head', {heading: 'Price and access', heading_level: 2, summary: 'You choose the bundle price. Each course in the bundle is granted for the access period below. A price change applies to purchases from now on; orders already placed keep their price.'}) }}</div>
+	{% if bundle.comparison %}<p class="help">For context only: the courses’ current individual prices add up to {{ bundle.comparison.individual_label }}{% if bundle.comparison.saving_label %}, so the bundle saves {{ bundle.comparison.saving_label }}{% endif %}. The bundle price is not calculated from them.</p>{% elseif bundle.courses %}<p class="help">Not every course has a current individual price, so no saving is shown to buyers.</p>{% endif %}
+	{% if can_manage %}
+	<form action="/admin/bundles/{{ bundle.id }}/offer" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bundle price (' ~ currency ~ ')', for: 'bundle-price', required: true})} %}{% block control %}<input id="bundle-price" name="price" value="{{ form.price }}" inputmode="decimal" maxlength="16" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', for: 'bundle-period', required: true})} %}{% block control %}<input id="bundle-period" name="access_period_value" type="number" min="1" max="3650" value="{{ form.access_period_value }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'bundle-unit', required: true})} %}{% block control %}<select id="bundle-unit" name="access_period_unit" required {{ ui_field_attrs(props) }}>{% for unit in units %}<option value="{{ unit }}"{% if form.access_period_unit == unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'On sale: a published bundle can be bought'})} %}{% block control %}<input type="checkbox" name="is_active" value="1" {{ form.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save price', variant: 'primary', type: 'submit'}) }}{% endblock %}{% endembed %}
+	</form>
+	{% else %}
+	{{ ui('data.key-value-list', {items: [{label: 'Price', value: bundle.price_label ?? 'No price yet'}, {label: 'Access', value: bundle.access_label ?? '—'}]}) }}
+	{% endif %}
+{% endblock %}{% endembed %}
+{% endif %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: bundle ? 'Details' : 'Create a bundle', heading_level: 2, summary: 'Dates and times are in the platform time zone, ' ~ timezone ~ '.'}) }}
+{% if can_manage %}
+<form action="/admin/bundles{{ bundle ? '/' ~ bundle.id : '' }}" method="post">
+	<input type="hidden" name="csrf" value="{{ csrf }}">
+	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title', for: 'bundle-title', required: true})} %}{% block control %}<input id="bundle-title" name="title" value="{{ form.title }}" maxlength="240" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Web address', for: 'bundle-slug', help: 'Lower-case words joined by hyphens. Left empty, it is made from the title.'})} %}{% block control %}<input id="bundle-slug" name="slug" value="{{ form.slug }}" maxlength="180" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Short description', for: 'bundle-short', full_width: true})} %}{% block control %}<input id="bundle-short" name="short_description" value="{{ form.short_description }}" maxlength="320" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (HTML)', for: 'bundle-description', full_width: true})} %}{% block control %}<textarea id="bundle-description" name="description_html" rows="6" {{ ui_field_attrs(props) }}>{{ form.description_html }}</textarea>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cover (SVG markup, optional)', for: 'bundle-cover', full_width: true})} %}{% block control %}<textarea id="bundle-cover" name="cover_svg" rows="3" {{ ui_field_attrs(props) }}>{{ form.cover_svg }}</textarea>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'On sale from (optional)', for: 'bundle-from'})} %}{% block control %}<input id="bundle-from" name="available_from" type="datetime-local" value="{{ form.available_from }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'On sale until (optional)', for: 'bundle-until', help: 'No longer sold from this moment.'})} %}{% block control %}<input id="bundle-until" name="available_until" type="datetime-local" value="{{ form.available_until }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: bundle ? 'Save details' : 'Create bundle', variant: 'primary', type: 'submit'}) }}<a href="/admin/bundles{{ bundle ? '/' ~ bundle.id : '' }}">Cancel</a>{% endblock %}{% endembed %}
+</form>
+{% else %}
+{{ ui('data.key-value-list', {items: [{label: 'Title', value: bundle.title}, {label: 'Web address', value: '/bundles/' ~ bundle.slug}, {label: 'Short description', value: bundle.short_description}]}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+
+{% if bundle %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'sales', heading: 'Sales', summary: 'Every order line that sold this bundle, with the price it was sold at and what was paid after any promotion.', pagination: bundle.sales_pagination})} %}
+{% block results %}
+{% if bundle.sales %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Orders for ' ~ bundle.title, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Order</th><th scope="col">Purchaser</th><th scope="col">Placed</th><th scope="col">State</th><th scope="col">Price</th><th scope="col">Paid</th></tr>{% endblock %}
+{% block body %}
+{% for sale in bundle.sales %}
+<tr><td><a href="/admin/commerce/orders/{{ sale.order_id }}">{{ sale.number }}</a></td><td>{{ sale.purchaser_name }}</td><td>{{ sale.placed_at|date('j M Y H:i') }}</td><td>{{ sale.state|replace({'_': ' '})|capitalize }}</td><td>{{ sale.price_label }}</td><td>{{ sale.paid_label }}</td></tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Not sold yet', summary: 'No order has included this bundle.'}) }}
+{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+{% endif %}
+</section>
+{% endblock %}

@@ -19,7 +19,7 @@ use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
 use CattoLearning\Support\{Money,Uuid};
-use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,IntegrationContainer};
+use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,IntegrationContainer,PromotionFixture};
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
@@ -54,10 +54,10 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->records=new CommerceRepository($this->db);
         $tx=new TransactionManager($this->db);
         $transitions=$container->get(TransitionService::class);
-        $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock);
+        $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock));
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyCredits=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
-        $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits,$this->analytics());
+        $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits,$this->analytics(),PromotionFixture::service($this->db,$this->clock));
         $this->payments=$this->paymentService(new OmnipayPaymentGatewayAdapter('test',$this->clock));
     }
     /** Records into this test's transaction, stamped by this test's clock. */
@@ -120,7 +120,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         foreach ($events as $event) {
             $course=(int)$event['course_id'];
             self::assertSame([$order,$items[$course],$this->actor->id,'checkout','course_purchased:order_item:'.$items[$course]],[(int)$event['order_id'],(int)$event['order_item_id'],(int)$event['user_id'],$event['source'],$event['idempotency_key']]);
-            self::assertSame(['access_period_seconds','amount_minor','currency','purchaser','quantity'],array_keys(self::sorted($event['metadata'])),'Only the line\'s own figures: no payment, card or provider details.');
+            self::assertSame(['access_period_seconds','amount_minor','currency','discount_minor','purchaser','quantity'],array_keys(self::sorted($event['metadata'])),'Only the line\'s own figures (what it was paid and its promotion share): no payment, card or provider details.');
         }
         self::assertSame([12345,5000],array_map(static fn(array $e): int => $e['metadata']['amount_minor'],$events));
     }
@@ -129,7 +129,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
         $admin=$this->financeAdmin(); $key=Uuid::v4();
         $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
         $service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
@@ -228,16 +228,16 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $id=$this->place();$this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $enrolment=(int)$this->db->fetchOne('SELECT e.enrolment_id FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE ce.user_id=:user', ['user'=>$this->actor->id]);
         $this->clock->modify('+90 days +1 hour');
-        $this->access->start($enrolment);$e=$this->records->entitlement($enrolment);
-        self::assertNotSame($e['access_started_at'],$e['learner_started_at']);
+        $this->access->start($enrolment);$e=$this->records->sources($enrolment)[0];
+        self::assertNotSame($e['access_started_at'],$this->db->fetchOne('SELECT started_at FROM course_enrolments WHERE id=:id',['id'=>$enrolment]));
         $this->clock->modify('+1 hour');$this->access->start($enrolment);
-        self::assertSame($e['access_expires_at'],$this->records->entitlement($enrolment)['access_expires_at']);
+        self::assertSame($e['access_expires_at'],$this->records->sources($enrolment)[0]['access_expires_at']);
     }
     public function testFreeAcceptanceStartsAccessWithoutFinancialDocuments(): void
     {
         $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=0 WHERE id=:id',['id'=>$this->variant]);
         $enrolment=$this->fulfilment->acceptFree($this->actor,$this->variant);
-        self::assertSame('active',$this->records->entitlement($enrolment)['state']);
+        self::assertSame('active',$this->records->sources($enrolment)[0]['state']);
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_orders WHERE purchaser_user_id=:user', ['user'=>$this->actor->id]));
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_documents d JOIN commerce_orders o ON o.id=d.order_id WHERE o.purchaser_user_id=:user', ['user'=>$this->actor->id]));
     }
@@ -451,7 +451,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
         $admin=$this->financeAdmin(); $key=Uuid::v4();
         $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
         self::assertSame($first,$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345));

@@ -58,6 +58,7 @@ final class AdminLookupController extends BaseController
         'people' => 'PLATFORM.PERSON.VIEW',
         'companies' => 'PLATFORM.COMPANY.VIEW',
         'courses' => 'COURSE.MANAGEMENT.VIEW',
+        'bundles' => 'BUNDLE.MANAGEMENT.VIEW',
     ];
 
     public function __construct(

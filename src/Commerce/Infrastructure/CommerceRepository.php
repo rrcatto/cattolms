@@ -70,6 +70,81 @@ final class CommerceRepository
         ) ?: null;
     }
 
+    private const BUNDLE_OFFER = 'SELECT o.id, o.bundle_id, o.price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
+            b.title, b.slug, b.status, b.available_from, b.available_until
+        FROM bundle_offers o JOIN bundles b ON b.id = o.bundle_id';
+
+    /**
+     * The cart's bundle lines: each bundle offer with its bundle, in the order they were added.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function cartBundles(int $cartId): array
+    {
+        return $this->db->fetchAllAssociative(self::BUNDLE_OFFER . ' JOIN commerce_cart_bundles cb ON cb.bundle_offer_id = o.id WHERE cb.cart_id=:id ORDER BY o.id', ['id'=>$cartId]);
+    }
+
+    /** @return array<string,mixed> */
+    public function bundleOffer(int $offerId): array
+    {
+        return $this->db->fetchAssociative(self::BUNDLE_OFFER . ' WHERE o.id=:id', ['id'=>$offerId]) ?: throw new RuntimeException('The bundle does not exist.');
+    }
+
+    /**
+     * A bundle's courses as they are now, in order. Placement copies them into the order line.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function bundleCourses(int $bundleId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT c.id AS course_id, c.title, c.slug, c.status FROM bundle_courses bc JOIN courses c ON c.id=bc.course_id WHERE bc.bundle_id=:id ORDER BY bc.position', ['id'=>$bundleId]);
+    }
+
+    public function changeCartBundle(int $cartId, int $offerId, bool $remove): void
+    {
+        if ($remove) {
+            $this->db->executeStatement('DELETE FROM commerce_cart_bundles WHERE cart_id=:cart AND bundle_offer_id=:offer', ['cart'=>$cartId,'offer'=>$offerId]);
+        } else {
+            $this->db->executeStatement('INSERT INTO commerce_cart_bundles(cart_id,bundle_offer_id) VALUES (:cart,:offer) ON CONFLICT DO NOTHING', ['cart'=>$cartId,'offer'=>$offerId]);
+        }
+        $this->db->executeStatement('UPDATE commerce_carts SET revision=revision+1 WHERE id=:id', ['id'=>$cartId]);
+    }
+
+    /** Whether an order that is not cancelled or refunded already sells this bundle to the learner. */
+    public function hasPayableBundle(int $userId, int $bundleId): bool
+    {
+        return (bool)$this->db->fetchOne("SELECT i.id FROM commerce_order_items i JOIN commerce_orders o ON o.id=i.order_id WHERE i.beneficiary_user_id=:user AND i.bundle_id=:bundle AND o.state IN ('placed','awaiting_payment','manual_review')", ['user'=>$userId,'bundle'=>$bundleId]);
+    }
+
+    /** The learner's open enrolment in the course, from any source. */
+    public function openEnrolment(int $userId, int $courseId): ?int
+    {
+        $id = $this->db->fetchOne("SELECT id FROM course_enrolments WHERE user_id=:user AND course_id=:course AND NOT is_preview AND status IN ('assigned','active','completed') ORDER BY id LIMIT 1", ['user'=>$userId,'course'=>$courseId]);
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
+    /**
+     * Records the entitlement source a bundle line created for one of its courses, the visible
+     * enrolment it belongs to, and whether another source already granted the course then. Once per
+     * line and course; returns false when already recorded.
+     */
+    public function recordBundleGrant(int $itemId, int $courseId, int $enrolmentId, int $entitlementId, bool $shared, string $now): bool
+    {
+        return $this->db->fetchOne('INSERT INTO commerce_bundle_grants(order_item_id,course_id,enrolment_id,entitlement_id,shared_at_grant,created_at) VALUES (:item,:course,:enrolment,:entitlement,:shared,:now) ON CONFLICT DO NOTHING RETURNING 1', ['item'=>$itemId,'course'=>$courseId,'enrolment'=>$enrolmentId,'entitlement'=>$entitlementId,'shared'=>$shared?'t':'f','now'=>$now]) !== false;
+    }
+
+    /** @return list<array<string,mixed>> the line's grants with the state of the source each created and of the enrolment */
+    public function bundleGrants(int $itemId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT g.*, e.state AS entitlement_state, e.access_expires_at, ce.status AS enrolment_status FROM commerce_bundle_grants g JOIN commerce_entitlements e ON e.id=g.entitlement_id JOIN course_enrolments ce ON ce.id=g.enrolment_id WHERE g.order_item_id=:item ORDER BY g.created_at, g.course_id', ['item'=>$itemId]);
+    }
+
+    /** Applies or removes the cart's promo code; like any cart change it invalidates an earlier quote. */
+    public function setCartPromotion(int $cartId, ?int $promotionId): void
+    {
+        $this->db->executeStatement('UPDATE commerce_carts SET promotion_id=:promotion, revision=revision+1 WHERE id=:id', ['id'=>$cartId,'promotion'=>$promotionId]);
+    }
+
     public function changeCart(int $cartId, int $variantId, bool $remove): void
     {
         if ($remove) {
@@ -141,18 +216,30 @@ final class CommerceRepository
         return $created === false ? ($this->purchasedCredit($itemId) ?? throw new RuntimeException('Purchased credit lot unavailable.')) : (int) $created;
     }
 
-    /** @param array<string,mixed> $snapshot */
-    public function place(int $cartId, int $userId, int $total, string $currency, array $snapshot, string $now, string $due): int
+    /**
+     * The total is after the discount; the promotion and its discount are recorded beside it.
+     *
+     * @param array<string,mixed> $snapshot
+     */
+    public function place(int $cartId, int $userId, int $total, string $currency, array $snapshot, string $now, string $due, ?int $promotionId = null, int $discountMinor = 0): int
     {
-        $id = (int) $this->db->fetchOne("INSERT INTO commerce_orders(public_id,purchaser_user_id,cart_id,state,total_minor,currency,snapshot,placed_at,payment_due_at) VALUES (:public,:user,:cart,'placed',:total,:currency,:snapshot,:now,:due) RETURNING id", ['public'=>Uuid::v4(),'user'=>$userId,'cart'=>$cartId,'total'=>$total,'currency'=>$currency,'snapshot'=>self::json($snapshot),'now'=>$now,'due'=>$due]);
+        $id = (int) $this->db->fetchOne("INSERT INTO commerce_orders(public_id,purchaser_user_id,cart_id,state,total_minor,currency,snapshot,placed_at,payment_due_at,promotion_id,discount_minor) VALUES (:public,:user,:cart,'placed',:total,:currency,:snapshot,:now,:due,:promotion,:discount) RETURNING id", ['public'=>Uuid::v4(),'user'=>$userId,'cart'=>$cartId,'total'=>$total,'currency'=>$currency,'snapshot'=>self::json($snapshot),'now'=>$now,'due'=>$due,'promotion'=>$promotionId,'discount'=>$discountMinor]);
         $this->db->executeStatement("UPDATE commerce_carts SET state='placed' WHERE id=:id", ['id'=>$cartId]);
         return $id;
     }
 
-    /** @param array<string,mixed> $snapshot */
+    /**
+     * amount_minor is the line's price; discount_minor its share of the order's promotion discount.
+     *
+     * @param array<string,mixed> $snapshot
+     */
     public function addOrderItem(int $orderId, int $userId, array $snapshot): void
     {
-        $this->db->executeStatement('INSERT INTO commerce_order_items(order_id,variant_id,course_id,beneficiary_user_id,amount_minor,access_period_seconds,snapshot) VALUES (:order,:variant,:course,:user,:amount,:duration,:snapshot)', ['order'=>$orderId,'variant'=>$snapshot['variant_id'],'course'=>$snapshot['course_id'],'user'=>$userId,'amount'=>$snapshot['unit_price_minor'],'duration'=>$snapshot['access_period_seconds'],'snapshot'=>self::json($snapshot)]);
+        if (($snapshot['fulfilment_type'] ?? '') === 'bundle') {
+            $this->db->executeStatement("INSERT INTO commerce_order_items(order_id,product_type,bundle_id,bundle_offer_id,beneficiary_user_id,amount_minor,discount_minor,access_period_seconds,snapshot) VALUES (:order,'bundle',:bundle,:offer,:user,:amount,:discount,:duration,:snapshot)", ['order'=>$orderId,'bundle'=>$snapshot['bundle_id'],'offer'=>$snapshot['bundle_offer_id'],'user'=>$userId,'amount'=>$snapshot['unit_price_minor'],'discount'=>(int)($snapshot['discount_minor'] ?? 0),'duration'=>$snapshot['access_period_seconds'],'snapshot'=>self::json($snapshot)]);
+            return;
+        }
+        $this->db->executeStatement('INSERT INTO commerce_order_items(order_id,variant_id,course_id,beneficiary_user_id,amount_minor,discount_minor,access_period_seconds,snapshot) VALUES (:order,:variant,:course,:user,:amount,:discount,:duration,:snapshot)', ['order'=>$orderId,'variant'=>$snapshot['variant_id'],'course'=>$snapshot['course_id'],'user'=>$userId,'amount'=>$snapshot['unit_price_minor'],'discount'=>(int)($snapshot['discount_minor'] ?? 0),'duration'=>$snapshot['access_period_seconds'],'snapshot'=>self::json($snapshot)]);
     }
 
     /** @return array<string,mixed> */
@@ -237,40 +324,132 @@ final class CommerceRepository
     {
         return (bool)$this->db->fetchOne("SELECT i.id FROM commerce_order_items i JOIN commerce_orders o ON o.id=i.order_id WHERE i.beneficiary_user_id=:user AND i.course_id=:course AND o.state IN ('placed','awaiting_payment','manual_review','paid')", ['user'=>$userId,'course'=>$courseId]);
     }
-    /** @return array<string,mixed>|null */
-    public function entitlement(int $enrolmentId, bool $lock = false): ?array
+    /**
+     * The visible enrolment access is resolved for, locked when asked.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function accessEnrolment(int $enrolmentId, bool $lock = false): ?array
     {
-        return $this->db->fetchAssociative('SELECT e.*,ce.user_id,ce.course_id,ce.access_period_seconds,ce.started_at AS learner_started_at,ce.status AS learning_status FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE e.enrolment_id=:id' . ($lock?' FOR UPDATE OF e,ce':''), ['id'=>$enrolmentId]) ?: null;
+        return $this->db->fetchAssociative('SELECT id,user_id,course_id,source_type,status,started_at,expires_at,assigned_at,access_period_seconds FROM course_enrolments WHERE id=:id' . ($lock?' FOR UPDATE':''), ['id'=>$enrolmentId]) ?: null;
     }
+
+    /**
+     * Every entitlement source behind an enrolment, oldest first.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function sources(int $enrolmentId, bool $lock = false): array
+    {
+        return $this->db->fetchAllAssociative('SELECT * FROM commerce_entitlements WHERE enrolment_id=:id ORDER BY id' . ($lock?' FOR UPDATE':''), ['id'=>$enrolmentId]);
+    }
+
+    /** @return array<string,mixed>|null */
+    public function source(int $sourceId, bool $lock = false): ?array
+    {
+        return $this->db->fetchAssociative('SELECT * FROM commerce_entitlements WHERE id=:id' . ($lock?' FOR UPDATE':''), ['id'=>$sourceId]) ?: null;
+    }
+
+    /** @return list<int> the sources an order line created */
+    public function sourcesForItem(int $itemId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT id FROM commerce_entitlements WHERE order_item_id=:item ORDER BY id', ['item'=>$itemId]));
+    }
+
     public function fulfilledItem(int $itemId): bool
     {
         return (bool)$this->db->fetchOne('SELECT id FROM commerce_entitlements WHERE order_item_id=:id', ['id'=>$itemId]);
     }
-    /** @param array<string,mixed> $snapshot */
+
+    /**
+     * A new visible enrolment with one entitlement source: what an individual purchase or a free
+     * acceptance creates. Returns the enrolment.
+     *
+     * @param array<string,mixed> $snapshot
+     */
     public function createEntitlement(?int $itemId, int $userId, int $courseId, int $duration, string $source, array $snapshot, string $now, string $deadline): int
     {
-        $enrolment = (int)$this->db->fetchOne("INSERT INTO course_enrolments(public_id,user_id,course_id,source_type,source_reference,status,access_period_seconds,assigned_at,created_at,updated_at) VALUES (:public,:user,:course,:source,:reference,'assigned',:duration,:now,:now,:now) RETURNING id", ['public'=>Uuid::v4(),'user'=>$userId,'course'=>$courseId,'source'=>$source,'reference'=>$itemId===null?null:(string)$itemId,'duration'=>$duration,'now'=>$now]);
-        $this->db->executeStatement("INSERT INTO commerce_entitlements(order_item_id,enrolment_id,state,source,snapshot,created_at,activation_deadline_at) VALUES (:item,:enrolment,'awaiting_activation',:source,:snapshot,:now,:deadline)", ['item'=>$itemId,'enrolment'=>$enrolment,'source'=>$source,'snapshot'=>self::json($snapshot),'now'=>$now,'deadline'=>$deadline]);
+        $enrolment = $this->createEnrolment($userId, $courseId, $duration, $source, $itemId, $now);
+        $this->addSource($itemId, $enrolment, $source, $duration, $snapshot, $now, $deadline);
         return $enrolment;
     }
-    public function activate(int $enrolmentId, string $state, string $start, string $expiry): void
+
+    /** A visible enrolment for a learner who has no open access to the course yet. */
+    public function createEnrolment(int $userId, int $courseId, int $duration, string $sourceType, ?int $itemId, string $now): int
     {
-        $this->db->executeStatement('UPDATE commerce_entitlements SET state=:state,access_started_at=:start,access_expires_at=:expiry WHERE enrolment_id=:id', ['id'=>$enrolmentId,'state'=>$state,'start'=>$start,'expiry'=>$expiry]);
-        // expires_at remains a compatibility projection; started_at continues to mean learner commencement.
-        $this->db->executeStatement('UPDATE course_enrolments SET expires_at=:expiry WHERE id=:id', ['id'=>$enrolmentId,'expiry'=>$expiry]);
+        return (int)$this->db->fetchOne("INSERT INTO course_enrolments(public_id,user_id,course_id,source_type,source_reference,status,access_period_seconds,assigned_at,created_at,updated_at) VALUES (:public,:user,:course,:source,:reference,'assigned',:duration,:now,:now,:now) RETURNING id", ['public'=>Uuid::v4(),'user'=>$userId,'course'=>$courseId,'source'=>$sourceType,'reference'=>$itemId===null?null:(string)$itemId,'duration'=>$duration,'now'=>$now]);
     }
+
+    /**
+     * One more entitlement source behind an enrolment, awaiting activation with its own access period.
+     *
+     * @param array<string,mixed> $snapshot
+     */
+    public function addSource(?int $itemId, int $enrolmentId, string $source, int $duration, array $snapshot, string $now, string $deadline): int
+    {
+        return (int)$this->db->fetchOne("INSERT INTO commerce_entitlements(order_item_id,enrolment_id,state,source,snapshot,created_at,activation_deadline_at,access_period_seconds) VALUES (:item,:enrolment,'awaiting_activation',:source,:snapshot,:now,:deadline,:duration) RETURNING id", ['item'=>$itemId,'enrolment'=>$enrolmentId,'source'=>$source,'snapshot'=>self::json($snapshot),'now'=>$now,'deadline'=>$deadline,'duration'=>$duration]);
+    }
+
+    /**
+     * Records an enrolment's own non-commerce term (ADMIN assignment, company credit, seed) as its
+     * 'origin' source, the first time a commerce source joins it, so the two stay independent. A
+     * term already running (or preset) is active until it ends; one not yet started starts when the
+     * learner starts. Does nothing for an enrolment that already has sources.
+     */
+    public function recordOriginSource(int $enrolmentId, string $now): void
+    {
+        $this->db->executeStatement(
+            "INSERT INTO commerce_entitlements(order_item_id,enrolment_id,state,source,snapshot,created_at,activation_deadline_at,access_started_at,access_expires_at,access_period_seconds)
+             SELECT NULL, ce.id,
+                    CASE WHEN ce.expires_at IS NULL THEN 'awaiting_activation' WHEN ce.expires_at <= CAST(:now AS TIMESTAMPTZ) THEN 'expired' ELSE 'active' END,
+                    'origin', jsonb_build_object('source_type', ce.source_type, 'source_reference', ce.source_reference), ce.assigned_at, NULL,
+                    CASE WHEN ce.expires_at IS NULL THEN NULL ELSE LEAST(COALESCE(ce.started_at, ce.assigned_at), ce.expires_at - INTERVAL '1 second') END,
+                    ce.expires_at, ce.access_period_seconds
+               FROM course_enrolments ce
+              WHERE ce.id=:id AND NOT EXISTS (SELECT 1 FROM commerce_entitlements e WHERE e.enrolment_id=ce.id)",
+            ['id'=>$enrolmentId,'now'=>$now]
+        );
+    }
+
+    public function activateSource(int $sourceId, string $state, string $start, string $expiry): void
+    {
+        $this->db->executeStatement('UPDATE commerce_entitlements SET state=:state,access_started_at=:start,access_expires_at=:expiry WHERE id=:id', ['id'=>$sourceId,'state'=>$state,'start'=>$start,'expiry'=>$expiry]);
+    }
+
+    public function expireSource(int $sourceId): void
+    {
+        $this->db->executeStatement("UPDATE commerce_entitlements SET state='expired' WHERE id=:id", ['id'=>$sourceId]);
+    }
+
+    /** Returns false when the source was already revoked. */
+    public function revokeSource(int $sourceId): bool
+    {
+        return $this->db->executeStatement("UPDATE commerce_entitlements SET state='revoked' WHERE id=:id AND state<>'revoked'", ['id'=>$sourceId]) > 0;
+    }
+
+    /**
+     * The enrolment's expires_at is a projection of its sources: the latest expiry among the active
+     * ones, null while sources only await activation. The library, reports and legacy checks read it.
+     */
+    public function projectAccess(int $enrolmentId, ?string $expiresAt): void
+    {
+        $this->db->executeStatement('UPDATE course_enrolments SET expires_at=CAST(:expiry AS TIMESTAMPTZ) WHERE id=:id AND expires_at IS DISTINCT FROM CAST(:expiry AS TIMESTAMPTZ)', ['id'=>$enrolmentId,'expiry'=>$expiresAt]);
+    }
+
+    /** Ends the visible access when no source keeps it open. Learning history remains. */
+    public function cancelEnrolment(int $enrolmentId, string $now): void
+    {
+        $this->db->executeStatement("UPDATE course_enrolments SET status='cancelled',updated_at=:now WHERE id=:id AND status IN ('assigned','active')", ['id'=>$enrolmentId,'now'=>$now]);
+    }
+
     public function learnerStarted(int $enrolmentId, string $now): void
     {
         $this->db->executeStatement("UPDATE course_enrolments SET started_at=COALESCE(started_at,:now),status=CASE WHEN status='assigned' THEN 'active' ELSE status END,updated_at=:now WHERE id=:id", ['id'=>$enrolmentId,'now'=>$now]);
     }
-    public function expireEntitlement(int $enrolmentId): void
-    {
-        $this->db->executeStatement("UPDATE commerce_entitlements SET state='expired' WHERE enrolment_id=:id", ['id'=>$enrolmentId]);
-    }
     /** @return list<int> */
     public function dueEntitlements(string $now, int $limit): array
     {
-        return array_map('intval',$this->db->fetchFirstColumn("SELECT enrolment_id FROM commerce_entitlements WHERE (state='awaiting_activation' AND activation_deadline_at<=:now) OR (state='active' AND access_expires_at<=:now) ORDER BY id LIMIT :limit", ['now'=>$now,'limit'=>$limit]));
+        return array_map('intval',$this->db->fetchFirstColumn("SELECT enrolment_id FROM commerce_entitlements WHERE (state='awaiting_activation' AND activation_deadline_at<=:now) OR (state='active' AND access_expires_at<=:now) GROUP BY enrolment_id ORDER BY MIN(id) LIMIT :limit", ['now'=>$now,'limit'=>$limit]));
     }
     /** @return list<int> */
     public function dueOrders(string $now, int $limit): array
@@ -369,11 +548,6 @@ final class CommerceRepository
     public function fundBalance(?int $userId, ?int $companyId, string $currency): int
     {
         return (int)$this->db->fetchOne('SELECT COALESCE(SUM(e.amount_minor),0) FROM commerce_fund_accounts a LEFT JOIN commerce_fund_entries e ON e.account_id=a.id WHERE a.owner_user_id IS NOT DISTINCT FROM CAST(:user AS BIGINT) AND a.owner_company_id IS NOT DISTINCT FROM CAST(:company AS BIGINT) AND a.currency=:currency', ['user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
-    }
-    public function revokeRefundedEntitlement(int $itemId, string $now): void
-    {
-        $this->db->executeStatement("UPDATE commerce_entitlements SET state='revoked' WHERE order_item_id=:item AND state<>'revoked'", ['item'=>$itemId]);
-        $this->db->executeStatement("UPDATE course_enrolments SET status='cancelled',updated_at=:now WHERE id IN (SELECT enrolment_id FROM commerce_entitlements WHERE order_item_id=:item) AND status IN ('assigned','active')", ['item'=>$itemId,'now'=>$now]);
     }
     public function pdf(int $documentId): ?string
     {

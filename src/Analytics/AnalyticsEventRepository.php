@@ -148,9 +148,10 @@ final class AnalyticsEventRepository
      *
      * purchases is the number of paid order lines (each one buying decision); purchased_units adds
      * up their quantities (a company credit line may buy many). refunded_units measures each refund
-     * in units of the line it refunds: its amount over the line's unit price, at most its quantity,
-     * so a partial refund of an individual course is a fraction of one unit and a company credit
-     * refund is the units it returned. A refund whose order line is gone counts its quantity.
+     * in units of the line it refunds: its amount over what the line was paid (its price less any
+     * promotion discount) per unit, at most its quantity, so a partial refund of an individual course
+     * is a fraction of one unit, a full refund of a discounted course is one unit, and a company
+     * credit refund is the units it returned. A refund whose order line is gone counts its quantity.
      *
      * @return array<int,array{purchases:int,purchased_units:int,refunds:int,refunded_units:float}> keyed by course id
      */
@@ -165,7 +166,7 @@ final class AnalyticsEventRepository
                     COALESCE(SUM(CASE
                         WHEN oi.id IS NOT NULL AND (e.metadata->>'amount_minor') IS NOT NULL
                             THEN LEAST(GREATEST(1, COALESCE((e.metadata->>'quantity')::int, 1))::numeric,
-                                       (e.metadata->>'amount_minor')::numeric * oi.quantity / oi.amount_minor)
+                                       (e.metadata->>'amount_minor')::numeric * oi.quantity / NULLIF(oi.amount_minor - oi.discount_minor, 0))
                         ELSE GREATEST(1, COALESCE((e.metadata->>'quantity')::int, 1))::numeric
                     END) FILTER (WHERE e.event_type = :refunded), 0) AS refunded_units
                FROM analytics_events e

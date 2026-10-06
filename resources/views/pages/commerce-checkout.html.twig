@@ -71,7 +71,12 @@
         {% else %}
             <h2 class="h4">Review my order</h2>
             {% for item in cart.items %}<p><strong>{{ item.title }}</strong> · {{ item.days }} days · {{ item.price_label }}</p>{% endfor %}
-            <p class="h4">Total: {{ cart.total_label }}</p>
+            {% for bundle in cart.bundles %}{% include '@platform/partials/commerce-bundle-line.html.twig' %}{% endfor %}
+            {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
+            {% include '@platform/partials/commerce-promo-code.html.twig' %}
+            <h3 class="h5 mt-4">Order total</h3>
+            {{ ui('data.key-value-list', {items: cart.totals}) }}
+            {% if cart.total_minor == 0 %}<p>Nothing to pay: the promotion covers this order, so it completes when you place it.</p>{% endif %}
             <h3 class="h5">Billed to</h3>
             {% include '@platform/partials/billing-address.html.twig' %}
             <p><a href="/checkout/profile">Change billing details</a></p>
