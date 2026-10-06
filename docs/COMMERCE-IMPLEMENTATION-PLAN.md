@@ -14,6 +14,7 @@ The commerce code lives in `src/Commerce/` (Contract, Domain, Application, Polic
 - **Billing profiles** (Phase F). One reusable profile per person (`user_billing_profiles`) and per company (`company_billing_profiles`), filled into both checkouts and copied into each order's immutable `billing` snapshot. VAT stays disabled; the tax number is informational.
 - **Promo codes** (Phase G, `/admin/promotions`). Percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and course and bundle scopes. The browser sends only the code; the server calculates, revalidates under the promotion's row lock at placement, holds a use while the order is unpaid and redeems it once when paid. The discount is an order adjustment allocated over lines by largest remainder and bounds each line's refund. Company credit purchases take no promotions.
 - **Course bundles** (Phase H, `/bundles`, `/admin/bundles`). Bundles of published courses with their own price and access period, sold as one line that snapshots its courses, price and access period. Never sold to companies.
+- **Document templates (Phase I, v0.8.8.8).** The shared engine in `src/Document/` can render invoices, receipts and credit notes from versioned ADMIN templates with a controlled placeholder language. Production financial documents still render through `InvoicePdfRenderer` from their snapshots until Phase K moves them onto it and records each document's template version.
 - **Entitlement sources.** Behind the one enrolment a learner sees per course, `commerce_entitlements` rows are independent sources (individual purchase, each bundle, free access, an ADMIN/company/seed `origin`), each with its own period, activation and expiry. `AccessService` keeps the course open while any source is valid; a refund revokes only the refunded line's sources.
 
 | Area | Current state | Next boundary |
@@ -36,7 +37,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.7. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.8. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 

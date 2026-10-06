@@ -124,7 +124,7 @@ async function checkoutToReview(page) {
             assert.ok(await page.getByRole('link', {name: fixture.bundle_title}).first().isVisible(), 'the bundle is in the bundle catalogue');
             await page.goto(`${base}${bundleUrl}`);
             assert.equal(await page.locator('main .cl-course-card').count(), 3, 'its courses are shown with the catalogue course cards');
-            const box = clean(await page.locator('aside').innerText());
+            const box = clean(await page.locator('main aside').innerText());
             for (const shown of [rand(120000), `Individual course prices ${rand(160000)}`, `You save ${rand(40000)}`]) assert.ok(box.includes(shown), shown);
             await page.getByRole('button', {name: 'Add bundle to cart'}).focus();
             await Promise.all([page.waitForNavigation(), page.keyboard.press('Enter')]);
@@ -167,7 +167,7 @@ async function checkoutToReview(page) {
     await scenario('a learner who already has one of the courses is told so, and the price stays the bundle price', 'chromium', async () => {
         const {ctx, page} = await open(chromium, learner('learner-owning-a').token);
         await page.goto(`${base}${bundleUrl}`);
-        const box = clean(await page.locator('aside').innerText());
+        const box = clean(await page.locator('main aside').innerText());
         assert.ok(box.includes('You already have access to 1 of the 3 courses in this bundle.'));
         assert.ok(box.includes(rand(120000)));
         await ctx.close();

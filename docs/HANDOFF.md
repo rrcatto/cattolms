@@ -1,6 +1,51 @@
-# Catto Learning 0.8.8.7 — Development Handoff
+# Catto Learning 0.8.8.8 — Development Handoff
 
-## Current development handoff — 2026/10/06 (v0.8.8.7)
+## Current development handoff — 2026/10/07 (v0.8.8.8)
+
+The owner authorized v0.8.8.8. It releases Phase I (below) and the front controller's `.env` reading:
+
+- **Reader.** `public_html/index.php` reads `APP_CODEBASE_PATH` with a port of phpdotenv's rules. It is proven equal to `Dotenv::parse()` on `.env.example` and 11 fixtures in `tests/Fixtures/env/` (`FrontControllerEnvTest`).
+- **Failures.** A missing or unreadable `.env`, a missing or empty `APP_CODEBASE_PATH`, and a missing `vendor/autoload.php` each answer HTTP 500 with their own message. The paths are logged only.
+- **Contract.** `IniParserContractTest` bans `parse_ini_file()` and `parse_ini_string()`.
+- **Other changes.** `.env.example` lost its stale v0.5.8 seed section, and PHPStan now analyses `index.php`. Report: workspace `REPORTS/env-front-controller-2026-10-06.md`.
+- **Release.** Annotated tag and GitHub release `v0.8.8.8` with `cattolms-v0.8.8.8.zip`. Gates: `composer qa` (1015 tests), the document templates browser check (9/9) and every existing browser suite.
+- **Next.** Phase J, moving certificates onto the document template engine, is in progress in the working tree.
+
+## Phase I — shared document template engine (2026/10/06, released in v0.8.8.8)
+
+Report: workspace `REPORTS/document-templates-2026-10-06.md`.
+
+- **Schema (in the canonical baseline).**
+  - `document_templates`: type `certificate|invoice|receipt|credit_note`, name, description, status `active|archived`, `is_current` (one per type, unique partial index) and `published_version_id`.
+  - `document_template_versions`: number, `draft|published`, `html`, `css`, page size, orientation and four margins from controlled lists, change note, `based_on_version_id`, authors and dates. One draft per template (unique partial index).
+  - The `document_template_version_guard` trigger refuses any UPDATE or DELETE of a published version, except clearing a deleted account's reference.
+  - `DOCUMENT.TEMPLATE.VIEW` and `DOCUMENT.TEMPLATE.MANAGE` (90 permissions, 80 business).
+  - The baseline publishes `resources/documents/{type}.html|css` as each type's current version 1.
+- **Engine (`src/Document/`).**
+  - `TemplateParser`: the language, with only `{{ group.name }}`, `{{#each collection}}` and `{{#if name}}…{{else}}…{{/if}}`. Every other form is an error with its line.
+  - `PlaceholderRegistry` (`PlaceholderSet`, `PlaceholderDefinition`, `CollectionDefinition`, `PlaceholderKind`): per-type names, kinds and required flags.
+  - `TemplateValidator`: syntax, names with "did you mean", `HtmlPolicy` and `CssPolicy`.
+  - `DocumentValueFormatter`: formats by kind (Money from minor units, `j F Y` dates in the platform zone, escaped addresses and line breaks, http(s) URLs, percentages).
+  - `DocumentTemplateRenderer`: `renderCurrent`, `renderVersion` and `renderSource`, the single path.
+  - Also `RenderedDocument::reference()`, `DocumentPdfRenderer` (Dompdf, remote, PHP and JS off), `DocumentSampleData`, `DocumentTemplateDefaults`, `DocumentTemplateRepository` and `DocumentTemplateService` (create, save draft, preview, save and publish, draft from version, discard, archive; audited by version reference).
+- **Administration.** System → Document Templates (`DocumentTemplateController`, `/admin/documents/templates…`).
+  - The list has type and status filters.
+  - The editor is one form with intent `save|preview|publish`.
+  - The preview is the renderer's HTML in a `sandbox=""` iframe, via `partials/document-template-preview.html.twig`.
+  - There is a placeholder reference with Insert buttons (`template_placeholders` Stimulus controller; the syntax is listed for copying without JavaScript), version history, a version page and a sample PDF.
+- **Platform fixes found on the way.**
+  - **Session save timing.** `App::handleWithSymfony()` now saves the session before `Response::send()`, which ends the FastCGI request first. Before this, a fast browser could follow a redirect before its flash message was written.
+  - **Breadcrumbs.** Administration pages that are not registered sections (Promotions, Bundles, Document Templates) no longer print "Administration" twice.
+- **Not migrated (Phase J).** The certificate editor, invoices, receipts and credit notes still render as before. No document records a template version yet. Business phone and registration numbers do not exist in CattoLMS and have no placeholders.
+- **Tests.**
+  - `DocumentTemplateEngineTest` (56) and `DocumentTemplateIntegrationTest` (7).
+  - `NavigationContractTest`, `AclContractTest` and the release validator are updated.
+  - `tests/Browser/document-templates.cjs`, with `document-templates-fixture.php`, has 9 scenarios: Chromium, Firefox, no JavaScript and all five themes.
+  - `composer qa`: 997 tests.
+  - Every existing browser suite passed after the platform fixes: UI matrix (70 pages with mutations and no JavaScript), canonical 30, Popular Courses 13, reviews 9, Course Content tree 41, billing 10, promotions 9, bundles 8.
+  - `bundles.cjs` now reads the bundle page's `main aside`, because the Factory Reset sidebar is also an `<aside>`.
+
+## v0.8.8.7 handoff — 2026/10/06
 
 The owner authorized v0.8.8.7. It contains the Billing Address change described at the end of the v0.8.8.6 section below: Account → Profile → Billing Address at `/account/billing`, with Personal Particulars restored. Annotated tag and GitHub release `v0.8.8.7` with `cattolms-v0.8.8.7.zip`. Gates: `composer qa` (934 tests) and `git diff --check`. The billing browser check (10/10), the UI matrix and the canonical matrix (30/30) passed on the same code before the version alignment.
 

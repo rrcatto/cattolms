@@ -1,6 +1,39 @@
 # Changelog
 
-**LMS version:** 0.8.8.7 **Date time:** 2026/10/06 SAST
+**LMS version:** 0.8.8.8 **Date time:** 2026/10/07 SAST
+
+## 2026-10-07 SAST — v0.8.8.8 Shared document template engine and .env-faithful front controller
+
+- **Release.** Version aligned to 0.8.8.8 at the owner's instruction. It releases the two entries below: Phase I and the front controller. Published as GitHub release `v0.8.8.8` with `cattolms-v0.8.8.8.zip`.
+- **Verification.** `composer qa` passed with 1015 tests. The document templates browser check passed 9/9, and every existing browser suite passed: UI matrix, canonical 30, Popular Courses 13, reviews 9, Course Content tree 41, billing 10, promotions 9, bundles 8.
+- **Deploying.** Rebuild the database, because the baseline changed. Copy `public_html/index.php` to the served web root, and publish `catto-platform.css` and the compiled assets.
+
+### Front controller reads .env exactly as phpdotenv does
+
+- **Reader.** `public_html/index.php` reads `APP_CODEBASE_PATH` with a port of phpdotenv's rules: BOM, CRLF/LF/CR, comments with any characters, multi-line values, `export`, quoted names, Dotenv's quoting and escapes, inline comments, and the last definition wins. A `${…}` value, or one Dotenv rejects, is refused. The reader's functions are defined in `index.php`, which returns before handling a request when it is not the script being run, so tests load the real file.
+- **Failures.** A missing or unreadable `.env`, a missing or empty `APP_CODEBASE_PATH`, and a missing `vendor/autoload.php` each answer HTTP 500 with their own plain-text message, without paths; the detail goes to the error log.
+- **`.env.example`.** The stale v0.5.8 Seed Database section is removed, and `APP_DOMAIN` notes how mail to generated `.invalid` companies is delivered.
+- **Tests.** `FrontControllerEnvTest` compares the reader with `Dotenv::parse()` on `.env.example` and 11 fixtures in `tests/Fixtures/env/`, and requests each failure over HTTP. `IniParserContractTest` fails the build on any `parse_ini_file()`/`parse_ini_string()` call in `src/`, `public_html/`, `tools/` or `bin/`. PHPStan now analyses `public_html/index.php`. `composer qa`: 1015 tests. Report: workspace `REPORTS/env-front-controller-2026-10-06.md`.
+
+### Phase I: shared document template engine
+
+- **Templates.** Certificates, invoices, receipts and credit notes get one shared document-template model: `document_templates` with versioned `document_template_versions` in the canonical baseline.
+  - An administrator edits one draft per template, previews it with fixed sample data and publishes it.
+  - A published version never changes; the database refuses it.
+  - Editing after publication starts a new draft, and an earlier version is reused by starting a draft from it.
+  - One template per document type is current. The baseline publishes `resources/documents/` as each type's version 1.
+- **Language.** `{{ group.name }}`, `{{#each items}} … {{/each}}` and `{{#if name}} … {{else}} … {{/if}}`, nothing else.
+  - No Twig, filters, expressions or method calls.
+  - Names come from `PlaceholderRegistry` per document type, and an unknown name is reported with its line and a suggestion.
+  - Values are escaped and formatted by kind: money from minor units, dates, address lines, line breaks, web addresses, percentages.
+- **Safety.** Template HTML may not contain scripts, styles, frames, forms, media, event handlers or `javascript:` addresses. Images must be embedded `data:` images, and placeholders may only appear in class, title, alt and web-address hrefs. CSS may not use `@import`, external `url()`, `expression()` or escapes. The preview is a fully sandboxed frame.
+- **Rendering.** `DocumentTemplateRenderer` (`renderCurrent`, `renderVersion`, `renderSource`) is the single path for previews, documents and PDFs (`DocumentPdfRenderer`, Dompdf). Each render reports the template and version it used.
+- **Administration.** System → Document Templates (`/admin/documents/templates`): list with filters, create, edit, preview, save and publish, discard, archive, version history, version pages and sample PDFs. `DOCUMENT.TEMPLATE.VIEW` and `DOCUMENT.TEMPLATE.MANAGE` take the catalogue to 90 permissions. Changes are audited by version reference.
+- **Fixes.**
+  - The session is now saved before the response is sent, so a redirect can no longer outrun its flash message.
+  - Administration pages that are not registered sections no longer show "Administration" twice in the breadcrumb.
+- **Tests.** `DocumentTemplateEngineTest` (56), `DocumentTemplateIntegrationTest` (7) and `tests/Browser/document-templates.cjs` (9 scenarios). `composer qa`: 997 tests.
+- **Not yet.** Production certificates, invoices, receipts and credit notes still render the old way; Phase J migrates them.
 
 ## 2026-10-06 SAST — v0.8.8.7 Billing Address under Account → Profile
 

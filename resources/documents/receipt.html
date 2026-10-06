@@ -1,0 +1,52 @@
+<table class="head">
+	<tr>
+		<td>
+			<p class="business">{{ business.name }}</p>
+			{{#if business.legal_name}}<p>{{ business.legal_name }}</p>{{/if}}
+			{{#if business.address}}<p>{{ business.address }}</p>{{/if}}
+			{{#if business.tax_number}}<p>Tax/VAT number: {{ business.tax_number }}</p>{{/if}}
+			{{#if business.email}}<p>{{ business.email }}</p>{{/if}}
+		</td>
+		<td class="title">
+			<h1>Receipt</h1>
+			<p>Receipt {{ receipt.number }}</p>
+			<p>Order {{ order.number }}</p>
+			<p>Received {{ receipt.date }}</p>
+			{{#if receipt.payment_method}}<p>Paid by {{ receipt.payment_method }}{{#if receipt.payment_reference}} · {{ receipt.payment_reference }}{{/if}}</p>{{/if}}
+		</td>
+	</tr>
+</table>
+
+<h2>Received from</h2>
+<p class="address">
+	{{ customer.billing_name }}<br>
+	{{#if customer.organisation}}{{ customer.organisation }}<br>{{/if}}
+	{{ customer.billing_address }}
+	{{#if customer.tax_number}}<br>Tax/VAT number: {{ customer.tax_number }}{{/if}}
+</p>
+{{#if customer.company_name}}<p>Purchased for {{ customer.company_name }}</p>{{/if}}
+
+<table class="lines">
+	<thead>
+		<tr><th>Item</th><th>Access</th><th class="amount">Price</th><th class="amount">Discount</th><th class="amount">Amount</th></tr>
+	</thead>
+	<tbody>
+		{{#each items}}
+		<tr>
+			<td>{{ item.description }}{{#if item.detail}}<br><small>{{ item.detail }}</small>{{/if}}</td>
+			<td>{{ item.access_period }}</td>
+			<td class="amount">{{ item.price }}</td>
+			<td class="amount">{{#if item.discount}}−{{ item.discount }}{{/if}}</td>
+			<td class="amount">{{ item.paid }}</td>
+		</tr>
+		{{/each}}
+	</tbody>
+</table>
+
+<table class="totals">
+	{{#if receipt.subtotal}}<tr><th>Subtotal</th><td>{{ receipt.subtotal }}</td></tr>{{/if}}
+	{{#if receipt.discount}}<tr><th>Promotion {{ promotion.code }}{{#if promotion.label}} ({{ promotion.label }}){{/if}}</th><td>−{{ receipt.discount }}</td></tr>{{/if}}
+	<tr class="total"><th>Amount received</th><td>{{ receipt.amount }}</td></tr>
+</table>
+
+<p class="note">Thank you. This receipt confirms payment of the order above.</p>

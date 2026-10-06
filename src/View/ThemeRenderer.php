@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.7';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.8';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -581,6 +581,11 @@ final class ThemeRenderer
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PROMOTION.VIEW')) {
                 $grandchildren[] = $child('admin-promotions', 'Promotions', '/admin/promotions', 'credits');
             }
+            // The templates certificates and financial documents are generated from are platform
+            // configuration, so they sit with Settings rather than with any one document's workspace.
+            if ($groupKey === 'system' && $this->can($data, 'DOCUMENT.TEMPLATE.VIEW')) {
+                $grandchildren[] = $child('admin-document-templates', 'Document Templates', '/admin/documents/templates', 'settings');
+            }
             if ($grandchildren === []) {
                 continue;
             }
@@ -835,7 +840,11 @@ final class ThemeRenderer
             try {
                 $section = $this->adminSections->get($sectionKey);
             } catch (\InvalidArgumentException) {
-                $section = ['label' => 'Administration', 'route' => '/admin'];
+                // A page that is not one of the registered sections (Promotions, Bundles, Document
+                // templates, ...) ends at its own title. Falling back to a section named
+                // "Administration" printed that crumb twice.
+                $appendCurrent($crumbs, $title !== '' ? $title : 'Administration');
+                return $crumbs;
             }
             $sectionLabel = (string) $section['label'];
 

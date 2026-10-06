@@ -1,0 +1,140 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/documents/templates' %}{% set ph_back_label = 'Document templates' %}{% set ph_kicker = template.type_label ~ ' template' %}{% set ph_title = template.name %}{% set ph_lead = template.is_current ? 'The current ' ~ template.type_label|lower ~ ' template: ' ~ template.type_label|lower ~ 's are generated from its published version ' ~ template.published_version_number ~ '.' : (template.published_version_number ? 'Published version ' ~ template.published_version_number ~ '. Not the current ' ~ template.type_label|lower ~ ' template.' : 'Not published yet.') %}{% include '@platform/partials/page-head.html.twig' %}
+{{ importmap() }}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Template', heading_level: 2, summary: 'Publishing a version makes this the current template for ' ~ template.type_label|lower ~ 's.'}) }}
+	<p>
+		{{ ui('feedback.badge', {label: template.type_label, tone: 'neutral'}) }}
+		{% if template.is_current %}{{ ui('feedback.badge', {label: 'Current', tone: 'success'}) }}{% endif %}
+		{% if template.status == 'archived' %}{{ ui('feedback.badge', {label: 'Archived', tone: 'warning'}) }}{% endif %}
+		{% if editing_draft %}{{ ui('feedback.badge', {label: 'Draft version ' ~ draft.version_number, tone: 'info'}) }}{% endif %}
+	</p>
+	{% if can_manage %}
+	<form action="/admin/documents/templates/{{ template.id }}/details" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'template-name', required: true})} %}{% block control %}<input id="template-name" name="name" value="{{ template.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', for: 'template-description'})} %}{% block control %}<input id="template-description" name="description" value="{{ template.description }}" maxlength="1000" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save details', variant: 'secondary', type: 'submit'}) }}{% endblock %}{% endembed %}
+	</form>
+	{% elseif template.description %}<p>{{ template.description }}</p>{% endif %}
+	{% if can_archive and not template.is_current %}
+	<form action="/admin/documents/templates/{{ template.id }}/archive" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="archived" value="{{ template.status == 'archived' ? '0' : '1' }}">
+		{{ ui('action.button', {label: template.status == 'archived' ? 'Restore template' : 'Archive template', variant: 'quiet', size: 'small', type: 'submit'}) }}
+	</form>
+	{% endif %}
+{% endblock %}{% endembed %}
+
+<div {{ stimulus_controller('template-placeholders') }}>
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'template-editor'})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: editing_draft ? 'Draft version ' ~ draft.version_number : 'Edit', heading_level: 2, summary: editing_draft ? 'Save keeps the draft; Preview shows your changes without saving; Save and publish makes this version the one documents use. A published version never changes.' : (published ? 'There is no draft. Saving starts a new draft from published version ' ~ published.version_number ~ '; the published version stays as it is.' : 'There is no draft.')}) }}
+	<div id="template-errors">
+	{% if errors %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: errors|length == 1 ? 'The template has a problem' : 'The template has ' ~ errors|length ~ ' problems'})} %}{% block body %}<ul class="cl-template-errors">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}
+	{% endif %}
+	</div>
+	{% if can_manage %}
+	<form action="/admin/documents/templates/{{ template.id }}" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Page size', for: 'template-page-size', required: true, span: 'quarter'})} %}{% block control %}<select id="template-page-size" name="page_size" required {{ ui_field_attrs(props) }}>{% for value, label in sizes %}<option value="{{ value }}"{% if form.page_size == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Orientation', for: 'template-orientation', required: true, span: 'quarter'})} %}{% block control %}<select id="template-orientation" name="page_orientation" required {{ ui_field_attrs(props) }}>{% for value, label in orientations %}<option value="{{ value }}"{% if form.page_orientation == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% for field, label in {margin_top_mm: 'Top margin (mm)', margin_right_mm: 'Right margin (mm)', margin_bottom_mm: 'Bottom margin (mm)', margin_left_mm: 'Left margin (mm)'} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: label, for: 'template-' ~ field, required: true, span: 'quarter'})} %}{% block control %}<input id="template-{{ field }}" name="{{ field }}" type="number" min="0" max="{{ max_margin }}" step="1" value="{{ form[field] }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% endfor %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'HTML', for: 'template-html', required: true, full_width: true, help: 'The body of the document. Placeholders are listed below; use {{#each items}} … {{/each}} for repeating lines and {{#if name}} … {{else}} … {{/if}} for optional content. Scripts, forms and event handlers are not allowed, and images must be embedded data: images.'})} %}{% block control %}<textarea id="template-html" name="html" rows="24" class="cl-template-source" spellcheck="false" required {{ stimulus_target('template-placeholders', 'source') }} {{ ui_field_attrs(props) }}>{{ form.html }}</textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'CSS', for: 'template-css', full_width: true, help: 'Styles for this document only: typography, spacing, borders, tables, backgrounds and page breaks. url() may only hold an embedded data: image.'})} %}{% block control %}<textarea id="template-css" name="css" rows="12" class="cl-template-source" spellcheck="false" {{ ui_field_attrs(props) }}>{{ form.css }}</textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Change note', for: 'template-note', full_width: true, help: 'Optional. Shown in the version history.'})} %}{% block control %}<input id="template-note" name="change_note" value="{{ form.change_note }}" maxlength="500" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+		{% block primary_actions %}
+			{{ ui('action.button', {label: 'Save draft', variant: 'primary', type: 'submit', name: 'intent', value: 'save'}) }}
+			{{ ui('action.button', {label: 'Preview', variant: 'secondary', type: 'submit', name: 'intent', value: 'preview', icon: 'action-open'}) }}
+		{% endblock %}
+		{% block secondary_actions %}
+			{{ ui('action.button', {label: 'Save and publish', variant: 'secondary', type: 'submit', name: 'intent', value: 'publish', confirm: 'Publish this version? Documents generated from now on will use it. A published version cannot be changed afterwards.'}) }}
+		{% endblock %}
+		{% endembed %}
+	</form>
+	{% if editing_draft %}
+	<form action="/admin/documents/templates/{{ template.id }}/discard" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{{ ui('action.button', {label: 'Discard draft', variant: 'danger', size: 'small', type: 'submit', icon: 'action-remove', confirm: 'Discard draft version ' ~ draft.version_number ~ '? The published version is unchanged.'}) }}
+	</form>
+	{% endif %}
+	{% else %}
+	{{ ui('feedback.notice', {tone: 'info', heading: template.status == 'archived' ? 'This template is archived. Restore it to edit it.' : 'You can view this template but not change it.'}) }}
+	{% endif %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'template-preview'})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: preview_unsaved ? 'Preview of your changes' : (editing_draft ? 'Preview of the saved draft' : 'Preview of the published version'), heading_level: 2}) }}
+	{% set preview_source = editing_draft ? draft : published %}
+	{% include '@platform/partials/document-template-preview.html.twig' with {dp_unsaved: preview_unsaved, dp_error: preview_error, dp_pdf_href: (not preview_unsaved and preview_source) ? '/admin/documents/templates/' ~ template.id ~ '/versions/' ~ preview_source.id ~ '/sample.pdf' : '', dp_title: 'Preview of ' ~ template.name} %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'template-placeholders'})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Placeholders', heading_level: 2, summary: 'Every placeholder a ' ~ template.type_label|lower ~ ' template may use. Any other name is an error. Values are formatted and escaped for you; an optional value that is absent prints nothing.'}) }}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: template.type_label ~ ' placeholders', density: 'compact'})} %}
+	{% block header %}<tr><th scope="col">Placeholder</th><th scope="col">Kind</th><th scope="col">Description</th></tr>{% endblock %}
+	{% block body %}
+	{% for placeholder in placeholders %}
+	<tr>
+		<td><code>{{ placeholder.token }}</code>{% if placeholder.required %} <small>(always present)</small>{% endif %}{% if can_manage %} {{ ui('action.button', {label: 'Insert', aria_label: 'Insert ' ~ placeholder.token, variant: 'quiet', size: 'small', type: 'button', hidden: true, name: 'token', value: placeholder.token, stimulus_action: 'template-placeholders#insert', icon: 'action-add'}) }}{% endif %}</td>
+		<td>{{ placeholder.kind }}</td>
+		<td>{{ placeholder.description }}</td>
+	</tr>
+	{% endfor %}
+	{% for collection in collections %}
+	<tr>
+		<td><code>{{ collection.open }}</code> … <code>{{ collection.close }}</code>{% if can_manage %} {{ ui('action.button', {label: 'Insert', aria_label: 'Insert ' ~ collection.open, variant: 'quiet', size: 'small', type: 'button', hidden: true, name: 'token', value: collection.open ~ "\n" ~ collection.close, stimulus_action: 'template-placeholders#insert', icon: 'action-add'}) }}{% endif %}</td>
+		<td>repeating block</td>
+		<td>{{ collection.description }} Inside it, use the fields below.</td>
+	</tr>
+	{% for placeholder in collection.fields %}
+	<tr>
+		<td><code>{{ placeholder.token }}</code>{% if placeholder.required %} <small>(always present)</small>{% endif %}{% if can_manage %} {{ ui('action.button', {label: 'Insert', aria_label: 'Insert ' ~ placeholder.token, variant: 'quiet', size: 'small', type: 'button', hidden: true, name: 'token', value: placeholder.token, stimulus_action: 'template-placeholders#insert', icon: 'action-add'}) }}{% endif %}</td>
+		<td>{{ placeholder.kind }}</td>
+		<td>{{ placeholder.description }}</td>
+	</tr>
+	{% endfor %}
+	{% endfor %}
+	{% endblock %}
+	{% endembed %}
+{% endblock %}{% endembed %}
+</div>
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'template-history'})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Version history', heading_level: 2, summary: 'Published versions never change. To go back to an earlier version, start a new draft from it and publish that.'}) }}
+	{% if versions %}
+	{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Versions of ' ~ template.name, density: 'compact'})} %}
+	{% block header %}<tr><th scope="col">Version</th><th scope="col">State</th><th scope="col">Created</th><th scope="col">Published</th><th scope="col">Note</th><th scope="col">Actions</th></tr>{% endblock %}
+	{% block body %}
+	{% for version in versions %}
+	<tr>
+		<td><a href="/admin/documents/templates/{{ template.id }}/versions/{{ version.id }}">Version {{ version.version_number }}</a></td>
+		<td>{% if version.state == 'draft' %}{{ ui('feedback.badge', {label: 'Draft', tone: 'info', size: 'small'}) }}{% elseif version.is_published_version %}{{ ui('feedback.badge', {label: 'Published · in use', tone: 'success', size: 'small'}) }}{% else %}{{ ui('feedback.badge', {label: 'Published', tone: 'neutral', size: 'small'}) }}{% endif %}</td>
+		<td>{{ version.created_at|date('j M Y H:i') }}{% if version.created_by_name %}<br><small>{{ version.created_by_name }}</small>{% endif %}</td>
+		<td>{% if version.published_at %}{{ version.published_at|date('j M Y H:i') }}{% if version.published_by_name %}<br><small>{{ version.published_by_name }}</small>{% endif %}{% else %}—{% endif %}</td>
+		<td>{{ version.change_note ?? '' }}</td>
+		<td>
+			{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}{% block body %}
+				{{ ui('action.link', {label: 'View', variant: 'quiet', size: 'small', href: '/admin/documents/templates/' ~ template.id ~ '/versions/' ~ version.id}) }}
+				{% if can_manage and not editing_draft %}<form action="/admin/documents/templates/{{ template.id }}/versions/{{ version.id }}/draft" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Start draft', aria_label: 'Start a new draft from version ' ~ version.version_number, variant: 'quiet', size: 'small', type: 'submit'}) }}</form>{% endif %}
+			{% endblock %}{% endembed %}
+		</td>
+	</tr>
+	{% endfor %}
+	{% endblock %}
+	{% endembed %}
+	{% else %}
+	{{ ui('feedback.empty', {heading: 'No versions', summary: 'This template has no versions.'}) }}
+	{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

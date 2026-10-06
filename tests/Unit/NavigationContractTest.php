@@ -120,6 +120,7 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/admin/companies', $adminChildren['admin-companies']['href'] ?? null);
         self::assertSame('/admin/roles', $adminChildren['admin-roles']['href'] ?? null);
         self::assertSame('/admin/settings', $adminChildren['admin-settings']['href'] ?? null);
+        self::assertSame('/admin/documents/templates', $adminChildren['admin-document-templates']['href'] ?? null, 'Document templates sit in the System group.');
     }
 
     /**

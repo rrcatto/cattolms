@@ -157,6 +157,13 @@ final class App
 
         $request = Request::createFromGlobals();
         $response = $kernel->handle($request);
+        // Save the session before the response leaves. Response::send() ends the FastCGI request
+        // (fastcgi_finish_request), and PHP would otherwise write the session at shutdown, after the
+        // browser already has the response: a redirect could then be followed before its flash
+        // message was saved, and the message was lost.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
         $response->send();
         $kernel->terminate($request, $response);
     }

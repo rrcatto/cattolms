@@ -7,6 +7,9 @@ parameters:
     # double-quoted PHP string, which PHP read as a variable. Static analysis that stops at the
     # application boundary cannot see the code that proves the application works.
     - tests
+    # The front controller reads .env before the autoloader exists, so its reader is plain functions
+    # in this file; analysing it checks that code and lets the tests that load it resolve them.
+    - public_html/index.php
   tmpDir: storage/cache/phpstan
   universalObjectCratesClasses:
     - CattoLearning\Infrastructure\Persistence\M\ApiTokensM

@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.8.7 (0.8 code line) **Date time:** 2026/10/06 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.8.8.8 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
@@ -492,6 +492,10 @@ A learner has one enrolment per course: the library, the reader, progress, resul
 A bundle is a commerce and catalogue offer that contains published courses; it is not a course and has no content, reader, progress or certificate of its own. Each course a bundle grants is opened, studied and graded exactly as if bought on its own. Removing a course from a bundle, or retiring or deleting the course, never changes an order that included it: the order keeps the courses it was sold with, and a bundle with an unpublished course cannot be bought.
 
 Course reviews belong to the course: only learners with a genuine enrolment may rate and review it (`/learn/{slug}/review`), nothing is public until ADMIN approves it, and the course rating uses approved versions only. Course popularity is a stored snapshot calculated by `popularity:recalculate`, never on a request.
+
+### Certificates and document templates
+
+The course certificate still renders from the course's certificate template fields. Phase I added the shared document template engine (`src/Document/`, System → Document Templates) with a certificate document type and its placeholders (`learner.name`, `course.title`, `course.completion_date`, `result.percentage`, …). Phase J moves certificates onto it, with their preview and issued documents rendered by the same renderer.
 
 ### HTML import mapping
 
