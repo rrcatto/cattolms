@@ -1,6 +1,15 @@
 # Changelog
 
-**LMS version:** 0.8.8.5 **Date time:** 2026/10/06 SAST
+**LMS version:** 0.8.8.6 **Date time:** 2026/10/06 SAST
+
+## 2026-10-06 SAST — v0.8.8.6 Front controller reads .env comments
+
+- **Fix.** `public_html/index.php` found the code root by reading the instance `.env` with `parse_ini_file()`, which does not treat `#` lines as comments.
+  - A comment containing brackets, such as line 66 of the shipped `.env.example`, made the whole file fail to parse. `APP_CODEBASE_PATH` came back empty, and every page answered "Application dependencies are missing." even with `vendor/` installed.
+  - Composer, Phinx and `smoke:install` read the same file with Dotenv, so they worked, which hid the cause.
+  - It now reads the file the way Dotenv does: `#` comments are skipped, quoted values, `export` and inline comments are accepted, and the first definition wins.
+- **Tests.** `FrontControllerEnvTest` (8 cases) runs the real front controller in a separate process against the shipped `.env.example` and each value form. The previous front controller fails 7 of them.
+- **Release.** `composer qa` passed. Published as GitHub release `v0.8.8.6` with `cattolms-v0.8.8.6.zip`. To deploy, copy `public_html/index.php` to the served web root.
 
 ## 2026-10-06 SAST — v0.8.8.5 One canonical migration and current documentation
 

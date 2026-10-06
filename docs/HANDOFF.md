@@ -1,6 +1,15 @@
-# Catto Learning 0.8.8.5 — Development Handoff
+# Catto Learning 0.8.8.6 — Development Handoff
 
-## Current development handoff — 2026/10/06 (v0.8.8.5)
+## Current development handoff — 2026/10/06 (v0.8.8.6)
+
+The owner authorized v0.8.8.6 after installing v0.8.8.5 on the VPS. Every page there answered "Application dependencies are missing." although `current` pointed at the release, `.env` existed and `vendor/autoload.php` was installed.
+
+- **Cause.** `public_html/index.php` read `APP_CODEBASE_PATH` with `parse_ini_file()`. That function fails on a `#` comment containing brackets (the shipped `.env.example` has one at line 66), so the code root came back empty. The local instance escaped because its `.env` has no comments. The owner confirmed the cause by removing the comment lines on the VPS, after which the site loaded.
+- **Fix.** The front controller now reads the file the way Dotenv does, and `tests/Unit/FrontControllerEnvTest.php` (8 cases) covers it.
+- **Deploying.** Copy `public_html/index.php` to the served web root; comments may then go back into `.env`.
+- **Release.** Annotated tag and GitHub release `v0.8.8.6` with `cattolms-v0.8.8.6.zip`. Gates: `composer qa` and `git diff --check`.
+
+## v0.8.8.5 handoff — 2026/10/06
 
 The owner asked for the migrations to be replaced in Git by the one canonical file and for the released zip to be updated, and chose a new version rather than moving the published `v0.8.8.4` tag. v0.8.8.5 is commit `511627b` (the consolidated baseline and refreshed documentation, pushed to `main`) plus the version alignment. It has an annotated tag and GitHub release `v0.8.8.5` with `cattolms-v0.8.8.5.zip`. v0.8.8.4 and its release are unchanged. The single-baseline details, its equivalence proof and the database rebuild are recorded under "One canonical migration" below. Gates: `composer qa` (926 PHPUnit tests) on the rebuilt database, release and UI-contract validation, Composer validation and `git diff --check`. No UI changed, so no browser checks were rerun.
 
