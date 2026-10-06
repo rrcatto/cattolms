@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.6';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.7';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -597,6 +597,7 @@ final class ThemeRenderer
             $accountPermissionBySection = [
                 'dashboard' => 'ACCOUNT.VIEW',
                 'profile' => 'ACCOUNT.PROFILE.VIEW',
+                'billing' => 'ACCOUNT.PROFILE.VIEW',
                 'emails' => 'ACCOUNT.PROFILE.VIEW',
                 'social' => 'ACCOUNT.PROFILE.VIEW',
                 'learning' => 'LEARNING.LIBRARY.VIEW',
@@ -606,8 +607,9 @@ final class ThemeRenderer
             // Profile is a group of three rather than three siblings. The owner's instruction,
             // 2026/09/10: Personal Particulars, Email Addresses and Social Media sit under a
             // Profile pop-out. Listed flat they would be three of six items in the Account menu,
-            // and nothing in it would say the three belong together.
-            $profileSectionKeys = ['profile', 'emails', 'social'];
+            // and nothing in it would say the three belong together. Billing Address joined them
+            // after Personal Particulars on 2026/10/06, in the registry's order.
+            $profileSectionKeys = ['profile', 'billing', 'emails', 'social'];
 
             // All sections, the dashboard, Profile, then the rest - the shape Company and
             // Administration already open with. Owner's instruction, 2026/09/11.

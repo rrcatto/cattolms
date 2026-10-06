@@ -77,20 +77,26 @@ final class BillingProfileIntegrationTest extends TestCase
         self::assertSame(0, (int) $this->db->fetchOne("SELECT COUNT(*) FROM information_schema.columns WHERE table_name='users' AND column_name='billing_address'"), 'users.billing_address is gone.');
     }
 
-    public function testAccountProfileShowsAndSavesOnlyTheSignedInPersonsBillingDetails(): void
+    public function testAccountBillingAddressShowsAndSavesOnlyTheSignedInPersonsBillingDetails(): void
     {
         [$id, $user] = $this->person('Account');
         [$otherId] = $this->person('Other');
         $this->billing->saveOwn($user, BillingFixture::personFields('Account Holder', '7 Protea Street'));
-        $page = InProcessPage::run($user, AccountController::class, 'profile');
+        $page = InProcessPage::run($user, AccountController::class, 'billing');
         self::assertSame(200, $page['status']);
-        foreach (['id="billing"', 'action="/account/profile/billing"', 'value="Account Holder"', 'value="7 Protea Street"', 'value="Nkosi Consulting"', 'name="country_code"', 'Personal particulars'] as $text) {
+        foreach (['id="billing"', 'action="/account/billing"', 'Billing Address', 'value="Account Holder"', 'value="7 Protea Street"', 'value="Nkosi Consulting"', 'name="country_code"'] as $text) {
             self::assertStringContainsString($text, $page['body']);
         }
+        // Billing is its own page under Profile; Personal Particulars holds the particulars and the image only.
+        $particulars = InProcessPage::run($user, AccountController::class, 'profile');
+        self::assertSame(200, $particulars['status']);
+        self::assertStringContainsString('Personal particulars', $particulars['body']);
+        self::assertStringContainsString('id="profile-image"', $particulars['body']);
+        self::assertStringNotContainsString('action="/account/billing"', $particulars['body']);
 
         $post = BillingFixture::personFields('Corrected Holder', '8 Protea Street') + ['csrf' => $_SESSION['csrf'], 'user_id' => (string) $otherId];
         $saved = InProcessPage::run($user, AccountController::class, 'updateBilling', [], $post);
-        self::assertSame('/account/profile#billing', $saved['location']);
+        self::assertSame('/account/billing', $saved['location']);
         self::assertSame('8 Protea Street', $this->billing->forUser($id)?->line1);
         self::assertNull($this->billing->forUser($otherId), 'A posted user id is ignored: only the signed-in person’s profile changes.');
 
@@ -103,7 +109,7 @@ final class BillingProfileIntegrationTest extends TestCase
         self::assertSame('8 Protea Street', $this->billing->forUser($id)?->line1, 'Without a valid token nothing is saved.');
 
         $invalid = InProcessPage::run($user, AccountController::class, 'updateBilling', [], ['csrf' => $_SESSION['csrf']] + array_merge(BillingFixture::personFields(), ['city' => str_repeat('x', 121)]));
-        self::assertSame('/account/profile#billing', $invalid['location']);
+        self::assertSame('/account/billing', $invalid['location']);
         self::assertSame('8 Protea Street', $this->billing->forUser($id)?->line1, 'An oversized value is refused and nothing is saved.');
         self::assertStringContainsString('may not exceed 120', json_encode($_SESSION['flash'] ?? [], JSON_THROW_ON_ERROR));
     }

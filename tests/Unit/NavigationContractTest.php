@@ -66,6 +66,7 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account/dashboard', $accountChildren['account-dashboard']['href'] ?? null);
         self::assertSame('/account/profile', $accountChildren['account-profile-group']['href'] ?? null);
         self::assertSame('/account/profile', $accountChildren['account-profile']['href'] ?? null);
+        self::assertSame('/account/billing', $accountChildren['account-billing']['href'] ?? null);
         self::assertSame('/account/emails', $accountChildren['account-emails']['href'] ?? null);
         self::assertSame('/account/social', $accountChildren['account-social']['href'] ?? null);
         self::assertSame('/account/courses', $accountChildren['account-learning']['href'] ?? null);
@@ -78,10 +79,11 @@ final class NavigationContractTest extends TestCase
 
         // Profile is a group, not a leaf. If it ever stops carrying children the three pages become
         // three more siblings in a menu of six, which is the shape the owner asked to be rid of.
-        self::assertCount(
-            3,
-            (array) ($accountChildren['account-profile-group']['children'] ?? []),
-            'Profile must hold Personal Particulars, Email Addresses and Social Media.'
+        // Billing Address comes straight after Personal Particulars (owner instruction, 2026/10/06).
+        self::assertSame(
+            ['account-profile', 'account-billing', 'account-emails', 'account-social'],
+            array_map(static fn(array $child): string => (string) $child['key'], (array) ($accountChildren['account-profile-group']['children'] ?? [])),
+            'Profile must hold Personal Particulars, Billing Address, Email Addresses and Social Media, in that order.'
         );
 
         // The Company menu is three levels since v0.6, for the reason Administration is: eight flat
@@ -369,7 +371,7 @@ final class NavigationContractTest extends TestCase
 
         // Third place is only correct while Profile is still a pop-out; flattened, it would be
         // three more siblings sitting between the dashboard and the library.
-        self::assertCount(3, (array) ($account[2]['children'] ?? []));
+        self::assertCount(4, (array) ($account[2]['children'] ?? []));
     }
 
     public function testNavigationDocumentationDefinesAccountCompanyAndAdministrationMenus(): void

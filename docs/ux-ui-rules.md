@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8.8.6 (development) **Date time:** 2026/10/06 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8.8.7 (development) **Date time:** 2026/10/06 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -227,7 +227,7 @@ Ordinary category results show courses filed directly in that category. Search i
 
 ## 9. Account and profile
 
-**9.1 Profile is a popout submenu under Account** containing Personal Particulars, Email Addresses and Social Media, each its own page.
+**9.1 Profile is a popout submenu under Account** containing Personal Particulars, Billing Address, Email Addresses and Social Media, in that order, each its own page. Billing Address (`/account/billing`) holds the person's billing details and comes immediately after Personal Particulars (owner instruction, 2026/10/06). Billing details do not go on Personal Particulars, where they pushed the profile image to the bottom. → Enforced by `NavigationContractTest`, `AccountWorkspaceContractTest` and `tests/Browser/billing-profiles.cjs`.
 
 **9.2 Personal Particulars carries the profile image.** Upload, resize, store in PostgreSQL as a 256x256 PNG.
 
@@ -276,6 +276,8 @@ Ordinary category results show courses filed directly in that category. Search i
 ## Changelog
 
 2026/10/06 SAST
+
+- 9.1: Billing Address is its own Profile page after Personal Particulars; Personal Particulars holds the particulars and the profile image again.
 
 - 6.2: the course card also presents course bundles, with their own facts; the card counts Course Items (it said modules).
 - Commerce checkout: the details step separates personal particulars from billing details; the promo code field and the subtotal/promotion/total lines; how bundles appear in the cart, on their page and in the ADMIN editor.

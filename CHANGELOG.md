@@ -1,6 +1,20 @@
 # Changelog
 
-**LMS version:** 0.8.8.6 **Date time:** 2026/10/06 SAST
+**LMS version:** 0.8.8.7 **Date time:** 2026/10/06 SAST
+
+## 2026-10-06 SAST — v0.8.8.7 Billing Address under Account → Profile
+
+- **Release.** Version aligned to 0.8.8.7 at the owner's instruction; published as GitHub release `v0.8.8.7` with `cattolms-v0.8.8.7.zip`. `composer qa` (934 tests) passed. Deploying is a code update only.
+
+- **Account.** Billing details move off Personal Particulars to their own page, Account → Profile → Billing Address (`/account/billing`, GET and POST), immediately after Personal Particulars and before Email Addresses.
+  - Personal Particulars again holds the particulars beside the profile image, the layout it had before Phase F placed a billing card between them.
+  - The former `POST /account/profile/billing` is replaced by `POST /account/billing`, which returns to the Billing Address page.
+  - `AccountSectionRegistry` has eight sections, and the Profile pop-out holds four.
+- **Tests.**
+  - `AccountWorkspaceContractTest`, `NavigationContractTest` (the Profile order), `BillingProfileIntegrationTest` and `ProfileImageUiRenderTest` are updated.
+  - `tests/Browser/billing-profiles.cjs` uses the new page, checks that Personal Particulars holds no billing form, and checks the Profile order.
+  - Its save helpers now wait for the form's navigation, not for a URL the page already had, which made their success checks racy.
+  - Billing check 10/10, UI matrix (70 pages, mutations and no-JavaScript) and canonical matrix 30/30 passed.
 
 ## 2026-10-06 SAST — v0.8.8.6 Front controller reads .env comments
 

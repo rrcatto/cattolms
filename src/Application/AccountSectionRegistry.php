@@ -17,8 +17,10 @@ final class AccountSectionRegistry
             // Profile is three sections, not one. The owner's instruction, 2026/09/10: Personal
             // Particulars, Email Addresses and Social Media, each its own page under a Profile
             // pop-out. They were one screen of three unrelated forms, and the personal particulars
-            // form has grown an image since.
-            $this->s('profile','Personal Particulars','account','/account/profile','partials/account/profile.html.twig','Your name, identity details, billing details and profile image.'),
+            // form has grown an image since. Billing Address follows Personal Particulars as its own
+            // page (owner instruction, 2026/10/06) rather than a third card on the particulars page.
+            $this->s('profile','Personal Particulars','account','/account/profile','partials/account/profile.html.twig','Your name, identity details and profile image.'),
+            $this->s('billing','Billing Address','settings','/account/billing','partials/account/billing.html.twig','Who your invoices are made out to.'),
             $this->s('emails','Email Addresses','contact','/account/emails','partials/account/emails.html.twig','The addresses you sign in with.'),
             $this->s('social','Social Media','social','/account/social','partials/account/social.html.twig','Links to your profiles elsewhere.'),
             $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),

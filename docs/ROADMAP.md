@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/06 (v0.8.8.6)
+## Current delivery position — 2026/10/06 (v0.8.8.7)
 
-**Current LMS version:** 0.8.8.6 · **Date:** 2026/10/06 SAST · tag `v0.8.8.6` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.8.7 · **Date:** 2026/10/06 SAST · tag `v0.8.8.7` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.7 | Billing Address as its own Account → Profile page |
 | 0.8.8.6 | Front controller reads `.env` comments correctly (`APP_CODEBASE_PATH`) |
 | 0.8.8.5 | One canonical baseline migration replacing the 25 development migrations; refreshed documentation |
 | 0.8.8.4 | Promo codes (Phase G), course bundles (Phase H) and independent entitlement sources, on billing profiles (Phase F) |
@@ -303,7 +304,7 @@ Implement one coherent commerce domain:
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
-**Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Editable invoice and receipt templates remain later work, and the structured snapshot is their input.
+**Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile → Billing Address and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Editable invoice and receipt templates remain later work, and the structured snapshot is their input.
 
 **Promo codes — Phase G, released in v0.8.8.4 (owner instruction, 2026/10/06):** ADMIN-managed promotions (`promotions`, `promotion_courses`, `promotion_redemptions`) with percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and all-courses or selected-courses applicability. One code per individual checkout order, validated by the server and again at placement under the promotion's row lock; the discount is an order adjustment allocated proportionally over lines, frozen into the order snapshot, shown on every document and bounding refunds. A use is held at placement and redeemed when paid. Bundles followed as Phase H, which replaced `applies_to` with separate course and bundle scopes. Not built: automatic promotions, stacking, referral or affiliate codes, gift vouchers, loyalty, personalised promotions, campaign pages, and promotions on company credit purchases.
 
