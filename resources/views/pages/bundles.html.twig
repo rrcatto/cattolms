@@ -1,0 +1,16 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_kicker = 'Catalogue' %}{% set ph_title = 'Course bundles' %}{% set ph_lead = 'Several courses for one bundle price. Each course in a bundle opens in your library like any other course you buy.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container py-5">
+	<p><a href="/courses">Browse all courses</a></p>
+	{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'bundles', pagination: bundles_pagination})} %}
+	{% block results %}
+		{% if bundles %}
+			{{ ui('catalogue.course-grid', {courses: bundles}) }}
+		{% else %}
+			{{ ui('feedback.empty', {heading: 'No bundles yet', summary: 'There are no course bundles on offer at the moment.'}) }}
+		{% endif %}
+	{% endblock %}
+	{% endembed %}
+</section>
+{% endblock %}

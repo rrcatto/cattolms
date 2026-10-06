@@ -1,0 +1,35 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/courses' %}{% set ph_back_label = 'Courses' %}{% set ph_kicker = 'Courses' %}{% set ph_title = 'Bundles' %}{% set ph_lead = 'Several published courses sold together for one bundle price. A bundle is not a course: each of its courses is granted to the buyer as an ordinary course purchase, and an order keeps the bundle exactly as it was sold.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{% if can_manage %}<p>{{ ui('action.link', {label: 'New bundle', variant: 'primary', href: '/admin/bundles/new'}) }}</p>{% endif %}
+<nav class="cl-filter-chips" aria-label="Filter by status">
+{% for chip in status_filters %}<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {% if chip.active %}aria-current="true"{% endif %}>{{ chip.label }}</a>{% endfor %}
+</nav>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'bundles', pagination: bundles_pagination, search: {ds_name: 'bundles', ds_label: 'Search titles and web addresses', ds_value: bundles_search, ds_action: '/admin/bundles'}})} %}
+{% block results %}
+{% if bundles %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Bundles', density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Bundle</th><th scope="col">Status</th><th scope="col">Courses</th><th scope="col">Price</th><th scope="col">Access</th><th scope="col">Sales</th></tr>{% endblock %}
+{% block body %}
+{% for row in bundles %}
+<tr>
+	<td><a href="/admin/bundles/{{ row.id }}"><strong>{{ row.title }}</strong></a><br><small>/bundles/{{ row.slug }}</small></td>
+	<td>{% include '@platform/partials/bundle-status.html.twig' with {status: row.status, on_sale: row.offer_active} %}</td>
+	<td>{{ row.course_count }}</td>
+	<td>{{ row.price_label ?? 'No price yet' }}</td>
+	<td>{{ row.access_label ?? '—' }}</td>
+	<td>{{ row.sales }}</td>
+</tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'No bundles', summary: bundles_search ? 'No bundle matches this search or filter.' : 'No bundle matches this filter yet.'}) }}
+{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

@@ -8,6 +8,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\PaymentAdministrationService;
 use CattoLearning\Commerce\Application\RefundAdministrationService;
 use CattoLearning\Commerce\Domain\BillingDetails;
+use CattoLearning\Commerce\Domain\OrderTotals;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer;
 use CattoLearning\Http\Controller\BaseController;
@@ -48,10 +49,21 @@ final class PaymentAdministrationController extends BaseController
         $items=$this->records->items($id);
         foreach ($items as &$item) {
             $details=CommerceRepository::decode((string)$item['snapshot']);
-            $item['title']=$details['course_title'] ?? 'Course';
+            $item['is_bundle']=$item['product_type']==='bundle';
+            $item['title']=$item['is_bundle'] ? 'Bundle: '.$details['bundle_title'] : ($details['course_title'] ?? 'Course');
+            $item['includes']=$item['is_bundle'] ? implode(', ',array_map(static fn(array $c): string => (string)$c['title'],(array)$details['courses'])) : '';
+            // Per course: the access source this bundle line created, and whether another source also held the course then.
+            $titles=$item['is_bundle'] ? array_column((array)$details['courses'],'title','course_id') : [];
+            $item['grants']=$item['is_bundle'] ? array_map(static fn(array $g): array => ['title'=>(string)($titles[(int)$g['course_id']] ?? 'Course '.(int)$g['course_id']),
+                'outcome'=>$g['shared_at_grant'] ? 'granted by this bundle, alongside access from another source' : 'granted by this bundle','state'=>(string)$g['entitlement_state']],$this->records->bundleGrants((int)$item['id'])) : [];
             $item['amount_label']=Money::strictMinorUnits((int)$item['amount_minor'],(string)$order['currency'])->format();
+            // What the line was paid bounds its refunds: its price less its share of the promotion discount.
+            $item['paid_minor']=RefundAdministrationService::paidAmount($item);
+            $item['paid_label']=Money::strictMinorUnits($item['paid_minor'],(string)$order['currency'])->format();
+            $item['discount_label']=(int)$item['discount_minor']>0 ? OrderTotals::negative((int)$item['discount_minor'],(string)$order['currency']) : null;
             $item['refunded_minor']=$this->records->refundedAmount($id,(int)$item['id']);
-            $item['remaining_label']=Money::strictMinorUnits(max(0,(int)$item['amount_minor']-(int)$item['refunded_minor']),(string)$order['currency'])->format();
+            $item['refunded_label']=Money::strictMinorUnits((int)$item['refunded_minor'],(string)$order['currency'])->format();
+            $item['remaining_label']=Money::strictMinorUnits(max(0,$item['paid_minor']-(int)$item['refunded_minor']),(string)$order['currency'])->format();
             $item['unissued']=$order['company_id']!==null && $this->records->purchasedCredit((int)$item['id'])===null;
             $item['latest_refundable']=$order['company_id']!==null ? $this->records->latestRefundableCredit((int)$order['company_id'],(int)$item['course_id'],(int)$item['access_period_seconds']) : null;
             $unit=(int)$item['amount_minor']>0 && (int)$item['quantity']>0 ? intdiv((int)$item['amount_minor'],(int)$item['quantity']) : 0;
@@ -71,7 +83,7 @@ final class PaymentAdministrationController extends BaseController
             default=>true,
         }));
         return $this->render('admin-commerce-order',['title'=>'Order CL-'.str_pad((string)$id,8,'0',STR_PAD_LEFT),'active_nav'=>'admin',
-            'order'=>$order,'snapshot'=>$snapshot,'billing_lines'=>BillingDetails::fromSnapshot((array)($snapshot['billing'] ?? []))->documentLines(),'items'=>$items,'payments'=>$payments,'refunds'=>$refunds,'documents'=>$documents,
+            'order'=>$order,'snapshot'=>$snapshot,'totals'=>OrderTotals::forSnapshot($snapshot),'promotion_eligible_label'=>is_array($snapshot['promotion'] ?? null) ? Money::strictMinorUnits((int)$snapshot['promotion']['eligible_minor'],(string)$order['currency'])->format() : null,'billing_lines'=>BillingDetails::fromSnapshot((array)($snapshot['billing'] ?? []))->documentLines(),'items'=>$items,'payments'=>$payments,'refunds'=>$refunds,'documents'=>$documents,
             'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'fund_balance_label'=>$actor->hasPermission('PLATFORM.REFUND.VIEW') ? Money::strictMinorUnits($this->records->fundBalance($order['company_id']===null?(int)$order['purchaser_user_id']:null,$order['company_id']===null?null:(int)$order['company_id'],(string)$order['currency']),(string)$order['currency'])->format() : null,
             'payment_method'=>$this->records->paymentMethod($id),'can_confirm'=>$actor->hasPermission('PLATFORM.PAYMENT.MANAGE') && $actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),

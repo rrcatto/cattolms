@@ -49,7 +49,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.8.8.3', 'composer.json version must be 0.8.8.3.');
+$need(($composer['version'] ?? '') === '0.8.8.4', 'composer.json version must be 0.8.8.4.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bundle','doctrine/dbal'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
@@ -132,11 +132,13 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // installation may well delegate one and not the other. 83 since v0.8.8.1: LEARNING.REVIEW.CREATE (a
 // learner rates and reviews a course) and COURSE.REVIEW.MANAGE (moderating those reviews). 84 with
 // COMPANY.BILLING.MANAGE: a company's billing details are company-owned data with their own authority.
-$need(count($permissionKeys) === 84, 'PermissionCatalog must define exactly 84 reserved/current secure actions for this release.');
+// 86 with PLATFORM.PROMOTION.VIEW and PLATFORM.PROMOTION.MANAGE: promo codes and their usage. 88 with
+// BUNDLE.MANAGEMENT.VIEW and BUNDLE.MANAGE: course bundles are a catalogue offer of their own.
+$need(count($permissionKeys) === 88, 'PermissionCatalog must define exactly 88 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 74, 'ACL catalogue must contain 10 SYSTEM and 74 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 78, 'ACL catalogue must contain 10 SYSTEM and 78 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -149,6 +151,7 @@ foreach ([
     'COMMERCE.CART.VIEW','COMMERCE.CART.MANAGE','COMMERCE.CHECKOUT.START','COMMERCE.ORDER.VIEW','COMMERCE.PAYMENT.VIEW',
     'COMPANY.ORDER.VIEW','COMPANY.PAYMENT.VIEW','PLATFORM.ORDER.VIEW','PLATFORM.ORDER.MANAGE','PLATFORM.PAYMENT.VIEW',
     'PLATFORM.PAYMENT.MANAGE','PLATFORM.PAYMENT.RECONCILE','PLATFORM.REFUND.VIEW','PLATFORM.REFUND.MANAGE',
+    'PLATFORM.PROMOTION.VIEW','PLATFORM.PROMOTION.MANAGE',
 ] as $commercePermission) {
     $need(in_array($commercePermission, $permissionKeys, true), 'Reserved Commerce permission missing: ' . $commercePermission);
 }
@@ -207,7 +210,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.8.8.3'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.8.4'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

@@ -16,7 +16,7 @@ use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,CompanyRepository,Database,TransactionManager};
 use CattoLearning\Support\Uuid;
-use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,IntegrationContainer};
+use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,IntegrationContainer,PromotionFixture};
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -63,10 +63,10 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $tx=new TransactionManager($this->db);
         $policy=new CommercePolicy(dirname(__DIR__,2));
         $transitions=$container->get(TransitionService::class);
-        $this->orders=new OrderService($this->records,$tx,$policy,$transitions,$this->clock);
+        $this->orders=new OrderService($this->records,$tx,$policy,$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock));
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyFulfilment=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
-        $fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyFulfilment,$this->analytics());
+        $fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyFulfilment,$this->analytics(),PromotionFixture::service($this->db,$this->clock));
         $this->payments=new PaymentService($this->records,$tx,$this->orders,new OmnipayPaymentGatewayAdapter('test',$this->clock),$fulfilment,$transitions,$this->clock);
         $this->purchases=new CompanyCreditPurchaseService($this->records,$container->get(CompanyRepository::class),
             $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock,$this->analytics(),BillingFixture::service($this->db,$this->clock));
@@ -236,7 +236,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$order]));
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE user_id=:user AND course_id=:course',['user'=>$learner,'course'=>$this->courseId]));
         $item=$this->records->items($order)[0];
-        $refunds=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
+        $refunds=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
         $refunds->approve($this->financeAdmin(),$order,(int)$item['id'],Uuid::v4(),'service_failure','Request changed before fulfilment; refund the unissued credit.',1,0);
         self::assertSame('refunded',$this->records->order($order)['state']);
         self::assertSame((int)$item['amount_minor'],(int)$this->db->fetchOne('SELECT SUM(amount_minor) FROM commerce_fund_entries WHERE account_id IN (SELECT id FROM commerce_fund_accounts WHERE owner_company_id=:company)',['company'=>$this->companyId]));
@@ -256,7 +256,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$id]));
         $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,
             new FulfilmentService($this->records,IntegrationContainer::get()->get(TransitionService::class),$this->access,new TransactionManager($this->db),$this->orders,$this->clock,
-                new CompanyCreditFulfilment($this->records,IntegrationContainer::get()->get(AdministrationRepository::class),IntegrationContainer::get()->get(CourseRepository::class),$this->clock),$this->analytics()),
+                new CompanyCreditFulfilment($this->records,IntegrationContainer::get()->get(AdministrationRepository::class),IntegrationContainer::get()->get(CourseRepository::class),$this->clock),$this->analytics(),PromotionFixture::service($this->db,$this->clock)),
             IntegrationContainer::get()->get(TransitionService::class),$this->clock);
         $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),24690,'2026-09-23T11:00:00+02:00','BANK-COMPANY-'.Uuid::v4(),'Matched company bank receipt.');
         self::assertSame('fulfilled',$this->records->order($id)['state']);
@@ -273,7 +273,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $review=$this->purchases->review($this->buyer,$this->companyId);
         $newer=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         $oldItem=$this->records->items($older)[0]; $newItem=$this->records->items($newer)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics());
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
         try {
             $service->approve($this->financeAdmin(),$older,(int)$oldItem['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
             self::fail('LIFO must reject the older eligible lot.');

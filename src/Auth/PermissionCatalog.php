@@ -99,6 +99,8 @@ final class PermissionCatalog
             $this->p('COURSE.TAG.MANAGE', 'ManageCourseTags', 'Courses', 'Create, edit, activate and delete course tags.'),
             $this->p('COURSE.REVIEW.MANAGE', 'ManageCourseReviews', 'Courses', 'Moderate learner course reviews.'),
             $this->p('COURSE.PRICING.MANAGE', 'ManageCoursePricing', 'Courses', 'Manage course price and access variants.'),
+            $this->p('BUNDLE.MANAGEMENT.VIEW', 'ViewBundleManagement', 'Bundles', 'View course bundles, their composition, offers and sales in Administration.'),
+            $this->p('BUNDLE.MANAGE', 'ManageBundles', 'Bundles', 'Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
             $this->p('COURSE.OWNERSHIP.MANAGE', 'ManageCourseOwnership', 'Courses', 'Assign owner company/person and course editors within scope.'),
             $this->p('COURSE.MEDIA.MANAGE', 'ManageCourseMedia', 'Courses', 'Upload and maintain private course media.'),
             $this->p('COURSE.ASSESSMENT.MANAGE', 'ManageCourseAssessments', 'Courses', 'Create and edit diagnostics, module/final assessments and grade bands.'),
@@ -118,6 +120,8 @@ final class PermissionCatalog
             $this->p('PLATFORM.PAYMENT.RECONCILE', 'ReconcilePlatformPayments', 'Commerce · Platform', 'Run supported payment reconciliation operations when Commerce is installed.'),
             $this->p('PLATFORM.REFUND.VIEW', 'ViewPlatformRefunds', 'Commerce · Platform', 'View refunds platform-wide when Commerce is installed.'),
             $this->p('PLATFORM.REFUND.MANAGE', 'ManagePlatformRefunds', 'Commerce · Platform', 'Create and manage supported refunds when Commerce is installed.'),
+            $this->p('PLATFORM.PROMOTION.VIEW', 'ViewPromotions', 'Commerce · Platform', 'View promotions, their promo codes and their usage when Commerce is installed.'),
+            $this->p('PLATFORM.PROMOTION.MANAGE', 'ManagePromotions', 'Commerce · Platform', 'Create, change, activate and deactivate promotions, and delete unused ones, when Commerce is installed.'),
         ];
     }
 

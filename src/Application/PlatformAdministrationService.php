@@ -2776,6 +2776,20 @@ final class PlatformAdministrationService
             'user.updated_by_administrator' => 'Person updated by administrator',
             'user.profile_updated' => 'Profile updated',
             'user.billing_profile_updated' => 'Billing details updated',
+            'promotion.created' => 'Promotion created',
+            'promotion.updated' => 'Promotion updated',
+            'promotion.activated' => 'Promotion activated',
+            'promotion.deactivated' => 'Promotion deactivated',
+            'promotion.deleted' => 'Unused promotion deleted',
+            'bundle.created' => 'Bundle created',
+            'bundle.updated' => 'Bundle details updated',
+            'bundle.course_added' => 'Course added to bundle',
+            'bundle.course_removed' => 'Course removed from bundle',
+            'bundle.courses_reordered' => 'Bundle courses reordered',
+            'bundle.offer_updated' => 'Bundle price or availability changed',
+            'bundle.status_changed' => 'Bundle status changed',
+            'bundle.retired' => 'Bundle retired',
+            'bundle.deleted' => 'Unused bundle deleted',
             'auth.logout' => 'Signed out',
             default => ucfirst(str_replace(['.','_','-'], ' ', $key)),
         };
@@ -2799,6 +2813,12 @@ final class PlatformAdministrationService
         }
         if ((int) ($metadata['enrolment_id'] ?? 0) > 0 || (int) ($metadata['request_id'] ?? 0) > 0) {
             $links[] = ['label' => 'Enrolments & Requests', 'url' => '/admin/course/enrolments'];
+        }
+        if ((int) ($metadata['bundle_id'] ?? 0) > 0) {
+            $links[] = ['label' => 'Bundle', 'url' => '/admin/bundles/' . (int) $metadata['bundle_id']];
+        }
+        if ((int) ($metadata['promotion_id'] ?? 0) > 0) {
+            $links[] = ['label' => 'Promotion', 'url' => '/admin/promotions/' . (int) $metadata['promotion_id']];
         }
         return $links;
     }

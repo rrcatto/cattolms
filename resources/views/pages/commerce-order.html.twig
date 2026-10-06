@@ -7,8 +7,17 @@
 
         <p><a href="/account/orders">My Orders</a> · {% if order.company_id|default(null) %}<a href="/company/credits">Company credits</a>{% else %}<a href="/account/courses">My Courses</a>{% endif %}</p>
         <p>Status: <strong>{{ order.state|replace({'_':' '})|capitalize }}</strong></p>
-        {% for item in order.details.items %}<p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {% if order.company_id|default(null) %}{{ item.quantity }} credits · {% endif %}{{ item.price_label }}</p>{% endfor %}
-        <p class="h4">Total: {{ total_label }}</p>
+        {% for item in order.details.items %}
+            {% if item.fulfilment_type|default('') == 'bundle' %}
+                {# The bundle as it was bought: its title, price and courses from the order, not the bundle now. #}
+                <p>{{ ui('feedback.badge', {label: 'Bundle', tone: 'info', size: 'small'}) }} <strong>{{ item.bundle_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {{ item.price_label }}</p>
+                <p class="help">Includes: {{ item.courses|map(c => c.title)|join(', ') }}</p>
+            {% else %}
+                <p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {% if order.company_id|default(null) %}{{ item.quantity }} credits · {% endif %}{{ item.price_label }}</p>
+            {% endif %}
+        {% endfor %}
+        {# The totals as the order was placed, from its snapshot: a later change to the promotion never alters them. #}
+        {{ ui('data.key-value-list', {items: totals}) }}
         <h2 class="h5">Billed to</h2>
         {% include '@platform/partials/billing-address.html.twig' %}
         <p class="help">As recorded when the order was placed. Changing your billing details later does not change this order or its documents.</p>

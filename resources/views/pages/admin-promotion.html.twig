@@ -1,0 +1,115 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/promotions' %}{% set ph_back_label = 'Promotions' %}{% set ph_kicker = 'Credits & Orders' %}{% set ph_title = promotion ? promotion.code : 'New promotion' %}{% set ph_lead = promotion ? promotion.name ~ ' · ' ~ promotion.discount : 'A promo code purchasers can enter when they review their order at checkout.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% if promotion %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Status and usage', heading_level: 2, summary: 'A use is held from the moment an order is placed with the code until that order is cancelled, and is redeemed when the order is paid.'}) }}
+	<p>{% include '@platform/partials/promotion-status.html.twig' with {status: promotion.status} %} {{ promotion.validity }}</p>
+	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 3})} %}{% block body %}
+		{{ ui('data.stat-card', {label: 'Redeemed', value: usage.redeemed, note: promotion.maximum_total_uses ? 'Limit ' ~ promotion.maximum_total_uses ~ ' uses' : 'No usage limit'}) }}
+		{{ ui('data.stat-card', {label: 'Unpaid orders', value: usage.pending, note: 'Holding a use until paid or cancelled'}) }}
+		{{ ui('data.stat-card', {label: 'Discount given', value: usage.discount_label, note: 'On paid orders'}) }}
+	{% endblock %}{% endembed %}
+	{% if can_manage %}
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+		<form action="/admin/promotions/{{ promotion.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="active" value="{{ promotion.active ? '0' : '1' }}">{{ ui('action.button', {label: promotion.active ? 'Deactivate' : 'Activate', variant: promotion.active ? 'secondary' : 'primary', type: 'submit'}) }}</form>
+		{% if usage.deletable %}<form action="/admin/promotions/{{ promotion.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete promotion', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ promotion.code ~ '? No order has used it.'}) }}</form>{% endif %}
+	{% endblock %}{% endembed %}
+	{% if not usage.deletable %}<p class="help">Orders were placed with this promotion, so it is kept for their history and cannot be deleted. Deactivate it to stop new uses. Changes apply to checkouts from now on; orders already placed keep the promotion as it was.</p>{% endif %}
+	{% endif %}
+{% endblock %}{% endembed %}
+{% endif %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{{ ui('layout.section-head', {heading: promotion ? 'Promotion details' : 'Create a promotion', heading_level: 2, summary: 'Amounts are in ' ~ currency ~ '. Dates and times are in the platform time zone, ' ~ timezone ~ '.'}) }}
+{% if can_manage %}
+<form action="/admin/promotions{{ promotion ? '/' ~ promotion.id : '' }}" method="post">
+	<input type="hidden" name="csrf" value="{{ csrf }}">
+	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Code', for: 'promotion-code', required: true, help: 'Letters, digits, hyphens and underscores. Case does not matter: SAVE10, save10 and Save10 are one code.'})} %}{% block control %}<input id="promotion-code" name="code" value="{{ form.code }}" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'promotion-name', required: true, help: 'Shown to the purchaser beside the code and on their invoice.'})} %}{% block control %}<input id="promotion-name" name="name" value="{{ form.name }}" maxlength="120" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (ADMIN only, optional)', for: 'promotion-description', full_width: true})} %}{% block control %}<textarea id="promotion-description" name="description" rows="2" maxlength="1000" {{ ui_field_attrs(props) }}>{{ form.description }}</textarea>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Discount', for: 'promotion-type', required: true})} %}{% block control %}<select id="promotion-type" name="discount_type" required {{ ui_field_attrs(props) }}><option value="percentage"{% if form.discount_type == 'percentage' %} selected{% endif %}>Percentage off</option><option value="fixed_amount"{% if form.discount_type == 'fixed_amount' %} selected{% endif %}>Amount off ({{ currency }})</option></select>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Discount value', for: 'promotion-value', required: true, help: 'A percentage greater than 0 and at most 100, such as 10 or 12.5; or an amount such as 100 or 99.50. An amount is never more than the eligible courses cost.'})} %}{% block control %}<input id="promotion-value" name="discount_value" value="{{ form.discount_value }}" inputmode="decimal" maxlength="16" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Minimum spend (' ~ currency ~ ', optional)', for: 'promotion-minimum', help: 'Of eligible courses, before the discount.'})} %}{% block control %}<input id="promotion-minimum" name="minimum_order" value="{{ form.minimum_order }}" inputmode="decimal" maxlength="16" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Maximum uses (optional)', for: 'promotion-max-total', help: 'Across all purchasers. Empty for no limit.'})} %}{% block control %}<input id="promotion-max-total" name="maximum_total_uses" type="number" min="1" max="1000000" value="{{ form.maximum_total_uses }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Maximum uses per customer (optional)', for: 'promotion-max-customer', help: 'Per signed-in purchaser. Empty for no limit.'})} %}{% block control %}<input id="promotion-max-customer" name="maximum_uses_per_customer" type="number" min="1" max="1000000" value="{{ form.maximum_uses_per_customer }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Valid from (optional)', for: 'promotion-starts', help: 'Valid from this moment. Empty to start at once.'})} %}{% block control %}<input id="promotion-starts" name="starts_at" type="datetime-local" value="{{ form.starts_at }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Valid until (optional)', for: 'promotion-ends', help: 'No longer valid from this moment. Empty for no end.'})} %}{% block control %}<input id="promotion-ends" name="ends_at" type="datetime-local" value="{{ form.ends_at }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% for kind, plural in {course: 'courses', bundle: 'bundles'} %}
+		{% set scope = kind == 'course' ? form.course_scope : form.bundle_scope %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Applies to ' ~ plural, for: 'promotion-' ~ kind ~ '-scope', required: true})} %}{% block control %}<select id="promotion-{{ kind }}-scope" name="{{ kind }}_scope" required {{ ui_field_attrs(props) }}>{% for value, text in {all: 'All ' ~ plural, selected: 'Selected ' ~ plural, none: 'No ' ~ plural} %}<option value="{{ value }}"{% if scope == value %} selected{% endif %}>{{ text }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% endfor %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active: the code can be used within its dates and limits'})} %}{% block control %}<input type="checkbox" name="active" value="1" {{ form.active ? 'checked' : '' }}>{% endblock %}{% endembed %}
+	<fieldset class="cl-promotion-courses mt-3">
+		<legend class="h6">Selected courses</legend>
+		<p class="help">Used when the promotion applies to selected courses: only those courses in a cart are discounted, and the others keep their full price. A bundle is never discounted because it contains a selected course.</p>
+		{% for course in form.courses %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: course.label ~ ' (' ~ course.detail ~ ')'})} %}{% block control %}<input type="checkbox" name="course_ids[]" value="{{ course.id }}" checked>{% endblock %}{% endembed %}
+		{% else %}
+			<p class="muted">No courses selected.</p>
+		{% endfor %}
+		{% if form.courses %}<p class="help">Clear a course’s box to remove it when you save.</p>{% endif %}
+		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_course_id', lk_type: 'courses', lk_label: 'Add a course', lk_empty: 'Search for a course to add', lk_selected: 0, lk_required: 0} %}
+	</fieldset>
+	<fieldset class="cl-promotion-courses mt-3">
+		<legend class="h6">Selected bundles</legend>
+		<p class="help">Used when the promotion applies to selected bundles: only those bundles in a cart are discounted.</p>
+		{% for bundle in form.bundles %}
+			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: bundle.label ~ ' (' ~ bundle.detail ~ ')'})} %}{% block control %}<input type="checkbox" name="bundle_ids[]" value="{{ bundle.id }}" checked>{% endblock %}{% endembed %}
+		{% else %}
+			<p class="muted">No bundles selected.</p>
+		{% endfor %}
+		{% if form.bundles %}<p class="help">Clear a bundle’s box to remove it when you save.</p>{% endif %}
+		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_bundle_id', lk_type: 'bundles', lk_label: 'Add a bundle', lk_empty: 'Search for a bundle to add', lk_selected: 0, lk_required: 0} %}
+	</fieldset>
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
+		{{ ui('action.button', {label: promotion ? 'Save promotion' : 'Create promotion', variant: 'primary', type: 'submit'}) }}<a href="/admin/promotions{{ promotion ? '/' ~ promotion.id : '' }}">Cancel</a>
+	{% endblock %}{% endembed %}
+</form>
+{% else %}
+{{ ui('data.key-value-list', {items: [
+	{label: 'Code', value: promotion.code},
+	{label: 'Name', value: promotion.name},
+	{label: 'Discount', value: promotion.discount},
+	{label: 'Minimum spend', value: promotion.minimum ?? 'None'},
+	{label: 'Validity', value: promotion.validity},
+	{label: 'Maximum uses', value: promotion.maximum_total_uses ?? 'No limit'},
+	{label: 'Maximum uses per customer', value: promotion.maximum_uses_per_customer ?? 'No limit'},
+	{label: 'Applies to', value: promotion.scope},
+]}) }}
+{% endif %}
+{% endblock %}{% endembed %}
+
+{% if promotion %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'usage', heading: 'Orders with this promotion', summary: 'Each order keeps the code, discount and totals it was placed with, whatever changes here later.', pagination: usage.pagination})} %}
+{% block results %}
+{% if usage.orders %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Orders placed with ' ~ promotion.code, density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Order</th><th scope="col">Purchaser</th><th scope="col">Placed</th><th scope="col">State</th><th scope="col">Discount</th><th scope="col">Total</th><th scope="col">Redeemed</th></tr>{% endblock %}
+{% block body %}
+{% for order in usage.orders %}
+<tr>
+	<td><a href="/admin/commerce/orders/{{ order.id }}">{{ order.number }}</a></td>
+	<td>{{ order.purchaser_name }}</td>
+	<td>{{ order.placed_at|date('j M Y H:i') }}</td>
+	<td>{{ order.state|replace({'_': ' '})|capitalize }}</td>
+	<td>{{ order.discount_label }}</td>
+	<td>{{ order.total_label }}</td>
+	<td>{{ order.redeemed_at ? order.redeemed_at|date('j M Y H:i') : (order.state == 'cancelled' ? 'Cancelled, use released' : 'Not paid yet') }}</td>
+</tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'Not used yet', summary: 'No order has been placed with this promotion.'}) }}
+{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+{% endif %}
+</section>
+{% endblock %}

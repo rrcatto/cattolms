@@ -42,7 +42,8 @@ final class CourseController extends BaseController
         private readonly LearningService $learning,
         private readonly CourseFavouriteService $favourites,
         private readonly AnalyticsEventRecorder $analytics,
-        private readonly CourseReviewService $reviews
+        private readonly CourseReviewService $reviews,
+        private readonly \CattoLearning\Bundle\BundleRepository $bundles
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -84,6 +85,7 @@ final class CourseController extends BaseController
             'title' => $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses',
             'category_picker' => $this->courses->catalogueCategoryPicker($category),
             'catalogue_search' => $search,
+            'bundle_count' => $this->bundles->publishedCount(),
             'courses' => $this->withFavourites($courses),
             'can_favourite' => $this->currentUser() !== null,
             'favourite_return' => $this->requests->getCurrentRequest()?->getRequestUri() ?? $base,

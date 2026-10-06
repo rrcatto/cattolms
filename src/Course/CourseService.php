@@ -59,6 +59,7 @@ use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\EmailAddress;
+use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Slug;
@@ -456,6 +457,18 @@ final class CourseService
     }
 
     /**
+     * Catalogue cards for these published courses, in the order given. A bundle's page shows its
+     * courses with the same cards as the catalogue; a course that is not published is left out.
+     *
+     * @param list<int> $courseIds
+     * @return list<array<string,mixed>>
+     */
+    public function cardsByIds(array $courseIds): array
+    {
+        return $courseIds === [] ? [] : $this->decorateCards($this->decorateCatalogue($this->courses->publishedCoursesByIds($courseIds)));
+    }
+
+    /**
      * @param list<array<string,mixed>> $courses
      * @return list<array<string,mixed>>
      */
@@ -465,7 +478,7 @@ final class CourseService
             $label = trim((string) ($course['category_name'] ?? 'Course'));
             $course['cover_initial'] = mb_strtoupper(mb_substr($label !== '' ? $label : 'Course', 0, 1));
             $course['default_price_label'] = $this->formatPrice((int) ($course['default_price_minor_units'] ?? 0), (string) ($course['default_currency_code'] ?? 'ZAR'));
-            $course['default_access_label'] = $this->accessPeriodLabel((int) ($course['default_price_access_period_seconds'] ?? 0));
+            $course['default_access_label'] = AccessPeriod::label((int) ($course['default_price_access_period_seconds'] ?? 0));
             $course['has_price'] = (int) ($course['default_price_variant_id'] ?? 0) > 0;
             $course['has_alternative_prices'] = (int) ($course['active_price_variant_count'] ?? 0) > 1;
         }
@@ -1372,20 +1385,7 @@ final class CourseService
      */
     private function validatePriceVariantInput(array $input): array
     {
-        $value = max(1, (int) ($input['access_period_value'] ?? 0));
-        $unit = trim((string) ($input['access_period_unit'] ?? 'months'));
-        $multipliers = [
-            'days' => 86400,
-            'weeks' => 604800,
-            'months' => 2592000,
-            'years' => 31536000,
-        ];
-        if (!isset($multipliers[$unit])) {
-            throw new InvalidArgumentException('Choose a valid access-period unit.');
-        }
-        if (($unit === 'days' && $value > 3650) || ($unit === 'weeks' && $value > 520) || ($unit === 'months' && $value > 120) || ($unit === 'years' && $value > 10)) {
-            throw new InvalidArgumentException('The access period is unreasonably long.');
-        }
+        $accessPeriod = AccessPeriod::fromInput($input['access_period_value'] ?? 0, $input['access_period_unit'] ?? 'months');
         $priceText = trim(str_replace([',', ' '], '', (string) ($input['price'] ?? '')));
         if (preg_match('/^\d+(?:\.\d{1,2})?$/', $priceText) !== 1) {
             throw new InvalidArgumentException('Enter the price as an amount with no more than two decimal places.');
@@ -1399,7 +1399,7 @@ final class CourseService
             throw new InvalidArgumentException('Currency must be a three-letter ISO code such as ZAR.');
         }
         return [
-            'access_period_seconds' => $value * $multipliers[$unit],
+            'access_period_seconds' => $accessPeriod,
             'price_minor_units' => $minorUnits,
             'currency_code' => $currency,
             'label' => mb_substr(trim((string) ($input['label'] ?? '')), 0, 120),
@@ -1443,37 +1443,15 @@ final class CourseService
     {
         foreach ($variants as &$variant) {
             $seconds = (int) ($variant['access_period_seconds'] ?? 0);
-            $variant['access_period_label'] = $this->accessPeriodLabel($seconds);
+            $variant['access_period_label'] = AccessPeriod::label($seconds);
             $variant['price_label'] = $this->formatPrice((int) ($variant['price_minor_units'] ?? 0), (string) ($variant['currency_code'] ?? 'ZAR'));
-            [$value, $unit] = $this->accessPeriodInput($seconds);
+            [$value, $unit] = AccessPeriod::decompose($seconds);
             $variant['access_period_value'] = $value;
             $variant['access_period_unit'] = $unit;
             $variant['price_input'] = number_format(((int) ($variant['price_minor_units'] ?? 0)) / 100, 2, '.', '');
         }
         unset($variant);
         return $variants;
-    }
-
-    /** @return array{0:int,1:string} */
-    private function accessPeriodInput(int $seconds): array
-    {
-        if ($seconds > 0 && $seconds % 31536000 === 0) {
-            return [(int) ($seconds / 31536000), 'years'];
-        }
-        if ($seconds > 0 && $seconds % 2592000 === 0) {
-            return [(int) ($seconds / 2592000), 'months'];
-        }
-        if ($seconds > 0 && $seconds % 604800 === 0) {
-            return [(int) ($seconds / 604800), 'weeks'];
-        }
-        return [max(1, (int) round($seconds / 86400)), 'days'];
-    }
-
-    private function accessPeriodLabel(int $seconds): string
-    {
-        [$value, $unit] = $this->accessPeriodInput($seconds);
-        $singular = rtrim($unit, 's');
-        return $value . ' ' . ($value === 1 ? $singular : $unit);
     }
 
     /**

@@ -1,0 +1,28 @@
+{#
+	The promo code on the checkout review. The browser sends only a code; the discount, the totals and
+	whether the code applies are all calculated by the server. One code applies to an order: applying
+	another replaces it once it has been accepted, and a rejected code leaves the current one in place.
+#}
+<section class="cl-checkout-promo" aria-labelledby="checkout-promo-heading">
+	<h3 class="h5" id="checkout-promo-heading">Promo code</h3>
+	{% if cart.promo.code %}
+		{% if cart.promo.applied %}
+			<p class="cl-checkout-promo-applied"><strong>{{ cart.promo.code }}</strong> · {{ cart.promo.label }} · {{ cart.promo.discount_label }}</p>
+		{% else %}
+			{{ ui('feedback.notice', {tone: 'warning', heading: cart.promo.code ~ ' no longer applies. ' ~ cart.promo.rejection}) }}
+		{% endif %}
+		<form action="/checkout/promo/remove" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Remove promo code ' ~ cart.promo.code}) }}
+		</form>
+	{% endif %}
+	<form action="/checkout/promo" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
+{% block body %}
+<label for="promo-code">{{ cart.promo.code ? 'Use a different code' : 'Enter a promo code' }}</label><input id="promo-code" name="promo_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" required>{{ ui('action.button', {label: 'Apply', type: 'submit'}) }}
+{% endblock %}
+{% endembed %}
+		{% if cart.promo.code %}<p class="help">One promo code applies to an order. A code you apply replaces {{ cart.promo.code }} once it is accepted.</p>{% endif %}
+	</form>
+</section>

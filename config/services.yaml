@@ -107,6 +107,11 @@ services:
         resource: '../src/Course/'
         exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php}'
 
+    # BundleRules is a set of static rules, not a service.
+    CattoLearning\Bundle\:
+        resource: '../src/Bundle/'
+        exclude: '../src/Bundle/BundleRules.php'
+
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'
         # DatabaseSessionHandler is constructed by App::run() before the container exists - the

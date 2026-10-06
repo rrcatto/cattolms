@@ -49,6 +49,26 @@ final class PaymentService
         return (string)$attempt['id'];
     }
 
+    /**
+     * An order a promotion discounted to zero has nothing to collect: it is settled as paid without a
+     * payment attempt (a payment of nothing cannot exist) and fulfilled like any paid order. No
+     * receipt is issued because nothing was received; the invoice shows the zero total.
+     */
+    public function settleWithoutPayment(CurrentUser $actor, int $orderId): void
+    {
+        OrderService::requireCapability($actor,'COMMERCE.CHECKOUT.START');
+        $this->transactions->run(function() use($actor,$orderId): void {
+            $this->records->lockPurchaser($actor->id);
+            $order=$this->records->order($orderId,true);
+            if ((int)$order['purchaser_user_id']!==$actor->id) throw new RuntimeException('This order belongs to another purchaser.');
+            if ($order['state']!=='awaiting_payment' || (int)$order['total_minor']!==0) throw new RuntimeException('This order has an amount to pay.');
+            $order['state']=$this->transitions->apply('order','awaiting_payment','confirm_paid');
+            $this->records->setOrderState((int)$order['id'],(string)$order['state']);
+            $this->records->audit((int)$order['id'],$actor->id,'order.settled_without_payment',['promotion_id'=>$order['promotion_id']===null?null:(int)$order['promotion_id'],'discount_minor'=>(int)$order['discount_minor']],$this->clock->now()->format(DATE_ATOM));
+            if (!$this->fulfilment->fulfil($order)) $this->records->setOrderState((int)$order['id'],$this->transitions->apply('order','paid','hold_for_review'));
+        });
+    }
+
     /** Only gateway adapters/reconciliation may provide evidence; no browser route accepts a result DTO. */
     public function confirm(string $gateway, PaymentResult $result): void
     {

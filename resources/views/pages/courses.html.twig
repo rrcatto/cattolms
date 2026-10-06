@@ -3,6 +3,7 @@
 {% block page_body %}
 	{% include '@platform/partials/page-head.html.twig' with {ph_kicker: 'Course catalogue', ph_title: 'Browse by category', ph_lead: 'Choose a category, search, or both.', ph_action_href: '/courses/tags', ph_action_label: 'Browse by tag'} %}
 	<section class="cl-page-section container-fluid cl-container-wide py-4">
+		{% if bundle_count|default(0) > 0 %}<p class="cl-catalogue-bundles">Several courses for one price: <a href="/bundles">browse course bundles</a>.</p>{% endif %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 			<form id="catalogue-category" class="cl-catalogue-category" method="get" action="/courses">

@@ -15,11 +15,23 @@ use CattoLearning\Support\Uuid;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
 
-/** Explicit ADMIN refund decisions; credited value enters the purchaser's append-only Account Funds ledger. */
+/**
+ * Explicit ADMIN refund decisions; credited value enters the purchaser's append-only Account Funds ledger.
+ *
+ * A line can return at most what was paid for it: its price less its share of the order's promotion
+ * discount (commerce_order_items.discount_minor, allocated at placement). The undiscounted catalogue
+ * price is never the basis of a refund.
+ *
+ * Refunding all that was paid for a line revokes the entitlement sources that line created and
+ * nothing else; each course's access is then worked out again from its remaining sources, so a course
+ * another purchase, bundle, ADMIN assignment, company credit or free access still covers stays open.
+ * A bundle line is refunded as the product that was bought, never course by course.
+ */
 final class RefundAdministrationService
 {
     public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
-        private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics) {}
+        private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics,
+        private readonly AccessService $access) {}
 
     public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor): int
     {
@@ -58,30 +70,63 @@ final class RefundAdministrationService
                 $amountMinor=$unit*$quantity;
             } else {
                 if ($quantity!==1 || $amountMinor<1) throw new RuntimeException('Enter a positive individual refund amount.');
-                $remaining=(int)$item['amount_minor']-$this->records->refundedAmount($orderId,$itemId);
+                $remaining=self::paidAmount($item)-$this->records->refundedAmount($orderId,$itemId);
                 if ($amountMinor>$remaining) throw new RuntimeException('The refund exceeds this item’s unrefunded paid amount.');
             }
             $id=$this->records->createRefund($requestKey,$orderId,$itemId,$quantity,$amountMinor,(string)$order['currency'],$basis,$reason,$actor->id,$now);
             $this->records->creditRefundFunds($id,$order['company_id']===null?(int)$order['purchaser_user_id']:null,$order['company_id']===null?null:(int)$order['company_id'],(string)$order['currency'],$amountMinor,$now);
             $itemSnapshot=CommerceRepository::decode((string)$item['snapshot']);
             $snapshot=CommerceRepository::decode((string)$order['snapshot']);
-            $snapshot['items']=[['course_title'=>$itemSnapshot['course_title'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]];
+            $bundle=$item['product_type']==='bundle';
+            $snapshot['items']=[$bundle
+                ? ['fulfilment_type'=>'bundle','bundle_title'=>$itemSnapshot['bundle_title'],'courses'=>$itemSnapshot['courses'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]
+                : ['course_title'=>$itemSnapshot['course_title'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]];
+            // The credit note states what the refunded line was paid; the order's totals are not its own.
+            $snapshot['refund_line']=['price_minor'=>(int)$item['amount_minor'],'discount_minor'=>(int)$item['discount_minor'],'paid_minor'=>self::paidAmount($item),'promotion_code'=>$snapshot['promotion']['code'] ?? null];
+            unset($snapshot['promotion'],$snapshot['subtotal_minor'],$snapshot['discount_minor']);
             $snapshot['total_minor']=$amountMinor;
             $snapshot['refund_id']=$id;
             $snapshot['refund_basis']=$basis;
             $snapshot['refund_reason']=$reason;
             $this->records->document($orderId,'credit_note','refund:'.$id,$snapshot,$now);
-            $fullyRefunded=$this->records->refundedAmount($orderId,$itemId)>=(int)$item['amount_minor'];
+            $fullyRefunded=$this->records->refundedAmount($orderId,$itemId)>=self::paidAmount($item);
+            $access=['revoked'=>0,'kept'=>0];
             if ($order['company_id']===null && $fullyRefunded) {
-                $this->records->revokeRefundedEntitlement($itemId,$now);
+                $sources=$this->records->sourcesForItem($itemId);
+                $open=$this->access->revoke($sources,'refund:'.$id);
+                $access=['revoked'=>count($sources),'kept'=>count(array_filter($open))];
             }
-            $this->recordRefund($order,$item,$id,$quantity,$amountMinor,$fullyRefunded);
+            if ($bundle) $this->recordBundleRefund($order,$item,$id,$amountMinor,$fullyRefunded,$access);
+            else $this->recordRefund($order,$item,$id,$quantity,$amountMinor,$fullyRefunded);
             $total=$this->records->refundedAmount($orderId);
             $transition=$total>=(int)$order['total_minor']?'mark_refunded':'mark_partially_refunded';
             $this->records->setOrderState($orderId,$this->transitions->apply('order',(string)$order['state'],$transition));
-            $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason],$now);
+            $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason]+($bundle?['bundle_access'=>$access]:[]),$now);
             return $id;
         });
+    }
+
+    /**
+     * @param array<string,mixed> $order
+     * @param array<string,mixed> $item
+     * @param array{revoked:int,kept:int} $access
+     */
+    private function recordBundleRefund(array $order, array $item, int $refundId, int $amountMinor, bool $fullyRefunded, array $access): void
+    {
+        $this->analytics->recordSafely(AnalyticsEventType::BundleRefunded, AnalyticsSource::Admin,
+            ['user_id'=>(int)$order['purchaser_user_id'],'order_id'=>(int)$order['id'],'order_item_id'=>(int)$item['id']],
+            ['bundle_id'=>(int)$item['bundle_id'],'refund_id'=>$refundId,'amount_minor'=>$amountMinor,'currency'=>(string)$order['currency'],'full_refund'=>$fullyRefunded,'courses_revoked'=>$access['revoked'],'courses_kept'=>$access['kept']],
+            'bundle_refunded:refund:'.$refundId);
+    }
+
+    /**
+     * What an order line was paid: its price less its share of the promotion discount.
+     *
+     * @param array<string,mixed> $item a commerce_order_items row
+     */
+    public static function paidAmount(array $item): int
+    {
+        return (int)$item['amount_minor']-(int)$item['discount_minor'];
     }
 
     /**

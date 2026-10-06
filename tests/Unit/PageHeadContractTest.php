@@ -68,6 +68,7 @@ final class PageHeadContractTest extends TestCase
         'home.html.twig' => 'Its own hero; a header would be a second title.',
         'error.html.twig' => 'No context to describe.',
         'course-detail.html.twig' => 'The course is the hero.',
+        'bundle-detail.html.twig' => 'The bundle is the hero, as a course is on its own page.',
         'learn-course.html.twig' => 'The core-owned full-screen Course Presentation carries its own compact course header.',
         'assessment-public-preview.html.twig' => 'The core-owned public assessment preview uses the compact course header.',
         'assessment-overview.html.twig' => 'The core-owned assessment presentation carries its own compact assessment heading.',

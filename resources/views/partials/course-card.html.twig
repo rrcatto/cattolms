@@ -5,6 +5,10 @@
 	one thing a reader is looking for - which course is this - was below it in the body, and the
 	star was at the very bottom of the card.
 
+	A course bundle is shown with this same card: it supplies its own href, link_label and facts
+	(the key-value rows), so a bundle looks like a catalogue item in every theme without a second
+	card of its own.
+
 	The artwork is a background rather than content: it is decoration behind the two things that
 	matter, and a scrim keeps the title legible whatever colours the artwork happens to use.
 #}
@@ -22,7 +26,7 @@
 		</div>
 		<div class="cl-course-card-headline">
 			<h3 class="cl-course-card-title">
-				<a href="/courses/{{ course.slug }}">{{ course.title }}</a>
+				<a href="{{ course.href|default('/courses/' ~ course.slug) }}">{{ course.title }}</a>
 			</h3>
 			{% if can_favourite is defined and can_favourite %}
 				{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_return: favourite_return|default('/courses')} %}
@@ -49,9 +53,9 @@
 				{% endfor %}
 			</div>
 		{% endif %}
-		{{ ui('data.key-value-list', {items: [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label)}]}) }}
+		{{ ui('data.key-value-list', {items: course.facts is defined ? course.facts : [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label)}]}) }}
 		<div class="cl-course-card-foot">
-			{{ ui('action.link', {label: 'View course', variant: 'primary', size: 'small', href: '/courses/' ~ (course.slug)}) }}
+			{{ ui('action.link', {label: course.link_label|default('View course'), variant: 'primary', size: 'small', href: course.href|default('/courses/' ~ (course.slug))}) }}
 		</div>
 	</div>
 </article>

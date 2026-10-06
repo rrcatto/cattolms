@@ -1,0 +1,37 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/commerce/orders' %}{% set ph_back_label = 'Orders & Payments' %}{% set ph_kicker = 'Credits & Orders' %}{% set ph_title = 'Promotions' %}{% set ph_lead = 'Promo codes purchasers enter when they review an order at checkout. A code takes a percentage or an amount off the courses it applies to; course prices are never changed. A use is held when an order is placed and counted as redeemed when it is paid.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+{% if can_manage %}<p>{{ ui('action.link', {label: 'New promotion', variant: 'primary', href: '/admin/promotions/new'}) }}</p>{% endif %}
+<nav class="cl-filter-chips" aria-label="Filter by status">
+{% for chip in status_filters %}<a class="cl-filter-chip {{ chip.active ? 'is-current' : '' }}" href="{{ chip.href }}" {% if chip.active %}aria-current="true"{% endif %}>{{ chip.label }}</a>{% endfor %}
+</nav>
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'promotions', pagination: promotions_pagination, search: {ds_name: 'promotions', ds_label: 'Search codes and names', ds_value: promotions_search, ds_action: '/admin/promotions'}})} %}
+{% block results %}
+{% if promotions %}
+{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Promotions', density: 'compact'})} %}
+{% block header %}<tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Discount</th><th scope="col">Validity</th><th scope="col">Status</th><th scope="col">Uses</th><th scope="col">Per customer</th><th scope="col">Applies to</th></tr>{% endblock %}
+{% block body %}
+{% for row in promotions %}
+<tr>
+	<td><a href="/admin/promotions/{{ row.id }}"><strong>{{ row.code }}</strong></a></td>
+	<td>{{ row.name }}</td>
+	<td>{{ row.discount }}{% if row.minimum %}<br><small>Minimum {{ row.minimum }}</small>{% endif %}</td>
+	<td>{{ row.validity }}</td>
+	<td>{% include '@platform/partials/promotion-status.html.twig' with {status: row.status} %}</td>
+	<td>{{ row.redeemed }}{% if row.pending %} <small>(+{{ row.pending }} unpaid)</small>{% endif %} / {{ row.maximum_total_uses ?? 'no limit' }}</td>
+	<td>{{ row.maximum_uses_per_customer ?? 'No limit' }}</td>
+	<td>{{ row.scope }}</td>
+</tr>
+{% endfor %}
+{% endblock %}
+{% endembed %}
+{% else %}
+{{ ui('feedback.empty', {heading: 'No promotions', summary: promotions_search or status_filters|filter(c => c.active and c.label != 'All promotions')|length ? 'No promotion matches this search or filter.' : 'No promotion has been created yet.'}) }}
+{% endif %}
+{% endblock %}
+{% endembed %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

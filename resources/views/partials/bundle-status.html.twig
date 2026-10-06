@@ -1,0 +1,1 @@
+{% if status == 'published' %}{{ ui('feedback.badge', {label: on_sale ? 'On sale' : 'Published, off sale', tone: on_sale ? 'success' : 'warning', size: 'small'}) }}{% elseif status == 'retired' %}{{ ui('feedback.badge', {label: 'Retired', tone: 'neutral', size: 'small'}) }}{% else %}{{ ui('feedback.badge', {label: 'Draft', tone: 'info', size: 'small'}) }}{% endif %}

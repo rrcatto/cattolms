@@ -74,7 +74,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.3';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.4';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -564,6 +564,9 @@ final class ThemeRenderer
                     $pendingReviews = isset($this->reviews) ? $this->reviews->pendingCount() : 0;
                     $grandchildren[] = $child('admin-course-reviews', 'Course Reviews' . ($pendingReviews > 0 ? ' (' . $pendingReviews . ' pending)' : ''), '/admin/course-reviews', 'courses');
                 }
+                if ($sectionKey === 'courses' && $this->can($data, 'BUNDLE.MANAGEMENT.VIEW')) {
+                    $grandchildren[] = $child('admin-bundles', 'Bundles', '/admin/bundles', 'courses');
+                }
                 // Companies keeps the name it has always had in the menu. Its second view sits
                 // beneath it rather than replacing it: renaming the entry to "Course Consumers"
                 // read as the Companies item having been deleted, which is a navigation people
@@ -574,6 +577,9 @@ final class ThemeRenderer
             }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
                 $grandchildren[] = $child('admin-commerce-orders', 'Orders & Payments', '/admin/commerce/orders', 'credits');
+            }
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PROMOTION.VIEW')) {
+                $grandchildren[] = $child('admin-promotions', 'Promotions', '/admin/promotions', 'credits');
             }
             if ($grandchildren === []) {
                 continue;

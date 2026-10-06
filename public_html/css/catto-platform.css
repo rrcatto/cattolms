@@ -1018,6 +1018,17 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
 .cl-cart-total { margin:0; }
 .cl-checkout-steps { display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem; }
 .cl-checkout-steps [aria-current] { font-weight:700; text-decoration:underline; }
+.cl-checkout-promo { margin:1.5rem 0; display:grid; gap:.75rem; }
+.cl-checkout-promo-applied { margin:0; overflow-wrap:anywhere; }
+.cl-promotion-courses { border:0; padding:0; margin-left:0; margin-right:0; min-width:0; }
+.cl-bundle-line { padding:.25rem 0 .5rem; overflow-wrap:anywhere; }
+.cl-bundle-line p { margin:0 0 .35rem; }
+.cl-bundle-line-title { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+.cl-bundle-courses { display:grid; gap:.5rem; padding-left:1.5rem; margin:0 0 1rem; }
+.cl-bundle-courses li { overflow-wrap:anywhere; }
+.cl-bundle-courses li > span:first-child { margin-right:.75rem; }
+.cl-bundle-course-actions { display:inline-flex; flex-wrap:wrap; gap:.25rem; vertical-align:middle; }
+.cl-catalogue-bundles { margin:0 0 1rem; }
 .cl-public-cart-bar { display:flex; align-items:center; max-width:1200px; margin:auto; padding:.75rem 1rem; }
 @media (max-width:700px) { .cl-cart-prompt { display:none; } }/* Platform UI: canonical functional geometry; themes own its visual treatment. */
 
