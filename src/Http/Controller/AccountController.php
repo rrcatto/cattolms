@@ -117,12 +117,19 @@ final class AccountController extends BaseController
     }
 
 
+    #[Route('/account/billing', name: 'account_billing', methods: ['GET'])]
+    public function billing(): Response
+    {
+        $user = $this->requirePermission('ACCOUNT.PROFILE.VIEW');
+        return $this->renderAccountSection('billing', $this->billingData($user->id));
+    }
+
     /**
      * The person's reusable billing details: who their invoices are made out to. Kept apart from
-     * the personal particulars above, and only ever the signed-in person's own: there is no user
-     * to choose. Orders already placed keep the billing details they were placed with.
+     * the personal particulars, and only ever the signed-in person's own: there is no user to
+     * choose. Orders already placed keep the billing details they were placed with.
      */
-    #[Route('/account/profile/billing', name: 'account_update_billing', methods: ['POST'])]
+    #[Route('/account/billing', name: 'account_update_billing', methods: ['POST'])]
     public function updateBilling(): Response
     {
         $this->requireCsrf();
@@ -130,8 +137,8 @@ final class AccountController extends BaseController
         return $this->handle(function () use ($user): void {
             $this->billing->saveOwn($user, $_POST);
             $this->flash('success', 'Your billing details were saved.');
-            $this->redirect('/account/profile#billing');
-        }, '/account/profile#billing');
+            $this->redirect('/account/billing');
+        }, '/account/billing');
     }
 
     #[Route('/account/emails', name: 'account_emails', methods: ['GET'])]
@@ -420,6 +427,7 @@ final class AccountController extends BaseController
             $data = array_replace($data, match ((string) $section['key']) {
                 'dashboard' => $this->dashboardData($user->id),
                 'profile' => $this->profileData($user->id),
+                'billing' => $this->billingData($user->id),
                 'emails' => $this->emailData($user->id),
                 'social' => $this->socialData($user->id),
                 'learning' => $this->learningData($user->id, $this->libraryRequest()),
@@ -437,6 +445,7 @@ final class AccountController extends BaseController
         $permissions = [
             'dashboard' => 'ACCOUNT.VIEW',
             'profile' => 'ACCOUNT.PROFILE.VIEW',
+            'billing' => 'ACCOUNT.PROFILE.VIEW',
             'emails' => 'ACCOUNT.PROFILE.VIEW',
             'social' => 'ACCOUNT.PROFILE.VIEW',
             'learning' => 'LEARNING.LIBRARY.VIEW',
@@ -485,8 +494,6 @@ final class AccountController extends BaseController
         $profile = $this->auth->profile($userId);
         return [
             'profile' => $profile,
-            'billing' => $this->billing->userForm($userId, $profile),
-            'billing_fields' => BillingDetails::formFields(true),
             'emails' => $this->auth->emails($userId),
             'company' => $this->companies->forUser($userId),
             'user_roles' => $user->roles,
@@ -494,6 +501,15 @@ final class AccountController extends BaseController
                 ? ''
                 : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
             'profile_image_size' => ProfileImage::SIZE,
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function billingData(int $userId): array
+    {
+        return [
+            'billing' => $this->billing->userForm($userId, $this->auth->profile($userId)),
+            'billing_fields' => BillingDetails::formFields(true),
         ];
     }
 

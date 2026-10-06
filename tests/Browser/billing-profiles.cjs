@@ -58,16 +58,16 @@ const personA = {billing_name: 'Lerato Dlamini', organisation_name: 'Dlamini & A
 const companyA = {billing_name: 'Billing Browser (Pty) Ltd', tax_registration_number: '4999999999', address_line_1: '1 Harbour Road', address_line_2: '', locality: 'Foreshore', city: 'Cape Town', region: 'Western Cape', postal_code: '8001', country_code: 'ZA'};
 
 async function saveAccountBilling(page, data) {
-    await page.goto(`${base}/account/profile`);
+    await page.goto(`${base}/account/billing`);
     await fill(page, 'account-billing', data);
-    await page.locator('#billing button[type=submit]').click();
-    await page.waitForURL(/\/account\/profile/);
+    // The form posts back to the page it is on, so waiting for the URL would return before the
+    // post had been answered; wait for the navigation the submit causes instead.
+    await Promise.all([page.waitForNavigation(), page.locator('#billing button[type=submit]').click()]);
 }
 async function saveCompanyBilling(page, data) {
     await page.goto(`${base}/company/billing`);
     await fill(page, 'company-billing', data);
-    await page.locator('form[action="/company/billing"] button[type=submit]').click();
-    await page.waitForURL(/\/company\/billing/);
+    await Promise.all([page.waitForNavigation(), page.locator('form[action="/company/billing"] button[type=submit]').click()]);
 }
 
 (async () => {
@@ -78,7 +78,7 @@ async function saveCompanyBilling(page, data) {
         await scenario('a learner’s billing details save and survive a reload', browserName, async () => {
             state = reset();
             const {ctx, page} = await open(browser, state.learner_token);
-            await page.goto(`${base}/account/profile`);
+            await page.goto(`${base}/account/billing`);
             assert.ok(await page.getByText('No billing details saved yet').isVisible(), 'a new profile says so');
             assert.equal(await page.locator('#account-billing-billing-name').inputValue(), 'Lerato Dlamini', 'it starts from the person’s name');
             await saveAccountBilling(page, personA);
@@ -87,6 +87,14 @@ async function saveCompanyBilling(page, data) {
             const saved = await values(page, 'account-billing', Object.keys(personA));
             assert.deepEqual(saved, {...personA, country_code: 'ZA'}, 'saved values survive a reload, the country upper-cased');
             assert.equal(await page.getByText('No billing details saved yet').count(), 0);
+            // Billing Address is its own page under Profile; Personal Particulars keeps only the
+            // particulars and the profile image (owner instruction, 2026/10/06).
+            await page.goto(`${base}/account/profile`);
+            assert.equal(await page.locator('#billing').count(), 0, 'Personal Particulars holds no billing form');
+            assert.ok(await page.locator('#profile-image').isVisible(), 'the profile image is on Personal Particulars');
+            const profileLinks = await page.locator('a[data-nav-item]').evaluateAll(links => links.map(a => a.getAttribute('href')));
+            const order = ['/account/profile', '/account/billing', '/account/emails', '/account/social'].map(href => profileLinks.indexOf(href));
+            assert.ok(order.every(i => i >= 0) && order.every((v, i) => i === 0 || v > order[i - 1]), `Profile lists Personal Particulars, Billing Address, Email Addresses, Social Media in order (${order})`);
             await ctx.close();
         });
 
@@ -105,7 +113,7 @@ async function saveCompanyBilling(page, data) {
         });
 
         await scenario('the billing forms fit a phone', browserName, async () => {
-            for (const [token, url] of [[state.learner_token, '/account/profile'], [state.company_admin_token, '/company/billing']]) {
+            for (const [token, url] of [[state.learner_token, '/account/billing'], [state.company_admin_token, '/company/billing']]) {
                 const {ctx, page} = await open(browser, token, {width: 390});
                 await page.goto(`${base}${url}`);
                 assert.ok(await noSideScroll(page), `no sideways scroll at 390px on ${url}`);
@@ -140,7 +148,7 @@ async function saveCompanyBilling(page, data) {
         await page.waitForURL(/\/account\/orders\/\d+/);
         const orderUrl = page.url();
         assert.deepEqual(await billedTo(page), ['Lerato Dlamini', 'Dlamini & Associates', '14 Corrected Avenue', 'Suite 4', 'Brooklyn', 'Pretoria 0181', 'Gauteng', 'South Africa', 'Tax/VAT number: 4000000001'], 'the order shows the billing it was placed with');
-        await page.goto(`${base}/account/profile`);
+        await page.goto(`${base}/account/billing`);
         assert.equal(await page.locator('#account-billing-address-line-1').inputValue(), '14 Corrected Avenue', 'the checkout correction was saved to the profile');
         await saveAccountBilling(page, {...personA, billing_name: 'Lerato Mokoena', address_line_1: '99 Changed Road'});
         await page.goto(orderUrl);
@@ -183,7 +191,7 @@ async function saveCompanyBilling(page, data) {
     await scenario('the billing forms work without JavaScript', 'chromium-nojs', async () => {
         state = reset();
         for (const [token, prefix, url, data, selector] of [
-            [state.learner_token, 'account-billing', '/account/profile', personA, '#billing button[type=submit]'],
+            [state.learner_token, 'account-billing', '/account/billing', personA, '#billing button[type=submit]'],
             [state.company_admin_token, 'company-billing', '/company/billing', companyA, 'form[action="/company/billing"] button[type=submit]'],
         ]) {
             const {ctx, page} = await open(chromium, token, {js: false});
@@ -205,10 +213,10 @@ async function saveCompanyBilling(page, data) {
         for (const theme of themes) {
             for (const width of [1440, 390]) {
                 await page.setViewportSize({width, height: 1200});
-                for (const url of ['/account/profile', '/company/billing']) {
+                for (const url of ['/account/billing', '/company/billing']) {
                     const response = await page.goto(`${base}${url}?theme_preview=${theme}`);
                     assert.equal(response.status(), 200, `${theme} ${url}`);
-                    const form = page.locator(url === '/account/profile' ? '#billing form' : 'form[action="/company/billing"]');
+                    const form = page.locator(url === '/account/billing' ? '#billing form' : 'form[action="/company/billing"]');
                     assert.equal(await form.count(), 1, `${theme} ${width} ${url} has the billing form`);
                     assert.ok(await noSideScroll(page), `${theme} ${width} ${url} does not scroll sideways`);
                     const overflow = await form.evaluate((el) => [...el.querySelectorAll('input')].some((input) => input.getBoundingClientRect().right > el.getBoundingClientRect().right + 1));

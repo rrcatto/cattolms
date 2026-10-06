@@ -44,15 +44,16 @@ final class AccountWorkspaceContractTest extends TestCase
         return (string) file_get_contents($matches[0]);
     }
 
-    public function testAccountRegistryDefinesSevenDistinctSectionsAndSemanticRoutes(): void
+    public function testAccountRegistryDefinesEightDistinctSectionsAndSemanticRoutes(): void
     {
         // Seven since 2026/09/10. Profile became three sections - Personal Particulars, Email
         // Addresses and Social Media - on the owner's instruction, each with its own page under a
-        // Profile pop-out, because each is a separate decision with its own rules.
+        // Profile pop-out, because each is a separate decision with its own rules. Eight since
+        // 2026/10/06: Billing Address is its own page straight after Personal Particulars.
         $sections = (new AccountSectionRegistry())->all();
-        self::assertSame(['dashboard','profile','emails','social','learning','sessions','activity'], array_column($sections, 'key'));
+        self::assertSame(['dashboard','profile','billing','emails','social','learning','sessions','activity'], array_column($sections, 'key'));
         self::assertSame(
-            ['/account/dashboard','/account/profile','/account/emails','/account/social','/account/courses','/account/sessions','/account/activity'],
+            ['/account/dashboard','/account/profile','/account/billing','/account/emails','/account/social','/account/courses','/account/sessions','/account/activity'],
             array_column($sections, 'route')
         );
         foreach ($sections as $section) self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
@@ -82,6 +83,7 @@ final class AccountWorkspaceContractTest extends TestCase
         // explanation as the thing it was warning about. Two guards in this codebase have already
         // been defeated by their own comments; this one reads markup only.
         $particulars = self::markupOf($root . 'profile.html.twig');
+        $billing = self::markupOf($root . 'billing.html.twig');
         $emails = self::markupOf($root . 'emails.html.twig');
         $social = self::markupOf($root . 'social.html.twig');
 
@@ -92,6 +94,12 @@ final class AccountWorkspaceContractTest extends TestCase
         // The three used to be one screen of three unrelated forms. Each page now holds its own
         // subject, and this is the assertion that stops them drifting back together.
         foreach (['Email Addresses','/account/email/secondary','Course history','Active sessions'] as $token) self::assertStringNotContainsString($token, $particulars);
+        // Billing details were crammed onto the particulars page as a third card, which pushed the
+        // profile image below them; the owner moved them to their own page (2026/10/06).
+        foreach (['Billing','/account/billing','billing-fields'] as $token) self::assertStringNotContainsString($token, $particulars);
+
+        foreach (['Billing Address','action="/account/billing"','billing-fields.html.twig'] as $token) self::assertStringContainsString($token, $billing);
+        foreach (['Personal Particulars','Profile image','Email Addresses'] as $token) self::assertStringNotContainsString($token, $billing);
 
         foreach (['Email Addresses','cannot be removed','/account/email/secondary','/account/email/promote','/account/email/remove'] as $token) self::assertStringContainsString($token, $emails);
         foreach (['Personal Particulars','Profile image'] as $token) self::assertStringNotContainsString($token, $emails);

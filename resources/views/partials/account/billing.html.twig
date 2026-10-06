@@ -1,0 +1,34 @@
+{#
+	The person's billing address: who their invoices are made out to, which may be an organisation
+	rather than the person. Its own page under Profile (owner instruction, 2026/10/06), apart from
+	the personal particulars, and copied into each order when it is placed, so a change here never
+	alters an order or document that already exists.
+#}
+{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
+{% block body %}
+
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'billing'})} %}
+{% block surface_body %}
+
+		{{ ui('layout.section-head', {heading: 'Billing details', eyebrow: 'Billing Address', summary: 'Who your invoices are made out to. Checkout fills these in for you.'}) }}
+		{% if not billing.saved %}
+			{{ ui('feedback.notice', {tone: 'info', heading: 'No billing details saved yet. Your name and the platform’s country are filled in to start from.'}) }}
+		{% endif %}
+		<form action="/account/billing" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% include '@platform/partials/billing-fields.html.twig' with {billing_prefix: 'account-billing'} %}
+			<p class="help">Orders you have already placed keep the billing details they were placed with.</p>
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+
+				{{ ui('action.button', {label: 'Save billing details', variant: 'primary', size: 'normal', type: 'submit'}) }}
+
+{% endblock %}
+{% endembed %}
+		</form>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}

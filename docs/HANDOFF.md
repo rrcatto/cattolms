@@ -1,6 +1,10 @@
-# Catto Learning 0.8.8.6 — Development Handoff
+# Catto Learning 0.8.8.7 — Development Handoff
 
-## Current development handoff — 2026/10/06 (v0.8.8.6)
+## Current development handoff — 2026/10/06 (v0.8.8.7)
+
+The owner authorized v0.8.8.7. It contains the Billing Address change described at the end of the v0.8.8.6 section below: Account → Profile → Billing Address at `/account/billing`, with Personal Particulars restored. Annotated tag and GitHub release `v0.8.8.7` with `cattolms-v0.8.8.7.zip`. Gates: `composer qa` (934 tests) and `git diff --check`. The billing browser check (10/10), the UI matrix and the canonical matrix (30/30) passed on the same code before the version alignment.
+
+## v0.8.8.6 handoff — 2026/10/06
 
 The owner authorized v0.8.8.6 after installing v0.8.8.5 on the VPS. Every page there answered "Application dependencies are missing." although `current` pointed at the release, `.env` existed and `vendor/autoload.php` was installed.
 
@@ -8,6 +12,8 @@ The owner authorized v0.8.8.6 after installing v0.8.8.5 on the VPS. Every page t
 - **Fix.** The front controller now reads the file the way Dotenv does, and `tests/Unit/FrontControllerEnvTest.php` (8 cases) covers it.
 - **Deploying.** Copy `public_html/index.php` to the served web root; comments may then go back into `.env`.
 - **Release.** Annotated tag and GitHub release `v0.8.8.6` with `cattolms-v0.8.8.6.zip`. Gates: `composer qa` and `git diff --check`.
+
+After the v0.8.8.6 tag (owner instruction, 2026/10/06; released in v0.8.8.7), billing details have their own page, Account → Profile → Billing Address (`/account/billing`, `AccountController::billing()` and `updateBilling()`, `partials/account/billing.html.twig`), between Personal Particulars and Email Addresses. Personal Particulars is back to the particulars beside the profile image. `POST /account/profile/billing` is gone. `billing-profiles.cjs` 10/10, the UI matrix and the canonical matrix 30/30 passed.
 
 ## v0.8.8.5 handoff — 2026/10/06
 

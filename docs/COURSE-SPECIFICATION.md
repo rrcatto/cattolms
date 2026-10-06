@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.8.6 (0.8 code line) **Date time:** 2026/10/06 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.8.8.7 (0.8 code line) **Date time:** 2026/10/06 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
