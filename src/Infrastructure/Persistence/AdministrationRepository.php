@@ -167,8 +167,8 @@ SQL);
     }
 
     /** Columns each shared dataset search matches on; the page and its count use the same list. */
-    // Each expression is written to match a trigram index in
-    // 20260830220000_add_search_trigram_indexes character for character. A predicate that differs
+    // Each expression is written to match a trigram index in the baseline migration's
+    // SEARCH_INDEXES character for character. A predicate that differs
     // from its index - even by a cast - simply will not use it, and the search silently falls back
     // to a sequential scan. DatasetSearchIndexTest asserts the pairing.
     private const FULLNAME = "(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,''))";

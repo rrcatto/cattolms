@@ -7,6 +7,8 @@ Description:
 Validates the Catto Learning v0.5.8 Seed Database release contract: PHP 8.5.9, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/10/06 SAST
+- Requires exactly one migration, the canonical baseline, while the system is not live; the additive-migration rules are removed with the migrations they policed.
 2026/09/09 02:10 SAST
 - Theme Package 4.0 paths and tokens.
 2026/09/09 01:20 SAST
@@ -56,18 +58,12 @@ foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bund
 }
 $need(!isset($composer['scripts']['migrate-test']) && !isset($composer['scripts']['migrate:test']), 'A separate test migration command must not be defined.');
 
-// Exactly one baseline, plus any number of additive migrations after it.
-//
-// This used to require exactly one migration file in total, which was right while v0.5.8 was
-// rebasing the schema: a second file then would have meant somebody had started layering onto a
-// baseline that was still moving. It is wrong now. Adding an index to a populated database is an
-// ordinary additive migration, and forbidding it would push schema changes into the baseline -
-// which is precisely the rebase this rule exists to prevent.
-//
-// What must stay true is the part that matters: one baseline, and every other migration additive.
-// A second baseline, or a migration that drops or rebuilds a baseline table, is still a failure.
+// Exactly one migration: the canonical baseline (owner instruction, 2026/10/06). While the system
+// is not live the database is disposable, so a schema change is made in the baseline and the
+// development database is reset and rebuilt from it. Incremental migrations begin only once
+// production is declared; until then a second migration file is a failure.
 $migrations = glob($root . '/database/migrations/*.php') ?: [];
-$need($migrations !== [], 'The release must contain at least the baseline migration.');
+$need(count($migrations) === 1, 'Expected exactly one migration, the canonical baseline, found ' . count($migrations) . '. Change the baseline and reset the development database instead.');
 $baselineMatches = glob($root . '/database/migrations/*_baseline.php') ?: [];
 $need(count($baselineMatches) === 1, 'Expected exactly one baseline migration, found ' . count($baselineMatches) . '.');
 $baselinePath = $baselineMatches[0] ?? '';
@@ -77,43 +73,6 @@ foreach (['CREATE TABLE permissions','CREATE TABLE role_permissions','role_descr
 }
 $need(!str_contains($baseline, 'audit_log.ip_hash'), 'audit_log must not retain an IP hash.');
 
-// Every migration that is not the baseline must be additive. A non-baseline migration that drops
-// or recreates a table is a rebase wearing a later timestamp, and it would silently destroy a
-// populated database on a routine upgrade.
-foreach ($migrations as $migration) {
-    if ($migration === $baselinePath) {
-        continue;
-    }
-    $body = $read($migration);
-    $name = basename($migration);
-
-    // TRUNCATE is never additive whatever it names.
-    $need(!str_contains(strtoupper($body), 'TRUNCATE'), 'Non-baseline migration ' . $name . ' must be additive; it contains TRUNCATE.');
-
-    // CREATE TABLE and DROP TABLE are judged by *which* table, not by the words. The rule this
-    // enforces is the one stated above - a migration must not drop or recreate a table the baseline
-    // owns - and a blanket ban on the words made it impossible to add a new table at all, which is
-    // the ordinary reason to write an additive migration in the first place.
-    preg_match_all('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/i', $body, $created);
-    preg_match_all('/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/i', $body, $dropped);
-    $createdTables = array_map('strtolower', $created[1] ?? []);
-
-    foreach ($createdTables as $table) {
-        $need(
-            !preg_match('/CREATE\s+TABLE\s+' . preg_quote($table, '/') . '\b/i', $baseline),
-            'Non-baseline migration ' . $name . ' recreates the baseline table ' . $table
-                . '. That is a rebase wearing a later timestamp and would destroy a populated database.'
-        );
-    }
-    foreach (array_map('strtolower', $dropped[1] ?? []) as $table) {
-        // A migration may roll back what it created itself. Anything else it drops belongs to
-        // somebody else's schema, and a routine upgrade would take the data with it.
-        $need(
-            in_array($table, $createdTables, true),
-            'Non-baseline migration ' . $name . ' drops ' . $table . ', which it did not create.'
-        );
-    }
-}
 $auditStart = strpos($baseline, 'CREATE TABLE audit_log');
 $auditEnd = $auditStart === false ? false : strpos($baseline, 'CREATE INDEX audit_log_user', $auditStart);
 $auditBlock = ($auditStart !== false && $auditEnd !== false) ? substr($baseline, $auditStart, $auditEnd - $auditStart) : '';

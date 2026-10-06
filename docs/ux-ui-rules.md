@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8 (development) **Date time:** 2026/10/05 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8.8.4 (development) **Date time:** 2026/10/06 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -157,7 +157,7 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.1a Gilded Noir keeps its own texture instead.** *GN texture*: gold hairlines raked **up from the left** at about 14 degrees — shallower than the platform's 45 — in two bands of unequal width, a narrow line against a wide gap. It sits on the theme's fixed `.gn-canvas` over the theme's own dark ground. Gilded Noir therefore suppresses the platform canvas rather than carrying both: two textures on one page fight each other, and the owner chose this one for this theme.
 
-**6.2 Course card.** A course card carries, in this order: the course icon or image, the course name, the description, the category breadcrumb with every ancestor category clickable, the tags under a "Tags" label, the price, the level, the number of modules, the favourite star, and a "View course" button. It does **not** show the access period. Public catalogue cards use one canonical grid: four columns on large desktops, three on smaller desktops, two on tablets and one on phones. Public results paginate in pages of 24. → Enforced by `CourseCardContractTest`.
+**6.2 Course card.** A course card carries, in this order: the course icon or image, the course name, the description, the category breadcrumb with every ancestor category clickable, the tags under a "Tags" label, the price, the level, the number of Course Items, the favourite star, and a "View course" button. It does **not** show the access period. Public catalogue cards use one canonical grid: four columns on large desktops, three on smaller desktops, two on tablets and one on phones. Public results paginate in pages of 24. A course bundle in the bundle catalogue is shown with this same card and grid (owner instruction, 2026/10/06: reuse the course card rather than duplicating its markup), with its own facts — number of courses, access, price — and a "View bundle" button. → Enforced by `CourseCardContractTest` and `UiComponentContractTest`.
 
 **6.3 Row menu.** The stacked action panel described in section 3.
 
@@ -275,6 +275,12 @@ Ordinary category results show courses filed directly in that category. Search i
 
 ## Changelog
 
+2026/10/06 SAST
+
+- 6.2: the course card also presents course bundles, with their own facts; the card counts Course Items (it said modules).
+- Commerce checkout: the details step separates personal particulars from billing details; the promo code field and the subtotal/promotion/total lines; how bundles appear in the cart, on their page and in the ADMIN editor.
+- Course Components presentation: content is added only through "+ Add here".
+
 2026/10/05 SAST
 
 - 6.9: Popular Courses replaces the nine-course showcase: a sixteen-course pool rotated in the browser four at a time, pausable, held while in use, and still on reduced motion.
@@ -324,11 +330,13 @@ Ordinary category results show courses filed directly in that category. Search i
 - “Add to cart” stays on the course; “Buy now” adds the selection and opens checkout. Guests can build a cart before signing in.
 - Put the count-bearing cart icon and hover summary on the right of the breadcrumb bar, with “Proceed to checkout now” and Checkout to its left. Keep the disclosure usable by keyboard and touch.
 - Use My Cart (`/cart`). Account → COURSES contains My Orders (`/account/orders`) and My Courses (`/account/courses`); do not add a Purchases navigation item.
-- Checkout collects sign-in, profile details, payment method and invoice-email preference before review and “Place my order”. Orders retain downloadable PDF invoices.
+- Checkout collects sign-in, then the learner's details (personal particulars and, separately, billing details from the reusable billing profile), then payment method and invoice-email preference, before review and “Place my order”. Orders retain downloadable PDF invoices.
 - A failed payment offers another method or paying later. Unpaid orders cancel after seven days; EFT uses the unique order number as its reference.
 
 - Cart colours, opaque dropdown surfaces and button treatments belong to each theme. Core cart CSS owns geometry and interaction only. Gilded Noir uses its existing gold primary-button treatment and dark navigation surface, including buttons outside the main content area.
 
+- Promo codes (owner instruction, 2026/10/06): the checkout review has a Promo code field with Apply; an applied code shows the code, its discount and Remove. The totals always show the subtotal, the promotion as its own line and the total — never hide the original subtotal — on the cart, the review, the order pages and every document. A code that cannot apply says why in plain words, with no internal detail.
+- Bundles (owner instruction, 2026/10/06): the cart and review identify a bundle clearly (“Includes N courses”) at its own price; the bundle page shows its courses with the catalogue's course cards, its price and, only where every course has a current price, the individual-course total and the saving. A learner who already has some of the courses is told so (“You already have access to 1 of the 3 courses in this bundle.”); the price never changes for it. The ADMIN bundle editor lists the courses in order with Add course, Move up/Move down and Remove.
 - Administration → Settings uses one shared-pattern accordion per section. Each editable section has its own save action; keep the saved section open. Bank details belong in `app_options`, never `.env`, and EFT orders display the current details and unique order reference.
 
 ## 13. Platform design system enforcement
@@ -352,4 +360,4 @@ Core owns the mobile toggle and Escape handling. With JavaScript disabled, navig
 
 ## Course Components presentation ownership
 
-Course Content editing, the grouped Course Item Library, Resource Library and type-specific authoring use the canonical `ui()` registry and explicit Save/Cancel. Multiple course groups may remain expanded; unused items appear in Not currently in use. Course Item creation normally starts in Course Content. Learner course and assessment presentation is a deliberate Core exception: `layout/course-presentation.html.twig` renders the white full-screen reader without theme navigation/footer/wrappers. Themes must not style or replace it. Ordinary content has no completion controls or progress indicators.
+Course Content editing, the grouped Course Item Library, Resource Library and type-specific authoring use the canonical `ui()` registry. Course Content moves are saved at once; other authoring forms use explicit Save/Cancel. Multiple course groups may remain expanded; unused items appear in Not currently in use. Content is added to a course only through "+ Add here" in Course Content. Learner course and assessment presentation is a deliberate Core exception: `layout/course-presentation.html.twig` renders the white full-screen reader without theme navigation/footer/wrappers. Themes must not style or replace it. Ordinary content has no completion controls or progress indicators.

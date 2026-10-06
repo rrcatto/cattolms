@@ -1,5 +1,7 @@
 # Platform UI component guide
 
+**LMS:** 0.8.8.4 · **Updated:** 2026-10-06 · **Registry:** 34 components in `src/View/Ui/PlatformUi.php`
+
 CattoLMS reusable UI structures are platform components. A page may not independently implement a job already represented by a canonical component. Extend the component and its contract test instead of forking markup.
 
 The purpose is to prevent UI drift from page-by-page LLM generation. Recreating equivalent controls from scratch had produced subtle differences in markup, spacing, responsive behavior, accessibility and no-JavaScript fallbacks. This registry makes one implementation authoritative; the ownership contracts fail the build when a duplicate structure appears.
@@ -82,6 +84,14 @@ The registry defaults are the authoritative property reference. Add a property t
 
 Page head, dataset search, pagination, sortable header, entity lookup, course card, favourite, identity, site footer and cart chrome remain shared partials. Components delegate to them rather than replacing them. Category and tag pages still share the persistent/flat catalogue workspace, 24-card results policy, bounded initial twelve courses and progressive GET/htmx navigation.
 
+Supported uses added in v0.8.8.x, each through the existing component rather than a new one:
+
+- **Course card for bundles.** `partials/course-card.html.twig` (the owner of `cl-course-card`) accepts optional `href`, `link_label` and `facts` (the key-value rows). The bundle catalogue passes bundles through `catalogue.course-grid` with these, so a bundle is presented by the course card; `UiComponentContractTest` forbids a second card or grid.
+- **Totals.** Cart, checkout review and order pages show Subtotal / Promo / Total with `data.key-value-list`, built once by `Commerce\Domain\OrderTotals`.
+- **Promo code.** The checkout's promo code field is a `form.compact-action` (one value, one immediate action); Remove is an `action.button` with an `aria_label` naming the code.
+- **Entity lookup types.** `/admin/lookup/{type}` serves `people`, `companies`, `courses` and `bundles`; the bundle editor adds courses and the promotion editor adds courses and bundles through `partials/entity-lookup.html.twig` (pass `lk_required`). Its search runs on keyup; a selection fills the hidden input.
+- **Ordered lists with actions.** The bundle editor's course list uses Move up / Move down / Remove buttons as ordinary forms (`cl-bundle-courses`), the same pattern as course price variants; it is not a second drag-and-drop tree.
+
 ## Themes and review
 
 Themes own palette, typography, borders, radii, shadows and decorative chrome. Core owns component structure, required spacing, responsive geometry, htmx targets, focus and native form/navigation semantics. Gilded Noir retains its canvas, gold treatment, navigation identity and individual footer. Theme templates cannot implement another card/table/field/modal for the same job.
@@ -139,4 +149,4 @@ Themes preserve top-header/sidebar shell geometry and decoration; core owns func
 
 ## Course Components presentation ownership
 
-Course Content editing, the grouped Course Item Library, Resource Library and type-specific authoring use the canonical `ui()` registry and explicit Save/Cancel. Multiple course groups may remain expanded; unused items appear in Not currently in use. Course Item creation normally starts in Course Content. Learner course and assessment presentation is a deliberate Core exception: `layout/course-presentation.html.twig` renders the white full-screen reader without theme navigation/footer/wrappers. `layout/course-item.html.twig` is the one mandatory Course Item page construction: HTML lessons, sections, assessments, diagnostics, assessment sessions, results and public assessment previews all render their title and body inside its `article.cl-course-item` surface. Themes must not style or replace either layout. Reader pages do not receive palette state or palette controls. Start, begin, previous, next and public-preview controls compose the canonical `action.button` and `action.link` components; the Core reader supplies their shared blue primary treatment and white text. Ordinary content has no completion controls or progress indicators.
+Course Content editing, the grouped Course Item Library, Resource Library and type-specific authoring use the canonical `ui()` registry and explicit Save/Cancel. Multiple course groups may remain expanded; unused items appear in Not currently in use. Content is added to a course only through "+ Add here" in Course Content (insert modal, or form pages without JavaScript); the Course Item Library's Create item makes an unplaced item. Learner course and assessment presentation is a deliberate Core exception: `layout/course-presentation.html.twig` renders the white full-screen reader without theme navigation/footer/wrappers. `layout/course-item.html.twig` is the one mandatory Course Item page construction: HTML lessons, sections, assessments, diagnostics, assessment sessions, results and public assessment previews all render their title and body inside its `article.cl-course-item` surface. Themes must not style or replace either layout. Reader pages do not receive palette state or palette controls. Start, begin, previous, next and public-preview controls compose the canonical `action.button` and `action.link` components; the Core reader supplies their shared blue primary treatment and white text. Ordinary content has no completion controls or progress indicators.

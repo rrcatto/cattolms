@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.4 · **Updated:** 2026-10-06
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -124,11 +124,16 @@ cl-nav-group/cl-nav-subpanel hooks. A scrolling sidebar nests the third level wi
 other navigation can use the core popout. Preserve visible keyboard focus and accessible mobile
 navigation controls. Navigation destinations are not a theme-maintained route catalogue.
 
-The current menus provide Account (All sections, Dashboard, Profile, My Courses, Sessions,
-Activity), Company (All sections, Dashboard, People, Course Requests, Course Credits and course/
-learning sections), and Administration (Dashboard, People, companies, courses, Roles & ACL,
-Themes, Settings and UI Components). Registries supply the exact labels, order and permission
-filtering; these examples do not authorise hard-coded destinations in themes.
+The current menus provide Account (All sections, Dashboard, a Profile group holding Personal
+Particulars, Email Addresses and Social Media, a COURSES group holding My Orders and My Courses,
+Sessions, Activity), Company (All sections, Dashboard, a People group holding People,
+Course Requests, Enrolments and Performance, a Courses group holding Courses Created, Favourites, Courses
+Bought and Credits, then Billing details), and Administration in five groups: Courses (courses, the Course Item and Resource
+Libraries, categories, tags, Course Reviews, Bundles, requests, enrolments), People & Companies,
+Credits & Orders (credits, Orders & Payments, Promotions), Insights (activity and reports) and
+System (Themes, Roles & ACL, Seed Database, Settings, UI Components). Third-level entries
+are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
+these examples do not authorise hard-coded destinations in themes.
 
 The standard footer destination array is core-owned. Factory Reset, Light Default and Radiant Learning delegate
 to the site-footer partial. Factory Reset Sidebar retains its richer themed footer. Gilded Noir retains its individual footer composition using the same
@@ -154,7 +159,12 @@ Canonical classes include `cl-ui-surface`, `cl-ui-section-head`, `cl-ui-action`,
 `cl-ui-badge`, `cl-ui-notice`, `cl-ui-empty-state`, `cl-ui-progress`, `cl-ui-modal` and
 `cl-ui-accordion-section`. Themes decorate these existing elements; they cannot emit duplicate
 functional structures. Existing shared search, pagination, sortable headers, entity lookup, course
-cards and favourites remain canonical.
+cards and favourites remain canonical. The course card (`partials/course-card.html.twig`,
+`cl-course-card` inside `catalogue.course-grid`) also presents course bundles in the bundle catalogue,
+so a theme's course-card styling covers bundles too; do not add a separate bundle card. Core styles
+the checkout promo code section (`cl-checkout-promo`), cart and checkout bundle lines
+(`cl-bundle-line`) and the bundle editor's course list (`cl-bundle-courses`); themes decorate them
+like any other core content.
 
 Core owns responsive columns, stable IDs/htmx targets, minimum functional spacing, native GET/POST,
 required overflow and accessible states. Themes own colours, typography, borders, radii and shadows.
@@ -198,7 +208,9 @@ owns theme installation and publication. Do not manually maintain a parallel the
 Version changes and release packaging require the owner's instruction.
 
 Run `composer qa`, inspect `/admin/system/ui-components`, and review actual login, account,
-administration, company, catalogue/tag, checkout and learning pages at desktop/tablet/mobile sizes.
+administration, company, catalogue/tag, bundle (`/bundles`, a bundle page), cart, checkout (including
+the promo code review step), order and learning pages at desktop/tablet/mobile sizes. The browser
+checks in `tests/Browser/` cover all five bundled themes at 1440 and 390px.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
 pagination, htmx replacement and plain GET/POST fallbacks. Gilded Noir, Light Default, Factory Reset
 Radiant Learning and Factory Reset Sidebar all need individual visual checks. The component ownership contracts scan bundled theme templates as well as platform views.
