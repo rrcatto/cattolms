@@ -1,6 +1,33 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/09/24
+## Current delivery position — 2026/10/06 (v0.8.8.4)
+
+**Current LMS version:** 0.8.8.4 · **Date:** 2026/10/06 SAST · tag `v0.8.8.4` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+
+**Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
+
+| Version | Delivered |
+|---|---|
+| 0.8.8.4 | Promo codes (Phase G), course bundles (Phase H) and independent entitlement sources, on billing profiles (Phase F) |
+| 0.8.8.3 | Rotating Popular Courses on the home page |
+| 0.8.8.2 | Course popularity engine and ADMIN popularity report |
+| 0.8.8.1 | Moderated course ratings and reviews |
+| 0.8.8 | First-party analytics events |
+| 0.8.7.9 | Sections that opt into the public preview; category statistics |
+| 0.8.7.8 | Depth-indented reader outline, one Previous/Next order (`CourseNavigation`) |
+| 0.8.7.7 | Reader presentation fixes; Course Item editing returns to its Course Content row |
+| 0.8.7.6 | "+ Add here" as the one way to add content, through the insert modal |
+| 0.8.7.5 | Course Content drag-and-drop tree with immediate validated moves |
+| 0.8.7.4 | Protected Downloadable File items |
+| 0.8.7.3 | Compact category picker and category management tree; one-row Gilded Noir navbar |
+| 0.8.7.2 | Tabbed course editor and working grading scale |
+| 0.8.7.1 | Course Content arrangement, imported assessment grouping |
+| 0.8.7 | Tester administration, company credit purchasing, payment administration and refunds |
+| 0.8.6 / 0.8.6.1 | Course Components v2; ADMIN test access |
+
+**What is next.** No phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+
+## Delivery sequence of 2026/09/24 — completed in v0.8.7
 
 The owner approved this sequence, with a review break after each step: (1) update stale documentation, (2) finish tester administration, (3) implement company credit purchasing, and (4) implement payment administration and refunds. The documentation correction and initial ADMIN grant workflow are included in the owner-authorized v0.8.6.1 release. Tester administration, company credit purchasing, and payment administration/refunds are included in the owner-authorized v0.8.7 release. Future scope, versions and Git publication require another explicit owner instruction.
 
@@ -12,11 +39,9 @@ The owner-approved Course Components v2 redesign is released as v0.8.6. The disp
 
 Read `COURSE-SPECIFICATION.md` section 18 for the current domain and interchange contract. ADMIN intent is authoritative: do not silently repair, rename, rewrite, substitute or cascade related authored content; unresolved draft shortcodes are permitted and block publication. Save changes a shared item; Save As creates independent item data while sharing its initial Resource file. Progress is assessment-only and grading remains fixed at 50/50. Course presentation is Core-owned and bypasses theme wrappers. Reports belong in workspace `cattolms/REPORTS/`, never the code tree.
 
-**Current LMS version:** 0.8.8.4 **Date time:** 2026/10/07 SAST **Current stage:** v0.8.8.4 releases promo codes (Phase G) and course bundles with independent entitlement sources (Phase H), on the billing profiles (Phase F) committed after v0.8.8.3 (section 3). They follow the rotating Popular Courses home page (section 9b), which follows v0.8.8.2's course popularity engine and ADMIN popularity report, which follow v0.8.8.1's course ratings and moderated learner reviews (section 3f), which follow v0.8.8's first-party analytics event foundation (section 9b), which follows v0.8.7.9's sections that opt into the public course preview and category statistics on the category management page, which followed v0.8.7.8's depth-indented course reader outline, "+ Add here" that keeps working after the Course Content tree refreshes, and one Previous/Next reading order (`CourseNavigation`) follow v0.8.7.7's course reader presentation fixes (distinct Section entries in the outline, one description per Course Item, white-text shared primary actions) and Course Item editing that returns to the Course Content row it started from follow v0.8.7.6, in which "+ Add here" became the one way to add Course Content, through an insert modal that places content at the exact place and refreshes the tree in place; it follows v0.8.7.5's Course Content drag-and-drop tree (immediate validated moves, keyboard and ⋯ menu moves, collapsible sections), which follows v0.8.7.4's protected Downloadable File items and Add item workflow, which followed v0.8.7.3's compact category pickers, collapsible category management tree and one-row Gilded Noir navbar follow v0.8.7.2's tabbed course editor and working grading scale (Grades tab, `[grading-scale]` placeholder and scale import), which followed v0.8.7.1's Course Content arrangement, imported assessment grouping and editor availability fix, which followed the tester, company credit purchasing and payment administration/refund sequence released in v0.8.7. `COMMERCE-IMPLEMENTATION-PLAN.md` records the implemented commerce boundaries. Account Funds spending, payouts and live payment gateways are not implemented. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it.
+The current version, release sequence and next work are at the top of this file. `COMMERCE-IMPLEMENTATION-PLAN.md` records the implemented commerce boundaries.
 
-Only the project owner decides future release numbers.
-
-**Reading the stage records below.** Sections 1 to 2, and historical paragraphs in later sections, record decisions and implementation states at their original dates; their “next”, “pending” and REAL/SEED instructions are not current tasks. The REAL/SEED universe, `seed_token`, constraint triggers, `SEED_*` roles and All/Real/Seed control were removed in v0.7. The current state is the delivery order above, `PROJECT-INSTRUCTIONS.md` section 5 and the current-status sections of `COMMERCE-IMPLEMENTATION-PLAN.md`. Historical text remains for decision provenance only.
+**Reading the stage records below.** Sections 1 to 2, and historical paragraphs in later sections, record decisions and implementation states at their original dates; their “next”, “pending” and REAL/SEED instructions are not current tasks. The REAL/SEED universe, `seed_token`, constraint triggers, `SEED_*` roles and All/Real/Seed control were removed in v0.7. The current state is the delivery position above, the current development position in `PROJECT-INSTRUCTIONS.md` and the current-implementation sections of `COMMERCE-IMPLEMENTATION-PLAN.md`. Historical text remains for decision provenance only.
 
 ## Current UI design system
 
@@ -257,9 +282,9 @@ Doing the first is worth little on its own if the catalogue stays in one languag
 
 ---
 
-## 3. Commerce — individual foundation built; company and administration work remains
+## 3. Commerce — built through v0.8.8.4; later money work remains
 
-The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. Local subsequent work adds company credit purchasing, ADMIN bank evidence confirmation, manual-review reconciliation and refund/credit-note/Account Funds records. `src/Commerce/` and its integration tests are the implementation source. The bullets below are the original broader domain target, not a claim that none of Commerce exists. Further commerce work requires a scope decision after owner review.
+The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. v0.8.7 added company credit purchasing, ADMIN bank evidence confirmation, manual-review reconciliation and refund/credit-note/Account Funds records; v0.8.8.4 added billing profiles, promo codes, course bundles and independent entitlement sources (below). `src/Commerce/`, `src/Bundle/` and their integration tests are the implementation source. The bullets below are the original broader domain target, most of which is now built; the PayFast/real gateway, Account Funds spending, payouts, debt and gifts remain. Further commerce work requires a scope decision by the owner.
 
 Implement one coherent commerce domain:
 
@@ -276,11 +301,11 @@ Implement one coherent commerce domain:
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
-**Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Editable invoice and receipt templates remain later work, and the structured snapshot is their input. Promo codes (Phase G) have not started.
+**Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Editable invoice and receipt templates remain later work, and the structured snapshot is their input.
 
-**Promo codes — Phase G, released in v0.8.8.4 (owner instruction, 2026/10/06):** ADMIN-managed promotions (`promotions`, `promotion_courses`, `promotion_redemptions`) with percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and all-courses or selected-courses applicability. One code per individual checkout order, validated by the server and again at placement under the promotion's row lock; the discount is an order adjustment allocated proportionally over lines, frozen into the order snapshot, shown on every document and bounding refunds. A use is held at placement and redeemed when paid. Not built here: bundles (next commerce phase, with `applies_to` and its own table), automatic promotions, stacking, referral or affiliate codes, gift vouchers, loyalty, personalised promotions, campaign pages, and promotions on company credit purchases.
+**Promo codes — Phase G, released in v0.8.8.4 (owner instruction, 2026/10/06):** ADMIN-managed promotions (`promotions`, `promotion_courses`, `promotion_redemptions`) with percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and all-courses or selected-courses applicability. One code per individual checkout order, validated by the server and again at placement under the promotion's row lock; the discount is an order adjustment allocated proportionally over lines, frozen into the order snapshot, shown on every document and bounding refunds. A use is held at placement and redeemed when paid. Bundles followed as Phase H, which replaced `applies_to` with separate course and bundle scopes. Not built: automatic promotions, stacking, referral or affiliate codes, gift vouchers, loyalty, personalised promotions, campaign pages, and promotions on company credit purchases.
 
-**Course bundles — Phase H, released in v0.8.8.4 (owner instruction, 2026/10/07):** ADMIN-managed bundles of published courses sold for one bundle price through the ordinary cart and checkout. An order line keeps the bundle's courses, price and access period as sold; fulfilment gives every course its own bundle entitlement source with provenance, beside any source the learner already has (several sources now coexist behind one visible enrolment, and access lasts while any is valid), and a refund revokes only the refunded line's sources. Promotions gained separate course and bundle scopes. Not built: nested or learner-built bundles, prorated prices for owned courses, company-credit or company-allocated bundles, bundle subscriptions, recommendations, bundle popularity, automatic bundle discounts and per-course refunds from a bundle.
+**Course bundles — Phase H, released in v0.8.8.4 (owner instruction, 2026/10/06):** ADMIN-managed bundles of published courses sold for one bundle price through the ordinary cart and checkout. An order line keeps the bundle's courses, price and access period as sold; fulfilment gives every course its own bundle entitlement source with provenance, beside any source the learner already has (several sources now coexist behind one visible enrolment, and access lasts while any is valid), and a refund revokes only the refunded line's sources. Promotions gained separate course and bundle scopes. Not built: nested or learner-built bundles, prorated prices for owned courses, company-credit or company-allocated bundles, bundle subscriptions, recommendations, bundle popularity, automatic bundle discounts and per-course refunds from a bundle.
 
 ## 3b. Course taxonomy and discovery
 
@@ -294,7 +319,7 @@ Built since, 2026/09/07: **tag management, tag pages and keyword search.** Admin
 
 Category, tag and keyword are one `CatalogueFilter` handed to both the count and the rows, so a facet cannot reach one and miss the other, and combining them means the intersection. The tag predicate is an EXISTS rather than a join, because a course carries several tags and a join would return it once per tag.
 
-Built since, 2026/09/07: **faceted search.** Every option in the category and tag rails carries the number of courses choosing it would return, and tags multi-select: several tags mean *any* of them, because intersecting tags collapses to nothing almost immediately and a facet whose options can only narrow gives a reader no way back.
+Built since, 2026/09/07 (the rails were replaced in v0.8.7.3 by the `form.tree-select` category picker and the tag browser; the shared `CatalogueFilter` and count rules below still apply): **faceted search.** Every option in the category and tag rails carries the number of courses choosing it would return, and tags multi-select: several tags mean *any* of them, because intersecting tags collapses to nothing almost immediately and a facet whose options can only narrow gives a reader no way back.
 
 The rule that makes it work: **a facet's own counts are taken with that facet relaxed.** Apply the tag facet to its own counts and choosing one tag drives every other tag to zero — no course carries a tag it does not carry — and the rail becomes a single live option and a dead end. Counted with the tag facet dropped but the category and keyword still applied, each figure means "how many more this would add". `CatalogueBrowseIntegrationTest` asserts both the relaxed figure and what the applied one would have done.
 
@@ -314,7 +339,7 @@ The owner will map out the categories and the structure the catalogue actually n
 - the schema, the three-level cap, the unique names and the management screens are settled and are not what needs revisiting;
 - replacing the list is a data change, not a schema change — the baseline seeds it and nothing in the code depends on any particular category existing.
 
-The practical consequence today is that the categories screen renders 369 rows in one unpaginated table. Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent in sight is worse than a long page; collapsible branches or filtering to one branch at a time are the right ones. Both are cheaper to build once the real taxonomy is known and its actual size is settled.
+The built-in set is still the 369-category placeholder (16/77/276). Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent in sight is worse than a long page; since v0.8.7.3 the category management page is a collapsible tree (with category statistics since v0.8.7.9), and the public catalogue uses the compact `form.tree-select` picker.
 
 ### Category hierarchy
 
@@ -370,7 +395,7 @@ This is a **company-to-course** relationship in its own right, not a user favour
 
 ## 3d. Company course lifecycle — the split is built
 
-**The five-section split is done.** What is still owed is company credit purchasing and its integration with request approval.
+**The five-section split is done**, and company credit purchasing with request approval followed in v0.8.7. The company workspace labels are now Courses Created (`/company/courses`), Courses Bought (`/company/training`), Favourites, Enrolments and Credits, beside People, Course Requests, Performance and Billing details (`/company/billing`, v0.8.8.4).
 
 | Section | Route | What it holds |
 |---|---|---|
@@ -384,9 +409,9 @@ This is a **company-to-course** relationship in its own right, not a user favour
 
 `company_favourites` is a company-to-course table. It is not a user favourite: staff favouriting a course for themselves changes nothing here, and the company's interest outlives whoever added it — owner decision, 2026/09/07. The former cross-universe trigger and `seed_token` behavior were removed in v0.7.
 
-### Still outstanding
+### Formerly outstanding
 
-- Buying credits, which is Commerce.
+- Buying credits — built in v0.8.7 (`/company/credits/buy`, and buying a missing credit while approving a request). Company purchases cannot use promo codes or bundles.
 
 Assigning an existing credit to a staff member was built on 2026/09/07: the form is on `/company/enrolments`, the rules are the same two that approval uses, and the pickers are a company-scoped lookup rather than the platform-wide one.
 
@@ -410,7 +435,7 @@ Training Courses will likely want per-course metrics: credits purchased, credits
 
 ## 3e. Promotions, recommendations and personalisation — after Commerce
 
-Planning only.
+Planning only. Checkout promo codes are a different thing and are built (section 3, Phase G). The home page's Popular Courses (v0.8.8.3) ranks by measured popularity; it is not an editorial or paid placement, so the distinction below still stands.
 
 ### Promoted, featured and sponsored courses
 
@@ -523,6 +548,8 @@ Late-project work, once the public catalogue is stable. `public_html/robots.txt`
 ## 9b. Analytics — after Commerce, and never ahead of it
 
 **Foundation implemented in v0.8.8** (owner instruction, 2026/10/04): CattoLMS keeps its own authoritative business-event stream (`analytics_events`, `CattoLearning\Analytics`), independent of any third-party service; an adapter may later forward selected events. Recorded now: course views (course page, public preview, learner reader; never ADMIN editing or previews), favourite changes, checkout starts, purchases per paid order line and refunds per approved refund, all server-side and the business events idempotently inside their transactions. ADMIN can inspect them at `/admin/analytics/events`. Not built yet, by instruction: landing-page analytics, external integrations and a retention UI. Ratings and reviews followed in v0.8.8.1 (section 3f).
+
+Added since: review events (v0.8.8.1: submitted, updated, approved, rejected), promo code events (`promo_code_applied`, `promo_code_redeemed`) and bundle events (`bundle_purchased`, `bundle_refunded`; a bundle's courses record no `course_purchased`) in v0.8.8.4 — 14 types in `AnalyticsEventType`.
 
 **Popularity implemented in v0.8.8.2** (owner instruction, 2026/10/04): `bin/console popularity:recalculate` scores every published course out of 100 over a 30-day window — distinct discovery viewers 15%, current favourites 20%, purchases net of a bounded refund penalty 35%, confidence-weighted approved rating 20%, smoothed 7-day momentum 10%, counts log-normalised — and stores the ranking with every component and source metric in `course_popularity`. ADMIN reads it at `/admin/reports/popularity`. **Popular Courses home page implemented in v0.8.8.3** (owner instruction, 2026/10/05): the home page loads a 16-course pool from `CoursePopularityRepository::popularCourses()`, topped up with the newest published courses, and rotates it four at a time in the browser every 20 seconds (pausable, held while in use, paused under reduced motion, first group only without JavaScript), replacing the course showcase. Still open: scheduling `popularity:recalculate` on an installation, impression analytics for home page cards, and optionally a free-enrolment event so free courses gain an acquisition signal. Promoted and personalised placements remain section 3e.
 

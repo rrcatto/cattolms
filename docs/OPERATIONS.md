@@ -1,22 +1,108 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.4 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.4 **Date time:** 2026/10/06 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
 ## Current v0.8.8.4 operational position
 
-The active local code is `code/current` on `dev-v0.8`. The development database was recreated on 2026/10/05 after a disk failure (all migrations, bundled themes and seed names, then a new 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); recreate it the same way whenever needed. All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. v0.8.6.1 adds initial ADMIN test access and corrected current documentation. v0.8.7 completes tester administration, company credit purchasing, and ADMIN payment administration/refunds. v0.8.7.1 adds explicit Save/Cancel to Course Content movement, groups imported module assessments beneath their modules and repairs the editor availability fields. v0.8.7.2 adds the tabbed course editor and the working grading scale; it changes `public_html/css/catto-platform.css`, so publish that file to the served web root and clear the cache. v0.8.7.3 changes `catto-platform.css`, `platform-overrides.js`, the `nav-icons.svg` sprite, the compiled `public_html/assets/` (new `category-tree` Stimulus controller) and Gilded Noir's stylesheet: publish those core files and the compiled assets to the served web root, run `composer themes:install -- --force` in development, and clear the cache. Those releases needed no migration. v0.8.7.4 adds two additive migrations, `20261002100000_add_downloadable_file_items.php` and `20261002110000_fold_document_items_into_downloadable_file.php`: run `php vendor/bin/phinx migrate -c phinx.php -e development` as `cattotest`, then publish `catto-platform.css` and clear the cache. Downloadable files stay in `storage/course-resources` outside the web root and are served only by the learner download route. No database reset is needed. v0.8.7.5 changes `catto-platform.css`, the `nav-icons.svg` sprite (new `action-drag` and `action-more` symbols) and the compiled `public_html/assets/` (new `course-content` Stimulus controller): publish those to the served web root and clear the cache. It needs no migration; `config/services.yaml` gives `PlatformUi` the public root so icons use the fingerprinted sprite URL. v0.8.7.6 changes `catto-platform.css`, `question-editor.js` and the compiled `public_html/assets/` (updated `course-content` controller): publish those to the served web root and clear the cache. It needs no migration. v0.8.7.7 changes only `catto-platform.css` among served assets: publish it and clear the cache; no migration. v0.8.7.8 changes `catto-platform.css` and the compiled `public_html/assets/` (updated `course-content` controller): publish both and clear the cache; no migration. v0.8.7.9 adds one additive migration, `20261003100000_add_public_preview_to_course_sections.php`: run `php vendor/bin/phinx migrate -c phinx.php -e development` as `cattotest`, then publish `catto-platform.css` and clear the cache. No database reset is needed. v0.8.8 adds one additive migration, `20261004100000_create_analytics_events.php` (the `analytics_events` table): run it the same way, then publish `catto-platform.css` and clear the cache. Analytics events hold no IP addresses, session tokens or payment details; `AnalyticsEventRepository::anonymiseBefore()` and `deleteBefore()` are the retention hooks for a later policy. v0.8.8.1 adds one additive migration, `20261004110000_create_course_reviews.php` (the `course_reviews` table and the `LEARNING.REVIEW.CREATE` and `COURSE.REVIEW.MANAGE` permissions): run it the same way, then publish `catto-platform.css` and clear the cache. No database reset is needed. Reviews are moderated at `/admin/course-reviews`; rejection never deletes a review, and there is no hard-delete action. v0.8.8.2 adds one additive migration, `20261004120000_create_course_popularity.php` (the `course_popularity_runs` and `course_popularity` snapshot tables): run it the same way, then run `php bin/console popularity:recalculate` as `cattotest`. That command recalculates the ranking of every published course and replaces the stored snapshot in one transaction; pages only read the snapshot, so schedule it (for example hourly from cron, as `cattotest`) wherever the ranking should stay current. It exits non-zero on failure. No assets changed and no database reset is needed. v0.8.8.4 adds three additive migrations: `20261006100000_create_promotions.php` (promotions, their courses and redemptions, the cart/order/line promotion columns and `PLATFORM.PROMOTION.VIEW`/`MANAGE`), `20261007100000_create_bundles.php` (bundles, their courses and offers, cart bundle lines, bundle order lines, bundle entitlement sources and grants, promotion course and bundle scopes, and `BUNDLE.MANAGEMENT.VIEW`/`BUNDLE.MANAGE`) and `20261007110000_create_entitlement_sources.php` (several entitlement sources per enrolment, each with its own access period; ADMIN, company and seed access joined by a commerce source is recorded as its `origin` source). Run them with the same Phinx command, publish `catto-platform.css` to the runtime web root and clear the cache; no database reset is needed. Their rollbacks fail while a zero-total order, a bundle order or an enrolment with several sources exists; reset the database first. `commerce:maintain` now reconciles each enrolment's sources: a course stays open while any source is valid. Phase F (billing profiles, committed after v0.8.8.3 and released with v0.8.8.4) adds migration `20261005100000_create_billing_profiles.php` (the `user_billing_profiles` and `company_billing_profiles` tables, removal of `users.billing_address`, and the `COMPANY.BILLING.MANAGE` permission for COMPANY_ADMIN): run it with the same Phinx command and clear the cache; no assets changed. Billing details entered before it are not carried over, because the old free-text address cannot be split into fields reliably; people and companies enter them once in the new forms. v0.8.8.3 has no migration: publish `catto-platform.css`, `nav-icons.svg` (new `action-pause` and `action-play` symbols) and the compiled `public_html/assets/` (new `popular-courses` Stimulus controller), clear the cache, and make sure `popularity:recalculate` has run, because the home page's Popular Courses reads its snapshot; without one it shows the newest published courses. Company checkout supports multiple exact course/access-period variants and quantities, with immutable paid credit lots. A linked request remains pending until simulated card payment succeeds, then one credit is allocated and the learner is enrolled. Direct EFT company orders issue no credit before confirmed full settlement. At `/admin/commerce/orders`, ADMIN can record bank amount, received time with timezone, unique bank reference and written reason; exact full payment settles, while late or changed paid orders require explicit reasoned manual-review release. Refund approval creates a credit note and Account Funds entry. Full individual item refunds revoke its access immediately; company credit refunds apply only to unused purchased units at historical LIFO prices. Account Funds spending and bank payouts are not implemented. The owner approved documentation correction, tester-administration completion, company credit purchasing, and payment administration/refunds in that order, with a review break after each step. This sequence is included in the owner-authorized v0.8.7 release; later pushes and versions need a new instruction.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.4` is on GitHub `main` and published as a GitHub release with the source zip. Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/06 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
+- **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 88 permissions (10 `SYSTEM.*`, 78 business) across the five roles.
+- **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below.
+- **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there as the files' owner (CSS, JS and images from the host as `rrcatto`; compiled `assets/` inside `env_php_1` as `cattotest`), then run `php bin/console cache:clear` as `cattotest`.
 
-Apply the additive local company purchase migrations with `php vendor/bin/phinx migrate -c phinx.php -e development` inside the PHP container as `cattotest`: `20260923190000_add_company_credit_purchases.php`, `20260923191000_guard_company_credit_settlement.php` and `20260923192000_repair_company_credit_delete_trigger.php`. The final migration corrects deletion of ordinary non-purchased credit lots while purchased lots remain immutable. No database reset or reseed is required. Keep `commerce:maintain` running for invoice and queued learner notices. Do not treat a pending EFT instruction as proof of payment or create its credits manually.
+### Rebuilding the development database
 
-Apply `20260923200000_add_payment_administration_and_refunds.php` and `20260923201000_guard_refunded_credit_allocations.php` additively with the same Phinx command. They record immutable manual bank evidence, refunds, credit notes and Account Funds entries, and prevent refunded credit units from being allocated. Record confirmation only against an independently verified bank statement; do not treat a customer's payment screenshot or an invoice as proof. If the amount differs from the order total, retain the order for review rather than confirming part-payment. A paid order held for manual review requires an explicit ADMIN release reason; resolving a broken learner/request relationship is separate from recording bank evidence. If fulfilment is impossible, ADMIN may refund the paid but unissued order from manual review, with reason, Account Funds credit and credit note. Refunds do not trigger a bank payout. The original invoice, payment events, course results and certificates remain historical records.
+The database is disposable, so it is rebuilt rather than upgraded. Run, as `cattotest` in `env_php_1` (each step of `composer smoke:install`, whose `@migrate` step cannot run the Phinx launcher as `cattotest`):
 
-Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It cancels overdue unpaid orders, advances access deadlines and retries requested invoice emails. The local Podman setup uses a dedicated worker; `deployment/commerce-worker.compose.yaml` exports its configuration for use with the workspace’s `env/compose.yaml`.
+```sh
+php tools/reset-development-database.php --force        # drops and recreates the public schema
+php vendor/bin/phinx migrate -c phinx.php -e development # the one baseline: schema and reference data
+composer themes:install && composer themes:sync && composer seeds:publish
+php tools/smoke-app-boot.php
+php tools/seed-generate.php 100000                       # optional test dataset and administrator
+php bin/console popularity:recalculate --no-debug
+php bin/console cache:clear
+```
 
-Run `php bin/console popularity:recalculate --no-debug` once an hour from the same scheduler, as the application user. It recalculates the course popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read; pages never calculate it, so without the schedule the ranking stays as it was last calculated. It exits non-zero on failure. An example crontab line: `5 * * * * cd /path/to/current && php bin/console popularity:recalculate --no-debug`.
+Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to the runtime web root. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources` when needed.
+
+To change the schema, edit the baseline and rebuild. Before replacing a large part of it, the equivalence check used on 2026/10/06 is cheap. Create two scratch databases, apply the old and new baselines to them through a copy of `phinx.php` that names the scratch database, and compare `pg_dump --schema-only --no-owner -T phinxlog` and a `--data-only --inserts` dump with timestamps masked.
+
+### Release notes for earlier v0.8 versions (historical)
+
+These versions shipped as incremental migrations. Those migrations were consolidated into the canonical baseline on 2026/10/06 and no longer exist; the schema they describe is part of the baseline. The served-file and command notes still describe what each release changed.
+
+- **v0.8.6.1:** initial ADMIN test access and corrected documentation.
+- **v0.8.7:** tester administration, company credit purchasing, and ADMIN payment administration and refunds.
+  - The company purchase migrations are `20260923190000_add_company_credit_purchases.php`, `20260923191000_guard_company_credit_settlement.php` and `20260923192000_repair_company_credit_delete_trigger.php`.
+  - The payment migrations are `20260923200000_add_payment_administration_and_refunds.php` and `20260923201000_guard_refunded_credit_allocations.php`.
+- **v0.8.7.1:** explicit Save/Cancel for Course Content movement (later replaced by immediate moves), module assessments imported beneath their modules, and repaired availability fields.
+- **v0.8.7.2:** the tabbed course editor and the working grading scale. Publish `catto-platform.css`.
+- **v0.8.7.3:** publish `catto-platform.css`, `platform-overrides.js`, `nav-icons.svg` and compiled `assets/` (the `category-tree` controller), and run `composer themes:install -- --force` (Gilded Noir).
+- **v0.8.7.4:** Downloadable Files, with `20261002100000_add_downloadable_file_items.php` and `20261002110000_fold_document_items_into_downloadable_file.php`. Files stay in `storage/course-resources`, outside the web root, and are served only by the learner download route.
+- **v0.8.7.5–v0.8.7.8:** the Course Content tree.
+  - v0.8.7.5 publishes `catto-platform.css`, `nav-icons.svg` (`action-drag`, `action-more`) and compiled `assets/` (the `course-content` controller).
+  - v0.8.7.6 publishes `question-editor.js` and updates the controller.
+  - v0.8.7.7 publishes CSS only.
+  - v0.8.7.8 publishes CSS and an updated controller.
+  - None of these releases has a migration.
+- **v0.8.7.9:** public section previews, with `20261003100000_add_public_preview_to_course_sections.php`.
+- **v0.8.8:** analytics events, with `20261004100000_create_analytics_events.php`. Events hold no IP addresses, session tokens or payment details; `AnalyticsEventRepository::anonymiseBefore()` and `deleteBefore()` are the retention hooks for a later policy.
+- **v0.8.8.1:** moderated course reviews, with `20261004110000_create_course_reviews.php` (`LEARNING.REVIEW.CREATE`, `COURSE.REVIEW.MANAGE`). Rejection never deletes a review, and there is no hard-delete action.
+- **v0.8.8.2:** course popularity, with `20261004120000_create_course_popularity.php`. Run `popularity:recalculate` afterwards.
+- **v0.8.8.3:** home page Popular Courses. Publish `catto-platform.css`, `nav-icons.svg` (`action-pause`, `action-play`) and compiled `assets/` (the `popular-courses` controller). Without a popularity snapshot it shows the newest published courses.
+- **v0.8.8.4:** billing profiles, promo codes, course bundles and independent entitlement sources, as migrations `20261005100000_create_billing_profiles`, `20261006100000_create_promotions`, `20261007100000_create_bundles` and `20261007110000_create_entitlement_sources`. Publish `catto-platform.css`.
+
+### Commerce operations
+
+- **Payment methods.** Individual checkout takes card (the Dummy gateway in development) and EFT. Company checkout buys exact course/access-period credit variants in quantities, as immutable paid credit lots.
+- **Company credit requests.** A linked request stays pending until simulated card payment succeeds. One credit is then allocated and the learner enrolled.
+- **EFT.** A direct EFT company order issues no credit before confirmed full settlement. Do not treat a pending EFT instruction as proof of payment, or create its credits manually.
+- **Recording bank payments.** At `/admin/commerce/orders`, ADMIN records the bank amount, the received time with timezone, a unique bank reference and a written reason.
+  - Record a confirmation only against an independently verified bank statement, never a customer's screenshot or an invoice.
+  - An exact full payment settles the order. A differing amount keeps the order for review rather than confirming part-payment.
+  - A late or changed paid order needs an explicit, reasoned manual-review release.
+  - If fulfilment is impossible, ADMIN may refund the paid but unissued order from manual review.
+- **Refunds.** Refund approval creates a credit note and an Account Funds entry.
+  - A full refund of an individual course or bundle line revokes exactly the entitlement sources that line created. Each course's access is then worked out again from its remaining sources.
+  - Refunds are bounded by what each line paid after promotions.
+  - Company credit refunds apply only to unused purchased units, at historical LIFO prices.
+  - Refunds trigger no bank payout. Account Funds spending and bank payouts are not implemented.
+- **Promotions.** A promotion's use is held from order placement until cancellation, and redeemed once when the order is paid. An order that a promotion makes free settles without a payment.
+- **Historical records.** Original invoices, payment events, course results and certificates remain historical records. Financial documents render only from the order's immutable snapshot, including its billing details and promotion.
+
+Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It does four things:
+
+- cancels unpaid orders after seven days;
+- activates entitlement sources at their deadlines;
+- expires sources and reconciles each affected enrolment;
+- retries requested invoice emails and queued learner notices.
+
+The local Podman setup uses a dedicated worker; `deployment/commerce-worker.compose.yaml` exports its configuration for use with the workspace’s `env/compose.yaml`.
+
+Run `php bin/console popularity:recalculate --no-debug` once an hour from the same scheduler, as the application user. It recalculates the course popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read. Pages never calculate it, so without the schedule the ranking stays as it was last calculated. It exits non-zero on failure. An example crontab line: `5 * * * * cd /path/to/current && php bin/console popularity:recalculate --no-debug`.
 
 Configure Administration → Settings → Bank details before providing EFT instructions to customers. The Dummy gateway simulates card outcomes only in development/test environments. EFT instructions do not confirm a bank payment; ADMIN must record independently verified bank evidence before settlement. No live payment-processor credentials are included in the current code.
 
-The version-specific installation and reset instructions below describe their named historical versions. They are not an upgrade procedure for the current v0.8.8.4 code or for a production system. Follow the current release procedure and `PROJECT-INSTRUCTIONS.md` for any later authorized deployment; do not apply a historical reset command to a populated instance.
+### Publishing a release (owner instruction, 2026/10/06)
+
+Only on the owner's explicit instruction to commit and push a version:
+
+1. Update the version, `README.md`, `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks).
+2. Commit on `dev-v0.8` and create the annotated tag `vX.Y.Z.W`.
+3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.8:main` and `git push origin vX.Y.Z.W`).
+4. Build the source zip from the tag and publish it as the GitHub release of that version:
+
+   ```sh
+   git archive --format=zip --prefix=cattolms-vX.Y.Z.W/ -o cattolms-vX.Y.Z.W.zip vX.Y.Z.W
+   gh release create vX.Y.Z.W cattolms-vX.Y.Z.W.zip --verify-tag --latest --title "CattoLMS vX.Y.Z.W" --notes-file <notes>
+   ```
+
+   Build the zip outside the code tree and attach it to the release.
+
+Every pushed version has a release with its zip; v0.8.8.4 is the first. Git publication and the release do not deploy the VPS.
+
+The version-specific installation and reset instructions below describe their named historical versions. They are not an upgrade procedure for the current v0.8.8.4 code or for a production system. Follow the current release procedure and `PROJECT-INSTRUCTIONS.md` for any later authorized deployment, and do not apply a historical reset command to a populated instance.
 
 ## Historical v0.8 commerce upgrade from v0.7
 
@@ -114,7 +200,7 @@ Required PHP extensions: DOM, fileinfo, GD, JSON, mbstring, OpenSSL, PDO/Postgre
 
 GD is required from v0.7 for the profile image: an upload is validated, cropped to a square and resized to 256x256 before it is stored. Without it the profile image control is the only thing that fails, but it fails at upload time rather than at boot.
 
-`composer migrate` is the canonical migration command. There is no separate `migrate-test` convention.
+`composer migrate` is the canonical migration command on an installation. In the local Podman environment it cannot run the Phinx launcher as `cattotest`; run `php vendor/bin/phinx migrate -c phinx.php -e development` directly. There is no separate `migrate-test` convention.
 
 ## Bundled themes
 
@@ -234,7 +320,7 @@ COURSE_OWNER
 
 Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
 
-The Commerce permission set is reserved in the ACL now but Commerce itself is not installed. `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
+Since v0.8 the commerce permissions are in use (orders, payments, refunds, promotions, bundles and company billing), and the catalogue has 88 permissions: 10 `SYSTEM.*` and 78 business. `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
 
 ## Browser acceptance after clean QA
 
@@ -250,18 +336,35 @@ At minimum review:
 /account/dashboard
 /account/profile
 /account/library
+/account/orders
 /account/sessions
 /account/activity
 /company
 /company/dashboard
 /company/people
 /company/requests
-/company/learning
+/company/enrolments
 /company/credits
 /company/courses
+/company/billing
+/courses
+/bundles
+/cart
+/checkout
+/admin/courses
+/admin/course-items
+/admin/resources
+/admin/bundles
+/admin/promotions
+/admin/commerce/orders
+/admin/course-reviews
+/admin/reports/popularity
+/admin/analytics/events
 /contact
 /help
 ```
+
+The browser checks in `tests/Browser/` cover most of these in all five themes; see its README.
 
 Also validate the accepted external theme at desktop and mobile widths.
 
@@ -341,9 +444,9 @@ Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE
 
 **There is no cleanup by token.** Generated rows are ordinary rows, so a set cannot be selectively removed once written. Resetting the database is the only way back to a clean state, which is what `composer smoke:install` does.
 
-**What a set contains.** People, companies, courses with modules, content blocks, assessments, questions and options, grade bands, price variants, editors, enrolments with progress, attempts, responses, sessions, results, certificates, favourites, requests, credits, allocations, edit history and audit activity — 29 tables.
+**What a set contains.** People with emails and roles, companies and memberships, courses with Course Items, structure nodes and placements, assessments with questions and options, grade bands, price variants, editors, enrolments, attempts, responses, assessment sessions, results, certificates, favourites, requests, credits, allocations, edit history and audit activity — 28 tables (`SeedGenerationPlan`).
 
-Never fabricated: `course_media`, `auth_sessions`, `auth_login_tokens`, `api_tokens`, `web_sessions`. Generation sends **zero email**.
+Never fabricated: sessions, login and API tokens, Resources, and everything commerce and analytics records (orders, payments, entitlement sources, billing profiles, promotions, bundles, reviews, analytics events). Those come only from using the application. Popularity is calculated from what exists by `popularity:recalculate`. Generation sends **zero email**.
 
 **Signing in as a generated identity.** Request an ordinary passwordless login for the generated address. The stored domain is the company's name plus `.invalid` — RFC 2606 reserves that suffix so the address can never leave the building — and `GeneratedDomainMailer` re-addresses the message to the same local part at `APP_DOMAIN`, so it arrives in the one inbox you already read. There is no `SEED_SYSTEM_COMPANY_DOMAIN` any more, and nothing in the mail path refers to seed data: these are simply the domains the platform invents.
 

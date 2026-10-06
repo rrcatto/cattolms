@@ -1,8 +1,20 @@
 # Changelog
 
-**LMS version:** 0.8.8.4 **Date time:** 2026/10/07 SAST
+**LMS version:** 0.8.8.4 **Date time:** 2026/10/06 SAST
 
-## 2026-10-07 SAST — v0.8.8.4 Promo codes, course bundles and entitlement sources
+## 2026-10-06 SAST — One canonical migration and current documentation (on 0.8.8.4)
+
+- **Schema.** On the owner's instruction the 25 development migrations are consolidated into one canonical baseline, `database/migrations/20261006120000_create_v088_baseline.php`.
+  - Every table, function, trigger and index is created in its final form, along with the reference data: roles, permissions and grants, app options, document numbers, the System company, and the 369 built-in categories with their generated icons.
+  - The one-off data conversions and incremental rollbacks are gone, and `down()` drops the whole schema.
+  - While the system is not live, a schema change is made in the baseline and the development database is rebuilt; `tools/validate-release.php` now fails with a second migration file.
+- **Verification.** The old chain and the new baseline were applied to two scratch databases.
+  - Their `pg_dump --schema-only` output was identical (6,825 lines).
+  - Their reference data was identical apart from the permission id sequence, which now ends at 88 instead of 95.
+- **Database.** The development database was reset and rebuilt from the baseline: themes, seed names, a 100,000-row dataset and the popularity snapshot.
+- **Documentation.** `PROJECT-INSTRUCTIONS.md`, `OPERATIONS.md` ("Rebuilding the development database"), `HANDOFF.md` and `COMMERCE-IMPLEMENTATION-PLAN.md` describe the single-baseline workflow.
+
+## 2026-10-06 SAST — v0.8.8.4 Promo codes, course bundles and entitlement sources
 
 Releases promo codes (Phase G), course bundles (Phase H) and independent entitlement sources, on the billing profiles (Phase F) committed after v0.8.8.3.
 

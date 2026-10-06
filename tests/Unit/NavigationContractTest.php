@@ -378,7 +378,7 @@ final class NavigationContractTest extends TestCase
         // The labels asserted here are the ones the section registries actually issue. "My Learning"
         // stood here while the registry said "My Course Library", so the documentation and the test
         // agreed with each other and neither agreed with the platform.
-        foreach (['All sections','Dashboard','Profile','My Courses','Sessions','Activity','Company','People','Course Requests','Course Credits','Administration','Roles & ACL','Themes','Settings','footer_navigation'] as $label) {
+        foreach (['All sections','Dashboard','Profile','My Courses','Sessions','Activity','Company','People','Course Requests','Credits','Billing details','Administration','Roles & ACL','Themes','Settings','footer_navigation'] as $label) {
             self::assertStringContainsString($label, $doc);
         }
     }

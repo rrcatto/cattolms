@@ -1,25 +1,34 @@
 # Commerce Implementation Plan
 
-Original plan: 12 September 2026; current-status update: 24 September 2026
+Original plan: 12 September 2026; current-status update: 6 October 2026 (v0.8.8.4)
 Target: `code/cattolms-v0.8`
-Status: Individual purchase foundation, tester administration, company credit purchasing, and payment administration/refunds are included through v0.8.7.
+Status: Individual and company purchasing, payment administration and refunds (v0.8.7), billing profiles (Phase F), promo codes (Phase G), course bundles (Phase H) and independent entitlement sources are released through v0.8.8.4. Account Funds spending, payouts, debt, gifts and real gateways are not implemented.
 
-## Current implementation and approved next steps
+## Current implementation
 
-Individual commerce exists in the v0.8.7 code: guest and signed-in carts; staged checkout; persisted orders, invoices and payment attempts; Omnipay Dummy card outcomes; manual EFT instructions; account order/document pages; idempotent fulfilment into access entitlements; free-course direct access; and scheduled deadline/outbox maintenance. The implementation is in `src/Commerce/`, `src/Commerce/Http/CommerceController.php`, the `20260912210000_add_commerce_foundation.php` and `20260913010000_add_checkout_details.php` migrations, and `tests/Integration/CommercePurchaseIntegrationTest.php`. A manual EFT instruction alone does not confirm payment; the ADMIN confirmation workflow records independent bank evidence. Dummy payment is not a live processor.
+The commerce code lives in `src/Commerce/` (Contract, Domain, Application, Policy, Workflow, Infrastructure, Http) and `src/Bundle/`, with tests in the `commerce` PHPUnit group (`composer test:commerce`) and the browser checks in `tests/Browser/`. What exists:
 
-The owner approved four ordered work steps, with a break for review after each: documentation correction; completion of tester administration; company credit purchasing; payment administration and refunds. The documentation correction and initial tester grant workflow are included in the owner-authorized v0.8.6.1 release; the remaining three phases are included in v0.8.7. Future release/version choices and Git pushes require explicit owner instruction. Company purchase uses exact course/access-period credits, published paid offers and the current Dummy-backed payment foundation. Direct purchase supports quantities and multiple course/access-period variants; request approval with missing credit starts a linked purchase, and confirmed simulated card payment allocates the matching credit and enrols the learner. Direct EFT company orders remain unpaid and issue no credits until ADMIN records an exact full bank receipt with independent reference, received time, identity and reason. Late or changed paid orders remain in manual review for an explicit, reasoned release. ADMIN refund decisions credit an append-only Account Funds ledger and issue a credit note; full individual item refunds revoke that item's access immediately, and company credit refunds use unused purchased units and historical LIFO value. Account Funds spending, payouts, debt, gifts, real processors and longer-range items remain later decisions/work; do not silently bundle them into this phase.
+- **Individual purchase.** Guest and signed-in carts of course offers and bundles; staged checkout (details with the billing profile, payment method, review with the promo code); persisted orders with immutable item and order snapshots; invoices, receipts and credit notes rendered only from the snapshot; payment attempts through the Omnipay Dummy adapter or a manual EFT instruction; idempotent fulfilment; free-course direct access; the `commerce:maintain` worker for payment deadlines, access activation and expiry, and invoice email.
+- **Company purchase.** The Company Administrator, the only company role with `COMPANY.CREDIT.MANAGE` and `COMPANY.BILLING.MANAGE`, buys exact course/access-period credits; paid lines create immutable credit lots; a linked request is fulfilled only after confirmed payment. Direct EFT company orders issue no credit before ADMIN confirms the full amount.
+- **Payment administration** (`/admin/commerce/orders`). Exact full EFT confirmation with immutable bank evidence, reasoned manual-review release, and refunds that create credit notes and append-only Account Funds entries. Company refunds use unused purchased units at historical LIFO value.
+- **Billing profiles** (Phase F). One reusable profile per person (`user_billing_profiles`) and per company (`company_billing_profiles`), filled into both checkouts and copied into each order's immutable `billing` snapshot. VAT stays disabled; the tax number is informational.
+- **Promo codes** (Phase G, `/admin/promotions`). Percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and course and bundle scopes. The browser sends only the code; the server calculates, revalidates under the promotion's row lock at placement, holds a use while the order is unpaid and redeems it once when paid. The discount is an order adjustment allocated over lines by largest remainder and bounds each line's refund. Company credit purchases take no promotions.
+- **Course bundles** (Phase H, `/bundles`, `/admin/bundles`). Bundles of published courses with their own price and access period, sold as one line that snapshots its courses, price and access period. Never sold to companies.
+- **Entitlement sources.** Behind the one enrolment a learner sees per course, `commerce_entitlements` rows are independent sources (individual purchase, each bundle, free access, an ADMIN/company/seed `origin`), each with its own period, activation and expiry. `AccessService` keeps the course open while any source is valid; a refund revokes only the refunded line's sources.
 
-| Area | Current state | Next required boundary |
+| Area | Current state | Next boundary |
 | --- | --- | --- |
-| Individual checkout and access | Implemented for guest/signed-in carts, Dummy card simulation, manual EFT instructions, orders, invoices and access entitlements | Preserve and extend the existing services and tests; do not rebuild this foundation |
-| Tester grants | Course-first and person-first grants show status/expiry and history; ADMIN can revoke in context or deliberately email an invitation | Preserve the released workflow |
-| Company credits | Company checkout buys exact-match course/access-period credits; paid lines create credit lots; a linked request receives one allocation, enrolment and notices on successful immediate payment | Do not issue credits from unconfirmed EFT orders |
-| Payment operations | ADMIN can confirm exact full EFT payment with immutable evidence, review/release paid exceptions, and approve individual or unused company-credit refunds; credit notes and Account Funds entries are append-only, with immediate full individual item access revocation | Account Funds spending, payout, partial bank settlement and real gateways remain later work |
-| Billing profiles (Phase F, after v0.8.8.3; released with v0.8.8.4) | One reusable billing profile per person and per company; both checkouts fill from and save to it; orders and their invoices, receipts and credit notes freeze a structured `billing` snapshot and render only from it | Editable document templates later consume the snapshot fields; VAT stays disabled and the tax number is informational |
-| Promo codes (Phase G, v0.8.8.4) | ADMIN promotions with percentage/fixed discounts, validity, minimum spend, use limits and course applicability; one code per individual checkout order, revalidated under lock at placement, held at placement and redeemed when paid; order adjustment allocated over lines, frozen in the snapshot and documents, bounding refunds | Bundles next; promotions do not apply to company credit purchases yet |
-| Course bundles (Phase H, v0.8.8.4) | ADMIN bundles of published courses with their own price and access period; one cart/order line per bundle with an immutable composition and price snapshot; every course gets its own bundle entitlement source (`commerce_bundle_grants`) beside any source the learner already has, access lasts while any source is valid, and refunds revoke only the refunded line's sources; promotions with course and bundle scopes | Company bundle purchasing, bundle popularity and subscriptions are not designed |
-| Later commerce | Real gateway, funds, payouts, debt, gifts and broader academic history are not implemented | Scope separately after the approved steps |
+| Individual checkout and access | Carts of courses and bundles, Dummy card simulation, manual EFT, orders, documents, entitlement sources | Preserve and extend the existing services and tests; do not rebuild this foundation |
+| Tester grants | Course-first and person-first grants with status, expiry and history; ADMIN revokes in context or emails an invitation | Preserve the released workflow |
+| Company credits | Exact course/access-period credit lots from paid lines; linked requests fulfilled after confirmed payment | Do not issue credits from unconfirmed EFT orders; bundles are not company products |
+| Payment operations | EFT confirmation with evidence, manual-review release, refunds with credit notes and Account Funds entries | Account Funds spending, payouts, partial bank settlement and real gateways remain later work |
+| Billing profiles (Phase F) | Reusable person and company profiles; structured `billing` snapshot on every order and document | Editable document templates would read the snapshot; VAT stays disabled |
+| Promo codes (Phase G) | ADMIN promotions with course and bundle scopes, server-side calculation, placement revalidation under lock, redemption when paid | Automatic promotions, stacking, referral codes, gift vouchers and loyalty are not designed |
+| Course bundles (Phase H) | One line per bundle with an immutable composition, price and access-period snapshot; a `bundle` source for every course | Company bundles, bundle popularity, subscriptions and several access periods per bundle are not designed |
+| Entitlement sources | Several sources per enrolment; access while any is valid; refunds revoke only their line's sources | ADMIN removal still ends every source of a course together |
+| Later commerce | Real gateway, funds spending, payouts, debt, disputes, gifts and broader academic history are not implemented | Scope each separately with the owner |
+
+The owner sets the order of further commerce work; versions, commits and pushes each need explicit instruction.
 
 ## 1. Scope and authority
 
@@ -27,7 +36,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.4. Older version directories are historical references. The owner authorized the v0.8.7 release; later releases and pushes still require explicit instruction. Do not reset the database merely to implement this plan.
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.4. Older version directories are historical references. Releases and pushes require explicit owner instruction. Do not reset the database merely to implement this plan.
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 
@@ -41,9 +50,9 @@ The following bullets describe the pre-commerce discovery day. They are retained
 - `COMPOSER_PROCESS_TIMEOUT=0 composer qa` passed in the development container: **562 tests, 8,890 assertions**, PHPStan level 6, architecture, runtime, UI contracts, and release validation. This is local Podman validation, not VPS validation.
 - A Composer dry run for `symfony/workflow:8.1.*`, `league/omnipay:^3`, and `omnipay/dummy:^3` succeeded: 14 proposed additions, no existing package updates/removals. It resolved Workflow 8.1.0, league/omnipay 3.2.1, omnipay/common 3.5.1, and Dummy 3.0.0. This proves dependency resolution, not runtime compatibility; adapter tests must prove that next. No dependencies were installed or manifest/lock changes retained.
 
-## 3. Original reuse and change map — reassess each row against v0.8.6
+## 3. Original reuse and change map — historical, 12 September 2026
 
-Paths below are relative to this code root. “Currently” in this original table means 12 September 2026; the current-status map above takes precedence where implementation has since landed.
+Paths below are relative to this code root. “Currently” in this original table means 12 September 2026; most rows have since been implemented, and the current-implementation section above takes precedence.
 
 | Existing component | Implementation decision |
 | --- | --- |
@@ -83,7 +92,7 @@ Sources checked: [Omnipay Dummy](https://github.com/thephpleague/omnipay-dummy),
 
 ## 5. Persistence and transaction design — implemented foundation plus remaining rules
 
-Use additive Phinx migrations for new commerce features. The current code has carts, orders/item snapshots, documents/numbering, payment attempts/events, audit/outbox, entitlements, manual bank evidence, refunds, credit notes and a refund-credit Account Funds ledger. Account Funds spending/reservations, payouts, debt, disputes, purchased credit invitations, gifts, retake allowances and broader completion/verification history remain later work according to owner decisions. Do not recreate existing commerce tables.
+While the system is not live, schema changes for new commerce features go into the one canonical baseline migration and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2); additive migrations begin only after production is declared. The current code has carts (course and bundle lines, an applied promotion), orders and item snapshots (billing, promotion and bundle composition), documents and numbering, payment attempts and events, audit and outbox, entitlement sources and bundle grants, billing profiles, promotions and their redemptions, bundles and their offers, manual bank evidence, refunds, credit notes and a refund-credit Account Funds ledger. Account Funds spending/reservations, payouts, debt, disputes, purchased credit invitations, gifts, retake allowances and broader completion/verification history remain later work according to owner decisions. Do not recreate existing commerce tables.
 
 Use BIGINT minor units with currency and TIMESTAMPTZ. Snapshot purchaser/billing identity, course/revision policy, duration, tax, discounts, consent wording/version and terms. Issued document content is immutable; lifecycle/payment summaries are separate mutable projections. Allocate permanent invoice numbers transactionally, with uniqueness and no reuse of issued numbers.
 
@@ -103,7 +112,7 @@ Backfill legacy enrolments, lots and allocations with explicit legacy/grant prov
 
 ## 6. Original broad delivery sequence and acceptance — superseded for scheduling
 
-The table below is the original full-domain sequence, not the next-work order. Phases 1–3 have an implemented individual-purchase foundation but are not a claim of complete coverage of every listed product and policy. The owner-approved order at the top of this document governs the next three coding steps and their review breaks. Security, audit, concurrency protection and tests accompany each step; they do not wait for a later administration phase.
+The table below is the original full-domain sequence, not the next-work order. Phases 1–3 have an implemented individual-purchase foundation but are not a claim of complete coverage of every listed product and policy. The owner sets the order of further work. Security, audit, concurrency protection and tests accompany each step; they do not wait for a later administration phase.
 
 | Phase | Deliverable and acceptance |
 | --- | --- |
@@ -117,7 +126,7 @@ The table below is the original full-domain sequence, not the next-work order. P
 | 7 — Administration | Complete purchaser/company/admin screens, private offers and discounts, manual EFT/PayShap confirmation, refunds, payouts, grants, debt waivers, deadline overrides, reconciliation, audit and manual review. Require actor/reason/evidence for financial overrides. |
 | 8 — Acceptance | All supplied scenarios and workflow transitions, race-condition tests, new-commerce coverage target, complete existing QA, fresh-install and populated-database migration rehearsals, and browser checks across bundled themes. Update operations/handoff documentation and demonstrate Dummy-only end-to-end flows. |
 
-The individual-course milestone, company credit purchasing and ADMIN bank-confirmation/refund paths are released in v0.8.7 and covered by Commerce integration tests. The broader original phases above remain a domain map, not a claim that funds spending, payouts, gifts or real gateways are present.
+The individual-course milestone, company credit purchasing and ADMIN bank-confirmation/refund paths were released in v0.8.7; billing profiles, discounts (promo codes), bundles and entitlement sources followed in v0.8.8.4. All are covered by the commerce integration tests. The broader original phases above remain a domain map, not a claim that funds spending, payouts, gifts or real gateways are present.
 
 ## 7. Timed work and workflow reconciliation
 
@@ -138,7 +147,7 @@ These are implementation reconciliations to satisfy the specification, not chang
 
 ## 8. Test and handoff strategy
 
-Place Commerce tests under the existing Unit, Architecture and Integration suites and add a focused `composer test:commerce` selector. Use Symfony MockClock, FakeMailer, payment contract fixtures and PostgreSQL integration tests. Enforce Omnipay dependency boundaries, browser CSRF, callback authentication, purchaser/company scope and mandatory audit reasons.
+Commerce tests live under the existing Unit, Architecture and Integration suites; `composer test:commerce` runs the `commerce` group. Use Symfony MockClock, FakeMailer, payment contract fixtures and PostgreSQL integration tests. Enforce Omnipay dependency boundaries, browser CSRF, callback authentication, purchaser/company scope and mandatory audit reasons.
 
 Prove concurrent double-confirmation, duplicate checkout, double allocation, spend-versus-payout, retake consumption and invoice numbering with separate database connections. Test crashes/retries around gateway confirmation and notification delivery, not only sequential happy paths. Target at least 90% new domain/application line coverage while directly testing every financial invariant.
 
