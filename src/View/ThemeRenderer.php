@@ -14,6 +14,7 @@ Changelog:
 - Courses → Certificate Designs replaces System → Document Templates in the navigation; load_certificate_editor loads CKEditor with the certificate profile (ck-certificate.js).
 - Advanced PLATFORM_ASSET_VERSION to 0.8.8.10.
 - Advanced PLATFORM_ASSET_VERSION to 0.8.8.11.
+- Advanced PLATFORM_ASSET_VERSION to 0.8.8.12.
 2026/09/09 02:10 SAST
 - Renders with Twig. Page bodies come from the @platform namespace and chrome from @theme, composed by inheritance rather than by substituting a rendered string into a content slot. stripHtmlComments() is gone: a Twig comment does not survive compilation, so there is nothing to strip on the way out. platformScalars() gives a workspace section the same facilities as the page it sits in - the section path had been rendering without a CSRF token.
 2026/09/09 01:20 SAST
@@ -78,7 +79,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.11';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.12';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,

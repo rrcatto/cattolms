@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8.8.10 (development) **Date time:** 2026/10/07 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8.8.12 (development) **Date time:** 2026/10/07 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -121,6 +121,8 @@ Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-ac
 
 **4.5 A label without a value is not rendered.** A section header, a field label or a card heading that would render blank is omitted entirely rather than emitted empty.
 
+**4.6 A course category is chosen in the one category picker.** Owner instruction, 2026/10/07. The course create and edit forms and the import review use the same `form.tree-select` as the catalogue (8.2): it opens on Uncategorised and the main categories with every branch closed, a disclosure button beside a category opens its subcategories and never chooses it, any level can be chosen, and the closed control shows the full path. Uncategorised means no category. + New beside it creates a category in place: its name, where it goes (Top level by default, a main category or a subcategory; never a sub-subcategory, so the tree stays three levels) and the path it will have; the new category is then chosen, Cancel leaves the choice as it was, and a refusal keeps what was typed and says why. → Enforced by `TreeSelectContractTest`, `CategoryPickerIntegrationTest` and `tests/Browser/category-picker.cjs`.
+
 ---
 
 ## 5. Navigation
@@ -209,7 +211,7 @@ When duplicating a palette selector to match both forms, rewrite each selector i
 
 **8.1 The catalogue shows the data that exists.** There is one kind of data and no universe switch.
 
-**8.2 `/courses` reads top to bottom: category, search, courses.** Owner instruction, 2026/10/01. Page head, then one card holding the optional category picker and the shared catalogue search, then the course workspace. The picker is the canonical `form.tree-select`: one form-control row showing the chosen path (`Business › Management › Project Management`), opening a native popover that lists the whole three-level tree, indented by level, with the current category highlighted and focused. Every level is selectable; choosing one submits its category ID, and `/courses?category={id}` redirects to `/courses/category/{slug}`. The tile grid and Tier 2/Tier 3 rails it replaced are removed. The initial workspace shows at most twelve featured/default courses. It never preloads the whole catalogue.
+**8.2 `/courses` reads top to bottom: category, search, courses.** Owner instruction, 2026/10/01. Page head, then one card holding the optional category picker and the shared catalogue search, then the course workspace. The picker is the canonical `form.tree-select`: one form-control row showing the chosen path (`Business › Management › Project Management`), opening a native popover that starts with the main categories, each with a disclosure button that opens its subcategories (only the branches leading to the current category open by themselves, and only the button opens or closes a branch), with the current category highlighted and focused. Without JavaScript the whole tree is listed. Every level is selectable; choosing one submits its category ID, and `/courses?category={id}` redirects to `/courses/category/{slug}`. The tile grid and Tier 2/Tier 3 rails it replaced are removed. The initial workspace shows at most twelve featured/default courses. It never preloads the whole catalogue.
 
 Ordinary category results show courses filed directly in that category. Search includes the active category and all descendants; clearing search returns to direct browsing. Category links and card breadcrumbs use `/courses/category/{slug}`. Recursive public accordions, lazy-open fragments and the old `open` query parameter are obsolete.
 
@@ -274,6 +276,11 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/07 SAST
+
+- 8.2: the catalogue's category picker opens on the main categories with every branch closed and a disclosure button per branch; the whole tree is listed without JavaScript.
+- 4.6: a course's category is chosen in the same picker on the course forms and the import review, with Uncategorised and + New at a chosen place.
 
 2026/10/06 SAST
 

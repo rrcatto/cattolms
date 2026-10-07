@@ -117,6 +117,33 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php cleanup'
 ```
 
+## Category picker
+
+`category-picker.cjs` drives the shared category picker (`form.tree-select`) in Chromium and Firefox
+(Chromium also covers saving, import and the catalogue), then without JavaScript and in every
+theme: the picker opening on Uncategorised and the main categories with every branch closed;
+branches opening and closing independently; choosing a sub-subcategory and seeing its full path;
+reopening with only the way to the choice open; choosing Uncategorised; + New creating a main
+category, a subcategory and a sub-subcategory at the place chosen in its own picker (the place
+changed before saving, sub-subcategories never offered, the new category chosen afterwards, Cancel
+keeping the previous choice, a refusal keeping what was typed); a forged fourth level refused by
+the server; the keyboard opening the picker and a branch and choosing; a course saved with a
+category at two levels and then Uncategorised; an import filed in a category created during the
+import; and the catalogue's picker going to the category chosen. Without JavaScript the whole tree
+is listed and a course is saved with a sub-subcategory. Every theme opens the picker at 1440 and
+390px without it leaving the screen or the page scrolling sideways.
+
+It uses `category-tree-fixture.php` (the same test tree, after the shipped taxonomy); `reset` also
+deletes the courses and Course Items the run created or imported. The theme scenario requests
+reduced motion and scrolls with `behavior: 'instant'`: a smooth scroll still running under
+Playwright moves the anchored popover.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/category-picker.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php cleanup'
+```
+
 ## Course reviews
 
 `course-reviews.cjs` checks course ratings and moderated reviews in Chromium and Firefox and

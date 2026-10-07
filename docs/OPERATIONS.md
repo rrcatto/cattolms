@@ -1,10 +1,10 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.10 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.12 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.8.10 operational position
+## Current v0.8.8.12 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.10` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.12` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
 - **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/07 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 90 permissions (10 `SYSTEM.*`, 80 business) across the five roles.
 - **Document templates (Phase I, v0.8.8.8).** The baseline publishes the source defaults in `resources/documents/` as the invoice, receipt and credit note templates; there is no page that edits them until Phase K. Editing a source file changes only new installations, until the database is rebuilt.
@@ -62,7 +62,8 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.8:** the baseline gained the document template tables and permissions: rebuild the database (see above). Copy `public_html/index.php` to the served web root (it reads `.env` comments correctly and reports each start-up failure separately; the detail is in the PHP error log), and publish `catto-platform.css` and the compiled `assets/` (the `template_placeholders` controller).
 - **v0.8.8.9:** certificates on the document template engine (Phase J). The baseline's `certificates` table and the course certificate columns changed, and the certificate designs are installed. Rebuild the database (see above), publish `catto-platform.css`, and run `composer themes:install -- --force`, because four theme stylesheets lost their unused certificate rules.
 - **v0.8.8.10:** certificate designs. The baseline gained `document_assets`, `document_template_versions.design`, `courses.certificate_design_id` and `courses.certificate_accreditation`, lost the course certificate title, body, footer and signatory columns, and renamed `DOCUMENT.TEMPLATE.*` to `CERTIFICATE.DESIGN.*`. Rebuild the database (see above). Publish `catto-platform.css`, `js/ck-certificate.js`, `img/certificates/` (the placement pictures and the look thumbnails) and the compiled `assets/` (the `certificate-preview` controller; delete the served `template_placeholders_controller-*.js`, which is gone).
-- **Category tree (after v0.8.8.10, unreleased):** `course_categories.position` is 1..n within each parent with the unique, deferrable `course_categories_sibling_position` constraint, and the shipped taxonomy is renumbered when it is installed. Rebuild the database (see above). Publish `catto-platform.css` and the compiled `assets/` (the shared `lib/sortable_tree_controller.js` and the rewritten `category-tree` and `course-content` controllers), and delete the served copies of the controllers they replace.
+- **v0.8.8.11:** the draggable category tree. `course_categories.position` is 1..n within each parent with the unique, deferrable `course_categories_sibling_position` constraint, and the shipped taxonomy is renumbered when it is installed. Rebuild the database (see above). Publish `catto-platform.css` and the compiled `assets/` (the shared `lib/sortable_tree_controller.js` and the rewritten `category-tree` and `course-content` controllers), and delete the served copies of the controllers they replace.
+- **v0.8.8.12:** one category picker for the catalogue, the course forms, course import and category deletion. No schema change. Publish `catto-platform.css` and `js/platform-overrides.js` (the picker's disclosure behaviour and + New).
 
 ### Commerce operations
 
@@ -99,7 +100,7 @@ Configure Administration → Settings → Bank details before providing EFT inst
 
 Only on the owner's explicit instruction to commit and push a version:
 
-1. Update the version, `README.md`, `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks).
+1. Update the version, `README.md` (its current release line and release history), `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks). `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
 2. Commit on `dev-v0.8` and create the annotated tag `vX.Y.Z.W`.
 3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.8:main` and `git push origin vX.Y.Z.W`).
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
@@ -347,7 +348,7 @@ At minimum review:
 /account/dashboard
 /account/profile
 /account/billing
-/account/library
+/account/courses
 /account/orders
 /account/sessions
 /account/activity
@@ -364,12 +365,16 @@ At minimum review:
 /cart
 /checkout
 /admin/courses
+/admin/courses/new
+/admin/courses/import
+/admin/courses/categories
 /admin/course-items
 /admin/resources
 /admin/bundles
 /admin/promotions
 /admin/commerce/orders
 /admin/course-reviews
+/admin/certificates/designs
 /admin/reports/popularity
 /admin/analytics/events
 /contact

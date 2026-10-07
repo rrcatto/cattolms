@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.8.10 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.8.8.12 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
@@ -8,7 +8,7 @@ New HTML courses intended for Catto Learning must use one predictable static str
 
 Important content must therefore exist as real HTML. Assessment banks must exist in the `QUIZ` object. JavaScript may enhance the standalone course but must not be the sole source of teaching content.
 
-Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain, learner access and the structured interchange format as implemented in v0.8.8.10. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
+Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain, learner access and the structured interchange format as implemented in v0.8.8.12. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
 
 ### 1.1 Trusted author content
 
@@ -453,7 +453,7 @@ Before delivery:
 
 ## 18. Course Components contract
 
-The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.10; `HANDOFF.md` holds the implementation and validation record of each release.
+The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.12; `HANDOFF.md` holds the implementation and validation record of each release.
 
 ### Identity, sharing and author control
 
@@ -524,6 +524,10 @@ HTML import reads the scale from the file: the shown `ul.scale-list` first, then
 ### Structured interchange 2.0
 
 The JSON package uses `format: catto-learning-course`, `schema_version: 2.0`, course metadata, `course_items`, `structure`, Resource metadata and assessment banks. Each item contains its exact `item_key`, `item_type`, title/description, source, type configuration, Resource public identifier where relevant and assessment configuration/questions. Each structure row has `node_key`, optional `parent_node_key`, `node_type`, position and relative delay; item rows reference `item_key` and carry placement overrides/public/final settings. Parents precede children. Export includes items reachable through shortcodes, preserving source. Question and option database IDs are excluded so import creates independent identities. Resource files must be registered explicitly on the target instance; export does not duplicate physical files. Existing keys are not silently reused or overwritten when a package also defines them.
+
+### Category on import
+
+Neither the HTML nor the JSON format carries a course category, and export writes none. The import review chooses it in the shared category picker (UX rule 4.6): Uncategorised by default, any of the three levels, or a category made there with + New; the commit files the course in it (`category_id`, 0 for none).
 
 ### Publication
 

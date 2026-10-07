@@ -416,25 +416,30 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         }
     }
 
-    public function testCategoryPickerListsTheWholeTreeWithPathsAndTheChosenCategory(): void
+    public function testCategoryPickerNestsTheWholeTreeWithPathsAndTheChosenCategory(): void
     {
         $picker = $this->service->catalogueCategoryPicker($this->service->category($this->leafId));
         self::assertSame((string) $this->leafId, $picker['selected']);
         self::assertSame(['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories'], $picker['items'][0]);
-        $values = array_column($picker['items'], 'value');
-        $item = static function (int $id) use ($picker, $values): array {
-            $index = array_search((string) $id, $values, true);
-            self::assertIsInt($index, 'Category ' . $id . ' is offered by the picker.');
-            return $picker['items'][$index];
+        $find = static function (array $items, int $id) use (&$find): ?array {
+            foreach ($items as $item) {
+                if ($item['value'] === (string) $id) return $item;
+                $inside = $find($item['children'] ?? [], $id);
+                if ($inside !== null) return $inside;
+            }
+            return null;
         };
+        $rootItem = $find($picker['items'], $this->rootId);
+        self::assertNotNull($rootItem, 'The root is a main category in the picker.');
+        self::assertContains((string) $this->rootId, array_column($picker['items'], 'value'), 'Main categories are the top level.');
+        $branchItem = $find($rootItem['children'] ?? [], $this->branchId);
+        self::assertNotNull($branchItem, 'The branch is inside its root.');
+        $leafItem = $find($branchItem['children'] ?? [], $this->leafId);
+        self::assertNotNull($leafItem, 'The leaf is inside its branch.');
         $root = $this->service->category($this->rootId); $branch = $this->service->category($this->branchId); $leaf = $this->service->category($this->leafId);
-        self::assertSame(1, $item($this->rootId)['depth']);
-        self::assertSame(2, $item($this->branchId)['depth']);
-        self::assertSame(3, $item($this->leafId)['depth']);
-        self::assertSame($root['name'] . ' › ' . $branch['name'] . ' › ' . $leaf['name'], $item($this->leafId)['path']);
-        $position = static fn(int $id): int|false => array_search((string) $id, $values, true);
-        self::assertLessThan($position($this->branchId), $position($this->rootId), 'A parent is listed before its children.');
-        self::assertLessThan($position($this->leafId), $position($this->branchId));
+        self::assertSame([1, 2, 3], [$rootItem['depth'], $branchItem['depth'], $leafItem['depth']]);
+        self::assertSame($root['name'] . ' › ' . $branch['name'] . ' › ' . $leaf['name'], $leafItem['path']);
+        self::assertArrayNotHasKey('children', $leafItem, 'A sub-subcategory holds nothing.');
         self::assertSame('', $this->service->catalogueCategoryPicker(null)['selected']);
     }
 

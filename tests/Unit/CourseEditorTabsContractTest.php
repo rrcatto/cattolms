@@ -61,21 +61,25 @@ final class CourseEditorTabsContractTest extends TestCase
         self::assertStringNotContainsString('data-density', ComponentHarness::render('data.stat-grid', []));
     }
 
-    /** The "+ New" category control has regressed repeatedly; every hook the inline create script needs must sit inside one picker. */
+    /** The "+ New" category control has regressed repeatedly; every hook the inline create script needs must sit inside one category field. */
     public function testCourseFieldsCategoryPickerIsWiredForInlineCreate(): void
     {
         $course = ['title' => 'T', 'slug' => 't', 'subtitle' => '', 'category_id' => 2, 'level' => '', 'estimated_minutes' => 0,
             'summary' => '', 'introduction_html' => '', 'description_html' => '', 'access_days' => 365, 'show_outline_on_intro' => false];
+        $picker = ['items' => [['value' => '0', 'label' => 'Uncategorised', 'depth' => 0, 'path' => 'Uncategorised'], ['value' => '2', 'label' => 'Health', 'depth' => 1, 'path' => 'Health']], 'selected' => '2'];
+        $places = ['items' => [['value' => '0', 'label' => 'Top level', 'depth' => 0, 'path' => 'Top level'], ['value' => '2', 'label' => 'Health', 'depth' => 1, 'path' => 'Health']], 'selected' => '0'];
         $html = RenderHarness::render('partials/admin-course-fields.html.twig', RenderHarness::hiveWith([
-            'course' => $course, 'categories' => [['id' => 2, 'name' => 'Health']], 'can_manage_categories' => true,
+            'course' => $course, 'category_picker' => $picker, 'category_places' => $places, 'can_manage_categories' => true,
         ]));
         $document = new \DOMDocument();
         @$document->loadHTML('<?xml encoding="UTF-8"><body>' . $html . '</body>');
         $xpath = new \DOMXPath($document);
-        self::assertSame(1.0, $xpath->evaluate('count(//*[@data-category-picker])'));
-        foreach (['select[@data-category-select]', 'button[@data-category-create-toggle][@aria-expanded="false"]', '*[@data-category-create-panel][@data-create-url][@data-csrf]', 'button[@data-category-create]', 'button[@data-category-create-cancel]', 'input[@data-category-name]'] as $hook) {
-            self::assertSame(1.0, $xpath->evaluate('count(//*[@data-category-picker]//' . $hook . ')'), 'Category picker is missing ' . $hook);
+        self::assertSame(1.0, $xpath->evaluate('count(//*[@data-category-field][@data-field-id="category"][@data-field-name="category_id"][@data-refresh-url])'));
+        foreach (['div[@data-tree-select="field"]//input[@type="radio"][@name="category_id"][@value="2"][@checked]', '*[@data-category-create-enhanced][@hidden]//button[@data-category-create-toggle][@aria-expanded="false"]', '*[@data-category-create-panel][@hidden][@data-create-url][@data-csrf]', 'button[@data-category-create]', 'button[@data-category-create-cancel]', 'input[@data-category-name]', '*[@data-category-create-panel]//div[@data-tree-select="field"]//input[@name="category_id_new_parent"][@value="0"][@checked]', '*[@data-category-create-path]', '*[@data-category-error][@role="alert"]'] as $hook) {
+            self::assertSame(1.0, $xpath->evaluate('count(//*[@data-category-field]//' . $hook . ')'), 'Category field is missing ' . $hook);
         }
+        self::assertSame(0.0, $xpath->evaluate('count(//*[@data-category-field]//select)'), 'No flat select: the hierarchy is a tree select.');
+        self::assertSame('Health', trim((string) $xpath->query('//button[@id="category"]')->item(0)?->textContent));
         self::assertSame(1.0, $xpath->evaluate('count(//div[@data-columns="wide"])'));
         self::assertSame(1.0, $xpath->evaluate('count(//div[contains(@class,"cl-ui-field--two-thirds")]//input[@id="title"])'));
     }

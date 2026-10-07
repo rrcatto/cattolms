@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.10 · **Updated:** 2026-10-07
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.12 · **Updated:** 2026-10-07
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -171,6 +171,17 @@ the checkout promo code section (`cl-checkout-promo`), cart and checkout bundle 
 (`cl-bundle-line`) and the bundle editor's course list (`cl-bundle-courses`); themes decorate them
 like any other core content.
 
+Hierarchies are core-owned controls. The category picker is `form.tree-select`
+(`cl-ui-tree-select-*`): a closed control showing the chosen path, opening a native popover of nested
+lists (`cl-ui-tree-select-list`, `cl-ui-tree-select-branch`) in which a disclosure button
+(`cl-ui-tree-select-expand`, `aria-expanded`) beside an option opens its branch. Core script opens
+only the way to the choice; without JavaScript every branch is listed. A course's category field and
+its in-place + New panel are `cl-category-field` and `cl-category-create-*`. Course Content and the
+course category tree share the sortable tree (`cl-tree-*`: rows, drag handles, disclosure toggles,
+the ⋯ tools and the status line). Core sets their indentation, disclosure state, popover position
+and drag geometry; no bundled theme styles them, and a theme that does gives them only its colours,
+type and borders, as with any other core content.
+
 Core owns responsive columns, stable IDs/htmx targets, minimum functional spacing, native GET/POST,
 required overflow and accessible states. Themes own colours, typography, borders, radii and shadows.
 `UiOwnershipAudit` rejects canonical component display/flex/grid, dimensions, overflow, positioning
@@ -188,7 +199,8 @@ focus restoration. Theme stacking contexts must never cover an open modal.
 Tables use the core width/row system. Row menus must escape their cells without clipping. Do not
 hide totals, pagers, actions or columns to create a different functional screen. Search and paired
 pagination retain real GET URLs; themes do not rebuild either control. Catalogue grids retain core
-responsive columns, the compact `form.tree-select` category picker and the shared results workspace.
+responsive columns, the compact `form.tree-select` category picker (opening on the main categories
+with branches closed) and the shared results workspace.
 
 The Contact `website` field inside `cl-honeypot` is deliberately invisible and non-interactive.
 Never style it as a human-facing field or override its hidden treatment.
@@ -214,7 +226,11 @@ Version changes and release packaging require the owner's instruction.
 
 Run `composer qa`, inspect `/admin/system/ui-components`, and review actual login, account,
 administration, company, catalogue/tag, bundle (`/bundles`, a bundle page), cart, checkout (including
-the promo code review step), order and learning pages at desktop/tablet/mobile sizes. The browser
+the promo code review step), order and learning pages at desktop/tablet/mobile sizes, with the
+category picker opened on the catalogue and on a course's edit form, and the Course Content and
+course category trees. To see an installed theme without activating it, add
+`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.2`) to a page while
+signed in with `SYSTEM.THEME.VIEW`; an unknown key leaves the live theme in place. The browser
 checks in `tests/Browser/` cover all five bundled themes at 1440 and 390px.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
 pagination, htmx replacement and plain GET/POST fallbacks. Gilded Noir, Light Default, Factory Reset

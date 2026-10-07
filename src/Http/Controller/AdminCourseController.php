@@ -12,6 +12,8 @@ Handles web requests for admin course operations, enforcing access rules and coo
 
 Changelog:
 2026/10/07 SAST
+- Category picker: the create form, the edit Overview tab and the import review receive the course category picker and the + New places instead of a flat category list.
+2026/10/07 SAST
 - Certificate designs: a blank course has an empty accreditation line instead of certificate wording.
 2026/10/07 SAST
 - The course certificate page moved to CourseCertificateController, without the CKEditor HTML/CSS form (Phase J).
@@ -84,7 +86,8 @@ final class AdminCourseController extends BaseController
         return $this->render('admin-course-form', [
             'title' => 'Create course',
             'course' => $this->blankCourse(),
-            'categories' => $this->courses->categories(true),
+            'category_picker' => $this->courses->courseCategoryPicker(null),
+            'category_places' => $this->courses->categoryLocationPicker(),
             'form_action' => '/admin/courses',
             'form_heading' => 'Create a new course',
             'load_ckeditor' => true,
@@ -130,7 +133,8 @@ final class AdminCourseController extends BaseController
             'active_tab' => $activeTab,
             'tab_url' => self::tabUrl($courseId, $activeTab),
             'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,
-            'categories' => [],
+            'category_picker' => null,
+            'category_places' => null,
             'course_states' => ['draft', 'published', 'retired', 'archived'],
             'owner_people' => [],
             'owner_companies' => [],
@@ -139,12 +143,9 @@ final class AdminCourseController extends BaseController
             'load_ckeditor' => $activeTab === 'overview',
         ];
         if ($activeTab === 'overview') {
-            $categoryOptions = $this->courses->categories(true);
             $currentCategoryId = (int) ($course['category_id'] ?? 0);
-            if ($currentCategoryId > 0 && !array_filter($categoryOptions, static fn(array $category): bool => (int) $category['id'] === $currentCategoryId)) {
-                $categoryOptions[] = $this->courses->category($currentCategoryId);
-            }
-            $data['categories'] = $categoryOptions;
+            $data['category_picker'] = $this->courses->courseCategoryPicker($currentCategoryId > 0 ? $currentCategoryId : null);
+            $data['category_places'] = $this->courses->categoryLocationPicker();
         }
         if ($activeTab === 'people') {
             // People and companies are loaded only for this tab; the development dataset is large.
@@ -367,7 +368,6 @@ final class AdminCourseController extends BaseController
         $user = $this->requirePermission('COURSE.IMPORT');
         return $this->render('admin-course-import', [
             'title' => 'Import an HTML or JSON course',
-            'categories' => $this->courses->categories(true),
         ]);
     }
 
@@ -453,7 +453,8 @@ final class AdminCourseController extends BaseController
             return $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
-                'categories' => $this->courses->categories(true),
+                'category_picker' => $this->courses->courseCategoryPicker(null),
+                'category_places' => $this->courses->categoryLocationPicker(),
                 'replaceable_courses' => $replaceable,
             ]);
         }, '/admin/courses/import');
