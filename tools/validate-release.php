@@ -8,6 +8,8 @@ Validates the Catto Learning v0.5.8 Seed Database release contract: PHP 8.5.9, r
 
 Changelog:
 2026/10/07 SAST
+- README.md must name the composer.json version as the current development release, and CHANGELOG.md must have a heading for it.
+2026/10/07 SAST
 - The certificate design permissions replace the document template permissions in the counted catalogue.
 2026/10/06 SAST
 - Requires exactly one migration, the canonical baseline, while the system is not live; the additive-migration rules are removed with the migrations they policed.
@@ -53,7 +55,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.8.8.11', 'composer.json version must be 0.8.8.11.');
+$need(($composer['version'] ?? '') === '0.8.8.12', 'composer.json version must be 0.8.8.12.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bundle','doctrine/dbal'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
@@ -172,7 +174,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.8.8.11'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.8.12'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 
@@ -245,6 +247,11 @@ $need(str_contains($themeSdk, 'footer_navigation'), 'Theme SDK must document foo
 
 $need(is_file($root . '/README.md'), 'Root README.md is missing.');
 $need(is_file($root . '/CHANGELOG.md'), 'Root CHANGELOG.md is missing.');
+// The README's release line and the changelog are written by hand at each release, and the README
+// was once published still naming the version before. Both follow the composer.json version.
+$releaseVersion = (string) ($composer['version'] ?? '');
+$need(str_contains($read($root . '/README.md'), 'The current development release is **v' . $releaseVersion . '**'), 'README.md must name v' . $releaseVersion . ' as the current development release.');
+$need(preg_match('/^## .* — v' . preg_quote($releaseVersion, '/') . ' /m', $read($root . '/CHANGELOG.md')) === 1, 'CHANGELOG.md must have a heading for v' . $releaseVersion . '.');
 $need(is_file($root . '/LICENSE'), 'Root LICENSE is missing.');
 
 $forbidden = [];

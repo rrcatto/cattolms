@@ -139,11 +139,7 @@ final class PlatformUi
             }
             if (!in_array($values['mode'], ['submit', 'field'], true)) throw new InvalidArgumentException('A tree select mode is submit or field.');
             if (!is_array($values['items']) || $values['items'] === []) throw new InvalidArgumentException('A tree select needs at least one option.');
-            foreach ($values['items'] as $item) {
-                if (!is_array($item) || array_keys($item) !== ['value', 'label', 'depth', 'path'] || !is_string($item['value']) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['path']) || !in_array($item['depth'], [0, 1, 2, 3], true)) {
-                    throw new InvalidArgumentException('Each tree select option has exactly a string value, label and path and a depth from 0 to 3.');
-                }
-            }
+            $values['selected_path'] = self::treeSelectOptions($values['items'], null, $values['selected']) ?? '';
         }
         if ($component === 'action.button' && (!is_string($values['form_action']) || ($values['form_action'] !== '' && preg_match('#^/(?!/)#', $values['form_action']) !== 1)
             || !is_string($values['form_target']) || ($values['form_target'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form_target']) !== 1))) {
@@ -201,5 +197,36 @@ final class PlatformUi
             $this->iconSprite = '/img/nav-icons.svg' . ($hash === false ? '' : '?v=' . substr($hash, 0, 16));
         }
         return $this->iconSprite;
+    }
+
+    /**
+     * Checks a tree select's options - {value, label, depth, path} with an optional list of
+     * children one level deeper, at most three levels, and depth-0 choices (such as "Uncategorised")
+     * only at the top and without children - and returns the path of the selected one, if any.
+     *
+     * @param array<mixed> $items
+     */
+    private static function treeSelectOptions(array $items, ?int $parentDepth, string $selected): ?string
+    {
+        $found = null;
+        foreach ($items as $item) {
+            $keys = is_array($item) ? array_keys($item) : [];
+            if (($keys !== ['value', 'label', 'depth', 'path'] && $keys !== ['value', 'label', 'depth', 'path', 'children'])
+                || !is_string($item['value']) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['path'])
+                || !in_array($item['depth'], [0, 1, 2, 3], true)
+                || ($parentDepth === null ? $item['depth'] > 1 : $item['depth'] !== $parentDepth + 1)) {
+                throw new InvalidArgumentException('Each tree select option has exactly a string value, label and path, a depth from 0 to 3 one deeper than its parent, and optional children.');
+            }
+            if ($item['value'] === $selected) {
+                $found = $item['path'];
+            }
+            if (isset($item['children'])) {
+                if (!is_array($item['children']) || ($item['children'] !== [] && ($item['depth'] === 0 || $item['depth'] >= 3))) {
+                    throw new InvalidArgumentException('Only a tree select option at depth 1 or 2 may have children.');
+                }
+                $found = self::treeSelectOptions($item['children'], $item['depth'], $selected) ?? $found;
+            }
+        }
+        return $found;
     }
 }

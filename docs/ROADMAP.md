@@ -1,15 +1,15 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/07 (v0.8.8.10)
+## Current delivery position — 2026/10/07 (v0.8.8.12)
 
-**Current LMS version:** 0.8.8.10 · **Date:** 2026/10/07 SAST · tag `v0.8.8.10` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
-
-**Unreleased since v0.8.8.10** (uncommitted on `dev-v0.8`, no version set): `/admin/courses/categories` is a draggable three-level tree - categories reorder, move inside one another and back out with their subtrees, by drag, keyboard, ⋯ menu or Move into, within the three-level limit and with an explicit sibling order - sharing its tree behaviour with Course Content.
+**Current LMS version:** 0.8.8.12 · **Date:** 2026/10/07 SAST · tag `v0.8.8.12` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.12 | One category picker wherever a category is chosen - the catalogue, the course forms, course import and category deletion - opening on the main categories with branches opened as needed, and + New creating a category at the level chosen |
+| 0.8.8.11 | Draggable three-level category tree at `/admin/courses/categories` (drag, keyboard, ⋯ menu, Move into; explicit sibling order), sharing its tree behaviour with Course Content |
 | 0.8.8.10 | Certificate designs, at the owner's request after reviewing mockups: six installed looks or an uploaded A4 landscape background, one form with a live PDF preview, and a design and accreditation line per course; System → Document Templates removed |
 | 0.8.8.9 | Certificates on the document template engine (Phase J): Classic, Modern and Minimal designs, certificate PDF, issued certificates keep their values and template version |
 | 0.8.8.8 | Shared document template engine (Phase I); front controller reads `.env` as phpdotenv does |
@@ -333,7 +333,7 @@ Built since, 2026/09/07 (the rails were replaced in v0.8.7.3 by the `form.tree-s
 
 The rule that makes it work: **a facet's own counts are taken with that facet relaxed.** Apply the tag facet to its own counts and choosing one tag drives every other tag to zero — no course carries a tag it does not carry — and the rail becomes a single live option and a dead end. Counted with the tag facet dropped but the category and keyword still applied, each figure means "how many more this would add". `CatalogueBrowseIntegrationTest` asserts both the relaxed figure and what the applied one would have done.
 
-Built since, 2026/09/07: **the distribution charts and the public tag index.** Both taxonomy administration screens open with a bar chart of where the published catalogue actually is — per top-level branch, and per most-used tag — each naming its remainder rather than leaving it implied. The uncategorised and untagged rows are the point of those charts as much as the bars are: a course with no category is invisible to every browse path there is, and nothing else on the platform says how many exist. `/courses/tags` lists every active label weighted in five steps.
+Built since, 2026/09/07 (both charts were removed again on 2026/09/08; the category tree shows category statistics instead since v0.8.7.9): **the distribution charts and the public tag index.** Both taxonomy administration screens opened with a bar chart of where the published catalogue actually is — per top-level branch, and per most-used tag — each naming its remainder rather than leaving it implied. The uncategorised and untagged rows are the point of those charts as much as the bars are: a course with no category is invisible to every browse path there is, and nothing else on the platform says how many exist. `/courses/tags` lists every active label weighted in five steps.
 
 No charting library. A bar is a div with a width, the figures are text beside it, and the whole thing renders server-side with no script — which also makes it legible to a screen reader, which a canvas is not.
 
@@ -349,7 +349,7 @@ The owner will map out the categories and the structure the catalogue actually n
 - the schema, the three-level cap, the unique names and the management screens are settled and are not what needs revisiting;
 - replacing the list is a data change, not a schema change — the baseline seeds it and nothing in the code depends on any particular category existing.
 
-The built-in set is still the 369-category placeholder (16/77/276). Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent in sight is worse than a long page; since v0.8.7.3 the category management page is a collapsible tree (with category statistics since v0.8.7.9; draggable, with an explicit sibling order, since v0.8.8.10, uncommitted), and the public catalogue uses the compact `form.tree-select` picker.
+The built-in set is still the 369-category placeholder (16/77/276). Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent in sight is worse than a long page; since v0.8.7.3 the category management page is a collapsible tree (with category statistics since v0.8.7.9; draggable, with an explicit sibling order, since v0.8.8.11), and the public catalogue uses the compact `form.tree-select` picker, which since v0.8.8.12 is also how a course's category is chosen on the course forms and in import, opening on the main categories with branches closed.
 
 ### Category hierarchy
 

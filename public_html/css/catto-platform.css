@@ -5,6 +5,8 @@
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
 2026/10/07 SAST
+- Category picker: form.tree-select nests its options with a disclosure button beside each branch (depth paddings replaced by branch indentation); the course category field and its in-place + New panel.
+2026/10/07 SAST
 - Certificate designs: form.picture-choice, the certificate editor and course certificate grid, the PDF preview frame, the wording editor (text styles and field labels), the design list (thumbnail, name, default badge, column widths) and the certificate PDF on its public page. The document template page rules are removed with those pages.
 2026/09/09 16:05 SAST
 - Form spacing is now core's guarantee rather than the active theme's. A .cl-ui-surface with no .cl-course-card-body had no padding in Gilded Noir or Light Default and 28 core templates use that shape; a .cl-ui-field had no gap in Gilded Noir and gap:0 in Light Default, so a label, its control and its help text touched in every form built without the two-column grid.
@@ -723,11 +725,23 @@
 @supports (position-area:block-end){.cl-ui-tree-select-panel{inset:0;height:auto;margin:.25rem 0 .5rem;position-area:block-end span-inline-end;align-self:stretch;position-try-fallbacks:--cl-tree-select-above;width:anchor-size(width);min-width:min(22rem,calc(100vw - 2rem));max-width:calc(100vw - 2rem);min-height:min(14rem,60vh);max-height:28rem}}
 /* The browser's popover style sets height:fit-content, which would stop the panel stretching into the space below. */
 @position-try --cl-tree-select-above{position-area:block-start span-inline-end;align-self:end;margin:.5rem 0 .25rem}
-.cl-ui-tree-select-list{list-style:none;margin:0;padding:0}
-.cl-ui-tree-select-option{display:block;width:100%;min-height:40px;margin:0;padding:.45rem .75rem;border:0;border-radius:.4rem;background:transparent;color:inherit;font:inherit;line-height:1.35;text-align:start;cursor:pointer;box-shadow:none}
+/* The hierarchy: each option on a row beside its disclosure button (or a spacer of the same width,
+   so names line up), its children in a branch list indented one step. Without JavaScript the
+   disclosure buttons stay hidden but keep their width, and every branch is listed open. */
+.cl-ui-tree-select-list,.cl-ui-tree-select-branch{list-style:none;margin:0;padding:0}
+.cl-ui-tree-select-item{margin:0;padding:0}
+.cl-ui-tree-select-branch{margin-inline-start:1rem;padding-inline-start:.35rem;border-inline-start:2px solid var(--cl-border,#dfe4ea)}
+.cl-ui-tree-select-row{display:flex;align-items:center;gap:.1rem;min-width:0}
+.cl-ui-tree-select-expand,.cl-ui-tree-select-spacer{flex:0 0 auto;width:2rem;min-height:40px}
+.cl-ui-tree-select-expand{display:inline-flex;align-items:center;justify-content:center;margin:0;padding:0;border:0;border-radius:.4rem;background:transparent;color:inherit;cursor:pointer}
+.cl-ui-tree-select-expand[hidden]{display:inline-flex;visibility:hidden}
+.cl-ui-tree-select-expand:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-ui-tree-select-expand:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
+.cl-ui-tree-select-expand .cl-ui-icon{width:1rem;height:1rem;transition:transform .15s ease}
+.cl-ui-tree-select-expand[aria-expanded="true"] .cl-ui-icon{transform:rotate(90deg)}
+@media(prefers-reduced-motion:reduce){.cl-ui-tree-select-expand .cl-ui-icon{transition:none}}
+.cl-ui-tree-select-option{display:block;flex:1 1 auto;width:100%;min-width:0;min-height:40px;margin:0;padding:.45rem .75rem;border:0;border-radius:.4rem;background:transparent;color:inherit;font:inherit;line-height:1.35;text-align:start;cursor:pointer;box-shadow:none}
 .cl-ui-tree-select-option[data-depth="1"]{font-weight:700}
-.cl-ui-tree-select-option[data-depth="2"]{padding-inline-start:2rem}
-.cl-ui-tree-select-option[data-depth="3"]{padding-inline-start:3.25rem}
 .cl-ui-tree-select-option:hover{background:color-mix(in srgb,currentColor 8%,transparent)}
 .cl-ui-tree-select-option:focus-visible{outline:2px solid currentColor;outline-offset:-2px}
 .cl-ui-tree-select-option.is-selected,.cl-ui-tree-select-option:has(input:checked){background:color-mix(in srgb,currentColor 14%,transparent);font-weight:700;box-shadow:inset 3px 0 0 currentColor}
@@ -735,6 +749,17 @@
 label.cl-ui-tree-select-option{position:relative}
 .cl-ui-tree-select-option input[type=radio]{position:absolute;inset-inline-start:0;width:1px;height:1px;margin:0;opacity:0}
 .cl-ui-tree-select-option:has(input:focus-visible){outline:2px solid currentColor;outline-offset:-2px}
+/* A course's category field: the category picker with + New beside it, and below it the panel
+   that creates a category in place - its name, where it goes, and the path it will have. */
+.cl-category-field{display:grid;gap:.5rem;min-width:0}
+.cl-category-field-row{display:flex;align-items:stretch;gap:.5rem;min-width:0}
+.cl-category-field-row>.cl-ui-tree-select{flex:1 1 auto}
+.cl-category-field-new{display:flex;flex:0 0 auto}
+.cl-category-field-new[hidden],.cl-category-create-panel[hidden],.cl-category-create-error[hidden]{display:none}
+.cl-category-create-panel{display:grid;gap:.6rem;padding:.75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:.6rem}
+.cl-category-create-heading{margin:0;font-weight:700}
+.cl-category-create-result{margin:0;font-size:.92rem}
+.cl-category-create-error{margin:0;font-size:.92rem;color:var(--cl-danger,#b42318)}
 /* Category management tree: nested lists indented one step per level, a chevron disclosure button
    per parent and the row actions outside it. The category-tree controller hides child lists. */
 .cl-analytics-filter{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.75rem;margin-bottom:1rem}

@@ -204,20 +204,42 @@
       input.addEventListener('input', () => { const q = input.value.toLowerCase().trim(); document.querySelectorAll(input.dataset.filterInput || '').forEach(row => { row.hidden = q !== '' && !row.textContent.toLowerCase().includes(q); }); });
     });
 
-    document.querySelectorAll('[data-category-picker]').forEach(picker => {
-      const select=picker.querySelector('[data-category-select]'), toggle=picker.querySelector('[data-category-create-toggle]'), panel=picker.querySelector('[data-category-create-panel]'), cancel=picker.querySelector('[data-category-create-cancel]'), create=picker.querySelector('[data-category-create]'), name=picker.querySelector('[data-category-name]'), description=picker.querySelector('[data-category-description]'), error=picker.querySelector('[data-category-error]');
-      if (!select || !toggle || !panel || !create || !name) return;
-      const setOpen=open=>{ panel.classList.toggle('d-none',!open); toggle.setAttribute('aria-expanded',open?'true':'false'); if(open)setTimeout(()=>name.focus(),10); if(!open&&error){error.textContent='';error.classList.add('d-none');} };
-      toggle.addEventListener('click',()=>setOpen(panel.classList.contains('d-none'))); cancel?.addEventListener('click',()=>setOpen(false)); name.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();create.click();}});
-      create.addEventListener('click',async()=>{ const categoryName=name.value.trim(); if(!categoryName){if(error){error.textContent='Enter a category name.';error.classList.remove('d-none');}name.focus();return;} create.disabled=true; const form=new FormData(); form.append('csrf',panel.dataset.csrf||''); form.append('category_name',categoryName); form.append('category_description',description?description.value.trim():''); form.append('is_active','1'); try{const response=await fetch(panel.dataset.createUrl||'/admin/courses/categories/inline',{method:'POST',body:form,credentials:'same-origin',headers:{Accept:'application/json'}});const data=await response.json().catch(()=>({}));if(!response.ok||!data.category)throw new Error(data.error||'The category could not be created.');const option=document.createElement('option');option.value=String(data.category.id);option.textContent=String(data.category.name);option.selected=true;select.append(option);name.value='';if(description)description.value='';setOpen(false);}catch(exception){if(error){error.textContent=exception instanceof Error?exception.message:'The category could not be created.';error.classList.remove('d-none');}}finally{create.disabled=false;} });
-    });
-
-    /* Tree select in field mode: the options are radios in a native popover, so the choice already
-       submits with the form. This shows the chosen path in the closed control and closes the list
-       on a pointer choice, Enter or Space. Arrow keys move the choice and leave the list open. */
-    document.querySelectorAll('[data-tree-select="field"]').forEach(select => {
+    /* Tree select: a hierarchy in a native popover, every branch rendered open so it all works
+       without JavaScript. This shows each branch's disclosure button and, every time the list
+       opens, closes every branch except those around the chosen option, so the reader starts from
+       the top level and opens only what they need. A disclosure button only opens or closes its
+       branch; choosing is the option itself. In field mode the options are radios: this shows the
+       chosen path in the closed control and closes the list on a pointer choice, Enter or Space.
+       Arrow keys move the choice and leave the list open. Run again on content swapped into the
+       page (window.CattoTreeSelect.initialise). */
+    // The root itself counts: a field swapped into the page is passed in as the root.
+    const within = (root, selector) => [...(root instanceof Element && root.matches(selector) ? [root] : []), ...root.querySelectorAll(selector)];
+    const initialiseTreeSelects = root => within(root, '.cl-ui-tree-select').forEach(select => {
+      if (select.dataset.treeSelectReady === 'true') return;
       const panel = select.querySelector('[popover]'), value = select.querySelector('.cl-ui-tree-select-value');
-      if (!panel || !value) return;
+      if (!panel) return;
+      select.dataset.treeSelectReady = 'true';
+      const expanders = [...panel.querySelectorAll('.cl-ui-tree-select-expand')];
+      const setBranch = (button, open) => {
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const list = document.getElementById(button.getAttribute('aria-controls') || '');
+        if (list) list.hidden = !open;
+      };
+      const showChosen = () => {
+        expanders.forEach(button => setBranch(button, false));
+        const chosen = panel.querySelector('input[type="radio"]:checked, [aria-current="true"]');
+        for (let list = chosen ? chosen.closest('.cl-ui-tree-select-branch') : null; list; list = list.parentElement ? list.parentElement.closest('.cl-ui-tree-select-branch') : null) {
+          const button = panel.querySelector(`[aria-controls="${CSS.escape(list.id)}"]`);
+          if (button) setBranch(button, true);
+        }
+      };
+      expanders.forEach(button => {
+        button.hidden = false;
+        button.addEventListener('click', event => { event.preventDefault(); setBranch(button, button.getAttribute('aria-expanded') !== 'true'); });
+      });
+      showChosen();
+      panel.addEventListener('beforetoggle', event => { if (event.newState === 'open') showChosen(); });
+      if (select.dataset.treeSelect !== 'field' || !value) return;
       const show = radio => { value.textContent = radio.dataset.treeSelectPath || ''; };
       const close = () => { if (panel.matches(':popover-open')) panel.hidePopover(); };
       panel.addEventListener('change', event => { if (event.target.matches('input[type="radio"]')) show(event.target); });
@@ -232,6 +254,75 @@
       });
     });
 
+    /* A course's category field (partials/admin/course-category-field): the tree select and, for
+       those who manage categories, + New, which creates a category in place without leaving the
+       course or import form. The new category's place is chosen in its own tree select (Top level,
+       a main category or a subcategory) and shown as the path it will have. The server checks the
+       place again; on success the whole field is drawn again by the server with the new category
+       chosen, and on a refusal the panel stays open with what was typed and the reason. Cancel
+       creates nothing and leaves the chosen category as it was. */
+    const initialiseCategoryFields = root => within(root, '[data-category-field]').forEach(field => {
+      if (field.dataset.categoryFieldReady === 'true') return;
+      const toggle = field.querySelector('[data-category-create-toggle]'), panel = field.querySelector('[data-category-create-panel]');
+      if (!toggle || !panel) return;
+      field.dataset.categoryFieldReady = 'true';
+      const name = panel.querySelector('[data-category-name]'), description = panel.querySelector('[data-category-description]');
+      const error = panel.querySelector('[data-category-error]'), create = panel.querySelector('[data-category-create]'), cancel = panel.querySelector('[data-category-create-cancel]');
+      const place = panel.querySelector('.cl-ui-tree-select'), result = panel.querySelector('[data-category-create-path]');
+      const enhanced = toggle.closest('[data-category-create-enhanced]');
+      if (enhanced) enhanced.hidden = false;
+      const parent = () => place ? place.querySelector('input[type="radio"]:checked') : null;
+      const preview = () => {
+        if (!result) return;
+        const chosen = parent();
+        const where = chosen && chosen.value !== '0' ? `${chosen.dataset.treeSelectPath} › ` : '';
+        result.textContent = where + (name.value.trim() || 'the new category');
+      };
+      const say = message => { error.textContent = message; error.hidden = message === ''; };
+      const setOpen = open => {
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) { preview(); window.setTimeout(() => name.focus(), 10); } else say('');
+      };
+      toggle.addEventListener('click', () => setOpen(panel.hidden));
+      if (cancel) cancel.addEventListener('click', () => { setOpen(false); toggle.focus(); });
+      name.addEventListener('input', preview);
+      if (place) place.addEventListener('change', preview);
+      name.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); create.click(); } });
+      create.addEventListener('click', async () => {
+        const categoryName = name.value.trim();
+        if (categoryName === '') { say('Enter a category name.'); name.focus(); return; }
+        create.disabled = true;
+        const body = new FormData();
+        body.append('csrf', panel.dataset.csrf || '');
+        body.append('name', categoryName);
+        body.append('description', description ? description.value.trim() : '');
+        body.append('parent_id', parent() ? parent().value : '0');
+        try {
+          const response = await fetch(panel.dataset.createUrl || '/admin/courses/categories/inline', { method: 'POST', body, credentials: 'same-origin', headers: { Accept: 'application/json' } });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.category) throw new Error(data.error || 'The category could not be created.');
+          const query = new URLSearchParams({ field_id: field.dataset.fieldId || '', field_name: field.dataset.fieldName || '', selected: String(data.category.id) });
+          const page = await fetch(`${field.dataset.refreshUrl}?${query}`, { credentials: 'same-origin', headers: { 'HX-Request': 'true' } });
+          const fresh = page.ok ? new DOMParser().parseFromString(await page.text(), 'text/html').querySelector('[data-category-field]') : null;
+          if (!fresh) throw new Error(`“${data.category.name}” was created, but the list could not be refreshed. Reload the page to choose it.`);
+          const adopted = document.importNode(fresh, true);
+          field.replaceWith(adopted);
+          initialiseTreeSelects(adopted);
+          initialiseCategoryFields(adopted);
+          const chosen = adopted.querySelector('.cl-ui-tree-select-toggle');
+          if (chosen) chosen.focus();
+        } catch (exception) {
+          say(exception instanceof Error ? exception.message : 'The category could not be created.');
+        } finally {
+          create.disabled = false;
+        }
+      });
+    });
+
+    window.CattoTreeSelect = { initialise: root => { initialiseTreeSelects(root); initialiseCategoryFields(root); } };
+    initialiseTreeSelects(document);
+    initialiseCategoryFields(document);
     const passwordInput=document.querySelector('form[action="/admin/settings/mail"] input[name="smtp_password"]');
     if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const toggle=document.getElementById('smtp-password-toggle');if(!(toggle instanceof HTMLButtonElement))return;toggle.hidden=false;toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.querySelector('span').textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
 

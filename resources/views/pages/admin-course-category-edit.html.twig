@@ -72,14 +72,8 @@
 {% block body %}
 
 							<input type="hidden" name="csrf" value="{{ csrf }}">
-							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replacement category', for: 'field-admin-course-category-edit', required: true})} %}
-{% block control %}
-<select id="field-admin-course-category-edit" class="form-select mb-3" name="replacement_category_id" required {{ ui_field_attrs(props) }}><option value="">Choose replacement…</option>
-							{% for replacement in replacement_categories %}
-								<option value="{{ replacement.id }}">{{ replacement.name }}</option>
-							{% endfor %}
-							</select>
-{% endblock %}
+							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replacement category', for: 'replacement-category', required: true, help: 'Its courses are moved to this category before it is deleted.'})} %}
+{% block control %}{{ ui('form.tree-select', {id: 'replacement-category', name: 'replacement_category_id', mode: 'field', items: replacement_picker.items, selected: replacement_picker.selected, placeholder: 'Choose a replacement…', list_label: 'Replacement categories'}) }}{% endblock %}
 {% endembed %}{{ ui('action.button', {label: 'Reassign courses and delete', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reassign the affected courses and permanently delete this category?', icon: 'action-remove'}) }}
 
 {% endblock %}

@@ -1,0 +1,21 @@
+{# A course's category: the shared category picker (form.tree-select in field mode: Uncategorised, then the main categories, each opening onto its subcategories) and, for those who manage categories, + New, which creates a category in place without leaving the form. Used by the course create and edit forms and the import review. The server draws this whole field again after + New (/admin/courses/categories/field), with the new category chosen.
+
+   cf_id: the picker's element id (the field label's for); cf_name: the submitted field (0 means uncategorised); cf_picker and cf_places: CourseService::courseCategoryPicker() and categoryLocationPicker().
+   + New needs JavaScript: its button is shown by core script, and without it the picker still chooses any existing category. The new category's fields sit inside the course or import form, so none of them is required by the browser (the script checks the name) and only the place's radios carry a form name, which the course and import saves ignore. #}
+<div class="cl-category-field" data-category-field data-field-id="{{ cf_id }}" data-field-name="{{ cf_name }}" data-refresh-url="/admin/courses/categories/field">
+	<div class="cl-category-field-row">
+		{{ ui('form.tree-select', {id: cf_id, name: cf_name, mode: 'field', items: cf_picker.items, selected: cf_picker.selected, placeholder: 'Uncategorised', list_label: 'Course categories'}) }}
+		{% if can_manage_categories %}<span class="cl-category-field-new" data-category-create-enhanced hidden>{{ ui('action.button', {label: 'New', variant: 'secondary', type: 'button', icon: 'action-add', category_create_toggle: true, expanded: false, controls: cf_id ~ '-new', aria_label: 'Create a new category'}) }}</span>{% endif %}
+	</div>
+	{% if can_manage_categories %}
+		<div class="cl-category-create-panel" id="{{ cf_id }}-new" data-category-create-panel data-create-url="/admin/courses/categories/inline" data-csrf="{{ csrf }}" hidden>
+			<p class="cl-category-create-heading">New category</p>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: cf_id ~ '-new-name', required: true, full_width: true})} %}{% block control %}<input class="form-control" id="{{ props.for }}" data-category-name maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where it goes', for: cf_id ~ '-new-place', help: 'Top level makes a main category. Inside a main category makes a subcategory; inside a subcategory, a sub-subcategory. Categories go three levels deep.', full_width: true})} %}{% block control %}{{ ui('form.tree-select', {id: props.for, name: cf_name ~ '_new_parent', mode: 'field', items: cf_places.items, selected: cf_places.selected, placeholder: 'Top level', list_label: 'Where the new category goes'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (optional)', for: cf_id ~ '-new-description', full_width: true})} %}{% block control %}<textarea class="form-control" id="{{ props.for }}" data-category-description rows="2" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+			<p class="cl-category-create-result" aria-live="polite">It will be created as <strong data-category-create-path>the new category</strong>.</p>
+			<p class="cl-category-create-error" role="alert" data-category-error hidden></p>
+			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true}) }}{% endblock %}{% endembed %}
+		</div>
+	{% endif %}
+</div>

@@ -14,6 +14,10 @@ Changelog:
 
 2026/10/07 SAST
 
+- Category picker: catalogueCategoryPicker() returns nested options; courseCategoryPicker() (Uncategorised = 0), categoryLocationPicker() (Top level, then main categories and subcategories only, for + New) and replacementCategoryPicker() share one builder over the stored tree.
+
+2026/10/07 SAST
+
 - Category tree: where a category sits is decided by CategoryHierarchyService - moveCategory() steps through it, arrangeCategory() and categoryDestinations() are new, createCategory() takes its parent from the caller under the taxonomy lock, updateCategory() changes only details and deleteCategory() closes the gap; categoryManagementTree() adds heights, paths and open branches; categoryTrail() reads a path fresh; the parent picker is gone.
 
 2026/10/07 SAST
@@ -313,23 +317,96 @@ final class CourseService
     }
 
     /**
-     * The catalogue's category picker: every category in tree order with its depth and full
-     * "Root › Branch › Leaf" path, preceded by an All categories choice. Values are category IDs.
+     * The catalogue's category picker: "All categories", then the category tree, each category with
+     * its subcategories nested under it in the order ADMIN arranged.
      *
      * @param array<string,mixed>|null $selected
-     * @return array{items:list<array{value:string,label:string,depth:int,path:string}>,selected:string}
+     * @return array{items:list<array<string,mixed>>,selected:string}
      */
     public function catalogueCategoryPicker(?array $selected): array
     {
-        $items = [['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories']];
-        $paths = [];
+        return [
+            'items' => [['value' => '', 'label' => 'All categories', 'depth' => 0, 'path' => 'All categories'], ...$this->nestedCategoryItems(3)],
+            'selected' => $selected === null ? '' : (string) $selected['id'],
+        ];
+    }
+
+    /**
+     * The picker for a course's category: "Uncategorised" (no category, sent as 0), then every
+     * category at all three levels, nested.
+     *
+     * @return array{items:list<array<string,mixed>>,selected:string}
+     */
+    public function courseCategoryPicker(?int $selectedId): array
+    {
+        return [
+            'items' => [['value' => '0', 'label' => 'Uncategorised', 'depth' => 0, 'path' => 'Uncategorised'], ...$this->nestedCategoryItems(3)],
+            'selected' => (string) ($selectedId ?? 0),
+        ];
+    }
+
+    /**
+     * Where a new category can go: "Top level" (0), then the main categories with their
+     * subcategories. Sub-subcategories are not offered: nothing can go inside them.
+     *
+     * @return array{items:list<array<string,mixed>>,selected:string}
+     */
+    public function categoryLocationPicker(): array
+    {
+        return [
+            'items' => [['value' => '0', 'label' => 'Top level', 'depth' => 0, 'path' => 'Top level'], ...$this->nestedCategoryItems(CategoryHierarchyService::MAX_LEVEL - 1)],
+            'selected' => '0',
+        ];
+    }
+
+    /**
+     * Every category another one's courses can move to, for deleting it: all three levels, nested,
+     * without the category itself and with nothing chosen yet.
+     *
+     * @return array{items:list<array<string,mixed>>,selected:string}
+     */
+    public function replacementCategoryPicker(int $excludedId): array
+    {
+        return ['items' => $this->nestedCategoryItems(3, $excludedId), 'selected' => ''];
+    }
+
+    /**
+     * The category tree as nested picker items, down to $maxDepth levels, in the order ADMIN
+     * arranged: {value, label, depth, path, children}. Paths come from the stored tree.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function nestedCategoryItems(int $maxDepth, ?int $excludedId = null): array
+    {
+        $nodes = [];
+        $roots = [];
         foreach ($this->courses->categoryTree() as $category) {
+            $id = (int) $category['id'];
+            $depth = (int) $category['level'];
             $parent = $category['parent_id'] === null ? null : (int) $category['parent_id'];
-            $path = ($parent !== null && isset($paths[$parent]) ? $paths[$parent] . ' › ' : '') . (string) $category['name'];
-            $paths[(int) $category['id']] = $path;
-            $items[] = ['value' => (string) $category['id'], 'label' => (string) $category['name'], 'depth' => max(1, min(3, (int) $category['level'])), 'path' => $path];
+            if ($depth > $maxDepth || $id === $excludedId || ($parent !== null && !isset($nodes[$parent]))) {
+                continue;
+            }
+            $path = ($parent !== null ? $nodes[$parent]['path'] . ' › ' : '') . (string) $category['name'];
+            $nodes[$id] = ['value' => (string) $id, 'label' => (string) $category['name'], 'depth' => $depth, 'path' => $path, 'children' => [], 'parent' => $parent];
+            if ($parent === null) {
+                $roots[] = $id;
+            } else {
+                $nodes[$parent]['children'][] = $id;
+            }
         }
-        return ['items' => $items, 'selected' => $selected === null ? '' : (string) $selected['id']];
+        $build = static function (array $ids) use (&$build, $nodes): array {
+            return array_map(static function (int $id) use ($build, $nodes): array {
+                $node = $nodes[$id];
+                unset($node['parent']);
+                $node['children'] = $build($node['children']);
+                if ($node['children'] === []) {
+                    unset($node['children']);
+                }
+                return $node;
+            }, $ids);
+        };
+        return $build($roots);
     }
 
     /**

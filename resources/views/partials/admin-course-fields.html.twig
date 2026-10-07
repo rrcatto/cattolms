@@ -25,35 +25,7 @@
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Category', for: 'category'})} %}
 {% block control %}
 
-		{# data-category-picker scopes the inline create script to this select, toggle and panel. #}
-		<div data-category-picker>
-			<div class="input-group">
-				<select class="form-select" id="category" name="category_id" data-category-select {{ ui_field_attrs(props) }}><option value="0">Uncategorised</option>
-				{% for category in categories %}
-					<option value="{{ category.id }}" {{ category.id == course.category_id ? 'selected' : '' }}>{{ category.name }}</option>
-				{% endfor %}
-				</select>
-				{% if can_manage_categories %}
-					{{ ui('action.button', {label: '+ New', variant: 'secondary', size: 'normal', type: 'button', category_create_toggle: true, expanded: false, controls: 'category-create-panel'}) }}
-				{% endif %}
-			</div>
-			{% if can_manage_categories %}
-				<div class="border rounded p-3 mt-2 d-none" id="category-create-panel" data-category-create-panel data-create-url="/admin/courses/categories/inline" data-csrf="{{ csrf }}">
-					<strong class="d-block mb-2">Create category</strong>
-					<input class="form-control mb-2" data-category-name maxlength="120" placeholder="Category name" aria-label="New category name">
-					<textarea class="form-control mb-2" data-category-description rows="2" placeholder="Description (optional)" aria-label="New category description"></textarea>
-					<div class="small text-danger mb-2 d-none" data-category-error role="alert">
-					</div>
-					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
-{% block body %}
-
-						{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true}) }}
-
-{% endblock %}
-{% endembed %}
-				</div>
-			{% endif %}
-		</div>
+		{% include '@platform/partials/admin/course-category-field.html.twig' with {cf_id: 'category', cf_name: 'category_id', cf_picker: category_picker, cf_places: category_places} %}
 
 {% endblock %}
 {% endembed %}
