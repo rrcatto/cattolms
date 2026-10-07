@@ -1,16 +1,18 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.12 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.13 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.8.12 operational position
+## Current v0.8.8.13 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.12` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.13` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
 - **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/07 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 90 permissions (10 `SYSTEM.*`, 80 business) across the five roles.
 - **Document templates (Phase I, v0.8.8.8).** The baseline publishes the source defaults in `resources/documents/` as the invoice, receipt and credit note templates; there is no page that edits them until Phase K. Editing a source file changes only new installations, until the database is rebuilt.
 - **Certificate designs (v0.8.8.10).** The baseline stores the six look backgrounds (`resources/certificates/looks/*.png`) as pictures in `document_assets` and installs six designs compiled from the looks (Classic, Modern, Minimal, Legal Seal, Gold Frame and Professional CPD), with Classic the default for new courses; every course starts on it. After that, designs are made at Courses → Certificate Designs and live in the database, uploaded backgrounds, logos and signatures included (`document_assets` rows are immutable, stored once by SHA-256, and never written to `storage/`). Each issued certificate stores its values and references the design version it was drawn with, and is drawn again from them, so editing or deleting a design never changes an issued certificate. Generated seed certificates are recorded the same way, against each course's design.
 - **Category order.** Category positions are explicit and compact: 1..n within each parent, refused as a duplicate by the database. A script that inserts categories directly must place each one after its siblings (`COALESCE(MAX(position),0)+1` for its parent) or run inside a transaction that defers `course_categories_sibling_position` and renumbers before it ends.
 - **PDF fonts.** Certificates print in the bundled OFL fonts in `resources/documents/fonts/` (Cormorant Garamond, Playfair Display, IBM Plex Sans and IBM Plex Serif). Dompdf keeps their metrics in the instance's `storage/cache/dompdf-fonts`, which it creates on first use; it must be writable by PHP-FPM (`cattotest` in development), and deleting it only makes the next PDF rebuild it.
+- **PHP extensions.** `composer.json` lists every required extension, GD included (profile images and certificate pictures); run `composer check-platform-reqs --no-dev` after installing PHP on a server. Without GD those uploads are refused with a message saying so. On Debian or Ubuntu with the `php8.5` packages, install it with `apt install php8.5-gd` and restart `php8.5-fpm`.
+- **Instance folders.** PHP-FPM must be able to write `storage/` and its subfolders, including `storage/tmp/theme-imports` (theme uploads) and `storage/logs/application.log`. A folder or log created by another user stops theme imports or silences the log; the theme page says which folder.
 - **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below.
 - **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there as the files' owner (CSS, JS and images from the host as `rrcatto`; compiled `assets/` inside `env_php_1` as `cattotest`), then run `php bin/console cache:clear` as `cattotest`.
 
@@ -64,6 +66,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.10:** certificate designs. The baseline gained `document_assets`, `document_template_versions.design`, `courses.certificate_design_id` and `courses.certificate_accreditation`, lost the course certificate title, body, footer and signatory columns, and renamed `DOCUMENT.TEMPLATE.*` to `CERTIFICATE.DESIGN.*`. Rebuild the database (see above). Publish `catto-platform.css`, `js/ck-certificate.js`, `img/certificates/` (the placement pictures and the look thumbnails) and the compiled `assets/` (the `certificate-preview` controller; delete the served `template_placeholders_controller-*.js`, which is gone).
 - **v0.8.8.11:** the draggable category tree. `course_categories.position` is 1..n within each parent with the unique, deferrable `course_categories_sibling_position` constraint, and the shipped taxonomy is renumbered when it is installed. Rebuild the database (see above). Publish `catto-platform.css` and the compiled `assets/` (the shared `lib/sortable_tree_controller.js` and the rewritten `category-tree` and `course-content` controllers), and delete the served copies of the controllers they replace.
 - **v0.8.8.12:** one category picker for the catalogue, the course forms, course import and category deletion. No schema change. Publish `catto-platform.css` and `js/platform-overrides.js` (the picker's disclosure behaviour and + New).
+- **v0.8.8.13:** install GD first (`apt install php8.5-gd`, restart `php8.5-fpm`; `php -m` then lists `gd`), because `composer install` refuses a server without it; a v0.8.8.4 VPS without GD answered a profile image upload with HTTP 500. Publish `catto-platform.css` (the certificate preview above its form). No schema change.
 
 ### Commerce operations
 
@@ -210,7 +213,7 @@ chmod 755 /home/prettythings/releases/deploy-catto-learning-v0.5.7.5.1.sh
 
 Required PHP extensions: DOM, fileinfo, GD, JSON, mbstring, OpenSSL, PDO/PostgreSQL and ZIP.
 
-GD is required from v0.7 for the profile image: an upload is validated, cropped to a square and resized to 256x256 before it is stored. Without it the profile image control is the only thing that fails, but it fails at upload time rather than at boot.
+GD is required from v0.7 for the profile image (an upload is validated, cropped to a square and resized to 256x256 before it is stored) and from v0.8.8.10 for certificate pictures and design thumbnails. Since v0.8.8.13 `composer.json` requires it, so `composer install` refuses a server without it; a server already running without it refuses those uploads with a message saying so and logs what to install, rather than answering HTTP 500.
 
 `composer migrate` is the canonical migration command on an installation. In the local Podman environment it cannot run the Phinx launcher as `cattotest`; run `php vendor/bin/phinx migrate -c phinx.php -e development` directly. There is no separate `migrate-test` convention.
 
@@ -235,6 +238,7 @@ Never install or update a theme by copying files into `/home/<site-user>/themes/
 Run from `/usr/local/lib/php/catto-learning/current`:
 
 ```bash
+runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer check-platform-reqs --no-dev
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer migrations:status
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer themes:install
 runuser -u prettythings -- env HOME=/home/prettythings COMPOSER_HOME=/home/prettythings/.composer composer themes:sync

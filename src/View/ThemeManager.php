@@ -10,6 +10,9 @@ Description:
 Manages filesystem-authoritative Catto Learning Theme Package 4.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
 
 Changelog:
+2026/10/07 SAST
+- Staging a theme package checks that storage/tmp/theme-imports is writable and says so when it is
+  not, logging the PHP reason instead of printing the copy warning into the response.
 2026/09/09 07:30 SAST
 - The generated palette no longer paints the links inside a dropdown panel with the navigation
   bar's own text colour. Every theme's menus were white on white.
@@ -208,13 +211,27 @@ final class ThemeManager
 
         $token = bin2hex(random_bytes(16));
         $dir = $this->instanceRoot . '/storage/tmp/theme-imports';
-        $this->ensureDirectory($dir);
+        // The folder is the instance's, not the code's, so its ownership is the installation's: a
+        // copy made as another user leaves it unwritable to PHP-FPM, and the copy warning used to be
+        // printed into the response while the message named no folder at all.
+        $unwritable = 'Unable to stage the theme package for inspection: the web server cannot write to storage/tmp/theme-imports in the instance folder. Make that folder writable by the PHP-FPM user.';
+        try {
+            $this->ensureDirectory($dir);
+        } catch (RuntimeException $failed) {
+            error_log('CattoLMS theme import: ' . $failed->getMessage());
+            throw new RuntimeException($unwritable, 0, $failed);
+        }
+        if (!is_writable($dir)) {
+            error_log('CattoLMS theme import: ' . $dir . ' is not writable by the PHP process.');
+            throw new RuntimeException($unwritable);
+        }
         foreach (glob($dir . '/*.zip') ?: [] as $old) {
             if (is_file($old) && filemtime($old) !== false && filemtime($old) < time() - 7200) @unlink($old);
         }
         $target = $dir . '/' . $token . '.zip';
-        if (!copy($uploadedPath, $target)) {
-            throw new RuntimeException('Unable to stage the theme package for inspection.');
+        if (!@copy($uploadedPath, $target)) {
+            error_log('CattoLMS theme import: ' . (error_get_last()['message'] ?? 'copy into ' . $dir . ' failed.'));
+            throw new RuntimeException($unwritable);
         }
         $meta = (array) $manifest['theme'];
         $inspection['install_action'] = 'install';
@@ -1002,8 +1019,8 @@ CSS;
 
     private function ensureDirectory(string $dir): void
     {
-        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
-            throw new RuntimeException('Unable to create directory: ' . $dir);
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('Unable to create directory: ' . $dir . ' (' . (error_get_last()['message'] ?? 'no reason given') . ')');
         }
     }
 

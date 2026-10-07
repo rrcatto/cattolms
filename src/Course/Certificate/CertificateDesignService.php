@@ -21,6 +21,7 @@ names the version it was drawn with.
 
 Changelog:
 2026/10/07 SAST
+- A design thumbnail is absent rather than an HTTP 500 when the server has no GD extension.
 - Created for certificate designs.
 */
 
@@ -37,6 +38,7 @@ use CattoLearning\Document\RenderedDocument;
 use CattoLearning\Document\TemplateValidationException;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Support\ImageProcessing;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -244,7 +246,7 @@ final class CertificateDesignService
     public function thumbnail(string $sha, int $width = 480): ?array
     {
         $asset = $this->assets->find($sha);
-        if ($asset === null) {
+        if ($asset === null || !ImageProcessing::available()) {
             return null;
         }
         $source = @imagecreatefromstring($asset['bytes']);

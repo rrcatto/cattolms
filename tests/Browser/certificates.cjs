@@ -1,7 +1,7 @@
 /* Certificate designs, in a real browser. The Certificate designs list shows the six installed
  * designs as pictures, Classic the default, and nothing of the template engine. ADMIN makes a design
  * in the one-form editor - a look picked by picture, the wording in CKEditor with Insert field, a
- * signatory - while the preview redraws as the form changes; the course then picks that design by
+ * signatory - while the preview above it, at the full width, redraws as the form changes; the course then picks that design by
  * picture with its own accreditation line and previews what issuing will draw. A learner passes the
  * final and gets the certificate page and PDF. Editing the design changes the next learner's
  * certificate and never the issued one. An uploaded Canva-sized background becomes a design's look.
@@ -317,7 +317,11 @@ async function passFinal(page) {
         step = 'reopened';
         const own = pictureChoice(page, 'Your own background');
         assert.ok(await own.isChecked(), 'the uploaded background is the look');
-        assert.ok(await pictureItem(page, 'Your own background').locator('img').evaluate((img) => img.complete && img.naturalWidth > 0), 'and shows as a picture');
+        // The looks sit below the preview and their pictures load lazily: scroll to it, as a reader does.
+        const ownPicture = pictureItem(page, 'Your own background').locator('img');
+        await ownPicture.scrollIntoViewIfNeeded();
+        await ownPicture.evaluate((img) => img.complete ? null : new Promise((loaded) => { img.addEventListener('load', loaded, {once: true}); img.addEventListener('error', loaded, {once: true}); }));
+        assert.ok(await ownPicture.evaluate((img) => img.complete && img.naturalWidth > 0), 'and shows as a picture');
         assert.ok(await pictureChoice(page, 'Right side').isChecked(), 'the words stay on the right');
         assert.equal(await page.locator('#design-typeface').inputValue(), 'sans');
         await page.screenshot({path: `${output}/editor-uploaded.png`, fullPage: true});
@@ -417,6 +421,10 @@ async function passFinal(page) {
                     assert.equal(response.status(), 200, `${theme} ${url}`);
                     assert.ok(await noSideScroll(page), `${theme} ${width} ${name} does not scroll sideways`);
                     assert.ok(await page.locator(selector).first().isVisible(), `${theme} ${width} ${name} shows ${selector}`);
+                    if (width === 1440 && (name === 'editor' || name === 'course')) {
+                        const [frame, editor, form] = await Promise.all(['.cl-certificate-preview-frame', '.cl-certificate-editor', '.cl-certificate-editor-form'].map((s) => page.locator(s).first().boundingBox()));
+                        assert.ok(frame.width >= editor.width * 0.9 && frame.y < form.y, `${theme} ${name}: the preview is above the form at the full width (${Math.round(frame.width)} of ${Math.round(editor.width)} px)`);
+                    }
                     await page.screenshot({path: `${output}/${theme}-${width}-${name}.png`});
                 }
             }

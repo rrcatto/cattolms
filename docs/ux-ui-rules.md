@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8.8.12 (development) **Date time:** 2026/10/07 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8.8.13 (development) **Date time:** 2026/10/07 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -179,6 +179,8 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.11 Flash message.** A transient notice sits above the page head and takes its space with it when it goes. Success hides itself after 4.5 seconds, info after 6.5, and every message carries a close control; on the way out the *container* goes too once it holds nothing, or its bottom margin is left holding open a gap the reader can no longer account for and the page head never returns to the top of its boxed container. Owner's instruction, 2026/09/12, from Administration Settings after a save. Core hooks the themes must emit: `.cl-flash-stack` around the messages, `data-flash-message` on each, `data-flash-close` on its control — the dismissal in `platform-overrides.js` finds the stack through them. Note that `:empty` cannot do this in CSS: the whitespace text nodes between the messages survive their removal, so the stack is never empty in the selector's sense. → Enforced by `FlashDismissalContractTest`.
 
+**6.12 Certificate preview.** On the certificate design editor and a course's certificate page the preview is the first thing on the page and takes the full width of the editor, with the form below it. Owner instruction, 2026/10/07: the preview beside the form (616 × 436 px at desktop widths) was too small, and it should be about twice as wide and twice as high. It is the PDF exactly as it prints, in the browser's own viewer, and it redraws as the form changes. → Enforced by `tests/Browser/certificates.cjs` in every theme.
+
 ---
 
 ## 7. Themes
@@ -276,6 +278,10 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/07 SAST — second pass
+
+- 6.12: the certificate preview comes first at the full width, about twice its former size, with the form below it.
 
 2026/10/07 SAST
 

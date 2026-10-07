@@ -1,6 +1,16 @@
 # Changelog
 
-**LMS version:** 0.8.8.12 **Date time:** 2026/10/07 SAST
+**LMS version:** 0.8.8.13 **Date time:** 2026/10/07 SAST
+
+## 2026-10-07 SAST — v0.8.8.13 GD requirement, theme uploads, re-importing a course, certificate preview
+
+- **Release.** Version aligned to 0.8.8.13 at the owner's instruction ("push too v0.8.8.13 - update all stale documentation first"); published as GitHub release `v0.8.8.13` with `cattolms-v0.8.8.13.zip`. The fixes below came from the owner's reports the same day: a VPS profile image upload answered HTTP 500, catto.test refused every theme upload, and a second import of a course listed 26 key collisions without saying why.
+- **Deploying.** Install GD for the PHP that serves the site before deploying (`apt install php8.5-gd`, then restart `php8.5-fpm`): `composer install` now refuses a server without it. Publish `catto-platform.css`. No schema change.
+
+- **GD is required.** The VPS (v0.8.8.4) answered a profile image upload with HTTP 500, "Call to undefined function imagecreatefromstring()": its PHP has no GD extension, which profile images and certificate pictures need. `composer.json` now requires `ext-gd`, so `composer install` refuses such a server, and `tools/validate-release.php` checks the requirement. A server running without it says so: `Support\ImageProcessing` refuses a profile image or certificate picture upload with a plain message and logs what to install; a design thumbnail is absent rather than an error.
+- **Theme staging.** catto.test refused every theme with "Unable to stage the theme package for inspection.": its `storage/tmp/theme-imports` had been created by another user and PHP-FPM could not write to it, and the copy warning was printed into the response. `ThemeManager::stageImport()` now checks the folder, names it in the message, and logs the PHP reason instead (`ThemeLifecycleRegressionTest`). The development folder's permissions were corrected, as was `storage/logs/application.log`, which PHP-FPM could not write either, so the log had stopped on 2026/09/21.
+- **Importing a course that is already on the site.** A second import of a course collides with its own Course Items, and the review listed every key as "Resolve the collision before importing" without saying why or that Replace existing course shell would import it. `CoursePortabilityService::courseHoldingConflicts()` finds the one course every collision belongs to (by the same rule a replacement passes); the review then says "This course is already on the site", lists no key, and chooses that course under Replace. A commit that would create a second copy says so in one sentence (`ImportReplacementIntegrationTest`).
+- **Certificate preview.** On the certificate design editor and a course's certificate page the preview comes first at the full width, about twice its former size (1217 × 861 rather than 616 × 436 px at desktop widths), with the form below it (owner instruction). The certificates browser check scrolls to a look's picture before checking it, since the pictures load lazily below the preview.
 
 ## 2026-10-07 SAST — v0.8.8.12 One category picker
 

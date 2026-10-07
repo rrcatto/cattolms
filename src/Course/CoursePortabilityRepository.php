@@ -12,6 +12,9 @@ Provides PostgreSQL persistence queries and data-access operations for course po
 
 Changelog:
 2026/10/07 SAST
+- coursesPlacingItemKey() names the courses that place a Course Item, so an import that collides
+  with a course already on the site can be offered as its replacement.
+2026/10/07 SAST
 - Removed updateCertificateTemplate() and the certificate design reset; a course holds no certificate HTML or CSS (Phase J).
 2026/09/08 19:52 SAST
 - Depends on the Database interface rather than naming Doctrine's Connection, so the bound PDO parameter type is inferred from the PHP value.
@@ -97,6 +100,16 @@ final class CoursePortabilityRepository
              WHERE id=:course_id",
             ['course_id' => $courseId]
         );
+    }
+
+    /** @return list<int> The courses that place the Course Item with this key, lowest id first. */
+    public function coursesPlacingItemKey(string $key): array
+    {
+        return array_map('intval', array_column($this->db->fetchAllAssociative(
+            'SELECT DISTINCT p.course_id FROM course_item_placements p JOIN course_items i ON i.id = p.course_item_id
+              WHERE i.item_key = :key ORDER BY p.course_id',
+            ['key' => $key]
+        ), 'course_id'));
     }
 
     public function itemKeyIsExclusiveToCourse(string $key, int $courseId): bool

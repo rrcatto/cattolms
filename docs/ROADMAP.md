@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/07 (v0.8.8.12)
+## Current delivery position — 2026/10/07 (v0.8.8.13)
 
-**Current LMS version:** 0.8.8.12 · **Date:** 2026/10/07 SAST · tag `v0.8.8.12` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.8.13 · **Date:** 2026/10/07 SAST · tag `v0.8.8.13` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.13 | GD required, with a plain message where it is missing; theme uploads name an unwritable folder; re-importing a course offers it for replacement; the certificate preview twice as large, above its form |
 | 0.8.8.12 | One category picker wherever a category is chosen - the catalogue, the course forms, course import and category deletion - opening on the main categories with branches opened as needed, and + New creating a category at the level chosen |
 | 0.8.8.11 | Draggable three-level category tree at `/admin/courses/categories` (drag, keyboard, ⋯ menu, Move into; explicit sibling order), sharing its tree behaviour with Course Content |
 | 0.8.8.10 | Certificate designs, at the owner's request after reviewing mockups: six installed looks or an uploaded A4 landscape background, one form with a live PDF preview, and a design and accreditation line per course; System → Document Templates removed |

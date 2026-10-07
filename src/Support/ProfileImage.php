@@ -29,6 +29,9 @@ The output is always PNG. One format out means one decoder path on the way back,
 survives, and the stored bytes cannot be a JPEG that some later resize quietly recompresses again.
 
 Changelog:
+2026/10/07 SAST
+- Without GD an upload is refused with a message that says so; a server without it had answered HTTP 500 ("Call to undefined function imagecreatefromstring()").
+
 2026/09/10 07:10 SAST
 - Applies the EXIF orientation. A photograph taken upright on a phone is stored as a landscape bitmap with a tag saying which way to turn it, and the decoder ignores that tag - so every such picture arrived lying on its side.
 
@@ -94,6 +97,9 @@ final class ProfileImage
         }
         if (strlen($bytes) > self::MAX_UPLOAD_BYTES) {
             throw new RuntimeException('That image is larger than 8 MB. Please choose a smaller file.');
+        }
+        if (!ImageProcessing::available()) {
+            throw new RuntimeException(ImageProcessing::UNAVAILABLE);
         }
 
         // The type comes from the bytes. The browser sends a Content-Type and a filename and the

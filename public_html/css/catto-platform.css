@@ -5,6 +5,8 @@
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
 2026/10/07 SAST
+- Certificate editor: the preview comes first at the full width, about twice its former size, with the form below it.
+2026/10/07 SAST
 - Category picker: form.tree-select nests its options with a disclosure button beside each branch (depth paddings replaced by branch indentation); the course category field and its in-place + New panel.
 2026/10/07 SAST
 - Certificate designs: form.picture-choice, the certificate editor and course certificate grid, the PDF preview frame, the wording editor (text styles and field labels), the design list (thumbnail, name, default badge, column widths) and the certificate PDF on its public page. The document template page rules are removed with those pages.
@@ -1261,14 +1263,13 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-ui-picture-choice-label{font-weight:600}
 .cl-ui-picture-choice-note{font-size:.85rem;font-weight:400;opacity:.75}
 
-/* Certificates: the design editor's form beside its preview, and the preview itself - the PDF the
+/* Certificates: the design editor's preview above its form, and the preview itself - the PDF the
  * renderer draws, shown by the browser's own PDF viewer. A design's text styles and fields look in
  * the wording editor roughly as they will print, without pretending to be the certificate. */
-.cl-certificate-editor{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:1.5rem;align-items:start}
-@media(max-width:1100px){.cl-certificate-editor{grid-template-columns:minmax(0,1fr)}}
-.cl-certificate-editor-form{min-width:0}
-.cl-certificate-editor-preview{position:sticky;top:1rem}
-@media(max-width:1100px){.cl-certificate-editor-preview{position:static}}
+/* The preview comes first and takes the full width, about twice the size it had beside the form
+   (owner instruction, 2026/10/07); the form follows it. */
+.cl-certificate-editor{display:grid;grid-template-columns:minmax(0,1fr);gap:1.5rem;align-items:start}
+.cl-certificate-editor-preview,.cl-certificate-editor-form{min-width:0}
 .cl-certificate-preview{display:flex;flex-direction:column;gap:.6rem}
 .cl-certificate-preview-frame{display:block;width:100%;aspect-ratio:297/210;min-height:16rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
 .cl-certificate-wording .ck-editor__editable,.cl-certificate-wording textarea{min-height:12rem}

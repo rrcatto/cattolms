@@ -21,12 +21,14 @@ Changelog:
 2026/10/07 SAST
 - Created for certificate designs (uploaded Canva backgrounds, logos and signatures).
 - A background is stored without an alpha channel.
+- Without GD an upload is refused with a message that says so, rather than ending in HTTP 500.
 */
 
 declare(strict_types=1);
 
 namespace CattoLearning\Course\Certificate;
 
+use CattoLearning\Support\ImageProcessing;
 use InvalidArgumentException;
 
 final class CertificateImage
@@ -75,6 +77,9 @@ final class CertificateImage
     public static function prepare(string $bytes, string $kind): array
     {
         $label = self::LABELS[$kind] ?? throw new InvalidArgumentException('Unknown certificate picture.');
+        if (!ImageProcessing::available()) {
+            throw new InvalidArgumentException(ImageProcessing::UNAVAILABLE);
+        }
         if ($bytes === '' || strlen($bytes) > self::MAX_UPLOAD_BYTES) {
             throw new InvalidArgumentException('The ' . $label . ' must be a PNG or JPEG file of at most 12 MB.');
         }
