@@ -61,7 +61,7 @@ final class LmsMcpTools
     {
         return [
             'application' => 'Catto Learning',
-            'application_version' => '0.8.8.10',
+            'application_version' => '0.8.8.11',
             'mcp_transport' => 'stdio',
             'identity' => $this->identity->toArray(),
         ];

@@ -90,8 +90,8 @@ final class CategoryStatisticsPageTest extends TestCase
         self::assertArrayNotHasKey(4, $depths, 'The development taxonomy keeps to three levels.');
         self::assertSame($total, $shown['Main categories'] + $shown['Subcategories'] + $shown['Sub-subcategories']);
         self::assertStringNotContainsString('Categories outside the three-level hierarchy', $html);
-        self::assertLessThan(strpos($html, 'class="cl-category-tree"'), strpos($html, 'cl-ui-stat-grid'), 'The counts sit above the tree.');
-        self::assertStringContainsString('data-controller="category-tree"', $html, 'The collapsible tree is unchanged.');
+        self::assertLessThan(strpos($html, 'id="category-tree"'), strpos($html, 'cl-ui-stat-grid'), 'The counts sit above the tree.');
+        self::assertStringContainsString('data-controller="category-tree"', $html, 'The tree is the sortable category tree.');
         self::assertStringContainsString('Stats Leaf', $html);
     }
 }

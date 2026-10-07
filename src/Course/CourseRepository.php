@@ -14,6 +14,8 @@ the home page asks for only the handful of courses it renders.
 
 Changelog:
 2026/10/07 SAST
+- Category tree: lockCategories(), saveCategoryArrangement() (parent, level and position in tree order, the sibling position constraint deferred and checked again before it returns) and compactCategorySiblings(); categoryTree() returns positions; updateCategory() changes only details; nextCategoryPosition() is the next of 1..n; swapCategoryPositions() and categoryDescendantDepth() are gone.
+2026/10/07 SAST
 - Certificate designs: courses save and read certificate_accreditation and certificate_design_id; updateCertificateSettings() sets the switch, the design and the accreditation line.
 2026/10/07 SAST
 - Removed createCertificate() - the str_replace certificate renderer - with certificateContext(), certificateForEnrolment(), certificateByPublicId() and findUserById(), and the course certificate design columns. Certificates are issued by Course\Certificate\CertificateIssuer through the document template engine (Phase J).
@@ -805,22 +807,6 @@ final class CourseRepository
         return (int) ($rows[0]['total'] ?? 0);
     }
 
-    /**
-     * How many levels sit beneath a category: 0 with no children, 1 with children, 2 with
-     * grandchildren. The three-level cap bounds this to two joins.
-     */
-    public function categoryDescendantDepth(int $categoryId): int
-    {
-        return (int) $this->db->fetchOne(
-            'SELECT CASE
-                      WHEN EXISTS (SELECT 1 FROM course_categories c JOIN course_categories g ON g.parent_id = c.id WHERE c.parent_id = :id) THEN 2
-                      WHEN EXISTS (SELECT 1 FROM course_categories c WHERE c.parent_id = :id) THEN 1
-                      ELSE 0
-                    END',
-            ['id' => $categoryId]
-        );
-    }
-
     /** @return array<string,mixed>|null */
     public function categoryById(int $categoryId): ?array
     {
@@ -889,7 +875,7 @@ final class CourseRepository
     public function categoryTree(): array
     {
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT cc.id, cc.parent_id, cc.level, cc.name, cc.slug
+            "SELECT cc.id, cc.parent_id, cc.level, cc.position, cc.name, cc.slug
              FROM course_categories cc
              LEFT JOIN course_categories parent ON parent.id = cc.parent_id
              LEFT JOIN course_categories grandparent ON grandparent.id = parent.parent_id
@@ -1428,38 +1414,69 @@ final class CourseRepository
         return (int) ($rows[0]['id'] ?? 0);
     }
 
-    /** @param array<string,mixed> $data */
+    /**
+     * A category's own details. Where it sits in the tree is changed only by
+     * saveCategoryArrangement(), through CategoryHierarchyService.
+     *
+     * @param array<string,mixed> $data
+     */
     public function updateCategory(int $categoryId, array $data): void
     {
         if ($this->categoryById($categoryId) === null) {
             throw new RuntimeException('The course category does not exist.');
         }
+        $this->db->executeStatement(
+            'UPDATE course_categories SET name=:name,slug=:slug,description=:description,updated_at=:updated_at WHERE id=:id',
+            [
+                'name' => (string) $data['name'],
+                'slug' => (string) $data['slug'],
+                'description' => (string) $data['description'],
+                'updated_at' => date('Y-m-d H:i:sP'),
+                'id' => $categoryId,
+            ]
+        );
+    }
 
-        $set = 'name=:name,slug=:slug,description=:description,updated_at=:updated_at';
-        $params = [
-            'name' => (string) $data['name'],
-            'slug' => (string) $data['slug'],
-            'description' => (string) $data['description'],
-            'updated_at' => date('Y-m-d H:i:sP'),
-            'id' => $categoryId,
-        ];
-        if (array_key_exists('parent_id', $data)) {
-            $parentId = (int) $data['parent_id'];
-            $set .= ',parent_id=:parent_id,level=:level';
-            $params['parent_id'] = $parentId > 0 ? $parentId : null;
-            $params['level'] = $this->categoryLevelFor($parentId);
-        }
+    /**
+     * Holds every other writer of the taxonomy until the caller's transaction ends, so a move or a
+     * new category is decided against the tree as it is now and cannot interleave with another.
+     * Readers are not blocked.
+     */
+    public function lockCategories(): void
+    {
+        $this->db->executeStatement('LOCK TABLE course_categories IN SHARE ROW EXCLUSIVE MODE');
+    }
 
-        $this->db->executeStatement('UPDATE course_categories SET ' . $set . ' WHERE id=:id', $params);
-        if (array_key_exists('parent_id', $data)) {
-            // Descendants follow their parent's new level, children first so the depth trigger
-            // always compares a row against an already re-levelled parent.
-            $this->db->executeStatement('UPDATE course_categories SET level = :level WHERE parent_id = :id', ['level' => $params['level'] + 1, 'id' => $categoryId]);
+    /**
+     * Saves where categories sit: parent, level and position, for the rows given, in tree order so
+     * the depth trigger always compares a row against an already re-levelled parent. The sibling
+     * position constraint is deferred while the rows are rewritten and checked again before this
+     * returns, so a duplicate place fails here rather than at some later commit.
+     *
+     * @param list<array{id:int,parent:int|null,depth:int,position:int}> $rows
+     */
+    public function saveCategoryArrangement(array $rows): void
+    {
+        $this->db->executeStatement('SET CONSTRAINTS course_categories_sibling_position DEFERRED');
+        foreach ($rows as $row) {
             $this->db->executeStatement(
-                'UPDATE course_categories SET level = :level WHERE parent_id IN (SELECT id FROM course_categories WHERE parent_id = :id)',
-                ['level' => $params['level'] + 2, 'id' => $categoryId]
+                'UPDATE course_categories SET parent_id = :parent, level = :level, position = :position, updated_at = NOW() WHERE id = :id',
+                ['parent' => $row['parent'], 'level' => $row['depth'], 'position' => $row['position'], 'id' => $row['id']]
             );
         }
+        $this->db->executeStatement('SET CONSTRAINTS course_categories_sibling_position IMMEDIATE');
+    }
+
+    /** Closes the gap a deleted category leaves among its former siblings: 1..n again. */
+    public function compactCategorySiblings(?int $parentId): void
+    {
+        $this->db->executeStatement(
+            'UPDATE course_categories c SET position = ordered.position
+               FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY position, id)::int AS position
+                       FROM course_categories WHERE parent_id IS NOT DISTINCT FROM :parent) ordered
+              WHERE ordered.id = c.id AND c.position <> ordered.position',
+            ['parent' => $parentId]
+        );
     }
 
     /**
@@ -1487,16 +1504,16 @@ final class CourseRepository
         return $parentLevel + 1;
     }
 
-    /** Positions are per parent, so ordering one branch never renumbers another. */
+    /** The place after the last of a parent's children: positions run 1..n within each parent. */
     public function nextCategoryPosition(int $parentId = 0): int
     {
         $rows = $this->db->fetchAllAssociative(
-            'SELECT COALESCE(MAX(position),0)+10 AS position FROM course_categories
+            'SELECT COALESCE(MAX(position),0)+1 AS position FROM course_categories
              WHERE parent_id IS NOT DISTINCT FROM :parent',
             ['parent' => $parentId > 0 ? $parentId : null]
         );
 
-        return max(10, (int) ($rows[0]['position'] ?? 10));
+        return max(1, (int) ($rows[0]['position'] ?? 1));
     }
 
     /** How many categories sit directly under this one. A parent with children cannot be removed. */
@@ -1508,20 +1525,6 @@ final class CourseRepository
         );
 
         return (int) ($rows[0]['total'] ?? 0);
-    }
-
-    public function swapCategoryPositions(int $firstId, int $secondId): void
-    {
-        $first = $this->categoryById($firstId);
-        $second = $this->categoryById($secondId);
-        if ($first === null || $second === null) {
-            throw new RuntimeException('The course categories could not be reordered.');
-        }
-        $temporaryRows = $this->db->fetchAllAssociative('SELECT COALESCE(MAX(position),0)+10 AS position FROM course_categories');
-        $temporary = (int) ($temporaryRows[0]['position'] ?? 10);
-        $this->db->executeStatement('UPDATE course_categories SET position=:position,updated_at=NOW() WHERE id=:id', ['position' => $temporary, 'id' => $firstId]);
-        $this->db->executeStatement('UPDATE course_categories SET position=:position,updated_at=NOW() WHERE id=:id', ['position' => (int) $first['position'], 'id' => $secondId]);
-        $this->db->executeStatement('UPDATE course_categories SET position=:position,updated_at=NOW() WHERE id=:id', ['position' => (int) $second['position'], 'id' => $firstId]);
     }
 
     public function reassignCategoryCourses(int $fromCategoryId, int $toCategoryId): int

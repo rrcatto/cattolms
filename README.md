@@ -11,6 +11,7 @@ Source archives of each released version are on the GitHub [Releases](https://gi
 - **Courses.** Reusable Course Items placed in courses as a nested tree of sections (Course Components).
   - `/admin/course-items` groups shared items by course and lists Not currently in use; `/admin/resources` manages immutable local files.
   - Content is added through "+ Add here" in the Course Content tree, and moves are saved at once.
+  - `/admin/courses/categories` arranges the three-level category tree: drag a category (with its subcategories) to reorder it, put it inside another or move it back out, or use the keyboard, the ⋯ menu or Move into; the server keeps every move within three levels.
   - Save updates a shared item everywhere; Save As creates an independent one. Exact `[course-item:key]` references stay authored source and resolve when displayed.
 - **Learning.** The learner reader is Core-owned, full-screen and white. Public previews need no enrolment and record no progress, and relative availability begins at Start Course.
   - Progress is assessment-only: earlier graded assessments make up 50% and the final 50%.
@@ -58,6 +59,7 @@ The development database is disposable test data. It was last recreated on 2026/
 - **v0.8.8.7:** Billing Address is its own Account → Profile page after Personal Particulars, which again holds the particulars beside the profile image.
 - **v0.8.8.8:** the shared document template engine (System → Document Templates: versioned HTML/CSS templates, a controlled placeholder language, one renderer for preview and PDF), and a front controller that reads `.env` exactly as phpdotenv does.
 - **v0.8.8.9:** certificates on the document template engine (Phase J): Classic, Modern and Minimal designs, a certificate PDF, and certificates that keep the values and template version they were issued with.
+- **Unreleased (after v0.8.8.10):** the draggable category tree, sharing its tree behaviour with Course Content.
 - **v0.8.8.10:** certificate designs replace the certificate template pages: six looks or your own uploaded background, one form with a live PDF preview, and a design and accreditation line per course.
 
 Git publication does not deploy the VPS.

@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-	{% set ph_back_href = '/admin/courses/categories' %}
+	{% set ph_back_href = tree_href %}
 	{% set ph_back_label = 'Course categories' %}
 	{% set ph_kicker = 'Course metadata' %}
 	{% set ph_title = category.name %}
@@ -25,9 +25,7 @@
 
 {% endblock %}
 {% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'category-parent-picker', help: 'Currently at level ' ~ (category.level) ~ ' of 3. Only parents it can legally sit under are listed: never itself or one of its own sub-categories, and never a parent that would push its sub-categories past level 3.'})} %}
-{% block control %}{{ ui('form.tree-select', {id: 'category-parent-picker', name: 'parent_id', mode: 'field', items: parent_picker.items, selected: parent_picker.selected, placeholder: 'No parent', list_label: 'Possible parent categories'}) }}{% endblock %}
-{% endembed %}
+					<p class="cl-category-edit-place">{{ category.level == 1 ? 'Main category' : (category.level == 2 ? 'Subcategory' : 'Sub-subcategory') }}: <strong>{{ category_path }}</strong>. To move it, drag it in the <a href="{{ tree_href }}">category tree</a> or use <a href="/admin/courses/categories/{{ category.id }}/move-into">Move into…</a>.</p>
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', full_width: false, for: 'field-admin-course-category-edit-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
 
@@ -48,6 +46,7 @@
 					{{ ui('action.button', {label: 'Save category', variant: 'primary', size: 'normal', type: 'submit'}) }}
 
 {% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: tree_href}) }}{% endblock %}
 {% endembed %}
 				</form>
 
@@ -61,9 +60,9 @@
 				</h2>
 				{% if category.child_count %}
 					<p>
-						This category has {{ category.child_count }} sub-categor{{ category.child_count==1 ? 'y' : 'ies' }} beneath it. Move or delete those first — deleting a branch would take its whole subtree with it, which is never what anybody means to do.
+						This category has {{ category.child_count }} subcategor{{ category.child_count==1 ? 'y' : 'ies' }} beneath it. Move or delete those first — deleting a branch would take its whole subtree with it, which is never what anybody means to do.
 					</p>
-					{{ ui('action.link', {label: 'Back to categories', variant: 'secondary', size: 'normal', href: '/admin/courses/categories'}) }}
+					{{ ui('action.link', {label: 'Back to categories', variant: 'secondary', size: 'normal', href: tree_href}) }}
 				{% else %}
 					{% if category.course_count %}
 						<p>

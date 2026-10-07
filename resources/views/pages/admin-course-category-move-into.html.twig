@@ -1,0 +1,31 @@
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = tree_href %}
+	{% set ph_back_label = 'Course categories' %}
+	{% set ph_kicker = 'Course metadata' %}
+	{% set ph_title = 'Move ' ~ category.name %}
+	{% set ph_lead = 'Choose where it goes. It moves with its subcategories and is placed last there. Places that would take it, or its subcategories, below the third level, and places inside it, are not offered.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section container py-5 cl-medium">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			<p>Now: <strong>{{ category_path }}</strong></p>
+			<form action="/admin/courses/categories/{{ category.id }}/arrange" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<fieldset class="cl-category-move-destinations">
+					<legend class="cl-ui-field-label">Move it into</legend>
+					{% for choice in choices %}
+						<div class="cl-category-move-destination" data-depth="{{ choice.level }}">
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.id is null ? choice.label : choice.path, help: choice.id is null ? 'It becomes a main category.' : (choice.level == 1 ? 'It becomes a subcategory.' : 'It becomes a sub-subcategory.')})} %}{% block control %}<input type="radio" name="parent_id" value="{{ choice.id is null ? '' : choice.id }}" required{% if (choice.id is null and category.parent_id is null) or (choice.id is not null and choice.id == category.parent_id) %} checked{% endif %}>{% endblock %}{% endembed %}
+						</div>
+					{% endfor %}
+				</fieldset>
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+					{% block primary_actions %}{{ ui('action.button', {label: 'Move here', variant: 'primary', type: 'submit'}) }}{% endblock %}
+					{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: tree_href}) }}{% endblock %}
+				{% endembed %}
+			</form>
+{% endblock %}
+		{% endembed %}
+	</section>
+{% endblock %}

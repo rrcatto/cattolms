@@ -8,7 +8,11 @@
         "type": "js"
     },
     "\/assets\/controllers\/category_tree_controller.js": {
-        "path": "\/assets\/controllers\/category_tree_controller-q4f48nV.js",
+        "path": "\/assets\/controllers\/category_tree_controller-wWZLLo_.js",
+        "type": "js"
+    },
+    "\/assets\/lib\/sortable_tree_controller.js": {
+        "path": "\/assets\/lib\/sortable_tree_controller-_P-gJwF.js",
         "type": "js"
     },
     "\/assets\/controllers\/certificate_preview_controller.js": {
@@ -16,7 +20,7 @@
         "type": "js"
     },
     "\/assets\/controllers\/course_content_controller.js": {
-        "path": "\/assets\/controllers\/course_content_controller-3AI3Rmw.js",
+        "path": "\/assets\/controllers\/course_content_controller-CeeAsVC.js",
         "type": "js"
     },
     "\/assets\/controllers\/popular_courses_controller.js": {

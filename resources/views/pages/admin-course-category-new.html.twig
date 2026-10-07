@@ -1,0 +1,13 @@
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = '/admin/courses/categories' ~ (create_parent ? '?reveal=' ~ create_parent.id ~ '#category-' ~ create_parent.id : '') %}
+	{% set ph_back_label = 'Course categories' %}
+	{% set ph_kicker = 'Course metadata' %}
+	{% set ph_title = create_parent ? 'Add a subcategory to ' ~ create_parent.name : 'Add a main category' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section container py-5 cl-medium">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}{% include '@platform/partials/admin/category-create-form.html.twig' %}{% endblock %}
+		{% endembed %}
+	</section>
+{% endblock %}

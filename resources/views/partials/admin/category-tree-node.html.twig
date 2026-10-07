@@ -1,25 +1,35 @@
-{# One category in the management tree. The disclosure button holds the chevron and the name; the move and Manage actions sit beside it, outside the button. Child lists are rendered open, so every category is reachable without JavaScript; the category-tree controller collapses them. #}
-<li class="cl-category-tree-item" data-level="{{ node.level }}">
-	<div class="cl-category-tree-row">
-		<div class="cl-category-tree-label">
-			{% if node.children %}
-				<button type="button" class="cl-category-tree-toggle" aria-expanded="true" aria-controls="category-branch-{{ node.id }}" data-action="category-tree#toggle">{{ ui('icon', {name: 'action-chevron', decorative: true}) }}<span class="cl-category-tree-name">{{ node.name }}</span></button>
+{# One category and its subcategories in the management tree. The disclosure button holds the chevron and the name and submits the page's GET view form, so a branch opens without JavaScript; the category-tree controller toggles it in place instead. Add subcategory, Manage and the ⋯ menu sit beside it, outside the button. The drag handle and the keyboard moves are enhancements; without JavaScript the ⋯ menu's forms and Move into move the category. Main categories and subcategories always have a child list, empty and hidden when they hold nothing, so a category can be dropped inside them; sub-subcategories have none. #}
+{% set has_children = node.children is not empty %}
+<li class="cl-tree-node" id="category-{{ node.id }}" data-node-id="{{ node.id }}" data-depth="{{ node.level }}" data-height="{{ node.height }}">
+	<div class="cl-tree-row">
+		<button type="button" class="cl-tree-handle" aria-label="Move {{ node.name }}" aria-describedby="category-tree-keys" data-category-tree-target="handle" data-action="pointerdown->category-tree#arm keydown->category-tree#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>
+		<div class="cl-tree-label">
+			{% if has_children %}
+				<button type="submit" form="category-tree-view" name="toggle" value="{{ node.id }}" class="cl-tree-toggle" aria-expanded="{{ node.open ? 'true' : 'false' }}" aria-controls="category-branch-{{ node.id }}" data-category-tree-target="toggle" data-action="category-tree#toggle">{{ ui('icon', {name: 'action-chevron', decorative: true}) }}<span class="cl-tree-name">{{ node.name }}</span></button>
 			{% else %}
-				<span class="cl-category-tree-leaf"><span class="cl-category-tree-spacer" aria-hidden="true"></span><span class="cl-category-tree-name">{{ node.name }}</span></span>
+				<span class="cl-tree-leaf"><span class="cl-tree-spacer" aria-hidden="true"></span><span class="cl-tree-name">{{ node.name }}</span></span>
 			{% endif %}
-			<span class="cl-category-tree-meta">{{ node.course_count }} course{{ node.course_count == 1 ? '' : 's' }}{% if node.children %} · {{ node.descendant_course_count }} with sub-categories · {{ node.children|length }} sub-categor{{ node.children|length == 1 ? 'y' : 'ies' }}{% endif %}</span>
+			<span class="cl-tree-meta">{{ node.course_count }} course{{ node.course_count == 1 ? '' : 's' }}{% if has_children %} · {{ node.descendant_course_count }} with subcategories · {{ node.children|length }} subcategor{{ node.children|length == 1 ? 'y' : 'ies' }}{% endif %}</span>
 		</div>
-		{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-			<form action="/admin/courses/categories/{{ node.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move ' ~ node.name ~ ' up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: node.is_first_sibling}) }}</form>
-			<form action="/admin/courses/categories/{{ node.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move ' ~ node.name ~ ' down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: node.is_last_sibling}) }}</form>
+			{% if node.level < 3 %}{{ ui('action.link', {label: 'Add subcategory', variant: 'quiet', size: 'small', href: '/admin/courses/categories/' ~ node.id ~ '/new', get: '/admin/courses/categories/' ~ node.id ~ '/new', target: '#category-create-body', modal: 'category-create', icon: 'action-add', aria_label: 'Add a subcategory to ' ~ node.name}) }}{% endif %}
 			{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/categories/' ~ node.id, aria_label: 'Manage ' ~ node.name}) }}
+			{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'Move ' ~ node.name})} %}
+{% block body %}
+				{% for move in [{direction: 'top', label: 'Move to top', allowed: not node.is_first_sibling}, {direction: 'up', label: 'Move up', allowed: not node.is_first_sibling}, {direction: 'down', label: 'Move down', allowed: not node.is_last_sibling}, {direction: 'bottom', label: 'Move to bottom', allowed: not node.is_last_sibling}] %}
+					<form action="/admin/courses/categories/{{ node.id }}/move" method="post" data-tree-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed}) }}</form>
+				{% endfor %}
+				{{ ui('action.link', {label: 'Move into…', href: '/admin/courses/categories/' ~ node.id ~ '/move-into', size: 'small', variant: 'quiet'}) }}
+				<form action="/admin/courses/categories/{{ node.id }}/move" method="post" data-tree-direction="out"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="out">{{ ui('action.button', {label: 'Move out', type: 'submit', size: 'small', variant: 'quiet', disabled: node.level == 1, title: node.level == 1 ? 'It is already a main category.' : ''}) }}</form>
 {% endblock %}
-{% endembed %}
+			{% endembed %}
+{% endblock %}
+		{% endembed %}
 	</div>
-	{% if node.children %}
-		<ul class="cl-category-tree-children" id="category-branch-{{ node.id }}" aria-label="Sub-categories of {{ node.name }}">
+	{% if node.level < 3 %}
+		<ol class="cl-tree-children" id="category-branch-{{ node.id }}" data-parent="{{ node.id }}" aria-label="Inside {{ node.name }}"{% if not node.open %} hidden{% endif %}>
 			{% for child in node.children %}{% include '@platform/partials/admin/category-tree-node.html.twig' with {node: child} %}{% endfor %}
-		</ul>
+		</ol>
 	{% endif %}
 </li>

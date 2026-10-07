@@ -12,6 +12,7 @@ Creates the complete Catto Learning PostgreSQL schema and its reference data for
 
 Changelog:
 2026/10/07 SAST
+- Course categories keep an explicit, compact sibling order: position runs 1..n within each parent (the shipped taxonomy is renumbered after it is inserted) and a deferrable unique constraint on (parent_id, position) refuses a duplicate, so a move renumbers its siblings in one transaction and can never leave two categories in one place.
 - Certificate designs (owner's redesign): courses keep an optional accreditation line and a certificate_design_id (filled with the default for new courses by a trigger) instead of their own title, body, footer and signatory; document_template_versions.design holds a design as its author made it; document_assets stores certificate backgrounds, logos and signatures immutably by SHA-256; the six looks are installed as designs, Classic the default; DOCUMENT.TEMPLATE.VIEW/MANAGE became CERTIFICATE.DESIGN.VIEW/MANAGE.
 - Certificates render through the document template engine (Phase J): courses keep only certificate data (enabled, title, body, footer, signatory), certificates store the data they were issued with and the exact template version, and the Classic, Modern and Minimal designs are installed with Classic current.
 2026/10/06 SAST
@@ -671,18 +672,24 @@ CREATE TABLE course_categories (
     name VARCHAR(120) NOT NULL UNIQUE,
     slug VARCHAR(120) NOT NULL UNIQUE,
     description TEXT NULL,
-    position INTEGER NOT NULL DEFAULT 0,
+    -- The category's place among its siblings, 1..n within one parent: the order ADMIN arranged,
+    -- never derived from names, ids or insertion time.
+    position INTEGER NOT NULL CHECK (position > 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     icon_svg TEXT NOT NULL DEFAULT '',
     -- A top level category has no parent; anything deeper must have one. Checked here because it
     -- needs no other row to decide it.
     CONSTRAINT course_categories_root_has_no_parent
-        CHECK ((level = 1 AND parent_id IS NULL) OR (level > 1 AND parent_id IS NOT NULL))
+        CHECK ((level = 1 AND parent_id IS NULL) OR (level > 1 AND parent_id IS NOT NULL)),
+    -- Two siblings never share a place. NULLS NOT DISTINCT makes the top level one sibling group.
+    -- Deferrable so a move can renumber a whole group inside its transaction; it is checked at
+    -- once otherwise, so a stray insert is refused where it happens.
+    CONSTRAINT course_categories_sibling_position
+        UNIQUE NULLS NOT DISTINCT (parent_id, position) DEFERRABLE INITIALLY IMMEDIATE
 );
 COMMENT ON COLUMN course_categories.icon_svg IS 'Generated title-bar icon.';
 CREATE INDEX course_categories_position_idx ON course_categories(position, name);
-CREATE INDEX course_categories_parent_idx ON course_categories(parent_id, position, name);
 
 -- A child sits exactly one level below its parent. This cannot be a CHECK constraint because it
 -- reads another row, so it is a trigger - the same mechanism the cross-universe guards use, and
@@ -1455,6 +1462,13 @@ UNION ALL
 SELECT 'Financial Literacy Practice', 'financial-literacy-practice', 20, 3, id FROM course_categories WHERE slug = 'wellbeing'
 UNION ALL
 SELECT 'Work Life Balance', 'work-life-balance', 30, 3, id FROM course_categories WHERE slug = 'wellbeing';
+
+-- Written above in tens for readability; stored as 1..n within each parent like every later move.
+UPDATE course_categories c
+   SET position = ordered.position
+  FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY parent_id ORDER BY position, name)::int AS position
+          FROM course_categories) ordered
+ WHERE ordered.id = c.id;
 
 -- Tags are the other half of discovery and are universe-free for the same reason categories are.
 -- Categories are for browsing and are hierarchical; tags are for searching, are flat, and a
