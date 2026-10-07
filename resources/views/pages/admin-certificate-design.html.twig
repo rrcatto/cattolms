@@ -1,0 +1,91 @@
+{% extends layout %}
+{% block page_body %}
+{{ importmap() }}
+{% set ph_back_href = return_to ?: '/admin/certificates/designs' %}{% set ph_back_label = return_to ? 'Course certificate' : 'Certificate designs' %}{% set ph_kicker = 'Certificate design' %}{% set ph_title = design_id ? name : 'New design' %}{% set ph_lead = saved ? ('Used by ' ~ (saved.course_count == 1 ? '1 course' : saved.course_count ~ ' courses') ~ ' · last edited ' ~ (saved.updated_at|date('j M Y, H:i')) ~ (saved.updated_by ? ' by ' ~ saved.updated_by : '') ~ '.') : 'Pick a look, then change the words. The preview shows the certificate exactly as it will print.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% if errors %}
+	{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'The design was not saved.', section_spacing: true})} %}{% block body %}<ul class="mb-0">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}
+{% endif %}
+<form id="certificate-design-form" action="{{ design_id ? '/admin/certificates/designs/' ~ design_id : '/admin/certificates/designs' }}" method="post" enctype="multipart/form-data" data-controller="certificate-preview" data-certificate-preview-button-value="certificate-preview-button">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+{% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
+<input type="hidden" name="background_asset" value="{{ design.background.sha|default('') }}">
+<input type="hidden" name="logo_asset" value="{{ design.logo.sha|default('') }}">
+<input type="hidden" name="signature_image_asset" value="{{ design.signature.sha|default('') }}">
+<div class="cl-certificate-editor">
+<div class="cl-certificate-editor-form">
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'design-name', required: true, help: 'For you only; it is not printed on the certificate.'})} %}{% block control %}<input id="design-name" name="name" maxlength="120" required value="{{ name }}" data-certificate-preview-ignore {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Look', heading_level: 2, summary: 'The picture behind the words. Every certificate is A4 landscape.'}) }}
+	{{ ui('form.picture-choice', {name: 'look', legend: 'Choose a look', items: looks, selected: design.look}) }}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Upload your own background', for: 'design-background', help: 'A PNG or JPEG in A4 landscape, at least 1240 px wide. From Canva: Download → PNG, the largest size (3508 × 2480 px). Leave the middle clear: the words go on top.'})} %}{% block control %}<input id="design-background" type="file" name="background" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+	<fieldset class="cl-certificate-custom">
+		<legend class="h6">For your own background</legend>
+		{{ ui('form.picture-choice', {name: 'placement', legend: 'Where the words go', items: placements, selected: design.placement}) }}
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Typeface', for: 'design-typeface'})} %}{% block control %}<select id="design-typeface" name="typeface" {{ ui_field_attrs(props) }}>{% for key, label in typefaces %}<option value="{{ key }}"{% if key == design.typeface %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title and name colour', for: 'design-colour'})} %}{% block control %}<input id="design-colour" type="color" name="colour" value="{{ design.colour }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+	</fieldset>
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Logo', heading_level: 2, summary: 'Optional. It is printed above the title. A Canva background usually has its logo drawn in already.'}) }}
+	{% if pictures.logo %}
+		<div class="cl-certificate-pictures"><img class="cl-certificate-picture" src="{{ pictures.logo }}" alt="The current logo">
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove the logo'})} %}{% block control %}<input type="checkbox" name="remove_logo" value="1">{% endblock %}{% endembed %}</div>
+	{% endif %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: pictures.logo ? 'Replace the logo' : 'Add a logo', for: 'design-logo', help: 'PNG or JPEG.'})} %}{% block control %}<input id="design-logo" type="file" name="logo" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Wording', heading_level: 2, summary: 'Type the words. Use Insert field for anything that changes per learner: it shows as a blue label and is filled in on each certificate. A line whose field has nothing to show, such as a result on a course without marks, is left out.'}) }}
+	<div class="cl-certificate-wording">
+		<label class="visually-hidden" for="design-wording">Wording</label>
+		<textarea id="design-wording" name="wording" rows="12" data-certificate-editor="wording" data-fields="{{ fields|json_encode }}" data-styles="{{ styles|json_encode }}">{{ design.wording }}</textarea>
+		<noscript><p class="cl-ui-field-help">Without JavaScript, type a field in square brackets, for example [Learner name] or [Course title].</p></noscript>
+	</div>
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Signature', heading_level: 2, summary: 'Who signs the certificates drawn in this design. Leave it empty for no signature.'}) }}
+	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'signature-name'})} %}{% block control %}<input id="signature-name" name="signature_name" maxlength="120" value="{{ design.signature_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Position', for: 'signature-position'})} %}{% block control %}<input id="signature-position" name="signature_position" maxlength="160" value="{{ design.signature_position }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+	{% if pictures.signature %}
+		<div class="cl-certificate-pictures"><img class="cl-certificate-picture" src="{{ pictures.signature }}" alt="The current signature">
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove the signature picture'})} %}{% block control %}<input type="checkbox" name="remove_signature_image" value="1">{% endblock %}{% endembed %}</div>
+	{% endif %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: pictures.signature ? 'Replace the signature picture' : 'Add a signature picture', for: 'signature-image', help: 'Optional. A PNG with a transparent or white background works best.'})} %}{% block control %}<input id="signature-image" type="file" name="signature_image" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Small print', heading_level: 2, summary: 'The lines at the foot of the certificate, such as its number and where to verify it.'}) }}
+	<div class="cl-certificate-wording cl-certificate-small-print">
+		<label class="visually-hidden" for="design-small-print">Small print</label>
+		<textarea id="design-small-print" name="small_print" rows="3" data-certificate-editor="small-print" data-fields="{{ fields|json_encode }}" data-styles="{}">{{ design.small_print }}</textarea>
+	</div>
+{% endblock %}{% endembed %}
+
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+	{% block primary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endif %}{% endblock %}
+	{% block secondary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'certificate-preview-button', form_action: '/admin/certificates/designs/preview.pdf', form_target: 'certificate-preview', skip_validation: true, icon: 'action-open'}) }}{% endif %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: return_to ?: '/admin/certificates/designs'}) }}{% endblock %}
+{% endembed %}
+<p class="cl-ui-field-help">Saving changes certificates issued from now on. Certificates already issued keep the design they were issued with.</p>
+</div>
+
+<aside class="cl-certificate-editor-preview" aria-label="Preview">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Preview', heading_level: 2, summary: 'A sample learner, drawn exactly as the PDF prints. It updates as you change the form.'}) }}
+	{% include '@platform/partials/certificate-preview.html.twig' with {cp_name: 'certificate-preview', cp_src: preview_src, cp_title: 'Preview of the certificate design'} %}
+{% endblock %}{% endembed %}
+</aside>
+</div>
+</form>
+</section>
+{% endblock %}

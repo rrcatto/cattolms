@@ -15,6 +15,8 @@ CSS policies, page settings, the source defaults and the PDF boundary.
 Architectural boundary: unit. The renderer's repository is a stub; renderSource() never reads it.
 
 Changelog:
+2026/10/07 SAST
+- Certificates have no source default template any more (their templates are compiled from designs), so the defaults loop covers the financial documents.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -292,6 +294,9 @@ final class DocumentTemplateEngineTest extends TestCase
     public function testEverySourceDefaultIsValidAndRendersItsSampleDocumentAsAPdf(): void
     {
         foreach (DocumentType::cases() as $type) {
+            if ($type === DocumentType::Certificate) {
+                continue; // Certificates are designs compiled from their looks: CertificateDesignTest.
+            }
             $default = DocumentTemplateDefaults::for($type);
             $document = $this->renderer->renderSource($type, $default['html'], $default['css'], $type->defaultSettings(), DocumentSampleData::for($type));
             self::assertStringNotContainsString('{{', $document->body, $type->value . ' renders every placeholder.');

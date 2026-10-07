@@ -15,8 +15,9 @@ anything that makes a document depend on something outside itself:
 
 - script, style, iframe, object, embed, forms, media, link, meta, base and the like;
 - event-handler attributes (onclick, onerror, ...) and javascript:/vbscript: addresses;
-- images, backgrounds and SVG references other than an embedded data: image or a #fragment, so
-  a document can be reproduced exactly however old it is and nothing is fetched to render it;
+- images, backgrounds and SVG references other than an embedded data: image, a stored document
+  image (asset:<sha256>, immutable and embedded by the renderer) or a #fragment, so a document can
+  be reproduced exactly however old it is and nothing is fetched to render it;
 - links other than http(s), mailto and #fragments;
 - placeholders in attributes, except plain text in class, title and alt, and a registered web
   address placeholder as a link's href. Blocks never go inside a tag.
@@ -25,6 +26,8 @@ It refuses rather than strips: the administrator sees exactly what is not allowe
 template is what renders. The renderer checks again before every render.
 
 Changelog:
+2026/10/07 SAST
+- Allows asset:<sha256> as an img src: a stored picture, embedded by the renderer.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -113,9 +116,10 @@ final class HtmlPolicy
         return ['errors' => array_values(array_unique($errors)), 'attribute_placeholders' => $placeholders];
     }
 
+    /** An embedded data: image, or a stored document image the renderer embeds (asset:<sha256>). */
     private static function isEmbeddedImage(string $value): bool
     {
-        return preg_match('#^\s*' . CssPolicy::DATA_IMAGE . '#i', $value) === 1;
+        return preg_match('#^\s*' . CssPolicy::DATA_IMAGE . '#i', $value) === 1 || preg_match('#^' . CssPolicy::ASSET . '$#D', trim($value)) === 1;
     }
 
     private static function shorten(string $value): string

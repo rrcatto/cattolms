@@ -33,6 +33,8 @@ services:
             $publicRoot: '%catto.public_root%'
             $storageRoot: '%catto.instance_root%/storage'
             $bundledImportRoot: '%catto.code_root%/resources/course-imports'
+            # Dompdf's metrics for the bundled document fonts, written once and reused.
+            $fontCache: '%catto.instance_root%/storage/cache/dompdf-fonts'
 
     # The controllers the Symfony kernel routes to. Registered as a namespace rather than one at a
     # time because a controller that is not a service is a 500 with no route name in it, and that
@@ -102,10 +104,11 @@ services:
             $instanceRoot: '%catto.instance_root%'
             $publicRoot: '%catto.public_root%'
 
-    # Popularity's model and its metric and score records are values, not services.
+    # Popularity's model and its metric and score records are values, not services; so are a
+    # certificate design, its looks and the uploaded images it is checked into.
     CattoLearning\Course\:
         resource: '../src/Course/'
-        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php}'
+        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php}'
 
     # BundleRules is a set of static rules, not a service.
     CattoLearning\Bundle\:

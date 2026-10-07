@@ -12,6 +12,8 @@ Handles web requests for admin course operations, enforcing access rules and coo
 
 Changelog:
 2026/10/07 SAST
+- Certificate designs: a blank course has an empty accreditation line instead of certificate wording.
+2026/10/07 SAST
 - The course certificate page moved to CourseCertificateController, without the CKEditor HTML/CSS form (Phase J).
 2026/09/03 00:08 SAST
 - Moved GET /admin/courses onto AdminController::courses so the Courses list uses the shared section renderer; its own request array had listed page and page size only, so the search term was never read.
@@ -652,11 +654,7 @@ final class AdminCourseController extends BaseController
             'module_weight' => 0.5,
             'final_weight' => 0.5,
             'certificate_enabled' => true,
-            'certificate_title' => 'Certificate of Completion',
-            'certificate_body_text' => 'has successfully completed',
-            'certificate_footer_text' => '',
-            'certificate_signatory_name' => '',
-            'certificate_signatory_title' => '',
+            'certificate_accreditation' => '',
             'course_style_key' => 'standard',
             'status' => 'draft',
         ];

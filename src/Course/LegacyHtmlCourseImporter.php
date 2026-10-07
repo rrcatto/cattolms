@@ -11,6 +11,8 @@ Description:
 Provides course-domain functionality for legacy html course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/10/07 SAST
+- No certificate title: a course holds only its certificate switch and accreditation line, and is drawn in the default certificate design.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -375,7 +377,6 @@ final class LegacyHtmlCourseImporter
                 'module_weight' => 0.5,
                 'final_weight' => 0.5,
                 'certificate_enabled' => true,
-                'certificate_title' => 'Certificate of Completion',
                 'course_style_key' => str_contains(mb_strtolower($title), 'linux') ? 'linux' : 'standard',
                 'presentation_css' => $this->presentationCss($html),
                 'source_filename' => $sourceFilename,

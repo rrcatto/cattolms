@@ -28,6 +28,10 @@ token would rebuild the same graph - useful when reproducing a defect found at v
 Changelog:
 
 2026/10/07 SAST
+
+- Certificate designs: generated certificates use the default design, which every generated course starts on.
+
+2026/10/07 SAST
 - Generated certificates store their document data and the current certificate template version, as issued ones do (Phase J).
 
 2026/09/07 00:50 SAST
@@ -833,7 +837,8 @@ final class SeedGenerator
         // reset per chunk it would issue SEED-<key>-000000 once per chunk instead of once.
         $certificateSequence = 0;
         // Generated certificates are drawn like issued ones: the certificate data and the version of
-        // the current certificate template they are rendered with.
+        // the design they are drawn in - the default certificate design, which every generated course
+        // starts on.
         $certificateTemplate = $this->repository->certificateTemplate();
         $learnerCount = count($learners);
         $courseCount = count($courses);

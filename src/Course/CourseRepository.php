@@ -14,6 +14,8 @@ the home page asks for only the handful of courses it renders.
 
 Changelog:
 2026/10/07 SAST
+- Certificate designs: courses save and read certificate_accreditation and certificate_design_id; updateCertificateSettings() sets the switch, the design and the accreditation line.
+2026/10/07 SAST
 - Removed createCertificate() - the str_replace certificate renderer - with certificateContext(), certificateForEnrolment(), certificateByPublicId() and findUserById(), and the course certificate design columns. Certificates are issued by Course\Certificate\CertificateIssuer through the document template engine (Phase J).
 2026/09/08 19:52 SAST
 - Converted every write off the F3 mappers: course, category, module, assessment, question and option, grade band, media, price variant, edit history, enrolment, attempt, certificate and ownership are now stated SQL, and the mapper imports are gone.
@@ -1765,15 +1767,13 @@ final class CourseRepository
             'INSERT INTO courses
                  (public_id,category_id,slug,title,subtitle,summary,description_html,level,
                   estimated_minutes,status,default_access_period_seconds,introduction_html,show_outline_on_intro,
-                  certificate_enabled,certificate_title,certificate_body_text,
-                  certificate_footer_text,certificate_signatory_name,certificate_signatory_title,
+                  certificate_enabled,certificate_accreditation,
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
                   publication_approval_status,interchange_schema_version,created_by_user_id,updated_by_user_id,
                   created_at,updated_at,cover_svg)
              VALUES (:public_id,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
                      :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,:show_outline_on_intro,
-                     :certificate_enabled,:certificate_title,:certificate_body_text,
-                     :certificate_footer_text,:certificate_signatory_name,:certificate_signatory_title,
+                     :certificate_enabled,:certificate_accreditation,
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
                      :publication_approval_status,:interchange_schema_version,:created_by,:updated_by,
                      :created_at,:updated_at,:cover_svg)
@@ -1793,11 +1793,7 @@ final class CourseRepository
                 'introduction_html' => (string) ($data['introduction_html'] ?? ''),
                 'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
                 'certificate_enabled' => (bool) $data['certificate_enabled'],
-                'certificate_title' => $data['certificate_title'] ?: null,
-                'certificate_body_text' => (string) ($data['certificate_body_text'] ?? 'has successfully completed'),
-                'certificate_footer_text' => ($data['certificate_footer_text'] ?? '') ?: null,
-                'certificate_signatory_name' => ($data['certificate_signatory_name'] ?? '') ?: null,
-                'certificate_signatory_title' => ($data['certificate_signatory_title'] ?? '') ?: null,
+                'certificate_accreditation' => trim((string) ($data['certificate_accreditation'] ?? '')) ?: null,
                 'course_style_key' => $data['course_style_key'] ?: 'standard',
                 'presentation_css' => (string) ($data['presentation_css'] ?? ''),
                 'source_filename' => ($data['source_filename'] ?? '') ?: null,
@@ -1839,11 +1835,7 @@ final class CourseRepository
             'introduction_html' => (string) ($data['introduction_html'] ?? ''),
             'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) $data['certificate_enabled'],
-            'certificate_title' => $data['certificate_title'] ?: null,
-            'certificate_body_text' => (string) ($data['certificate_body_text'] ?? 'has successfully completed'),
-            'certificate_footer_text' => ($data['certificate_footer_text'] ?? '') ?: null,
-            'certificate_signatory_name' => ($data['certificate_signatory_name'] ?? '') ?: null,
-            'certificate_signatory_title' => ($data['certificate_signatory_title'] ?? '') ?: null,
+            'certificate_accreditation' => trim((string) ($data['certificate_accreditation'] ?? '')) ?: null,
             'course_style_key' => $data['course_style_key'] ?: 'standard',
             'updated_by' => $userId,
             'updated_at' => gmdate('Y-m-d H:i:sP'),
@@ -1852,10 +1844,7 @@ final class CourseRepository
             . 'description_html=:description_html,level=:level,estimated_minutes=:estimated_minutes,'
             . 'default_access_period_seconds=:default_access_period_seconds,introduction_html=:introduction_html,'
             . 'show_outline_on_intro=:show_outline_on_intro,certificate_enabled=:certificate_enabled,'
-            . 'certificate_title=:certificate_title,'
-            . 'certificate_body_text=:certificate_body_text,certificate_footer_text=:certificate_footer_text,'
-            . 'certificate_signatory_name=:certificate_signatory_name,'
-            . 'certificate_signatory_title=:certificate_signatory_title,course_style_key=:course_style_key,'
+            . 'certificate_accreditation=:certificate_accreditation,course_style_key=:course_style_key,'
             . 'updated_by_user_id=:updated_by,updated_at=:updated_at';
 
         // Columns only written when the caller supplied them: an editor form that does not carry
@@ -1896,18 +1885,13 @@ final class CourseRepository
     {
         $updated = $this->db->executeStatement(
             'UPDATE courses
-                SET certificate_enabled=:enabled,certificate_title=:title,
-                    certificate_body_text=:body,certificate_footer_text=:footer,
-                    certificate_signatory_name=:signatory_name,certificate_signatory_title=:signatory_title,
+                SET certificate_enabled=:enabled,certificate_design_id=:design,certificate_accreditation=:accreditation,
                     updated_by_user_id=:updated_by,updated_at=:updated_at
               WHERE id=:id',
             [
                 'enabled' => (bool) $data['certificate_enabled'],
-                'title' => $data['certificate_title'],
-                'body' => $data['certificate_body_text'],
-                'footer' => $data['certificate_footer_text'] ?: null,
-                'signatory_name' => $data['certificate_signatory_name'] ?: null,
-                'signatory_title' => $data['certificate_signatory_title'] ?: null,
+                'design' => (int) $data['certificate_design_id'],
+                'accreditation' => trim((string) ($data['certificate_accreditation'] ?? '')) ?: null,
                 'updated_by' => $userId,
                 'updated_at' => gmdate('Y-m-d H:i:sP'),
                 'id' => $courseId,
@@ -2010,8 +1994,7 @@ final class CourseRepository
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.status AS course_status,
-                    c.certificate_enabled, c.certificate_title, c.certificate_body_text,
-                    c.certificate_footer_text, c.certificate_signatory_name, c.certificate_signatory_title,
+                    c.certificate_enabled, c.certificate_accreditation, c.certificate_design_id,
                     0.5::numeric AS module_weight, 0.5::numeric AS final_weight
              FROM course_enrolments ce
              JOIN courses c ON c.id = ce.course_id
@@ -2188,8 +2171,7 @@ final class CourseRepository
     {
         $rows = $this->db->fetchAllAssociative(
             'SELECT ce.*, c.slug, c.title, c.status AS course_status, 0.5::numeric AS module_weight, 0.5::numeric AS final_weight,
-                    c.certificate_enabled, c.certificate_title, c.certificate_body_text,
-                    c.certificate_footer_text, c.certificate_signatory_name, c.certificate_signatory_title
+                    c.certificate_enabled, c.certificate_accreditation, c.certificate_design_id
              FROM course_enrolments ce JOIN courses c ON c.id = ce.course_id
              WHERE ce.id = :id AND ce.user_id = :user_id LIMIT 1',
             ['id' => $enrolmentId, 'user_id' => $userId]

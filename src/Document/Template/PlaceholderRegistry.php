@@ -16,11 +16,16 @@ value CattoLMS actually holds:
   phone or registration number in CattoLMS, so there is no placeholder for one;
 - invoice, receipt and credit note values come from the order snapshot each financial document is
   rendered from: the billing snapshot, the lines, the subtotal, promotion and total, the refund;
-- certificate values are the ones the course certificate fills today, under document names.
+- certificate values are the learner, course, result and certificate identity of an issue. The
+  wording, signatory and small print belong to the certificate design itself and are written
+  into it, so they are not placeholders.
 
 A placeholder not listed for a type is an error in a template of that type, never an empty string.
 
 Changelog:
+2026/10/07 SAST
+- Certificates: course.accreditation added; certificate.title, certificate.body, certificate.footer and
+  signatory.* removed, as the certificate design now holds its own wording and signatory.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -150,19 +155,15 @@ final class PlaceholderRegistry
     {
         return [
             self::p('certificate.number', 'The certificate number.', PlaceholderKind::Text, true),
-            self::p('certificate.title', 'The certificate’s title, for example Certificate of Completion.', PlaceholderKind::Text, true),
-            self::p('certificate.body', 'The sentence between the learner and the course, for example has successfully completed.', PlaceholderKind::Text, true),
-            self::p('certificate.footer', 'Footer text set on the course.'),
             self::p('certificate.issue_date', 'When the certificate was issued.', PlaceholderKind::Date, true),
             self::p('certificate.verification_url', 'Where the certificate can be verified.', PlaceholderKind::Url),
             self::p('learner.name', 'The name printed on the certificate.', PlaceholderKind::Text, true),
             self::p('course.title', 'The course title.', PlaceholderKind::Text, true),
             self::p('course.provider', 'The company that provides the course.'),
             self::p('course.completion_date', 'When the learner completed the course.', PlaceholderKind::Date, true),
+            self::p('course.accreditation', 'The course’s accreditation or CPD line, for example Legal Practice Council CPD: 2 points.'),
             self::p('result.percentage', 'The overall result, for example 84.50%.', PlaceholderKind::Percent),
             self::p('result.grade', 'The overall grade from the course’s grading scale.'),
-            self::p('signatory.name', 'Who signs the certificate.'),
-            self::p('signatory.title', 'The signatory’s title.'),
         ];
     }
 

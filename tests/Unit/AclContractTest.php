@@ -7,6 +7,8 @@ Description:
 Protects the simplified shared business-permission catalogue, SYSTEM-only infrastructure permissions, permanent normal/SEED role families, Commerce permission reservations, rollback guard names and ADMIN recovery semantics.
 
 Changelog:
+2026/10/07 SAST
+- The certificate design permissions replace the document template permissions.
 2026/08/23 04:19 SAST
 - Decision D5: SEED course-management roles may now hold COURSE.MEDIA.MANAGE for genuine test uploads, while COURSE.IMPORT and COURSE.EXPORT stay withheld.
 - Discover the single baseline migration by glob instead of naming it, so a rebased baseline does not require editing every call site.
@@ -57,7 +59,7 @@ final class AclContractTest extends TestCase
         // structure - and an installation may well want one delegated and not the other. 73 since
         // v0.8.8.1: LEARNING.REVIEW.CREATE and COURSE.REVIEW.MANAGE for course reviews; 74 with
         // COMPANY.BILLING.MANAGE for the company's own billing details. 80 with
-        // DOCUMENT.TEMPLATE.VIEW and DOCUMENT.TEMPLATE.MANAGE for the shared document templates.
+        // CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE for certificate designs.
         self::assertCount(80, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];

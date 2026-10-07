@@ -11,6 +11,10 @@ Defines the canonical Catto Learning ACL permission catalogue. Business permissi
 
 Changelog:
 
+2026/10/07 SAST
+
+- CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE (Courses) replace DOCUMENT.TEMPLATE.VIEW and DOCUMENT.TEMPLATE.MANAGE: certificate designs replace the generic template pages. Still 90 permissions.
+
 2026/09/07 00:50 SAST
 
 - Reserved COURSE.TAG.MANAGE. Tags and categories are separate decisions and may be separately delegated.
@@ -101,12 +105,12 @@ final class PermissionCatalog
             $this->p('COURSE.PRICING.MANAGE', 'ManageCoursePricing', 'Courses', 'Manage course price and access variants.'),
             $this->p('BUNDLE.MANAGEMENT.VIEW', 'ViewBundleManagement', 'Bundles', 'View course bundles, their composition, offers and sales in Administration.'),
             $this->p('BUNDLE.MANAGE', 'ManageBundles', 'Bundles', 'Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
-            $this->p('DOCUMENT.TEMPLATE.VIEW', 'ViewDocumentTemplates', 'Documents', 'View document templates, their versions and previews.'),
-            $this->p('DOCUMENT.TEMPLATE.MANAGE', 'ManageDocumentTemplates', 'Documents', 'Create document templates, edit drafts, publish versions and start drafts from earlier versions.'),
+            $this->p('CERTIFICATE.DESIGN.VIEW', 'ViewCertificateDesigns', 'Courses', 'See the certificate designs and preview them.'),
+            $this->p('CERTIFICATE.DESIGN.MANAGE', 'ManageCertificateDesigns', 'Courses', 'Create, edit, duplicate and delete certificate designs and choose the default for new courses.'),
             $this->p('COURSE.OWNERSHIP.MANAGE', 'ManageCourseOwnership', 'Courses', 'Assign owner company/person and course editors within scope.'),
             $this->p('COURSE.MEDIA.MANAGE', 'ManageCourseMedia', 'Courses', 'Upload and maintain private course media.'),
             $this->p('COURSE.ASSESSMENT.MANAGE', 'ManageCourseAssessments', 'Courses', 'Create and edit diagnostics, module/final assessments and grade bands.'),
-            $this->p('COURSE.CERTIFICATE.MANAGE', 'ManageCourseCertificates', 'Courses', 'Manage certificate configuration and templates.'),
+            $this->p('COURSE.CERTIFICATE.MANAGE', 'ManageCourseCertificates', 'Courses', 'Choose whether a course gives a certificate, its certificate design and its accreditation line.'),
             $this->p('COURSE.PREVIEW', 'PreviewCourse', 'Courses', 'Use the learner-view course preview workflow.'),
             $this->p('COMMERCE.CART.VIEW', 'ViewOwnCart', 'Commerce · Learner', 'View the signed-in user’s current cart when Commerce is installed.'),
             $this->p('COMMERCE.CART.MANAGE', 'ManageOwnCart', 'Commerce · Learner', 'Add, remove and update the signed-in user’s cart items when Commerce is installed.'),

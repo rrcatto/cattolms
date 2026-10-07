@@ -23,6 +23,8 @@ the wrong kind is an error, never a blank. A published version that no longer va
 too - the renderer never falls back to another template for a legal or financial document.
 
 Changelog:
+2026/10/07 SAST
+- Embeds stored pictures: an asset:<sha256> reference in an img src or a CSS url() becomes a data: URI read from document_assets, and a missing picture stops the render with a clear message.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -46,6 +48,7 @@ final class DocumentTemplateRenderer
         private readonly PlaceholderRegistry $registry,
         private readonly TemplateValidator $validator,
         private readonly DocumentValueFormatter $formatter,
+        private readonly ?DocumentAssetRepository $assets = null,
     ) {}
 
     /** @param array<string,mixed> $data */
@@ -74,13 +77,33 @@ final class DocumentTemplateRenderer
         $tree = $this->validator->validate($type, $html, $css);
         $set = $this->registry->forType($type);
         $this->checkData($set, $data);
-        $body = $this->nodes($tree, $set, $data, null, []);
+        $body = $this->embedAssets($this->nodes($tree, $set, $data, null, []));
         $title = DocumentValueFormatter::escape($type->label());
         $document = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>' . $title . '</title>'
             . '<style>' . $settings->css() . '</style>'
-            . ($css !== '' ? '<style>' . $css . '</style>' : '')
+            . ($css !== '' ? '<style>' . $this->embedAssets($css) . '</style>' : '')
             . '</head><body>' . $body . '</body></html>';
         return new RenderedDocument($type, $document, $body, $settings, $templateId, $versionId, $versionNumber);
+    }
+
+    /**
+     * Replaces each stored image reference (asset:<sha256>) in an src attribute or a CSS url() with
+     * the image itself. A reference to an image that is not stored is an error, never a blank.
+     */
+    private function embedAssets(string $source): string
+    {
+        if (!str_contains($source, 'asset:')) {
+            return $source;
+        }
+        $embed = function (string $sha): string {
+            $uri = $this->assets?->dataUri($sha);
+            if ($uri === null) {
+                throw new RuntimeException('The document image ' . $sha . ' is not stored.');
+            }
+            return $uri;
+        };
+        $source = (string) preg_replace_callback('/(\bsrc=")asset:([0-9a-f]{64})(")/', static fn(array $m): string => $m[1] . $embed($m[2]) . $m[3], $source);
+        return (string) preg_replace_callback('/url\(\s*([\'"]?)asset:([0-9a-f]{64})\1\s*\)/', static fn(array $m): string => 'url("' . $embed($m[2]) . '")', $source);
     }
 
     /**

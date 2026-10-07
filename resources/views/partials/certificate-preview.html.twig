@@ -1,0 +1,7 @@
+{# A certificate's preview: the PDF the renderer draws, in the browser's own PDF viewer. cp_name lets a
+   form post into the frame (Update preview); cp_src is what the frame opens with. Browsers that cannot
+   show a PDF in a page still have the link. #}
+<div class="cl-certificate-preview">
+	<iframe class="cl-certificate-preview-frame" name="{{ cp_name }}" title="{{ cp_title }}"{% if cp_src %} src="{{ cp_src }}#view=Fit&amp;toolbar=0"{% endif %}></iframe>
+	{% if cp_src %}<p class="cl-ui-field-help mb-0"><a href="{{ cp_src }}" target="_blank" rel="noopener">Open the PDF in a new tab</a></p>{% endif %}
+</div>

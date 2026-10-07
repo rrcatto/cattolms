@@ -1,0 +1,32 @@
+{% extends layout %}
+{% block page_body %}
+{% set ph_back_href = '/admin/certificates/designs' %}{% set ph_back_label = 'Certificate designs' %}{% set ph_kicker = 'Certificate design' %}{% set ph_title = 'Delete “' ~ design.name ~ '”?' %}{% set ph_lead = 'Certificates already issued with this design are not changed: they keep the design they were issued with.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+<div class="cl-certificate-pictures"><img class="cl-certificate-design-thumb" src="{{ design.image }}" alt=""><strong>{{ design.name }}</strong></div>
+{% if others is empty %}
+	{{ ui('feedback.notice', {tone: 'warning', heading: 'This is the only design, so it cannot be deleted. Make another design first.'}) }}
+	<p>{{ ui('action.link', {label: 'Back to the designs', href: '/admin/certificates/designs'}) }}</p>
+{% else %}
+	{% if courses %}
+		<p>{{ design.course_count == 1 ? 'One course uses' : design.course_count ~ ' courses use' }} this design:</p>
+		<ul>{% for course in courses %}<li><a href="/admin/courses/{{ course.id }}/certificate">{{ course.title }}</a></li>{% endfor %}{% if design.course_count > courses|length %}<li>and {{ design.course_count - courses|length }} more</li>{% endif %}</ul>
+	{% else %}
+		<p>No course uses this design.</p>
+	{% endif %}
+	<form action="/admin/certificates/designs/{{ design.id }}/delete" method="post">
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		{% if courses or design.is_default %}
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: courses ? 'Those courses will use instead' : 'New courses will start with', for: 'replacement', help: design.is_default ? 'This design is the default for new courses; the one you choose becomes the default.' : ''})} %}{% block control %}<select id="replacement" name="replacement_id" {{ ui_field_attrs(props) }}>{% for other in others %}<option value="{{ other.id }}"{% if other.id == suggested %} selected{% endif %}>{{ other.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% else %}<input type="hidden" name="replacement_id" value="{{ suggested }}">{% endif %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+			{% block primary_actions %}{{ ui('action.button', {label: 'Delete design', variant: 'danger', type: 'submit', icon: 'action-remove'}) }}{% endblock %}
+			{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/certificates/designs'}) }}{% endblock %}
+		{% endembed %}
+	</form>
+{% endif %}
+{% endblock %}{% endembed %}
+</section>
+{% endblock %}

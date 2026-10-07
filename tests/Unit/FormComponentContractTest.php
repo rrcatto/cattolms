@@ -51,4 +51,16 @@ final class FormComponentContractTest extends TestCase
         }
         self::assertStringContainsString('type="submit"', ComponentHarness::render('action.button', ['label' => 'Save']));
     }
+
+    public function testAButtonPostsItsFormElsewhereOnlyOnThisSiteAndIntoANamedFrame(): void
+    {
+        $html = ComponentHarness::render('action.button', ['label' => 'Update preview', 'type' => 'submit', 'form_action' => '/admin/certificates/designs/preview.pdf', 'form_target' => 'certificate-preview', 'skip_validation' => true]);
+        foreach (['formaction="/admin/certificates/designs/preview.pdf"', 'formtarget="certificate-preview"', 'formnovalidate'] as $attribute) {
+            self::assertStringContainsString($attribute, $html);
+        }
+        foreach ([['form_action' => 'https://example.com/steal'], ['form_action' => '//example.com/x'], ['form_action' => 'javascript:alert(1)'], ['form_target' => '_top'], ['form_target' => 'Frame name']] as $broken) {
+            try { (new PlatformUi())->properties('action.button', $broken + ['label' => 'Go']); self::fail('Accepted ' . json_encode($broken)); }
+            catch (\InvalidArgumentException $refused) { self::assertStringContainsString('only to a path on this site', $refused->getMessage()); }
+        }
+    }
 }
