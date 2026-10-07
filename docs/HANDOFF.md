@@ -1,14 +1,25 @@
-# Catto Learning 0.8.8.12 — Development Handoff
+# Catto Learning 0.8.8.13 — Development Handoff
 
-## Current development handoff — 2026/10/07 (v0.8.8.12)
+## Current development handoff — 2026/10/07 (v0.8.8.13)
+
+The owner authorized v0.8.8.13 ("push too v0.8.8.13 - update all stale documentation first"). It releases fixes for three reports the owner made that day, and a larger certificate preview.
+
+- **Release.** Annotated tag and GitHub release `v0.8.8.13` with `cattolms-v0.8.8.13.zip`. Gates on the release code: `composer qa` with a cold cache (1057 PHPUnit tests; release validation of 0.8.8.13 with `ext-gd` required), Twig lint (228 files), AssetMapper compilation (no compiled asset changed), `git diff --check`, and the certificates (11/11, with the new preview size check in every theme), category picker (17/17, import included) and canonical (30/30) browser checks.
+- **GD.** A v0.8.8.4 VPS answered a profile image upload with HTTP 500, "Call to undefined function imagecreatefromstring()": its PHP had no GD extension. `composer.json` now requires `ext-gd` (and `tools/validate-release.php` keeps it there), so `composer install` refuses such a server; one that runs without it refuses profile image and certificate picture uploads with a plain message (`Support\ImageProcessing`) and logs what to install. The owner installs `php8.5-gd` on the VPS.
+- **Theme uploads.** catto.test refused every theme with "Unable to stage the theme package for inspection.": its `storage/tmp/theme-imports` was not writable by PHP-FPM, and the copy warning was printed into the response. `ThemeManager::stageImport()` now names the folder and logs the reason (`ThemeLifecycleRegressionTest`). The development folders and `storage/logs/application.log` (unwritable since 2026/09/21, so nothing had been logged) were made writable like their siblings.
+- **Re-importing a course.** A course imported a second time collides with its own Course Items; the review listed 26 "Resolve the collision" lines without saying the course was already there. `CoursePortabilityService::courseHoldingConflicts()` finds the one course every collision belongs to; the review says so once and chooses it under Replace, and a commit that would make a second copy says so in one sentence (`ImportReplacementIntegrationTest`).
+- **Certificate preview.** On the design editor and a course's certificate page the preview is first and full width, twice its former size, with the form below (UX rule 6.12; `tests/Browser/certificates.cjs` checks it in every theme).
+- **Deploying.** Install GD before `composer install`. Publish `catto-platform.css`. No schema change.
+- **Next.** The owner's Canva certificates, then Phase K.
+
+## v0.8.8.12 handoff — 2026/10/07
 
 The owner authorized v0.8.8.12 ("push to git - v0.8.8.12 - make sure you update the README.md because it's version number is out of sync. update stale docs. make sure the THEME-SDK.md is up to date"). It releases one category picker (below).
 
-- **Release.** Annotated tag and GitHub release `v0.8.8.12` with `cattolms-v0.8.8.12.zip`. Gates on the release code: `composer qa` with a cold cache (1054 PHPUnit tests; release validation of 0.8.8.12 with the new README and CHANGELOG check), Twig lint (228 files), AssetMapper compilation (no compiled asset changed), `git diff --check`, and the category picker (17/17), canonical (30/30) and category tree (22/22) browser checks; every other suite passed on the same code before the version change (UI matrix 72, Popular Courses 13, course reviews 9, Course Content tree 41, billing 10, certificates 11, promotions 9, bundles 8).
+- **Release.** Commit `9554057` on GitHub `main`, annotated tag and GitHub release `v0.8.8.12` with `cattolms-v0.8.8.12.zip` (1013 files). Gates on the release code: `composer qa` with a cold cache (1054 PHPUnit tests; release validation of 0.8.8.12 with the new README and CHANGELOG check), Twig lint (228 files), AssetMapper compilation (no compiled asset changed), `git diff --check`, and the category picker (17/17), canonical (30/30) and category tree (22/22) browser checks; every other suite passed on the same code before the version change (UI matrix 72, Popular Courses 13, course reviews 9, Course Content tree 41, billing 10, certificates 11, promotions 9, bundles 8).
 - **README.** The README pushed with v0.8.8.11 still named v0.8.8.10 as the current release, and its release history was out of order. Both are corrected, and `tools/validate-release.php` now refuses a README whose current release, or a CHANGELOG without a heading, for the `composer.json` version.
 - **Documentation.** Every `docs/` file describes v0.8.8.12. The Theme SDK now covers the core-owned hierarchical controls (`cl-ui-tree-select-*`, `cl-category-field`/`cl-category-create-*`, the shared `cl-tree-*`) and `?theme_preview=` for reviewing an installed theme without activating it; UX rule 4.6 records the course category picker.
 - **Deploying.** Publish `catto-platform.css` and `js/platform-overrides.js`. No schema change; the database need not be rebuilt.
-- **Next.** The owner's Canva certificates, then Phase K.
 
 ## One category picker (2026/10/07, released in v0.8.8.12)
 

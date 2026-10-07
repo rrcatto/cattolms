@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.8.12 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.8.8.13 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
@@ -8,7 +8,7 @@ New HTML courses intended for Catto Learning must use one predictable static str
 
 Important content must therefore exist as real HTML. Assessment banks must exist in the `QUIZ` object. JavaScript may enhance the standalone course but must not be the sole source of teaching content.
 
-Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain, learner access and the structured interchange format as implemented in v0.8.8.12. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
+Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain, learner access and the structured interchange format as implemented in v0.8.8.13. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
 
 ### 1.1 Trusted author content
 
@@ -453,7 +453,7 @@ Before delivery:
 
 ## 18. Course Components contract
 
-The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.12; `HANDOFF.md` holds the implementation and validation record of each release.
+The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.13; `HANDOFF.md` holds the implementation and validation record of each release.
 
 ### Identity, sharing and author control
 
@@ -498,7 +498,7 @@ Course reviews belong to the course: only learners with a genuine enrolment may 
 A certificate is drawn in a **certificate design**: a look, the wording, a signature and small print, made by ADMIN at Courses → Certificate Designs (`/admin/certificates/designs`, `CERTIFICATE.DESIGN.VIEW` to see and `CERTIFICATE.DESIGN.MANAGE` to change). Designs are stored as certificate templates of the shared document template engine (`src/Document/`), but nobody edits template HTML, CSS, versions or page settings: those are compiled from the design.
 
 - **Six installed designs.** Classic (the default for new courses), Modern, Minimal, Legal Seal, Gold Frame and Professional CPD, one for each installed look (`CertificateLooks`). Every certificate is A4 landscape on one page.
-- **One form.** A design's page (`/admin/certificates/designs/{id}`, or `/new?look=` for a new one) has its name (not printed), the look chosen by picture or an uploaded background, an optional logo, the wording, the signatory's name and position with an optional signature picture, and the small print. The preview beside the form is the PDF exactly as it prints, for a sample learner; it redraws a moment after any change (`certificate-preview` Stimulus controller), and without JavaScript the Update preview button draws it into the same frame.
+- **One form.** A design's page (`/admin/certificates/designs/{id}`, or `/new?look=` for a new one) has its name (not printed), the look chosen by picture or an uploaded background, an optional logo, the wording, the signatory's name and position with an optional signature picture, and the small print. The preview above the form, at the full page width, is the PDF exactly as it prints, for a sample learner; it redraws a moment after any change (`certificate-preview` Stimulus controller), and without JavaScript the Update preview button draws it into the same frame.
 - **Wording.** The wording and small print are written in CKEditor (`public_html/js/ck-certificate.js`) in paragraphs with the certificate's text styles (Certificate title, Learner name, Course title, Small capitals, Small text), bold, italic and alignment. Anything that changes per learner is a field inserted with Insert field and shown as a blue label (Learner name, Course title, Completion date, Date issued, Result, Grade, Accreditation line, Course provider, Certificate number, Verification address); without JavaScript a field is typed as `[Learner name]`. Nothing else is kept: pasted formatting is dropped (`CertificateWording`). A line holding Result, Grade, Accreditation line, Course provider or Verification address is left out when that value is empty, so a course without marks prints no result line. The wording must include the Learner name field.
 - **Your own background.** A PNG or JPEG in A4 landscape proportions, at least 1240 px wide (a Canva download at 3508 × 2480 px is ideal), becomes the design's look when uploaded. It is scaled to 2480 × 1754 and stored opaque in `document_assets` (logos and signatures keep their transparency). Its words go in the centre, on the right or on the left, in a chosen typeface and title colour. Pictures are stored once by SHA-256 and never changed.
 - **It must fit.** Saving draws the design with a sample learner and refuses it, saying so, when the words do not fit the look's box on one page.
@@ -511,7 +511,7 @@ A certificate is drawn in a **certificate design**: a look, the wording, a signa
 
 ### HTML import mapping
 
-Existing conforming HTML remains valid input. Teaching modules become HTML Course Items and placements. Separately represented graded assessments, diagnostics, finals and review components become their own Course Items. A module assessment is placed as a child of its source HTML module; final assessments remain top-level. Author identifiers/titles produce deterministic keys; existing/imported key collisions are reported and block commit pending explicit resolution. Existing authored media remains embedded. Shortcodes may refer to definitions in the package or an existing Course Item by exact key. Missing references are import errors. Commit is transactional; technical failures do not leave half-created courses.
+Existing conforming HTML remains valid input. Teaching modules become HTML Course Items and placements. Separately represented graded assessments, diagnostics, finals and review components become their own Course Items. A module assessment is placed as a child of its source HTML module; final assessments remain top-level. Author identifiers/titles produce deterministic keys; existing/imported key collisions are reported and block commit pending explicit resolution. Importing a course a second time collides with its own Course Items: when every collision belongs to one course and nothing else uses those items, the review says the course is already on the site and chooses it under Replace existing course shell, which imports the file into it; keys are never renamed to make a second copy. Existing authored media remains embedded. Shortcodes may refer to definitions in the package or an existing Course Item by exact key. Missing references are import errors. Commit is transactional; technical failures do not leave half-created courses.
 
 ### Grading scale (owner instruction, 2026/09/25)
 

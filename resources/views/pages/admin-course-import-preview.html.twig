@@ -134,7 +134,7 @@
 
 					{{ ui('layout.section-head', {heading: 'Course Item structure and keys', heading_level: 2, summary: 'Key collisions must be resolved before import; CattoLMS does not rename or guess.'}) }}
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}{% for item in analysis.course_items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}<strong>{{ item.title }}</strong><div><code>{{ item.item_key }}</code> · {{ item.item_type|replace({'_':' '}) }}</div>{% endblock %}{% endembed %}{% endfor %}{% endblock %}{% endembed %}
-					{% if analysis.key_conflicts|default([]) %}{{ ui('feedback.notice', {tone: 'danger', heading: 'Resolve Course Item key conflicts before importing', section_spacing: true}) }}{% endif %}
+					{% if existing_course %}{{ ui('feedback.notice', {tone: 'info', heading: 'These Course Items belong to “' ~ existing_course.title ~ '”, which is already on the site. Importing replaces that course.', section_spacing: true}) }}{% elseif analysis.key_conflicts|default([]) %}{{ ui('feedback.notice', {tone: 'danger', heading: 'Resolve Course Item key conflicts before importing', section_spacing: true}) }}{% endif %}
 					<h3>Legacy source components</h3>
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}
@@ -254,6 +254,9 @@
 										<p>
 											Create a new draft, or replace an existing course. Replacement removes test grants and course work for this course, including attempts, results and certificates. Purchased enrolments remain, with their old course work cleared.
 						</p>
+						{% if existing_course %}
+							{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'This course is already on the site'})} %}{% block body %}<p class="mb-0">“{{ existing_course.title }}” was imported before, and this file's {{ analysis.key_conflicts|length }} Course Items use its keys. It is chosen below under Replace existing course shell, so importing updates it instead of creating a second copy.</p>{% endblock %}{% endembed %}
+						{% endif %}
 						<form action="/admin/courses/import/commit" method="post"><div>{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
@@ -270,7 +273,7 @@
 {% block control %}
 <select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
 							{% for existing in replaceable_courses %}
-								<option value="{{ existing.id }}">{{ existing.title }}</option>
+								<option value="{{ existing.id }}"{% if existing_course and existing_course.id == existing.id %} selected{% endif %}>{{ existing.title }}</option>
 							{% endfor %}
 							</select>
 {% endblock %}

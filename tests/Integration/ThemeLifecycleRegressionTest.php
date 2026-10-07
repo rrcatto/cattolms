@@ -11,6 +11,8 @@ Description:
 Protects the Theme SDK defect-repair rule by proving a theme may be uninstalled and then reinstalled with the same logical name/version when the replacement package fixes defective files.
 
 Changelog:
+2026/10/07 SAST
+- Staging into a folder the server cannot write names the folder and prints no PHP warning.
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
 2026/08/17 00:02 SAST
@@ -97,6 +99,42 @@ final class ThemeLifecycleRegressionTest extends TestCase
         }
     }
 
+
+    /** catto.test refused every theme with a bare message: its staging folder belonged to another user. */
+    public function testStagingIntoAFolderTheServerCannotWriteNamesTheFolder(): void
+    {
+        $container = CliBootstrap::boot()['container'];
+        $suffix = bin2hex(random_bytes(6));
+        $instanceRoot = sys_get_temp_dir() . '/catto-theme-unwritable-' . $suffix;
+        $package = sys_get_temp_dir() . '/catto-theme-unwritable-' . $suffix . '.zip';
+        try {
+            mkdir($instanceRoot . '/storage/tmp/theme-imports', 0775, true);
+            chmod($instanceRoot . '/storage/tmp/theme-imports', 0555);
+            $manager = new ThemeManager(
+                dirname(__DIR__, 2),
+                $instanceRoot,
+                $instanceRoot,
+                $container->get(OptionRepository::class),
+                $container->get(AuditRepository::class),
+                $container->get(ThemeRegistryRepository::class)
+            );
+            $this->writeThemeZip($package, 'QA Unwritable ' . $suffix, 'qa-unwritable-' . $suffix, '1.0.0', 'body{color:red}');
+            ob_start();
+            try {
+                $manager->stageImport($package);
+                self::fail('A theme was staged into a folder the server cannot write.');
+            } catch (\RuntimeException $refused) {
+                self::assertStringContainsString('storage/tmp/theme-imports', $refused->getMessage());
+                self::assertStringContainsString('writable', $refused->getMessage());
+            } finally {
+                self::assertSame('', (string) ob_get_clean(), 'No PHP warning reaches the response.');
+            }
+        } finally {
+            @chmod($instanceRoot . '/storage/tmp/theme-imports', 0775);
+            @unlink($package);
+            $this->removeDirectory($instanceRoot);
+        }
+    }
 
     public function testThemeLifecycleCoversInspectActivateSwitchParentChildDeleteAndBrokenRejection(): void
     {

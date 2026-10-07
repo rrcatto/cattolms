@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.12 · **Updated:** 2026-10-07
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.8.13 · **Updated:** 2026-10-07
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -16,8 +16,8 @@ package at their root or under one enclosing directory. Paths must be safe relat
 A certificate is a PDF drawn by the document template engine in its course's certificate design and
 shown in the browser's own PDF viewer: a theme styles the certificate page and the certificate design
 pages around it, never the certificate itself (the themes' old `.cl-certificate` rules were removed in
-Phase J). The design pages' picture choices, preview frame and wording editor are core-owned
-(`cl-ui-picture-choice`, `cl-certificate-*`).
+Phase J). The design pages' picture choices, preview frame (full width, above the form) and wording editor
+are core-owned (`cl-ui-picture-choice`, `cl-certificate-*`).
 
 ```json
 {

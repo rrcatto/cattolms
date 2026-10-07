@@ -12,6 +12,9 @@ Handles web requests for admin course operations, enforcing access rules and coo
 
 Changelog:
 2026/10/07 SAST
+- Import review: when every key collision belongs to one course already on the site, the review
+  says so once and chooses that course under Replace, instead of listing each key.
+2026/10/07 SAST
 - Category picker: the create form, the edit Overview tab and the import review receive the course category picker and the + New places instead of a flat category list.
 2026/10/07 SAST
 - Certificate designs: a blank course has an empty accreditation line instead of certificate wording.
@@ -450,12 +453,25 @@ final class AdminCourseController extends BaseController
                 $this->courses->adminCourses(null, true, max(Pagination::PAGE_SIZES), 0),
                 fn(array $course): bool => $user->hasPermission('PLATFORM.DASHBOARD.VIEW') || (int) ($course['owner_user_id'] ?? 0) === $user->id
             ));
+            // A course imported a second time collides with its own Course Items. Say that once and
+            // choose it under Replace, rather than listing every key as a problem to resolve.
+            $holder = $this->portability->courseHoldingConflicts($analysis);
+            $existingCourse = null;
+            foreach ($replaceable as $course) {
+                if ((int) $course['id'] === $holder) {
+                    $existingCourse = ['id' => (int) $course['id'], 'title' => (string) $course['title']];
+                }
+            }
+            if ($existingCourse !== null) {
+                $analysis['warnings'] = array_values(array_diff((array) ($analysis['warnings'] ?? []), (array) ($analysis['key_conflicts'] ?? [])));
+            }
             return $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
                 'category_picker' => $this->courses->courseCategoryPicker(null),
                 'category_places' => $this->courses->categoryLocationPicker(),
                 'replaceable_courses' => $replaceable,
+                'existing_course' => $existingCourse,
             ]);
         }, '/admin/courses/import');
     }

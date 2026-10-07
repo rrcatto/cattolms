@@ -12,6 +12,10 @@ Implements Catto Learning business and application logic for course portability 
 
 Changelog:
 2026/10/07 SAST
+- courseHoldingConflicts() finds the one course on the site whose Course Items an import collides
+  with - the same course imported before - so the review can offer it for replacement; a commit
+  that would create a second copy says so in one sentence instead of listing every key.
+2026/10/07 SAST
 - Certificate designs: a package carries the certificate switch and the accreditation line; the certificate title, body, footer and signatory are gone.
 2026/10/07 SAST
 - Removed the course certificate HTML/CSS editor, its preview renderer and the certificate template fields in export and import: the design is a certificate document template (Phase J).
@@ -172,15 +176,62 @@ final class CoursePortabilityService
             }
             $analysis['key_conflicts'] = array_values(array_filter(
                 (array) ($analysis['key_conflicts'] ?? []),
-                static fn(mixed $conflict): bool => !in_array((string) preg_replace('/^Course Item key already exists: (.+)\\. Resolve the collision before importing\\.$/', '$1', (string) $conflict), $replaceableKeys, true)
+                static fn(mixed $conflict): bool => !in_array(self::collidingKey((string) $conflict), $replaceableKeys, true)
             ));
         }
-        if ((array) ($analysis['key_conflicts'] ?? []) !== []) { throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts'])); }
+        if ((array) ($analysis['key_conflicts'] ?? []) !== []) {
+            $existing = $replaceCourseId === null ? $this->courseHoldingConflicts($analysis) : null;
+            if ($existing !== null) {
+                throw new InvalidArgumentException('This course is already on the site as “' . (string) ($this->requireRealCourse($existing)['title'] ?? '') . '”. To update it, choose it under Replace existing course shell and import again.');
+            }
+            throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts']));
+        }
         $courseId = $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId);
         [$path] = $this->staged($key);
         @unlink($path);
         @unlink($this->storageRoot . '/imports/' . $key . '.meta.json');
         return $courseId;
+    }
+
+    /**
+     * The one course on the site that every key collision of this import belongs to, if there is one.
+     *
+     * Importing a course a second time collides with its own Course Items. When each colliding key
+     * is used by one and the same course and by nothing else - the test a replacement passes in
+     * commitImport() - that course is the one this file updates, and replacing it imports cleanly.
+     * Any other conflict, or keys spread over several courses, answers null.
+     *
+     * @param array<string,mixed> $analysis
+     */
+    public function courseHoldingConflicts(array $analysis): ?int
+    {
+        $keys = [];
+        foreach ((array) ($analysis['key_conflicts'] ?? []) as $conflict) {
+            $key = self::collidingKey((string) $conflict);
+            if ($key === null) {
+                return null;
+            }
+            $keys[] = $key;
+        }
+        if ($keys === []) {
+            return null;
+        }
+        $courses = $this->portability->coursesPlacingItemKey($keys[0]);
+        if (count($courses) !== 1) {
+            return null;
+        }
+        foreach ($keys as $key) {
+            if (!$this->portability->itemKeyIsExclusiveToCourse($key, $courses[0])) {
+                return null;
+            }
+        }
+        return $courses[0];
+    }
+
+    /** The key named by an "already exists" conflict, or null for any other conflict. */
+    private static function collidingKey(string $conflict): ?string
+    {
+        return preg_match('/^Course Item key already exists: (.+)\\. Resolve the collision before importing\\.$/', $conflict, $match) === 1 ? $match[1] : null;
     }
 
     /** @return array<string,mixed> */
