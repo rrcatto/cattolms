@@ -27,15 +27,15 @@ async function renderedTree(page, state) {
     const names = Object.fromEntries(Object.entries(state.nodes).map(([name, id]) => [String(id), name]));
     return page.evaluate((names) => {
         const walk = (list) => [...list.children].filter((el) => el.matches('li[data-node-id]')).map((li) => {
-            const children = li.querySelector(':scope > .cl-course-tree-children');
+            const children = li.querySelector(':scope > .cl-tree-children');
             const inner = children ? walk(children) : '';
             return (names[li.dataset.nodeId] || li.dataset.nodeId) + (inner ? `[${inner}]` : '');
         }).join(',');
-        return walk(document.querySelector('#course-content-tree > .cl-course-tree-list'));
+        return walk(document.querySelector('#course-content-tree > .cl-tree-list'));
     }, names);
 }
-const row = (page, id) => page.locator(`#course-node-${id} > .cl-course-tree-row`);
-const handle = (page, id) => page.locator(`#course-node-${id} > .cl-course-tree-row .cl-course-tree-handle`);
+const row = (page, id) => page.locator(`#course-node-${id} > .cl-tree-row`);
+const handle = (page, id) => page.locator(`#course-node-${id} > .cl-tree-row .cl-tree-handle`);
 
 /* A real pointer drag from the handle to a fraction of the target row's height. */
 async function drag(page, fromId, toId, fraction, release = true) {
@@ -53,7 +53,7 @@ async function drag(page, fromId, toId, fraction, release = true) {
     return indicator;
 }
 async function saved(page) {
-    await page.locator('.cl-course-tree-status[data-state="saved"]').waitFor({timeout: 10000});
+    await page.locator('.cl-tree-status[data-state="saved"]').waitFor({timeout: 10000});
 }
 
 async function scenario(name, browserName, run) {
@@ -83,7 +83,7 @@ async function scenario(name, browserName, run) {
             assert.equal(await renderedTree(page, state), 'A[a1,a2,a3],B[b1[b1x]],c');
             await handle(page, n().a1).waitFor({state: 'visible'});
             assert.equal(await handle(page, n().a1).evaluate((el) => getComputedStyle(el).cursor), 'grab', 'The tree stylesheet is applied.');
-            assert.equal(await page.locator('.cl-course-tree-children').first().evaluate((el) => getComputedStyle(el).listStyleType), 'none');
+            assert.equal(await page.locator('.cl-tree-children').first().evaluate((el) => getComputedStyle(el).listStyleType), 'none');
             await page.screenshot({path: `${output}/${browserName}-tree.png`, fullPage: true});
         });
 
@@ -187,12 +187,12 @@ async function scenario(name, browserName, run) {
         await scenario('collapsed sections stay collapsed for the session', browserName, async () => {
             state = reset();
             await page.goto(url());
-            const toggle = row(page, n().A).locator('.cl-course-tree-toggle');
+            const toggle = row(page, n().A).locator('.cl-tree-toggle');
             await toggle.click();
             assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
             assert.equal(await page.locator(`#course-branch-${n().A}`).isHidden(), true);
             await page.reload();
-            assert.equal(await row(page, n().A).locator('.cl-course-tree-toggle').getAttribute('aria-expanded'), 'false');
+            assert.equal(await row(page, n().A).locator('.cl-tree-toggle').getAttribute('aria-expanded'), 'false');
             assert.equal(await page.locator(`#course-branch-${n().B}`).isVisible(), true, 'Branches are independent.');
             await page.getByRole('button', {name: 'Expand all'}).click();
             assert.equal(await page.locator(`#course-branch-${n().A}`).isVisible(), true);
@@ -203,13 +203,13 @@ async function scenario(name, browserName, run) {
             await page.goto(url());
             await page.route('**/content/arrange', (route) => route.abort());
             await drag(page, n().a3, n().a1, 0.15);
-            await page.locator('.cl-course-tree-error:not([hidden])').waitFor();
-            assert.match(await page.locator('.cl-course-tree-error').textContent(), /could not be saved/);
+            await page.locator('.cl-tree-error:not([hidden])').waitFor();
+            assert.match(await page.locator('.cl-tree-error').textContent(), /could not be saved/);
             assert.equal(await renderedTree(page, state), 'A[a1,a2,a3],B[b1[b1x]],c', 'The previous order is back.');
             await page.unroute('**/content/arrange');
             await page.route('**/content/arrange', (route) => route.fulfill({status: 500, contentType: 'text/html', body: '<p>Server error</p>'}));
             await drag(page, n().a3, n().a1, 0.15);
-            await page.locator('.cl-course-tree-error:not([hidden])').waitFor();
+            await page.locator('.cl-tree-error:not([hidden])').waitFor();
             assert.equal(await renderedTree(page, state), 'A[a1,a2,a3],B[b1[b1x]],c');
             await page.unroute('**/content/arrange');
             assert.equal(await drag(page, n().a3, n().a1, 0.15), 'before', 'The restored tree still drags.');
@@ -228,7 +228,7 @@ async function scenario(name, browserName, run) {
         }
         const afterRow = (id) => page.locator(`#course-node-${id} > .cl-course-tree-add`);
         const firstInside = (id) => page.locator(`#course-branch-${id} > li.cl-course-tree-add`);
-        const courseStart = () => page.locator('#course-content-tree > .cl-course-tree-list > li.cl-course-tree-add');
+        const courseStart = () => page.locator('#course-content-tree > .cl-tree-list > li.cl-course-tree-add');
 
         await scenario('the top Add item area is gone; + Add here is the way in', browserName, async () => {
             state = reset();
@@ -242,7 +242,7 @@ async function scenario(name, browserName, run) {
             state = reset();
             await page.goto(url());
             await page.evaluate(() => { window.__sameDocument = true; });
-            await row(page, n().B).locator('.cl-course-tree-toggle').click();
+            await row(page, n().B).locator('.cl-tree-toggle').click();
             await page.locator('#course-content-tree').evaluate((tree) => tree.scrollIntoView({block: 'start', behavior: 'instant'}));
             const scrollBefore = await page.evaluate(() => window.scrollY);
             await insertAt(afterRow(n().a1), 'Add section');
@@ -255,11 +255,11 @@ async function scenario(name, browserName, run) {
             await saved(page);
             assert.match(await renderedTree(page, state), /^A\[a1,\d+,a2,a3\],B\[b1\[b1x\]\],c$/);
             assert.equal(await page.evaluate(() => window.__sameDocument === true), true, 'No page load.');
-            assert.equal(await row(page, n().B).locator('.cl-course-tree-toggle').getAttribute('aria-expanded'), 'false', 'Collapsed sections stay collapsed.');
+            assert.equal(await row(page, n().B).locator('.cl-tree-toggle').getAttribute('aria-expanded'), 'false', 'Collapsed sections stay collapsed.');
             assert.ok(Math.abs(await page.evaluate(() => window.scrollY) - scrollBefore) < 120, 'The editor does not jump to the top.');
-            assert.equal(await page.evaluate(() => document.activeElement.closest('li[data-node-id]')?.querySelector('.cl-course-tree-name')?.textContent), 'Inserted section', 'The new row takes the focus.');
+            assert.equal(await page.evaluate(() => document.activeElement.closest('li[data-node-id]')?.querySelector('.cl-tree-name')?.textContent), 'Inserted section', 'The new row takes the focus.');
             assert.match(await savedTree(page, state), /^A\[a1,\d+,a2,a3\],B\[b1\[b1x\]\],c$/, 'It persisted.');
-            await row(page, n().B).locator('.cl-course-tree-toggle').click();
+            await row(page, n().B).locator('.cl-tree-toggle').click();
         });
 
         await scenario('Add existing item in the modal lands at the start of the course', browserName, async () => {
@@ -274,8 +274,8 @@ async function scenario(name, browserName, run) {
             await modalBody().getByRole('button', {name: 'Add to course'}).click();
             await modal().waitFor({state: 'hidden'});
             await saved(page);
-            const first = page.locator('#course-content-tree > .cl-course-tree-list > li[data-node-id]').first();
-            assert.equal(await first.locator(':scope > .cl-course-tree-row .cl-course-tree-name').textContent(), 'Item b1x', 'The shared item is placed first.');
+            const first = page.locator('#course-content-tree > .cl-tree-list > li[data-node-id]').first();
+            assert.equal(await first.locator(':scope > .cl-tree-row .cl-tree-name').textContent(), 'Item b1x', 'The shared item is placed first.');
             assert.match(await savedTree(page, state), /^\d+,A\[a1,a2,a3\],B\[b1\[b1x\]\],c$/);
         });
 
@@ -288,7 +288,7 @@ async function scenario(name, browserName, run) {
             await page.locator('#item-key').waitFor();
             await page.waitForFunction(() => document.querySelectorAll('#course-content-insert-body .ck-editor').length === 2);
             await page.evaluate(() => { for (const [element, editor] of window.CattoLearningEditors.instances) if (element.id === 'item-source') editor.setData('<p>Kept lesson body</p>'); });
-            const takenKey = await page.evaluate((id) => document.querySelector(`#course-node-${id} .cl-course-tree-meta code`).textContent, n().a1);
+            const takenKey = await page.evaluate((id) => document.querySelector(`#course-node-${id} .cl-tree-meta code`).textContent, n().a1);
             await page.locator('#item-key').fill(takenKey);
             await page.locator('#item-title').fill('Created in the modal');
             await modalBody().getByRole('button', {name: 'Create and add to course'}).click();
@@ -303,7 +303,7 @@ async function scenario(name, browserName, run) {
             await modal().waitFor({state: 'hidden'});
             await saved(page);
             const created = page.locator(`#course-branch-${n().B} > li[data-node-id]`).first();
-            assert.equal(await created.locator(':scope > .cl-course-tree-row .cl-course-tree-name').textContent(), 'Created in the modal');
+            assert.equal(await created.locator(':scope > .cl-tree-row .cl-tree-name').textContent(), 'Created in the modal');
             assert.match(await savedTree(page, state), /^A\[a1,a2,a3\],B\[\d+,b1\[b1x\]\],c$/, 'Created, attached and placed in one step.');
         });
 
@@ -368,7 +368,7 @@ async function scenario(name, browserName, run) {
             await modal().waitFor({state: 'hidden'});
             await page.route('**/content/arrange', (route) => route.abort());
             await drag(page, n().a3, n().a2, 0.15);
-            await page.locator('.cl-course-tree-error:not([hidden])').waitFor();
+            await page.locator('.cl-tree-error:not([hidden])').waitFor();
             await page.unroute('**/content/arrange');
             await insertAt(afterRow(n().b1), 'Create new item');
             await modalBody().locator('input[name="type"]').first().waitFor();
@@ -387,7 +387,7 @@ async function scenario(name, browserName, run) {
             await modalBody().getByRole('button', {name: 'Save new section'}).click();
             await modal().waitFor({state: 'hidden'});
             await saved(page);
-            assert.equal(await page.locator('#course-content-tree > .cl-course-tree-list > li[data-node-id]').count(), 1);
+            assert.equal(await page.locator('#course-content-tree > .cl-tree-list > li[data-node-id]').count(), 1);
             assert.match(await savedTree(page, state), /^\d+$/);
         });
 

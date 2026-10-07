@@ -92,6 +92,31 @@ The runner reads the fixture state and resets the tree through `podman exec` (`C
 default `env_php_1`). `CATTO_BROWSERS` (default `chromium,firefox`) and `CATTO_BROWSER_OUTPUT`
 (default `/tmp/catto-course-content-tree`) override the browsers and screenshot directory.
 
+## Category tree
+
+`category-tree.cjs` drives `/admin/courses/categories` in Chromium and Firefox (10 scenarios each),
+then Chromium without JavaScript and every theme: the page opening on the main categories with
+every branch closed; branches opening and closing independently and remembered for the session;
+dragging to reorder main categories, into another category and back out (with the counts above the
+tree following), a sub-subcategory between subcategories and a whole subtree; a fourth level never
+offered, a drop onto a category's own subcategory refused, and a forged move refused by the server
+with the tree unchanged; a drop onto a closed category opening it; keyboard moves on the handle and
+a ⋯ menu move; Add category, Add subcategory and a sub-subcategory through the modal; Manage
+returning to the tree. Without JavaScript the disclosure buttons, a ⋯ menu move, Move into, the
+Add subcategory page, the inline Add category form and Manage work as ordinary requests. Every theme
+renders the tree open at 1440 and 390px without sideways scrolling. The shared sortable-tree code
+is the Course Content tree's too, so run both checks after changing it.
+
+The fixture builds `A > A1 > A1x, A > A2 · B > B1 · G · D > D1 > D1x` after the shipped taxonomy
+(named "Tree Alpha <suffix>" and so on); `reset` deletes every category the run made, renumbers
+the shipped ones and rebuilds it before each scenario, and `cleanup` also removes the identity.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/category-tree.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php cleanup'
+```
+
 ## Course reviews
 
 `course-reviews.cjs` checks course ratings and moderated reviews in Chromium and Firefox and

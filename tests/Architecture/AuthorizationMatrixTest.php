@@ -9,6 +9,7 @@ Protects the simplified v0.5.7.5.1 ACL by requiring high-value actions to use on
 Changelog:
 2026/10/07 SAST
 - Covers CertificateDesignController and the course certificate preview actions; the document template pages are gone.
+- Covers the category tree's new actions: the create forms, createChild, arrange and moveInto.
 2026/10/07 SAST
 - Covers CourseCertificateController and the document template pages in place of the removed AdminCourseController certificate actions (Phase J).
 2026/09/03 00:08 SAST
@@ -55,7 +56,7 @@ final class AuthorizationMatrixTest extends TestCase
             [AdminController::class, ['decideRequest'], 'PLATFORM.REQUEST.MANAGE'],
             [AdminController::class, ['removeEnrolment','restoreEnrolment'], 'PLATFORM.ENROLMENT.MANAGE'],
             [AdminController::class, ['addCredit'], 'PLATFORM.CREDIT.MANAGE'],
-            [AdminCourseCategoryController::class, ['index','create','inlineCreate','edit','update','move','delete'], 'COURSE.CATEGORY.MANAGE'],
+            [AdminCourseCategoryController::class, ['index','newCategory','newChild','create','createChild','inlineCreate','edit','update','move','arrange','moveInto','delete'], 'COURSE.CATEGORY.MANAGE'],
             [AdminCourseController::class, ['createForm','create'], 'COURSE.CREATE'],
             [AdminCourseController::class, ['edit','update'], 'COURSE.EDIT'],
             [AdminCourseController::class, ['preview','resetPreview'], 'COURSE.PREVIEW'],

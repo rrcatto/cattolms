@@ -4,20 +4,12 @@
 	{% set ph_back_label = 'Course administration' %}
 	{% set ph_kicker = 'Course metadata' %}
 	{% set ph_title = 'Course categories' %}
-	{% set ph_lead = 'Create and maintain the catalogue taxonomy used by courses.' %}
+	{% set ph_lead = 'Arrange the catalogue taxonomy: main categories, subcategories and sub-subcategories, three levels at most.' %}
 	{% set ph_action_href = '/admin/courses' %}
 	{% set ph_action_label = 'Courses' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{# Loads the Stimulus app for the category-tree controller. After the page head: themes style the page head as the first element of main. #}
 	{{ importmap() }}
-	{#
-		The wrapper Courses, Requests and Enrolments use, which is the plain section that
-		admin-section.html.twig puts round a section body - no container of its own.
-
-		It used to be container-fluid cl-container-wide py-5, which imposes a different maximum
-		width and its own padding, so the card sat at a different place on the page from every
-		other Courses page and appeared to jump when moving between them.
-	#}
 	<section class="cl-page-section section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
 {% block body %}
@@ -26,33 +18,26 @@
 {% block surface_body %}
 
 				{% include '@platform/partials/admin/course-group-nav.html.twig' %}
-				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'The catalogue taxonomy', eyebrow: 'Course Categories', summary: 'The categories a course can be filed under. A course is named after its category and tagged with the branch it belongs to.'})} %}
+				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'The catalogue taxonomy', eyebrow: 'Course Categories', summary: 'The categories a course can be filed under. Open a category to see its subcategories; drag a category by its handle, or use its ⋯ menu, to put it somewhere else.'})} %}
 {% block section_actions %}
-{{ ui('action.button', {label: '＋ Create category', variant: 'primary', size: 'normal', type: 'button', modal: 'createCategoryModal', icon: 'action-add'}) }}
+{{ ui('action.link', {label: 'Add category', variant: 'primary', href: '/admin/courses/categories/new', get: '/admin/courses/categories/new', target: '#category-create-body', modal: 'category-create', icon: 'action-add'}) }}
 {% endblock %}
 {% endembed %}
 
-					{# Levels follow parent_id; a category counts as having courses when courses are filed directly in it. #}
-					{% set stats = category_statistics %}
-					{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact'})} %}
-{% block body %}{{ ui('data.stat-card', {label: 'Main categories', value: stats.main}) }}{{ ui('data.stat-card', {label: 'Subcategories', value: stats.sub}) }}{{ ui('data.stat-card', {label: 'Sub-subcategories', value: stats.sub_sub}) }}{{ ui('data.stat-card', {label: 'Total categories', value: stats.total}) }}{{ ui('data.stat-card', {label: 'With courses', value: stats.with_courses}) }}{{ ui('data.stat-card', {label: 'Empty categories', value: stats.empty}) }}{% endblock %}
-					{% endembed %}
-					<p class="cl-category-stats-note">With courses and Empty count only courses filed directly in a category; an empty category's sub-categories may still hold courses.</p>
-					{% if stats.invalid %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Categories outside the three-level hierarchy'})} %}{% block body %}<p>These categories are not counted at any level until they are moved:</p><ul>{% for problem in stats.invalid %}<li>{{ problem }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}{% endif %}
-					<div class="cl-category-tree-wrap" data-controller="category-tree">
-						<div data-category-tree-target="controls" hidden>
-							{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+				<div class="cl-tree-wrap" data-controller="category-tree" data-action="dragstart->category-tree#start dragover->category-tree#over dragleave->category-tree#leave drop->category-tree#drop dragend->category-tree#end submit->category-tree#menu htmx:before:request->category-tree#loading">
+					{% include '@platform/partials/admin/category-statistics.html.twig' %}
+					<div class="cl-tree-tools" data-category-tree-target="enhanced" hidden>
+						<p class="cl-tree-help" id="category-tree-keys">Drag a category by its handle: drop it on the upper or lower part of another category to put it before or after it, or on the middle to put it inside. On a focused handle, ↑ and ↓ move it, Home and End move it to the top or bottom, ← moves it out to its parent's level and → moves it into the category above.</p>
+						{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}{{ ui('action.button', {label: 'Expand all', variant: 'secondary', size: 'small', type: 'button', stimulus_action: 'category-tree#expandAll', icon: 'action-chevron'}) }}{{ ui('action.button', {label: 'Collapse all', variant: 'secondary', size: 'small', type: 'button', stimulus_action: 'category-tree#collapseAll', icon: 'action-chevron'}) }}{% endblock %}
 {% endembed %}
-						</div>
-						{% if category_tree %}
-							<ul class="cl-category-tree" aria-label="Course categories">
-								{% for node in category_tree %}{% include '@platform/partials/admin/category-tree-node.html.twig' with {node: node} %}{% endfor %}
-							</ul>
-						{% else %}
-							{{ ui('feedback.empty', {heading: 'No categories yet', summary: 'Create a top-level category to start the catalogue taxonomy.'}) }}
-						{% endif %}
 					</div>
+					<p class="cl-tree-status" role="status" aria-live="polite" data-category-tree-target="status"></p>
+					<p class="cl-tree-error" role="alert" data-category-tree-target="error" hidden></p>
+					{# The disclosure buttons submit this form without JavaScript: open[] keeps the branches already open, toggle opens or closes one more. #}
+					<form id="category-tree-view" action="/admin/courses/categories" method="get">{% for id in open_ids %}<input type="hidden" name="open[]" value="{{ id }}">{% endfor %}</form>
+					{% include '@platform/partials/admin/category-tree.html.twig' %}
+				</div>
 
 {% endblock %}
 {% endembed %}
@@ -60,46 +45,8 @@
 {% endblock %}
 {% endembed %}
 	</section>
-	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createCategoryModal', title: 'Create category', action: '/admin/courses/categories', method: 'post'})} %}
-{% block modal_body %}
-
-					<p class="text-body-secondary">
-						The slug is generated from the name unless you supply one.
-					</p>
-					<div class="vstack gap-3">
-						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'field-admin-course-categories-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-							<input class="form-control" name="name" maxlength="120" required id="field-admin-course-categories-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Parent category', full_width: false, for: 'new-category-parent-picker', help: 'Categories go three levels deep, so a level-3 category cannot hold children of its own.'})} %}
-{% block control %}{{ ui('form.tree-select', {id: 'new-category-parent-picker', name: 'parent_id', mode: 'field', items: parent_picker.items, selected: parent_picker.selected, placeholder: 'No parent', list_label: 'Possible parent categories'}) }}{% endblock %}
-{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug optional', full_width: false, for: 'field-admin-course-categories-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-							<input class="form-control" name="slug" placeholder="generated-from-name" id="field-admin-course-categories-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description', full_width: false, for: 'field-admin-course-categories-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-							<textarea class="form-control" name="description" rows="4" id="field-admin-course-categories-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}></textarea>
-
-{% endblock %}
-{% endembed %}
-					</div>
-
-{% endblock %}
-{% block modal_actions %}
-
-					{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true}) }}
-					{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
-
-{% endblock %}
+	{# + Add category and Add subcategory load their form into this modal; without JavaScript the main-category form shows here and the links open their own pages. #}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'category-create', title: 'Add a category'})} %}
+{% block modal_body %}<div class="cl-category-create-body" id="category-create-body">{% include '@platform/partials/admin/category-create-form.html.twig' with {in_modal: true} %}</div>{% endblock %}
 {% endembed %}
 {% endblock %}

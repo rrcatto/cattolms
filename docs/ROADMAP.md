@@ -4,6 +4,8 @@
 
 **Current LMS version:** 0.8.8.10 · **Date:** 2026/10/07 SAST · tag `v0.8.8.10` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
+**Unreleased since v0.8.8.10** (uncommitted on `dev-v0.8`, no version set): `/admin/courses/categories` is a draggable three-level tree - categories reorder, move inside one another and back out with their subtrees, by drag, keyboard, ⋯ menu or Move into, within the three-level limit and with an explicit sibling order - sharing its tree behaviour with Course Content.
+
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
@@ -33,7 +35,7 @@
 
 **Document templates.** Phase I (v0.8.8.8) built the shared engine: versioned templates with a controlled placeholder language and one renderer for preview, documents and PDFs. Phase J (v0.8.8.9) moved certificates onto it, and each certificate records the version it was issued with. The owner then rejected the generic template pages: nobody should see template HTML, versions or page settings. Certificate designs (v0.8.8.10) replaced them — a design made in one form compiles to a template; System → Document Templates is gone. Phase K moves invoices, receipts and credit notes onto the engine.
 
-**What is next.** A draggable three-level category tree at `/admin/courses/categories` (requested 2026/10/07), the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks), then Phase K (invoices, receipts and credit notes on the document template engine). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**What is next.** The owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks), then Phase K (invoices, receipts and credit notes on the document template engine). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 
@@ -347,7 +349,7 @@ The owner will map out the categories and the structure the catalogue actually n
 - the schema, the three-level cap, the unique names and the management screens are settled and are not what needs revisiting;
 - replacing the list is a data change, not a schema change — the baseline seeds it and nothing in the code depends on any particular category existing.
 
-The built-in set is still the 369-category placeholder (16/77/276). Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent in sight is worse than a long page; since v0.8.7.3 the category management page is a collapsible tree (with category statistics since v0.8.7.9), and the public catalogue uses the compact `form.tree-select` picker.
+The built-in set is still the 369-category placeholder (16/77/276). Pagination is the wrong answer for a tree, because a page beginning mid-branch with no parent in sight is worse than a long page; since v0.8.7.3 the category management page is a collapsible tree (with category statistics since v0.8.7.9; draggable, with an explicit sibling order, since v0.8.8.10, uncommitted), and the public catalogue uses the compact `form.tree-select` picker.
 
 ### Category hierarchy
 

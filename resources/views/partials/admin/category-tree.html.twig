@@ -1,0 +1,10 @@
+{# The category tree. The category-tree controller swaps this region for the server's copy after every move: the saved tree, or the authoritative tree with the reason in data-error when a move was refused. #}
+<div class="cl-tree cl-tree--categories" id="category-tree" data-category-tree-target="tree" data-error="{{ tree_error|default('') }}">
+	{% if category_tree %}
+		<ol class="cl-tree-list" data-parent="" aria-label="Course categories">
+			{% for node in category_tree %}{% include '@platform/partials/admin/category-tree-node.html.twig' with {node: node} %}{% endfor %}
+		</ol>
+	{% else %}
+		{{ ui('feedback.empty', {heading: 'No categories yet', summary: 'Use Add category to create the first main category.'}) }}
+	{% endif %}
+</div>

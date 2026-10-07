@@ -32,7 +32,7 @@ final class UiComponentContractTest extends TestCase
         self::assertStringContainsString('data-controller="course-content"', $page);
         self::assertStringNotContainsString('save-arrangement', $page, 'Moves save at once; there is no staged arrangement.');
         $node = (string) file_get_contents($root . '/resources/views/partials/admin/course-content-node.html.twig');
-        foreach (['data-course-content-target="handle"', 'aria-controls="course-branch-', 'data-course-content-direction=', 'compact: true', '/move-into?'] as $contract) {
+        foreach (['data-course-content-target="handle"', 'aria-controls="course-branch-', 'data-tree-direction=', 'compact: true', '/move-into?'] as $contract) {
             self::assertStringContainsString($contract, $node);
         }
         self::assertStringContainsString('id="course-content-tree"', (string) file_get_contents($root . '/resources/views/partials/admin/course-content-tree.html.twig'));

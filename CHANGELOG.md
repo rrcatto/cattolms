@@ -2,6 +2,20 @@
 
 **LMS version:** 0.8.8.10 **Date time:** 2026/10/07 SAST
 
+## 2026-10-07 SAST — Unreleased: draggable category tree
+
+Uncommitted on `dev-v0.8` after v0.8.8.10; no version was set. At the owner's request `/admin/courses/categories` is a draggable tree for the three-level category hierarchy, built on the Course Content tree's patterns.
+
+- **The tree.** Main categories with every branch closed; a disclosure button beside each category that has subcategories (a GET form without JavaScript, toggled in place and remembered for the session with it); a drag handle on every row; drop markers for before, inside and after, and "Not allowed" where a drop would break a rule; hovering over a closed category while dragging opens it, and a drop inside keeps the destination open. Dragging moves a category with its whole subtree: reordering siblings, into another category, back out to a higher level, or a sub-subcategory between subcategories.
+- **Rules, server side.** `CategoryHierarchyService` decides every move and every new category's place: three levels at most, counting the destination's level plus the height of the moving subtree; never inside itself or one of its descendants; siblings in an explicit order, positions 1..n within each parent. Each change is one transaction under a lock on the taxonomy, checked in full against the stored tree; a refused move (a forged request included) changes nothing and says why, and a move decided on a tree that has since changed is refused. Moving never touches which courses are filed in a category; paths, picker entries and the counts follow the tree.
+- **Without dragging.** On a focused handle ↑ and ↓ move a category, Home and End to the top or bottom, ← out to its parent's level and → into the category above; the ⋯ menu has Move to top, up, down, to bottom, Move into… (a page listing every valid place) and Move out, all as ordinary form posts without JavaScript.
+- **Creating and editing.** Add category (a main category) and Add subcategory on main categories and subcategories load their form into the page's modal; a new category goes last among its siblings, under the parent in the form's address, never a posted field. Manage edits name, slug and description and returns to the tree open at the category; the parent picker is gone from the create and edit forms. Deleting closes the gap among the siblings; a category with subcategories still cannot be deleted, and courses are still reassigned first.
+- **Schema.** `course_categories.position` is required and positive, with `course_categories_sibling_position` (`UNIQUE NULLS NOT DISTINCT (parent_id, position)`, deferrable); the shipped taxonomy is installed as 1..n.
+- **Shared with Course Content.** `Support\TreeArrangement` holds the tree rules both trees use (Course Content keeps its messages through `CourseStructureArrangement`); `assets/lib/sortable_tree_controller.js` holds the drag, drop, keyboard, branch-memory and server-swap behaviour both Stimulus controllers extend; both render the shared `cl-tree-*` markup, styled once.
+- **Tests.** `TreeArrangementTest`, `CategoryHierarchyIntegrationTest`, the rewritten `CategoryTreeContractTest`, and `tests/Browser/category-tree.cjs` (22 scenarios in Chromium, Firefox, without JavaScript and all five themes). Gates, on a database rebuilt from the changed baseline: `composer qa` with a cold cache (1049 PHPUnit tests), Twig lint (227 files), AssetMapper compilation, `git diff --check`, and every browser suite run serially: category tree 22/22, Course Content tree 41, UI matrix 72, canonical 30, Popular Courses 13, course reviews 9, billing 10, certificates 11, promotions 9, bundles 8.
+- **Deploying.** Rebuild the database. Publish `catto-platform.css` and the compiled assets.
+- Report: workspace `REPORTS/category-tree-2026-10-07.md`.
+
 ## 2026-10-07 SAST — v0.8.8.10 Certificate designs
 
 - **Release.** Version aligned to 0.8.8.10 at the owner's instruction ("commit and push to git - v0.8.8.10 - update stale documents"); published as GitHub release `v0.8.8.10` with `cattolms-v0.8.8.10.zip`. The documentation was brought up to the v0.8.8.10 state.

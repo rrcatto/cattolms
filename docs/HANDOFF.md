@@ -1,6 +1,19 @@
 # Catto Learning 0.8.8.10 — Development Handoff
 
-## Current development handoff — 2026/10/07 (v0.8.8.10)
+## Current development handoff — 2026/10/07 (category tree, unreleased)
+
+The owner asked for `/admin/courses/categories` to become a draggable tree for the three-level category hierarchy, reusing the Course Content tree's patterns. It is in the `dev-v0.8` working tree, uncommitted; the version stays 0.8.8.10. Report: workspace `REPORTS/category-tree-2026-10-07.md`.
+
+- **Rules.** `CategoryHierarchyService` decides where every category sits - dragging, keyboard and ⋯ menu moves, Move into, and the place of a new category. Three levels at most, counted as the destination's level plus the height of the moving subtree; never inside itself or a descendant; siblings ordered by `position` 1..n within each parent. Each change locks the taxonomy, applies the change to the stored tree, checks the whole result and writes only what moved, in one transaction; refused moves write nothing and say why (`course_category.moved` is audited). A move sent with the parent the page showed (`from_parent`) is refused when the stored parent differs.
+- **Schema (baseline).** `position` has no default and must be positive; `course_categories_sibling_position` is `UNIQUE NULLS NOT DISTINCT (parent_id, position) DEFERRABLE INITIALLY IMMEDIATE`; the shipped taxonomy is renumbered 1..n after it is inserted; the `(parent_id, position, name)` index gave way to the constraint's.
+- **Shared tree.** The tree rules moved from `CourseStructureArrangement` into `Support\TreeArrangement` (with `TreeMoveRefused` reason codes); Course Content keeps its API and messages through an adapter. The drag, drop-marker, hover-expansion, branch-memory, keyboard and server-swap behaviour moved from `course_content_controller.js` into `assets/lib/sortable_tree_controller.js`, which `course-content` and `category-tree` extend. The generic `cl-course-tree-*` classes became `cl-tree-*` (Course Content keeps `cl-course-tree-select`, `-edit`, `-add`, `-bulk`); its menu forms use `data-tree-direction`.
+- **Page.** Main categories with every branch closed (server-rendered; the disclosure buttons submit a GET form `open[]`/`toggle`, so branches open without JavaScript), a handle on every row, Add subcategory on levels 1-2, Manage, and a ⋯ menu (top, up, down, bottom, Move into…, Move out). Add category and Add subcategory load their form into the page's modal; the parent comes from the address (`/admin/courses/categories/{id}/children`). Creating, moving or editing returns to the tree open at the category (`?reveal=`). The counts above the tree come back with every move.
+- **Removed.** The parent picker on the create and edit forms (`categoryParentPicker`), `CourseService::parentOf`/`categoryIsDescendantOf`, `CourseRepository::swapCategoryPositions`/`categoryDescendantDepth`, the re-parenting in `updateCategory`, and `CategoryParentIntegrationTest`.
+- **Tests.** `TreeArrangementTest`, `CategoryHierarchyIntegrationTest` (moves, refusals, positions, course assignments, paths, creation, rendering, the script's 422), the rewritten `CategoryTreeContractTest`; `tests/Browser/category-tree.cjs` with `category-tree-fixture.php` (22 scenarios). Results are in the report.
+- **Deploying.** Rebuild the database; publish `catto-platform.css` and the compiled assets.
+- **Next.** The owner's Canva certificates, then Phase K.
+
+## v0.8.8.10 handoff — 2026/10/07
 
 The owner authorized v0.8.8.10 ("commit and push to git - v0.8.8.10 - update stale documents"). It releases certificate designs (below).
 

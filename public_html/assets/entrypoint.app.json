@@ -8,5 +8,6 @@
     "\/assets\/controllers\/popular_courses_controller.js",
     "\/assets\/controllers\/profile_image_controller.js",
     "\/assets\/controllers\/tag_cloud_controller.js",
+    "\/assets\/lib\/sortable_tree_controller.js",
     "TagCloud"
 ]

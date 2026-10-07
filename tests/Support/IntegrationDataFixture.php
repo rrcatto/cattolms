@@ -23,6 +23,8 @@ Rows are built by direct insert rather than through the services under test. A f
 behaviour a test is verifying would pass or fail for two unrelated reasons at once.
 
 Changelog:
+2026/10/07 SAST
+- A category goes last among its siblings: positions are unique within a parent.
 2026/09/09 21:40 SAST
 - Created when the REAL/SEED split was removed; one builder, no tokens, no universes.
 */
@@ -138,7 +140,9 @@ final class IntegrationDataFixture
 
         $id = (int) $this->db->fetchAllAssociative(
             'INSERT INTO course_categories (name,slug,position,level,parent_id)
-             VALUES (:name,:slug,1,:level,:parent) RETURNING id',
+             VALUES (:name,:slug,
+                     (SELECT COALESCE(MAX(position),0)+1 FROM course_categories WHERE parent_id IS NOT DISTINCT FROM :parent),
+                     :level,:parent) RETURNING id',
             ['name' => $name, 'slug' => $slug, 'level' => $level, 'parent' => $parentId ?: null]
         )[0]['id'];
         $this->categories[] = $id;
