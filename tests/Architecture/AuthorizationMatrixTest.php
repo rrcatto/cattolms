@@ -7,6 +7,8 @@ Description:
 Protects the simplified v0.5.7.5.1 ACL by requiring high-value actions to use one shared business capability catalogue plus explicit SYSTEM permissions, resource-specific platform write scope and no controller role-name bypasses.
 
 Changelog:
+2026/10/07 SAST
+- Covers CourseCertificateController and the document template pages in place of the removed AdminCourseController certificate actions (Phase J).
 2026/09/03 00:08 SAST
 - Moved GET /admin/courses onto AdminController::courses so the Courses list uses the shared section renderer; its own request array had listed page and page size only, so the search term was never read.
 2026/08/20 06:17 SAST
@@ -58,7 +60,9 @@ final class AuthorizationMatrixTest extends TestCase
             [AdminCourseController::class, ['importForm','stageImport','previewImport','commitImport'], 'COURSE.IMPORT'],
             [AdminCourseController::class, ['export'], 'COURSE.EXPORT'],
             [\CattoLearning\Http\Controller\AdminCourseComponentController::class, ['create','edit','update','saveAs','delete','content','addSection','addPlacement','updatePlacement','move','remove','resourceLibrary','uploadResource','registerResource','deleteResource','updateSection','moveSelection'], 'COURSE.EDIT'],
-            [AdminCourseController::class, ['certificate','updateCertificate'], 'COURSE.CERTIFICATE.MANAGE'],
+            [\CattoLearning\Http\Controller\CourseCertificateController::class, ['show','update','sample'], 'COURSE.CERTIFICATE.MANAGE'],
+            [\CattoLearning\Http\Controller\DocumentTemplateController::class, ['index','show','version','samplePdf'], 'DOCUMENT.TEMPLATE.VIEW'],
+            [\CattoLearning\Http\Controller\DocumentTemplateController::class, ['create','store','update','details','discard','archive','draftFrom'], 'DOCUMENT.TEMPLATE.MANAGE'],
             [AdminCourseController::class, ['updateGradeBands'], 'COURSE.ASSESSMENT.MANAGE'],
             [AdminCourseController::class, ['status'], 'COURSE.PUBLISH'],
             [AdminCourseController::class, ['submitForApproval'], 'COURSE.PUBLICATION.REQUEST'],

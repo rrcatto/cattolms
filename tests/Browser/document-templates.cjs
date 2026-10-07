@@ -73,7 +73,7 @@ async function createCertificate(page, name) {
         await scenario('the template list shows the installed templates and filters by type and status', browserName, async () => {
             const {ctx, page} = await open(browser, admin());
             await page.goto(`${base}/admin/documents/templates`);
-            for (const name of ['Standard certificate', 'Standard invoice', 'Standard receipt', 'Standard credit note']) {
+            for (const name of ['Classic certificate', 'Modern certificate', 'Minimal certificate', 'Standard invoice', 'Standard receipt', 'Standard credit note']) {
                 assert.ok(await page.getByRole('link', {name}).isVisible(), `${name} is listed`);
             }
             await page.getByRole('link', {name: 'Certificate', exact: true}).click();
@@ -164,7 +164,7 @@ async function createCertificate(page, name) {
         await scenario('the editor fits a phone', browserName, async () => {
             const {ctx, page} = await open(browser, admin(), {width: 390});
             await page.goto(`${base}/admin/documents/templates`);
-            const href = await page.getByRole('link', {name: 'Standard certificate'}).getAttribute('href');
+            const href = await page.getByRole('link', {name: 'Classic certificate'}).getAttribute('href');
             await page.goto(base + href);
             assert.ok(await noSideScroll(page), 'no sideways scroll at 390px');
             assert.ok(await page.locator('iframe.cl-document-preview-frame').isVisible(), 'the landscape preview scrolls inside its own box');

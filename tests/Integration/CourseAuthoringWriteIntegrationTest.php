@@ -22,6 +22,8 @@ wrong type, an UPDATE whose WHERE matches nothing, an INSERT reported as a state
 RETURNs an id. Each assertion below reads back what was written.
 
 Changelog:
+2026/10/07 SAST
+- A reissue is checked through CertificateIssuer (Phase J).
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
 
@@ -279,19 +281,16 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
             self::assertNotNull($started['expires_at']);
 
             // A certificate keeps the identity a learner may already have shared, so reissuing
-            // updates the content and carries the public id and the number forward unchanged.
-            $first = $repository->createCertificate(
-                $enrolmentId, 'First Learner', 'QA Certificate', 'QA Authoring Course',
-                'A', 91.5, 'classic', 'has successfully completed', '', '', ''
-            );
-            $second = $repository->createCertificate(
-                $enrolmentId, 'Second Learner', 'QA Certificate', 'QA Authoring Course',
-                'A', 91.5, 'classic', 'has successfully completed', '', '', ''
-            );
+            // records the new issue and carries the public id and the number forward unchanged.
+            $issuer = \CattoLearning\Tests\Support\IntegrationContainer::get()->get(\CattoLearning\Course\Certificate\CertificateIssuer::class);
+            $db->executeStatement("UPDATE users SET certificate_name = 'First Learner' WHERE id = :id", ['id' => $ownerId]);
+            $first = $issuer->issue($enrolmentId);
+            $db->executeStatement("UPDATE users SET certificate_name = 'Second Learner' WHERE id = :id", ['id' => $ownerId]);
+            $second = $issuer->issue($enrolmentId);
             self::assertSame((string) $first['public_id'], (string) $second['public_id']);
             self::assertSame((string) $first['certificate_number'], (string) $second['certificate_number']);
             self::assertSame('Second Learner', (string) $second['learner_name']);
-            self::assertStringContainsString('Second Learner', (string) $second['rendered_html']);
+            self::assertSame('Second Learner', $second['document_data']['learner.name']);
             $db->executeStatement('DELETE FROM certificates WHERE enrolment_id = :id', ['id' => $enrolmentId]);
 
             $repository->markEnrolmentExpired($enrolmentId);

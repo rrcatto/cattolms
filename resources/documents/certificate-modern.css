@@ -1,0 +1,23 @@
+/* Modern: a solid accent band, clean sans-serif type, a strong learner/course hierarchy and a ruled
+ * footer row. Tables carry the layout because the PDF renderer does not lay out flex or grid. */
+body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; }
+.sheet { width: 100%; border-collapse: collapse; }
+.sheet td { vertical-align: top; }
+.band { width: 14mm; background: #0f766e; }
+/* 150mm plus 16mm of padding fits the 186mm printable height; a table cell grows past it only for unusually long values. */
+.content { padding: 10mm 14mm 6mm 16mm; height: 150mm; }
+.issuer { font-size: 10pt; font-weight: bold; letter-spacing: 0.15em; text-transform: uppercase; color: #0f766e; margin: 0 0 8mm; }
+.kicker { font-size: 12pt; letter-spacing: 0.2em; text-transform: uppercase; color: #6b7280; margin: 0 0 3mm; }
+.learner { font-size: 28pt; font-weight: bold; line-height: 1.1; margin: 0 0 4mm; word-wrap: break-word; }
+.body { font-size: 11pt; color: #4b5563; margin: 0 0 2mm; }
+.course { font-size: 17pt; font-weight: bold; color: #0f766e; line-height: 1.2; margin: 0 0 2mm; word-wrap: break-word; }
+.provider { font-size: 11pt; color: #4b5563; margin: 0 0 4mm; }
+.facts { width: 100%; border-collapse: collapse; border-top: 2px solid #111827; margin-top: 5mm; }
+.facts td { padding: 3mm 6mm 3mm 0; font-size: 11pt; vertical-align: top; }
+.label { display: block; font-size: 8pt; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280; margin-bottom: 1mm; }
+.foot { width: 100%; border-collapse: collapse; margin-top: 7mm; }
+.foot td { vertical-align: bottom; font-size: 9pt; color: #4b5563; }
+.signatory .name { display: block; font-size: 12pt; color: #111827; border-top: 1px solid #9ca3af; padding-top: 1.5mm; width: 70mm; }
+.signatory .role { display: block; }
+.issued { text-align: right; }
+.footer { margin-top: 3mm; font-size: 8.5pt; color: #6b7280; }

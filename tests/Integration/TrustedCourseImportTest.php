@@ -88,13 +88,11 @@ final class TrustedCourseImportTest extends TestCase
             self::assertStringContainsString($fragment, $item['content_source']);
             $items->update((int) $item['id'], array_replace($item, ['title' => 'Edited diagram', 'content_source' => $fragment]), $owner);
             $service->updateCourse($course, ['title' => 'Trusted course', 'description_html' => $fragment], $owner);
-            $portability->updateCertificateTemplate($course, ['certificate_template_html' => TrustedCourseContent::SVG . '<p>{{student_name}}</p>', 'certificate_template_css' => '@import url("https://courses.example.test/certificate.css"); .art{background:url(/art.svg)}'], $owner);
             $export = $portability->exportCourse($course);
             self::assertSame($fragment, $export['course']['description_html']);
             self::assertSame($fragment, (new StructuredCourseImporter())->analyse($export, 'export.json')['course_items'][0]['content_source']);
             self::assertSame($fragment, $export['course_items'][0]['content_source']);
-            self::assertStringContainsString('viewBox=', $export['course']['certificate_template_html']);
-            self::assertStringContainsString('url(/art.svg)', $export['course']['certificate_template_css']);
+            self::assertArrayNotHasKey('certificate_template_html', $export['course'], 'The certificate design is a document template, not course content.');
             $resources = $container->get(\CattoLearning\Course\ResourceLibraryService::class);
             $mediaPath = $resources->path(['filename' => 'trusted-' . $suffix . '.svg']);
             file_put_contents($mediaPath, TrustedCourseContent::SVG);

@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/07 (v0.8.8.8)
+## Current delivery position — 2026/10/07 (v0.8.8.9)
 
-**Current LMS version:** 0.8.8.8 · **Date:** 2026/10/07 SAST · tag `v0.8.8.8` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.8.9 · **Date:** 2026/10/07 SAST · tag `v0.8.8.9` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.9 | Certificates on the document template engine (Phase J): Classic, Modern and Minimal designs, certificate PDF, issued certificates keep their values and template version |
 | 0.8.8.8 | Shared document template engine (Phase I); front controller reads `.env` as phpdotenv does |
 | 0.8.8.7 | Billing Address as its own Account → Profile page |
 | 0.8.8.6 | Front controller reads `.env` comments correctly (`APP_CODEBASE_PATH`) |
@@ -29,9 +30,9 @@
 | 0.8.7 | Tester administration, company credit purchasing, payment administration and refunds |
 | 0.8.6 / 0.8.6.1 | Course Components v2; ADMIN test access |
 
-**Document templates.** Phase I (v0.8.8.8) built the shared engine: ADMIN-edited, versioned HTML/CSS templates with a controlled placeholder language, one renderer for preview, documents and PDFs, and System → Document Templates. Phase J moves certificates onto it (with Classic, Modern and Minimal designs); Phase K moves invoices, receipts and credit notes.
+**Document templates.** Phase I (v0.8.8.8) built the shared engine: ADMIN-edited, versioned HTML/CSS templates with a controlled placeholder language, one renderer for preview, documents and PDFs, and System → Document Templates. Phase J (v0.8.8.9) moved certificates onto it: Classic, Modern and Minimal designs as separate templates, one current; the course keeps only certificate data; issuing, the course preview, the certificate page and the certificate PDF share the renderer; and each certificate records the template version it was issued with. Phase K moves invoices, receipts and credit notes.
 
-**What is next.** After Phases J and K, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**What is next.** Phase K (invoices, receipts and credit notes on the document template engine). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 
@@ -307,7 +308,7 @@ Implement one coherent commerce domain:
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
 
-**Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile → Billing Address and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Editable invoice and receipt templates remain later work, and the structured snapshot is their input.
+**Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile → Billing Address and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Phase I (v0.8.8.8) built the editable template engine; Phase K moves invoices, receipts and credit notes onto it, with the structured snapshot as their input.
 
 **Promo codes — Phase G, released in v0.8.8.4 (owner instruction, 2026/10/06):** ADMIN-managed promotions (`promotions`, `promotion_courses`, `promotion_redemptions`) with percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and all-courses or selected-courses applicability. One code per individual checkout order, validated by the server and again at placement under the promotion's row lock; the discount is an order adjustment allocated proportionally over lines, frozen into the order snapshot, shown on every document and bounding refunds. A use is held at placement and redeemed when paid. Bundles followed as Phase H, which replaced `applies_to` with separate course and bundle scopes. Not built: automatic promotions, stacking, referral or affiliate codes, gift vouchers, loyalty, personalised promotions, campaign pages, and promotions on company credit purchases.
 
@@ -533,7 +534,7 @@ Social posting must remain voluntary and must not gate course completion.
 
 ## 7. Certificates
 
-Add learner-facing PDF certificate download with stable certificate identity, revocation awareness and appropriate print/download presentation.
+Delivered by Phase J: certificates are rendered by the document template engine; learners open them from the course page and download a one-page PDF; the public verification page keeps a stable identity (number and public id survive a reissue); a revoked certificate says so and has no PDF; and each certificate keeps the values and template version it was issued with. Not built: an ADMIN list of issued certificates and a revoke action (the `revoked_at` and `revocation_reason` columns exist, but nothing sets them yet); and signature images (a template can embed one as a `data:` image, but a course has no signature upload).
 
 ## 8. Company embedding / white-label delivery
 

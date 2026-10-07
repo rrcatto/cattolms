@@ -1,13 +1,13 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.8 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.9 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.8.8 operational position
+## Current v0.8.8.9 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.8` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
-- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/06 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.9` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/07 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 90 permissions (10 `SYSTEM.*`, 80 business) across the five roles.
-- **Document templates (Phase I, v0.8.8.8).** The baseline publishes the source defaults in `resources/documents/` as each document type's current template. After that, templates are edited at System → Document Templates and live in the database; editing a source file changes only new installations, until the database is rebuilt.
+- **Document templates (Phase I, v0.8.8.8).** The baseline publishes the source defaults in `resources/documents/` as each document type's current template. After that, templates are edited at System → Document Templates and live in the database; editing a source file changes only new installations, until the database is rebuilt. Certificates (Phase J, v0.8.8.9) have three installed designs (`certificate-classic`, `-modern` and `-minimal`), with Classic current. Each issued certificate stores its values and references the template version it was rendered with, and is drawn again from them, so publishing a new certificate template never changes an issued certificate. Generated seed certificates are recorded the same way, against the template that is current when they are generated.
 - **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below.
 - **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there as the files' owner (CSS, JS and images from the host as `rrcatto`; compiled `assets/` inside `env_php_1` as `cattotest`), then run `php bin/console cache:clear` as `cattotest`.
 
@@ -57,6 +57,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.6:** copy the new `public_html/index.php` to the served web root. The front controller reads `APP_CODEBASE_PATH` as a `.env` file, so comments in the instance `.env` no longer stop the site loading; before it, a `#` comment containing brackets made every page answer "Application dependencies are missing."
 - **v0.8.8.7:** code only (Account → Profile → Billing Address at `/account/billing`); no CSS, JavaScript or schema change.
 - **v0.8.8.8:** the baseline gained the document template tables and permissions: rebuild the database (see above). Copy `public_html/index.php` to the served web root (it reads `.env` comments correctly and reports each start-up failure separately; the detail is in the PHP error log), and publish `catto-platform.css` and the compiled `assets/` (the `template_placeholders` controller).
+- **v0.8.8.9:** certificates on the document template engine (Phase J). The baseline's `certificates` table and the course certificate columns changed, and the certificate designs are installed. Rebuild the database (see above), publish `catto-platform.css`, and run `composer themes:install -- --force`, because four theme stylesheets lost their unused certificate rules.
 
 ### Commerce operations
 
@@ -74,7 +75,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
   - Company credit refunds apply only to unused purchased units, at historical LIFO prices.
   - Refunds trigger no bank payout. Account Funds spending and bank payouts are not implemented.
 - **Promotions.** A promotion's use is held from order placement until cancellation, and redeemed once when the order is paid. An order that a promotion makes free settles without a payment.
-- **Historical records.** Original invoices, payment events, course results and certificates remain historical records. Financial documents render only from the order's immutable snapshot, including its billing details and promotion.
+- **Historical records.** Original invoices, payment events, course results and certificates remain historical records. A certificate is drawn only from the values and template version stored with it. Financial documents render only from the order's immutable snapshot, including its billing details and promotion.
 
 Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It does four things:
 
@@ -107,7 +108,7 @@ Only on the owner's explicit instruction to commit and push a version:
 
 Every pushed version has a release with its zip; v0.8.8.4 is the first. Git publication and the release do not deploy the VPS.
 
-The version-specific installation and reset instructions below describe their named historical versions. They are not an upgrade procedure for the current v0.8.8.4 code or for a production system. Follow the current release procedure and `PROJECT-INSTRUCTIONS.md` for any later authorized deployment, and do not apply a historical reset command to a populated instance.
+The version-specific installation and reset instructions below describe their named historical versions. They are not an upgrade procedure for the current code or for a production system. Follow the current release procedure and `PROJECT-INSTRUCTIONS.md` for any later authorized deployment, and do not apply a historical reset command to a populated instance.
 
 ## Historical v0.8 commerce upgrade from v0.7
 
@@ -450,7 +451,7 @@ Administration → Seed Database (`/admin/seed`), guarded by `SYSTEM.SEED.MANAGE
 
 **There is no cleanup by token.** Generated rows are ordinary rows, so a set cannot be selectively removed once written. Resetting the database is the only way back to a clean state, which is what `composer smoke:install` does.
 
-**What a set contains.** People with emails and roles, companies and memberships, courses with Course Items, structure nodes and placements, assessments with questions and options, grade bands, price variants, editors, enrolments, attempts, responses, assessment sessions, results, certificates, favourites, requests, credits, allocations, edit history and audit activity — 28 tables (`SeedGenerationPlan`).
+**What a set contains.** People with emails and roles, companies and memberships, courses with Course Items, structure nodes and placements, assessments with questions and options, grade bands, price variants, editors, enrolments, attempts, responses, assessment sessions, results, certificates, favourites, requests, credits, allocations, edit history and audit activity — 28 tables (`SeedGenerationPlan`). Generated certificates are recorded like issued ones, with their document data and the version of the current certificate template, so generation needs a current certificate template (the baseline installs Classic).
 
 Never fabricated: sessions, login and API tokens, Resources, and everything commerce and analytics records (orders, payments, entitlement sources, billing profiles, promotions, bundles, reviews, analytics events). Those come only from using the application. Popularity is calculated from what exists by `popularity:recalculate`. Generation sends **zero email**.
 

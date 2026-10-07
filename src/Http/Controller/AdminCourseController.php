@@ -11,6 +11,8 @@ Description:
 Handles web requests for admin course operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/07 SAST
+- The course certificate page moved to CourseCertificateController, without the CKEditor HTML/CSS form (Phase J).
 2026/09/03 00:08 SAST
 - Moved GET /admin/courses onto AdminController::courses so the Courses list uses the shared section renderer; its own request array had listed page and page size only, so the search term was never read.
 2026/08/23 04:19 SAST
@@ -202,41 +204,6 @@ final class AdminCourseController extends BaseController
         $this->flash('success', 'The preview progress and scores were reset.');
         $this->redirect(self::tabUrl($courseId, 'test-access'));
     }
-
-
-    #[Route('/admin/courses/{id}/certificate', name: 'admin_course_certificate', requirements: ['id' => '\\d+'], methods: ['GET'])]
-    public function certificate(): Response
-    {
-        $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
-        $course = $this->requireManagedCourse($this->courseId());
-        $profile = $this->auth->profile($user->id);
-        $sampleName = trim((string) ($profile['certificate_name'] ?? ''))
-            ?: trim((string) ($profile['display_name'] ?? ''))
-            ?: 'Sample Learner';
-        return $this->render('admin-course-certificate', [
-            'title' => 'Certificate · ' . (string) $course['title'],
-            'course' => $course,
-            'sample_name' => $sampleName,
-            'certificate_preview_html' => $this->portability->previewCertificate($course, $sampleName),
-            'load_ckeditor' => true,
-        ]);
-    }
-
-
-    #[Route('/admin/courses/{id}/certificate', name: 'admin_course_update_certificate', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function updateCertificate(): Response
-    {
-        $this->requireCsrf();
-        $user = $this->requirePermission('COURSE.CERTIFICATE.MANAGE');
-        $courseId = $this->courseId();
-        $this->requireManagedCourse($courseId);
-        return $this->handle(function () use ($user, $courseId): void {
-            $this->portability->updateCertificateTemplate($courseId, $_POST, $user->id);
-            $this->flash('success', 'The certificate template was updated.');
-            $this->redirect('/admin/courses/' . $courseId . '/certificate');
-        }, '/admin/courses/' . $courseId . '/certificate');
-    }
-
 
     #[Route('/admin/courses/{id}', name: 'admin_course_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function update(): Response
@@ -686,7 +653,6 @@ final class AdminCourseController extends BaseController
             'final_weight' => 0.5,
             'certificate_enabled' => true,
             'certificate_title' => 'Certificate of Completion',
-            'certificate_template' => 'classic',
             'certificate_body_text' => 'has successfully completed',
             'certificate_footer_text' => '',
             'certificate_signatory_name' => '',

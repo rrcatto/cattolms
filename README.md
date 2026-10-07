@@ -1,6 +1,6 @@
 # Catto Learning LMS
 
-Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.8.8.8** (the application package remains on the 0.8 code line). Development data is disposable; no production data or upgrade compatibility is assumed.
+Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.8.8.9** (the application package remains on the 0.8 code line). Development data is disposable; no production data or upgrade compatibility is assumed.
 
 Source archives of each released version are on the GitHub [Releases](https://github.com/rrcatto/cattolms/releases) page, starting with v0.8.8.4.
 
@@ -16,6 +16,7 @@ Source archives of each released version are on the GitHub [Releases](https://gi
   - Progress is assessment-only: earlier graded assessments make up 50% and the final 50%.
   - Downloadable Files are served only to learners with access.
   - Learners with a genuine enrolment may rate and review a course; ADMIN approves reviews before they are public.
+  - A passing course issues a certificate from the current certificate design (System → Document Templates: Classic, Modern or Minimal). The learner opens it and its PDF from the course page; it keeps the values and design version it was issued with.
 - **Individual commerce.** Guest and signed-in carts and a staged checkout, paying by Dummy card simulation or manual EFT. Orders, invoices, receipts and credit notes are rendered from immutable snapshots, and fulfilment is idempotent.
   - Promo codes apply at checkout.
   - Course bundles (`/bundles`) sell several courses for one price; each bundled course gets its own entitlement source beside any access the learner already has.
@@ -31,9 +32,10 @@ Public readers can use:
 - `/courses/category/{slug}` to browse a category branch;
 - `/courses/tags` and `/courses/tag/{slug}` to browse tags;
 - `/bundles` and `/bundles/{slug}` to browse course bundles;
+- `/certificates/{public_id}` to verify a certificate and download its PDF;
 - `/help` for the learner-facing guide to finding, buying and completing courses.
 
-The development database is disposable test data. It was last recreated on 2026/10/05 with a 100,000-record seed dataset. Reports are kept in workspace `cattolms/REPORTS`, outside the repository.
+The development database is disposable test data. It was last recreated on 2026/10/07 from the canonical baseline with a 100,000-record seed dataset. Reports are kept in workspace `cattolms/REPORTS`, outside the repository.
 
 ## Release history (v0.8)
 
@@ -55,6 +57,7 @@ The development database is disposable test data. It was last recreated on 2026/
 - **v0.8.8.6:** the front controller reads `APP_CODEBASE_PATH` as a `.env` file, so comments in the instance `.env` no longer stop the site loading.
 - **v0.8.8.7:** Billing Address is its own Account → Profile page after Personal Particulars, which again holds the particulars beside the profile image.
 - **v0.8.8.8:** the shared document template engine (System → Document Templates: versioned HTML/CSS templates, a controlled placeholder language, one renderer for preview and PDF), and a front controller that reads `.env` exactly as phpdotenv does.
+- **v0.8.8.9:** certificates on the document template engine (Phase J): Classic, Modern and Minimal designs, a certificate PDF, and certificates that keep the values and template version they were issued with.
 
 Git publication does not deploy the VPS.
 
@@ -108,7 +111,7 @@ The complete quality gate is:
 podman exec -u cattotest env_php_1 sh -lc 'composer qa'
 ```
 
-It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and release validation. The v0.8.8.8 release passes `composer qa` (1015 PHPUnit tests), the document templates browser check and every existing browser suite; the v0.8.8.7 release passed `composer qa` (934 PHPUnit tests), the billing browser check and both all-theme matrices; the v0.8.8.6 release passed `composer qa` (934 PHPUnit tests, including `FrontControllerEnvTest`); the v0.8.8.5 release passed `composer qa` (926 PHPUnit tests) on a database rebuilt from the canonical baseline; the v0.8.8.4 release passed `composer qa` (926 PHPUnit tests, cold cache), Twig lint and AssetMapper compilation, both all-theme browser matrices, the billing profiles, promo codes and course bundles browser checks (`tests/Browser/billing-profiles.cjs`, `promotions.cjs` and `bundles.cjs`: 10, 9 and 8 checks), the course reviews browser check (`tests/Browser/course-reviews.cjs`, 9 checks in Chromium, Firefox and without JavaScript), the Popular Courses browser check (`tests/Browser/popular-courses.cjs`, 13 checks: rotation without requests, Pause/Resume by keyboard, hover and focus holding a group, reduced motion, favourites across a cycle, card links and responsive layout, plus no JavaScript), and the Course Content tree browser check (`tests/Browser/course-content-tree.cjs`, 41 checks: drag and drop, keyboard, menu, collapse, failure recovery and the "+ Add here" insert modal in Chromium and Firefox, plus the no-JavaScript menu, Move into page and "+ Add here" form pages). `phpunit.xml` sets `memory_limit` to 512M, because a cold-cache run of the whole suite needs more than PHP's default 128M. Both all-theme browser matrices and no-JavaScript smoke checks of the ADMIN tester, company checkout and ADMIN orders flows passed in v0.8.7; v0.8.7.2 passed an all-theme course-editor check with native no-JavaScript tab navigation. A Chromium check of content produced by the real importer and renderer verifies SVG gradients, namespaces and embedded interactions. The browser regression matrix is documented in `tests/Browser/README.md`. JavaScript changed in the repository should also pass `node --check`.
+It runs the PHPUnit suite, PHPStan, architecture and runtime checks, UI ownership validation and release validation. The v0.8.8.9 release passes `composer qa` (1036 PHPUnit tests), the certificates browser check (`tests/Browser/certificates.cjs`, 9) and every existing browser suite; the v0.8.8.8 release passed `composer qa` (1015 PHPUnit tests), the document templates browser check and every existing browser suite; the v0.8.8.7 release passed `composer qa` (934 PHPUnit tests), the billing browser check and both all-theme matrices; the v0.8.8.6 release passed `composer qa` (934 PHPUnit tests, including `FrontControllerEnvTest`); the v0.8.8.5 release passed `composer qa` (926 PHPUnit tests) on a database rebuilt from the canonical baseline; the v0.8.8.4 release passed `composer qa` (926 PHPUnit tests, cold cache), Twig lint and AssetMapper compilation, both all-theme browser matrices, the billing profiles, promo codes and course bundles browser checks (`tests/Browser/billing-profiles.cjs`, `promotions.cjs` and `bundles.cjs`: 10, 9 and 8 checks), the course reviews browser check (`tests/Browser/course-reviews.cjs`, 9 checks in Chromium, Firefox and without JavaScript), the Popular Courses browser check (`tests/Browser/popular-courses.cjs`, 13 checks: rotation without requests, Pause/Resume by keyboard, hover and focus holding a group, reduced motion, favourites across a cycle, card links and responsive layout, plus no JavaScript), and the Course Content tree browser check (`tests/Browser/course-content-tree.cjs`, 41 checks: drag and drop, keyboard, menu, collapse, failure recovery and the "+ Add here" insert modal in Chromium and Firefox, plus the no-JavaScript menu, Move into page and "+ Add here" form pages). `phpunit.xml` sets `memory_limit` to 512M, because a cold-cache run of the whole suite needs more than PHP's default 128M. Both all-theme browser matrices and no-JavaScript smoke checks of the ADMIN tester, company checkout and ADMIN orders flows passed in v0.8.7; v0.8.7.2 passed an all-theme course-editor check with native no-JavaScript tab navigation. A Chromium check of content produced by the real importer and renderer verifies SVG gradients, namespaces and embedded interactions. The browser regression matrix is documented in `tests/Browser/README.md`. JavaScript changed in the repository should also pass `node --check`.
 
 ## Documentation
 

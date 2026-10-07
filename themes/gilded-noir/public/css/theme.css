@@ -1649,67 +1649,7 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 .cl-main .ck-editor__editable_inline { min-height: 220px; background: #fff; }
 
 .gn-family-certificate .cl-main { padding-top: 34px; }
-.cl-main .cl-certificate {
-  position: relative;
-  max-width: 940px;
-  margin: 0 auto;
-  padding: 20px;
-  border-radius: var(--gn-radius-plate);
-  background: linear-gradient(150deg, #16161a, #23231f 48%, #0d0d0e);
-  box-shadow: var(--gn-shadow-lg);
-}
-.cl-main .cl-certificate-border {
-  padding: clamp(28px, 5vw, 62px);
-  border: 2px solid rgba(234, 210, 138, .6);
-  border-radius: var(--gn-radius-lg);
-  background:
-    repeating-linear-gradient(-14deg, rgba(191, 167, 93, .09) 0 14px, transparent 14px 50px),
-    linear-gradient(180deg, rgba(255, 255, 255, .03), transparent);
-  text-align: center;
-  color: #f2ead9;
-}
-.cl-main .cl-certificate h1 {
-  font-family: var(--gn-font-display);
-  font-size: clamp(2rem, 4.4vw, 3.2rem);
-  color: var(--gn-gold-bright);
-  letter-spacing: .02em;
-}
-.cl-main .cl-certificate h2 { font-family: var(--gn-font-display); font-size: clamp(1.4rem, 3vw, 2.1rem); color: #fff; }
-.cl-main .cl-certificate-copy { max-width: 62ch; margin: 18px auto; color: #cec5b2; line-height: 1.8; }
-.cl-main .cl-certificate small,.cl-main .cl-certificate-signature small {
-  font-family: var(--gn-font-ui);
-  font-size: .72rem;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-  color: #a89f8d;
-}
-.cl-main .cl-certificate-grade {
-  display: inline-block;
-  margin-top: 18px;
-  padding: .5em 1.2em;
-  border-radius: var(--gn-radius-pill);
-  border: 1px solid rgba(234, 210, 138, .55);
-  background: rgba(191, 167, 93, .18);
-  font-family: var(--gn-font-display);
-  font-size: 1.25rem;
-  color: var(--gn-gold-bright);
-}
-.cl-main .cl-certificate-signature {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-around;
-  gap: 26px;
-  margin-top: 44px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(234, 210, 138, .3);
-}
-.cl-main .cl-certificate-signature strong { display: block; font-family: var(--gn-font-display); font-size: 1.1rem; color: #fff; }
-.cl-main .cl-certificate-preview-frame {
-  padding: 20px;
-  border: 1px dashed var(--gn-line-strong);
-  border-radius: var(--gn-radius-lg);
-  background: var(--gn-ivory);
-}
+
 .cl-main .cl-placeholder-list code {
   padding: .2em .45em;
   border-radius: 5px;
@@ -2005,15 +1945,7 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
   .cl-page-frame::before { display: none; }
   .cl-main { padding: 0; }
   .cl-main .cl-ui-surface,.cl-main .cl-ui-table { box-shadow: none; break-inside: avoid; }
-  .cl-main .cl-certificate {
-    background: #fff;
-    box-shadow: none;
-    padding: 0;
-  }
-  .cl-main .cl-certificate-border { border-color: #8d7340; background: #fff; }
-  .cl-main .cl-certificate h1,.cl-main .cl-certificate-grade { color: #6f5a2f; }
-  .cl-main .cl-certificate h2,.cl-main .cl-certificate-signature strong { color: #000; }
-  .cl-main .cl-certificate-copy,.cl-main .cl-certificate small { color: #333; }
+
 }
 
 .cl-nav-link .cl-nav-icon,.cl-nav-panel a .cl-nav-icon {

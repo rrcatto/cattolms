@@ -27,6 +27,8 @@ token would rebuild the same graph - useful when reproducing a defect found at v
 
 Changelog:
 
+2026/10/07 SAST
+- Generated certificates store their document data and the current certificate template version, as issued ones do (Phase J).
 
 2026/09/07 00:50 SAST
 
@@ -47,6 +49,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Seed;
 
+use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
 use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use CattoLearning\Infrastructure\Persistence\SeedRepository;
 use CattoLearning\Auth\RoleCatalog;
@@ -482,7 +485,6 @@ final class SeedGenerator
                     $status,
                     31536000,
                     true,
-                    'classic',
                     $owner,
                     $company['id'],
                     'approved',
@@ -498,7 +500,7 @@ final class SeedGenerator
                 [
                     'public_id', 'category_id', 'slug', 'title', 'summary', 'level', 'estimated_minutes',
                     'status', 'default_access_period_seconds',
-                    'certificate_enabled', 'certificate_template', 'owner_user_id', 'owner_company_id',
+                    'certificate_enabled', 'owner_user_id', 'owner_company_id',
                     'publication_approval_status', 'created_by_user_id',
                     'updated_by_user_id', 'published_at', 'cover_svg',
                 ],
@@ -830,6 +832,9 @@ final class SeedGenerator
         // Certificate numbers run across the whole set, so the counter cannot live inside a chunk:
         // reset per chunk it would issue SEED-<key>-000000 once per chunk instead of once.
         $certificateSequence = 0;
+        // Generated certificates are drawn like issued ones: the certificate data and the version of
+        // the current certificate template they are rendered with.
+        $certificateTemplate = $this->repository->certificateTemplate();
         $learnerCount = count($learners);
         $courseCount = count($courses);
 
@@ -945,10 +950,18 @@ final class SeedGenerator
                     $overall = round(60 + $this->next(40), 2);
                     $resultRows[] = [$enrolmentId, $overall, $overall, $overall, $this->gradeFor($overall), $overall >= 50.0];
 
+                    $number = 'SEED-' . strtoupper($suffix) . '-' . str_pad((string) $certificateSequence, 6, '0', STR_PAD_LEFT);
+                    $issuedAt = (new \DateTimeImmutable($now))->format(DATE_ATOM);
+                    $data = CertificateDocumentDataBuilder::assemble(
+                        ['business.name' => $certificateTemplate['business_name']],
+                        ['title' => $course['title'], 'overall_percentage' => $overall, 'grade_code' => $this->gradeFor($overall)],
+                        'Seed Learner', '', $number, null, $issuedAt, $issuedAt
+                    );
                     $certificateRows[] = [
-                        Uuid::v4(), $enrolmentId,
-                        'SEED-' . strtoupper($suffix) . '-' . str_pad((string) $certificateSequence, 6, '0', STR_PAD_LEFT),
-                        'Seed Learner', $course['title'], $this->gradeFor($overall), $overall, $now,
+                        Uuid::v4(), $enrolmentId, $number,
+                        'Seed Learner', $course['title'], $this->gradeFor($overall), $overall,
+                        json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        $certificateTemplate['template_id'], $certificateTemplate['version_id'], $certificateTemplate['version_number'], $now,
                     ];
                     $certificateSequence++;
                 }
@@ -1014,7 +1027,7 @@ final class SeedGenerator
 
             $this->write(
                 'certificates',
-                ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'issued_at'],
+                ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'document_data', 'template_id', 'template_version_id', 'template_version_number', 'issued_at'],
                 $certificateRows
             );
             unset($certificateRows);

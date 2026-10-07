@@ -1,0 +1,27 @@
+<table class="sheet">
+	<tr>
+		<td class="band"></td>
+		<td class="content">
+			<p class="issuer">{{ business.name }}</p>
+			<p class="kicker">{{ certificate.title }}</p>
+			<h1 class="learner">{{ learner.name }}</h1>
+			<p class="body">{{ certificate.body }}</p>
+			<h2 class="course">{{ course.title }}</h2>
+			{{#if course.provider}}<p class="provider">{{ course.provider }}</p>{{/if}}
+			<table class="facts">
+				<tr>
+					<td><span class="label">Completed</span>{{ course.completion_date }}</td>
+					{{#if result.percentage}}<td><span class="label">Result</span>{{ result.percentage }}{{#if result.grade}} · {{ result.grade }}{{/if}}</td>{{else}}{{#if result.grade}}<td><span class="label">Grade</span>{{ result.grade }}</td>{{/if}}{{/if}}
+					<td><span class="label">Certificate</span>{{ certificate.number }}</td>
+				</tr>
+			</table>
+			<table class="foot">
+				<tr>
+					<td class="signatory">{{#if signatory.name}}<span class="name">{{ signatory.name }}</span>{{#if signatory.title}}<span class="role">{{ signatory.title }}</span>{{/if}}{{/if}}</td>
+					<td class="issued">Issued {{ certificate.issue_date }}{{#if certificate.verification_url}}<br>{{ certificate.verification_url }}{{/if}}</td>
+				</tr>
+			</table>
+			{{#if certificate.footer}}<p class="footer">{{ certificate.footer }}</p>{{/if}}
+		</td>
+	</tr>
+</table>

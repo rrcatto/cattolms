@@ -12,6 +12,8 @@ Resolves administrator-overridable runtime settings with PostgreSQL taking prece
 
 Changelog:
 
+2026/10/07 SAST
+- Added contactEmail(): the reply-to, else the from address, for business.email in documents (Phase J).
 2026/08/25 14:29 SAST
 
 - Stage C: added the SEED System Company name and mail domain as administrator-overridable settings resolving app_options, then .env, then a built-in default.
@@ -108,6 +110,21 @@ final class RuntimeSettings
     public function platformName(): string
     {
         return $this->options->find('platform_name') ?? Env::string('APP_NAME', 'Catto Learning');
+    }
+
+    /**
+     * The address people are told to write to: the reply-to address mail goes out with, or the sender
+     * when there is none. Read without the mail transport, so a document never depends on it.
+     */
+    public function contactEmail(): string
+    {
+        foreach ([$this->options->find(self::MAIL_REPLY_TO) ?? Env::string('MAIL_REPLY_TO'), $this->options->find(self::MAIL_FROM_ADDRESS) ?? Env::string('MAIL_FROM_ADDRESS')] as $address) {
+            $address = trim($address);
+            if ($address !== '' && filter_var($address, FILTER_VALIDATE_EMAIL) !== false) {
+                return $address;
+            }
+        }
+        return '';
     }
 
     public function platformNameSource(): string

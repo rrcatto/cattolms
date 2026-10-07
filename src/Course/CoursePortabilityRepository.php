@@ -11,6 +11,8 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for course portability records.
 
 Changelog:
+2026/10/07 SAST
+- Removed updateCertificateTemplate() and the certificate design reset; a course holds no certificate HTML or CSS (Phase J).
 2026/09/08 19:52 SAST
 - Depends on the Database interface rather than naming Doctrine's Connection, so the bound PDO parameter type is inferred from the PHP value.
 2026/08/12 23:56 SAST
@@ -91,7 +93,7 @@ final class CoursePortabilityRepository
         $this->db->executeStatement('DELETE FROM course_grade_bands WHERE course_id=:course_id', ['course_id' => $courseId]);
         $this->db->executeStatement(
             "UPDATE courses SET status='draft', publication_approval_status='pending', source_filename=NULL,
-                    updated_at=NOW(), certificate_template_html='', certificate_template_css='', presentation_css=''
+                    updated_at=NOW(), presentation_css=''
              WHERE id=:course_id",
             ['course_id' => $courseId]
         );
@@ -131,46 +133,6 @@ final class CoursePortabilityRepository
         );
         $this->db->executeStatement('DELETE FROM course_enrolments WHERE course_id=:course_id', ['course_id' => $courseId]);
         $this->db->executeStatement('DELETE FROM courses WHERE id=:course_id', ['course_id' => $courseId]);
-    }
-
-    public function updateCertificateTemplate(
-        int $courseId,
-        bool $enabled,
-        string $title,
-        string $body,
-        string $footer,
-        string $signatoryName,
-        string $signatoryTitle,
-        string $html,
-        string $css,
-        int $userId
-    ): void {
-        $this->db->executeStatement(
-            'UPDATE courses
-             SET certificate_enabled=:enabled,
-                 certificate_title=:title,
-                 certificate_body_text=:body,
-                 certificate_footer_text=:footer,
-                 certificate_signatory_name=:signatory_name,
-                 certificate_signatory_title=:signatory_title,
-                 certificate_template_html=:html,
-                 certificate_template_css=:css,
-                 updated_by_user_id=:user_id,
-                 updated_at=NOW()
-             WHERE id=:course_id',
-            [
-                'enabled' => $enabled,
-                'title' => $title,
-                'body' => $body,
-                'footer' => $footer !== '' ? $footer : null,
-                'signatory_name' => $signatoryName !== '' ? $signatoryName : null,
-                'signatory_title' => $signatoryTitle !== '' ? $signatoryTitle : null,
-                'html' => $html,
-                'css' => $css,
-                'user_id' => $userId,
-                'course_id' => $courseId,
-            ]
-        );
     }
 
     /** @return array<string,mixed> */

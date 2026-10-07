@@ -1,6 +1,21 @@
 # Changelog
 
-**LMS version:** 0.8.8.8 **Date time:** 2026/10/07 SAST
+**LMS version:** 0.8.8.9 **Date time:** 2026/10/07 SAST
+
+## 2026-10-07 SAST — v0.8.8.9 Certificates on the document template engine
+
+- **Release.** Version aligned to 0.8.8.9 at the owner's instruction ("commit and push to git - v0.8.8.9 - update stale documents"); published as GitHub release `v0.8.8.9` with `cattolms-v0.8.8.9.zip`. It releases Phase J below and the `.gitattributes` fix found after v0.8.8.8. The documentation was brought up to the v0.8.8.9 state.
+
+- **One rendering path.** Certificates are documents of the shared engine. `CertificateDocumentDataBuilder` builds their values from real CattoLMS data; `CertificateIssuer` issues on a passing result through `DocumentTemplateRenderer::renderCurrent()`; the course preview, its sample PDF, the certificate page and the certificate PDF use the same renderer. Issuing fails with a clear message, and stores nothing, when no certificate template is current.
+- **History.** Each certificate stores the values it was rendered with (`certificates.document_data`) and the template id, version id and version number, audited as `certificate.issued`/`certificate.reissued`. It is always drawn again from those, so renaming the learner or course, changing the course's wording or publishing a new template never changes it. A reissue keeps the number and public id; the number rule (`CL-<UTC year>-<12 hex>`) is unchanged.
+- **Designs.** Classic (current), Modern and Minimal are installed as separate certificate templates, A4 landscape, one page with long realistic values, with every optional part (result, grade, provider, signatory, footer, verification address) behind `{{#if}}`.
+- **Course settings.** `/admin/courses/{id}/certificate` keeps only data — enabled, title, body, footer, signatory name and title — in plain fields, previews it in a sandboxed frame with a sample PDF, and links to Manage certificate templates.
+- **Learners.** View certificate and Download certificate PDF on the course page. `/certificates/{public_id}` shows the details and the certificate as issued; `/certificates/{public_id}/certificate.pdf` serves it. A revoked certificate says so and has no PDF. Template viewers see the version a certificate was drawn from; the version page counts the certificates issued with it.
+- **Removed.** The `str_replace` renderer, the course's certificate HTML/CSS and design columns, the CKEditor field that rewrote authored markup on every save (the cause of the broken preview), the unsandboxed preview and its separate renderer, the certificate template fields in course export/import, and the themes' unused `.cl-certificate` rules.
+- **Tests.** `CertificateTemplatesTest` (14) and `CertificateIntegrationTest` (7), with updated authoring, import and authorisation tests; `composer qa`: 1036 tests. `tests/Browser/certificates.cjs` passed 9/9, and every other suite passed: UI matrix 72, canonical 30, Popular Courses 13, reviews 9, Course Content tree 41, billing 10, document templates 9, promotions 9, bundles 8.
+- **Deploying.** Rebuild the database (the baseline changed), publish `catto-platform.css`, and run `composer themes:install -- --force`.
+- **Fixture line endings.** `.gitattributes` keeps `tests/Fixtures/env/*.env` byte-exact (`-text -whitespace`): v0.8.8.8 had committed `bom-crlf.env` with LF endings, so the CRLF case it exists for was not in the repository.
+- Report: workspace `REPORTS/certificates-phase-j-2026-10-07.md`.
 
 ## 2026-10-07 SAST — v0.8.8.8 Shared document template engine and .env-faithful front controller
 
@@ -33,7 +48,7 @@
   - The session is now saved before the response is sent, so a redirect can no longer outrun its flash message.
   - Administration pages that are not registered sections no longer show "Administration" twice in the breadcrumb.
 - **Tests.** `DocumentTemplateEngineTest` (56), `DocumentTemplateIntegrationTest` (7) and `tests/Browser/document-templates.cjs` (9 scenarios). `composer qa`: 997 tests.
-- **Not yet.** Production certificates, invoices, receipts and credit notes still render the old way; Phase J migrates them.
+- **Not yet.** Production certificates, invoices, receipts and credit notes still rendered the old way at this release; Phase J migrates certificates and Phase K the rest.
 
 ## 2026-10-06 SAST — v0.8.8.7 Billing Address under Account → Profile
 

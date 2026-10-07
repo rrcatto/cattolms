@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/07 SAST
+- Certificates render through the document template engine (Phase J): courses keep only certificate data (enabled, title, body, footer, signatory), certificates store the data they were issued with and the exact template version, and the Classic, Modern and Minimal designs are installed with Classic current.
 2026/10/06 SAST
 - Consolidated all 25 development migrations into this one canonical baseline, on the owner's instruction: company favourites, generated artwork, profile images and social links, the removed company type, commerce (carts, orders, documents, payments, entitlements, company credit purchases, payment administration and refunds), authenticated session email, Downloadable File items, public section previews, analytics events, course reviews, course popularity, billing profiles, promo codes, course bundles and independent entitlement sources. Each table is created in its final form; the incremental migrations and their one-off data conversions are gone.
 - Records the bundled Factory Reset 2.0.1 as the default active theme directly.
@@ -1496,13 +1498,10 @@ CREATE TABLE courses (
     default_access_period_seconds INTEGER NOT NULL DEFAULT 31536000 CHECK (default_access_period_seconds > 0),
     certificate_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     certificate_title VARCHAR(240) NULL,
-    certificate_template VARCHAR(24) NOT NULL DEFAULT 'classic',
     certificate_body_text VARCHAR(500) NOT NULL DEFAULT 'has successfully completed',
     certificate_footer_text VARCHAR(500) NULL,
     certificate_signatory_name VARCHAR(160) NULL,
     certificate_signatory_title VARCHAR(160) NULL,
-    certificate_template_html TEXT NOT NULL DEFAULT '<section class="cl-certificate"><p class="cl-certificate-kicker">{{certificate_title}}</p><h1>{{student_name}}</h1><p>{{certificate_body}}</p><h2>{{course_title}}</h2><p>Overall result: {{overall_percentage}}% · {{overall_grade}}</p><p>Completed {{completion_date}}</p><footer><strong>{{signatory_name}}</strong><br>{{signatory_title}}<br>{{certificate_number}}</footer></section>',
-    certificate_template_css TEXT NOT NULL DEFAULT '.cl-certificate{padding:48px;text-align:center;border:12px double #2A324B;font-family:system-ui,sans-serif}.cl-certificate h1{font-size:42px}.cl-certificate h2{font-size:28px}.cl-certificate footer{margin-top:36px}',
     course_style_key VARCHAR(120) NOT NULL DEFAULT 'standard',
     presentation_css TEXT NOT NULL DEFAULT '',
     source_filename VARCHAR(500) NULL,
@@ -1515,8 +1514,7 @@ CREATE TABLE courses (
     published_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    cover_svg TEXT NOT NULL DEFAULT '',
-    CONSTRAINT courses_certificate_template_check CHECK (certificate_template IN ('classic','modern','simple','custom'))
+    cover_svg TEXT NOT NULL DEFAULT ''
 );
 COMMENT ON COLUMN courses.cover_svg IS
     'Generated cover artwork, replaced when a real cover image is uploaded. Never selected by a list query.';
@@ -1867,24 +1865,25 @@ CREATE TABLE course_results (
     calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- An issued certificate. document_data is the certificate exactly as issued - every value its
+-- document template was given - and template_version_id names the published version it was rendered
+-- with. A certificate is drawn again from those two whenever it is viewed or downloaded, so it never
+-- changes when the learner, the course or the certificate templates change later. A later passing
+-- final reissues it under the same number and public id with the data and version of that issue.
 CREATE TABLE certificates (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
     enrolment_id BIGINT NOT NULL UNIQUE REFERENCES course_enrolments(id) ON DELETE RESTRICT,
     certificate_number VARCHAR(80) NOT NULL UNIQUE,
+    -- Copies of the certified values the verification page and lists show without rendering.
     learner_name VARCHAR(240) NOT NULL,
-    certificate_title VARCHAR(240) NOT NULL DEFAULT 'Certificate of Completion',
     course_title VARCHAR(240) NOT NULL,
-    grade_code VARCHAR(24) NOT NULL,
-    overall_percentage NUMERIC(5,2) NOT NULL,
-    certificate_template VARCHAR(24) NOT NULL DEFAULT 'classic',
-    certificate_body_text VARCHAR(500) NOT NULL DEFAULT 'has successfully completed',
-    certificate_footer_text VARCHAR(500) NULL,
-    certificate_signatory_name VARCHAR(160) NULL,
-    certificate_signatory_title VARCHAR(160) NULL,
-    template_html_snapshot TEXT NOT NULL DEFAULT '',
-    template_css_snapshot TEXT NOT NULL DEFAULT '',
-    rendered_html TEXT NOT NULL DEFAULT '',
+    grade_code VARCHAR(24) NULL,
+    overall_percentage NUMERIC(5,2) NULL,
+    document_data JSONB NOT NULL CHECK (jsonb_typeof(document_data) = 'object'),
+    template_id BIGINT NOT NULL,
+    template_version_id BIGINT NOT NULL,
+    template_version_number INTEGER NOT NULL CHECK (template_version_number > 0),
     issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     revoked_at TIMESTAMPTZ NULL,
     revocation_reason VARCHAR(500) NULL
@@ -2721,6 +2720,14 @@ ALTER TABLE document_templates ADD CONSTRAINT document_templates_published_versi
     FOREIGN KEY (published_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
 CREATE INDEX document_templates_published_version_fk_idx ON document_templates (published_version_id);
 
+-- An issued certificate names the exact template version it was rendered with; that version can
+-- never change or be deleted, so the certificate can always be drawn again exactly as issued.
+ALTER TABLE certificates
+    ADD CONSTRAINT certificates_template_fkey FOREIGN KEY (template_id) REFERENCES document_templates(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT certificates_template_version_fkey FOREIGN KEY (template_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
+CREATE INDEX certificates_template_version_fk_idx ON certificates (template_version_id);
+CREATE INDEX certificates_template_fk_idx ON certificates (template_id);
+
 -- A published version never changes and is never deleted: a document generated from it must be
 -- reproducible. A draft may be edited or discarded; publishing it is its last change.
 CREATE FUNCTION document_template_version_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
@@ -2796,21 +2803,24 @@ SQL);
         // of every type can be rendered from the moment the platform is installed. The source
         // files seed the installation; once installed the template lives here.
         foreach (DocumentType::cases() as $type) {
-            $default = DocumentTemplateDefaults::for($type);
             $settings = $type->defaultSettings()->toArray();
-            $templateId = (int) $this->fetchRow(
-                'INSERT INTO document_templates (document_type, name, description) VALUES ('
-                . $this->quote($type->value) . ', ' . $this->quote($default['name']) . ', ' . $this->quote($default['description']) . ') RETURNING id'
-            )['id'];
-            $versionId = (int) $this->fetchRow(
-                'INSERT INTO document_template_versions (template_id, version_number, state, html, css, page_size, page_orientation,'
-                . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
-                . $templateId . ", 1, 'published', " . $this->quote($default['html']) . ', ' . $this->quote($default['css']) . ', '
-                . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
-                . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
-                . ", 'Installed default.', NOW()) RETURNING id"
-            )['id'];
-            $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId . ', is_current = TRUE WHERE id = ' . $templateId);
+            foreach (DocumentTemplateDefaults::presets($type) as $position => $default) {
+                $templateId = (int) $this->fetchRow(
+                    'INSERT INTO document_templates (document_type, name, description) VALUES ('
+                    . $this->quote($type->value) . ', ' . $this->quote($default['name']) . ', ' . $this->quote($default['description']) . ') RETURNING id'
+                )['id'];
+                $versionId = (int) $this->fetchRow(
+                    'INSERT INTO document_template_versions (template_id, version_number, state, html, css, page_size, page_orientation,'
+                    . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
+                    . $templateId . ", 1, 'published', " . $this->quote($default['html']) . ', ' . $this->quote($default['css']) . ', '
+                    . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
+                    . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
+                    . ", 'Installed starter design.', NOW()) RETURNING id"
+                )['id'];
+                // The first design of each type is current: Classic for certificates.
+                $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId
+                    . ($position === 0 ? ', is_current = TRUE' : '') . ' WHERE id = ' . $templateId);
+            }
         }
 
     }

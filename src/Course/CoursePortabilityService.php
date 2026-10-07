@@ -11,6 +11,8 @@ Description:
 Implements Catto Learning business and application logic for course portability operations.
 
 Changelog:
+2026/10/07 SAST
+- Removed the course certificate HTML/CSS editor, its preview renderer and the certificate template fields in export and import: the design is a certificate document template (Phase J).
 2026/08/23 04:19 SAST
 - Enforced decision D5 at the service layer: a SEED course cannot be exported or cloned, and a seed identity cannot import.
 - Threaded the Seed Database data universe through this file so every business read states which universe it means.
@@ -232,8 +234,6 @@ final class CoursePortabilityService
                 'certificate_footer_text' => $course['certificate_footer_text'] ?? '',
                 'certificate_signatory_name' => $course['certificate_signatory_name'] ?? '',
                 'certificate_signatory_title' => $course['certificate_signatory_title'] ?? '',
-                'certificate_template_html' => $course['certificate_template_html'] ?? '',
-                'certificate_template_css' => $course['certificate_template_css'] ?? '',
                 'course_style_key' => $course['course_style_key'],
                 'presentation_css' => $course['presentation_css'] ?? '',
             ],
@@ -257,27 +257,6 @@ final class CoursePortabilityService
         return $this->portability->hasStartedLearners($courseId);
     }
 
-    /** @param array<string,mixed> $course */
-    public function previewCertificate(array $course, string $studentName): string
-    {
-        $courseId = (int) ($course['id'] ?? 0);
-        return $this->renderCertificateTemplate($course, [
-            'student_name' => $studentName,
-            'course_title' => (string) ($course['title'] ?? 'Sample Course'),
-            'course_provider' => $courseId > 0 ? $this->courses->certificateProviderName($courseId) : 'Catto Learning',
-            'completion_date' => date('j F Y'),
-            'overall_percentage' => '85.00',
-            'overall_grade' => 'A',
-            'certificate_number' => 'CL-PREVIEW-000001',
-            'certificate_verification_url' => '#preview',
-            'signatory_name' => (string) ($course['certificate_signatory_name'] ?? ''),
-            'signatory_title' => (string) ($course['certificate_signatory_title'] ?? ''),
-            'certificate_title' => (string) ($course['certificate_title'] ?? 'Certificate of Completion'),
-            'certificate_body' => (string) ($course['certificate_body_text'] ?? 'has successfully completed'),
-            'certificate_footer' => (string) ($course['certificate_footer_text'] ?? ''),
-        ]);
-    }
-
     public function resetCourse(int $courseId, int $userId): void
     {
         $this->requireCourse($courseId);
@@ -291,56 +270,6 @@ final class CoursePortabilityService
         $course = $this->requireCourse($courseId);
         $this->transactions->run(fn() => $this->portability->deleteCourse($courseId));
         $this->audit->record($userId, 'course.deleted', ['course_id' => $courseId, 'title' => $course['title']]);
-    }
-
-    /**
-     * @param array<string,mixed> $input
-     */
-    public function updateCertificateTemplate(int $courseId, array $input, int $userId): void
-    {
-        $this->requireCourse($courseId);
-        $html = $this->courseHtml->preserve(trim((string) ($input['certificate_template_html'] ?? '')));
-        if ($html === '') {
-            throw new InvalidArgumentException('Enter the certificate HTML template.');
-        }
-        $allowed = [
-            'student_name','course_title','course_provider','completion_date','overall_percentage',
-            'overall_grade','certificate_number','certificate_verification_url','signatory_name',
-            'signatory_title','certificate_title','certificate_body','certificate_footer',
-        ];
-        preg_match_all('/\{\{([a-z_]+)\}\}/', $html, $matches);
-        foreach (array_unique($matches[1]) as $placeholder) {
-            if (!in_array($placeholder, $allowed, true)) {
-                throw new InvalidArgumentException('Unknown certificate placeholder: {{' . $placeholder . '}}');
-            }
-        }
-        $css = trim((string) ($input['certificate_template_css'] ?? ''));
-        $enabled = array_key_exists('certificate_enabled', $input);
-        $title = mb_substr(trim((string) ($input['certificate_title'] ?? 'Certificate of Completion')), 0, 240);
-        $body = mb_substr(trim((string) ($input['certificate_body_text'] ?? 'has successfully completed')), 0, 500);
-        $footer = mb_substr(trim((string) ($input['certificate_footer_text'] ?? '')), 0, 500);
-        $signatoryName = mb_substr(trim((string) ($input['certificate_signatory_name'] ?? '')), 0, 160);
-        $signatoryTitle = mb_substr(trim((string) ($input['certificate_signatory_title'] ?? '')), 0, 160);
-        if ($title === '') {
-            $title = 'Certificate of Completion';
-        }
-        if ($body === '') {
-            $body = 'has successfully completed';
-        }
-        $this->portability->updateCertificateTemplate(
-            $courseId,
-            $enabled,
-            $title,
-            $body,
-            $footer,
-            $signatoryName,
-            $signatoryTitle,
-            $html,
-            $css,
-            $userId
-        );
-        $this->courses->recordHistory($courseId, $userId, 'certificate.template_updated', 'course', $courseId, 'Certificate template updated.');
-        $this->audit->record($userId, 'course.certificate_template_updated', ['course_id' => $courseId]);
     }
 
     /** @return array<string,mixed> */
@@ -432,13 +361,10 @@ final class CoursePortabilityService
             'show_outline_on_intro' => (bool) ($input['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) ($input['certificate_enabled'] ?? true),
             'certificate_title' => trim((string) ($input['certificate_title'] ?? 'Certificate of Completion')),
-            'certificate_template' => 'custom',
             'certificate_body_text' => trim((string) ($input['certificate_body_text'] ?? 'has successfully completed')) ?: 'has successfully completed',
             'certificate_footer_text' => trim((string) ($input['certificate_footer_text'] ?? '')),
             'certificate_signatory_name' => trim((string) ($input['certificate_signatory_name'] ?? '')),
             'certificate_signatory_title' => trim((string) ($input['certificate_signatory_title'] ?? '')),
-            'certificate_template_html' => (string) ($input['certificate_template_html'] ?? ''),
-            'certificate_template_css' => (string) ($input['certificate_template_css'] ?? ''),
             'course_style_key' => trim((string) ($input['course_style_key'] ?? 'standard')) ?: 'standard',
             'presentation_css' => (string) ($input['presentation_css'] ?? ''),
             'source_filename' => basename((string) ($input['source_filename'] ?? 'structured-course.json')),
@@ -462,23 +388,6 @@ final class CoursePortabilityService
                 Env::string('APP_DOMAIN', 'local')
             );
         return (int) $systemCompany['id'];
-    }
-
-    /**
-     * @param array<string,mixed> $course
-     * @param array<string,string> $values
-     */
-    private function renderCertificateTemplate(array $course, array $values): string
-    {
-        $html = trim((string) ($course['certificate_template_html'] ?? ''));
-        if ($html === '') {
-            $html = '<section class="cl-certificate"><p>{{certificate_title}}</p><h1>{{student_name}}</h1><p>{{certificate_body}}</p><h2>{{course_title}}</h2><p>{{overall_percentage}}% · {{overall_grade}}</p><footer>{{certificate_number}}</footer></section>';
-        }
-        foreach ($values as $key => $value) {
-            $html = str_replace('{{' . $key . '}}', htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), $html);
-        }
-        $css = (string) ($course['certificate_template_css'] ?? '');
-        return '<style>' . $css . '</style>' . $html;
     }
 
     /** @return array<string,mixed> */

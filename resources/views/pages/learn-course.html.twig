@@ -16,6 +16,9 @@
 <span></span>{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ preview_query}) }}
 </nav>
 {% endif %}
+{% if not is_preview and course.certificate|default(null) %}
+<p class="cl-course-certificate-links">{{ ui('action.link', {label: 'View certificate', variant: 'primary', size: 'small', href: '/certificates/' ~ course.certificate.public_id}) }} {{ ui('action.link', {label: 'Download certificate PDF', variant: 'secondary', size: 'small', href: '/certificates/' ~ course.certificate.public_id ~ '/certificate.pdf'}) }}</p>
+{% endif %}
 {# Not in an ADMIN preview: previewing a course is authoring it, not studying it. #}
 {% if not is_preview and 'LEARNING.REVIEW.CREATE' in permissions %}
 <p class="cl-course-review-prompt">{{ ui('action.link', {label: 'Rate this course', variant: 'secondary', size: 'small', href: '/learn/' ~ course.slug ~ '/review'}) }}</p>

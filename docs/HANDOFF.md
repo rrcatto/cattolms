@@ -1,6 +1,25 @@
-# Catto Learning 0.8.8.8 — Development Handoff
+# Catto Learning 0.8.8.9 — Development Handoff
 
-## Current development handoff — 2026/10/07 (v0.8.8.8)
+## Current development handoff — 2026/10/07 (v0.8.8.9)
+
+The owner authorized v0.8.8.9 ("commit and push to git - v0.8.8.9 - update stale documents"). It releases Phase J, certificates on the document template engine (below), and the `.gitattributes` rule that keeps `tests/Fixtures/env/*.env` byte-exact (`-text -whitespace`, so `bom-crlf.env` keeps its CRLF endings, which v0.8.8.8 had committed as LF).
+
+- **Release.** Annotated tag and GitHub release `v0.8.8.9` with `cattolms-v0.8.8.9.zip`. Gates: `composer qa` (1036 tests), Twig lint, AssetMapper compilation, `git diff --check`, `tests/Browser/certificates.cjs` (9/9) and every existing browser suite.
+- **Deploying.** Rebuild the database (the baseline changed), publish `catto-platform.css`, and run `composer themes:install -- --force` (four theme stylesheets lost their unused certificate rules).
+- **Next.** Phase K, invoices, receipts and credit notes on the document template engine. Open certificate items: an ADMIN certificate list, a revoke action and signature images.
+
+## Phase J — certificates on the document template engine (2026/10/07, released in v0.8.8.9)
+
+Report: workspace `REPORTS/certificates-phase-j-2026-10-07.md`.
+
+- **Why the old preview broke.** The course's certificate HTML field was a CKEditor (`cl-rich-editor`) that rewrote authored markup on every load and save (`<em>` to `<i>`, spans and footers wrapped in `<p>`, tables given `<tbody>` and a class). The preview was raw HTML injected into the admin page, so theme CSS restyled it. Preview and issue used two different renderers.
+- **Schema (baseline).** `courses` lost `certificate_template`, `certificate_template_html` and `certificate_template_css`. `certificates` holds the identity, copies of the learner, course, grade and percentage, `document_data JSONB` (every value rendered) and `template_id`, `template_version_id` and `template_version_number`, with foreign keys to the template tables. The baseline installs Classic (current), Modern and Minimal (`DocumentTemplateDefaults::presets()`).
+- **Code.** `src/Course/Certificate/`: `CertificateDocumentDataBuilder` (`forIssue`, `forPreview`, `assemble`), `CertificateIssuer` (transactional issue/reissue, number, audit), `CertificateRepository` (SQL), `CertificateDocuments` (render and PDF of an issued certificate from its own version). `src/Document/DocumentBusinessData` provides `business.*`. `CourseCertificateController` owns `/admin/courses/{id}/certificate` (and `sample.pdf`); `CertificateController` owns `/certificates/{public_id}` and `certificate.pdf`. The learner course page links to the certificate. Seed certificates record data and the current version.
+- **Removed.** `CourseRepository::createCertificate()` and its helpers, the portability preview/update/render methods, the old admin and public certificate actions, `LearningService::certificate()`, the certificate template fields in export/import, and the themes' `.cl-certificate` CSS.
+- **Not built.** An ADMIN certificate list, a revoke action, signature images on courses. Invoices, receipts and credit notes are Phase K.
+- **Tests.** `CertificateTemplatesTest` (14), `CertificateIntegrationTest` (7); `composer qa`: 1036 tests. `tests/Browser/certificates.cjs` with `certificates-fixture.php`: 9/9. Every other browser suite passed (UI 72, canonical 30, Popular Courses 13, reviews 9, Course Content tree 41, billing 10, document templates 9, promotions 9, bundles 8).
+
+## v0.8.8.8 handoff — 2026/10/07
 
 The owner authorized v0.8.8.8. It releases Phase I (below) and the front controller's `.env` reading:
 
@@ -9,7 +28,6 @@ The owner authorized v0.8.8.8. It releases Phase I (below) and the front control
 - **Contract.** `IniParserContractTest` bans `parse_ini_file()` and `parse_ini_string()`.
 - **Other changes.** `.env.example` lost its stale v0.5.8 seed section, and PHPStan now analyses `index.php`. Report: workspace `REPORTS/env-front-controller-2026-10-06.md`.
 - **Release.** Annotated tag and GitHub release `v0.8.8.8` with `cattolms-v0.8.8.8.zip`. Gates: `composer qa` (1015 tests), the document templates browser check (9/9) and every existing browser suite.
-- **Next.** Phase J, moving certificates onto the document template engine, is in progress in the working tree.
 
 ## Phase I — shared document template engine (2026/10/06, released in v0.8.8.8)
 
@@ -36,7 +54,7 @@ Report: workspace `REPORTS/document-templates-2026-10-06.md`.
 - **Platform fixes found on the way.**
   - **Session save timing.** `App::handleWithSymfony()` now saves the session before `Response::send()`, which ends the FastCGI request first. Before this, a fast browser could follow a redirect before its flash message was written.
   - **Breadcrumbs.** Administration pages that are not registered sections (Promotions, Bundles, Document Templates) no longer print "Administration" twice.
-- **Not migrated (Phase J).** The certificate editor, invoices, receipts and credit notes still render as before. No document records a template version yet. Business phone and registration numbers do not exist in CattoLMS and have no placeholders.
+- **Not migrated in Phase I.** The certificate editor, invoices, receipts and credit notes still rendered as before (Phase J moved certificates in v0.8.8.9). No document records a template version yet. Business phone and registration numbers do not exist in CattoLMS and have no placeholders.
 - **Tests.**
   - `DocumentTemplateEngineTest` (56) and `DocumentTemplateIntegrationTest` (7).
   - `NavigationContractTest`, `AclContractTest` and the release validator are updated.
