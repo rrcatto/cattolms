@@ -4,11 +4,15 @@
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-QiY84QT.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-i3Y_kUZ.js",
         "type": "js"
     },
     "\/assets\/controllers\/category_tree_controller.js": {
         "path": "\/assets\/controllers\/category_tree_controller-q4f48nV.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/certificate_preview_controller.js": {
+        "path": "\/assets\/controllers\/certificate_preview_controller-nvs8RB-.js",
         "type": "js"
     },
     "\/assets\/controllers\/course_content_controller.js": {
@@ -25,10 +29,6 @@
     },
     "\/assets\/controllers\/tag_cloud_controller.js": {
         "path": "\/assets\/controllers\/tag_cloud_controller-yi-Ny1Y.js",
-        "type": "js"
-    },
-    "\/assets\/controllers\/template_placeholders_controller.js": {
-        "path": "\/assets\/controllers\/template_placeholders_controller-HgeEcQA.js",
         "type": "js"
     },
     "@hotwired\/stimulus": {

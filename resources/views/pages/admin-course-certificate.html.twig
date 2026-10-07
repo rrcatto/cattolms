@@ -1,31 +1,47 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Certificate settings' %}{% set ph_title = course.title %}{% set ph_lead = 'Whether this course issues a certificate, and its wording and signatory. The design is the current certificate template, shared by every course.' %}{% include '@platform/partials/page-head.html.twig' %}
+{{ importmap() }}
+{% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Certificate' %}{% set ph_title = course.title %}{% set ph_lead = 'Whether this course gives a certificate, and which design it is drawn in.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section container-fluid cl-container-wide py-5">
+<form action="/admin/courses/{{ course.id }}/certificate" method="post" data-controller="certificate-preview" data-certificate-preview-button-value="course-certificate-preview-button">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<div class="cl-certificate-editor">
+<div class="cl-certificate-editor-form">
 
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-	{{ ui('layout.section-head', {heading: 'Certificate for this course', heading_level: 2, summary: 'A certificate is issued when a learner passes the course. It keeps the wording, names, result and design it was issued with.'}) }}
-	<form action="/admin/courses/{{ course.id }}/certificate" method="post">
-		<input type="hidden" name="csrf" value="{{ csrf }}">
-		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Issue a certificate after a passing overall result'})} %}{% block control %}<input type="checkbox" id="certificate-enabled" name="certificate_enabled" value="1" {{ course.certificate_enabled ? 'checked' : '' }}>{% endblock %}{% endembed %}
-		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate title', for: 'certificate-title', help: 'For example Certificate of Completion.'})} %}{% block control %}<input id="certificate-title" name="certificate_title" maxlength="240" value="{{ course.certificate_title }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Body text', for: 'certificate-body', help: 'The words between the learner and the course, for example has successfully completed.'})} %}{% block control %}<input id="certificate-body" name="certificate_body_text" maxlength="500" value="{{ course.certificate_body_text }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signatory name', for: 'signatory-name'})} %}{% block control %}<input id="signatory-name" name="certificate_signatory_name" maxlength="160" value="{{ course.certificate_signatory_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Signatory title', for: 'signatory-title'})} %}{% block control %}<input id="signatory-title" name="certificate_signatory_title" maxlength="160" value="{{ course.certificate_signatory_title }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Footer', for: 'certificate-footer', full_width: true, help: 'Optional, for example accreditation details.'})} %}{% block control %}<input id="certificate-footer" name="certificate_footer_text" maxlength="500" value="{{ course.certificate_footer_text }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-		{% endblock %}{% endembed %}
-		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save certificate settings', variant: 'primary', type: 'submit'}) }}{% endblock %}{% endembed %}
-	</form>
+	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Give learners a certificate when they pass this course'})} %}{% block control %}<input type="checkbox" id="certificate-enabled" name="certificate_enabled" value="1" {{ course.certificate_enabled ? 'checked' : '' }}>{% endblock %}{% endembed %}
 {% endblock %}{% endembed %}
 
-{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'certificate-preview'})} %}{% block surface_body %}
-	{{ ui('layout.section-head', {heading: 'Preview', heading_level: 2, summary: 'This course’s certificate for a sample learner, in the current design, drawn by the renderer that issues certificates.'}) }}
-	{% if current_template %}
-	<p>Design: <strong>{{ current_template.template_name }}</strong>, version {{ current_template.version_number }}.
-	{% if can_view_templates %}{{ ui('action.link', {label: 'Manage certificate templates', variant: 'secondary', size: 'small', href: '/admin/documents/templates?type=certificate'}) }}{% endif %}</p>
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Design', heading_level: 2, summary: 'Click the design this course’s certificate should use.'}) }}
+	{% if can_manage_designs or can_view_designs %}
+	{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+		{% if can_manage_designs %}{{ ui('action.link', {label: 'Edit this design', size: 'small', href: '/admin/certificates/designs/' ~ selected_design ~ '?return_to=' ~ ('/admin/courses/' ~ course.id ~ '/certificate')|url_encode}) }}
+		{{ ui('action.link', {label: 'New design', size: 'small', icon: 'action-add', href: '/admin/certificates/designs/new?return_to=' ~ ('/admin/courses/' ~ course.id ~ '/certificate')|url_encode}) }}{% endif %}
+		{% if can_view_designs %}{{ ui('action.link', {label: 'All certificate designs', size: 'small', variant: 'quiet', href: '/admin/certificates/designs'}) }}{% endif %}
+	{% endblock %}{% endembed %}
 	{% endif %}
-	{% include '@platform/partials/document-template-preview.html.twig' with {dp_error: preview_error, dp_pdf_href: '/admin/courses/' ~ course.id ~ '/certificate/sample.pdf', dp_title: 'Certificate preview for ' ~ course.title} %}
+	{{ ui('form.picture-choice', {name: 'certificate_design_id', legend: 'Certificate design', items: design_items, selected: selected_design}) }}
 {% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Only for this course', heading_level: 2}) }}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Accreditation or CPD line (optional)', for: 'certificate-accreditation', help: 'For example Legal Practice Council CPD: 2 points. It is printed where the design has the Accreditation line field; leave it empty and that line is left out.'})} %}{% block control %}<input id="certificate-accreditation" name="certificate_accreditation" maxlength="240" value="{{ course.certificate_accreditation|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+	{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
+	{% block secondary_actions %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'course-certificate-preview-button', form_action: '/admin/courses/' ~ course.id ~ '/certificate/preview.pdf', form_target: 'course-certificate-preview', icon: 'action-open'}) }}{% endblock %}
+{% endembed %}
+</div>
+
+<aside class="cl-certificate-editor-preview" aria-label="Preview">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Preview', heading_level: 2, summary: 'This course’s certificate for a sample learner, exactly as the PDF prints.'}) }}
+	{% include '@platform/partials/certificate-preview.html.twig' with {cp_name: 'course-certificate-preview', cp_src: '/admin/courses/' ~ course.id ~ '/certificate/preview.pdf', cp_title: 'Preview of this course’s certificate'} %}
+{% endblock %}{% endembed %}
+</aside>
+</div>
+</form>
 </section>
 {% endblock %}

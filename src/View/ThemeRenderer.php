@@ -10,6 +10,9 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/07 SAST
+- Courses → Certificate Designs replaces System → Document Templates in the navigation; load_certificate_editor loads CKEditor with the certificate profile (ck-certificate.js).
+- Advanced PLATFORM_ASSET_VERSION to 0.8.8.10.
 2026/09/09 02:10 SAST
 - Renders with Twig. Page bodies come from the @platform namespace and chrome from @theme, composed by inheritance rather than by substituting a rendered string into a content slot. stripHtmlComments() is gone: a Twig comment does not survive compilation, so there is nothing to strip on the way out. platformScalars() gives a workspace section the same facilities as the page it sits in - the section path had been rendering without a CSRF token.
 2026/09/09 01:20 SAST
@@ -74,7 +77,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.9';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.10';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -258,7 +261,7 @@ final class ThemeRenderer
 
         $navigation = $this->navigation($data, $csrf);
         $platformStyles = [$this->platformAsset('/css/bootstrap.min.css'), $this->platformAsset('/css/catto-platform.css')];
-        if ((bool) ($data['load_ckeditor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
+        if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
         // htmx is a platform-owned progressive enhancement: every surface that uses it renders
         // and works server-side first, so the page degrades to plain navigation if the script
         // is absent. Supplied with the other vendor browser assets under the public root.
@@ -270,6 +273,11 @@ final class ThemeRenderer
         if ((bool) ($data['load_ckeditor'] ?? false)) {
             $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
             $platformScripts[] = $this->platformAsset('/js/ck-main.js');
+        } elseif ((bool) ($data['load_certificate_editor'] ?? false)) {
+            // The certificate wording editor: CKEditor with only paragraphs, text styles, bold,
+            // italic, alignment and fields, so the stored wording is exactly what a certificate can show.
+            $platformScripts[] = $this->platformAsset('/js/ckeditor5.umd.js');
+            $platformScripts[] = $this->platformAsset('/js/ck-certificate.js');
         }
         if ((bool) ($data['load_question_editor'] ?? false)) $platformScripts[] = $this->platformAsset('/js/question-editor.js');
         if ((bool) ($data['load_assessment_timer'] ?? false)) $platformScripts[] = $this->platformAsset('/js/assessment-timer.js');
@@ -567,6 +575,9 @@ final class ThemeRenderer
                 if ($sectionKey === 'courses' && $this->can($data, 'BUNDLE.MANAGEMENT.VIEW')) {
                     $grandchildren[] = $child('admin-bundles', 'Bundles', '/admin/bundles', 'courses');
                 }
+                if ($sectionKey === 'courses' && $this->can($data, 'CERTIFICATE.DESIGN.VIEW')) {
+                    $grandchildren[] = $child('admin-certificate-designs', 'Certificate Designs', '/admin/certificates/designs', 'courses');
+                }
                 // Companies keeps the name it has always had in the menu. Its second view sits
                 // beneath it rather than replacing it: renaming the entry to "Course Consumers"
                 // read as the Companies item having been deleted, which is a navigation people
@@ -580,11 +591,6 @@ final class ThemeRenderer
             }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PROMOTION.VIEW')) {
                 $grandchildren[] = $child('admin-promotions', 'Promotions', '/admin/promotions', 'credits');
-            }
-            // The templates certificates and financial documents are generated from are platform
-            // configuration, so they sit with Settings rather than with any one document's workspace.
-            if ($groupKey === 'system' && $this->can($data, 'DOCUMENT.TEMPLATE.VIEW')) {
-                $grandchildren[] = $child('admin-document-templates', 'Document Templates', '/admin/documents/templates', 'settings');
             }
             if ($grandchildren === []) {
                 continue;

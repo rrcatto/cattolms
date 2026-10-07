@@ -7,6 +7,8 @@ Description:
 Validates the Catto Learning v0.5.8 Seed Database release contract: PHP 8.5.9, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/10/07 SAST
+- The certificate design permissions replace the document template permissions in the counted catalogue.
 2026/10/06 SAST
 - Requires exactly one migration, the canonical baseline, while the system is not live; the additive-migration rules are removed with the migrations they policed.
 2026/09/09 02:10 SAST
@@ -51,7 +53,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.8.8.9', 'composer.json version must be 0.8.8.9.');
+$need(($composer['version'] ?? '') === '0.8.8.10', 'composer.json version must be 0.8.8.10.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 foreach (['psr/container','geocoder-php/geoip2-provider','symfony/framework-bundle','doctrine/dbal'] as $package) {
     $need(isset($composer['require'][$package]), 'Missing required dependency: ' . $package);
@@ -93,7 +95,7 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // COMPANY.BILLING.MANAGE: a company's billing details are company-owned data with their own authority.
 // 86 with PLATFORM.PROMOTION.VIEW and PLATFORM.PROMOTION.MANAGE: promo codes and their usage. 88 with
 // BUNDLE.MANAGEMENT.VIEW and BUNDLE.MANAGE: course bundles are a catalogue offer of their own. 90 with
-// DOCUMENT.TEMPLATE.VIEW and DOCUMENT.TEMPLATE.MANAGE: the shared document templates.
+// CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE: certificate designs.
 $need(count($permissionKeys) === 90, 'PermissionCatalog must define exactly 90 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
@@ -170,7 +172,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.8.8.9'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.8.10'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

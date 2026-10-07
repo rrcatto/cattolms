@@ -13,6 +13,8 @@ type; a type only decides its placeholders, its sample data, its default templat
 page settings. A new document type is a new case here, not a new template system.
 
 Changelog:
+2026/10/07 SAST
+- A certificate is an A4 landscape sheet with no page margins; its design places the background across the sheet.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -38,11 +40,14 @@ enum DocumentType: string
         };
     }
 
-    /** A certificate is a landscape page; financial documents are A4 portrait. */
+    /**
+     * A certificate is an A4 landscape sheet with no page margins: its design places its background
+     * picture across the whole sheet and keeps the words inside it. Financial documents are A4 portrait.
+     */
     public function defaultSettings(): PageSettings
     {
         return $this === self::Certificate
-            ? new PageSettings('A4', 'landscape', 12, 12, 12, 12)
+            ? new PageSettings('A4', 'landscape', 0, 0, 0, 0)
             : new PageSettings('A4', 'portrait', 18, 16, 18, 16);
     }
 

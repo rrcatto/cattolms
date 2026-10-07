@@ -15,6 +15,8 @@ other than an embedded data: image), anything executable in some renderer (expre
 placeholders, because document CSS is the same for every document.
 
 Changelog:
+2026/10/07 SAST
+- Allows asset:<sha256> in url(): a stored picture, embedded by the renderer.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -26,6 +28,8 @@ namespace CattoLearning\Document\Template;
 final class CssPolicy
 {
     public const DATA_IMAGE = 'data:image/(?:png|jpeg|gif|webp|svg\+xml)[;,]';
+    /** A stored document image, by the SHA-256 of its bytes; the renderer embeds it. */
+    public const ASSET = 'asset:[0-9a-f]{64}';
 
     /** @return list<string> */
     public function check(string $css, string $where = 'The CSS'): array
@@ -52,8 +56,8 @@ final class CssPolicy
         }
         if (preg_match_all('/url\(\s*([\'"]?)(.*?)\1\s*\)/is', $plain, $urls, PREG_SET_ORDER) > 0) {
             foreach ($urls as $url) {
-                if (preg_match('#^' . self::DATA_IMAGE . '#i', trim($url[2])) !== 1) {
-                    $errors[] = $where . ' may only use url() with an embedded image (data:image/png, jpeg, gif, webp or svg+xml), not ' . self::shorten(trim($url[2])) . '.';
+                if (preg_match('#^' . self::DATA_IMAGE . '#i', trim($url[2])) !== 1 && preg_match('#^' . self::ASSET . '$#D', trim($url[2])) !== 1) {
+                    $errors[] = $where . ' may only use url() with an embedded image (data:image/png, jpeg, gif, webp or svg+xml) or a stored document image, not ' . self::shorten(trim($url[2])) . '.';
                 }
             }
         }

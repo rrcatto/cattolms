@@ -27,13 +27,16 @@ final class PlatformUi
         'layout.breadcrumb' => ['template' => 'layout/breadcrumb', 'defaults' => ['items' => null, 'aria_label' => 'Breadcrumb']],
         'layout.tabs' => ['template' => 'layout/tabs', 'defaults' => ['items' => null, 'current' => '', 'aria_label' => null]],
         'action.link' => ['template' => 'actions/link', 'defaults' => ['lookup_clear' => '', 'new_window' => false, 'rel' => '', 'aria_label' => '', 'navigation_key' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'full_width' => false, 'href' => null]],
-        'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
+        'action.button' => ['template' => 'actions/button', 'defaults' => ['lookup_clear' => '', 'aria_label' => '', 'get' => '', 'target' => '', 'select' => '', 'push_url' => false, 'indicator' => '', 'label' => null, 'variant' => 'secondary', 'size' => 'normal', 'icon' => '', 'title' => '', 'id' => '', 'confirm' => '', 'modal' => '', 'close_modal' => false, 'form' => '', 'form_action' => '', 'form_target' => '', 'name' => '', 'value' => '', 'stimulus_action' => '', 'disabled' => false, 'hidden' => false, 'expanded' => null, 'controls' => '', 'full_width' => false, 'type' => 'submit', 'skip_validation' => false, 'category_create_toggle' => false, 'category_create' => false, 'category_create_cancel' => false]],
         'action.group' => ['template' => 'actions/group', 'defaults' => []],
         'action.row' => ['template' => 'actions/row-actions', 'defaults' => ['menu' => false, 'label' => 'Actions', 'aria_label' => '', 'icon' => 'action-open', 'compact' => false]],
         'form.grid' => ['template' => 'forms/form-grid', 'defaults' => ['columns' => 'auto']],
         'form.field' => ['template' => 'forms/field', 'defaults' => ['label' => null, 'for' => '', 'required' => false, 'full_width' => false, 'span' => '', 'help' => '', 'error' => '']],
         'form.actions' => ['template' => 'forms/form-actions', 'defaults' => []],
         'form.choice' => ['template' => 'forms/choice-field', 'defaults' => ['label' => null, 'help' => '', 'full_width' => false, 'span' => '']],
+        // A choice made by picture: a radio group whose options are images with a label and an
+        // optional note - certificate designs and where the words go on one.
+        'form.picture-choice' => ['template' => 'forms/picture-choice', 'defaults' => ['name' => null, 'legend' => null, 'items' => null, 'selected' => '', 'help' => '', 'id' => '']],
         'form.tree-select' => ['template' => 'forms/tree-select', 'defaults' => ['id' => null, 'name' => null, 'items' => null, 'selected' => '', 'placeholder' => 'Choose', 'list_label' => null, 'mode' => 'submit']],
         'form.compact-action' => ['template' => 'forms/compact-action', 'defaults' => []],
         'data.table' => ['template' => 'data/data-table', 'defaults' => ['section_spacing' => false, 'density' => 'normal', 'caption' => '']],
@@ -139,6 +142,24 @@ final class PlatformUi
             foreach ($values['items'] as $item) {
                 if (!is_array($item) || array_keys($item) !== ['value', 'label', 'depth', 'path'] || !is_string($item['value']) || !is_string($item['label']) || $item['label'] === '' || !is_string($item['path']) || !in_array($item['depth'], [0, 1, 2, 3], true)) {
                     throw new InvalidArgumentException('Each tree select option has exactly a string value, label and path and a depth from 0 to 3.');
+                }
+            }
+        }
+        if ($component === 'action.button' && (!is_string($values['form_action']) || ($values['form_action'] !== '' && preg_match('#^/(?!/)#', $values['form_action']) !== 1)
+            || !is_string($values['form_target']) || ($values['form_target'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['form_target']) !== 1))) {
+            throw new InvalidArgumentException('A button posts its form only to a path on this site, into a named frame on the page.');
+        }
+        if ($component === 'form.picture-choice') {
+            if (!is_string($values['name']) || $values['name'] === '' || !is_string($values['legend']) || $values['legend'] === '' || !is_scalar($values['selected'])
+                || !is_string($values['id']) || ($values['id'] !== '' && preg_match('/^[a-z][a-z0-9-]*$/', $values['id']) !== 1)) {
+                throw new InvalidArgumentException('A picture choice needs a field name, a legend and a selected value.');
+            }
+            if (!is_array($values['items']) || $values['items'] === []) throw new InvalidArgumentException('A picture choice needs at least one option.');
+            foreach ($values['items'] as $item) {
+                $keys = is_array($item) ? array_keys($item) : [];
+                if (($keys !== ['value', 'label', 'image'] && $keys !== ['value', 'label', 'image', 'note']) || !(is_string($item['value']) || is_int($item['value']))
+                    || !is_string($item['label']) || $item['label'] === '' || !is_string($item['image']) || preg_match('#^/(?!/)#', $item['image']) !== 1 || !is_string($item['note'] ?? '')) {
+                    throw new InvalidArgumentException('Each picture choice option has a value, a label, a picture on this site and an optional note.');
                 }
             }
         }

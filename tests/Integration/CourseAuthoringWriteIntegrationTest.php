@@ -23,6 +23,8 @@ RETURNs an id. Each assertion below reads back what was written.
 
 Changelog:
 2026/10/07 SAST
+- Certificate settings are the switch, a design and the accreditation line.
+2026/10/07 SAST
 - A reissue is checked through CertificateIssuer (Phase J).
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
@@ -94,7 +96,7 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
                 'module_weight' => 0.6,
                 'final_weight' => 0.4,
                 'certificate_enabled' => true,
-                'certificate_title' => '',
+                'certificate_accreditation' => '',
                 'course_style_key' => '',
                 'owner_company_id' => $companyId,
                 'owner_user_id' => $ownerId,
@@ -114,7 +116,7 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
                 'module_weight' => 0.5,
                 'final_weight' => 0.5,
                 'certificate_enabled' => false,
-                'certificate_title' => '',
+                'certificate_accreditation' => '',
                 'course_style_key' => '',
                 'presentation_css' => '.from-update{}',
             ], $ownerId);
@@ -153,18 +155,18 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
             }
             $db->executeStatement("DELETE FROM course_edit_history WHERE course_id=:id AND event_key='grade_bands.updated'", ['id' => $courseId]);
 
+            // A course is created with the default design and keeps only its own certificate data.
+            $designs = \CattoLearning\Tests\Support\IntegrationContainer::get()->get(\CattoLearning\Course\Certificate\CertificateDesignRepository::class);
+            self::assertSame($designs->defaultId(), (int) $repository->findById($courseId)['certificate_design_id']);
+            $other = (int) $db->fetchOne("SELECT id FROM document_templates WHERE document_type = 'certificate' AND NOT is_current AND status = 'active' ORDER BY id LIMIT 1");
             $repository->updateCertificateSettings($courseId, [
                 'certificate_enabled' => true,
-                'certificate_title' => 'QA Certificate',
-                'certificate_template' => 'classic',
-                'certificate_body_text' => 'has successfully completed',
-                'certificate_footer_text' => '',
-                'certificate_signatory_name' => '',
-                'certificate_signatory_title' => '',
+                'certificate_design_id' => $other,
+                'certificate_accreditation' => 'Legal Practice Council CPD: 2 points',
             ], $ownerId);
             $certificated = $repository->findById($courseId);
-            self::assertSame('QA Certificate', (string) $certificated['certificate_title']);
-            self::assertNull($certificated['certificate_footer_text']);
+            self::assertSame($other, (int) $certificated['certificate_design_id']);
+            self::assertSame('Legal Practice Council CPD: 2 points', (string) $certificated['certificate_accreditation']);
 
             // Publishing stamps the date once. Unpublishing and republishing must not restamp it,
             // or a course's publication date would move every time its status was toggled.

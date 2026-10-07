@@ -12,6 +12,8 @@ Provides course-domain functionality for structured course importer, including t
 
 Changelog:
 2026/10/07 SAST
+- Certificate designs: reads the accreditation line instead of the certificate title, body, footer and signatory.
+2026/10/07 SAST
 - No longer reads a course certificate design (HTML or CSS): a course package carries certificate data, not a design (Phase J).
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
@@ -211,11 +213,7 @@ final class StructuredCourseImporter
                 'module_weight' => (float) ($courseInput['module_weight'] ?? 0.5),
                 'final_weight' => (float) ($courseInput['final_weight'] ?? 0.5),
                 'certificate_enabled' => (bool) ($courseInput['certificate_enabled'] ?? true),
-                'certificate_title' => trim((string) ($courseInput['certificate_title'] ?? 'Certificate of Completion')),
-                'certificate_body_text' => trim((string) ($courseInput['certificate_body_text'] ?? 'has successfully completed')),
-                'certificate_footer_text' => trim((string) ($courseInput['certificate_footer_text'] ?? '')),
-                'certificate_signatory_name' => trim((string) ($courseInput['certificate_signatory_name'] ?? '')),
-                'certificate_signatory_title' => trim((string) ($courseInput['certificate_signatory_title'] ?? '')),
+                'certificate_accreditation' => mb_substr(trim((string) ($courseInput['certificate_accreditation'] ?? '')), 0, 240),
                 'course_style_key' => trim((string) ($courseInput['course_style_key'] ?? 'standard')) ?: 'standard',
                 'presentation_css' => (string) ($courseInput['presentation_css'] ?? ''),
                 'source_filename' => $sourceFilename,

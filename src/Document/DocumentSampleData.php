@@ -13,6 +13,8 @@ order, the same every time, so a preview changes only when the template does. No
 from real learners, customers or settings.
 
 Changelog:
+2026/10/07 SAST
+- Certificate sample: a South African conveyancing course with a grade and an accreditation line; course.accreditation added and the certificate title, body, footer and signatory removed.
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -28,20 +30,16 @@ final class DocumentSampleData
     {
         return match ($type) {
             DocumentType::Certificate => self::business() + [
-                'certificate.number' => 'CL-CERT-2026-000184',
-                'certificate.title' => 'Certificate of Completion',
-                'certificate.body' => 'has successfully completed',
-                'certificate.footer' => 'Accredited short course · 12 notional hours',
+                'certificate.number' => 'CL-2026-9141C30F7167',
                 'certificate.issue_date' => '2026-09-30',
                 'certificate.verification_url' => 'https://learning.example.test/certificates/3f6c1e2a',
                 'learner.name' => 'Thandiwe Mokoena',
-                'course.title' => 'Fire Safety for Workplace Supervisors',
+                'course.title' => 'Conveyancing 1',
                 'course.provider' => 'Example Training Academy',
                 'course.completion_date' => '2026-09-29',
+                'course.accreditation' => 'Legal Practice Council CPD: 2 points',
                 'result.percentage' => '86.50',
-                'result.grade' => 'A',
-                'signatory.name' => 'Dr. Pieter van der Merwe',
-                'signatory.title' => 'Head of Learning',
+                'result.grade' => 'Distinction',
             ],
             DocumentType::Invoice => self::business() + self::customer() + self::order() + [
                 'invoice.number' => 'INV-000412',

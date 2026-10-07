@@ -13,6 +13,10 @@ Implements Catto Learning business and application logic for course operations.
 Changelog:
 
 2026/10/07 SAST
+
+- Certificate designs: updateCertificateSettings() takes the switch, a design (checked through CertificateDesignRepository) and the accreditation line, and audits the design id.
+
+2026/10/07 SAST
 - updateCertificateSettings() saves only certificate data - enabled, title, body, footer and signatory - with length checks, history and audit; the design choice is gone (Phase J).
 
 
@@ -55,7 +59,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
-use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
+use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Popularity\CoursePopularityRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
@@ -93,7 +97,8 @@ final class CourseService
         private readonly LegacyHtmlCourseImporter $importer,
         private readonly CourseItemService $courseItems,
         private readonly CourseReviewRepository $reviews,
-        private readonly CoursePopularityRepository $popularity
+        private readonly CoursePopularityRepository $popularity,
+        private readonly CertificateDesignRepository $certificateDesigns
     ) {
     }
 
@@ -1192,23 +1197,18 @@ final class CourseService
         if ($this->courses->findById($courseId) === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
-        // The course holds the certificate's data - whether one is issued, its wording and its
-        // signatory. The design is the current certificate document template, never stored here.
-        $limits = ['certificate_title' => [240, 'title'], 'certificate_body_text' => [500, 'body text'], 'certificate_footer_text' => [500, 'footer'],
-            'certificate_signatory_name' => [160, 'signatory name'], 'certificate_signatory_title' => [160, 'signatory title']];
-        $data = ['certificate_enabled' => array_key_exists('certificate_enabled', $input)];
-        foreach ($limits as $field => [$limit, $label]) {
-            $value = trim((string) ($input[$field] ?? ''));
-            if (mb_strlen($value) > $limit) {
-                throw new InvalidArgumentException('The certificate ' . $label . ' can be at most ' . $limit . ' characters.');
-            }
-            $data[$field] = $value;
+        // The course holds whether it issues a certificate, which design its certificates are drawn
+        // in and its own accreditation line. The wording, signatory and look belong to the design.
+        $design = $this->certificateDesigns->find((int) ($input['certificate_design_id'] ?? 0))
+            ?? throw new InvalidArgumentException('Choose one of the certificate designs.');
+        $accreditation = trim((string) ($input['certificate_accreditation'] ?? ''));
+        if (mb_strlen($accreditation) > 240) {
+            throw new InvalidArgumentException('The accreditation line can be at most 240 characters.');
         }
-        $data['certificate_title'] = $data['certificate_title'] !== '' ? $data['certificate_title'] : CertificateDocumentDataBuilder::DEFAULT_TITLE;
-        $data['certificate_body_text'] = $data['certificate_body_text'] !== '' ? $data['certificate_body_text'] : CertificateDocumentDataBuilder::DEFAULT_BODY;
+        $data = ['certificate_enabled' => array_key_exists('certificate_enabled', $input), 'certificate_design_id' => $design['id'], 'certificate_accreditation' => $accreditation];
         $this->courses->updateCertificateSettings($courseId, $data, $userId);
         $this->courses->recordHistory($courseId, $userId, 'certificate.updated', 'course', $courseId, 'Certificate settings updated.', $data);
-        $this->audit->record($userId, 'course.certificate_updated', ['course_id' => $courseId]);
+        $this->audit->record($userId, 'course.certificate_updated', ['course_id' => $courseId, 'design_id' => $design['id']]);
     }
 
     public function grantForTesting(int $courseId, int $targetUserId, int $userId): void
@@ -1586,11 +1586,7 @@ final class CourseService
             'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $existing['introduction_html'] ?? '')),
             'show_outline_on_intro' => $this->boolValue($input['show_outline_on_intro'] ?? $existing['show_outline_on_intro'] ?? true),
             'certificate_enabled' => $this->boolValue($input['certificate_enabled'] ?? $existing['certificate_enabled'] ?? true),
-            'certificate_title' => trim((string) ($input['certificate_title'] ?? $existing['certificate_title'] ?? 'Certificate of Completion')),
-            'certificate_body_text' => trim((string) ($input['certificate_body_text'] ?? $existing['certificate_body_text'] ?? 'has successfully completed')) ?: 'has successfully completed',
-            'certificate_footer_text' => trim((string) ($input['certificate_footer_text'] ?? $existing['certificate_footer_text'] ?? '')),
-            'certificate_signatory_name' => trim((string) ($input['certificate_signatory_name'] ?? $existing['certificate_signatory_name'] ?? '')),
-            'certificate_signatory_title' => trim((string) ($input['certificate_signatory_title'] ?? $existing['certificate_signatory_title'] ?? '')),
+            'certificate_accreditation' => mb_substr(trim((string) ($input['certificate_accreditation'] ?? $existing['certificate_accreditation'] ?? '')), 0, 240),
             'course_style_key' => trim((string) ($input['course_style_key'] ?? $existing['course_style_key'] ?? 'standard')) ?: 'standard',
             'source_filename' => trim((string) ($input['source_filename'] ?? $existing['source_filename'] ?? '')),
         ];

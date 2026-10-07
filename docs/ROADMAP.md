@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/07 (v0.8.8.9)
+## Current delivery position — 2026/10/07 (v0.8.8.10)
 
-**Current LMS version:** 0.8.8.9 · **Date:** 2026/10/07 SAST · tag `v0.8.8.9` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.8.10 · **Date:** 2026/10/07 SAST · tag `v0.8.8.10` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.8.10 | Certificate designs, at the owner's request after reviewing mockups: six installed looks or an uploaded A4 landscape background, one form with a live PDF preview, and a design and accreditation line per course; System → Document Templates removed |
 | 0.8.8.9 | Certificates on the document template engine (Phase J): Classic, Modern and Minimal designs, certificate PDF, issued certificates keep their values and template version |
 | 0.8.8.8 | Shared document template engine (Phase I); front controller reads `.env` as phpdotenv does |
 | 0.8.8.7 | Billing Address as its own Account → Profile page |
@@ -30,9 +31,9 @@
 | 0.8.7 | Tester administration, company credit purchasing, payment administration and refunds |
 | 0.8.6 / 0.8.6.1 | Course Components v2; ADMIN test access |
 
-**Document templates.** Phase I (v0.8.8.8) built the shared engine: ADMIN-edited, versioned HTML/CSS templates with a controlled placeholder language, one renderer for preview, documents and PDFs, and System → Document Templates. Phase J (v0.8.8.9) moved certificates onto it: Classic, Modern and Minimal designs as separate templates, one current; the course keeps only certificate data; issuing, the course preview, the certificate page and the certificate PDF share the renderer; and each certificate records the template version it was issued with. Phase K moves invoices, receipts and credit notes.
+**Document templates.** Phase I (v0.8.8.8) built the shared engine: versioned templates with a controlled placeholder language and one renderer for preview, documents and PDFs. Phase J (v0.8.8.9) moved certificates onto it, and each certificate records the version it was issued with. The owner then rejected the generic template pages: nobody should see template HTML, versions or page settings. Certificate designs (v0.8.8.10) replaced them — a design made in one form compiles to a template; System → Document Templates is gone. Phase K moves invoices, receipts and credit notes onto the engine.
 
-**What is next.** Phase K (invoices, receipts and credit notes on the document template engine). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**What is next.** A draggable three-level category tree at `/admin/courses/categories` (requested 2026/10/07), the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks), then Phase K (invoices, receipts and credit notes on the document template engine). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 
@@ -534,7 +535,7 @@ Social posting must remain voluntary and must not gate course completion.
 
 ## 7. Certificates
 
-Delivered by Phase J: certificates are rendered by the document template engine; learners open them from the course page and download a one-page PDF; the public verification page keeps a stable identity (number and public id survive a reissue); a revoked certificate says so and has no PDF; and each certificate keeps the values and template version it was issued with. Not built: an ADMIN list of issued certificates and a revoke action (the `revoked_at` and `revocation_reason` columns exist, but nothing sets them yet); and signature images (a template can embed one as a `data:` image, but a course has no signature upload).
+Delivered by Phase J: certificates are rendered by the document template engine; learners open them from the course page and download a one-page PDF; the public verification page keeps a stable identity (number and public id survive a reissue); a revoked certificate says so and has no PDF; and each certificate keeps the values and version it was issued with. Delivered by certificate designs (v0.8.8.10): six installed looks and uploaded backgrounds, logos and signature pictures, wording with fields, a live PDF preview, a fit check, and a design and accreditation line per course. Not built: an ADMIN list of issued certificates and a revoke action (the `revoked_at` and `revocation_reason` columns exist, but nothing sets them yet).
 
 ## 8. Company embedding / white-label delivery
 

@@ -1,12 +1,33 @@
-# Catto Learning 0.8.8.9 — Development Handoff
+# Catto Learning 0.8.8.10 — Development Handoff
 
-## Current development handoff — 2026/10/07 (v0.8.8.9)
+## Current development handoff — 2026/10/07 (v0.8.8.10)
+
+The owner authorized v0.8.8.10 ("commit and push to git - v0.8.8.10 - update stale documents"). It releases certificate designs (below).
+
+- **Release.** Annotated tag and GitHub release `v0.8.8.10` with `cattolms-v0.8.8.10.zip`. Gates are listed under Tests below; the certificates and canonical browser checks were repeated on the release code.
+- **Deploying.** Rebuild the database (the baseline changed). Publish `catto-platform.css`, `js/ck-certificate.js`, `img/certificates/` and the compiled assets; delete the served `template_placeholders_controller-*.js`.
+- **Next.** The owner asked for `/admin/courses/categories` to become a draggable three-level category tree (2026/10/07). After it: the owner's Canva certificates (upload as backgrounds, or add as installed looks) and Phase K, invoices, receipts and credit notes on the document template engine. Still open from Phase J: an ADMIN certificate list and a revoke action.
+
+## Certificate designs (2026/10/07, released in v0.8.8.10)
+
+The owner rejected the v0.8.8.9 certificate and template pages ("complete and utter mess") and agreed a redesign from mockups: design-first, the signature on the design, A4 landscape only, a per-course accreditation line, and an upload option for backgrounds the owner will make in Canva ("those designs will do for a start. perform the code updates"). Report: workspace `REPORTS/certificate-designs-2026-10-07.md`.
+
+- **Model.** A certificate design (`src/Course/Certificate/`) is a look or an uploaded background, an optional logo, wording, a signatory with an optional signature picture, and small print (`CertificateDesign`, stored as JSON in `document_template_versions.design`). `CertificateDesignCompiler` compiles it to the certificate template HTML/CSS/settings the engine renders; a design is a certificate `document_templates` row, each save a new published version, and `is_current` marks the default for new courses. `CertificateLooks` holds the six installed looks (Classic, Modern, Minimal, Legal Seal, Gold Frame, Professional CPD) and the custom look for an uploaded background; `CertificateWording` turns the editor's wording into template HTML (fields become placeholders, optional lines `{{#if}}`, typed braces entities); `CertificateImage` prepares uploads (backgrounds 2480 × 1754, opaque; logos and signatures fitted, transparent).
+- **Pages.** `CertificateDesignController`: the list (`/admin/certificates/designs`, default for new courses), the one-form editor (`/new?look=`, `/{id}`), previews (`preview.pdf` for the posted form, a saved design or an installed look), duplicate, delete (moves courses and the default), and stored pictures (`/admin/certificates/pictures/{sha}.png`). `CourseCertificateController`: the course picks its design by picture and sets `certificate_accreditation`; its previews are drawn exactly as issuing draws. Permissions `CERTIFICATE.DESIGN.VIEW`/`MANAGE` (Courses; they replaced `DOCUMENT.TEMPLATE.*`). Navigation: Courses → Certificate Designs.
+- **Engine.** `document_assets` (immutable pictures by SHA-256; `DocumentAssetRepository`), `asset:<sha256>` references embedded by `DocumentTemplateRenderer`, bundled fonts registered by `DocumentPdfRenderer` (cache in `storage/cache/dompdf-fonts`), and `renderWithLayout()`, which measures the words' box so a design that overflows is refused on save. The certificate sample data is a South African conveyancing course.
+- **Schema (baseline).** `courses.certificate_design_id` (NOT NULL; a trigger fills the default and requires an active certificate design) and `courses.certificate_accreditation`; the course title, body, footer and signatory columns are gone. The six look backgrounds are stored as assets and six designs installed, Classic the default.
+- **Removed.** System → Document Templates (`DocumentTemplateController`, `DocumentTemplateService`, its pages, the `template_placeholders` controller and `document-templates.cjs`), the certificate presets in `resources/documents/`. The invoice, receipt and credit note templates have no page until Phase K.
+- **UI.** `form.picture-choice` (35 components), `action.button` `form_action`/`form_target`, CKEditor certificate profile (`public_html/js/ck-certificate.js`), `certificate-preview` controller, `img/certificates/` (placement pictures, look thumbnails drawn from the real designs). Samples for the owner's Canva work are in workspace `design/certificate-samples/`.
+- **Found on the way.** The certificate form pages lacked `{{ importmap() }}`, so the preview controller never started; a transparent full-page PNG made Dompdf take about 4.5 s per certificate (backgrounds are now stored opaque: 0.7 s); the preview controller listened for `change` as well as `input` and redrew twice.
+- **Tests.** `CertificateDesignTest` (unit: looks, wording, compiler, fit with sample and long values, uploads, the Phase I safety rules, the number rule), `CertificateIntegrationTest` (designs end to end through the controllers), `PictureChoiceContractTest`, and `tests/Browser/certificates.cjs` (11 scenarios). Gates, on a database rebuilt from the changed baseline: `composer qa` with a cold cache (1040 PHPUnit tests), Twig lint (221 files), AssetMapper compilation, Composer validation, `git diff --check`, and every browser suite: certificates 11/11, UI matrix 72, canonical 30, Popular Courses 13, course reviews 9, Course Content tree 41, billing 10, promotions 9, bundles 8.
+
+## v0.8.8.9 handoff — 2026/10/07
 
 The owner authorized v0.8.8.9 ("commit and push to git - v0.8.8.9 - update stale documents"). It releases Phase J, certificates on the document template engine (below), and the `.gitattributes` rule that keeps `tests/Fixtures/env/*.env` byte-exact (`-text -whitespace`, so `bom-crlf.env` keeps its CRLF endings, which v0.8.8.8 had committed as LF).
 
 - **Release.** Annotated tag and GitHub release `v0.8.8.9` with `cattolms-v0.8.8.9.zip`. Gates: `composer qa` (1036 tests), Twig lint, AssetMapper compilation, `git diff --check`, `tests/Browser/certificates.cjs` (9/9) and every existing browser suite.
 - **Deploying.** Rebuild the database (the baseline changed), publish `catto-platform.css`, and run `composer themes:install -- --force` (four theme stylesheets lost their unused certificate rules).
-- **Next.** Phase K, invoices, receipts and credit notes on the document template engine. Open certificate items: an ADMIN certificate list, a revoke action and signature images.
+- **Next (then).** Phase K, invoices, receipts and credit notes on the document template engine. Open certificate items: an ADMIN certificate list, a revoke action and signature images (signature pictures came with certificate designs).
 
 ## Phase J — certificates on the document template engine (2026/10/07, released in v0.8.8.9)
 
@@ -238,7 +259,7 @@ Earlier browser runs exposed footer contrast and default stat-grid issues and we
 
 ## Current platform UI architecture
 
-The design system uses 34 namespaced components in `resources/views/ui/`, with one `PlatformUi` registry and authored Twig slots. Layout, actions, fields, forms, datasets, tables, statistics, lists, metadata, notices, badges, empty states, progress, modals, accordions and icons serve the migrated platform pages. The complete API is in [UI-COMPONENTS.md](UI-COMPONENTS.md). The component gallery is `/admin/system/ui-components` under the existing System settings ACL. No compatibility component names or old structural CSS aliases remain. Gilded Noir keeps its own visual design and uses the shared structure. Earlier historical UI instructions below are records, not current implementation requirements; use the component guide and UX rules for changes.
+The design system uses 35 namespaced components in `resources/views/ui/`, with one `PlatformUi` registry and authored Twig slots. Layout, actions, fields, forms, datasets, tables, statistics, lists, metadata, notices, badges, empty states, progress, modals, accordions and icons serve the migrated platform pages. The complete API is in [UI-COMPONENTS.md](UI-COMPONENTS.md). The component gallery is `/admin/system/ui-components` under the existing System settings ACL. No compatibility component names or old structural CSS aliases remain. Gilded Noir keeps its own visual design and uses the shared structure. Earlier historical UI instructions below are records, not current implementation requirements; use the component guide and UX rules for changes.
 
 This standardisation exists to stop page-by-page LLM generation from recreating the same UI job with subtly different markup. A new view must compose an existing component, or extend the registry and its contract tests when the job is genuinely new. The resulting structure keeps spacing, responsive behavior, accessibility and no-JavaScript fallbacks consistent across themes.
 

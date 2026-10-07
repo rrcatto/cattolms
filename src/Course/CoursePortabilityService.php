@@ -12,6 +12,8 @@ Implements Catto Learning business and application logic for course portability 
 
 Changelog:
 2026/10/07 SAST
+- Certificate designs: a package carries the certificate switch and the accreditation line; the certificate title, body, footer and signatory are gone.
+2026/10/07 SAST
 - Removed the course certificate HTML/CSS editor, its preview renderer and the certificate template fields in export and import: the design is a certificate document template (Phase J).
 2026/08/23 04:19 SAST
 - Enforced decision D5 at the service layer: a SEED course cannot be exported or cloned, and a seed identity cannot import.
@@ -229,11 +231,7 @@ final class CoursePortabilityService
                 'introduction_html' => $course['introduction_html'],
                 'show_outline_on_intro' => (bool) $course['show_outline_on_intro'],
                 'certificate_enabled' => (bool) $course['certificate_enabled'],
-                'certificate_title' => $course['certificate_title'],
-                'certificate_body_text' => $course['certificate_body_text'] ?? 'has successfully completed',
-                'certificate_footer_text' => $course['certificate_footer_text'] ?? '',
-                'certificate_signatory_name' => $course['certificate_signatory_name'] ?? '',
-                'certificate_signatory_title' => $course['certificate_signatory_title'] ?? '',
+                'certificate_accreditation' => $course['certificate_accreditation'] ?? '',
                 'course_style_key' => $course['course_style_key'],
                 'presentation_css' => $course['presentation_css'] ?? '',
             ],
@@ -360,11 +358,7 @@ final class CoursePortabilityService
             'introduction_html' => $this->courseHtml->preserve((string) ($input['introduction_html'] ?? $input['description_html'] ?? '')),
             'show_outline_on_intro' => (bool) ($input['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) ($input['certificate_enabled'] ?? true),
-            'certificate_title' => trim((string) ($input['certificate_title'] ?? 'Certificate of Completion')),
-            'certificate_body_text' => trim((string) ($input['certificate_body_text'] ?? 'has successfully completed')) ?: 'has successfully completed',
-            'certificate_footer_text' => trim((string) ($input['certificate_footer_text'] ?? '')),
-            'certificate_signatory_name' => trim((string) ($input['certificate_signatory_name'] ?? '')),
-            'certificate_signatory_title' => trim((string) ($input['certificate_signatory_title'] ?? '')),
+            'certificate_accreditation' => mb_substr(trim((string) ($input['certificate_accreditation'] ?? '')), 0, 240),
             'course_style_key' => trim((string) ($input['course_style_key'] ?? 'standard')) ?: 'standard',
             'presentation_css' => (string) ($input['presentation_css'] ?? ''),
             'source_filename' => basename((string) ($input['source_filename'] ?? 'structured-course.json')),

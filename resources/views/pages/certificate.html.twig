@@ -7,7 +7,7 @@
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section container-fluid cl-container-wide py-5">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-			{{ ui('layout.section-head', {heading: certificate_values.title, heading_level: 2, summary: 'This public page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
+			{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2, summary: 'This public page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
 			{% if certificate.revoked_at %}
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This certificate was revoked on ' ~ (certificate.revoked_at|date('j F Y')) ~ '.'})} %}{% block body %}{% if certificate.revocation_reason %}<p>{{ certificate.revocation_reason }}</p>{% endif %}{% endblock %}{% endembed %}
 			{% endif %}
@@ -16,18 +16,20 @@
 				{label: 'Awarded to', value: certificate.learner_name},
 				{label: 'Course', value: certificate.course_title},
 				{label: 'Issued', value: certificate_values.issue_date|date('j F Y')},
-			] | merge(certificate.overall_percentage is not null ? [{label: 'Result', value: (certificate.overall_percentage|number_format(2, '.', '')) ~ '%' ~ (certificate.grade_code ? ' (' ~ certificate.grade_code ~ ')' : '')}] : []) | merge(certificate_values.provider ? [{label: 'Provider', value: certificate_values.provider}] : [])}) }}
+			] | merge(certificate.overall_percentage is not null ? [{label: 'Result', value: (certificate.overall_percentage|number_format(2, '.', '')) ~ '%' ~ (certificate.grade_code ? ' (' ~ certificate.grade_code ~ ')' : '')}] : []) | merge(certificate_values.accreditation ? [{label: 'Accreditation', value: certificate_values.accreditation}] : []) | merge(certificate_values.provider ? [{label: 'Provider', value: certificate_values.provider}] : [])}) }}
 			{% if not certificate.revoked_at %}
 				<p>{{ ui('action.link', {label: 'Download PDF', variant: 'primary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf', icon: 'action-open'}) }}</p>
 			{% endif %}
-			{% if can_view_templates %}
-				<p class="help">Drawn from the template <a href="/admin/documents/templates/{{ certificate.template_id }}/versions/{{ certificate.template_version_id }}">{{ certificate.template_name }}, version {{ certificate.template_version_number }}</a>, as issued. Only administrators see this line.</p>
+			{% if can_view_designs %}
+				<p class="cl-ui-field-help">Drawn in the design “{{ certificate.template_name }}” as it was when the certificate was issued. Only administrators see this line.</p>
 			{% endif %}
 		{% endblock %}{% endembed %}
 		{% if not certificate.revoked_at %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'certificate-document'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'The certificate', heading_level: 2}) }}
-			{% include '@platform/partials/document-template-preview.html.twig' with {dp_title: certificate_values.title ~ ' for ' ~ certificate.learner_name, dp_caption: 'The certificate exactly as issued.'} %}
+			<object class="cl-certificate-pdf" data="/certificates/{{ certificate.public_id }}/certificate.pdf#view=Fit&amp;toolbar=0" type="application/pdf" aria-label="The certificate for {{ certificate.learner_name }}">
+				<p>This browser cannot show the certificate on the page. {{ ui('action.link', {label: 'Download the PDF', variant: 'secondary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf'}) }}</p>
+			</object>
 		{% endblock %}{% endembed %}
 		{% endif %}
 	</section>

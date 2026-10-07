@@ -12,6 +12,7 @@ Creates the complete Catto Learning PostgreSQL schema and its reference data for
 
 Changelog:
 2026/10/07 SAST
+- Certificate designs (owner's redesign): courses keep an optional accreditation line and a certificate_design_id (filled with the default for new courses by a trigger) instead of their own title, body, footer and signatory; document_template_versions.design holds a design as its author made it; document_assets stores certificate backgrounds, logos and signatures immutably by SHA-256; the six looks are installed as designs, Classic the default; DOCUMENT.TEMPLATE.VIEW/MANAGE became CERTIFICATE.DESIGN.VIEW/MANAGE.
 - Certificates render through the document template engine (Phase J): courses keep only certificate data (enabled, title, body, footer, signatory), certificates store the data they were issued with and the exact template version, and the Classic, Modern and Minimal designs are installed with Classic current.
 2026/10/06 SAST
 - Consolidated all 25 development migrations into this one canonical baseline, on the owner's instruction: company favourites, generated artwork, profile images and social links, the removed company type, commerce (carts, orders, documents, payments, entitlements, company credit purchases, payment administration and refunds), authenticated session email, Downloadable File items, public section previews, analytics events, course reviews, course popularity, billing profiles, promo codes, course bundles and independent entitlement sources. Each table is created in its final form; the incremental migrations and their one-off data conversions are gone.
@@ -61,6 +62,9 @@ Changelog:
 
 declare(strict_types=1);
 
+use CattoLearning\Course\Certificate\CertificateDesign;
+use CattoLearning\Course\Certificate\CertificateDesignCompiler;
+use CattoLearning\Course\Certificate\CertificateLooks;
 use CattoLearning\Document\DocumentTemplateDefaults;
 use CattoLearning\Document\DocumentType;
 use CattoLearning\View\Artwork\ArtworkGenerator;
@@ -331,7 +335,7 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('COURSE.OWNERSHIP.MANAGE','ManageCourseOwnership','Courses','Assign owner company/person and course editors within scope.'),
     ('COURSE.MEDIA.MANAGE','ManageCourseMedia','Courses','Upload and maintain private course media.'),
     ('COURSE.ASSESSMENT.MANAGE','ManageCourseAssessments','Courses','Create and edit diagnostics, module/final assessments and grade bands.'),
-    ('COURSE.CERTIFICATE.MANAGE','ManageCourseCertificates','Courses','Manage certificate configuration and templates.'),
+    ('COURSE.CERTIFICATE.MANAGE','ManageCourseCertificates','Courses','Choose whether a course gives a certificate, its certificate design and its accreditation line.'),
     ('COURSE.PREVIEW','PreviewCourse','Courses','Use the learner-view course preview workflow.'),
     ('COMMERCE.CART.VIEW','ViewOwnCart','Commerce · Learner','View the signed-in user’s current cart when Commerce is installed.'),
     ('COMMERCE.CART.MANAGE','ManageOwnCart','Commerce · Learner','Add, remove and update the signed-in user’s cart items when Commerce is installed.'),
@@ -351,8 +355,8 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('PLATFORM.PROMOTION.MANAGE','ManagePromotions','Commerce · Platform','Create, change, activate and deactivate promotions, and delete unused ones, when Commerce is installed.'),
     ('BUNDLE.MANAGEMENT.VIEW','ViewBundleManagement','Bundles','View course bundles, their composition, offers and sales in Administration.'),
     ('BUNDLE.MANAGE','ManageBundles','Bundles','Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
-    ('DOCUMENT.TEMPLATE.VIEW','ViewDocumentTemplates','Documents','View document templates, their versions and previews.'),
-    ('DOCUMENT.TEMPLATE.MANAGE','ManageDocumentTemplates','Documents','Create document templates, edit drafts, publish versions and start drafts from earlier versions.');
+    ('CERTIFICATE.DESIGN.VIEW','ViewCertificateDesigns','Courses','See the certificate designs and preview them.'),
+    ('CERTIFICATE.DESIGN.MANAGE','ManageCertificateDesigns','Courses','Create, edit, duplicate and delete certificate designs and choose the default for new courses.');
 
 CREATE TABLE role_permissions (
     role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
@@ -1497,11 +1501,11 @@ CREATE TABLE courses (
     status VARCHAR(24) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','retired','archived')),
     default_access_period_seconds INTEGER NOT NULL DEFAULT 31536000 CHECK (default_access_period_seconds > 0),
     certificate_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    certificate_title VARCHAR(240) NULL,
-    certificate_body_text VARCHAR(500) NOT NULL DEFAULT 'has successfully completed',
-    certificate_footer_text VARCHAR(500) NULL,
-    certificate_signatory_name VARCHAR(160) NULL,
-    certificate_signatory_title VARCHAR(160) NULL,
+    -- The course's own certificate data: an optional accreditation or CPD line, and the design its
+    -- certificates are drawn in (a certificate document template). The wording, signatory and look
+    -- belong to the design. A course created without a design gets the default for new courses.
+    certificate_accreditation VARCHAR(240) NULL CHECK (certificate_accreditation IS NULL OR btrim(certificate_accreditation) <> ''),
+    certificate_design_id BIGINT NOT NULL,
     course_style_key VARCHAR(120) NOT NULL DEFAULT 'standard',
     presentation_css TEXT NOT NULL DEFAULT '',
     source_filename VARCHAR(500) NULL,
@@ -2671,7 +2675,8 @@ CREATE TABLE document_templates (
     name VARCHAR(120) NOT NULL CHECK (btrim(name) <> ''),
     description VARCHAR(1000) NULL CHECK (description IS NULL OR btrim(description) <> ''),
     status VARCHAR(16) NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
-    -- The template documents of this type are generated from: one per type.
+    -- One per type. Financial documents are generated from their current template; for certificates
+    -- it is the design new courses start with, as each course names its own design.
     is_current BOOLEAN NOT NULL DEFAULT FALSE,
     -- The latest published version, which is what the current template renders.
     published_version_id BIGINT NULL,
@@ -2701,6 +2706,9 @@ CREATE TABLE document_template_versions (
     margin_bottom_mm SMALLINT NOT NULL CHECK (margin_bottom_mm BETWEEN 0 AND 50),
     margin_left_mm SMALLINT NOT NULL CHECK (margin_left_mm BETWEEN 0 AND 50),
     change_note VARCHAR(500) NULL CHECK (change_note IS NULL OR btrim(change_note) <> ''),
+    -- A certificate design as its author made it (look, pictures, wording, signatory, small print);
+    -- html and css are compiled from it. Null for templates written as HTML and CSS.
+    design JSONB NULL CHECK (design IS NULL OR jsonb_typeof(design) = 'object'),
     -- The version this one was started from, when it was.
     based_on_version_id BIGINT NULL REFERENCES document_template_versions(id) ON DELETE RESTRICT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -2719,6 +2727,57 @@ CREATE INDEX document_template_versions_based_on_fk_idx ON document_template_ver
 ALTER TABLE document_templates ADD CONSTRAINT document_templates_published_version_fkey
     FOREIGN KEY (published_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
 CREATE INDEX document_templates_published_version_fk_idx ON document_templates (published_version_id);
+
+-- A course's certificate design. A course created without one gets the default for new courses,
+-- and a course can only name an active certificate design.
+ALTER TABLE courses ADD CONSTRAINT courses_certificate_design_fkey
+    FOREIGN KEY (certificate_design_id) REFERENCES document_templates(id) ON DELETE RESTRICT;
+CREATE INDEX courses_certificate_design_fk_idx ON courses (certificate_design_id);
+CREATE FUNCTION courses_certificate_design_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF NEW.certificate_design_id IS NULL THEN
+        SELECT id INTO NEW.certificate_design_id FROM document_templates WHERE document_type = 'certificate' AND is_current;
+        IF NEW.certificate_design_id IS NULL THEN
+            RAISE EXCEPTION 'No certificate design is the default for new courses';
+        END IF;
+    ELSIF TG_OP = 'INSERT' OR NEW.certificate_design_id IS DISTINCT FROM OLD.certificate_design_id THEN
+        IF NOT EXISTS (SELECT 1 FROM document_templates WHERE id = NEW.certificate_design_id AND document_type = 'certificate' AND status = 'active') THEN
+            RAISE EXCEPTION 'A course''s certificate design must be an active certificate design';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$fn$;
+CREATE TRIGGER courses_certificate_design BEFORE INSERT OR UPDATE OF certificate_design_id ON courses
+    FOR EACH ROW EXECUTE FUNCTION courses_certificate_design_guard();
+
+-- Stored document images - certificate backgrounds, logos and signatures - kept once each and
+-- addressed by the SHA-256 of their bytes. A template names one as asset:<sha256> and the renderer
+-- embeds it, so a version always draws the same picture. An image never changes and is never
+-- deleted; the only change allowed is a deleted account's reference being cleared.
+CREATE TABLE document_assets (
+    id BIGSERIAL PRIMARY KEY,
+    sha256 CHAR(64) NOT NULL UNIQUE CHECK (sha256 ~ '^[0-9a-f]{64}$'),
+    mime_type VARCHAR(32) NOT NULL CHECK (mime_type IN ('image/png','image/jpeg')),
+    byte_size INTEGER NOT NULL CHECK (byte_size > 0 AND byte_size <= 12582912),
+    width INTEGER NOT NULL CHECK (width BETWEEN 1 AND 4000),
+    height INTEGER NOT NULL CHECK (height BETWEEN 1 AND 4000),
+    data BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX document_assets_created_by_fk_idx ON document_assets (created_by_user_id);
+CREATE FUNCTION document_asset_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF TG_OP = 'UPDATE' AND NEW.created_by_user_id IS NULL
+       AND (to_jsonb(NEW) - 'created_by_user_id') = (to_jsonb(OLD) - 'created_by_user_id') THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'A stored document image cannot be changed or deleted';
+END;
+$fn$;
+CREATE TRIGGER document_asset_immutable BEFORE UPDATE OR DELETE ON document_assets
+    FOR EACH ROW EXECUTE FUNCTION document_asset_guard();
 
 -- An issued certificate names the exact template version it was rendered with; that version can
 -- never change or be deleted, so the certificate can always be drawn again exactly as issued.
@@ -2817,10 +2876,41 @@ SQL);
                     . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
                     . ", 'Installed starter design.', NOW()) RETURNING id"
                 )['id'];
-                // The first design of each type is current: Classic for certificates.
                 $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId
                     . ($position === 0 ? ', is_current = TRUE' : '') . ' WHERE id = ' . $templateId);
             }
+        }
+
+        // The six installed certificate designs, one per look, each published as version 1 from its
+        // starter design. Their backgrounds are stored as document images first, as an uploaded one
+        // would be. Classic is the default for new courses.
+        $compiler = new CertificateDesignCompiler();
+        $settings = DocumentType::Certificate->defaultSettings()->toArray();
+        $position = 0;
+        foreach (CertificateLooks::installed() as $key => $look) {
+            $bytes = (string) file_get_contents($look->backgroundPath());
+            [$width, $height] = getimagesizefromstring($bytes) ?: [0, 0];
+            $this->execute('INSERT INTO document_assets (sha256, mime_type, byte_size, width, height, data) VALUES ('
+                . $this->quote(hash('sha256', $bytes)) . ", 'image/png', " . strlen($bytes) . ', ' . (int) $width . ', ' . (int) $height
+                . ", decode(" . $this->quote(base64_encode($bytes)) . ", 'base64')) ON CONFLICT (sha256) DO NOTHING");
+            $design = CertificateDesign::starter($key);
+            $compiled = $compiler->compile($design);
+            $templateId = (int) $this->fetchRow(
+                "INSERT INTO document_templates (document_type, name, description) VALUES ('certificate', "
+                . $this->quote($look->name) . ', ' . $this->quote($look->description) . ') RETURNING id'
+            )['id'];
+            $versionId = (int) $this->fetchRow(
+                'INSERT INTO document_template_versions (template_id, version_number, state, html, css, design, page_size, page_orientation,'
+                . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
+                . $templateId . ", 1, 'published', " . $this->quote($compiled['html']) . ', ' . $this->quote($compiled['css']) . ', '
+                . $this->quote((string) json_encode($design->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) . '::jsonb, '
+                . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
+                . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
+                . ", 'Installed design.', NOW()) RETURNING id"
+            )['id'];
+            $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId
+                . ($position === 0 ? ', is_current = TRUE' : '') . ' WHERE id = ' . $templateId);
+            $position++;
         }
 
     }
@@ -2833,7 +2923,7 @@ SQL);
     {
         $this->execute(<<<'SQL'
 DROP TABLE IF EXISTS
-    document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
+    document_assets, document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
     assessment_questions, assessment_responses, assessment_session_questions, assessment_sessions,
     audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_offers, bundles,
     certificates, commerce_audit_events, commerce_bundle_grants, commerce_cart_bundles,
@@ -2852,6 +2942,8 @@ DROP TABLE IF EXISTS
     user_social_links, users, web_sessions
     CASCADE;
 DROP FUNCTION IF EXISTS document_template_version_guard() CASCADE;
+DROP FUNCTION IF EXISTS document_asset_guard() CASCADE;
+DROP FUNCTION IF EXISTS courses_certificate_design_guard() CASCADE;
 DROP FUNCTION IF EXISTS commerce_guard_credit_refund_projection() CASCADE;
 DROP FUNCTION IF EXISTS commerce_guard_refunded_credit_allocation() CASCADE;
 DROP FUNCTION IF EXISTS commerce_protect_order_snapshot() CASCADE;

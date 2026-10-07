@@ -185,44 +185,29 @@ bundle they bought, its retired courses and the promotion used.
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/bundles.cjs
 ```
 
-## Document templates
-
-`document-templates.cjs` checks Administration → System → Document Templates in Chromium and Firefox,
-without JavaScript and in every bundled theme (9 scenarios).
-
-- **List.** The list shows the installed templates (Classic, Modern and Minimal certificates, and the standard invoice, receipt and credit note) and filters by type and status.
-- **Editing a certificate template.** ADMIN creates one, inserts a placeholder from the keyboard, and previews unsaved edits, which render with the sample data in a fully sandboxed frame.
-- **Errors.** An unknown placeholder is named with a suggestion, and the edits are kept. A script is refused.
-- **Saving and publishing.** The saved draft shows in the preview; publishing makes it current. ADMIN opens a sample PDF, starts a new draft from version 1 and reads the version page.
-- **Breadcrumb.** The breadcrumb ends at the template with no crumb repeated.
-- **Phone.** The editor fits 390px, with the landscape preview scrolling in its own box.
-- **No JavaScript.** Insert buttons stay hidden and the syntax is listed to copy. Preview and save work as ordinary posts.
-- **Access.** A learner is refused.
-- **Themes.** The list and editor render in all five themes at 1440 and 390px.
-
-Publishing makes the run's template current; `cleanup` restores the templates that were current before, archives the run's templates (published versions are immutable) and removes the identities.
-
-```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/document-templates-fixture.php create'
-CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/document-templates.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/document-templates-fixture.php cleanup'
-```
-
 ## Certificates
 
-`certificates.cjs` checks certificates on the document template engine (Phase J): 9 scenarios in
-Chromium, Firefox, without JavaScript and in every bundled theme.
+`certificates.cjs` checks certificate designs and certificates: 11 scenarios in Chromium, Firefox,
+without JavaScript and in every bundled theme. Each preview is a PDF in a frame; the check reads its
+text with Ghostscript (`gs` on the host) and compares pictures by rasterising them. Headless Chromium
+treats a PDF frame as a download, so in Chromium the check routes preview requests to keep their
+bodies; a routed request loses its uploaded file, so the upload runs in Firefox, which returns the
+body directly. Pages count as loaded at DOMContentLoaded, because a success message hides itself
+after 4.5 seconds.
 
-- **Designs.** Classic, Modern and Minimal are listed, each previews the sample certificate in a sandboxed frame, and Classic is current.
-- **Course certificate page.** It has no textarea or CKEditor, links to Manage certificate templates, saves the title and footer, previews them with the shared renderer, and opens a one-page sample PDF.
-- **Learner.** A learner passes the final in the reader, opens View certificate from the course page, sees the certificate (not the template line ADMIN sees), and downloads one-page PDFs from the certificate page and the course page.
-- **Template change.** ADMIN publishes a new Modern version, making Modern current. The course preview uses it, the first certificate stays Classic and names Classic certificate version 1, and the next learner's certificate is Modern.
-- **Authored markup.** A certificate template's HTML — a bare span, `<em>`, a table without `<tbody>`, a footer outside a paragraph — is unchanged after two saves. The old course certificate field was a CKEditor that rewrote exactly this markup.
-- **No JavaScript.** The certificate frame renders, and the course certificate settings save and preview.
-- **Access.** A learner is refused the course certificate page and its sample PDF.
-- **Themes.** The certificate page and the course certificate page fit all five themes at 1440 and 390px.
+- **List.** The six installed designs are listed with their pictures, Classic is the default for new courses, the navigation leads there, and the page says nothing of states, versions, HTML or CSS.
+- **Editor.** ADMIN picks Modern by picture, types wording and inserts the Date issued field with Insert field (CKEditor), adds a signatory; each change redraws the PDF preview, typing the name does not, and the field is stored as a field. Save keeps the look, wording and signatory.
+- **Course page.** The course picks that design by picture and sets its accreditation line; the previews show this course's certificate with both, and Save keeps them. Edit this design carries `return_to`.
+- **Learner.** A learner passes the final in the reader, opens View certificate from the course page, sees the details and the PDF, and downloads one-page PDFs from the certificate page and the course page that print their name, the course, the design's wording, the accreditation line and the signatory.
+- **History.** Editing the design (opened from the course, returning there) changes the next learner's certificate and leaves the issued PDF's text exactly as it was; ADMIN sees the design it was drawn in.
+- **Upload (Firefox).** The sample Canva-sized background (`design/certificate-samples/01-classic-background.png` in the workspace, or `CATTO_CERTIFICATE_BACKGROUND`) becomes the look; the preview differs from Classic, then follows the placement and typeface; after saving, Your own background is chosen and shows its picture, also on the list.
+- **Duplicate, default and delete.** A duplicate becomes the default for new courses and is deleted with Classic as the replacement; deleting the course's design moves the course to Minimal, and the issued certificate still prints exactly as it did.
+- **No JavaScript.** A design without the Learner name field is refused with the typed words kept; typed `[Learner name]` and `[Course title]` fields preview and save; the course page saves a design.
+- **Access.** A learner is refused the design pages, the course certificate page and the previews.
+- **Themes.** The list, an editor, the course page and the certificate page fit all five themes at 1440 and 390px.
+- **Firefox.** CKEditor's Insert field fills the preview, and the certificate page shows and serves the same PDF.
 
-`cleanup` removes the course, its enrolments and certificates and the identities, restores the templates that were current before and archives the run's templates. Modern keeps the version the run published: published versions are immutable.
+`cleanup` removes the course, its enrolments and certificates and the identities, makes the recorded default design the default again, and deletes the run's designs as the list does (archived and renamed). Published versions and stored pictures are immutable and stay.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/certificates-fixture.php create'

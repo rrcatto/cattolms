@@ -1,6 +1,27 @@
 # Changelog
 
-**LMS version:** 0.8.8.9 **Date time:** 2026/10/07 SAST
+**LMS version:** 0.8.8.10 **Date time:** 2026/10/07 SAST
+
+## 2026-10-07 SAST — v0.8.8.10 Certificate designs
+
+- **Release.** Version aligned to 0.8.8.10 at the owner's instruction ("commit and push to git - v0.8.8.10 - update stale documents"); published as GitHub release `v0.8.8.10` with `cattolms-v0.8.8.10.zip`. The documentation was brought up to the v0.8.8.10 state.
+
+The owner rejected the v0.8.8.9 certificate and template pages and agreed a redesign from mockups: design-first, a signature on the design, A4 landscape only, a per-course accreditation line, and an upload option for backgrounds made in Canva.
+
+- **Certificate designs.** Courses → Certificate Designs (`/admin/certificates/designs`) lists the designs as pictures with the courses using each and the default for new courses. Six are installed: Classic (the default), Modern, Minimal, Legal Seal, Gold Frame and Professional CPD, each from a look (`CertificateLooks`) with its own background, typefaces and layout. Nothing on these pages shows template HTML, CSS, versions, states or page settings.
+- **One form.** A design is its name, a look picked by picture or an uploaded background, an optional logo, the wording, the signatory with an optional signature picture, and the small print. The preview beside the form is the PDF exactly as it prints for a sample learner; it redraws a moment after any change (`certificate-preview` Stimulus controller), and without JavaScript Update preview draws it into the same frame.
+- **Wording.** CKEditor with a certificate profile (`public_html/js/ck-certificate.js`): paragraphs in five text styles, bold, italic, alignment, and fields inserted with Insert field as blue labels (typed as `[Learner name]` without JavaScript). Pasted formatting is dropped (`CertificateWording`). A line whose optional field (result, grade, accreditation, provider, verification address) is empty is left out. The wording must include the learner's name.
+- **Your own background.** A PNG or JPEG in A4 landscape proportions, at least 1240 px wide (Canva's 3508 × 2480 export is ideal), becomes the look, with the words in the centre, right or left, a typeface and a colour. It is scaled to 2480 × 1754 and stored opaque; logos and signatures keep their transparency. Pictures live in the new immutable `document_assets` table, stored once by SHA-256 and embedded by the renderer (`asset:<sha256>`).
+- **Fit, versions and deletion.** Saving draws the design with a sample learner and refuses it when the words overflow the look's box (measured from Dompdf's layout). Each save is a new published version; issued certificates keep theirs. Duplicate copies a design; Delete moves the courses using it, and the default if it was the default, to the design chosen.
+- **Courses.** The course's certificate page picks the design by picture and sets the course's own accreditation or CPD line (`courses.certificate_design_id`, `courses.certificate_accreditation`); its preview is this course's certificate exactly as issuing draws it. The course's title, body, footer and signatory fields are gone. Export and import carry the switch and the accreditation line.
+- **Issuing.** A certificate is drawn with the course's design as it is then and records its version; editing, replacing or deleting the design never changes an issued certificate. The public page shows the details and the certificate PDF (`<object>` with a download fallback).
+- **Fonts.** Cormorant Garamond, Playfair Display, IBM Plex Sans and IBM Plex Serif are bundled (OFL) in `resources/documents/fonts/`; Dompdf caches their metrics in the instance's `storage/cache/dompdf-fonts`.
+- **UI.** New component `form.picture-choice` (35 components), with `PictureChoiceContractTest` and a gallery example. `action.button` gained `form_action` and `form_target` (a path on this site, a named frame). The list uses the row Actions menu.
+- **Removed.** System → Document Templates (`DocumentTemplateController`, `DocumentTemplateService`, its pages and the `template_placeholders` controller), the certificate presets in `resources/documents/`, and `tests/Browser/document-templates.cjs`. The invoice, receipt and credit note templates stay installed until Phase K gives them a page. `DOCUMENT.TEMPLATE.*` became `CERTIFICATE.DESIGN.*` (still 90 permissions).
+- **Fixes found on the way.** The certificate form pages now load the importmap, without which the preview controller never started; a text field no longer redraws the preview twice (input only, not change).
+- **Tests.** `CertificateDesignTest` (unit, with `Tests\Support\ImageFileDatabase`), `CertificateIntegrationTest` rewritten for designs, `PictureChoiceContractTest`, and the rewritten `tests/Browser/certificates.cjs` (11 scenarios in Chromium, Firefox and without JavaScript, all five themes). Gates, on a database rebuilt from the changed baseline: `composer qa` with a cold cache (1040 PHPUnit tests), Twig lint (221 files), AssetMapper compilation, Composer validation, `git diff --check`, and every browser suite: certificates 11/11, UI matrix 72, canonical 30, Popular Courses 13, course reviews 9, Course Content tree 41, billing 10, promotions 9, bundles 8.
+- **Deploying.** Rebuild the database (the baseline changed). Publish `catto-platform.css`, `js/ck-certificate.js`, `img/certificates/` and the compiled assets, and delete the served `template_placeholders` controller file.
+- Report: workspace `REPORTS/certificate-designs-2026-10-07.md`.
 
 ## 2026-10-07 SAST — v0.8.8.9 Certificates on the document template engine
 

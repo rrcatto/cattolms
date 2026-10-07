@@ -120,7 +120,8 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/admin/companies', $adminChildren['admin-companies']['href'] ?? null);
         self::assertSame('/admin/roles', $adminChildren['admin-roles']['href'] ?? null);
         self::assertSame('/admin/settings', $adminChildren['admin-settings']['href'] ?? null);
-        self::assertSame('/admin/documents/templates', $adminChildren['admin-document-templates']['href'] ?? null, 'Document templates sit in the System group.');
+        self::assertSame('/admin/certificates/designs', $adminChildren['admin-certificate-designs']['href'] ?? null, 'Certificate designs sit in the Courses group.');
+        self::assertArrayNotHasKey('admin-document-templates', $adminChildren, 'There is no generic document template page.');
     }
 
     /**
@@ -157,7 +158,7 @@ final class NavigationContractTest extends TestCase
             'Administration must be gathered into its five groups, in order.'
         );
         self::assertSame(
-            ['admin-courses', 'admin-course-items', 'admin-resources', 'admin-course-categories', 'admin-course-tags', 'admin-course-reviews', 'admin-bundles', 'admin-requests', 'admin-enrolments'],
+            ['admin-courses', 'admin-course-items', 'admin-resources', 'admin-course-categories', 'admin-course-tags', 'admin-course-reviews', 'admin-bundles', 'admin-certificate-designs', 'admin-requests', 'admin-enrolments'],
             $groups['admin-group-catalogue'],
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );

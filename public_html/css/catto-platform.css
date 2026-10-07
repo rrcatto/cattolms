@@ -4,6 +4,8 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/10/07 SAST
+- Certificate designs: form.picture-choice, the certificate editor and course certificate grid, the PDF preview frame, the wording editor (text styles and field labels), the design list (thumbnail, name, default badge, column widths) and the certificate PDF on its public page. The document template page rules are removed with those pages.
 2026/09/09 16:05 SAST
 - Form spacing is now core's guarantee rather than the active theme's. A .cl-ui-surface with no .cl-course-card-body had no padding in Gilded Noir or Light Default and 28 core templates use that shape; a .cl-ui-field had no gap in Gilded Noir and gap:0 in Light Default, so a label, its control and its help text touched in every form built without the two-column grid.
 2026/09/09 14:01 SAST
@@ -1224,11 +1226,51 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-course-outline-title{font-size:.95rem;font-weight:800;letter-spacing:.11em}.cl-course-outline-introduction{display:block;margin:.25rem 0;padding:.75rem .85rem;border-radius:.65rem;color:#465466;text-decoration:none;font-weight:600;line-height:1.3}.cl-course-outline-introduction:hover{background:#edf4fb;color:#145da0}.cl-course-outline-introduction.is-current{background:#145da0;color:#fff;box-shadow:0 4px 12px rgba(20,93,160,.22)}
 .cl-course-presentation-intro{padding:clamp(1.4rem,5vw,3.2rem)!important}.cl-course-presentation-intro .masthead{margin:0 0 1.5rem!important}.cl-course-presentation-intro .course-introduction-copy{max-width:none;margin:0}
 
-/* Document templates (Phase I). The source editors are monospaced and keep tabs narrow. The
- * preview is a sandboxed frame the size of the document's page; its box scrolls on its own, so a
- * landscape certificate never makes the administration page scroll sideways on a phone. */
-.cl-template-source { width:100%; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace; font-size:.85rem; line-height:1.45; tab-size:4; white-space:pre; overflow:auto; }
-.cl-template-errors { margin:.25rem 0 0; padding-left:1.25rem; }
-.cl-template-errors li + li { margin-top:.25rem; }
-.cl-document-preview { overflow:auto; max-width:100%; max-height:80vh; padding:1rem; background:#e5e7eb; border:1px solid var(--cl-border,#dfe4ea); border-radius:.5rem; }
-.cl-document-preview-frame { display:block; margin:0 auto; border:0; background:#fff; box-shadow:0 1px 6px rgb(0 0 0 / 25%); }
+/* form.picture-choice: a choice made by picture - a radio group whose options are images with a
+ * label and an optional note. The radio stays visible on the picture, and the chosen card is
+ * outlined, so the choice reads the same with a mouse, a keyboard or a screen reader. */
+.cl-ui-picture-choice{border:0;margin:0;padding:0;min-width:0}
+.cl-ui-picture-choice-legend{float:none;width:auto;margin:0 0 .5rem;padding:0;font-size:1rem;font-weight:600}
+.cl-ui-picture-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr));gap:.75rem}
+.cl-ui-picture-choice-item{position:relative;display:flex;flex-direction:column;gap:.45rem;min-width:0;padding:.5rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:var(--cl-page-surface,#fff);color:inherit;cursor:pointer}
+.cl-ui-picture-choice-item img{display:block;width:100%;aspect-ratio:297/210;object-fit:cover;border:1px solid var(--cl-border,#d9dee5);background:#fff}
+.cl-ui-picture-choice-item input{position:absolute;top:.9rem;left:.9rem;width:1.15rem;height:1.15rem;margin:0;accent-color:var(--cl-primary,#1f5fbf)}
+.cl-ui-picture-choice-item:has(input:checked){padding:calc(.5rem - 1px);border:2px solid var(--cl-primary,#1f5fbf);background:var(--cl-primary-soft,rgba(31,95,191,.07))}
+.cl-ui-picture-choice-item:has(input:focus-visible){outline:2px solid var(--cl-primary,#1f5fbf);outline-offset:2px}
+.cl-ui-picture-choice-text{display:flex;flex-direction:column;line-height:1.3}
+.cl-ui-picture-choice-label{font-weight:600}
+.cl-ui-picture-choice-note{font-size:.85rem;font-weight:400;opacity:.75}
+
+/* Certificates: the design editor's form beside its preview, and the preview itself - the PDF the
+ * renderer draws, shown by the browser's own PDF viewer. A design's text styles and fields look in
+ * the wording editor roughly as they will print, without pretending to be the certificate. */
+.cl-certificate-editor{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:1.5rem;align-items:start}
+@media(max-width:1100px){.cl-certificate-editor{grid-template-columns:minmax(0,1fr)}}
+.cl-certificate-editor-form{min-width:0}
+.cl-certificate-editor-preview{position:sticky;top:1rem}
+@media(max-width:1100px){.cl-certificate-editor-preview{position:static}}
+.cl-certificate-preview{display:flex;flex-direction:column;gap:.6rem}
+.cl-certificate-preview-frame{display:block;width:100%;aspect-ratio:297/210;min-height:16rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
+.cl-certificate-wording .ck-editor__editable,.cl-certificate-wording textarea{min-height:12rem}
+.cl-certificate-wording .ck-content p{margin:0 0 .35rem}
+.cl-certificate-wording .ck-content .cert-title{font-size:1.45em;font-weight:700}
+.cl-certificate-wording .ck-content .cert-name{font-size:1.6em;font-style:italic}
+.cl-certificate-wording .ck-content .cert-course{font-size:1.2em;font-weight:700}
+.cl-certificate-wording .ck-content .cert-caps{font-size:.8em;letter-spacing:.15em;text-transform:uppercase}
+.cl-certificate-wording .ck-content .cert-small{font-size:.85em}
+.cl-certificate-wording .ck-content .align-center{text-align:center}.cl-certificate-wording .ck-content .align-right{text-align:right}.cl-certificate-wording .ck-content .align-left{text-align:left}
+.cl-certificate-wording .ck-content .cl-field{display:inline-block;padding:0 .45em;border:1px solid #a9c2ec;border-radius:999px;background:#e6eefb;color:#1a4e9e;font-size:.9em;font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;white-space:nowrap}
+.cl-certificate-small-print .ck-editor__editable,.cl-certificate-small-print textarea{min-height:4.5rem}
+.cl-certificate-custom{min-width:0;margin:1.25rem 0 0;padding:1rem 0 0;border:0;border-top:1px solid var(--cl-border,#d9dee5)}
+.cl-certificate-design{display:flex;align-items:center;gap:.75rem;min-width:0;white-space:normal}
+.cl-certificate-design-link{font-weight:700;text-decoration:none}
+.cl-certificate-design-name{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;min-width:0;white-space:normal}
+.cl-certificate-custom input[type=color]{width:5rem;min-height:2.6rem;padding:.25rem;cursor:pointer}
+.cl-certificate-design-link:hover,.cl-certificate-design-link:focus-visible{text-decoration:underline}
+.cl-ui-table .cl-certificate-design-name .cl-ui-badge{white-space:normal}
+.cl-certificate-designs-col-design{width:46%}.cl-certificate-designs-col-actions{width:8.5rem}
+@media(max-width:700px){.cl-certificate-designs-col-design{width:52%}.cl-certificate-designs-col-actions{width:3.25rem}.cl-certificate-design .cl-certificate-design-thumb{width:3.5rem}}
+.cl-certificate-design-thumb{display:block;width:7.5rem;aspect-ratio:297/210;object-fit:cover;border:1px solid var(--cl-border,#d9dee5);background:#fff}
+.cl-certificate-pictures{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+.cl-certificate-picture{display:block;max-width:12rem;max-height:5rem;border:1px solid var(--cl-border,#d9dee5);background:#fff}
+.cl-certificate-pdf{display:block;width:100%;aspect-ratio:297/210;min-height:16rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
