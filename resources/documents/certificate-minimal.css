@@ -1,0 +1,12 @@
+/* Minimal: whitespace, two hairlines and the learner's name doing the work. */
+body { font-family: "DejaVu Sans", Arial, sans-serif; color: #111827; }
+.sheet { padding: 22mm 24mm 0; min-height: 150mm; border-top: 0.5pt solid #9ca3af; border-bottom: 0.5pt solid #9ca3af; }
+.kicker { font-size: 10pt; letter-spacing: 0.3em; text-transform: uppercase; color: #6b7280; margin: 0 0 14mm; }
+.learner { font-size: 34pt; font-weight: normal; line-height: 1.1; margin: 0 0 6mm; word-wrap: break-word; }
+.body { font-size: 11pt; color: #6b7280; margin: 0 0 3mm; }
+.course { font-size: 18pt; font-weight: bold; line-height: 1.25; margin: 0 0 4mm; word-wrap: break-word; }
+.meta { font-size: 10pt; color: #6b7280; margin: 0; }
+.foot { width: 100%; border-collapse: collapse; margin-top: 22mm; }
+.foot td { font-size: 9pt; color: #6b7280; vertical-align: bottom; padding-bottom: 6mm; }
+.foot td.number { text-align: right; }
+.footer { font-size: 8.5pt; color: #9ca3af; margin: 0 0 6mm; }

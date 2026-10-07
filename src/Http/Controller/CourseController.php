@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use CattoLearning\Course\LearningService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -39,7 +38,6 @@ final class CourseController extends BaseController
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly LearningService $learning,
         private readonly CourseFavouriteService $favourites,
         private readonly AnalyticsEventRecorder $analytics,
         private readonly CourseReviewService $reviews,
@@ -266,17 +264,4 @@ final class CourseController extends BaseController
 
 
 
-    #[Route('/certificates/{public_id}', name: 'course_certificate', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]
-    public function certificate(): Response
-    {
-        $publicId = (string) $this->param('public_id');
-        $certificate = $this->learning->certificate($publicId);
-        if ($certificate === null) {
-            throw new NotFoundHttpException('The certificate could not be found.');
-        }
-        return $this->render('certificate', [
-            'title' => 'Certificate verification',
-            'certificate' => $certificate,
-        ]);
-    }
 }

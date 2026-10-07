@@ -12,6 +12,8 @@ Implements Catto Learning business and application logic for course operations.
 
 Changelog:
 
+2026/10/07 SAST
+- updateCertificateSettings() saves only certificate data - enabled, title, body, footer and signatory - with length checks, history and audit; the design choice is gone (Phase J).
 
 
 
@@ -53,6 +55,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
 use CattoLearning\Course\Popularity\CoursePopularityRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
@@ -1189,27 +1192,20 @@ final class CourseService
         if ($this->courses->findById($courseId) === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
-        $template = trim((string) ($input['certificate_template'] ?? 'classic'));
-        if (!in_array($template, ['classic', 'modern', 'simple'], true)) {
-            throw new InvalidArgumentException('Select a valid certificate design.');
+        // The course holds the certificate's data - whether one is issued, its wording and its
+        // signatory. The design is the current certificate document template, never stored here.
+        $limits = ['certificate_title' => [240, 'title'], 'certificate_body_text' => [500, 'body text'], 'certificate_footer_text' => [500, 'footer'],
+            'certificate_signatory_name' => [160, 'signatory name'], 'certificate_signatory_title' => [160, 'signatory title']];
+        $data = ['certificate_enabled' => array_key_exists('certificate_enabled', $input)];
+        foreach ($limits as $field => [$limit, $label]) {
+            $value = trim((string) ($input[$field] ?? ''));
+            if (mb_strlen($value) > $limit) {
+                throw new InvalidArgumentException('The certificate ' . $label . ' can be at most ' . $limit . ' characters.');
+            }
+            $data[$field] = $value;
         }
-        $title = trim((string) ($input['certificate_title'] ?? ''));
-        $body = trim((string) ($input['certificate_body_text'] ?? ''));
-        if ($title === '' || mb_strlen($title) > 240) {
-            throw new InvalidArgumentException('Enter a certificate heading of no more than 240 characters.');
-        }
-        if ($body === '' || mb_strlen($body) > 500) {
-            throw new InvalidArgumentException('Enter certificate body text of no more than 500 characters.');
-        }
-        $data = [
-            'certificate_enabled' => array_key_exists('certificate_enabled', $input),
-            'certificate_title' => $title,
-            'certificate_template' => $template,
-            'certificate_body_text' => $body,
-            'certificate_footer_text' => mb_substr(trim((string) ($input['certificate_footer_text'] ?? '')), 0, 500),
-            'certificate_signatory_name' => mb_substr(trim((string) ($input['certificate_signatory_name'] ?? '')), 0, 160),
-            'certificate_signatory_title' => mb_substr(trim((string) ($input['certificate_signatory_title'] ?? '')), 0, 160),
-        ];
+        $data['certificate_title'] = $data['certificate_title'] !== '' ? $data['certificate_title'] : CertificateDocumentDataBuilder::DEFAULT_TITLE;
+        $data['certificate_body_text'] = $data['certificate_body_text'] !== '' ? $data['certificate_body_text'] : CertificateDocumentDataBuilder::DEFAULT_BODY;
         $this->courses->updateCertificateSettings($courseId, $data, $userId);
         $this->courses->recordHistory($courseId, $userId, 'certificate.updated', 'course', $courseId, 'Certificate settings updated.', $data);
         $this->audit->record($userId, 'course.certificate_updated', ['course_id' => $courseId]);
@@ -1591,7 +1587,6 @@ final class CourseService
             'show_outline_on_intro' => $this->boolValue($input['show_outline_on_intro'] ?? $existing['show_outline_on_intro'] ?? true),
             'certificate_enabled' => $this->boolValue($input['certificate_enabled'] ?? $existing['certificate_enabled'] ?? true),
             'certificate_title' => trim((string) ($input['certificate_title'] ?? $existing['certificate_title'] ?? 'Certificate of Completion')),
-            'certificate_template' => trim((string) ($input['certificate_template'] ?? $existing['certificate_template'] ?? 'classic')) ?: 'classic',
             'certificate_body_text' => trim((string) ($input['certificate_body_text'] ?? $existing['certificate_body_text'] ?? 'has successfully completed')) ?: 'has successfully completed',
             'certificate_footer_text' => trim((string) ($input['certificate_footer_text'] ?? $existing['certificate_footer_text'] ?? '')),
             'certificate_signatory_name' => trim((string) ($input['certificate_signatory_name'] ?? $existing['certificate_signatory_name'] ?? '')),

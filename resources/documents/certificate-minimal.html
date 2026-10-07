@@ -1,0 +1,14 @@
+<div class="sheet">
+	<p class="kicker">{{ certificate.title }}</p>
+	<h1 class="learner">{{ learner.name }}</h1>
+	<p class="body">{{ certificate.body }}</p>
+	<h2 class="course">{{ course.title }}</h2>
+	<p class="meta">{{ course.completion_date }}{{#if course.provider}} · {{ course.provider }}{{/if}}{{#if result.percentage}} · {{ result.percentage }}{{#if result.grade}} ({{ result.grade }}){{/if}}{{else}}{{#if result.grade}} · Grade {{ result.grade }}{{/if}}{{/if}}</p>
+	<table class="foot">
+		<tr>
+			<td>{{#if signatory.name}}{{ signatory.name }}{{#if signatory.title}}, {{ signatory.title }}{{/if}}{{/if}}</td>
+			<td class="number">{{ business.name }} · {{ certificate.number }} · {{ certificate.issue_date }}</td>
+		</tr>
+	</table>
+	{{#if certificate.footer}}<p class="footer">{{ certificate.footer }}</p>{{/if}}
+</div>

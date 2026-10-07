@@ -11,6 +11,8 @@ Description:
 Implements Catto Learning business and application logic for learning operations.
 
 Changelog:
+2026/10/07 SAST
+- The course home's certificate comes from CertificateRepository and is omitted when revoked; certificate() was removed, as CertificateController reads the repository (Phase J).
 2026/08/31 19:05 SAST
 - Round: shared search button moved into noscript, server-search marker on every results region, Course Library rebuilt as paginated accordions, Reports paginated and searched, company requests as a table, company dashboard Courses figure.
 2026/08/23 04:19 SAST
@@ -29,6 +31,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Certificate\CertificateRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Support\Pagination;
@@ -59,6 +62,7 @@ final class LearningService
         private readonly AuditRepository $audit,
         private readonly AdministrationRepository $administration,
         private readonly ResourceLibraryService $resources,
+        private readonly CertificateRepository $certificates,
         private readonly ?AccessService $commerceAccess = null
     ) {
     }
@@ -182,7 +186,8 @@ final class LearningService
         $course['progress'] = $this->courseItemRecords->assessmentProgress((int) $enrolment['id'], (int) $course['id']);
         $course['is_preview'] = $preview;
         $course['remaining_access_label'] = empty($enrolment['expires_at']) ? '' : CourseItemService::duration((int) ceil(max(0, (strtotime((string) $enrolment['expires_at']) ?: time()) - time()) / 60));
-        $course['certificate'] = $this->courses->certificateForEnrolment((int) $enrolment['id']);
+        $certificate = $this->certificates->forEnrolment((int) $enrolment['id']);
+        $course['certificate'] = $certificate !== null && $certificate['revoked_at'] === null ? $certificate : null;
         return $course;
     }
 
@@ -286,15 +291,6 @@ final class LearningService
         $course['item'] = $node;
         $course['current_node_id'] = $nodeId;
         return $course;
-    }
-
-    /** @return array<string,mixed>|null */
-    public function certificate(string $publicId): ?array
-    {
-        if (preg_match('/^[0-9a-f-]{36}$/i', $publicId) !== 1) {
-            return null;
-        }
-        return $this->courses->certificateByPublicId($publicId);
     }
 
     /** @param array<string,mixed> $enrolment */

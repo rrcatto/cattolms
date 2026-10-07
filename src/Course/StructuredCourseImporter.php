@@ -11,6 +11,8 @@ Description:
 Provides course-domain functionality for structured course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/10/07 SAST
+- No longer reads a course certificate design (HTML or CSS): a course package carries certificate data, not a design (Phase J).
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -214,8 +216,6 @@ final class StructuredCourseImporter
                 'certificate_footer_text' => trim((string) ($courseInput['certificate_footer_text'] ?? '')),
                 'certificate_signatory_name' => trim((string) ($courseInput['certificate_signatory_name'] ?? '')),
                 'certificate_signatory_title' => trim((string) ($courseInput['certificate_signatory_title'] ?? '')),
-                'certificate_template_html' => (string) ($courseInput['certificate_template_html'] ?? ''),
-                'certificate_template_css' => (string) ($courseInput['certificate_template_css'] ?? ''),
                 'course_style_key' => trim((string) ($courseInput['course_style_key'] ?? 'standard')) ?: 'standard',
                 'presentation_css' => (string) ($courseInput['presentation_css'] ?? ''),
                 'source_filename' => $sourceFilename,

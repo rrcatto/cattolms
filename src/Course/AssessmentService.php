@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\Course\Certificate\CertificateIssuer;
 use CattoLearning\Commerce\Application\AccessService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -14,7 +15,7 @@ use RuntimeException;
 /** Runs assessment and diagnostic Course Items in a placement context. */
 final class AssessmentService
 {
-    public function __construct(private readonly TransactionManager $transactions, private readonly CourseRepository $courses, private readonly CourseItemRepository $itemRecords, private readonly CourseItemService $items, private readonly AssessmentRepository $assessments, private readonly AuditRepository $audit, private readonly ?AccessService $commerceAccess = null)
+    public function __construct(private readonly TransactionManager $transactions, private readonly CourseRepository $courses, private readonly CourseItemRepository $itemRecords, private readonly CourseItemService $items, private readonly AssessmentRepository $assessments, private readonly AuditRepository $audit, private readonly CertificateIssuer $certificates, private readonly ?AccessService $commerceAccess = null)
     {
     }
 
@@ -202,8 +203,9 @@ final class AssessmentService
         $before = $this->courses->enrolmentByIdForUser((int) $session['enrolment_id'], (int) $session['user_id']); $this->courses->saveCourseResult((int) $session['enrolment_id'], $module, $final, $overall, (string) $band['grade_code'], (bool) $band['is_passing']);
         if (($before['status'] ?? '') !== 'completed') { $this->audit->record((int) $session['user_id'], 'course.completed', ['course_id' => (int) $session['course_id'], 'enrolment_id' => (int) $session['enrolment_id'], 'completion_method' => 'final_assessment', 'percentage' => $overall, 'grade_code' => $band['grade_code'], 'passed' => $band['is_passing']]); }
         $course = $this->courses->findById((int) $session['course_id']); if ($course === null || !(bool) $course['certificate_enabled'] || !(bool) $band['is_passing']) { return; }
-        $user = $this->courses->findUserById((int) $session['user_id']); $name = trim((string) ($user['certificate_name'] ?? $user['display_name'] ?? $user['email'] ?? 'Learner'));
-        $this->courses->createCertificate((int) $session['enrolment_id'], $name, trim((string) ($course['certificate_title'] ?? '')) ?: 'Certificate of Completion', (string) $course['title'], (string) $band['grade_code'], $overall, (string) ($course['certificate_template'] ?? 'custom'), (string) ($course['certificate_body_text'] ?? 'has successfully completed'), (string) ($course['certificate_footer_text'] ?? ''), (string) ($course['certificate_signatory_name'] ?? ''), (string) ($course['certificate_signatory_title'] ?? ''), (string) ($course['certificate_template_html'] ?? ''), (string) ($course['certificate_template_css'] ?? ''));
+        // Issued through the document template engine with the current published certificate design;
+        // the certificate keeps the values and the template version it was issued with.
+        $this->certificates->issue((int) $session['enrolment_id'], (int) $session['user_id']);
     }
 
     /** @return array{0:array<string,mixed>,1:array<string,mixed>} */

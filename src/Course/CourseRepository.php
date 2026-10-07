@@ -13,6 +13,8 @@ The Administration course list and the public published catalogue are bounded an
 the home page asks for only the handful of courses it renders.
 
 Changelog:
+2026/10/07 SAST
+- Removed createCertificate() - the str_replace certificate renderer - with certificateContext(), certificateForEnrolment(), certificateByPublicId() and findUserById(), and the course certificate design columns. Certificates are issued by Course\Certificate\CertificateIssuer through the document template engine (Phase J).
 2026/09/08 19:52 SAST
 - Converted every write off the F3 mappers: course, category, module, assessment, question and option, grade band, media, price variant, edit history, enrolment, attempt, certificate and ownership are now stated SQL, and the mapper imports are gone.
 - questions() reads an assessment's options in one query and groups them, rather than one query per question.
@@ -1763,19 +1765,17 @@ final class CourseRepository
             'INSERT INTO courses
                  (public_id,category_id,slug,title,subtitle,summary,description_html,level,
                   estimated_minutes,status,default_access_period_seconds,introduction_html,show_outline_on_intro,
-                  certificate_enabled,certificate_title,certificate_template,certificate_body_text,
+                  certificate_enabled,certificate_title,certificate_body_text,
                   certificate_footer_text,certificate_signatory_name,certificate_signatory_title,
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
-                  publication_approval_status,certificate_template_html,
-                  certificate_template_css,interchange_schema_version,created_by_user_id,updated_by_user_id,
+                  publication_approval_status,interchange_schema_version,created_by_user_id,updated_by_user_id,
                   created_at,updated_at,cover_svg)
              VALUES (:public_id,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
                      :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,:show_outline_on_intro,
-                     :certificate_enabled,:certificate_title,:certificate_template,:certificate_body_text,
+                     :certificate_enabled,:certificate_title,:certificate_body_text,
                      :certificate_footer_text,:certificate_signatory_name,:certificate_signatory_title,
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
-                     :publication_approval_status,:certificate_template_html,
-                     :certificate_template_css,:interchange_schema_version,:created_by,:updated_by,
+                     :publication_approval_status,:interchange_schema_version,:created_by,:updated_by,
                      :created_at,:updated_at,:cover_svg)
              RETURNING id',
             [
@@ -1794,7 +1794,6 @@ final class CourseRepository
                 'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
                 'certificate_enabled' => (bool) $data['certificate_enabled'],
                 'certificate_title' => $data['certificate_title'] ?: null,
-                'certificate_template' => (string) ($data['certificate_template'] ?? 'classic'),
                 'certificate_body_text' => (string) ($data['certificate_body_text'] ?? 'has successfully completed'),
                 'certificate_footer_text' => ($data['certificate_footer_text'] ?? '') ?: null,
                 'certificate_signatory_name' => ($data['certificate_signatory_name'] ?? '') ?: null,
@@ -1805,8 +1804,6 @@ final class CourseRepository
                 'owner_company_id' => $ownerCompanyId,
                 'owner_user_id' => $ownerUserId,
                 'publication_approval_status' => (string) ($data['publication_approval_status'] ?? 'pending'),
-                'certificate_template_html' => (string) ($data['certificate_template_html'] ?? ''),
-                'certificate_template_css' => (string) ($data['certificate_template_css'] ?? ''),
                 'interchange_schema_version' => (string) ($data['interchange_schema_version'] ?? '1.0'),
                 'created_by' => $userId,
                 'updated_by' => $userId,
@@ -1843,7 +1840,6 @@ final class CourseRepository
             'show_outline_on_intro' => (bool) ($data['show_outline_on_intro'] ?? true),
             'certificate_enabled' => (bool) $data['certificate_enabled'],
             'certificate_title' => $data['certificate_title'] ?: null,
-            'certificate_template' => (string) ($data['certificate_template'] ?? 'classic'),
             'certificate_body_text' => (string) ($data['certificate_body_text'] ?? 'has successfully completed'),
             'certificate_footer_text' => ($data['certificate_footer_text'] ?? '') ?: null,
             'certificate_signatory_name' => ($data['certificate_signatory_name'] ?? '') ?: null,
@@ -1856,18 +1852,16 @@ final class CourseRepository
             . 'description_html=:description_html,level=:level,estimated_minutes=:estimated_minutes,'
             . 'default_access_period_seconds=:default_access_period_seconds,introduction_html=:introduction_html,'
             . 'show_outline_on_intro=:show_outline_on_intro,certificate_enabled=:certificate_enabled,'
-            . 'certificate_title=:certificate_title,certificate_template=:certificate_template,'
+            . 'certificate_title=:certificate_title,'
             . 'certificate_body_text=:certificate_body_text,certificate_footer_text=:certificate_footer_text,'
             . 'certificate_signatory_name=:certificate_signatory_name,'
             . 'certificate_signatory_title=:certificate_signatory_title,course_style_key=:course_style_key,'
             . 'updated_by_user_id=:updated_by,updated_at=:updated_at';
 
         // Columns only written when the caller supplied them: an editor form that does not carry
-        // ownership must not blank it, and the import path sets the two template columns alone.
+        // ownership must not blank it.
         $optional = [
             'presentation_css' => 'presentation_css',
-            'certificate_template_html' => 'certificate_template_html',
-            'certificate_template_css' => 'certificate_template_css',
             'owner_company_id' => 'owner_company_id',
             'owner_user_id' => 'owner_user_id',
         ];
@@ -1902,7 +1896,7 @@ final class CourseRepository
     {
         $updated = $this->db->executeStatement(
             'UPDATE courses
-                SET certificate_enabled=:enabled,certificate_title=:title,certificate_template=:template,
+                SET certificate_enabled=:enabled,certificate_title=:title,
                     certificate_body_text=:body,certificate_footer_text=:footer,
                     certificate_signatory_name=:signatory_name,certificate_signatory_title=:signatory_title,
                     updated_by_user_id=:updated_by,updated_at=:updated_at
@@ -1910,7 +1904,6 @@ final class CourseRepository
             [
                 'enabled' => (bool) $data['certificate_enabled'],
                 'title' => $data['certificate_title'],
-                'template' => $data['certificate_template'],
                 'body' => $data['certificate_body_text'],
                 'footer' => $data['certificate_footer_text'] ?: null,
                 'signatory_name' => $data['certificate_signatory_name'] ?: null,
@@ -2017,7 +2010,7 @@ final class CourseRepository
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT ce.*, c.slug, c.title, c.subtitle, c.summary, c.status AS course_status,
-                    c.certificate_enabled, c.certificate_title, c.certificate_template, c.certificate_body_text,
+                    c.certificate_enabled, c.certificate_title, c.certificate_body_text,
                     c.certificate_footer_text, c.certificate_signatory_name, c.certificate_signatory_title,
                     0.5::numeric AS module_weight, 0.5::numeric AS final_weight
              FROM course_enrolments ce
@@ -2195,7 +2188,7 @@ final class CourseRepository
     {
         $rows = $this->db->fetchAllAssociative(
             'SELECT ce.*, c.slug, c.title, c.status AS course_status, 0.5::numeric AS module_weight, 0.5::numeric AS final_weight,
-                    c.certificate_enabled, c.certificate_title, c.certificate_template, c.certificate_body_text,
+                    c.certificate_enabled, c.certificate_title, c.certificate_body_text,
                     c.certificate_footer_text, c.certificate_signatory_name, c.certificate_signatory_title
              FROM course_enrolments ce JOIN courses c ON c.id = ce.course_id
              WHERE ce.id = :id AND ce.user_id = :user_id LIMIT 1',
@@ -2280,170 +2273,6 @@ final class CourseRepository
         );
     }
 
-    /** @return array<string,mixed>|null */
-    public function certificateForEnrolment(int $enrolmentId): ?array
-    {
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM certificates WHERE enrolment_id = :enrolment_id AND revoked_at IS NULL',
-            ['enrolment_id' => $enrolmentId]
-        );
-
-        return $row === false ? null : $this->normaliseRow($row);
-    }
-
-    /** @return array<string,mixed>|null */
-    public function certificateByPublicId(string $publicId): ?array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT cert.*, c.slug
-             FROM certificates cert
-             JOIN course_enrolments ce ON ce.id = cert.enrolment_id
-             JOIN courses c ON c.id = ce.course_id
-             WHERE cert.public_id = :public_id LIMIT 1',
-            ['public_id' => $publicId]
-        );
-        return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
-    }
-
-    /** @return array<string,mixed> */
-    public function createCertificate(
-        int $enrolmentId,
-        string $learnerName,
-        string $certificateTitle,
-        string $courseTitle,
-        string $gradeCode,
-        float $overallPercentage,
-        string $template,
-        string $bodyText,
-        string $footerText,
-        string $signatoryName,
-        string $signatoryTitle,
-        string $templateHtml = '',
-        string $templateCss = ''
-    ): array {
-        // Reissuing keeps the identity a learner may already have shared: the public id and the
-        // certificate number are minted once and carried forward, so the verification URL a printed
-        // certificate carries still resolves.
-        $existing = $this->db->fetchAssociative(
-            'SELECT public_id, certificate_number FROM certificates WHERE enrolment_id = :enrolment_id',
-            ['enrolment_id' => $enrolmentId]
-        );
-
-        if ($existing === false) {
-            $publicId = Uuid::v4();
-            $certificateNumber = 'CL-' . gmdate('Y') . '-'
-                . strtoupper(substr(str_replace('-', '', $publicId), 0, 12));
-        } else {
-            $publicId = (string) $existing['public_id'];
-            $certificateNumber = (string) $existing['certificate_number'];
-        }
-
-        $issuedAt = gmdate('Y-m-d H:i:sP');
-        $context = $this->certificateContext($enrolmentId);
-        $completionTimestamp = trim((string) ($context['completed_at'] ?? ''));
-        try {
-            $completionDateValue = $completionTimestamp !== ''
-                ? new \DateTimeImmutable($completionTimestamp)
-                : new \DateTimeImmutable('now');
-            $completionDate = $completionDateValue
-                ->setTimezone(new \DateTimeZone(Env::string('APP_TIMEZONE', 'UTC')))
-                ->format('j F Y');
-        } catch (\Throwable) {
-            $completionDate = gmdate('j F Y');
-        }
-        $providerName = trim((string) ($context['provider_name'] ?? '')) ?: $this->settings->platformName();
-        $verificationBase = rtrim(Env::string('APP_URL'), '/');
-        $verificationUrl = ($verificationBase !== '' ? $verificationBase : '') . '/certificates/' . $publicId;
-        if (trim($templateHtml) === '') {
-            $templateHtml = '<section class="cl-certificate"><p>{{certificate_title}}</p><h1>{{student_name}}</h1><p>{{certificate_body}}</p><h2>{{course_title}}</h2><p>{{overall_percentage}}% · {{overall_grade}}</p><footer>{{signatory_name}}<br>{{signatory_title}}<br>{{certificate_footer}}<br>{{certificate_number}}</footer></section>';
-        }
-        $values = [
-            'student_name' => $learnerName,
-            'course_title' => $courseTitle,
-            'course_provider' => $providerName,
-            'completion_date' => $completionDate,
-            'overall_percentage' => number_format($overallPercentage, 2, '.', ''),
-            'overall_grade' => $gradeCode,
-            'certificate_number' => $certificateNumber,
-            'certificate_verification_url' => $verificationUrl,
-            'signatory_name' => $signatoryName,
-            'signatory_title' => $signatoryTitle,
-            'certificate_title' => $certificateTitle,
-            'certificate_body' => $bodyText,
-            'certificate_footer' => $footerText,
-        ];
-        $rendered = $templateHtml;
-        foreach ($values as $key => $value) {
-            $rendered = str_replace('{{' . $key . '}}', htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), $rendered);
-        }
-
-        $this->db->executeStatement(
-            'INSERT INTO certificates
-                 (public_id,enrolment_id,certificate_number,learner_name,certificate_title,
-                  course_title,grade_code,overall_percentage,certificate_template,certificate_body_text,
-                  certificate_footer_text,certificate_signatory_name,certificate_signatory_title,
-                  issued_at,template_html_snapshot,template_css_snapshot,rendered_html)
-             VALUES (:public_id,:enrolment_id,:certificate_number,:learner_name,:certificate_title,
-                     :course_title,:grade_code,:overall_percentage,:certificate_template,:body_text,
-                     :footer_text,:signatory_name,:signatory_title,
-                     :issued_at,:template_html,:template_css,:rendered_html)
-             ON CONFLICT (enrolment_id) DO UPDATE SET
-                 learner_name=EXCLUDED.learner_name,certificate_title=EXCLUDED.certificate_title,
-                 course_title=EXCLUDED.course_title,grade_code=EXCLUDED.grade_code,
-                 overall_percentage=EXCLUDED.overall_percentage,
-                 certificate_template=EXCLUDED.certificate_template,
-                 certificate_body_text=EXCLUDED.certificate_body_text,
-                 certificate_footer_text=EXCLUDED.certificate_footer_text,
-                 certificate_signatory_name=EXCLUDED.certificate_signatory_name,
-                 certificate_signatory_title=EXCLUDED.certificate_signatory_title,
-                 issued_at=EXCLUDED.issued_at,template_html_snapshot=EXCLUDED.template_html_snapshot,
-                 template_css_snapshot=EXCLUDED.template_css_snapshot,
-                 rendered_html=EXCLUDED.rendered_html,revoked_at=NULL,revocation_reason=NULL',
-            [
-                'public_id' => $publicId,
-                'certificate_number' => $certificateNumber,
-                'learner_name' => $learnerName,
-                'certificate_title' => $certificateTitle,
-                'course_title' => $courseTitle,
-                'grade_code' => $gradeCode,
-                'overall_percentage' => $overallPercentage,
-                'certificate_template' => $template,
-                'body_text' => $bodyText,
-                'footer_text' => $footerText !== '' ? $footerText : null,
-                'signatory_name' => $signatoryName !== '' ? $signatoryName : null,
-                'signatory_title' => $signatoryTitle !== '' ? $signatoryTitle : null,
-                'issued_at' => $issuedAt,
-                'template_html' => $templateHtml,
-                'template_css' => $templateCss,
-                'rendered_html' => '<style>' . $templateCss . '</style>' . $rendered,
-                'enrolment_id' => $enrolmentId,
-            ]
-        );
-
-        return $this->certificateForEnrolment($enrolmentId)
-            ?? throw new RuntimeException('Unable to create certificate.');
-    }
-
-
-    /** @return array<string,mixed> */
-    private function certificateContext(int $enrolmentId): array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT ce.completed_at,
-                    COALESCE(NULLIF(trim(oc.name), ''), NULLIF(trim(sc.name), ''), :fallback) AS provider_name
-             FROM course_enrolments ce
-             JOIN courses c ON c.id = ce.course_id
-             LEFT JOIN companies oc ON oc.id = c.owner_company_id
-             LEFT JOIN LATERAL (
-                 SELECT name FROM companies WHERE is_system = TRUE ORDER BY id LIMIT 1
-             ) sc ON TRUE
-             WHERE ce.id = :enrolment_id
-             LIMIT 1",
-            ['enrolment_id' => $enrolmentId, 'fallback' => $this->settings->platformName()]
-        );
-        return isset($rows[0]) ? $this->normaliseRow($rows[0]) : [];
-    }
-
     public function certificateProviderName(int $courseId): string
     {
         $rows = $this->db->fetchAllAssociative(
@@ -2458,19 +2287,6 @@ final class CourseRepository
             ['course_id' => $courseId, 'fallback' => $this->settings->platformName()]
         );
         return trim((string) ($rows[0]['provider_name'] ?? '')) ?: $this->settings->platformName();
-    }
-
-
-    /** @return array<string,mixed>|null */
-    public function findUserById(int $userId): ?array
-    {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT u.id, u.public_id, u.display_name, u.certificate_name, ue.email
-             FROM users u JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
-             WHERE u.id = :id LIMIT 1',
-            ['id' => $userId]
-        );
-        return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
     }
 
     public function markEnrolmentExpired(int $enrolmentId): void

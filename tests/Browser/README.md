@@ -190,7 +190,7 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 `document-templates.cjs` checks Administration → System → Document Templates in Chromium and Firefox,
 without JavaScript and in every bundled theme (9 scenarios).
 
-- **List.** The list shows the installed templates and filters by type and status.
+- **List.** The list shows the installed templates (Classic, Modern and Minimal certificates, and the standard invoice, receipt and credit note) and filters by type and status.
 - **Editing a certificate template.** ADMIN creates one, inserts a placeholder from the keyboard, and previews unsaved edits, which render with the sample data in a fully sandboxed frame.
 - **Errors.** An unknown placeholder is named with a suggestion, and the edits are kept. A script is refused.
 - **Saving and publishing.** The saved draft shows in the preview; publishing makes it current. ADMIN opens a sample PDF, starts a new draft from version 1 and reads the version page.
@@ -206,4 +206,26 @@ Publishing makes the run's template current; `cleanup` restores the templates th
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/document-templates-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/document-templates.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/document-templates-fixture.php cleanup'
+```
+
+## Certificates
+
+`certificates.cjs` checks certificates on the document template engine (Phase J): 9 scenarios in
+Chromium, Firefox, without JavaScript and in every bundled theme.
+
+- **Designs.** Classic, Modern and Minimal are listed, each previews the sample certificate in a sandboxed frame, and Classic is current.
+- **Course certificate page.** It has no textarea or CKEditor, links to Manage certificate templates, saves the title and footer, previews them with the shared renderer, and opens a one-page sample PDF.
+- **Learner.** A learner passes the final in the reader, opens View certificate from the course page, sees the certificate (not the template line ADMIN sees), and downloads one-page PDFs from the certificate page and the course page.
+- **Template change.** ADMIN publishes a new Modern version, making Modern current. The course preview uses it, the first certificate stays Classic and names Classic certificate version 1, and the next learner's certificate is Modern.
+- **Authored markup.** A certificate template's HTML — a bare span, `<em>`, a table without `<tbody>`, a footer outside a paragraph — is unchanged after two saves. The old course certificate field was a CKEditor that rewrote exactly this markup.
+- **No JavaScript.** The certificate frame renders, and the course certificate settings save and preview.
+- **Access.** A learner is refused the course certificate page and its sample PDF.
+- **Themes.** The certificate page and the course certificate page fit all five themes at 1440 and 390px.
+
+`cleanup` removes the course, its enrolments and certificates and the identities, restores the templates that were current before and archives the run's templates. Modern keeps the version the run published: published versions are immutable.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/certificates-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/certificates.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/certificates-fixture.php cleanup'
 ```

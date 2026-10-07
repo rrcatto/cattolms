@@ -1,6 +1,6 @@
 # Commerce Implementation Plan
 
-Original plan: 12 September 2026; current-status update: 6 October 2026 (v0.8.8.4)
+Original plan: 12 September 2026; current-status update: 7 October 2026 (v0.8.8.9)
 Target: `code/cattolms-v0.8`
 Status: Individual and company purchasing, payment administration and refunds (v0.8.7), billing profiles (Phase F), promo codes (Phase G), course bundles (Phase H) and independent entitlement sources are released through v0.8.8.4. Account Funds spending, payouts, debt, gifts and real gateways are not implemented.
 
@@ -14,7 +14,7 @@ The commerce code lives in `src/Commerce/` (Contract, Domain, Application, Polic
 - **Billing profiles** (Phase F). One reusable profile per person (`user_billing_profiles`) and per company (`company_billing_profiles`), filled into both checkouts and copied into each order's immutable `billing` snapshot. VAT stays disabled; the tax number is informational.
 - **Promo codes** (Phase G, `/admin/promotions`). Percentage or fixed discounts, a half-open validity window, minimum spend, total and per-customer limits, and course and bundle scopes. The browser sends only the code; the server calculates, revalidates under the promotion's row lock at placement, holds a use while the order is unpaid and redeems it once when paid. The discount is an order adjustment allocated over lines by largest remainder and bounds each line's refund. Company credit purchases take no promotions.
 - **Course bundles** (Phase H, `/bundles`, `/admin/bundles`). Bundles of published courses with their own price and access period, sold as one line that snapshots its courses, price and access period. Never sold to companies.
-- **Document templates (Phase I, v0.8.8.8).** The shared engine in `src/Document/` can render invoices, receipts and credit notes from versioned ADMIN templates with a controlled placeholder language. Production financial documents still render through `InvoicePdfRenderer` from their snapshots until Phase K moves them onto it and records each document's template version.
+- **Document templates (Phase I, v0.8.8.8).** The shared engine in `src/Document/` can render invoices, receipts and credit notes from versioned ADMIN templates with a controlled placeholder language. Production financial documents still render through `InvoicePdfRenderer` from their snapshots until Phase K moves them onto it and records each document's template version. Certificates moved onto it in Phase J (v0.8.8.9): each stores its values and its template version, the pattern Phase K follows.
 - **Entitlement sources.** Behind the one enrolment a learner sees per course, `commerce_entitlements` rows are independent sources (individual purchase, each bundle, free access, an ADMIN/company/seed `origin`), each with its own period, activation and expiry. `AccessService` keeps the course open while any source is valid; a refund revokes only the refunded line's sources.
 
 | Area | Current state | Next boundary |
@@ -37,7 +37,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.8. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.9. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 
@@ -63,7 +63,7 @@ Paths below are relative to this code root. “Currently” in this original tab
 | `course_credits`, `course_credit_allocations` | Existing credit rows are quantity-bearing lots, not individual tokens. Extend them as purchase/grant lots and add individual credit-unit identities beneath them. Link existing allocations to units; add deadlines, invitations, state/events, and historical purchase valuation. Avoid a second independent credit pool. |
 | `PlatformAdministrationService::decideRequest()` and `AdministrationRepository::availableCredit()` | Preserve exact course/period matching and existing row-locking. Delegate allocations to the commerce service. If no credit exists, an approved request leads into purchase; approval alone must not manufacture paid access. |
 | `PlatformAdministrationService::removeCompanyPerson()` and company enrolment removal | Currently remove learner access on membership removal. Change ordinary company actions to preserve consumed entitlements and restrict reversal to an unconsumed provisional allocation. ADMIN exceptions remain reasoned and audited. |
-| `AssessmentService`, `AssessmentRepository`, `CourseRepository::createCertificate()` | Retain attempt/session history and grading infrastructure. Add atomic retake allowances. Certificates currently depend on passing and are updated on enrolment conflict; replace new issuance with immutable completion records. Add the full transcript and shared learner-course verification identity. |
+| `AssessmentService`, `AssessmentRepository`, `CertificateIssuer` | Retain attempt/session history and grading infrastructure. Add atomic retake allowances. Certificates are issued on a passing result through the document template engine; each issue stores its values and template version, and a reissue replaces them under the same number and public id. Replace new issuance with immutable completion records. Add the full transcript and shared learner-course verification identity. |
 | `Database`, `DbalDatabase`, `TransactionManager` | Reuse the shared DBAL connection and transaction boundary; no Doctrine ORM. Financial SQL stays in repositories. |
 | `PermissionCatalog`, `AclService`, `SelectedCompanyContext` | Activate reserved commerce permissions and add missing funds, payouts, offers, overrides and disputes capabilities. Enforce permission plus purchaser/company/resource scope. |
 | `AuditRepository`, `Event/EventDispatcher` | Reuse normal activity reporting. Add protected commerce audit/payment/ledger events. The existing plugin dispatcher catches listener failures, so it must not be responsible for essential fulfilment. |

@@ -779,6 +779,7 @@ label.cl-ui-tree-select-option{position:relative}
 .cl-rating-distribution dt{font-weight:400;margin:0}.cl-rating-distribution dd{display:contents;margin:0}
 .cl-course-review-action{margin-top:1rem}.cl-course-review-action p{margin:0 0 .5rem}
 .cl-course-review-prompt{margin-top:1.5rem}
+.cl-course-certificate-links{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.5rem}
 .cl-category-stats-note{margin:.25rem 0 1rem;font-size:.88rem;opacity:.8}
 .cl-category-tree,.cl-category-tree-children{list-style:none;margin:0;padding:0}
 .cl-category-tree-children{margin-inline-start:.85rem;padding-inline-start:1rem;border-inline-start:2px solid var(--cl-border,#dfe4ea)}

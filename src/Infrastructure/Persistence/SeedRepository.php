@@ -21,6 +21,8 @@ insertMany() is a single multi-row INSERT per batch rather than a statement per 
 this is used for that is the difference between seconds and minutes.
 
 Changelog:
+2026/10/07 SAST
+- Added certificateTemplate(): the current certificate template version generated certificates are recorded against (Phase J).
 2026/09/09 22:20 SAST
 - Reduced to the write half when the REAL/SEED split was removed; generation itself is unchanged.
 */
@@ -149,6 +151,29 @@ final class SeedRepository
         }
 
         return $ids;
+    }
+
+    /**
+     * What a generated certificate is rendered with: the current certificate template's published
+     * version, and the platform name the certificate is issued by.
+     *
+     * @return array{template_id:int,version_id:int,version_number:int,business_name:string}
+     */
+    public function certificateTemplate(): array
+    {
+        $row = $this->db->fetchAssociative(
+            "SELECT t.id AS template_id, v.id AS version_id, v.version_number
+               FROM document_templates t JOIN document_template_versions v ON v.id = t.published_version_id
+              WHERE t.document_type = 'certificate' AND t.is_current"
+        );
+        if ($row === false) {
+            throw new \RuntimeException('No certificate template is current; generated certificates need one.');
+        }
+        $name = $this->db->fetchOne("SELECT option_value FROM app_options WHERE option_key = 'platform_name'");
+        return [
+            'template_id' => (int) $row['template_id'], 'version_id' => (int) $row['version_id'], 'version_number' => (int) $row['version_number'],
+            'business_name' => is_string($name) && trim($name) !== '' ? $name : \CattoLearning\Support\Env::string('APP_NAME', 'Catto Learning'),
+        ];
     }
 
     /**

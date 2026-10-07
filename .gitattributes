@@ -18,3 +18,7 @@
 # Generated or vendored files, excluded from language statistics and diff noise.
 composer.lock  -diff linguist-generated
 SHA256SUMS.txt -diff linguist-generated
+
+# The front controller .env fixtures test line endings (CRLF, CR) and a UTF-8 BOM, so git must keep
+# their exact bytes rather than normalise them.
+tests/Fixtures/env/*.env -text -whitespace

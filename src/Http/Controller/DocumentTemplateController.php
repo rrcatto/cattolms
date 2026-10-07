@@ -17,6 +17,8 @@ The editor is one form whose submit buttons say what to do (intent=save, preview
 every action is an ordinary POST that works without JavaScript.
 
 Changelog:
+2026/10/07 SAST
+- A certificate template version's page shows how many certificates were issued with it (Phase J).
 2026/10/06 SAST
 - Created for the shared document template engine (Phase I).
 */
@@ -27,6 +29,7 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\Certificate\CertificateRepository;
 use CattoLearning\Document\DocumentPdfRenderer;
 use CattoLearning\Document\DocumentTemplateRepository;
 use CattoLearning\Document\DocumentTemplateService;
@@ -57,6 +60,7 @@ final class DocumentTemplateController extends BaseController
         private readonly DocumentTemplateRepository $templates,
         private readonly PlaceholderRegistry $registry,
         private readonly DocumentPdfRenderer $pdf,
+        private readonly CertificateRepository $certificates,
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -224,6 +228,7 @@ final class DocumentTemplateController extends BaseController
             'preview' => $preview === null ? null : self::preview($preview),
             'preview_error' => $error,
             'has_draft' => $template['draft_version_id'] !== null,
+            'issued_certificates' => $type === DocumentType::Certificate ? $this->certificates->countForVersion((int) $version['id']) : null,
             'can_manage' => $actor->hasPermission('DOCUMENT.TEMPLATE.MANAGE') && $template['status'] === 'active',
         ]);
     }

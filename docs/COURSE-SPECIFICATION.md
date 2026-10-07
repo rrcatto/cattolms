@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.8.8 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.8.8.9 (0.8 code line) **Date time:** 2026/10/07 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
@@ -8,7 +8,7 @@ New HTML courses intended for Catto Learning must use one predictable static str
 
 Important content must therefore exist as real HTML. Assessment banks must exist in the `QUIZ` object. JavaScript may enhance the standalone course but must not be the sole source of teaching content.
 
-Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain, learner access and the structured interchange format as implemented in v0.8.8.4. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
+Sections 2–17 describe the accepted authored HTML input syntax. Section 18 describes the Course Components domain, learner access and the structured interchange format as implemented in v0.8.8.9. Module terminology in the input syntax describes source documents, not database ownership or learner completion.
 
 ### 1.1 Trusted author content
 
@@ -16,7 +16,7 @@ Sections 2–17 describe the accepted authored HTML input syntax. Section 18 des
 
 The platform owner authors and imports these courses. Course content is trusted. The importer and course editor do not run an HTML/SVG element allowlist, attribute/style/URL filtering, or malicious-code stripping. Authored SVG, HTML, inline styles, event attributes, embedded scripts and stylesheet imports are preserved in the content fields that map into the LMS. Saving and exporting that content uses the same policy. Uploaded course media, including `.svg`, is stored unchanged; MIME detection describes the file rather than deciding which content is trusted.
 
-Course structure and data still have to be valid: titles, module identities, supported block types, question banks, answer indexes, grading/pool rules and certificate placeholder names remain checked. The existing import permissions, file-size limits, course ownership and learner-access rules remain in force. This is a content-preservation policy, not a change to authentication or course access.
+Course structure and data still have to be valid: titles, module identities, supported block types, question banks, answer indexes and grading/pool rules remain checked. A course carries its certificate data (whether it issues one, title, body, footer and signatory), never a certificate design: packages are exported without one, and import ignores the `certificate_template_html`/`css` fields of older packages. The existing import permissions, file-size limits, course ownership and learner-access rules remain in force. This is a content-preservation policy, not a change to authentication or course access.
 
 Inline SVG is supported, including `viewBox`, gradients, clipping paths, masks, symbols/`use`, `foreignObject`, namespace declarations and authored styling. The HTML importer uses an HTML5 parser so SVG names and attributes retain their proper case and namespace. For example:
 
@@ -453,7 +453,7 @@ Before delivery:
 
 ## 18. Course Components contract
 
-The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.4; `HANDOFF.md` holds the implementation and validation record of each release.
+The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.9; `HANDOFF.md` holds the implementation and validation record of each release.
 
 ### Identity, sharing and author control
 
@@ -495,7 +495,14 @@ Course reviews belong to the course: only learners with a genuine enrolment may 
 
 ### Certificates and document templates
 
-The course certificate still renders from the course's certificate template fields. Phase I added the shared document template engine (`src/Document/`, System → Document Templates) with a certificate document type and its placeholders (`learner.name`, `course.title`, `course.completion_date`, `result.percentage`, …). Phase J moves certificates onto it, with their preview and issued documents rendered by the same renderer.
+Certificates are documents of the shared document template engine (`src/Document/`, System → Document Templates; Phase J).
+
+- **The course holds data, not a design.** On its certificate page (`/admin/courses/{id}/certificate`, `COURSE.CERTIFICATE.MANAGE` on a course the person manages) a course says whether it issues a certificate and sets its title, body text, footer and signatory name and title, as plain text fields. There is no HTML or CSS on the course and no rich-text editor; the page links to the certificate templates ("Manage certificate templates").
+- **The design is the current certificate template.** One certificate template is current at a time. Classic (the default), Modern and Minimal are installed as separate templates, each A4 landscape and drawn on one page. ADMIN edits, versions and publishes them like any document template; publishing one makes it current for every course.
+- **One rendering path.** The course page's preview, its sample PDF, issuing, the certificate page and the certificate PDF all go through `DocumentTemplateRenderer` and `DocumentPdfRenderer`. `CertificateDocumentDataBuilder` builds the certificate's values: `certificate.*` (number, title, body, footer, issue date, verification URL), `learner.name` (the learner's name for certificates, else display name, else email), `course.title`, `course.provider`, `course.completion_date`, `result.percentage`, `result.grade`, `signatory.*` and `business.*`. An absent result, grade, provider, signatory, footer or verification URL is null, and the installed designs print nothing for it.
+- **Issuing.** A passing overall result on a course whose certificate is enabled issues the certificate (`CertificateIssuer`), in the result's transaction. It renders the current template, stores the values it was given (`certificates.document_data`) with the template id, version id and version number, and audits `certificate.issued` or `certificate.reissued` with that reference. If the certificate cannot be rendered, the issue fails with the reason. A certificate number is `CL-<year>-<12 hex digits>`; a later passing final reissues under the same number and public id.
+- **An issued certificate never changes.** The certificate page and PDF are drawn again from the stored values and the recorded version, so renaming the learner or the course, changing the course's wording or publishing a new template leaves them exactly as issued. Only a reissue records new values and the version current at that time.
+- **Learners and verification.** The learner opens the certificate from the course page (View certificate, Download certificate PDF) or the account's course history. `/certificates/{public_id}` is the public verification page: the certificate's details, the certificate itself in a sandboxed frame and Download PDF (`/certificates/{public_id}/certificate.pdf`). Viewers with `DOCUMENT.TEMPLATE.VIEW` also see the template version it was drawn from; that version's page counts the certificates issued with it. A revoked certificate's page says so, and it has no PDF.
 
 ### HTML import mapping
 

@@ -6,7 +6,7 @@
 #}
 {% if preview %}
 	{% if dp_unsaved|default(false) %}{{ ui('feedback.notice', {tone: 'info', heading: 'This preview shows your unsaved changes. Save the draft to keep them.'}) }}{% endif %}
-	<p class="help">Sample data, rendered by the document renderer documents use. Page: {{ preview.label }}.{% if dp_pdf_href|default('') %} <a href="{{ dp_pdf_href }}" target="_blank" rel="noopener">Open a sample PDF</a>{% endif %}</p>
+	<p class="help">{{ dp_caption|default('Sample data, rendered by the document renderer documents use.') }} Page: {{ preview.label }}.{% if dp_pdf_href|default('') %} <a href="{{ dp_pdf_href }}" target="_blank" rel="noopener">Open a sample PDF</a>{% endif %}</p>
 	<div class="cl-document-preview">
 		<iframe class="cl-document-preview-frame" title="{{ dp_title|default('Document preview') }}" sandbox="" srcdoc="{{ preview.html }}" width="{{ preview.width }}" height="{{ preview.height }}"></iframe>
 	</div>
