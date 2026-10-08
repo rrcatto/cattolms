@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.8.14 (0.8 code line) **Date time:** 2026/10/08 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.8.9 (0.8 code line) **Date time:** 2026/10/08 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
@@ -453,7 +453,7 @@ Before delivery:
 
 ## 18. Course Components contract
 
-The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.8.14; `HANDOFF.md` holds the implementation and validation record of each release.
+The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.9; `HANDOFF.md` holds the implementation and validation record of each release.
 
 ### Identity, sharing and author control
 

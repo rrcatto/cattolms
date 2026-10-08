@@ -4,6 +4,8 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/10/08 SAST
+- Financial documents: the design page's A4 portrait preview above its form (.cl-document-*).
 2026/10/07 SAST
 - Certificate editor: the preview comes first at the full width, about twice its former size, with the form below it.
 2026/10/07 SAST
@@ -1295,3 +1297,12 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-certificate-pictures{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
 .cl-certificate-picture{display:block;max-width:12rem;max-height:5rem;border:1px solid var(--cl-border,#d9dee5);background:#fff}
 .cl-certificate-pdf{display:block;width:100%;aspect-ratio:297/210;min-height:16rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
+/* Financial documents (Commerce → Financial Documents): the chosen invoice, receipt or credit note
+   first, as an A4 portrait page at about the size it prints, with the design's form below it. */
+.cl-document-design{display:grid;grid-template-columns:minmax(0,1fr);gap:1.5rem;align-items:start}
+.cl-document-design-form{min-width:0}
+.cl-document-preview{display:flex;flex-direction:column;align-items:center;gap:.6rem;margin-top:1rem}
+.cl-document-preview-frame{display:block;width:100%;max-width:52rem;aspect-ratio:210/297;min-height:20rem;border:1px solid var(--cl-border,#d9dee5);border-radius:var(--cl-radius,10px);background:#e8ecf1}
+.cl-document-pictures{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+.cl-document-logo{display:block;max-width:12rem;max-height:5rem;border:1px solid var(--cl-border,#d9dee5);background:#fff}
+.cl-document-design input[type=color]{width:5rem;min-height:2.6rem;padding:.25rem;cursor:pointer}

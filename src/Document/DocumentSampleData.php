@@ -10,9 +10,13 @@ Version: 0.8.8.7
 Description:
 Fixed sample data for previewing each document type: a fictional business, learner, customer and
 order, the same every time, so a preview changes only when the template does. Nothing here is read
-from real learners, customers or settings.
+from real learners, customers or settings. A financial document is the made-up learner order of
+FinancialDocumentSamples, turned into values by the builder that issues real ones.
 
 Changelog:
+2026/10/08 SAST
+- Invoice, receipt and credit note samples are built by FinancialDocumentDataBuilder from the sample
+  learner order, rather than written out here a second time.
 2026/10/07 SAST
 - Certificate sample: a South African conveyancing course with a grade and an accreditation line; course.accreditation added and the certificate title, body, footer and signatory removed.
 2026/10/06 SAST
@@ -22,6 +26,9 @@ Changelog:
 declare(strict_types=1);
 
 namespace CattoLearning\Document;
+
+use CattoLearning\Commerce\Document\FinancialDocumentDataBuilder;
+use CattoLearning\Commerce\Document\FinancialDocumentSamples;
 
 final class DocumentSampleData
 {
@@ -41,54 +48,7 @@ final class DocumentSampleData
                 'result.percentage' => '86.50',
                 'result.grade' => 'Distinction',
             ],
-            DocumentType::Invoice => self::business() + self::customer() + self::order() + [
-                'invoice.number' => 'INV-000412',
-                'invoice.date' => '2026-10-01',
-                'invoice.due_date' => '2026-10-08',
-                'invoice.subtotal' => self::money(487000),
-                'invoice.discount' => self::money(48700),
-                'invoice.total' => self::money(438300),
-                'invoice.currency' => 'ZAR',
-                'promotion.code' => 'SPRING10',
-                'promotion.label' => '10% off',
-                'bank.name' => 'Example Bank',
-                'bank.account_name' => 'Example Learning (Pty) Ltd',
-                'bank.account_number' => '62000000000',
-                'bank.branch_code' => '250655',
-                'items' => self::lines(),
-            ],
-            DocumentType::Receipt => self::business() + self::customer() + self::order() + [
-                'receipt.number' => 'REC-000398',
-                'receipt.date' => '2026-10-03',
-                'receipt.subtotal' => self::money(487000),
-                'receipt.discount' => self::money(48700),
-                'receipt.amount' => self::money(438300),
-                'receipt.currency' => 'ZAR',
-                'receipt.payment_method' => 'EFT',
-                'receipt.payment_reference' => 'FNB-20261003-7741',
-                'promotion.code' => 'SPRING10',
-                'promotion.label' => '10% off',
-                'items' => self::lines(),
-            ],
-            DocumentType::CreditNote => self::business() + self::customer() + self::order() + [
-                'credit_note.number' => 'CN-000027',
-                'credit_note.date' => '2026-10-05',
-                'credit_note.amount' => self::money(161100),
-                'credit_note.currency' => 'ZAR',
-                'credit_note.basis' => 'Goodwill',
-                'credit_note.reason' => "The learner could not attend the practical assessment.\nCredited to Account Funds.",
-                'credit_note.invoice_number' => 'INV-000412',
-                'items' => [[
-                    'description' => 'Bundle: Workplace Safety Essentials',
-                    'detail' => 'Includes: First Aid Level 1, Incident Reporting',
-                    'quantity' => 1,
-                    'access_period' => '365 days',
-                    'price' => self::money(179000),
-                    'discount' => self::money(17900),
-                    'paid' => self::money(161100),
-                    'credited' => self::money(161100),
-                ]],
-            ],
+            DocumentType::Invoice, DocumentType::Receipt, DocumentType::CreditNote => self::financial($type),
         };
     }
 
@@ -105,42 +65,16 @@ final class DocumentSampleData
         ];
     }
 
-    /** @return array<string,mixed> */
-    private static function customer(): array
+    /**
+     * A financial document of the made-up learner order - two courses, a bundle and a promotion - built
+     * by the same builder as an issued document, with the example business and bank details.
+     *
+     * @return array<string,mixed>
+     */
+    private static function financial(DocumentType $type): array
     {
-        return [
-            'customer.billing_name' => 'Lerato Dlamini',
-            'customer.organisation' => 'Dlamini & Associates',
-            'customer.tax_number' => '4000000001',
-            'customer.billing_address' => ['12 Kéré Street', 'Suite 4', 'Brooklyn', 'Pretoria 0181', 'Gauteng', 'South Africa'],
-            'customer.company_name' => null,
-            'customer.purchaser_name' => 'Lerato Dlamini',
-            'customer.email' => 'lerato@example.test',
-        ];
-    }
-
-    /** @return array<string,mixed> */
-    private static function order(): array
-    {
-        return ['order.number' => 'CL-00000412', 'order.date' => '2026-10-01'];
-    }
-
-    /** @return list<array<string,mixed>> */
-    private static function lines(): array
-    {
-        return [
-            ['description' => 'Fire Safety for Workplace Supervisors', 'detail' => null, 'quantity' => 1, 'access_period' => '365 days',
-                'price' => self::money(129000), 'discount' => self::money(12900), 'paid' => self::money(116100)],
-            ['description' => 'Bundle: Workplace Safety Essentials', 'detail' => 'Includes: First Aid Level 1, Incident Reporting', 'quantity' => 1, 'access_period' => '365 days',
-                'price' => self::money(179000), 'discount' => self::money(17900), 'paid' => self::money(161100)],
-            ['description' => 'Hazard Identification & Risk Assessment', 'detail' => null, 'quantity' => 1, 'access_period' => '180 days',
-                'price' => self::money(179000), 'discount' => self::money(17900), 'paid' => self::money(161100)],
-        ];
-    }
-
-    /** @return array{minor:int,currency:string} */
-    private static function money(int $minor): array
-    {
-        return ['minor' => $minor, 'currency' => 'ZAR'];
+        $example = FinancialDocumentSamples::for('learner', $type);
+        return FinancialDocumentDataBuilder::assemble($type, $example['order'], $example['snapshot'], $example['number'], $example['issued_at'], $example['context'], self::business(),
+            ['bank.name' => 'Example Bank', 'bank.account_name' => 'Example Learning (Pty) Ltd', 'bank.account_number' => '62000000000', 'bank.branch_code' => '250655']);
     }
 }

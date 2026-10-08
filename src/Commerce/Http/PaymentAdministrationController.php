@@ -7,10 +7,10 @@ namespace CattoLearning\Commerce\Http;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\PaymentAdministrationService;
 use CattoLearning\Commerce\Application\RefundAdministrationService;
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Domain\OrderTotals;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
-use CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
@@ -25,7 +25,7 @@ final class PaymentAdministrationController extends BaseController
 {
     public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests,
         private readonly CommerceRepository $records, private readonly PaymentAdministrationService $payments,
-        private readonly RefundAdministrationService $refunds, private readonly InvoicePdfRenderer $pdfs)
+        private readonly RefundAdministrationService $refunds, private readonly FinancialDocuments $financialDocuments)
     { parent::__construct($auth,$view,$requests); }
 
     #[Route('/admin/commerce/orders',name:'admin_commerce_orders',methods:['GET'])]
@@ -136,7 +136,7 @@ final class PaymentAdministrationController extends BaseController
             if ($document['kind']==='receipt' && !$actor->hasPermission('PLATFORM.PAYMENT.VIEW')) throw $this->notFound('Document not found.');
             if ($document['kind']==='credit_note' && !$actor->hasPermission('PLATFORM.REFUND.VIEW')) throw $this->notFound('Document not found.');
             $disposition=$this->request()->query->get('download')==='1'?'attachment':'inline';
-            return new Response($this->pdfs->render($document),200,['Content-Type'=>'application/pdf','Content-Disposition'=>$disposition.'; filename="'.$document['number'].'.pdf"','Cache-Control'=>'private, no-store','X-Content-Type-Options'=>'nosniff']);
+            return new Response($this->financialDocuments->pdf($document),200,['Content-Type'=>'application/pdf','Content-Disposition'=>$disposition.'; filename="'.$document['number'].'.pdf"','Cache-Control'=>'private, no-store','X-Content-Type-Options'=>'nosniff']);
         }
         throw $this->notFound('Document not found.');
     }

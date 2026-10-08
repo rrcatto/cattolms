@@ -1,0 +1,72 @@
+{% extends layout %}
+{% block page_body %}
+{{ importmap() }}
+{% set ph_kicker = 'Commerce' %}{% set ph_title = 'Financial documents' %}{% set ph_lead = 'Invoices, receipts and credit notes are drawn in this design. Last saved ' ~ (saved.updated_at|date('j M Y, H:i')) ~ (saved.updated_by ? ' by ' ~ saved.updated_by : '') ~ '.' %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section container-fluid cl-container-wide py-5">
+{% if errors %}
+	{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'The design was not saved.', section_spacing: true})} %}{% block body %}<ul class="mb-0">{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}
+{% endif %}
+{% set choosers %}
+	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Document', for: 'preview-document'})} %}{% block control %}<select id="preview-document" name="document" {{ ui_field_attrs(props) }}>{% for item in documents %}<option value="{{ item.value }}"{% if item.value == document %} selected{% endif %}>{{ item.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Sample order', for: 'preview-sample', help: 'Made up. An order a promotion made free has only an invoice.'})} %}{% block control %}<select id="preview-sample" name="sample" {{ ui_field_attrs(props) }}>{% for item in samples %}<option value="{{ item.value }}"{% if item.value == sample %} selected{% endif %}>{{ item.label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+{% endset %}
+{% set preview %}
+	{{ ui('layout.section-head', {heading: 'Preview', heading_level: 2, summary: 'The chosen document for a made-up order, drawn exactly as its PDF prints, with your business and bank details. It updates as you change the form.'}) }}
+	<div class="cl-document-preview">
+		<iframe class="cl-document-preview-frame" name="financial-preview" title="Preview of the chosen document"{% if preview_src %} src="{{ preview_src }}#view=Fit&amp;toolbar=0"{% endif %}></iframe>
+		{% if preview_src %}<p class="cl-ui-field-help mb-0"><a href="{{ preview_src }}" target="_blank" rel="noopener">Open the PDF in a new tab</a></p>{% endif %}
+	</div>
+{% endset %}
+{% if not can_manage %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+		<form method="get" action="/admin/commerce/documents">{{ choosers }}{{ ui('action.button', {label: 'Show', type: 'submit'}) }}</form>
+		{{ preview }}
+	{% endblock %}{% endembed %}
+{% else %}
+<form id="financial-documents-form" action="/admin/commerce/documents" method="post" enctype="multipart/form-data" data-controller="certificate-preview" data-certificate-preview-button-value="financial-preview-button">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="logo_asset" value="{{ design.logo.sha|default('') }}">
+<div class="cl-document-design">
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ choosers }}
+	{{ preview }}
+{% endblock %}{% endembed %}
+<div class="cl-document-design-form">
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Logo', heading_level: 2, summary: 'Optional. It is printed above your business name on all three documents.'}) }}
+	{% if logo %}
+		<div class="cl-document-pictures"><img class="cl-document-logo" src="{{ logo }}" alt="The current logo">
+		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove the logo'})} %}{% block control %}<input type="checkbox" name="remove_logo" value="1">{% endblock %}{% endembed %}</div>
+	{% endif %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: logo ? 'Replace the logo' : 'Add a logo', for: 'document-logo', help: 'PNG or JPEG, any size: it is fitted to the top of the page.'})} %}{% block control %}<input id="document-logo" type="file" name="logo" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Look', heading_level: 2, summary: 'Every document is A4 portrait.'}) }}
+	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Typeface', for: 'document-typeface'})} %}{% block control %}<select id="document-typeface" name="typeface" {{ ui_field_attrs(props) }}>{% for key, label in typefaces %}<option value="{{ key }}"{% if key == design.typeface %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Accent colour', for: 'document-colour', help: 'For the headings and the rules under the table heading and above the total.'})} %}{% block control %}<input id="document-colour" type="color" name="colour" value="{{ design.colour|lower }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Notes', heading_level: 2, summary: 'The line at the foot of each document. Plain text; leave one empty for no note.'}) }}
+	{% for note in notes %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: note.label, for: 'note-' ~ note.type, help: 'At most ' ~ note_limit ~ ' characters.'})} %}{% block control %}<textarea id="note-{{ note.type }}" name="note_{{ note.type }}" rows="2" maxlength="{{ note_limit }}" {{ ui_field_attrs(props) }}>{{ note.value }}</textarea>{% endblock %}{% endembed %}
+	{% endfor %}
+{% endblock %}{% endembed %}
+
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+	{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
+	{% block secondary_actions %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'financial-preview-button', form_action: '/admin/commerce/documents/preview.pdf', form_target: 'financial-preview', skip_validation: true, icon: 'action-open'}) }}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/commerce/documents'}) }}{% endblock %}
+{% endembed %}
+<p class="cl-ui-field-help">Saving changes invoices, receipts and credit notes issued from now on. Documents already issued keep the design they were issued with.</p>
+</div>
+</div>
+</form>
+{% endif %}
+</section>
+{% endblock %}

@@ -8,6 +8,7 @@ use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventType;
 use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -31,7 +32,7 @@ final class RefundAdministrationService
 {
     public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
         private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics,
-        private readonly AccessService $access) {}
+        private readonly AccessService $access, private readonly FinancialDocuments $documents) {}
 
     public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor): int
     {
@@ -82,13 +83,13 @@ final class RefundAdministrationService
                 ? ['fulfilment_type'=>'bundle','bundle_title'=>$itemSnapshot['bundle_title'],'courses'=>$itemSnapshot['courses'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]
                 : ['course_title'=>$itemSnapshot['course_title'],'access_period_seconds'=>$item['access_period_seconds'],'quantity'=>$quantity,'line_total_minor'=>$amountMinor,'currency'=>$order['currency']]];
             // The credit note states what the refunded line was paid; the order's totals are not its own.
-            $snapshot['refund_line']=['price_minor'=>(int)$item['amount_minor'],'discount_minor'=>(int)$item['discount_minor'],'paid_minor'=>self::paidAmount($item),'promotion_code'=>$snapshot['promotion']['code'] ?? null];
+            $snapshot['refund_line']=['price_minor'=>(int)$item['amount_minor'],'discount_minor'=>(int)$item['discount_minor'],'paid_minor'=>self::paidAmount($item),'quantity'=>(int)$item['quantity'],'promotion_code'=>$snapshot['promotion']['code'] ?? null];
             unset($snapshot['promotion'],$snapshot['subtotal_minor'],$snapshot['discount_minor']);
             $snapshot['total_minor']=$amountMinor;
             $snapshot['refund_id']=$id;
             $snapshot['refund_basis']=$basis;
             $snapshot['refund_reason']=$reason;
-            $this->records->document($orderId,'credit_note','refund:'.$id,$snapshot,$now);
+            $this->documents->issueCreditNote($orderId,$id,$snapshot,$now,$actor->id);
             $fullyRefunded=$this->records->refundedAmount($orderId,$itemId)>=self::paidAmount($item);
             $access=['revoked'=>0,'kept'=>0];
             if ($order['company_id']===null && $fullyRefunded) {

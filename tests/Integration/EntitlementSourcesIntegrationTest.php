@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Analytics\{AnalyticsEventRecorder, AnalyticsEventRepository};
 use CattoLearning\Auth\{AuthService, CurrentUser, PermissionCatalog};
 use CattoLearning\Commerce\Application\{AccessService,BillingProfileService,CheckoutService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,RefundAdministrationService};
@@ -54,11 +55,11 @@ final class EntitlementSourcesIntegrationTest extends TestCase
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
         $promotions = PromotionFixture::service($this->db, $this->clock);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $promotions);
+        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $promotions,IntegrationContainer::get()->get(FinancialDocuments::class));
         $this->access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $this->access, $tx, $this->orders, $this->clock, $companyCredits, $this->analytics(), $promotions);
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock);
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
         $this->billing = BillingFixture::service($this->db, $this->clock);
         $this->owner = $this->fixture->createUser('Sources course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Sources provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.sources.example.test');
@@ -225,7 +226,7 @@ final class EntitlementSourcesIntegrationTest extends TestCase
 
     private function refunds(): RefundAdministrationService
     {
-        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(), $this->access);
+        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(), $this->access,IntegrationContainer::get()->get(FinancialDocuments::class));
     }
 
     /** What the scheduled maintenance does for entitlements, at the mock clock's time. */

@@ -15,6 +15,8 @@ CSS policies, page settings, the source defaults and the PDF boundary.
 Architectural boundary: unit. The renderer's repository is a stub; renderSource() never reads it.
 
 Changelog:
+2026/10/08 SAST
+- The financial source defaults are the standard financial document design, compiled (DocumentTemplateDefaults is gone).
 2026/10/07 SAST
 - Certificates have no source default template any more (their templates are compiled from designs), so the defaults loop covers the financial documents.
 2026/10/06 SAST
@@ -25,10 +27,11 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
+use CattoLearning\Commerce\Document\FinancialDocumentDesign;
+use CattoLearning\Commerce\Document\FinancialDocumentDesignCompiler;
 use CattoLearning\Document\DocumentDataException;
 use CattoLearning\Document\DocumentPdfRenderer;
 use CattoLearning\Document\DocumentSampleData;
-use CattoLearning\Document\DocumentTemplateDefaults;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentTemplateRepository;
 use CattoLearning\Document\DocumentType;
@@ -291,14 +294,13 @@ final class DocumentTemplateEngineTest extends TestCase
         self::assertSame(['document_type' => 'certificate', 'template_id' => 7, 'template_version_id' => 42, 'template_version_number' => 3], $document->reference());
     }
 
-    public function testEverySourceDefaultIsValidAndRendersItsSampleDocumentAsAPdf(): void
+    public function testTheStandardFinancialDesignIsValidAndRendersEachSampleDocumentAsAPdf(): void
     {
-        foreach (DocumentType::cases() as $type) {
-            if ($type === DocumentType::Certificate) {
-                continue; // Certificates are designs compiled from their looks: CertificateDesignTest.
-            }
-            $default = DocumentTemplateDefaults::for($type);
-            $document = $this->renderer->renderSource($type, $default['html'], $default['css'], $type->defaultSettings(), DocumentSampleData::for($type));
+        // Certificates are designs compiled from their looks (CertificateDesignTest); financial
+        // documents from the financial document design (FinancialDocumentsTest).
+        foreach (FinancialDocumentDesign::types() as $type) {
+            $default = (new FinancialDocumentDesignCompiler())->compile(FinancialDocumentDesign::standard(), $type);
+            $document = $this->renderer->renderSource($type, $default['html'], $default['css'], $default['settings'], DocumentSampleData::for($type));
             self::assertStringNotContainsString('{{', $document->body, $type->value . ' renders every placeholder.');
             $pdf = (new DocumentPdfRenderer())->render($document);
             self::assertStringStartsWith('%PDF-', $pdf, $type->value . ' becomes a PDF.');

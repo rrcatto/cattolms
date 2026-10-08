@@ -18,6 +18,7 @@ Every test runs inside a transaction that is rolled back.
 
 Changelog:
 2026/10/08 SAST
+- The installed invoice, receipt and credit note are the standard financial document design, compiled (Phase K).
 - An installed design is compared by its first version, so a design ADMIN has since saved again
   in the development database no longer fails the test.
 2026/10/07 SAST
@@ -31,13 +32,14 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Commerce\Document\FinancialDocumentDesign;
+use CattoLearning\Commerce\Document\FinancialDocumentDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateDesign;
 use CattoLearning\Course\Certificate\CertificateDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Certificate\CertificateLooks;
 use CattoLearning\Document\DocumentAssetRepository;
 use CattoLearning\Document\DocumentSampleData;
-use CattoLearning\Document\DocumentTemplateDefaults;
 use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Document\DocumentTemplateRepository;
 use CattoLearning\Document\DocumentType;
@@ -79,7 +81,8 @@ final class DocumentTemplateIntegrationTest extends TestCase
             $current = $this->templates->currentVersion($type);
             self::assertNotNull($current, $type->value . ' has a current template.');
             self::assertSame('published', $current['state']);
-            self::assertSame(DocumentTemplateDefaults::for($type)['html'], $current['html'], 'The installed default is the source default.');
+            $first = $this->templates->version((int) $this->db->fetchOne('SELECT id FROM document_template_versions WHERE template_id = :id AND version_number = 1', ['id' => $current['template_id']]));
+            self::assertSame((new FinancialDocumentDesignCompiler())->compile(FinancialDocumentDesign::standard(), $type)['html'], $first['html'] ?? null, 'The installed template is the standard financial design, compiled.');
             $document = $this->renderer->renderCurrent($type->value, DocumentSampleData::for($type));
             self::assertSame((int) $current['id'], $document->reference()['template_version_id'], 'A rendered document names the exact version it came from.');
             self::assertSame($type->defaultSettings()->orientation, $document->settings->orientation);

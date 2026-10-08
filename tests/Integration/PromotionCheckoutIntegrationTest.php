@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Commerce\Document\FinancialDocumentDataBuilder;
+use CattoLearning\Commerce\Document\FinancialDocuments;
+use CattoLearning\Document\DocumentPdfRenderer;
+use CattoLearning\Document\DocumentTemplateRenderer;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Application\CliBootstrap;
@@ -12,7 +16,7 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\{AccessService,BillingProfileService,CartService,CheckoutService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,PromotionAdministrationService,PromotionService,RefundAdministrationService};
 use CattoLearning\Commerce\Domain\{PaymentResult,PromotionRejected};
 use CattoLearning\Commerce\Http\{CommerceController,PaymentAdministrationController};
-use CattoLearning\Commerce\Infrastructure\{CommerceRepository,InvoicePdfRenderer,PromotionRepository};
+use CattoLearning\Commerce\Infrastructure\{CommerceRepository,PromotionRepository};
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
@@ -297,7 +301,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $administration->setActive($admin, $id, false);
         self::assertEquals($before, [$this->records->order($orderId), $this->documentsHtml($orderId), $this->db->fetchAllAssociative('SELECT * FROM commerce_order_items WHERE order_id=:id ORDER BY id', ['id' => $orderId])], 'Editing and deactivating the promotion changed nothing about the order or its documents.');
         foreach ($this->documentsHtml($orderId) as $kind => $html) {
-            foreach (['Promo ' . $code . ' (10% off)', '−' . $this->rand(1735), $this->rand(17345), $this->rand(15610)] as $shown) self::assertStringContainsString(htmlspecialchars($shown, ENT_QUOTES), $html, $kind . ': ' . $shown);
+            foreach (['Promotion ' . $code . ' (10% off)', '−' . $this->rand(1735), $this->rand(17345), $this->rand(15610)] as $shown) self::assertStringContainsString(htmlspecialchars($shown, ENT_QUOTES), $html, $kind . ': ' . $shown);
             self::assertStringNotContainsString('Renamed offer', $html);
         }
         $customer = InProcessPage::run($buyer, CommerceController::class, 'order', ['id' => (string) $orderId]);
@@ -344,11 +348,12 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $note = $this->db->fetchAssociative("SELECT * FROM commerce_documents WHERE order_id=:o AND kind='credit_note' AND source_key=:k", ['o' => $orderId, 'k' => 'refund:' . $refundA]) ?: [];
         $noteSnapshot = CommerceRepository::decode((string) $note['snapshot']);
         self::assertSame(11110, $noteSnapshot['total_minor']);
-        self::assertEquals(['price_minor' => 12345, 'discount_minor' => 1235, 'paid_minor' => 11110, 'promotion_code' => $code], $noteSnapshot['refund_line'], 'The credit note states the line\'s price, its promotion share and what was paid for it.');
+        self::assertEquals(['price_minor' => 12345, 'discount_minor' => 1235, 'paid_minor' => 11110, 'quantity' => 1, 'promotion_code' => $code], $noteSnapshot['refund_line'], 'The credit note states the line\'s price, its promotion share and what was paid for it.');
         self::assertArrayNotHasKey('promotion', $noteSnapshot, 'The credit note states its own amount, not the order\'s totals.');
-        $noteHtml = (new InvoicePdfRenderer($this->records))->html($note);
-        self::assertStringContainsString('Amount credited: ' . htmlspecialchars($this->rand(11110), ENT_QUOTES), $noteHtml);
-        self::assertStringContainsString(htmlspecialchars($this->rand(11110), ENT_QUOTES) . ' was paid for it', $noteHtml);
+        $noteHtml = IntegrationContainer::get()->get(FinancialDocuments::class)->render($note)->html;
+        self::assertStringContainsString('<th>Amount credited</th><td>' . htmlspecialchars($this->rand(11110), ENT_QUOTES) . '</td>', $noteHtml);
+        // The line as it was paid: its price, its share of the promotion, what was paid and what this refund credits.
+        foreach ([$this->rand(12345), '−' . $this->rand(1235), $this->rand(11110), 'Discount from promotion ' . $code] as $shown) self::assertStringContainsString(htmlspecialchars($shown, ENT_QUOTES), $noteHtml, $shown);
 
         $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 4000);
         try {
@@ -501,11 +506,13 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $tx = new TransactionManager($db);
         $transitions = $container->get(TransitionService::class);
         $promotions = PromotionFixture::service($db, $this->clock);
-        $orders = new OrderService($records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $promotions);
+        // Documents are issued through this connection's repository, inside its transaction.
+        $documents = new FinancialDocuments($records, $container->get(FinancialDocumentDataBuilder::class), $container->get(DocumentTemplateRenderer::class), $container->get(DocumentPdfRenderer::class));
+        $orders = new OrderService($records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $promotions, $documents);
         $access = new AccessService($records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $fulfilment = new FulfilmentService($records, $transitions, $access, $tx, $orders, $this->clock, $companyCredits, new AnalyticsEventRecorder(new AnalyticsEventRepository($db), $this->clock), $promotions);
-        $payments = new PaymentService($records, $tx, $orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $fulfilment, $transitions, $this->clock);
+        $payments = new PaymentService($records, $tx, $orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $fulfilment, $transitions, $this->clock, $documents);
         return [$records, $orders, $fulfilment, $payments, $promotions];
     }
 
@@ -569,7 +576,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
     private function refunds(): RefundAdministrationService
     {
         return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock,
-            new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
+            new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
     }
 
     private function administration(): PromotionAdministrationService
@@ -581,7 +588,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
     private function documentsHtml(int $orderId): array
     {
         $html = [];
-        foreach ($this->records->documents($orderId) as $document) $html[(string) $document['kind']] = (new InvoicePdfRenderer($this->records))->html($document);
+        foreach ($this->records->documents($orderId) as $document) $html[(string) $document['kind']] = IntegrationContainer::get()->get(FinancialDocuments::class)->render($document)->html;
         return $html;
     }
 

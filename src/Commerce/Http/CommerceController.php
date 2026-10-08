@@ -22,7 +22,7 @@ final class CommerceController extends BaseController
         private readonly OrderService $orders, private readonly CommerceRepository $records,
         private readonly PlatformAdministrationService $administration,
         private readonly CartService $carts, private readonly CheckoutService $checkout,
-        private readonly \CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer $pdfs,
+        private readonly \CattoLearning\Commerce\Document\FinancialDocuments $documents,
         private readonly \CattoLearning\Commerce\Application\CommerceMaintenance $maintenance,
         private readonly \CattoLearning\Configuration\RuntimeSettings $settings,
         private readonly BillingProfileService $billing,
@@ -224,7 +224,7 @@ final class CommerceController extends BaseController
         $order=$this->orders->view($this->requirePermission('COMMERCE.ORDER.VIEW'),(int)$this->param('id'));
         foreach($order['documents'] as $document) {
             if ((int)$document['id']!==(int)$this->param('document')) continue;
-            $bytes = $this->pdfs->render($document);
+            $bytes = $this->documents->pdf($document);
             $disposition = $this->request()->query->get('download') === '1' ? 'attachment' : 'inline';
             return new Response($bytes, 200, ['Content-Type'=>'application/pdf', 'Content-Disposition'=>$disposition.'; filename="'.$document['number'].'.pdf"', 'Cache-Control'=>'private, no-store', 'X-Content-Type-Options'=>'nosniff']);
         }
