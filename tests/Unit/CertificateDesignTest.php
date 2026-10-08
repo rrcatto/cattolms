@@ -21,6 +21,8 @@ Architectural boundary: unit. Stored images are read through a stand-in database
 installed looks' backgrounds (Tests\Support\ImageFileDatabase).
 
 Changelog:
+2026/10/08 SAST
+- A signature picture of any shape fits every look, centred on the line; uploads are trimmed and lose their paper.
 2026/10/07 SAST
 - Created for certificate designs (replacing the preset-based certificate template test).
 */
@@ -161,6 +163,39 @@ final class CertificateDesignTest extends TestCase
         }
     }
 
+    #[DataProvider('looks')]
+    public function testASignaturePictureOfAnyShapeFitsAndSitsCentredOnTheLine(string $key): void
+    {
+        // A nearly square signature (as uploaded on 2026-10-08, when every look overflowed) and a wide one.
+        foreach (['square' => [200, 210], 'wide' => [1200, 300]] as $shape => [$width, $height]) {
+            $design = self::withSignature($this->design($key, 'Dr. Pieter van der Merwe', 'Head of Training'), new CertificateImage(str_repeat('a', 64), $width, $height));
+            $compiled = $this->compiler->compile($design, $this->signatoryText($design));
+            foreach (['sample' => DocumentSampleData::for(DocumentType::Certificate), 'long' => self::long()] as $label => $data) {
+                [$pages, $fits, , $boxes] = $this->draw($compiled, $data);
+                self::assertSame(1, $pages);
+                self::assertTrue($fits, $key . ' with a ' . $shape . ' signature and ' . $label . ' values fits its box.');
+            }
+            $mm = static fn(float $points): float => $points * 25.4 / 72;
+            [$picture, $text] = [$boxes[CertificateDesignCompiler::SIGN_IMAGE_ID], $boxes[CertificateDesignCompiler::SIGN_TEXT_ID]];
+            self::assertGreaterThanOrEqual(CertificateDesignCompiler::SIGNATURE_MIN_HEIGHT, $mm($picture['h']), 'It is printed at a size worth printing.');
+            self::assertEqualsWithDelta(0.0, $mm(($picture['x'] + $picture['w'] / 2) - ($text['x'] + $text['w'] / 2)), 0.2, $key . ': centred on the line.');
+            self::assertEqualsWithDelta(1.0, $mm($text['y'] - ($picture['y'] + $picture['h'])), 0.2, $key . ': resting just above the line.');
+            self::assertSame($compiled['html'], $this->compiler->compile($design, $this->signatoryText($design))['html'], 'Sizing is repeatable.');
+        }
+    }
+
+    public function testASignatoryThatLeavesNoRoomIsMeasuredAsNotFitting(): void
+    {
+        $design = self::withSignature(CertificateDesign::starter('professional-cpd', str_repeat('Signatory ', 12), str_repeat('Head of a very long department ', 5)),
+            new CertificateImage(str_repeat('a', 64), 200, 210));
+        $compiled = $this->compiler->compile($design, $this->signatoryText($design));
+        self::assertLessThan(CertificateDesignCompiler::SIGNATURE_MIN_HEIGHT, $compiled['signature_room_mm']);
+        [, $fits] = $this->draw($compiled, DocumentSampleData::for(DocumentType::Certificate));
+        self::assertFalse($fits);
+        $this->expectException(\LogicException::class);
+        $this->compiler->compile($design);
+    }
+
     public function testTooMuchWordingIsMeasuredAsNotFitting(): void
     {
         $wording = CertificateLooks::defaultWording('classic') . str_repeat('<p class="cert-course">Another long line of wording that goes on and on</p>', 8);
@@ -225,7 +260,19 @@ final class CertificateDesignTest extends TestCase
         $logo = CertificateImage::prepare(self::png(2400, 600), CertificateImage::LOGO);
         self::assertSame([1200, 300], [$logo['width'], $logo['height']], 'A logo is scaled down to fit its box.');
         self::assertSame(6, ord($logo['bytes'][25]), 'A logo keeps an alpha channel, so it sits cleanly on the background.');
-        foreach ([[self::png(1000, 1000), CertificateImage::BACKGROUND, 'A4 landscape'], [self::png(800, 566), CertificateImage::BACKGROUND, 'too small'], ['GIF89a', CertificateImage::LOGO, 'PNG or JPEG']] as [$bytes, $kind, $message]) {
+        $signature = CertificateImage::prepare(self::scannedSignature(), CertificateImage::SIGNATURE);
+        self::assertSame('image/png', $signature['mime'], 'A scanned JPEG signature is stored as a PNG.');
+        $ink = imagecreatefromstring($signature['bytes']) ?: imagecreatetruecolor(1, 1);
+        self::assertSame(127, (imagecolorat($ink, 0, 0) >> 24) & 0x7F, 'Its paper is transparent.');
+        self::assertEqualsWithDelta(620, $signature['width'], 12, 'Its margins are trimmed to the ink.');
+        self::assertEqualsWithDelta(220, $signature['height'], 12);
+        $centre = imagecolorsforindex($ink, imagecolorat($ink, intdiv($signature['width'], 2), intdiv($signature['height'], 2)));
+        self::assertSame(0, $centre['alpha'], 'The ink is solid.');
+        foreach (['red' => 20, 'green' => 30, 'blue' => 90] as $channel => $value) {
+            self::assertEqualsWithDelta($value, $centre[$channel], 3, 'The ink keeps its colour (within JPEG noise).');
+        }
+        foreach ([[self::png(1000, 1000), CertificateImage::BACKGROUND, 'A4 landscape'], [self::png(800, 566), CertificateImage::BACKGROUND, 'too small'], ['GIF89a', CertificateImage::LOGO, 'PNG or JPEG'],
+            [self::png(600, 200, [255, 255, 255]), CertificateImage::SIGNATURE, 'looks empty']] as [$bytes, $kind, $message]) {
             try {
                 CertificateImage::prepare($bytes, $kind);
                 self::fail('Refused: ' . $message);
@@ -288,21 +335,60 @@ final class CertificateDesignTest extends TestCase
     }
 
     /**
-     * @param array{html:string,css:string,settings:\CattoLearning\Document\PageSettings,box_height_mm:int} $compiled
+     * @param array{html:string,css:string,settings:\CattoLearning\Document\PageSettings,box_height_mm:int,signature_room_mm:?float} $compiled
      * @param array<string,mixed> $data
-     * @return array{0:int,1:bool,2:string} pages, whether the words fit, the rendered body
+     * @return array{0:int,1:bool,2:string,3:array<string,array{x:float,y:float,w:float,h:float}>} pages, whether the words fit, the rendered body, the signature's boxes
      */
     private function draw(array $compiled, array $data): array
     {
         $document = $this->renderer->renderSource(DocumentType::Certificate, $compiled['html'], $compiled['css'], $compiled['settings'], $data);
-        $out = (new DocumentPdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::LAYOUT_ID]);
+        $out = (new DocumentPdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::LAYOUT_ID, CertificateDesignCompiler::SIGN_IMAGE_ID, CertificateDesignCompiler::SIGN_TEXT_ID]);
         $height = $out['boxes'][CertificateDesignCompiler::LAYOUT_ID]['h'] ?? 0.0;
-        return [preg_match_all('#/Type\s*/Page(?![a-zA-Z])#', $out['pdf']), $height <= $compiled['box_height_mm'] * 72 / 25.4 + 1.0, $document->body];
+        return [preg_match_all('#/Type\s*/Page(?![a-zA-Z])#', $out['pdf']), $height <= $compiled['box_height_mm'] * 72 / 25.4 + 1.0, $document->body, $out['boxes']];
     }
 
-    private static function png(int $width, int $height): string
+    /** The signatory's text measured as CertificateDesignService measures it, in mm. */
+    private function signatoryText(CertificateDesign $design): float
+    {
+        $probe = $this->compiler->signatureProbe($design) ?? self::fail('A design with a signature picture has a probe.');
+        $document = $this->renderer->renderSource(DocumentType::Certificate, $probe['html'], $probe['css'], $probe['settings'], DocumentSampleData::for(DocumentType::Certificate));
+        return (new DocumentPdfRenderer())->renderWithLayout($document, [CertificateDesignCompiler::SIGN_TEXT_ID])['boxes'][CertificateDesignCompiler::SIGN_TEXT_ID]['h'] * 25.4 / 72;
+    }
+
+    private static function withSignature(CertificateDesign $design, CertificateImage $signature): CertificateDesign
+    {
+        return new CertificateDesign($design->look, $design->background, $design->placement, $design->typeface, $design->colour, $design->logo,
+            $design->wording, $design->signatureName, $design->signaturePosition, $signature, $design->smallPrint);
+    }
+
+    /** A signature scanned on off-white paper with grain, the ink in the middle of wide margins. */
+    private static function scannedSignature(): string
+    {
+        $image = imagecreatetruecolor(1200, 800);
+        imagefill($image, 0, 0, (int) imagecolorallocate($image, 238, 236, 230));
+        mt_srand(7);
+        for ($i = 0; $i < 3000; $i++) {
+            $grey = mt_rand(225, 248);
+            imagesetpixel($image, mt_rand(0, 1199), mt_rand(0, 799), (int) imagecolorallocate($image, $grey, $grey, $grey));
+        }
+        imagefilledrectangle($image, 290, 290, 909, 509, (int) imagecolorallocate($image, 20, 30, 90));
+        ob_start();
+        imagepng($image);
+        $png = (string) ob_get_clean();
+        // Through JPEG, as a scan arrives; the ink's edges and the paper pick up its noise.
+        $scan = imagecreatefromstring($png) ?: imagecreatetruecolor(1, 1);
+        ob_start();
+        imagejpeg($scan, null, 92);
+        return (string) ob_get_clean();
+    }
+
+    /** @param array{int,int,int}|null $fill */
+    private static function png(int $width, int $height, ?array $fill = null): string
     {
         $image = imagecreatetruecolor($width, $height);
+        if ($fill !== null) {
+            imagefill($image, 0, 0, (int) imagecolorallocate($image, ...$fill));
+        }
         ob_start();
         imagepng($image);
         return (string) ob_get_clean();

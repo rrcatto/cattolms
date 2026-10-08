@@ -17,6 +17,9 @@ or deleted, and the renderer embeds stored images and refuses a missing one.
 Every test runs inside a transaction that is rolled back.
 
 Changelog:
+2026/10/08 SAST
+- An installed design is compared by its first version, so a design ADMIN has since saved again
+  in the development database no longer fails the test.
 2026/10/07 SAST
 - Rewritten for the engine alone: the generic template pages and their service were removed with
   the certificate designs redesign. Installed certificate designs and stored images are covered.
@@ -92,7 +95,9 @@ final class DocumentTemplateIntegrationTest extends TestCase
             self::assertArrayHasKey($look->name, $byName, $look->name . ' is installed.');
             $installed = $byName[$look->name];
             self::assertSame($key, $installed['design']->look);
-            $version = $this->templates->version((int) $installed['published_version_id']);
+            // Its first version, which is immutable: ADMIN may have saved later ones in the development database.
+            $version = $this->templates->version((int) $this->db->fetchOne('SELECT id FROM document_template_versions WHERE template_id = :id AND version_number = 1', ['id' => $installed['id']]));
+            self::assertNotNull($version);
             self::assertSame($compiler->compile(CertificateDesign::starter($key))['html'], $version['html'], 'The installed design is its look’s starter, compiled.');
             self::assertSame(['A4', 'landscape', 0], [$version['page_size'], $version['page_orientation'], (int) $version['margin_top_mm']]);
             $document = $this->renderer->renderVersion((int) $version['id'], DocumentSampleData::for(DocumentType::Certificate));

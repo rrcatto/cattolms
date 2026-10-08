@@ -18,6 +18,8 @@ defaultWording() is what a new design on a look starts with, in the editor's own
 CertificateWording); the small print default is the certificate number and where to verify it.
 
 Changelog:
+2026/10/08 SAST
+- Professional CPD's foot is 26 mm, as tall as the others', so a signature picture has room above the line.
 2026/10/07 SAST
 - Created for certificate designs.
 */
@@ -174,7 +176,7 @@ final class CertificateLooks
 
     private static function professionalCpd(): CertificateLook
     {
-        return new CertificateLook('professional-cpd', 'Professional CPD', 'Green header band with an emblem, details on white, small print in the foot band.', 'professional-cpd.png', [24, 9, 249, 182], 29, 22, 'left', 'band',
+        return new CertificateLook('professional-cpd', 'Professional CPD', 'Green header band with an emblem, details on white, small print in the foot band.', 'professional-cpd.png', [24, 9, 249, 182], 29, 26, 'left', 'band',
             "body{font-family:'Plex Sans';color:#15201E}.cd-layout{text-align:left}"
             . '.cd-head{padding-right:62mm}'
             . 'p{font-size:11.5pt;color:#4A5856;line-height:1.3}'

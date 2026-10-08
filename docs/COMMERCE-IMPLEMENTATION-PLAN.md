@@ -1,6 +1,6 @@
 # Commerce Implementation Plan
 
-Original plan: 12 September 2026; current-status update: 7 October 2026 (v0.8.8.13)
+Original plan: 12 September 2026; current-status update: 8 October 2026 (v0.8.8.14)
 Target: `code/cattolms-v0.8`
 Status: Individual and company purchasing, payment administration and refunds (v0.8.7), billing profiles (Phase F), promo codes (Phase G), course bundles (Phase H) and independent entitlement sources are released through v0.8.8.4. Account Funds spending, payouts, debt, gifts and real gateways are not implemented.
 
@@ -37,7 +37,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.13. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
+All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.8.8.14. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 

@@ -25,6 +25,8 @@ uploaded background, and open only to those with the certificate design permissi
 Every test runs inside a transaction that is rolled back.
 
 Changelog:
+2026/10/08 SAST
+- A design saves with an uploaded signature picture, sized to the foot and centred on the line.
 2026/10/07 SAST
 - Rewritten for certificate designs.
 - Created for certificates on the document template engine (Phase J).
@@ -41,6 +43,7 @@ use CattoLearning\Course\Certificate\CertificateDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Certificate\CertificateDesignService;
 use CattoLearning\Course\Certificate\CertificateDocuments;
+use CattoLearning\Course\Certificate\CertificateImage;
 use CattoLearning\Course\Certificate\CertificateIssuer;
 use CattoLearning\Course\Certificate\CertificateLooks;
 use CattoLearning\Course\Certificate\CertificateRepository;
@@ -363,6 +366,36 @@ final class CertificateIntegrationTest extends TestCase
         $thumbnail = InProcessPage::run($this->admin, CertificateDesignController::class, 'picture', ['sha' => (string) $design->background?->sha]);
         self::assertSame(200, $thumbnail['status']);
         self::assertStringStartsWith("\x89PNG", $thumbnail['body']);
+    }
+
+    public function testADesignSavesWithASignaturePictureSizedAndCentredOnTheLine(): void
+    {
+        $container = IntegrationContainer::get();
+        $service = new CertificateDesignService($this->designs, new CertificateDesignCompiler(), $container->get(DocumentAssetRepository::class), $container->get(DocumentTemplateRenderer::class),
+            $container->get(DocumentPdfRenderer::class), $container->get(TransactionManager::class), $container->get(AuditRepository::class), static fn(string $path): bool => is_file($path));
+        // A nearly square signature on white paper with wide margins: before 2026-10-08 every look
+        // refused it as words that do not fit.
+        $file = (string) tempnam(sys_get_temp_dir(), 'signature');
+        $image = imagecreatetruecolor(1000, 1050);
+        imagefill($image, 0, 0, (int) imagecolorallocate($image, 255, 255, 255));
+        imagefilledellipse($image, 500, 525, 400, 420, (int) imagecolorallocate($image, 10, 10, 10));
+        imagepng($image, $file);
+        $upload = ['signature_image' => ['name' => 'signature.png', 'type' => 'image/png', 'tmp_name' => $file, 'error' => UPLOAD_ERR_OK, 'size' => filesize($file)]];
+        $saved = $service->save(null, $this->form('Signed CPD', CertificateLooks::defaultWording('professional-cpd'), 'professional-cpd'), $upload, $this->adminId);
+        self::assertSame([], $saved['errors']);
+        $signature = $this->designs->find($saved['id'])['design']->signature;
+        self::assertInstanceOf(CertificateImage::class, $signature);
+        // Trimmed to the ink (about 404 x 424 px), then scaled into the 400 px tall signature box.
+        self::assertSame(400, $signature->height);
+        self::assertEqualsWithDelta(381, $signature->width, 6, 'Stored trimmed to the ink.');
+        $html = (string) $this->db->fetchOne('SELECT v.html FROM document_template_versions v WHERE v.template_id = :id ORDER BY v.version_number DESC LIMIT 1', ['id' => $saved['id']]);
+        self::assertMatchesRegularExpression('/id="' . CertificateDesignCompiler::SIGN_IMAGE_ID . '" src="asset:' . $signature->sha . '" alt="" style="width:[\d.]+mm;height:[\d.]+mm;margin-left:[\d.]+mm"/', $html);
+        self::assertSame(1, self::pages($service->previewPdf($saved['id'])));
+
+        $crowded = $service->save(null, ['signature_position' => str_repeat('Head of a very long department ', 5), 'signature_name' => str_repeat('Signatory ', 12)]
+            + $this->form('Crowded signatory', CertificateLooks::defaultWording('professional-cpd'), 'professional-cpd'), $upload, $this->adminId);
+        @unlink($file);
+        self::assertSame(['The signatory’s name and position leave no room for the signature picture. Shorten them.'], $crowded['errors']);
     }
 
     public function testOnlyCertificateDesignPermissionsOpenTheDesignPages(): void

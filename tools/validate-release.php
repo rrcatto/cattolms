@@ -57,7 +57,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.8.8.13', 'composer.json version must be 0.8.8.13.');
+$need(($composer['version'] ?? '') === '0.8.8.14', 'composer.json version must be 0.8.8.14.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 // ext-gd: profile images and certificate pictures are processed with GD, and an installation without
 // it answered an upload with HTTP 500, so `composer install` refuses a server that lacks it.
@@ -178,7 +178,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.8.8.13'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.8.8.14'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

@@ -18,10 +18,18 @@ millimetres - head, a middle centred vertically in the space left, and a foot wi
 and small print - because Dompdf lays tables out reliably and does not do flexbox. Its id,
 cd-layout, is what the fit check measures: a box that is too full grows taller than the look allows.
 
+The signature picture is sized to the room the foot leaves above the signatory's line, name and
+position, and centred on the line just above it. That room depends on how the name and position
+wrap, so the caller measures them first: signatureProbe() is the same text block on its own, and its
+measured height is passed to compile(). A design with a signature picture cannot be compiled without it.
+
 Pure: no database. An installed look's background is addressed by the SHA-256 of its file, which
 the installation stores in document_assets (and CertificateDesignService stores again on save).
 
 Changelog:
+2026/10/08 SAST
+- The signature picture fills the room left above the signatory's text, centred on the line,
+  instead of a fixed 14 mm that overflowed every look's foot.
 2026/10/07 SAST
 - Created for certificate designs.
 */
@@ -36,10 +44,29 @@ use CattoLearning\Document\PageSettings;
 final class CertificateDesignCompiler
 {
     public const LAYOUT_ID = 'cd-layout';
+    /** The signatory's line, name and position, measured to size the signature picture. */
+    public const SIGN_TEXT_ID = 'cd-sign-text';
+    public const SIGN_IMAGE_ID = 'cd-sign-image';
+    /** The smallest signature picture worth printing; less room than this does not fit. */
+    public const SIGNATURE_MIN_HEIGHT = 6.0;
     private const SIGNATURE_WIDTH = 72;
+    private const SIGNATURE_MAX_HEIGHT = 20.0;
+    private const SIGNATURE_MAX_WIDTH = 64.0;
+    /** Between the picture and the line. */
+    private const SIGNATURE_GAP = 1.0;
+    /** Kept free so rounding in the PDF engine cannot tip a full foot over. */
+    private const SIGNATURE_SLACK = 0.5;
+    /** The foot row and the signature block; shared by compile() and signatureProbe() so both lay the text out alike. */
+    private const FOOT_CSS = '.cd-foot-row{width:100%;border-collapse:collapse}.cd-foot-row td{vertical-align:bottom;padding:0}'
+        . '.cd-sign-image{display:block;margin:0 0 1mm}'
+        . '.cd-sign-line{border-top:0.3mm solid #333333;padding-top:1.4mm;text-align:center}'
+        . '.cd-sign-position{text-align:center}';
 
-    /** @return array{html:string,css:string,settings:PageSettings,box_height_mm:int} */
-    public function compile(CertificateDesign $design): array
+    /**
+     * @param float|null $signatureTextMm the measured height of signatureProbe(); required when the design has a signature picture
+     * @return array{html:string,css:string,settings:PageSettings,box_height_mm:int,signature_room_mm:?float}
+     */
+    public function compile(CertificateDesign $design, ?float $signatureTextMm = null): array
     {
         $look = $design->lookDefinition();
         [$left, $top, $width, $height] = $look->box;
@@ -57,7 +84,14 @@ final class CertificateDesignCompiler
         }
         $rows .= '<tr><td class="cd-main">' . $main . '</td></tr>';
         $band = '';
-        $foot = $this->foot($look, $width, $this->signature($design), $look->smallPrint === 'band' ? '' : $smallPrint);
+        $room = null;
+        if ($design->signature !== null) {
+            if ($signatureTextMm === null) {
+                throw new \LogicException('A signature picture is sized from the measured signatory text; measure signatureProbe() first.');
+            }
+            $room = $look->footHeight - $signatureTextMm - self::SIGNATURE_GAP - self::SIGNATURE_SLACK;
+        }
+        $foot = $this->foot($look, $width, $this->signature($design, $room), $look->smallPrint === 'band' ? '' : $smallPrint);
         if ($look->smallPrint === 'band' && $smallPrint !== '') {
             $band = '<div class="cd-band"><table class="cd-band-row"><tr><td>' . $smallPrint . '</td></tr></table></div>';
         }
@@ -75,16 +109,30 @@ final class CertificateDesignCompiler
             // what is left after the head and foot; the foot then sits on the box's bottom edge.
             . sprintf('.cd-main{vertical-align:middle;height:%dmm}', $height - ($hasHead ? $headHeight : 0) - $look->footHeight)
             . sprintf('.cd-foot{vertical-align:bottom;height:%dmm}', $look->footHeight)
-            . '.cd-foot-row{width:100%;border-collapse:collapse}.cd-foot-row td{vertical-align:bottom;padding:0}'
+            . self::FOOT_CSS
             . 'p{margin:0 0 1.4mm}'
             . '.align-left{text-align:left}.align-center{text-align:center}.align-right{text-align:right}'
             . '.cd-logo-line{margin:0 0 2mm}'
-            . '.cd-sign-image{display:block;margin:0 auto 1mm}'
-            . '.cd-sign-line{border-top:0.3mm solid #333333;padding-top:1.4mm;text-align:center}'
-            . '.cd-sign-position{text-align:center}'
             . '.cd-band{position:absolute}.cd-band-row{width:100%;height:10mm;border-collapse:collapse}.cd-band-row td{vertical-align:middle;padding:0}'
             . $look->css;
-        return ['html' => $html, 'css' => $css, 'settings' => DocumentType::Certificate->defaultSettings(), 'box_height_mm' => $height];
+        return ['html' => $html, 'css' => $css, 'settings' => DocumentType::Certificate->defaultSettings(), 'box_height_mm' => $height, 'signature_room_mm' => $room];
+    }
+
+    /**
+     * The signatory's line, name and position alone, in the signature column with the look's text
+     * styles: measure the element SIGN_TEXT_ID and pass its height to compile(). Null when the
+     * design has no signature picture to size.
+     *
+     * @return array{html:string,css:string,settings:PageSettings}|null
+     */
+    public function signatureProbe(CertificateDesign $design): ?array
+    {
+        if ($design->signature === null) {
+            return null;
+        }
+        $html = sprintf('<table class="cd-foot-row" style="width:%dmm"><tr><td class="cd-sign-cell" style="width:%dmm"><div class="cd-sign">%s</div></td></tr></table>',
+            self::SIGNATURE_WIDTH, self::SIGNATURE_WIDTH, self::signatoryText($design));
+        return ['html' => $html, 'css' => 'body{margin:0}' . self::FOOT_CSS . $design->lookDefinition()->css, 'settings' => DocumentType::Certificate->defaultSettings()];
     }
 
     /** The SHA-256 an installed look's background is stored under. */
@@ -93,16 +141,27 @@ final class CertificateDesignCompiler
         return (string) hash_file('sha256', $look->backgroundPath());
     }
 
-    private function signature(CertificateDesign $design): string
+    /** @param float|null $room the height left for the picture above the signatory's text, in mm */
+    private function signature(CertificateDesign $design, ?float $room): string
     {
         if ($design->signature === null && trim($design->signatureName) === '' && trim($design->signaturePosition) === '') {
             return '';
         }
         $html = '<div class="cd-sign">';
-        if ($design->signature !== null) {
-            $html .= self::image('cd-sign-image', $design->signature, 14, 64);
+        if ($design->signature !== null && $room !== null) {
+            // As tall as the room allows (never less than the smallest worth printing; the fit
+            // check then refuses the design), narrower than the column, centred over the line.
+            $height = min(self::SIGNATURE_MAX_HEIGHT, max(self::SIGNATURE_MIN_HEIGHT, $room));
+            $html .= self::image('cd-sign-image', $design->signature, $height, self::SIGNATURE_MAX_WIDTH, self::SIGN_IMAGE_ID, self::SIGNATURE_WIDTH);
         }
-        $html .= '<div class="cd-sign-line">' . (trim($design->signatureName) === '' ? '&nbsp;' : self::text($design->signatureName)) . '</div>';
+        return $html . self::signatoryText($design) . '</div>';
+    }
+
+    /** The line with the signatory's name under it, and their position. */
+    private static function signatoryText(CertificateDesign $design): string
+    {
+        $html = '<div class="cd-sign-text" id="' . self::SIGN_TEXT_ID . '">'
+            . '<div class="cd-sign-line">' . (trim($design->signatureName) === '' ? '&nbsp;' : self::text($design->signatureName)) . '</div>';
         if (trim($design->signaturePosition) !== '') {
             $html .= '<div class="cd-sign-position">' . self::text($design->signaturePosition) . '</div>';
         }
@@ -125,15 +184,21 @@ final class CertificateDesignCompiler
         return '<table class="cd-foot-row"><tr>' . $cells . '</tr></table>';
     }
 
-    /** A stored picture at a fixed height, narrower if it would be wider than allowed. */
-    private static function image(string $class, CertificateImage $image, int $heightMm, int $maxWidthMm): string
+    /**
+     * A stored picture at a fixed height, narrower if it would be wider than allowed; centred in a
+     * column of $centreInMm by its left margin, because Dompdf does not centre a block image with auto margins.
+     */
+    private static function image(string $class, CertificateImage $image, float $heightMm, float $maxWidthMm, string $id = '', int $centreInMm = 0): string
     {
-        $height = (float) $heightMm;
+        $height = $heightMm;
         $width = $height * $image->width / $image->height;
         if ($width > $maxWidthMm) {
             [$width, $height] = [(float) $maxWidthMm, $maxWidthMm * $image->height / $image->width];
         }
-        return sprintf('<img class="%s" src="asset:%s" alt="" style="width:%.1fmm;height:%.1fmm">', $class, $image->sha, $width, $height);
+        // Rounded down, so a picture sized to the room never comes out a fraction taller than it.
+        [$width, $height] = [floor($width * 10) / 10, floor($height * 10) / 10];
+        $centre = $centreInMm > 0 ? sprintf(';margin-left:%.1fmm', ($centreInMm - $width) / 2) : '';
+        return sprintf('<img class="%s"%s src="asset:%s" alt="" style="width:%.1fmm;height:%.1fmm%s">', $class, $id === '' ? '' : ' id="' . $id . '"', $image->sha, $width, $height, $centre);
     }
 
     private static function text(string $text): string

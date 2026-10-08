@@ -15,11 +15,15 @@ A design is checked before it is saved: it must be complete (CertificateDesign::
 compiled template must pass the engine's validator, and its words must fit the look's box on one A4
 page with the sample learner - measured in the real PDF, not guessed. A preview draws whatever the
 form holds through the same renderer and PDF engine, so it is exactly what saving would produce.
+A signature picture is sized from the signatory's text as it prints, measured the same way.
 
 Every change is audited (certificate.design_*); none changes a certificate already issued, which
 names the version it was drawn with.
 
 Changelog:
+2026/10/08 SAST
+- The signatory's text is measured before compiling, so the signature picture is sized to fit the
+  foot; a picture with no room left is refused with a message about the signatory, not the wording.
 2026/10/07 SAST
 - A design thumbnail is absent rather than an HTTP 500 when the server has no GD extension.
 - Created for certificate designs.
@@ -181,9 +185,12 @@ final class CertificateDesignService
         }
         $out = $this->pdf->renderWithLayout($document, [CertificateDesignCompiler::LAYOUT_ID]);
         $height = $out['boxes'][CertificateDesignCompiler::LAYOUT_ID]['h'] ?? 0.0;
-        $errors = $height > $compiled['box_height_mm'] * 72 / 25.4 + 1.0
-            ? ['The words do not fit on one A4 page. Shorten the wording or the small print, or use smaller text styles.']
-            : [];
+        $errors = [];
+        if ($height > $compiled['box_height_mm'] * 72 / 25.4 + 1.0) {
+            $errors[] = $compiled['signature_room_mm'] !== null && $compiled['signature_room_mm'] < CertificateDesignCompiler::SIGNATURE_MIN_HEIGHT
+                ? 'The signatory’s name and position leave no room for the signature picture. Shorten them.'
+                : 'The words do not fit on one A4 page. Shorten the wording or the small print, or use smaller text styles.';
+        }
         return ['pdf' => $out['pdf'], 'errors' => $errors];
     }
 
@@ -266,7 +273,7 @@ final class CertificateDesignService
      * The design's template, with an installed look's background stored as a document image so the
      * renderer can embed it.
      *
-     * @return array{html:string,css:string,settings:\CattoLearning\Document\PageSettings,box_height_mm:int}
+     * @return array{html:string,css:string,settings:\CattoLearning\Document\PageSettings,box_height_mm:int,signature_room_mm:?float}
      */
     private function compile(CertificateDesign $design): array
     {
@@ -278,7 +285,20 @@ final class CertificateDesignService
                 $this->assets->store($bytes, 'image/png', (int) $width, (int) $height, null);
             }
         }
-        return $this->compiler->compile($design);
+        return $this->compiler->compile($design, $this->signatoryTextHeight($design));
+    }
+
+    /** How tall the signatory's line, name and position print, in mm; null without a signature picture. */
+    private function signatoryTextHeight(CertificateDesign $design): ?float
+    {
+        $probe = $this->compiler->signatureProbe($design);
+        if ($probe === null) {
+            return null;
+        }
+        $document = $this->renderer->renderSource(DocumentType::Certificate, $probe['html'], $probe['css'], $probe['settings'], self::sample());
+        $box = $this->pdf->renderWithLayout($document, [CertificateDesignCompiler::SIGN_TEXT_ID])['boxes'][CertificateDesignCompiler::SIGN_TEXT_ID]
+            ?? throw new RuntimeException('The signature could not be measured.');
+        return $box['h'] * 25.4 / 72;
     }
 
     /** @return array<string,mixed> the sample certificate's values */

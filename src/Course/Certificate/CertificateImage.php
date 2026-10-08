@@ -17,7 +17,14 @@ opaque, so any transparency in it is flattened onto white: Dompdf separates a PN
 pixel by pixel, which made every certificate on a transparent full-page background take seconds to
 draw. A logo or signature keeps its transparency, so it sits cleanly on the background.
 
+A signature is prepared for its line without anyone editing the file: white or near-white paper
+becomes transparent (a scanned or photographed signature on paper then sits on any background),
+the empty margins around the ink are trimmed so the ink itself is what is sized and centred, and it
+is stored as a PNG within its box. CertificateDesignCompiler then fits it to the room on the line.
+
 Changelog:
+2026/10/08 SAST
+- A signature has its paper made transparent and its empty margins trimmed, and is stored as PNG.
 2026/10/07 SAST
 - Created for certificate designs (uploaded Canva backgrounds, logos and signatures).
 - A background is stored without an alpha channel.
@@ -41,6 +48,11 @@ final class CertificateImage
     public const BACKGROUND_SIZE = [2480, 1754];
     /** The largest stored logo and signature, in pixels. */
     private const BOXES = [self::LOGO => [1200, 600], self::SIGNATURE => [1200, 400]];
+    /** The largest side a signature is worked on at, in pixels. */
+    private const SIGNATURE_WORKING = 1200;
+    /** How far from white a pixel must be to start counting as ink, and to count as solid ink (0 to 1). */
+    private const PAPER = 0.12;
+    private const INK = 0.6;
     private const LABELS = [self::BACKGROUND => 'background', self::LOGO => 'logo', self::SIGNATURE => 'signature'];
 
     public function __construct(
@@ -89,6 +101,9 @@ final class CertificateImage
             throw new InvalidArgumentException('The ' . $label . ' must be a PNG or JPEG picture. From Canva, choose Download → PNG.');
         }
         [$width, $height] = [(int) $info[0], (int) $info[1]];
+        if ($kind === self::SIGNATURE) {
+            return self::signature($bytes);
+        }
         if ($kind === self::BACKGROUND) {
             $ratio = $width / max(1, $height);
             if (abs($ratio - 297 / 210) > 0.05) {
@@ -108,6 +123,66 @@ final class CertificateImage
             return ['bytes' => $bytes, 'mime' => $mime, 'width' => $width, 'height' => $height];
         }
         return ['bytes' => self::resample($bytes, $mime, $targetWidth, $targetHeight, !$opaque), 'mime' => $mime, 'width' => $targetWidth, 'height' => $targetHeight];
+    }
+
+    /**
+     * The ink of a signature on a transparent ground, trimmed to the ink and scaled into its box.
+     *
+     * @return array{bytes:string,mime:string,width:int,height:int}
+     */
+    private static function signature(string $bytes): array
+    {
+        $source = @imagecreatefromstring($bytes);
+        if ($source === false) {
+            throw new InvalidArgumentException('The picture could not be read. Save it again as PNG or JPEG.');
+        }
+        // Worked on at no more than SIGNATURE_WORKING px a side: far sharper than it prints, and it
+        // keeps the pixel pass below quick for a large photograph.
+        $scale = min(1.0, self::SIGNATURE_WORKING / max(imagesx($source), imagesy($source)));
+        [$width, $height] = [max(1, (int) round(imagesx($source) * $scale)), max(1, (int) round(imagesy($source) * $scale))];
+        $ink = imagecreatetruecolor($width, $height);
+        imagealphablending($ink, false);
+        imagesavealpha($ink, true);
+        imagefill($ink, 0, 0, (int) imagecolorallocatealpha($ink, 0, 0, 0, 127));
+        imagecopyresampled($ink, $source, 0, 0, 0, 0, $width, $height, imagesx($source), imagesy($source));
+        [$left, $top, $right, $bottom] = [$width, $height, -1, -1];
+        for ($y = 0; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x++) {
+                $colour = imagecolorat($ink, $x, $y);
+                [$r, $g, $b] = [($colour >> 16) & 0xFF, ($colour >> 8) & 0xFF, $colour & 0xFF];
+                // How far the pixel is from white paper (0 white, 1 full ink); faint paper grain is
+                // dropped and the ink's edges kept soft.
+                $inked = max(0.0, min(1.0, (1 - min($r, $g, $b) / 255 - self::PAPER) / (self::INK - self::PAPER)));
+                $opacity = (1 - (($colour >> 24) & 0x7F) / 127) * $inked;
+                if ($opacity <= 0.0) {
+                    imagesetpixel($ink, $x, $y, 0x7F000000);
+                    continue;
+                }
+                // The colour that, laid on white at this opacity, looks as the pixel did: solid ink
+                // keeps its colour, and a soft edge keeps its shade without a white fringe.
+                $unmix = static fn(int $c): int => max(0, min(255, (int) round(255 - (255 - $c) / $inked)));
+                imagesetpixel($ink, $x, $y, ((int) round(127 * (1 - $opacity)) << 24) | ($unmix($r) << 16) | ($unmix($g) << 8) | $unmix($b));
+                if ($opacity > 0.1) {
+                    [$left, $top, $right, $bottom] = [min($left, $x), min($top, $y), max($right, $x), max($bottom, $y)];
+                }
+            }
+        }
+        if ($right < 0) {
+            throw new InvalidArgumentException('No signature could be found in the signature picture: it looks empty or white.');
+        }
+        [$left, $top] = [max(0, $left - 2), max(0, $top - 2)];
+        [$cropWidth, $cropHeight] = [min($width, $right + 3) - $left, min($height, $bottom + 3) - $top];
+        [$boxWidth, $boxHeight] = self::BOXES[self::SIGNATURE];
+        $fit = min(1.0, $boxWidth / $cropWidth, $boxHeight / $cropHeight);
+        [$targetWidth, $targetHeight] = [max(1, (int) round($cropWidth * $fit)), max(1, (int) round($cropHeight * $fit))];
+        $target = imagecreatetruecolor($targetWidth, $targetHeight);
+        imagealphablending($target, false);
+        imagesavealpha($target, true);
+        imagefill($target, 0, 0, (int) imagecolorallocatealpha($target, 0, 0, 0, 127));
+        imagecopyresampled($target, $ink, 0, 0, $left, $top, $targetWidth, $targetHeight, $cropWidth, $cropHeight);
+        ob_start();
+        imagepng($target, null, 6);
+        return ['bytes' => (string) ob_get_clean(), 'mime' => 'image/png', 'width' => $targetWidth, 'height' => $targetHeight];
     }
 
     /** Whether a PNG has an alpha channel or a transparent colour (a tRNS chunk before its image data). */
