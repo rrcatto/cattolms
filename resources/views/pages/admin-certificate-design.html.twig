@@ -67,7 +67,7 @@
 		<div class="cl-certificate-pictures"><img class="cl-certificate-picture" src="{{ pictures.signature }}" alt="The current signature">
 		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove the signature picture'})} %}{% block control %}<input type="checkbox" name="remove_signature_image" value="1">{% endblock %}{% endembed %}</div>
 	{% endif %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: pictures.signature ? 'Replace the signature picture' : 'Add a signature picture', for: 'signature-image', help: 'Optional. A PNG with a transparent or white background works best.'})} %}{% block control %}<input id="signature-image" type="file" name="signature_image" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: pictures.signature ? 'Replace the signature picture' : 'Add a signature picture', for: 'signature-image', help: 'Optional. A PNG or JPEG of the signature, any size: its paper and empty margins are removed, and it is sized to fit and centred on the signature line.'})} %}{% block control %}<input id="signature-image" type="file" name="signature_image" accept="image/png,image/jpeg" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% endblock %}{% endembed %}
 
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}

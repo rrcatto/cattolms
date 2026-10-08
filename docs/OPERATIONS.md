@@ -1,10 +1,10 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.8.13 **Date time:** 2026/10/07 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.8.8.14 **Date time:** 2026/10/08 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.8.13 operational position
+## Current v0.8.8.14 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.13` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.8.14` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
 - **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/07 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 90 permissions (10 `SYSTEM.*`, 80 business) across the five roles.
 - **Document templates (Phase I, v0.8.8.8).** The baseline publishes the source defaults in `resources/documents/` as the invoice, receipt and credit note templates; there is no page that edits them until Phase K. Editing a source file changes only new installations, until the database is rebuilt.
@@ -14,7 +14,25 @@
 - **PHP extensions.** `composer.json` lists every required extension, GD included (profile images and certificate pictures); run `composer check-platform-reqs --no-dev` after installing PHP on a server. Without GD those uploads are refused with a message saying so. On Debian or Ubuntu with the `php8.5` packages, install it with `apt install php8.5-gd` and restart `php8.5-fpm`.
 - **Instance folders.** PHP-FPM must be able to write `storage/` and its subfolders, including `storage/tmp/theme-imports` (theme uploads) and `storage/logs/application.log`. A folder or log created by another user stops theme imports or silences the log; the theme page says which folder.
 - **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below.
-- **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there as the files' owner (CSS, JS and images from the host as `rrcatto`; compiled `assets/` inside `env_php_1` as `cattotest`), then run `php bin/console cache:clear` as `cattotest`.
+- **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there (from the host or inside `env_php_1` as `cattotest`, which are the same user), then run `php bin/console cache:clear` as `cattotest`.
+- **Local environment.** Linux Mint with rootless Podman since 2026/10/08 (below).
+
+### Local development environment
+
+The workspace is `/media/rrcatto/ESD410C-2TB/cattolms` on Linux Mint 22.3 with rootless Podman 4.9.3 (development moved from WSL with Podman Desktop on 2026/10/08). The services run in one pod, `pod_env`, created once by the workspace script `env/scripts/create-pod.sh`:
+
+| Container | Image | Job |
+|---|---|---|
+| `env_postgres_1` | `postgres:16` | the database, kept in workspace `postgres-data/` (published on 127.0.0.1:5433) |
+| `env_mailpit_1` | `axllent/mailpit` | catches every email (http://127.0.0.1:8025) |
+| `env_php_1` | `localhost/env_php` (built from `env/containers/php`) | PHP-FPM 8.5 and the command line, in `/home/cattotest/code/current` |
+| `env_commerce-worker_1` | `localhost/env_php` | `php bin/console commerce:maintain --watch --no-debug` |
+| `env_nginx_1` | `nginx:1.24-alpine` | `https://catto.test/` on 127.0.0.1:80 and 443, serving `runtime/public_html` |
+
+- **Start and stop.** `podman pod start pod_env` and `podman pod stop pod_env`; stopping keeps the pod and its containers. `env/scripts/create-pod.sh --recreate` replaces the containers (the database and runtime files on the host mounts are kept), and `--recreate --build` also rebuilds the PHP image. The containers reach each other on 127.0.0.1, and `--add-host` keeps the hostnames `php`, `postgres` and `mailpit` that the instance `.env` and the nginx configuration use. `env/compose.yaml` describes the same services but is not used.
+- **One owner.** The pod runs with `--userns=keep-id`: the host user (UID 1000) is `cattotest` in the containers, so the code, `runtime/` and everything PHP-FPM writes have one owner, and files can be copied or deleted from either side. Do not `chown` the database directory (Podman maps it to the PostgreSQL user with `:U`).
+- **Host setup, once.** Ports below 1024 for the rootless pod (`net.ipv4.ip_unprivileged_port_start=80` in `/etc/sysctl.d/`), `127.0.0.1 catto.test` in `/etc/hosts`, and a certificate made with `mkcert` (whose CA the host trusts) in `env/config/certs/catto.test.pem` and `catto.test-key.pem`. No other web server may listen on ports 80 and 443.
+- **Host tools.** Node 24 and Playwright (Chromium and Firefox) for the browser checks, with `CATTO_PLAYWRIGHT_MODULE` naming its `node_modules/playwright`; `gs` and `pdftoppm` for the certificate PDF checks; `psql` 16 for the database on port 5433.
 
 ### Rebuilding the development database
 
@@ -66,6 +84,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.10:** certificate designs. The baseline gained `document_assets`, `document_template_versions.design`, `courses.certificate_design_id` and `courses.certificate_accreditation`, lost the course certificate title, body, footer and signatory columns, and renamed `DOCUMENT.TEMPLATE.*` to `CERTIFICATE.DESIGN.*`. Rebuild the database (see above). Publish `catto-platform.css`, `js/ck-certificate.js`, `img/certificates/` (the placement pictures and the look thumbnails) and the compiled `assets/` (the `certificate-preview` controller; delete the served `template_placeholders_controller-*.js`, which is gone).
 - **v0.8.8.11:** the draggable category tree. `course_categories.position` is 1..n within each parent with the unique, deferrable `course_categories_sibling_position` constraint, and the shipped taxonomy is renumbered when it is installed. Rebuild the database (see above). Publish `catto-platform.css` and the compiled `assets/` (the shared `lib/sortable_tree_controller.js` and the rewritten `category-tree` and `course-content` controllers), and delete the served copies of the controllers they replace.
 - **v0.8.8.12:** one category picker for the catalogue, the course forms, course import and category deletion. No schema change. Publish `catto-platform.css` and `js/platform-overrides.js` (the picker's disclosure behaviour and + New).
+- **v0.8.8.14:** signature pictures fitted to the certificate automatically. No schema change and nothing to publish to the web root.
 - **v0.8.8.13:** install GD first (`apt install php8.5-gd`, restart `php8.5-fpm`; `php -m` then lists `gd`), because `composer install` refuses a server without it; a v0.8.8.4 VPS without GD answered a profile image upload with HTTP 500. Publish `catto-platform.css` (the certificate preview above its form). No schema change.
 
 ### Commerce operations
@@ -93,7 +112,7 @@ Run `php bin/console commerce:maintain --no-debug` once per minute from the inst
 - expires sources and reconciles each affected enrolment;
 - retries requested invoice emails and queued learner notices.
 
-The local Podman setup uses a dedicated worker; `deployment/commerce-worker.compose.yaml` exports its configuration for use with the workspace’s `env/compose.yaml`.
+The local pod runs it in its own container, `env_commerce-worker_1`; `deployment/commerce-worker.compose.yaml` holds the same configuration in Compose form for other setups.
 
 Run `php bin/console popularity:recalculate --no-debug` once an hour from the same scheduler, as the application user. It recalculates the course popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read. Pages never calculate it, so without the schedule the ranking stays as it was last calculated. It exits non-zero on failure. An example crontab line: `5 * * * * cd /path/to/current && php bin/console popularity:recalculate --no-debug`.
 
@@ -416,7 +435,7 @@ chmod +x bin/console
 git update-index --chmod=+x bin/console
 ```
 
-**Build output under `public_html/assets/` is owned by the container user**, because `asset-map:compile` runs as `cattotest`. The host cannot delete it; remove it from inside the container. The same applies to anything else PHP-FPM writes.
+**Build output under `public_html/assets/` is written by `cattotest`**, because `asset-map:compile` runs in the container. In the Linux Mint pod `cattotest` is the host user, so the host can delete it; on a host where the container user maps to another UID (the former WSL setup), remove it from inside the container. The same applies to anything else PHP-FPM writes.
 
 ## Development database cleanup
 

@@ -1,6 +1,17 @@
 # Changelog
 
-**LMS version:** 0.8.8.13 **Date time:** 2026/10/07 SAST
+**LMS version:** 0.8.8.14 **Date time:** 2026/10/08 SAST
+
+## 2026-10-08 SAST — v0.8.8.14 Signature pictures fitted to the certificate; Linux Mint development environment
+
+- **Release.** Version 0.8.8.14 at the owner's instruction ("commit and push to git - v0.8.8.14 - update all stale documentation"); published as GitHub release `v0.8.8.14` with `cattolms-v0.8.8.14.zip`. The fix came from the owner's report that a Professional CPD design with a signature picture would not save: "The design was not saved. The words do not fit on one A4 page." The owner asked for the picture to be resized and centred on the signature line automatically.
+- **Deploying.** No schema change and no CSS, JavaScript or image to publish. The installed Professional CPD design keeps its first version until it is saved again; a database rebuilt from the baseline installs it with the taller foot.
+
+- **The signature picture fits.** `CertificateDesignCompiler` drew a signature picture 14 mm tall whatever room the look had; with the line, name and position under it that was more than any look's foot holds, so every design with a signature was refused, and the message blamed the wording. The picture is now as tall as the foot allows above the signatory's text (at most 20 mm tall and 64 mm wide), centred on the line by an explicit left margin (Dompdf ignores `margin: auto` on a block image) and resting 1 mm above it. The name and position may wrap, so `CertificateDesignService` measures them in the PDF engine first (`signatureProbe()`, about 20 ms) and compiles with that height; `compile()` refuses to size a signature without it. A name and position that leave less than 6 mm are refused with a message about the signatory, not the wording.
+- **Signature uploads are prepared.** `CertificateImage` turns a signature's white or near-white paper transparent (keeping the ink's colour), trims the empty margins to the ink, fits it within 1200 × 400 px and stores it as a PNG, so the signature itself is what gets sized and centred. A blank picture is refused. The help text under the field says any size works.
+- **Professional CPD.** Its foot is 26 mm like the other looks (it was 22 mm, which left a signature 8.5 mm tall); its middle text sits about 2 mm higher.
+- **Tests.** `CertificateDesignTest` checks the fit, the centring and the gap above the line in every look with square and wide signatures, the signatory refusal and upload preparation; `CertificateIntegrationTest` saves a design with a signature. `DocumentTemplateIntegrationTest` compares each installed design's first (immutable) version with its look, so a design saved again in the development database no longer fails it.
+- **Development environment.** Development moved from WSL with Podman Desktop to Linux Mint 22.3 with rootless Podman 4.9.3. The workspace is `/media/rrcatto/ESD410C-2TB/cattolms`. The workspace script `env/scripts/create-pod.sh` creates the pod `pod_env` once (PostgreSQL, Mailpit, PHP-FPM, the commerce worker and nginx); `podman pod start pod_env` and `podman pod stop pod_env` keep the containers. The pod uses `--userns=keep-id`, so the host user and `cattotest` are the same UID and every file has one owner. `README.md`, `docs/OPERATIONS.md` and `tests/Browser/README.md` describe it.
 
 ## 2026-10-07 SAST — v0.8.8.13 GD requirement, theme uploads, re-importing a course, certificate preview
 

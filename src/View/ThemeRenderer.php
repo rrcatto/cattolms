@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/08 SAST
+- Advanced PLATFORM_ASSET_VERSION to 0.8.8.14.
 2026/10/07 SAST
 - Courses → Certificate Designs replaces System → Document Templates in the navigation; load_certificate_editor loads CKEditor with the certificate profile (ck-certificate.js).
 - Advanced PLATFORM_ASSET_VERSION to 0.8.8.10.
@@ -80,7 +82,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.13';
+    private const PLATFORM_ASSET_VERSION = '0.8.8.14';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,

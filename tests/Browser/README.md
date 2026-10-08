@@ -5,7 +5,10 @@ administrator session. Component checks select theme previews without changing t
 the canonical matrix temporarily activates themes and restores the original. Both use bundled manifests' actual versions. They fail if authentication redirects or the wrong theme loads.
 No Node dependency or frontend build is added; use an existing Playwright installation.
 
-Run from the v0.8 repository on the host (adjust the instance/container paths if necessary):
+Run from the v0.8 repository on the host (adjust the instance/container paths if necessary). In the
+Linux Mint development pod (`docs/OPERATIONS.md`, "Local development environment") Playwright is
+installed on the host, so `CATTO_PLAYWRIGHT_MODULE` is `$HOME/tools/playwright/node_modules/playwright`;
+the runners accept the local mkcert certificate (`ignoreHTTPSErrors`), which Playwright's Firefox does not trust:
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/ui-stabilisation-fixture.php create'
