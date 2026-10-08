@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/08 SAST
+- Financial documents on the document template engine (Phase K): commerce_documents stores the values each invoice, receipt and credit note was issued with (document_data) and the exact published template version that drew it, checked by a trigger; the invoice, receipt and credit note templates are installed compiled from the standard financial document design; PLATFORM.DOCUMENT.VIEW/MANAGE (92 permissions).
 2026/10/07 SAST
 - Course categories keep an explicit, compact sibling order: position runs 1..n within each parent (the shipped taxonomy is renumbered after it is inserted) and a deferrable unique constraint on (parent_id, position) refuses a duplicate, so a move renumbers its siblings in one transaction and can never leave two categories in one place.
 - Certificate designs (owner's redesign): courses keep an optional accreditation line and a certificate_design_id (filled with the default for new courses by a trigger) instead of their own title, body, footer and signatory; document_template_versions.design holds a design as its author made it; document_assets stores certificate backgrounds, logos and signatures immutably by SHA-256; the six looks are installed as designs, Classic the default; DOCUMENT.TEMPLATE.VIEW/MANAGE became CERTIFICATE.DESIGN.VIEW/MANAGE.
@@ -65,8 +67,9 @@ declare(strict_types=1);
 
 use CattoLearning\Course\Certificate\CertificateDesign;
 use CattoLearning\Course\Certificate\CertificateDesignCompiler;
+use CattoLearning\Commerce\Document\FinancialDocumentDesign;
+use CattoLearning\Commerce\Document\FinancialDocumentDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateLooks;
-use CattoLearning\Document\DocumentTemplateDefaults;
 use CattoLearning\Document\DocumentType;
 use CattoLearning\View\Artwork\ArtworkGenerator;
 use Phinx\Migration\AbstractMigration;
@@ -357,7 +360,9 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('BUNDLE.MANAGEMENT.VIEW','ViewBundleManagement','Bundles','View course bundles, their composition, offers and sales in Administration.'),
     ('BUNDLE.MANAGE','ManageBundles','Bundles','Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
     ('CERTIFICATE.DESIGN.VIEW','ViewCertificateDesigns','Courses','See the certificate designs and preview them.'),
-    ('CERTIFICATE.DESIGN.MANAGE','ManageCertificateDesigns','Courses','Create, edit, duplicate and delete certificate designs and choose the default for new courses.');
+    ('CERTIFICATE.DESIGN.MANAGE','ManageCertificateDesigns','Courses','Create, edit, duplicate and delete certificate designs and choose the default for new courses.'),
+    ('PLATFORM.DOCUMENT.VIEW','ViewFinancialDocumentDesign','Commerce · Platform','See the design of invoices, receipts and credit notes and preview it when Commerce is installed.'),
+    ('PLATFORM.DOCUMENT.MANAGE','ManageFinancialDocumentDesign','Commerce · Platform','Change the design of invoices, receipts and credit notes when Commerce is installed.');
 
 CREATE TABLE role_permissions (
     role_id SMALLINT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
@@ -2181,6 +2186,11 @@ CREATE TABLE commerce_order_preferences (
 
 CREATE TABLE commerce_document_numbers (kind TEXT PRIMARY KEY, next_number BIGINT NOT NULL CHECK(next_number>0));
 INSERT INTO commerce_document_numbers VALUES ('invoice',1),('receipt',1),('credit_note',1);
+-- An issued invoice, receipt or credit note. snapshot is the commerce record it was issued from (the
+-- order as placed, with the payment or the refund); document_data is every value the document prints,
+-- as it was issued, and template_version_id names the published version it was drawn in. It is drawn
+-- again from those two alone, so later changes to a billing profile, a course, a bundle, a promotion,
+-- the business details or the design never change it.
 CREATE TABLE commerce_documents (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
@@ -2189,6 +2199,10 @@ CREATE TABLE commerce_documents (
     number TEXT NOT NULL UNIQUE,
     source_key TEXT NOT NULL UNIQUE,
     snapshot JSONB NOT NULL,
+    document_data JSONB NOT NULL CHECK (jsonb_typeof(document_data) = 'object'),
+    template_id BIGINT NOT NULL,
+    template_version_id BIGINT NOT NULL,
+    template_version_number INTEGER NOT NULL CHECK (template_version_number > 0),
     issued_at TIMESTAMPTZ NOT NULL
 );
 CREATE UNIQUE INDEX commerce_one_invoice ON commerce_documents(order_id) WHERE kind='invoice';
@@ -2801,6 +2815,29 @@ ALTER TABLE certificates
 CREATE INDEX certificates_template_version_fk_idx ON certificates (template_version_id);
 CREATE INDEX certificates_template_fk_idx ON certificates (template_id);
 
+-- An issued financial document names the exact published version of a template of its own kind
+-- that drew it, with that version's number.
+ALTER TABLE commerce_documents
+    ADD CONSTRAINT commerce_documents_template_fkey FOREIGN KEY (template_id) REFERENCES document_templates(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT commerce_documents_template_version_fkey FOREIGN KEY (template_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
+CREATE INDEX commerce_documents_template_version_fk_idx ON commerce_documents (template_version_id);
+CREATE INDEX commerce_documents_template_fk_idx ON commerce_documents (template_id);
+CREATE FUNCTION commerce_document_template_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE version_row RECORD;
+BEGIN
+    SELECT v.template_id, v.version_number, v.state, t.document_type INTO version_row
+      FROM document_template_versions v JOIN document_templates t ON t.id = v.template_id
+     WHERE v.id = NEW.template_version_id;
+    IF NOT FOUND OR version_row.state <> 'published' OR version_row.document_type <> NEW.kind
+       OR version_row.template_id <> NEW.template_id OR version_row.version_number <> NEW.template_version_number THEN
+        RAISE EXCEPTION 'A financial document must name the published version of a % template that drew it', NEW.kind;
+    END IF;
+    RETURN NEW;
+END;
+$fn$;
+CREATE TRIGGER commerce_document_template_check BEFORE INSERT ON commerce_documents
+    FOR EACH ROW EXECUTE FUNCTION commerce_document_template_guard();
+
 -- A published version never changes and is never deleted: a document generated from it must be
 -- reproducible. A draft may be edited or discarded; publishing it is its last change.
 CREATE FUNCTION document_template_version_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
@@ -2872,27 +2909,30 @@ SQL);
             );
         }
 
-        // Each document type's default template, published as version 1 and current, so documents
-        // of every type can be rendered from the moment the platform is installed. The source
-        // files seed the installation; once installed the template lives here.
-        foreach (DocumentType::cases() as $type) {
-            $settings = $type->defaultSettings()->toArray();
-            foreach (DocumentTemplateDefaults::presets($type) as $position => $default) {
-                $templateId = (int) $this->fetchRow(
-                    'INSERT INTO document_templates (document_type, name, description) VALUES ('
-                    . $this->quote($type->value) . ', ' . $this->quote($default['name']) . ', ' . $this->quote($default['description']) . ') RETURNING id'
-                )['id'];
-                $versionId = (int) $this->fetchRow(
-                    'INSERT INTO document_template_versions (template_id, version_number, state, html, css, page_size, page_orientation,'
-                    . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
-                    . $templateId . ", 1, 'published', " . $this->quote($default['html']) . ', ' . $this->quote($default['css']) . ', '
-                    . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
-                    . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
-                    . ", 'Installed starter design.', NOW()) RETURNING id"
-                )['id'];
-                $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId
-                    . ($position === 0 ? ', is_current = TRUE' : '') . ' WHERE id = ' . $templateId);
-            }
+        // The invoice, receipt and credit note templates, each published as version 1 and current
+        // from the standard financial document design, so every financial document can be issued
+        // from the moment the platform is installed. ADMIN changes the design at Commerce →
+        // Financial Documents; each save is a new version of all three.
+        $financial = new FinancialDocumentDesignCompiler();
+        $design = FinancialDocumentDesign::standard();
+        foreach (FinancialDocumentDesign::types() as $type) {
+            $compiled = $financial->compile($design, $type);
+            $settings = $compiled['settings']->toArray();
+            $templateId = (int) $this->fetchRow(
+                'INSERT INTO document_templates (document_type, name, description, is_current) VALUES ('
+                . $this->quote($type->value) . ', ' . $this->quote($type->label()) . ', '
+                . $this->quote('The ' . strtolower($type->label()) . ', drawn in the financial document design.') . ', FALSE) RETURNING id'
+            )['id'];
+            $versionId = (int) $this->fetchRow(
+                'INSERT INTO document_template_versions (template_id, version_number, state, html, css, design, page_size, page_orientation,'
+                . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
+                . $templateId . ", 1, 'published', " . $this->quote($compiled['html']) . ', ' . $this->quote($compiled['css']) . ', '
+                . $this->quote((string) json_encode($design->toArray(), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) . '::jsonb, '
+                . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
+                . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
+                . ", 'Installed design.', NOW()) RETURNING id"
+            )['id'];
+            $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId . ', is_current = TRUE WHERE id = ' . $templateId);
         }
 
         // The six installed certificate designs, one per look, each published as version 1 from its
@@ -2956,6 +2996,7 @@ DROP TABLE IF EXISTS
     user_social_links, users, web_sessions
     CASCADE;
 DROP FUNCTION IF EXISTS document_template_version_guard() CASCADE;
+DROP FUNCTION IF EXISTS commerce_document_template_guard() CASCADE;
 DROP FUNCTION IF EXISTS document_asset_guard() CASCADE;
 DROP FUNCTION IF EXISTS courses_certificate_design_guard() CASCADE;
 DROP FUNCTION IF EXISTS commerce_guard_credit_refund_projection() CASCADE;

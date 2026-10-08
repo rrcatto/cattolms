@@ -119,7 +119,7 @@ services:
     # data and template definitions are values, not services.
     CattoLearning\Document\:
         resource: '../src/Document/'
-        exclude: '../src/Document/{DocumentType.php,DocumentTemplateDefaults.php,PageSettings.php,RenderedDocument.php,DocumentSampleData.php,*Exception.php,Template/PlaceholderKind.php,Template/PlaceholderDefinition.php,Template/CollectionDefinition.php,Template/PlaceholderSet.php}'
+        exclude: '../src/Document/{DocumentType.php,PageSettings.php,RenderedDocument.php,DocumentSampleData.php,*Exception.php,Template/PlaceholderKind.php,Template/PlaceholderDefinition.php,Template/CollectionDefinition.php,Template/PlaceholderSet.php}'
 
     CattoLearning\Infrastructure\Persistence\:
         resource: '../src/Infrastructure/Persistence/'
@@ -200,6 +200,9 @@ services:
         resource: '../src/Commerce/Application/'
     CattoLearning\Commerce\Infrastructure\:
         resource: '../src/Commerce/Infrastructure/'
+    CattoLearning\Commerce\Document\:
+        resource: '../src/Commerce/Document/'
+        exclude: '../src/Commerce/Document/{FinancialDocumentDesign.php,FinancialDocumentSamples.php}'
     CattoLearning\Commerce\Policy\:
         resource: '../src/Commerce/Policy/'
     CattoLearning\Commerce\Workflow\:

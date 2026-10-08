@@ -7,6 +7,8 @@ Description:
 Protects the simplified shared business-permission catalogue, SYSTEM-only infrastructure permissions, permanent normal/SEED role families, Commerce permission reservations, rollback guard names and ADMIN recovery semantics.
 
 Changelog:
+2026/10/08 SAST
+- 92 permissions (82 business): PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE for the financial document design.
 2026/10/07 SAST
 - The certificate design permissions replace the document template permissions.
 2026/08/23 04:19 SAST
@@ -59,8 +61,9 @@ final class AclContractTest extends TestCase
         // structure - and an installation may well want one delegated and not the other. 73 since
         // v0.8.8.1: LEARNING.REVIEW.CREATE and COURSE.REVIEW.MANAGE for course reviews; 74 with
         // COMPANY.BILLING.MANAGE for the company's own billing details. 80 with
-        // CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE for certificate designs.
-        self::assertCount(80, $catalog->businessKeys());
+        // CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE for certificate designs. 82 with
+        // PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE for the financial document design.
+        self::assertCount(82, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {
@@ -99,6 +102,8 @@ final class AclContractTest extends TestCase
             'PLATFORM.PROMOTION.MANAGE',
             'BUNDLE.MANAGEMENT.VIEW',
             'BUNDLE.MANAGE',
+            'PLATFORM.DOCUMENT.VIEW',
+            'PLATFORM.DOCUMENT.MANAGE',
         ] as $permission) {
             self::assertContains($permission, $keys);
         }

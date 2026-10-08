@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8.8.14 (development) **Date time:** 2026/10/08 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.8.9 (development) **Date time:** 2026/10/08 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -181,6 +181,8 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.12 Certificate preview.** On the certificate design editor and a course's certificate page the preview is the first thing on the page and takes the full width of the editor, with the form below it. Owner instruction, 2026/10/07: the preview beside the form (616 × 436 px at desktop widths) was too small, and it should be about twice as wide and twice as high. It is the PDF exactly as it prints, in the browser's own viewer, and it redraws as the form changes. → Enforced by `tests/Browser/certificates.cjs` in every theme.
 
+**6.13 Financial document preview.** On Commerce → Financial Documents the chosen document (invoice, receipt or credit note) for a made-up sample order comes first, as an A4 portrait page at about the size it prints (at most 52rem wide), with its Document and Sample order choices above it and the form below. It is the PDF exactly as issuing draws it, and it redraws as the form changes; without JavaScript Update preview draws the unsaved form into it. Nothing on the page shows template HTML, versions or page settings. → Enforced by `tests/Browser/financial-documents.cjs` in every theme.
+
 ---
 
 ## 7. Themes
@@ -278,6 +280,10 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/08 SAST
+
+- 6.13: the financial document preview comes first as an A4 portrait page at about its printed size, with the form below it.
 
 2026/10/07 SAST — second pass
 

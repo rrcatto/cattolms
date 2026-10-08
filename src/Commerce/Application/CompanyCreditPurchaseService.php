@@ -8,6 +8,7 @@ use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventType;
 use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Auth\CurrentUser;
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Policy\CommercePolicy;
@@ -33,7 +34,8 @@ final class CompanyCreditPurchaseService
         private readonly PaymentService $payments,
         private readonly ClockInterface $clock,
         private readonly AnalyticsEventRecorder $analytics,
-        private readonly BillingProfileService $billing
+        private readonly BillingProfileService $billing,
+        private readonly FinancialDocuments $documents
     ) {}
 
     /**
@@ -219,7 +221,7 @@ final class CompanyCreditPurchaseService
             $id = $this->records->placeCompany($actor->id,$companyId,$requestId,$key,(int)$review['total_minor'],'ZAR',$snapshot,
                 $now->format(DATE_ATOM),$now->modify('+'.$this->policy->paymentDueDays.' days')->format(DATE_ATOM));
             foreach ($review['items'] as $line) $this->records->addCompanyOrderItem($id,$companyId,$line);
-            $this->records->document($id,'invoice','order:'.$id,$snapshot,$now->format(DATE_ATOM));
+            $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $this->records->selectPaymentMethod($id,$method);
             if ($emailInvoice) $this->records->enqueue('invoice:'.$id,'invoice.email_requested',['order_id'=>$id],$now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));

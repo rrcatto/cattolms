@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Analytics\{AnalyticsEventRecorder, AnalyticsEventRepository};
 use CattoLearning\Auth\{AuthService, CurrentUser, PermissionCatalog};
 use CattoLearning\Bundle\BundleService;
 use CattoLearning\Commerce\Application\{AccessService,BillingProfileService,CartService,CheckoutService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,PromotionService,RefundAdministrationService};
 use CattoLearning\Commerce\Domain\PaymentResult;
 use CattoLearning\Commerce\Http\{CommerceController,PaymentAdministrationController};
-use CattoLearning\Commerce\Infrastructure\{CommerceRepository,InvoicePdfRenderer};
+use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
@@ -62,11 +63,11 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
         $this->promotions = PromotionFixture::service($this->db, $this->clock);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $this->promotions);
+        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $this->promotions,IntegrationContainer::get()->get(FinancialDocuments::class));
         $access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $access, $tx, $this->orders, $this->clock, $companyCredits, $this->analytics(), $this->promotions);
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock);
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
         $this->billing = BillingFixture::service($this->db, $this->clock);
         $this->owner = $this->fixture->createUser('Bundle course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Bundle provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.bundle.example.test');
@@ -241,10 +242,11 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $note = $this->db->fetchAssociative("SELECT * FROM commerce_documents WHERE order_id=:o AND kind='credit_note'", ['o' => $orderId]) ?: [];
         $noteSnapshot = CommerceRepository::decode((string) $note['snapshot']);
         self::assertSame(['bundle', 'Discounted Bundle', 108000], [$noteSnapshot['items'][0]['fulfilment_type'], $noteSnapshot['items'][0]['bundle_title'], $noteSnapshot['total_minor']]);
-        self::assertEquals(['price_minor' => 120000, 'discount_minor' => 12000, 'paid_minor' => 108000, 'promotion_code' => $code], $noteSnapshot['refund_line']);
-        $noteHtml = (new InvoicePdfRenderer($this->records))->html($note);
+        self::assertEquals(['price_minor' => 120000, 'discount_minor' => 12000, 'paid_minor' => 108000, 'quantity' => 1, 'promotion_code' => $code], $noteSnapshot['refund_line']);
+        $noteHtml = IntegrationContainer::get()->get(FinancialDocuments::class)->render($note)->html;
         self::assertStringContainsString('Bundle: Discounted Bundle', $noteHtml);
-        self::assertStringContainsString('Amount credited: ' . htmlspecialchars($this->rand(108000), ENT_QUOTES), $noteHtml);
+        self::assertStringContainsString('<th>Amount credited</th><td>' . htmlspecialchars($this->rand(108000), ENT_QUOTES) . '</td>', $noteHtml);
+        self::assertStringContainsString('Includes: Course A, Course B, Course C', $noteHtml, 'The refunded bundle is the product that was bought, with the courses it included.');
         self::assertSame([], $this->openCourses($buyer));
         $refunded = $this->events('bundle_refunded', $buyer->id);
         self::assertCount(1, $refunded);
@@ -445,7 +447,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
 
     private function refunds(): RefundAdministrationService
     {
-        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
+        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
     }
 
     private function bundleService(): BundleService
@@ -462,7 +464,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
     private function documentsHtml(int $orderId): array
     {
         $html = [];
-        foreach ($this->records->documents($orderId) as $document) $html[(string) $document['kind']] = (new InvoicePdfRenderer($this->records))->html($document);
+        foreach ($this->records->documents($orderId) as $document) $html[(string) $document['kind']] = IntegrationContainer::get()->get(FinancialDocuments::class)->render($document)->html;
         return $html;
     }
 

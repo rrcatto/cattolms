@@ -5,6 +5,7 @@ namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Contract\PaymentGatewayInterface;
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\PaymentRequest;
 use CattoLearning\Commerce\Domain\PaymentResult;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
@@ -18,7 +19,7 @@ use RuntimeException;
 /** Commits attempts before provider calls and settles verified results exactly once under order locks. */
 final class PaymentService
 {
-    public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly PaymentGatewayInterface $gateway, private readonly FulfilmentService $fulfilment, private readonly TransitionService $transitions, private readonly ClockInterface $clock) {}
+    public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly PaymentGatewayInterface $gateway, private readonly FulfilmentService $fulfilment, private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly FinancialDocuments $documents) {}
 
     public function purchase(CurrentUser $actor, int $orderId, string $key, string $methodToken): string
     {
@@ -91,7 +92,7 @@ final class PaymentService
             $this->records->setPaymentState($result->transactionId,$state,$result->providerReference);
             if ($state!=='paid') return;
             $snapshot=CommerceRepository::decode((string)$order['snapshot']);
-            $this->records->document((int)$order['id'],'receipt','payment:'.$result->transactionId,$snapshot+['payment_id'=>$result->transactionId,'gateway'=>$gateway,'provider_reference'=>$result->providerReference],$this->clock->now()->format(DATE_ATOM));
+            $this->documents->issueReceipt((int)$order['id'],$snapshot,$this->records->payment($result->transactionId),$gateway,$result->providerReference,$this->clock->now()->format(DATE_ATOM));
             $this->records->audit((int)$order['id'],null,'payment.confirmed',['payment_id'=>$result->transactionId],$this->clock->now()->format(DATE_ATOM));
             if ($order['state']!=='awaiting_payment' || new \DateTimeImmutable((string)$order['payment_due_at'])<=$this->clock->now()) {
                 if (in_array($order['state'],['awaiting_payment','cancelled','paid'],true)) $this->records->setOrderState((int)$order['id'],$this->transitions->apply('order',(string)$order['state'],'hold_for_review'));

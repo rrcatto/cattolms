@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/08 (v0.8.8.14)
+## Current delivery position — 2026/10/08 (v0.8.9)
 
-**Current LMS version:** 0.8.8.14 · **Date:** 2026/10/08 SAST · tag `v0.8.8.14` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.8.9 · **Date:** 2026/10/08 SAST · tag `v0.8.9` on GitHub `main`, published as a GitHub release with its source zip. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released v0.8 sequence** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.8.9 | Invoices, receipts and credit notes on the document template engine (Phase K): issued from the immutable order, payment and refund records, each keeping its values and design version; one financial document design at Commerce → Financial Documents with a live PDF preview of made-up orders |
 | 0.8.8.14 | Certificate signature pictures of any size made transparent, trimmed, fitted above the signatory's name and centred on the line, so designs with a signature save; Professional CPD's foot 26 mm; development moved to Linux Mint |
 | 0.8.8.13 | GD required, with a plain message where it is missing; theme uploads name an unwritable folder; re-importing a course offers it for replacement; the certificate preview twice as large, above its form |
 | 0.8.8.12 | One category picker wherever a category is chosen - the catalogue, the course forms, course import and category deletion - opening on the main categories with branches opened as needed, and + New creating a category at the level chosen |
@@ -35,9 +36,9 @@
 | 0.8.7 | Tester administration, company credit purchasing, payment administration and refunds |
 | 0.8.6 / 0.8.6.1 | Course Components v2; ADMIN test access |
 
-**Document templates.** Phase I (v0.8.8.8) built the shared engine: versioned templates with a controlled placeholder language and one renderer for preview, documents and PDFs. Phase J (v0.8.8.9) moved certificates onto it, and each certificate records the version it was issued with. The owner then rejected the generic template pages: nobody should see template HTML, versions or page settings. Certificate designs (v0.8.8.10) replaced them — a design made in one form compiles to a template; System → Document Templates is gone. Phase K moves invoices, receipts and credit notes onto the engine.
+**Document templates.** Phase I (v0.8.8.8) built the shared engine: versioned templates with a controlled placeholder language and one renderer for preview, documents and PDFs. Phase J (v0.8.8.9) moved certificates onto it, and each certificate records the version it was issued with. The owner then rejected the generic template pages: nobody should see template HTML, versions or page settings. Certificate designs (v0.8.8.10) replaced them — a design made in one form compiles to a template; System → Document Templates is gone. Phase K (v0.8.9) moved invoices, receipts and credit notes onto the engine: each stores its values and the template version that drew it, `InvoicePdfRenderer` is gone, and ADMIN edits one financial document design at Commerce → Financial Documents (the owner's choice of a design form over the template editor the Phase K brief described).
 
-**What is next.** Phase K (invoices, receipts and credit notes on the document template engine), and the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**What is next.** The owner's review of the financial documents (v0.8.9), and the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 

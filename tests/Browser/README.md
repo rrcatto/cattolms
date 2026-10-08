@@ -269,3 +269,27 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/certificates.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/certificates-fixture.php cleanup'
 ```
+
+## Financial documents
+
+`financial-documents.cjs` checks invoices, receipts and credit notes on the document template engine:
+9 scenarios in Chromium, Firefox, without JavaScript and in every bundled theme. Previews and
+downloads are PDFs whose text is read with Ghostscript (`gs` on the host); in Chromium preview
+requests are routed so their bodies can be read, as in `certificates.cjs`.
+
+- **Design page.** ADMIN opens Commerce → Financial Documents (nothing of templates, versions or HTML on it); the preview follows the Document and Sample order choices (the learner's receipt by EFT, the credit note of a refunded bundle, a company's credit note, an invoice a 100% promotion made free) and the form (a note, a typeface and a colour).
+- **Learner.** The learner downloads the invoice (courses, the bundle with its courses, the promotion, the billing snapshot), the receipt and the credit note of their own order, and the invoice for nothing of a free order, which has no receipt.
+- **History.** ADMIN saves a new invoice note: the learner's documents download exactly as before and the ADMIN order page names the version that drew them, while an order placed afterwards (`financial-documents-fixture.php order`) is drawn in the new design and names the next version.
+- **ADMIN.** The order pages serve the EFT receipt (bank reference and amount) and the company's invoice (the company billed, its administrator as purchaser, the credits per unit).
+- **Access.** Another learner is refused the design page, its previews, the learner's invoice and the ADMIN document route.
+- **No JavaScript and keyboard.** Update preview draws the unsaved form into the frame and Save keeps it; a document is chosen with the arrow keys and Save is reached with Tab.
+- **Themes.** The design page and an ADMIN order page fit all five themes at 1440 and 390px, with the preview an A4 portrait page above the form (UX rule 6.13).
+- **Firefox.** The preview follows the sample order choice and a receipt downloads as in Chromium.
+
+The fixture places its orders through the real commerce services (a card payment, a 100% promotion, an EFT confirmed by ADMIN, a company credit purchase and a refund), so their documents are issued as a checkout issues them. `cleanup` saves the recorded design again as the current one and signs everyone out; orders are immutable, so each run leaves its orders, their purchasers and the retired courses.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/financial-documents-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/financial-documents.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/financial-documents-fixture.php cleanup'
+```

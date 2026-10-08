@@ -3,7 +3,8 @@
 declare(strict_types=1);
 namespace CattoLearning\Commerce\Application;
 
-use CattoLearning\Commerce\Infrastructure\{CommerceRepository, InvoicePdfRenderer};
+use CattoLearning\Commerce\Document\FinancialDocuments;
+use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use Symfony\Component\Clock\ClockInterface;
@@ -12,7 +13,7 @@ use Symfony\Component\Clock\ClockInterface;
 final class CommerceMaintenance
 {
     public function __construct(private readonly CommerceRepository $records, private readonly OrderService $orders,
-        private readonly AccessService $access, private readonly InvoicePdfRenderer $pdfs,
+        private readonly AccessService $access, private readonly FinancialDocuments $documents,
         private readonly MailerInterface $mailer, private readonly TransactionManager $transactions,
         private readonly ClockInterface $clock) {}
 
@@ -36,7 +37,7 @@ final class CommerceMaintenance
                     foreach ($this->records->documents((int) $payload['order_id']) as $document) {
                         if ($document['kind'] !== 'invoice') continue;
                         $snapshot = CommerceRepository::decode((string) $document['snapshot']);
-                        $this->mailer->sendInvoice((string) $snapshot['purchaser_email'], (string) $document['number'], $this->pdfs->render($document));
+                        $this->mailer->sendInvoice((string) $snapshot['purchaser_email'], (string) $document['number'], $this->documents->pdf($document));
                     }
                     $this->records->emailDelivered((int) $event['id'], null);
                 } catch (\Throwable) {

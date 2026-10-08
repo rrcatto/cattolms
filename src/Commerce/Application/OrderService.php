@@ -5,6 +5,7 @@ namespace CattoLearning\Commerce\Application;
 
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Bundle\BundleRules;
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Domain\PromotionRejected;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
@@ -25,7 +26,8 @@ final class OrderService
         private readonly CommercePolicy $policy,
         private readonly TransitionService $transitions,
         private readonly ClockInterface $clock,
-        private readonly PromotionService $promotions
+        private readonly PromotionService $promotions,
+        private readonly FinancialDocuments $documents
     ) {}
 
     public static function requireCapability(CurrentUser $actor, string $permission): void
@@ -229,7 +231,7 @@ final class OrderService
             $snapshot=['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,'billing'=>$billing->toSnapshot(),'items'=>$lines,'subtotal_minor'=>$subtotal->minorUnits,'discount_minor'=>$discountMinor,'promotion'=>$discount?->toSnapshot(),'total_minor'=>$total,'currency'=>$subtotal->currency,'payment_method'=>$checkout['payment_method'] ?? 'dummy','invoice_email'=>$checkout['invoice_email'] ?? false,'tax_enabled'=>false,'terms_version'=>$this->policy->termsVersion,'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false],'activation_deadline_days'=>$this->policy->activationDeadlineDays];
             $id=$this->records->place($cartId,$actor->id,$total,$subtotal->currency,$snapshot,$now->format(DATE_ATOM),$now->modify('+'.$this->policy->paymentDueDays.' days')->format(DATE_ATOM),$discount?->promotion->id,$discountMinor);
             foreach($lines as $line) $this->records->addOrderItem($id,$actor->id,$line);
-            $this->records->document($id,'invoice','order:'.$id,$snapshot,$now->format(DATE_ATOM));
+            $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $this->records->selectPaymentMethod($id, (string) ($checkout['payment_method'] ?? 'dummy'));
             if ($checkout['invoice_email'] ?? false) $this->records->enqueue('invoice:'.$id, 'invoice.email_requested', ['order_id'=>$id], $now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));

@@ -22,7 +22,7 @@
         {% include '@platform/partials/billing-address.html.twig' %}
         <p class="help">As recorded when the order was placed. Changing your billing details later does not change this order or its documents.</p>
         {% for document in order.documents %}
-            <p>{{ ui('action.link', {label: 'View ' ~ (document.kind), variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
+            <p>{{ ui('action.link', {label: 'View ' ~ document.kind|replace({'_': ' '}) ~ ' ' ~ document.number, variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
         {% endfor %}
         {% if payment_method == 'eft' or order.details.payment_method|default('') == 'eft' %}
             <h2 class="h5 mt-4">EFT bank account details</h2>

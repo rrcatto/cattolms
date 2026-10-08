@@ -3,11 +3,11 @@
 declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\AuthService;
-use CattoLearning\Commerce\Infrastructure\InvoicePdfRenderer;
 use CattoLearning\Tests\Support\FakeMailer;
 use CattoLearning\Commerce\Application\{AccessService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,PaymentAdministrationService,RefundAdministrationService,CartService,CheckoutService,CommerceMaintenance};
 use CattoLearning\Commerce\Contract\PaymentGatewayInterface;
@@ -54,7 +54,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->records=new CommerceRepository($this->db);
         $tx=new TransactionManager($this->db);
         $transitions=$container->get(TransitionService::class);
-        $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock));
+        $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyCredits=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
         $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits,$this->analytics(),PromotionFixture::service($this->db,$this->clock));
@@ -73,7 +73,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     }
     private function paymentService(PaymentGatewayInterface $gateway): PaymentService
     {
-        return new PaymentService($this->records,new TransactionManager($this->db),$this->orders,$gateway,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        return new PaymentService($this->records,new TransactionManager($this->db),$this->orders,$gateway,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
     }
     private function place(): int
     {
@@ -129,7 +129,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
         $admin=$this->financeAdmin(); $key=Uuid::v4();
         $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
         $service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
@@ -365,10 +365,10 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $cart = $this->orders->cart($this->actor);
         $id = $this->orders->place($this->actor, (int) $cart['id'], (string) $cart['quote'], BillingFixture::person('Billing Buyer'), true, ['invoice_email'=>true]);
         $invoice = $this->records->documents($id)[0];
-        $pdfs = new InvoicePdfRenderer($this->records);
-        $bytes = $pdfs->render($invoice);
+        $pdfs = IntegrationContainer::get()->get(FinancialDocuments::class);
+        $bytes = $pdfs->pdf($invoice);
         self::assertStringStartsWith('%PDF-', $bytes);
-        self::assertSame($bytes, $pdfs->render($invoice));
+        self::assertSame($bytes, $pdfs->pdf($invoice));
         $mailer = new FakeMailer();
         $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, $pdfs, $mailer, new TransactionManager($this->db), $this->clock);
         $maintenance->deliverInvoices(); $maintenance->deliverInvoices();
@@ -451,7 +451,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
         $admin=$this->financeAdmin(); $key=Uuid::v4();
         $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
         self::assertSame($first,$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345));
@@ -462,6 +462,6 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertSame('revoked',$this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:item',['item'=>$item['id']]));
         self::assertSame(12345,(int)$this->db->fetchOne('SELECT SUM(amount_minor) FROM commerce_fund_entries WHERE account_id IN (SELECT id FROM commerce_fund_accounts WHERE owner_user_id=:user)',['user'=>$this->actor->id]));
         self::assertSame(2,(int)$this->db->fetchOne("SELECT COUNT(*) FROM commerce_documents WHERE order_id=:id AND kind='credit_note'",['id'=>$id]));
-        self::assertStringStartsWith('%PDF-',(new InvoicePdfRenderer($this->records))->render($this->records->documents($id)[2]));
+        self::assertStringStartsWith('%PDF-',IntegrationContainer::get()->get(FinancialDocuments::class)->pdf($this->records->documents($id)[2]));
     }
 }

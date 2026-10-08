@@ -11,6 +11,10 @@ Defines the canonical Catto Learning ACL permission catalogue. Business permissi
 
 Changelog:
 
+2026/10/08 SAST
+
+- PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE (Commerce · Platform): the design of invoices, receipts and credit notes (Phase K). 92 permissions.
+
 2026/10/07 SAST
 
 - CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE (Courses) replace DOCUMENT.TEMPLATE.VIEW and DOCUMENT.TEMPLATE.MANAGE: certificate designs replace the generic template pages. Still 90 permissions.
@@ -128,6 +132,8 @@ final class PermissionCatalog
             $this->p('PLATFORM.REFUND.MANAGE', 'ManagePlatformRefunds', 'Commerce · Platform', 'Create and manage supported refunds when Commerce is installed.'),
             $this->p('PLATFORM.PROMOTION.VIEW', 'ViewPromotions', 'Commerce · Platform', 'View promotions, their promo codes and their usage when Commerce is installed.'),
             $this->p('PLATFORM.PROMOTION.MANAGE', 'ManagePromotions', 'Commerce · Platform', 'Create, change, activate and deactivate promotions, and delete unused ones, when Commerce is installed.'),
+            $this->p('PLATFORM.DOCUMENT.VIEW', 'ViewFinancialDocumentDesign', 'Commerce · Platform', 'See the design of invoices, receipts and credit notes and preview it when Commerce is installed.'),
+            $this->p('PLATFORM.DOCUMENT.MANAGE', 'ManageFinancialDocumentDesign', 'Commerce · Platform', 'Change the design of invoices, receipts and credit notes when Commerce is installed.'),
         ];
     }
 

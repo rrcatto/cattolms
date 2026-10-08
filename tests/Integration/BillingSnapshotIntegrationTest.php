@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Auth\AuthService;
@@ -12,7 +13,7 @@ use CattoLearning\Commerce\Application\{AccessService,BillingProfileService,Chec
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Http\CommerceController;
 use CattoLearning\Commerce\Http\PaymentAdministrationController;
-use CattoLearning\Commerce\Infrastructure\{CommerceRepository,InvoicePdfRenderer};
+use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
@@ -45,7 +46,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
     private PaymentService $payments;
     private FulfilmentService $fulfilment;
     private BillingProfileService $billing;
-    private InvoicePdfRenderer $pdfs;
+    private FinancialDocuments $pdfs;
     private int $ownerId;
     private int $ownerCompanyId;
 
@@ -60,13 +61,13 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $this->records = new CommerceRepository($this->db);
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock,PromotionFixture::service($this->db,$this->clock));
+        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
         $access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $access, $tx, $this->orders, $this->clock, $companyCredits, $this->analytics(),PromotionFixture::service($this->db,$this->clock));
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock);
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
         $this->billing = BillingFixture::service($this->db, $this->clock);
-        $this->pdfs = new InvoicePdfRenderer($this->records);
+        $this->pdfs = IntegrationContainer::get()->get(FinancialDocuments::class);
         $this->ownerId = $this->fixture->createUser('Snapshot course owner');
         $this->ownerCompanyId = $this->fixture->createCompany($this->ownerId, 'Snapshot provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.provider.example.test');
     }
@@ -99,7 +100,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $this->assertBilling($a, $this->orderBilling($orderId));
         $invoice = $this->onlyDocument($orderId, 'invoice');
         $this->assertBilling($a, $this->documentBilling($invoice));
-        $pdfBefore = $this->pdfs->render($invoice);
+        $pdfBefore = $this->pdfs->pdf($invoice);
 
         // The profile becomes B and the person is renamed.
         $this->billing->saveOwn($buyer, $b->toRow());
@@ -112,23 +113,23 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $this->assertBilling($a, $this->orderBilling($orderId));
         self::assertSame($invoice, $this->onlyDocument($orderId, 'invoice'), 'The invoice is untouched by the change and the retry.');
         $this->assertBilling($a, $this->documentBilling($this->onlyDocument($orderId, 'receipt')));
-        $this->assertShowsAButNotB($this->pdfs->html($invoice), $a, $b, 'invoice HTML');
-        self::assertSame($pdfBefore, $this->pdfs->render($invoice), 'The invoice PDF is the one generated before the change.');
-        $this->assertShowsAButNotB($this->pdfs->html($this->onlyDocument($orderId, 'receipt')), $a, $b, 'receipt HTML');
+        $this->assertShowsAButNotB($this->pdfs->render($invoice)->html, $a, $b, 'invoice HTML');
+        self::assertSame($pdfBefore, $this->pdfs->pdf($invoice), 'The invoice PDF is the one generated before the change.');
+        $this->assertShowsAButNotB($this->pdfs->render($this->onlyDocument($orderId, 'receipt'))->html, $a, $b, 'receipt HTML');
 
         // A refund after the change: its credit note carries the order's billing, not the profile's.
         $item = $this->records->items($orderId)[0];
         $this->refunds()->approve($this->finance($buyerId), $orderId, (int) $item['id'], Uuid::v4(), 'goodwill', 'Goodwill after a billing change.', 1, 1000);
         $creditNote = $this->onlyDocument($orderId, 'credit_note');
         $this->assertBilling($a, $this->documentBilling($creditNote));
-        $this->assertShowsAButNotB($this->pdfs->html($creditNote), $a, $b, 'credit note HTML');
+        $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'credit note HTML');
 
         // The customer's and ADMIN's order pages read the order, not the profile.
         $this->assertShowsAButNotB($this->page($buyer, CommerceController::class, 'order', ['id' => $orderId]), $a, $b, 'customer order page');
         $this->assertShowsAButNotB($this->page($this->finance($buyerId), PaymentAdministrationController::class, 'order', ['id' => $orderId]), $a, $b, 'ADMIN order page');
         // Deleting the mutable profile cannot leave an issued document incomplete.
         $this->db->executeStatement('DELETE FROM user_billing_profiles WHERE user_id=:id', ['id' => $buyerId]);
-        $this->assertShowsAButNotB($this->pdfs->html($invoice), $a, $b, 'invoice HTML with no profile left');
+        $this->assertShowsAButNotB($this->pdfs->render($invoice)->html, $a, $b, 'invoice HTML with no profile left');
         $this->assertShowsAButNotB($this->page($this->finance($buyerId), PaymentAdministrationController::class, 'order', ['id' => $orderId]), $a, $b, 'ADMIN order page with no profile left');
         $this->billing->saveOwn($buyer, $b->toRow());
 
@@ -169,7 +170,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
         self::assertNotSame('Administrator Personally', $snapshot['billing']['name']);
         $invoice = $this->onlyDocument($orderId, 'invoice');
         $this->assertBilling($a, $this->documentBilling($invoice));
-        $pdfBefore = $this->pdfs->render($invoice);
+        $pdfBefore = $this->pdfs->pdf($invoice);
 
         // The company profile becomes B and the company is renamed.
         self::assertTrue($this->billing->saveForCompany($admin, $companyId, $b));
@@ -179,18 +180,18 @@ final class BillingSnapshotIntegrationTest extends TestCase
         self::assertSame('fulfilled', $this->records->order($orderId)['state']);
         self::assertSame($invoice, $this->onlyDocument($orderId, 'invoice'));
         $this->assertBilling($a, $this->documentBilling($this->onlyDocument($orderId, 'receipt')));
-        $this->assertShowsAButNotB($this->pdfs->html($invoice), $a, $b, 'company invoice HTML');
-        self::assertSame($pdfBefore, $this->pdfs->render($invoice));
+        $this->assertShowsAButNotB($this->pdfs->render($invoice)->html, $a, $b, 'company invoice HTML');
+        self::assertSame($pdfBefore, $this->pdfs->pdf($invoice));
 
         $item = $this->records->items($orderId)[0];
         $this->refunds()->approve($this->finance($adminId), $orderId, (int) $item['id'], Uuid::v4(), 'voluntary', 'Unused credit after a billing change.', 1, 0);
         $creditNote = $this->onlyDocument($orderId, 'credit_note');
         $this->assertBilling($a, $this->documentBilling($creditNote));
-        $this->assertShowsAButNotB($this->pdfs->html($creditNote), $a, $b, 'company credit note HTML');
+        $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'company credit note HTML');
         $this->assertShowsAButNotB($this->page($admin, CommerceController::class, 'order', ['id' => $orderId]), $a, $b, 'company order page');
         $this->assertShowsAButNotB($this->page($this->finance($adminId), PaymentAdministrationController::class, 'order', ['id' => $orderId]), $a, $b, 'ADMIN company order page');
         $this->db->executeStatement('DELETE FROM company_billing_profiles WHERE company_id=:id', ['id' => $companyId]);
-        $this->assertShowsAButNotB($this->pdfs->html($creditNote), $a, $b, 'company credit note HTML with no profile left');
+        $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'company credit note HTML with no profile left');
         $this->billing->saveForCompany($admin, $companyId, $b);
 
         $purchases->add($admin, $companyId, $this->paidCourse('Second company course'), 1);
@@ -292,12 +293,12 @@ final class BillingSnapshotIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         return new CompanyCreditPurchaseService($this->records, $container->get(CompanyRepository::class), $container->get(AdministrationRepository::class),
-            new TransactionManager($this->db), new CommercePolicy(dirname(__DIR__, 2)), $container->get(TransitionService::class), $this->payments, $this->clock, $this->analytics(), $this->billing);
+            new TransactionManager($this->db), new CommercePolicy(dirname(__DIR__, 2)), $container->get(TransitionService::class), $this->payments, $this->clock, $this->analytics(), $this->billing,IntegrationContainer::get()->get(FinancialDocuments::class));
     }
 
     private function refunds(): RefundAdministrationService
     {
-        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock));
+        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
     }
 
     private function analytics(): AnalyticsEventRecorder

@@ -11,7 +11,9 @@ Renders platform-owned Catto Learning page bodies independently of themes, then 
 
 Changelog:
 2026/10/08 SAST
+- Administration → Commerce → Financial Documents (PLATFORM.DOCUMENT.VIEW): the design of invoices, receipts and credit notes.
 - Advanced PLATFORM_ASSET_VERSION to 0.8.8.14.
+- Advanced PLATFORM_ASSET_VERSION to 0.8.9.
 2026/10/07 SAST
 - Courses → Certificate Designs replaces System → Document Templates in the navigation; load_certificate_editor loads CKEditor with the certificate profile (ck-certificate.js).
 - Advanced PLATFORM_ASSET_VERSION to 0.8.8.10.
@@ -82,7 +84,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.8.14';
+    private const PLATFORM_ASSET_VERSION = '0.8.9';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -596,6 +598,9 @@ final class ThemeRenderer
             }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PROMOTION.VIEW')) {
                 $grandchildren[] = $child('admin-promotions', 'Promotions', '/admin/promotions', 'credits');
+            }
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.DOCUMENT.VIEW')) {
+                $grandchildren[] = $child('admin-financial-documents', 'Financial Documents', '/admin/commerce/documents', 'credits');
             }
             if ($grandchildren === []) {
                 continue;

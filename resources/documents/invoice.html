@@ -1,11 +1,13 @@
 <table class="head">
 	<tr>
 		<td>
+			[[logo]]
 			<p class="business">{{ business.name }}</p>
 			{{#if business.legal_name}}<p>{{ business.legal_name }}</p>{{/if}}
 			{{#if business.address}}<p>{{ business.address }}</p>{{/if}}
 			{{#if business.tax_number}}<p>Tax/VAT number: {{ business.tax_number }}</p>{{/if}}
 			{{#if business.email}}<p>{{ business.email }}</p>{{/if}}
+			{{#if business.website}}<p>{{ business.website }}</p>{{/if}}
 		</td>
 		<td class="title">
 			<h1>Invoice</h1>
@@ -24,17 +26,17 @@
 	{{ customer.billing_address }}
 	{{#if customer.tax_number}}<br>Tax/VAT number: {{ customer.tax_number }}{{/if}}
 </p>
-{{#if customer.company_name}}<p>Purchased for {{ customer.company_name }}</p>{{/if}}
+{{#if customer.company_name}}<p>Purchased for {{ customer.company_name }}{{#if customer.purchaser_name}} by {{ customer.purchaser_name }}{{/if}}</p>{{/if}}
 
 <table class="lines">
 	<thead>
-		<tr><th>Item</th><th>Access</th><th class="amount">Price</th><th class="amount">Discount</th><th class="amount">Amount</th></tr>
+		<tr><th>Item</th><th class="access">Access</th><th class="amount">Price</th><th class="amount">Discount</th><th class="amount">Amount</th></tr>
 	</thead>
 	<tbody>
 		{{#each items}}
 		<tr>
 			<td>{{ item.description }}{{#if item.detail}}<br><small>{{ item.detail }}</small>{{/if}}</td>
-			<td>{{ item.access_period }}</td>
+			<td class="access">{{ item.access_period }}</td>
 			<td class="amount">{{ item.price }}</td>
 			<td class="amount">{{#if item.discount}}−{{ item.discount }}{{/if}}</td>
 			<td class="amount">{{ item.paid }}</td>
@@ -44,8 +46,10 @@
 </table>
 
 <table class="totals">
+	{{#if invoice.discount}}
 	<tr><th>Subtotal</th><td>{{ invoice.subtotal }}</td></tr>
-	{{#if invoice.discount}}<tr><th>Promotion {{ promotion.code }}{{#if promotion.label}} ({{ promotion.label }}){{/if}}</th><td>−{{ invoice.discount }}</td></tr>{{/if}}
+	<tr><th>Promotion {{ promotion.code }}{{#if promotion.label}} ({{ promotion.label }}){{/if}}</th><td>−{{ invoice.discount }}</td></tr>
+	{{/if}}
 	<tr class="total"><th>Total</th><td>{{ invoice.total }}</td></tr>
 </table>
 
@@ -53,4 +57,4 @@
 <h2>Paying by EFT</h2>
 <p>{{ bank.name }} · {{ bank.account_name }} · Account {{ bank.account_number }} · Branch {{ bank.branch_code }}<br>Use {{ order.number }} as the payment reference.</p>
 {{/if}}
-<p class="note">Tax is not charged. An invoice is not proof of payment.</p>
+[[note]]

@@ -266,19 +266,38 @@ final class CommerceRepository
     {
         return $this->db->fetchAllAssociative('SELECT * FROM commerce_order_items WHERE order_id=:id ORDER BY id', ['id'=>$orderId]);
     }
-    /** @return list<array<string,mixed>> */
+    /**
+     * An order's financial documents, oldest first, each with the name of the template that drew it.
+     *
+     * @return list<array<string,mixed>>
+     */
     public function documents(int $orderId): array
     {
-        return $this->db->fetchAllAssociative('SELECT * FROM commerce_documents WHERE order_id=:id ORDER BY id', ['id'=>$orderId]);
+        return $this->db->fetchAllAssociative('SELECT d.*, t.name AS template_name FROM commerce_documents d JOIN document_templates t ON t.id=d.template_id WHERE d.order_id=:id ORDER BY d.id', ['id'=>$orderId]);
     }
-    /** @param array<string,mixed> $snapshot */
-    public function document(int $orderId, string $kind, string $sourceKey, array $snapshot, string $now): void
+    /** @return array<string,mixed>|null the document issued for a source (an order, a payment, a refund), if it was */
+    public function documentForSource(string $sourceKey): ?array
     {
-        if ($this->db->fetchOne('SELECT id FROM commerce_documents WHERE source_key=:key', ['key'=>$sourceKey])) return;
+        return $this->db->fetchAssociative('SELECT * FROM commerce_documents WHERE source_key=:key', ['key'=>$sourceKey]) ?: null;
+    }
+    /** The next number of a kind of document, taken for good: INV-00000001, REC-…, CN-…. */
+    public function nextDocumentNumber(string $kind): string
+    {
+        $prefix = match ($kind) { 'invoice'=>'INV-', 'receipt'=>'REC-', 'credit_note'=>'CN-', default=>throw new RuntimeException('Unknown financial document type.') };
         $number = $this->db->fetchOne('UPDATE commerce_document_numbers SET next_number=next_number+1 WHERE kind=:kind RETURNING next_number-1', ['kind'=>$kind]);
         if ($number === false) throw new RuntimeException('Unknown financial document type.');
-        $prefix = match ($kind) { 'invoice'=>'INV-', 'receipt'=>'REC-', 'credit_note'=>'CN-', default=>throw new RuntimeException('Unknown financial document type.') };
-        $this->db->executeStatement('INSERT INTO commerce_documents(public_id,order_id,kind,number,source_key,snapshot,issued_at) VALUES (:public,:order,:kind,:number,:key,:snapshot,:now)', ['public'=>Uuid::v4(),'order'=>$orderId,'kind'=>$kind,'number'=>$prefix.str_pad((string)$number,8,'0',STR_PAD_LEFT),'key'=>$sourceKey,'snapshot'=>self::json($snapshot),'now'=>$now]);
+        return $prefix.str_pad((string)$number,8,'0',STR_PAD_LEFT);
+    }
+    /**
+     * @param array<string,mixed> $snapshot the commerce record it was issued from
+     * @param array<string,mixed> $data every value it prints
+     * @param array{template_id:?int,template_version_id:?int,template_version_number:?int} $reference the template version that drew it
+     */
+    public function insertDocument(int $orderId, string $kind, string $number, string $sourceKey, array $snapshot, array $data, array $reference, string $issuedAt): int
+    {
+        return (int) $this->db->fetchOne('INSERT INTO commerce_documents(public_id,order_id,kind,number,source_key,snapshot,document_data,template_id,template_version_id,template_version_number,issued_at) VALUES (:public,:order,:kind,:number,:key,:snapshot,:data,:template,:version,:version_number,:now) RETURNING id',
+            ['public'=>Uuid::v4(),'order'=>$orderId,'kind'=>$kind,'number'=>$number,'key'=>$sourceKey,'snapshot'=>self::json($snapshot),'data'=>self::json($data),
+                'template'=>$reference['template_id'],'version'=>$reference['template_version_id'],'version_number'=>$reference['template_version_number'],'now'=>$issuedAt]);
     }
     /** @param array<string,mixed> $payload */
     public function audit(?int $orderId, ?int $actor, string $event, array $payload, string $now): void
@@ -557,7 +576,7 @@ final class CommerceRepository
     public function savePdf(int $documentId, string $bytes): string
     {
         $this->db->executeStatement('INSERT INTO commerce_document_files(document_id,pdf_base64) VALUES (:id,:pdf) ON CONFLICT DO NOTHING', ['id'=>$documentId,'pdf'=>base64_encode($bytes)]);
-        return $this->pdf($documentId) ?? throw new RuntimeException('Invoice PDF unavailable.');
+        return $this->pdf($documentId) ?? throw new RuntimeException('The document PDF is unavailable.');
     }
     /** @return array<string,mixed> */
     public static function decode(string $json): array { return json_decode($json,true,512,JSON_THROW_ON_ERROR); }
