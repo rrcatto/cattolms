@@ -6,12 +6,14 @@ namespace CattoLearning\Analytics;
 
 /**
  * Where an analytics event came from. A controlled vocabulary, so reports can compare origins
- * without guessing at free-form strings. landing_page is added with the landing pages.
+ * without guessing at free-form strings.
  */
 enum AnalyticsSource: string
 {
     case Catalogue = 'catalogue';
     case CourseDetail = 'course_detail';
+    /** A course's marketing landing page, /landing/{slug}. */
+    case LandingPage = 'landing_page';
     case PublicPreview = 'public_preview';
     case LearnerReader = 'learner_reader';
     case Account = 'account';

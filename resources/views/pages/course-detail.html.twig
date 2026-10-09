@@ -120,12 +120,7 @@
 						<h2 class="h4">
 							Course access
 						</h2>
-						{% if has_access %}
-							<p>
-								This course is already in your library.
-							</p>
-							{{ ui('action.link', {label: 'Open course', variant: 'primary', size: 'normal', full_width: true, href: '/learn/' ~ (course.slug)}) }}
-						{% endif %}
+						{% include '@platform/partials/course-purchase.html.twig' with {purchase: purchase, purchase_style: 'full'} %}
 						{#
 							Reviewing is offered to anyone who has held access to the course, including a
 							learner whose access has expired, so it does not depend on has_access.
@@ -137,42 +132,6 @@
 								{% endif %}
 								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review'}) }}
 							</div>
-						{% endif %}
-						{% if not has_access %}
-							{% if course.price_variants %}
-								<form action="/cart/add" method="post">
-									<input type="hidden" name="csrf" value="{{ csrf }}">
-									<input type="hidden" name="course_id" value="{{ course.id }}">
-									<div class="vstack gap-2 mb-3">
-										{% for price_index, price in course.price_variants %}
-											{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: price.price_label ~ ' · ' ~ price.access_period_label ~ ' access' ~ (price.label ? ' · ' ~ price.label : '')})} %}
-{% block control %}
-<input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.is_default ? 'checked' : '' }} required>
-{% endblock %}
-{% endembed %}
-										{% endfor %}
-									</div>
-                                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-
-                                        {{ ui('action.button', {label: 'Add to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-add'}) }}
-                                        {{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now'}) }}
-                                        {% if is_authenticated and 'CATALOGUE.COURSE.REQUEST' in permissions %}
-                                            {{ ui('action.button', {label: 'Request from my company', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'request'}) }}
-                                        {% endif %}
-
-{% endblock %}
-{% endembed %}
-								</form>
-							{% else %}
-								{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
-{% block body %}
-
-									This course does not currently have an active purchase price.
-
-{% endblock %}
-{% endembed %}
-							{% endif %}
 						{% endif %}
 
 {% endblock %}

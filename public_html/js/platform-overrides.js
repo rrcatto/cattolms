@@ -183,7 +183,12 @@
       flash.querySelector('[data-flash-close]')?.addEventListener('click', dismiss);
       const type = flash.dataset.flashType || 'info'; if (type === 'success' || type === 'info') setTimeout(dismiss, type === 'success' ? 4500 : 6500);
     });
-    document.querySelectorAll('[data-confirm]').forEach(element => element.addEventListener('click', event => { if (!confirm(element.dataset.confirm || 'Continue?')) event.preventDefault(); }));
+    /* One listener for every confirmation, so a control drawn into the page after it loaded (a list
+       swapped in after a move, a form loaded into a modal) asks before it acts too. */
+    document.addEventListener('click', event => {
+      const element = event.target instanceof Element ? event.target.closest('[data-confirm]') : null;
+      if (element && !confirm(element.dataset.confirm || 'Continue?')) event.preventDefault();
+    });
     /* Live dataset search needs nothing from this file. The debounce, the abort-in-flight and the
        loading indicator are declared on the input itself, and the submit button now lives inside a
        noscript element, so it is never in the document when scripting is available and is a real

@@ -4,6 +4,8 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/10/09 SAST
+- Course landing pages: the hero in the page-head band with its picture beside the copy, the section cards (checklists, benefit cards, the outline, questions, reviews), the shared purchase box (.cl-course-purchase) and the landing page editor (.cl-landing-*).
 2026/10/08 SAST
 - Financial documents: the design page's A4 portrait preview above its form (.cl-document-*).
 2026/10/07 SAST
@@ -1306,3 +1308,65 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-document-pictures{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
 .cl-document-logo{display:block;max-width:12rem;max-height:5rem;border:1px solid var(--cl-border,#d9dee5);background:#fff}
 .cl-document-design input[type=color]{width:5rem;min-height:2.6rem;padding:.25rem;cursor:pointer}
+/* Course landing pages (/landing/…): the hero in the page-head band with its picture beside the copy
+   on wide screens and above nothing on narrow ones, then each section on its own card. Layout only:
+   colours, type and borders come from the theme through its tokens. Decorative check marks are
+   absolutely placed and never interactive. */
+.cl-landing-hero .cl-rating-summary{margin:.25rem 0 0}
+.cl-landing-hero-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:1.5rem 2.5rem;align-items:center}
+@media (min-width:992px){.cl-landing-hero-grid.has-picture{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}}
+.cl-landing-hero-copy,.cl-landing-hero-picture{min-width:0}
+.cl-landing-headline{margin:0 0 .75rem;font-size:clamp(2rem,1.4rem + 2.6vw,3.4rem);font-weight:700;line-height:1.1;text-wrap:balance;overflow-wrap:anywhere}
+.cl-landing-hero-copy .lead{margin:0 0 .75rem}
+.cl-landing-hero-copy>.cl-ui-surface{margin-top:1.25rem;max-width:38rem}
+/* The buy box is a card in the page-head band: its words take the card's colour, not the band's
+   (a theme that lightens every paragraph of a dark band would otherwise make them unreadable). */
+.cl-landing-hero .cl-landing-hero-copy>.cl-ui-surface :is(p,li){color:inherit}
+.cl-landing-hero-picture img{display:block;width:100%;height:auto;max-height:26rem;object-fit:cover;border-radius:var(--cl-radius,10px)}
+.cl-landing-hero-cover{aspect-ratio:3/2;overflow:hidden;border-radius:var(--cl-radius,10px)}
+.cl-landing-hero-cover svg{display:block;width:100%;height:100%}
+.cl-landing-secondary{margin:.75rem 0 0}
+.cl-landing-sections{display:grid;gap:1.5rem}
+.cl-landing-section{min-width:0;scroll-margin-top:5rem}
+.cl-landing-section-head{max-width:48rem;margin-bottom:1rem}
+.cl-landing-section-heading{margin:0 0 .5rem;font-size:clamp(1.4rem,1.15rem + 1vw,2rem);text-wrap:balance}
+.cl-landing-intro{margin:0 0 .5rem}
+.cl-landing-checklist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr));gap:.6rem 1.5rem}
+.cl-landing-checklist>li{position:relative;padding-inline-start:1.75rem;overflow-wrap:anywhere}
+.cl-landing-checklist>li::before{content:"";position:absolute;inset-inline-start:.15rem;top:.35em;width:.9rem;height:.5rem;border-inline-start:3px solid var(--cl-accent,#2563eb);border-bottom:3px solid var(--cl-accent,#2563eb);transform:rotate(-45deg);pointer-events:none}
+.cl-landing-benefits{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:1rem}
+.cl-landing-benefit{min-width:0;padding:1rem 1.1rem;border:1px solid var(--cl-border,#dfe4ea);border-top:3px solid var(--cl-accent,#2563eb);border-radius:var(--cl-radius,10px)}
+.cl-landing-benefit-title{margin:0 0 .4rem;font-size:1.1rem;overflow-wrap:anywhere}
+.cl-landing-benefit p{margin:0 0 .4rem}
+.cl-landing-outline-count{margin:0 0 .5rem;font-size:.9rem;opacity:.8}
+.cl-landing-outline{list-style:none;margin:0;padding:0;border-top:1px solid var(--cl-border,#dfe4ea)}
+.cl-landing-outline-node{display:flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .6rem;padding:.55rem .25rem;border-bottom:1px solid var(--cl-border,#dfe4ea)}
+.cl-landing-outline-node[data-depth="2"]{padding-inline-start:1.5rem}
+.cl-landing-outline-node[data-depth="3"]{padding-inline-start:2.75rem}
+.cl-landing-outline-node[data-depth="4"]{padding-inline-start:4rem}
+.cl-landing-outline-node.is-section .cl-landing-outline-title{font-weight:700}
+.cl-landing-outline-title{min-width:0;overflow-wrap:anywhere}
+.cl-landing-outline-kind{font-size:.82rem;opacity:.75}
+.cl-landing-outline-description{flex:1 1 100%;font-size:.9rem;opacity:.85;overflow-wrap:anywhere}
+.cl-landing-faq{display:grid;gap:.5rem}
+.cl-landing-more{margin:1rem 0 0}
+.cl-landing-section--cta .cl-landing-section-head{margin-inline:auto;text-align:center}
+.cl-landing-section--cta .cl-course-purchase{max-width:34rem;margin-inline:auto}
+.cl-course-purchase{min-width:0}
+.cl-course-purchase-note{margin:0 0 .6rem}
+.cl-course-purchase-price{margin:0 0 .75rem;overflow-wrap:anywhere}
+.cl-course-purchase-signin,.cl-course-purchase-inert{margin:.75rem 0 0;font-size:.88rem}
+/* The landing page editor: the hero row fixed above the sortable list, the address field with its
+   prefix, and the rows of benefits or questions. */
+.cl-landing-address{margin:0 0 1rem;overflow-wrap:anywhere}
+.cl-landing-note{margin:.5rem 0 0;font-size:.9rem;opacity:.85}
+.cl-tree--landing .cl-tree-name,.cl-landing-fixed .cl-tree-name{font-weight:600}
+.cl-landing-fixed>.cl-tree-row{border-top:1px solid var(--cl-border,#dfe4ea)}
+/* The hero has no handle; when the others show theirs, its name lines up with their names. */
+.cl-landing-editor:has(.cl-tree-handle:not([hidden])) .cl-landing-fixed>.cl-tree-row{padding-inline-start:calc(.25rem + 36px + .6rem)}
+.cl-landing-editor .cl-tree-row>.cl-ui-action-group{flex:0 1 auto;justify-content:flex-end;gap:.35rem}
+.cl-landing-slug{display:flex;align-items:center;gap:.25rem}
+.cl-landing-slug>input{flex:1 1 auto;min-width:0}
+.cl-landing-picture,.cl-landing-rows{display:grid;gap:.75rem;min-width:0;margin:0;padding:0;border:0}
+.cl-landing-row{display:grid;gap:.5rem;padding:.75rem;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,10px)}
+.cl-landing-add{display:grid;gap:.4rem;margin:0;padding:0;border:0}

@@ -1,0 +1,33 @@
+{#
+	One landing page section in the editor's list: the drag handle (not on the hero, which is always
+	first), its kind and a line about it, Hidden and Needs content when they apply, Edit, Show or Hide,
+	and the menu that moves or removes it. Every action is a form; the landing-sections controller saves
+	the menu's moves and drags without a page load.
+#}
+<div class="cl-tree-row">
+	{% if not row.is_hero %}
+		<button type="button" class="cl-tree-handle" aria-label="Move {{ row.label }}" aria-describedby="landing-section-keys" data-landing-sections-target="handle" data-action="pointerdown->landing-sections#arm keydown->landing-sections#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>
+	{% endif %}
+	<div class="cl-tree-label">
+		<span class="cl-tree-leaf"><span class="cl-tree-spacer" aria-hidden="true"></span><span class="cl-tree-name">{{ row.label }}</span></span>
+		<span class="cl-tree-meta">{{ row.is_hero ? 'Always at the top · ' : '' }}{{ row.summary }}</span>
+		{% if not row.enabled %}{{ ui('feedback.badge', {label: 'Hidden', tone: 'neutral', size: 'small'}) }}{% endif %}
+		{% if row.needs_content and row.enabled %}{{ ui('feedback.badge', {label: 'Needs content', tone: 'warning', size: 'small'}) }}{% endif %}
+	</div>
+	{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+		{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing/sections/' ~ row.id, aria_label: 'Edit ' ~ row.label}) }}
+		<form action="/admin/courses/{{ course.id }}/landing/sections/{{ row.id }}/visibility" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="enabled" value="{{ row.enabled ? '0' : '1' }}">{{ ui('action.button', {label: row.enabled ? 'Hide' : 'Show', size: 'small', type: 'submit', aria_label: (row.enabled ? 'Hide ' : 'Show ') ~ row.label, icon: 'action-open'}) }}</form>
+		{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'More for ' ~ row.label})} %}
+{% block body %}
+			{% if not row.is_hero %}
+				{% for move in [{direction: 'top', label: 'Move to top', allowed: not row.is_first}, {direction: 'up', label: 'Move up', allowed: not row.is_first}, {direction: 'down', label: 'Move down', allowed: not row.is_last}, {direction: 'bottom', label: 'Move to bottom', allowed: not row.is_last}] %}
+					<form action="/admin/courses/{{ course.id }}/landing/sections/{{ row.id }}/move" method="post" data-tree-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed}) }}</form>
+				{% endfor %}
+			{% endif %}
+			<form action="/admin/courses/{{ course.id }}/landing/sections/{{ row.id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', type: 'submit', size: 'small', variant: 'danger', icon: 'action-remove', confirm: 'Remove the ' ~ row.label ~ ' section and what is written in it?'}) }}</form>
+{% endblock %}
+		{% endembed %}
+{% endblock %}
+	{% endembed %}
+</div>

@@ -74,7 +74,7 @@ services:
     # source enums are vocabulary, not services.
     CattoLearning\Analytics\:
         resource: '../src/Analytics/'
-        exclude: '../src/Analytics/{AnalyticsEventType.php,AnalyticsSource.php}'
+        exclude: '../src/Analytics/{AnalyticsEventType.php,AnalyticsSource.php,CampaignAttribution.php}'
 
     # Generated artwork: a course cover, a category icon, a tag icon. Presentation, so it lives
     # beside the theme layer rather than in the persistence graph that calls it.
@@ -105,10 +105,11 @@ services:
             $publicRoot: '%catto.public_root%'
 
     # Popularity's model and its metric and score records are values, not services; so are a
-    # certificate design, its looks and the uploaded images it is checked into.
+    # certificate design, its looks and the uploaded images it is checked into, and a landing page's
+    # section types and copy rules.
     CattoLearning\Course\:
         resource: '../src/Course/'
-        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php}'
+        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php,Landing/LandingCopy.php,Landing/LandingSectionType.php}'
 
     # BundleRules is a set of static rules, not a service.
     CattoLearning\Bundle\:

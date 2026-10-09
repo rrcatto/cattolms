@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>{{ page.title ?: app.name }} · {{ app.name }}</title>
-		<meta name="description" content="Structured self-study courses, progress tracking and assessments.">
+		{% include '@platform/partials/head-meta.html.twig' %}
 		<meta name="theme-color" content="#f3f5f8">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 		{% for resourceUrl in platform.styles %}

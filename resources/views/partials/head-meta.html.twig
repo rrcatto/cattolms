@@ -1,0 +1,11 @@
+{#
+	What the head says about the page: its description on every page, and only where a page sets them
+	its canonical address, a robots rule and Open Graph tags (a course landing page; its ADMIN preview
+	asks not to be indexed and claims no address). ThemeRenderer builds meta from the page's page_meta;
+	every bundled theme includes this in its head in place of a description of its own.
+#}
+{% set head_meta = meta|default({description: 'Structured self-study courses, progress tracking and assessments.', canonical: '', robots: '', og: {}}) %}
+<meta name="description" content="{{ head_meta.description }}">
+{% if head_meta.robots %}<meta name="robots" content="{{ head_meta.robots }}">{% endif %}
+{% if head_meta.canonical %}<link rel="canonical" href="{{ head_meta.canonical }}">{% endif %}
+{% if head_meta.og %}{% for property, content in head_meta.og %}<meta property="og:{{ property }}" content="{{ content }}">{% endfor %}<meta property="og:site_name" content="{{ app_name|default('') }}">{% endif %}

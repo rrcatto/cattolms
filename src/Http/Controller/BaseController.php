@@ -338,6 +338,25 @@ abstract class BaseController
         return $visitor;
     }
 
+    /**
+     * The campaign this browser session arrived from: the utm_ parameters of the last landing page
+     * address that carried them, remembered with the analytics visitor and ending with it. With
+     * $capture, this request's address replaces it when it carries any.
+     *
+     * @return array<string,string>
+     */
+    protected function analyticsCampaign(bool $capture = false): array
+    {
+        if ($capture) {
+            $fresh = \CattoLearning\Analytics\CampaignAttribution::from($this->request()->query->all());
+            if ($fresh !== []) {
+                $_SESSION['analytics_campaign'] = $fresh;
+            }
+        }
+        $stored = $_SESSION['analytics_campaign'] ?? [];
+        return \CattoLearning\Analytics\CampaignAttribution::from(is_array($stored) ? $stored : []);
+    }
+
     protected function redirect(string $path): never
     {
         throw new HttpRedirect($path);

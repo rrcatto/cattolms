@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/09 SAST
+- Course marketing landing pages (Phase L): course_landing_pages (one per course, its own unique slug, draft or published, optional page title and description) and course_landing_sections (a flat ordered list of typed sections whose copy and settings are JSONB checked by type; the hero is always first, and hero, audience, outcomes, contents, instructor, reviews and pricing appear at most once).
 2026/10/08 SAST
 - Financial documents on the document template engine (Phase K): commerce_documents stores the values each invoice, receipt and credit note was issued with (document_data) and the exact published template version that drew it, checked by a trigger; the invoice, receipt and credit note templates are installed compiled from the standard financial document design; PLATFORM.DOCUMENT.VIEW/MANAGE (92 permissions).
 2026/10/07 SAST
@@ -2647,6 +2649,49 @@ CREATE INDEX course_reviews_published_idx ON course_reviews (course_id, publishe
 -- The moderation queue: by status, oldest submission first.
 CREATE INDEX course_reviews_status_idx ON course_reviews (status, updated_at);
 
+-- Course marketing landing pages (Phase L): an optional public page that sells one course, at
+-- /landing/{slug}, separate from the course's own catalogue page. It holds only marketing copy;
+-- the price, rating, reviews, outline and who may buy are read live whenever it is drawn. One page
+-- per course for now (course_landing_pages_one_per_course); the page has its own id and slug, so
+-- dropping that index is all several pages per course would need of the schema.
+CREATE TABLE course_landing_pages (
+    id BIGSERIAL PRIMARY KEY,
+    course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    slug VARCHAR(120) NOT NULL CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+    status VARCHAR(16) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+    meta_title VARCHAR(120) NULL,
+    meta_description VARCHAR(300) NULL,
+    -- The first publication; a page that has been public is unpublished rather than deleted.
+    first_published_at TIMESTAMPTZ NULL,
+    published_at TIMESTAMPTZ NULL,
+    created_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT course_landing_pages_slug_key UNIQUE (slug),
+    CONSTRAINT course_landing_pages_published_when CHECK ((status = 'published') = (published_at IS NOT NULL) AND (published_at IS NULL OR first_published_at IS NOT NULL))
+);
+CREATE UNIQUE INDEX course_landing_pages_one_per_course ON course_landing_pages (course_id);
+
+-- A landing page's sections, a flat ordered list. data is the section's own copy and settings,
+-- checked against its type's schema by LandingSectionType before it is written. The hero is the
+-- top of the page and has position 0; every other section is placed 1..n.
+CREATE TABLE course_landing_sections (
+    id BIGSERIAL PRIMARY KEY,
+    landing_page_id BIGINT NOT NULL REFERENCES course_landing_pages(id) ON DELETE CASCADE,
+    section_type VARCHAR(32) NOT NULL CHECK (section_type IN ('hero','audience','outcomes','contents','benefits','instructor','reviews','pricing','faq','cta')),
+    position INTEGER NOT NULL CHECK (position >= 0),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    data JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(data) = 'object'),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT course_landing_sections_hero_first CHECK ((section_type = 'hero') = (position = 0)),
+    CONSTRAINT course_landing_sections_position_key UNIQUE (landing_page_id, position) DEFERRABLE INITIALLY IMMEDIATE
+);
+-- Sections a page can hold only once. Benefits, FAQ and call-to-action sections may repeat.
+CREATE UNIQUE INDEX course_landing_sections_once ON course_landing_sections (landing_page_id, section_type)
+    WHERE section_type IN ('hero','audience','outcomes','contents','instructor','reviews','pricing');
+
 -- The stored course popularity snapshot, replaced whole by popularity:recalculate. Pages read it
 -- and never calculate on a request.
 CREATE TABLE course_popularity_runs (
@@ -2987,7 +3032,7 @@ DROP TABLE IF EXISTS
     commerce_orders, commerce_outbox, commerce_payment_events, commerce_payments, commerce_refunds,
     companies, company_billing_profiles, company_favourites, company_users, course_categories,
     course_credit_allocations, course_credits, course_edit_history, course_editors,
-    course_enrolments, course_favourites, course_grade_bands, course_item_assessments,
+    course_enrolments, course_favourites, course_grade_bands, course_item_assessments, course_landing_pages, course_landing_sections,
     course_item_placements, course_item_references, course_items, course_popularity,
     course_popularity_runs, course_price_variants, course_requests, course_results, course_reviews,
     course_sections, course_structure_nodes, course_tags, courses, permissions, promotion_bundles,

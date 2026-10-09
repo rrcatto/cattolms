@@ -1,0 +1,25 @@
+{% extends layout %}
+{% block page_body %}
+{#
+	A course's marketing landing page under /landing/ and ADMIN's preview of it: the hero in the
+	page-head band, then the shown sections in their order, each on its own card. The preview is this
+	same page with a notice above it and its purchase buttons disabled.
+#}
+	{% if landing.preview %}
+		<div class="container pt-4">
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Preview of the landing page'})} %}
+{% block body %}
+				This is the saved page as visitors will see it{{ landing.course.published ? '' : ' once the course is published' }}. Its buttons do nothing here and this view is not counted. <a href="{{ landing_editor_href|default('/admin/courses') }}">Back to the landing page editor</a>
+{% endblock %}
+{% endembed %}
+		</div>
+	{% endif %}
+	{% include '@platform/partials/landing/hero.html.twig' with {hero: landing.hero} %}
+	{% if landing.sections %}
+		<div class="cl-page-section cl-landing-sections container py-5">
+			{% for section in landing.sections %}
+				{% include '@platform/partials/landing/section.html.twig' with {section: section} %}
+			{% endfor %}
+		</div>
+	{% endif %}
+{% endblock %}

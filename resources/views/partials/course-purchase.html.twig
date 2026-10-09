@@ -1,0 +1,61 @@
+{#
+	What a visitor can do about a course, from CoursePurchaseOptions: open it when they have it, find
+	their order when one already holds it, buy it when it is on sale, or read that it is not. The course
+	page and a landing page's hero, pricing and call to action all draw it.
+
+	purchase is the options. purchase_style is full (every price to choose from) or compact (the default
+	price, named above the buttons). landing_page_id, on a landing page, goes with the form so the press
+	is recorded for the page. purchase_inert draws the buttons disabled, for ADMIN's preview.
+#}
+{% set purchase_style = purchase_style|default('full') %}
+{% set purchase_inert = purchase_inert|default(false) %}
+{% set purchase_form = 'course-purchase-' ~ purchase.course_id ~ '-' ~ (purchase_key|default('main')) %}
+<div class="cl-course-purchase cl-course-purchase--{{ purchase_style }}">
+	{% if purchase.state == 'owned' %}
+		<p class="cl-course-purchase-note">This course is already in your library.</p>
+		{{ ui('action.link', {label: purchase.continue.label, variant: 'primary', size: 'normal', full_width: purchase_style == 'full', href: purchase.continue.href}) }}
+	{% elseif purchase.state == 'ordered' %}
+		<p class="cl-course-purchase-note">An order of yours already holds this course.</p>
+		{{ ui('action.link', {label: 'View your orders', variant: 'primary', size: 'normal', full_width: purchase_style == 'full', href: purchase.orders_href}) }}
+	{% elseif purchase.state == 'available' %}
+		<form id="{{ purchase_form }}" action="/cart/add" method="post">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<input type="hidden" name="course_id" value="{{ purchase.course_id }}">
+			{% if landing_page_id|default(0) %}<input type="hidden" name="landing_page_id" value="{{ landing_page_id }}">{% endif %}
+			{% if purchase_style == 'full' %}
+				<div class="vstack gap-2 mb-3">
+					{% for price in purchase.variants %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: price.price_label ~ ' · ' ~ price.access_period_label ~ ' access' ~ (price.label ? ' · ' ~ price.label : '')})} %}
+{% block control %}
+<input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.id == purchase.default_variant.id ? 'checked' : '' }} required>
+{% endblock %}
+{% endembed %}
+					{% endfor %}
+				</div>
+			{% else %}
+				<input type="hidden" name="variant_id" value="{{ purchase.default_variant.id }}">
+				<p class="cl-course-purchase-price"><strong>{{ purchase.default_variant.price_label }}</strong> · {{ purchase.default_variant.access_period_label }} access{% if purchase.variants|length > 1 %} · other periods available{% endif %}</p>
+			{% endif %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+				{{ ui('action.button', {label: 'Add to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-add', disabled: purchase_inert}) }}
+				{{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now', disabled: purchase_inert}) }}
+				{% if purchase.can_request %}
+					{{ ui('action.button', {label: 'Request from my company', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'request', disabled: purchase_inert}) }}
+				{% endif %}
+{% endblock %}
+{% endembed %}
+		</form>
+	{% else %}
+		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', section_spacing: false})} %}
+{% block body %}
+			This course is not on sale at the moment.
+{% endblock %}
+{% endembed %}
+	{% endif %}
+	{% if purchase_inert %}
+		<p class="cl-course-purchase-note cl-course-purchase-inert">In a preview the buttons do nothing.</p>
+	{% elseif purchase.sign_in_href and purchase.state != 'owned' %}
+		<p class="cl-course-purchase-note cl-course-purchase-signin">Already have this course? <a href="{{ purchase.sign_in_href }}">Sign in</a></p>
+	{% endif %}
+</div>

@@ -1,0 +1,129 @@
+{% extends layout %}
+{% block page_body %}
+{#
+	One landing page section's form, made for its kind. The copy is plain text: an empty line starts a
+	new paragraph. A heading left empty shows the heading in its placeholder. What the course itself
+	knows - its outline, prices, rating, reviews and provider - is not written here; the page reads it
+	from the course.
+#}
+{% set ph_back_href = landing_home %}{% set ph_back_label = 'Landing page' %}{% set ph_kicker = 'Landing page · ' ~ course.title %}{% set ph_title = section.label %}{% set ph_lead = section.description %}{% include '@platform/partials/page-head.html.twig' %}
+<section class="cl-page-section section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 1, section_spacing: true})} %}
+{% block body %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+		{% if error %}
+			{{ ui('feedback.notice', {tone: 'danger', heading: 'The section was not saved. ' ~ error}) }}
+		{% endif %}
+		{% if not section.enabled %}
+			{{ ui('feedback.notice', {tone: 'info', heading: 'This section is hidden: the page does not show it until you show it again.'}) }}
+		{% endif %}
+		<form action="{{ landing_home }}/sections/{{ section.id }}" method="post"{% if section.type == 'hero' %} enctype="multipart/form-data"{% endif %}>
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}
+{% block body %}
+			{% if section.type == 'hero' %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Headline', for: 'landing-headline', help: 'At most 120 characters. Left empty, the course title is the headline.'})} %}
+{% block control %}<input type="text" id="landing-headline" name="headline" value="{{ values.headline }}" maxlength="120" placeholder="{{ course.title }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Supporting text', for: 'landing-text', help: 'A sentence or two under the headline, at most 600 characters. Left empty, the course’s subtitle or summary is used.'})} %}
+{% block control %}<textarea id="landing-text" name="text" rows="4" maxlength="600" placeholder="{{ course.subtitle ?: course.summary }}" {{ ui_field_attrs(props) }}>{{ values.text }}</textarea>{% endblock %}
+{% endembed %}
+				<fieldset class="cl-landing-picture">
+					<legend>Picture</legend>
+					{% for choice in [{value: 'cover', label: 'The course’s cover artwork'}, {value: 'resource', label: 'A picture from the Resource Library'}, {value: 'none', label: 'No picture'}] %}
+						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.label})} %}
+{% block control %}<input class="form-check-input mt-1" type="radio" name="image" value="{{ choice.value }}"{{ values.image == choice.value ? ' checked' : '' }}>{% endblock %}
+{% endembed %}
+					{% endfor %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Picture from the Resource Library', for: 'landing-picture', help: pictures ? 'Used when A picture from the Resource Library is chosen.' : 'The Resource Library has no pictures yet.'})} %}
+{% block control %}<select id="landing-picture" name="image_resource_id" {{ ui_field_attrs(props) }}><option value="">Choose a picture</option>{% for picture in pictures %}<option value="{{ picture.id }}"{{ values.image_resource_id ~ '' == picture.id ~ '' ? ' selected' : '' }}>{{ picture.title }} ({{ picture.original_filename }})</option>{% endfor %}</select>{% endblock %}
+{% endembed %}
+					{% if can_upload %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Or upload a new picture', for: 'landing-upload', help: 'It is added to the Resource Library and chosen. A wide picture, about 3:2, looks best.'})} %}
+{% block control %}<input type="file" id="landing-upload" name="picture" accept="image/*" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Title for the uploaded picture', for: 'landing-upload-title', help: 'Its name in the Resource Library. Left empty, its file name is used.'})} %}
+{% block control %}<input type="text" id="landing-upload-title" name="upload_title" value="" maxlength="200" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% endif %}
+				</fieldset>
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Second button', for: 'landing-secondary', help: 'Beside the buy button: a link to a part of this page, or to the course’s free preview. It is left out when that part is not on the page.'})} %}
+{% block control %}<select id="landing-secondary" name="secondary" {{ ui_field_attrs(props) }}>{% for value, label in secondary_targets %}<option value="{{ value }}"{{ values.secondary == value ? ' selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Second button’s label (optional)', for: 'landing-secondary-label', help: 'At most 40 characters. Left empty, it says where it leads, such as See what’s inside.'})} %}
+{% block control %}<input type="text" id="landing-secondary-label" name="secondary_label" value="{{ values.secondary_label }}" maxlength="40" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{% else %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Heading', for: 'landing-heading', help: 'At most 120 characters. Left empty, the heading is “' ~ section.default_heading ~ '”.'})} %}
+{% block control %}<input type="text" id="landing-heading" name="heading" value="{{ values.heading }}" maxlength="120" placeholder="{{ section.default_heading }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: section.type == 'cta' ? 'Supporting text (optional)' : 'Introduction (optional)', for: 'landing-text', help: 'Plain text; an empty line starts a new paragraph.'})} %}
+{% block control %}<textarea id="landing-text" name="text" rows="4" {{ ui_field_attrs(props) }}>{{ values.text }}</textarea>{% endblock %}
+{% endembed %}
+				{% if section.type == 'audience' or section.type == 'outcomes' %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: section.type == 'audience' ? 'Who it is for' : 'Outcomes', for: 'landing-items', help: (section.type == 'audience' ? 'One statement a line, such as Conveyancers new to bond registrations. At most 12' : 'One outcome a line, such as Draft a deed of transfer. At most 20') ~ ' lines of 200 characters.'})} %}
+{% block control %}<textarea id="landing-items" name="items" rows="8" {{ ui_field_attrs(props) }}>{{ values.items }}</textarea>{% endblock %}
+{% endembed %}
+				{% elseif section.type == 'benefits' or section.type == 'faq' %}
+					{% set first_key = section.type == 'faq' ? 'question' : 'title' %}
+					{% set second_key = section.type == 'faq' ? 'answer' : 'text' %}
+					<fieldset class="cl-landing-rows">
+						<legend>{{ section.type == 'faq' ? 'Questions and answers' : 'Benefits' }}</legend>
+						<p class="cl-ui-field-help">{{ section.type == 'faq' ? 'Each question opens to show its answer.' : 'Each benefit is a card with a title and a short explanation.' }} Leave a row empty to remove it; save to get more empty rows.</p>
+						{% for item in values.items %}
+							{% set n = loop.index %}
+							<div class="cl-landing-row">
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: (section.type == 'faq' ? 'Question ' : 'Benefit ') ~ n, for: 'landing-item-' ~ n ~ '-first'})} %}
+{% block control %}<input type="text" id="landing-item-{{ n }}-first" name="items[{{ n }}][{{ first_key }}]" value="{{ attribute(item, first_key) }}" maxlength="{{ section.type == 'faq' ? 200 : 80 }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: section.type == 'faq' ? 'Answer ' ~ n : 'Explanation ' ~ n, for: 'landing-item-' ~ n ~ '-second'})} %}
+{% block control %}<textarea id="landing-item-{{ n }}-second" name="items[{{ n }}][{{ second_key }}]" rows="3" {{ ui_field_attrs(props) }}>{{ attribute(item, second_key) }}</textarea>{% endblock %}
+{% endembed %}
+							</div>
+						{% endfor %}
+					</fieldset>
+				{% elseif section.type == 'contents' %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show the items inside each section', help: 'Otherwise only the sections are listed.'})} %}
+{% block control %}<input class="form-check-input mt-1" type="checkbox" name="show_items" value="1"{{ values.show_items ? ' checked' : '' }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show descriptions', help: 'Each item’s own description, as a short line of text.'})} %}
+{% block control %}<input class="form-check-input mt-1" type="checkbox" name="show_descriptions" value="1"{{ values.show_descriptions ? ' checked' : '' }}>{% endblock %}
+{% endembed %}
+					<p class="cl-landing-note">The outline is read from the course every time the page is shown: titles and kinds only, never what is inside a lesson or an assessment.</p>
+				{% elseif section.type == 'instructor' %}
+					{% set provider_rows = [{label: 'Provided by', value: provider ?: 'No owning company'}] %}
+					{% if accreditation %}{% set provider_rows = provider_rows|merge([{label: 'Accreditation', value: accreditation}]) %}{% endif %}
+					<p class="cl-landing-note">The page shows what the course records about who provides it:</p>
+					{{ ui('data.key-value-list', {items: provider_rows}) }}
+				{% elseif section.type == 'reviews' %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How many reviews to show', for: 'landing-limit', help: 'The latest approved reviews, from 1 to ' ~ review_limit_max ~ '. The rating counts every approved review.'})} %}
+{% block control %}<input type="number" id="landing-limit" name="limit" value="{{ values.limit }}" min="1" max="{{ review_limit_max }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					<fieldset>
+						<legend>While the course has no approved reviews</legend>
+						{% for choice in [{value: 'hide', label: 'Leave the section out'}, {value: 'show', label: 'Show it, saying there are no reviews yet'}] %}
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.label})} %}
+{% block control %}<input class="form-check-input mt-1" type="radio" name="when_empty" value="{{ choice.value }}"{{ values.when_empty == choice.value ? ' checked' : '' }}>{% endblock %}
+{% endembed %}
+						{% endfor %}
+					</fieldset>
+				{% elseif section.type == 'pricing' %}
+					<p class="cl-landing-note">The prices and access periods are the course’s own, read when the page is shown, with the buy buttons a visitor can use.</p>
+				{% elseif section.type == 'cta' %}
+					<p class="cl-landing-note">Under the text the page shows the course’s buy button, or Continue course for a learner who already has it.</p>
+				{% endif %}
+			{% endif %}
+{% endblock %}
+			{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', href: landing_home ~ '#landing-section-' ~ section.id}) }}{% endblock %}
+			{% endembed %}
+		</form>
+{% endblock %}
+	{% endembed %}
+{% endblock %}
+	{% endembed %}
+</section>
+{% endblock %}

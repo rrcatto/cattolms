@@ -12,6 +12,7 @@
 			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content'}) }}
 			{% if can_preview_courses %}{{ ui('action.link', {label: 'Preview as student', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview'}) }}{% endif %}
 			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate'}) }}{% endif %}
+			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing', aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status)}) }}
 			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export'}) }}
 			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import'}) }}
 {% endblock %}

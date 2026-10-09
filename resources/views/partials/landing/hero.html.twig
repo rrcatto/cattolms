@@ -1,0 +1,46 @@
+{#
+	The top of a landing page, in the page-head band the course page uses: the category and level, the
+	headline (the course title unless the author wrote one), the supporting text, the rating, the buy
+	button with its price and an optional second button, and the hero picture beside them. A page whose
+	hero is hidden or removed still opens with the course title.
+#}
+<section class="cl-page-head cl-landing-hero" aria-labelledby="landing-title">
+	<div class="container py-5">
+		<div class="cl-landing-hero-grid{{ hero and hero.picture ? ' has-picture' : '' }}">
+			<div class="cl-landing-hero-copy">
+				{% if landing.course.category_name or landing.course.level %}
+					<div class="d-flex flex-wrap gap-2 mb-3">
+						{% if landing.course.category_name %}{{ ui('feedback.badge', {label: landing.course.category_name, tone: 'neutral'}) }}{% endif %}
+						{% if landing.course.level %}{{ ui('feedback.badge', {label: landing.course.level, tone: 'neutral'}) }}{% endif %}
+					</div>
+				{% endif %}
+				<h1 class="cl-landing-headline" id="landing-title">{{ hero ? hero.headline : landing.course.title }}</h1>
+				{% if hero %}
+					{% include '@platform/partials/landing/paragraphs.html.twig' with {paragraphs: hero.paragraphs, paragraph_class: 'lead'} %}
+					{% if hero.rating and hero.rating.count > 0 %}
+						{% include '@platform/partials/course-rating-summary.html.twig' with {rating: hero.rating} %}
+					{% endif %}
+					{% if hero.purchase %}
+						{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact'})} %}
+{% block surface_body %}
+							{% include '@platform/partials/course-purchase.html.twig' with {purchase: hero.purchase, purchase_style: 'compact', purchase_key: 'hero', landing_page_id: landing.landing_page_id, purchase_inert: landing.preview} %}
+							{% if hero.secondary %}<p class="cl-landing-secondary">{{ ui('action.link', {label: hero.secondary.label, variant: 'quiet', size: 'normal', href: hero.secondary.href}) }}</p>{% endif %}
+{% endblock %}
+{% endembed %}
+					{% elseif hero.secondary %}
+						<p class="cl-landing-secondary">{{ ui('action.link', {label: hero.secondary.label, variant: 'secondary', size: 'normal', href: hero.secondary.href}) }}</p>
+					{% endif %}
+				{% endif %}
+			</div>
+			{% if hero and hero.picture %}
+				<div class="cl-landing-hero-picture">
+					{% if hero.picture.kind == 'resource' %}
+						<img src="{{ hero.picture.src }}" alt="{{ hero.picture.alt }}" width="960" height="640" decoding="async">
+					{% else %}
+						<div class="cl-landing-hero-cover" aria-hidden="true">{{ landing.course.cover_svg|raw }}</div>
+					{% endif %}
+				</div>
+			{% endif %}
+		</div>
+	</div>
+</section>

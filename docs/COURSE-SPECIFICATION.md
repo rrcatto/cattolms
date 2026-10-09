@@ -1,6 +1,6 @@
 # Catto Learning Course Components and HTML Authoring Specification
 
-**Target LMS:** 0.8.9 (0.8 code line) **Date time:** 2026/10/08 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
+**Target LMS:** 0.9.0 (0.8 code line) **Date time:** 2026/10/09 SAST **Status:** Canonical specification for the implemented HTML course authoring/import workflow and the Course Components domain.
 
 ## 1. Purpose
 
@@ -205,6 +205,8 @@ Use real HTML:
 The LMS supplies the visible Learning Outcomes heading after import. The importer removes one source label matching `Learning outcomes`/`Learning outcome` from stored outcomes content.
 
 Do **not** generate this label using CSS pseudo-elements.
+
+Learning outcomes stay inside the module content; there is no course-level outcomes field. A course landing page's Learning outcomes section is therefore written by ADMIN in the landing page editor and never read from, or written back to, the course.
 
 ## 7. Module summary and `.subs`
 
@@ -453,7 +455,7 @@ Before delivery:
 
 ## 18. Course Components contract
 
-The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.8.9; `HANDOFF.md` holds the implementation and validation record of each release.
+The owner-approved Course Components v2 specification (released in v0.8.6) supersedes module-centric runtime assumptions. This section is the current contract for v0.9.0; `HANDOFF.md` holds the implementation and validation record of each release.
 
 ### Identity, sharing and author control
 
@@ -492,6 +494,10 @@ A learner has one enrolment per course: the library, the reader, progress, resul
 A bundle is a commerce and catalogue offer that contains published courses; it is not a course and has no content, reader, progress or certificate of its own. Each course a bundle grants is opened, studied and graded exactly as if bought on its own. Removing a course from a bundle, or retiring or deleting the course, never changes an order that included it: the order keeps the courses it was sold with, and a bundle with an unpublished course cannot be bought.
 
 Course reviews belong to the course: only learners with a genuine enrolment may rate and review it (`/learn/{slug}/review`), nothing is public until ADMIN approves it, and the course rating uses approved versions only. Course popularity is a stored snapshot calculated by `popularity:recalculate`, never on a request.
+
+### Landing pages
+
+A course may have an optional marketing landing page (`/landing/{slug}`, Phase L). Its Course contents section reads the course outline live through `LandingPageRepository::outline()`: section and item titles, item kinds, the free-preview flag and, when the section asks for them, items' own descriptions as plain text. It never reads or shows lesson HTML, section introductions, assessments, questions, answers, files or download addresses. Nothing on the landing page changes the course.
 
 ### Certificates and certificate designs
 
