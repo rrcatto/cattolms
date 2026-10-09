@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.8.9 · **Updated:** 2026-10-08
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.0 · **Updated:** 2026-10-09
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -18,6 +18,10 @@ shown in the browser's own PDF viewer: a theme styles the certificate page and t
 pages around it, never the certificate itself (the themes' old `.cl-certificate` rules were removed in
 Phase J). The design pages' picture choices, preview frame (full width, above the form) and wording editor
 are core-owned (`cl-ui-picture-choice`, `cl-certificate-*`, and the financial document design page's `cl-document-*`).
+A course landing page (`/landing/…`) is in the course-detail page family: its hero is a `cl-page-head`
+band like the course page's, its sections are ordinary surfaces, and its classes (`cl-landing-*`, and the
+purchase box `cl-course-purchase` that the course page shares) are core-owned. A theme styles the band
+and the cards as it styles them everywhere; it never restyles the purchase box or the section layout.
 
 ```json
 {
@@ -47,7 +51,10 @@ paths and template boundary. Installed files are authoritative; the database reg
 ## Twig composition
 
 Platform pages extend the resolved theme layout and supply `page_body`. A base retains that block,
-the required resource arrays, navigation, flash messages and appropriate footer. For example:
+the required resource arrays, navigation, flash messages and appropriate footer. Its head includes
+`@platform/partials/head-meta.html.twig` after the title and writes no description of its own: core
+draws the page's description, and for pages that set them (a course landing page) its canonical
+address, robots rule and Open Graph tags, from the view model's `meta`. For example:
 
 ```twig
 <!doctype html>
@@ -56,6 +63,7 @@ the required resource arrays, navigation, flash messages and appropriate footer.
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page.title }} · {{ app.name }}</title>
+    {% include '@platform/partials/head-meta.html.twig' %}
     {% for url in platform.styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}
     {% for url in theme.external_styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}
     {% for url in theme.styles %}<link rel="stylesheet" href="{{ url }}">{% endfor %}

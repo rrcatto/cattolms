@@ -10,6 +10,10 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/09 SAST
+- Head metadata: the view model's meta (description, canonical address, robots rule and Open Graph tags) from a page's page_meta, drawn by the core partials/head-meta.html.twig that every bundled theme's head includes; the description defaults to the one the themes carried.
+- A course landing page (landing-page) is in the course-detail page family.
+- Advanced PLATFORM_ASSET_VERSION to 0.9.0.
 2026/10/08 SAST
 - Administration → Commerce → Financial Documents (PLATFORM.DOCUMENT.VIEW): the design of invoices, receipts and credit notes.
 - Advanced PLATFORM_ASSET_VERSION to 0.8.8.14.
@@ -84,7 +88,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.8.9';
+    private const PLATFORM_ASSET_VERSION = '0.9.0';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -344,6 +348,7 @@ final class ThemeRenderer
         $model['footer_social'] = $this->footerSocial($data);
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
+        $model['meta'] = self::pageMeta((array) ($data['page_meta'] ?? []));
         $model['sidebar'] = '';
 
         return array_merge($model, $this->pageFamilyObjects($family, $data));
@@ -975,12 +980,40 @@ final class ThemeRenderer
         return $this->themes->platformAssetUrl($path, self::PLATFORM_ASSET_VERSION);
     }
 
+    /** What every page's head says about it unless the page says otherwise. */
+    private const DEFAULT_DESCRIPTION = 'Structured self-study courses, progress tracking and assessments.';
+
+    /**
+     * The head metadata partials/head-meta.html.twig draws: a description for every page, and the
+     * canonical address, robots rule and Open Graph tags only for a page that sets them.
+     *
+     * @param array<array-key,mixed> $meta
+     * @return array{description:string,canonical:string,robots:string,og:array<string,string>}
+     */
+    private static function pageMeta(array $meta): array
+    {
+        $og = [];
+        foreach (['type', 'title', 'description', 'url', 'image'] as $property) {
+            $value = trim((string) (((array) ($meta['og'] ?? []))[$property] ?? ''));
+            if ($value !== '') {
+                $og[$property] = $value;
+            }
+        }
+        $description = trim((string) ($meta['description'] ?? ''));
+        return [
+            'description' => $description !== '' ? $description : self::DEFAULT_DESCRIPTION,
+            'canonical' => trim((string) ($meta['canonical'] ?? '')),
+            'robots' => trim((string) ($meta['robots'] ?? '')),
+            'og' => $og,
+        ];
+    }
+
     private function pageFamily(string $page): string
     {
         if (str_starts_with($page, 'admin-')) return 'admin';
         if (str_starts_with($page, 'assessment-')) return 'assessment';
         return match ($page) {
-            'home' => 'home', 'courses' => 'catalogue', 'course-detail' => 'course-detail', 'course-public-preview','course-public-preview-item' => 'course-player',
+            'home' => 'home', 'courses' => 'catalogue', 'course-detail', 'landing-page' => 'course-detail', 'course-public-preview','course-public-preview-item' => 'course-player',
             'login','login-sent','register','company-register' => 'auth', 'profile','sessions','account-control-centre','account-section','account-dashboard','account-activity' => 'account',
             'library' => 'library', 'learn-course','learn-item' => 'course-player',
             'certificate' => 'certificate', 'company-control-centre','company-section' => 'company', 'error' => 'error',

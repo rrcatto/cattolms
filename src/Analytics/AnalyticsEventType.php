@@ -12,8 +12,14 @@ use InvalidArgumentException;
  * metadata keys it may carry, with their types, so metadata stays bounded and can never become a
  * place to copy a profile, a payment or a request into.
  *
- * Planned events are added here when the feature that produces them exists, not before:
- * landing_page_view.
+ * Planned events are added here when the feature that produces them exists, not before.
+ *
+ * Course landing pages have two events. landing_page_view: a visitor's view of a published landing
+ * page (never ADMIN's preview or editor), with the campaign the visitor arrived from when the
+ * address carried utm_ parameters. landing_page_cta_clicked: a purchase button on the page was
+ * pressed and the server accepted it (the course went into the cart, or a company request was
+ * sent); the purchase itself is still checkout_started and course_purchased. A click is intent,
+ * never a sale.
  *
  * A bundle is its own product. bundle_purchased: a paid bundle order line, once per line, with what
  * was paid for it; bundle_refunded: a refund of one. Neither records course_purchased or
@@ -40,6 +46,8 @@ enum AnalyticsEventType: string
     case PromoCodeRedeemed = 'promo_code_redeemed';
     case BundlePurchased = 'bundle_purchased';
     case BundleRefunded = 'bundle_refunded';
+    case LandingPageView = 'landing_page_view';
+    case LandingPageCtaClicked = 'landing_page_cta_clicked';
 
     public static function fromName(string $name): self
     {
@@ -63,6 +71,7 @@ enum AnalyticsEventType: string
             self::PromoCodeApplied => ['user_id'],
             self::PromoCodeRedeemed => ['user_id', 'order_id'],
             self::BundlePurchased, self::BundleRefunded => ['user_id', 'order_id', 'order_item_id'],
+            self::LandingPageView, self::LandingPageCtaClicked => ['course_id'],
         };
     }
 
@@ -97,6 +106,10 @@ enum AnalyticsEventType: string
             // amount_minor is what the line was paid; the courses it granted and those already held.
             self::BundlePurchased => ['bundle_id' => 'int', 'amount_minor' => 'int', 'discount_minor' => 'int', 'currency' => 'string', 'course_count' => 'int', 'courses_granted' => 'int', 'courses_already_held' => 'int', 'access_period_seconds' => 'int'],
             self::BundleRefunded => ['bundle_id' => 'int', 'refund_id' => 'int', 'amount_minor' => 'int', 'currency' => 'string', 'full_refund' => 'bool', 'courses_revoked' => 'int', 'courses_kept' => 'int'],
+            // The page, and the campaign the visitor arrived from (first-party, from the address only).
+            self::LandingPageView => ['landing_page_id' => 'int', 'utm_source' => 'string', 'utm_medium' => 'string', 'utm_campaign' => 'string', 'utm_content' => 'string', 'utm_term' => 'string'],
+            // Which button (add, buy_now or request) and the price chosen.
+            self::LandingPageCtaClicked => ['landing_page_id' => 'int', 'action' => 'string', 'variant_id' => 'int', 'utm_source' => 'string', 'utm_medium' => 'string', 'utm_campaign' => 'string', 'utm_content' => 'string', 'utm_term' => 'string'],
         };
     }
 }

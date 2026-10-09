@@ -6,18 +6,7 @@
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'reviews', pagination: reviews_pagination})} %}
 {% block results %}
 {% if reviews %}
-<ol class="cl-review-list">
-	{% for review in reviews %}
-		<li class="cl-review">
-			<p class="cl-review-rating">
-				<span class="cl-rating-stars" aria-hidden="true">{% for stars in 1..5 %}<span class="{{ stars <= review.rating ? 'is-filled' : '' }}">{{ stars <= review.rating ? '★' : '☆' }}</span>{% endfor %}</span>
-				<span class="cl-visually-hidden">{{ review.rating }} out of 5 stars</span>
-			</p>
-			{% if review.comment %}<p class="cl-review-comment">{{ review.comment|nl2br }}</p>{% endif %}
-			<p class="cl-review-byline">{{ review.reviewer }} · <time datetime="{{ review.published_at|date('Y-m-d') }}">{{ review.published_at|date('j M Y') }}</time></p>
-		</li>
-	{% endfor %}
-</ol>
+{% include '@platform/partials/course-review-list.html.twig' %}
 {% else %}
 {{ ui('feedback.empty', {heading: 'No reviews yet', summary: 'Reviews from learners who have taken this course appear here once they have been checked.'}) }}
 {% endif %}

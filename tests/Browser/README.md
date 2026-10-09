@@ -293,3 +293,21 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/financial-documents.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/financial-documents-fixture.php cleanup'
 ```
+
+## Course landing pages
+
+`landing-pages.cjs` checks course marketing landing pages (Phase L) in 13 scenarios:
+
+- **Editor.** ADMIN opens Landing page from the course editor's tools, creates the page (the hero and eight sections, Publish waiting for the empty lists), writes the hero, fills Who this course is for, Learning outcomes and a question, hides and shows Benefits, adds a call to action from Add section (Pricing is refused as already on the page) and removes it from its ⋯ menu.
+- **Order.** A section dragged by its handle and another moved with ↑ on its handle are saved and survive a reload; without JavaScript the ⋯ menu's Move to bottom moves a section; Firefox repeats a drag.
+- **Preview and publication.** Preview opens in a new tab with the buttons disabled, `noindex` and no canonical address; Publish makes the page public and the course editor says so; Unpublish takes it down (not found) and keeps every section, and a page that has been public offers no Delete.
+- **Visitor.** The published page shows the hero, the lists, the outline (never the fixture's lesson, bonds or question text), the approved review, both prices and a question that opens; its canonical address is set. Add to cart from the hero returns to the landing page, with JavaScript and without. A learner who has the course is offered Continue course and no Add to cart; a course with no active price says it is not on sale.
+- **Themes.** The page, the editor and a section form fit all five themes at 1440 and 390px without sideways scrolling; the hero's Add to cart is whole and at least 32px tall, and the buy box's price has a contrast of at least 4.5:1 against its card.
+
+The fixture makes two published courses (one with two prices, an outline with protected content and an approved review; one not on sale with a published landing page), an ADMIN, a course owner, a learner who has the first course and one who does not. The check places no order, so `cleanup` removes everything.
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/landing-pages-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/landing-pages.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/landing-pages-fixture.php cleanup'
+```

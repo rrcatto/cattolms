@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.8.9 (development) **Date time:** 2026/10/08 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.9.0 (development) **Date time:** 2026/10/09 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -183,6 +183,8 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.13 Financial document preview.** On Commerce → Financial Documents the chosen document (invoice, receipt or credit note) for a made-up sample order comes first, as an A4 portrait page at about the size it prints (at most 52rem wide), with its Document and Sample order choices above it and the form below. It is the PDF exactly as issuing draws it, and it redraws as the form changes; without JavaScript Update preview draws the unsaved form into it. Nothing on the page shows template HTML, versions or page settings. → Enforced by `tests/Browser/financial-documents.cjs` in every theme.
 
+**6.14 Course landing page.** A landing page opens with its hero in the page-head band, as the course page does (headline, supporting text, rating, the buy box on its own card and an optional second button, the picture beside them on wide screens and above nothing on phones); every other section sits on its own card, one after another, in the order its editor sets. The buy box is the course page's (`partials/course-purchase.html.twig`), never a link written into the page. Its editor stacks Status, Sections and Address on full-width cards; the hero row is first without a handle and lines up with the rows below it. → Enforced by `tests/Browser/landing-pages.cjs` in every theme at 1440 and 390px (no sideways scrolling, a readable buy box).
+
 ---
 
 ## 7. Themes
@@ -280,6 +282,10 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/09 SAST
+
+- 6.14: the course landing page and its editor.
 
 2026/10/08 SAST
 

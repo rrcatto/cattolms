@@ -1,0 +1,19 @@
+{#
+	The sections after the hero, in page order. The landing-sections controller swaps this region for the
+	server's copy after every move: the saved order, or the stored order with the reason in data-error
+	when a move was refused. data-order is the order this copy shows, sent with a move so a page changed
+	elsewhere is refused rather than guessed at.
+#}
+<div class="cl-tree cl-tree--landing" id="landing-section-list" data-landing-sections-target="tree" data-error="{{ list_error|default('') }}" data-order="{{ landing_page.order|join(',') }}">
+	{% if landing_page.rows %}
+		<ol class="cl-tree-list" data-parent="" aria-label="Sections after the hero">
+			{% for row in landing_page.rows %}
+				<li class="cl-tree-node" id="landing-section-{{ row.id }}" data-node-id="{{ row.id }}" data-depth="1" data-height="1">
+					{% include '@platform/partials/admin/landing-section-row.html.twig' with {row: row} %}
+				</li>
+			{% endfor %}
+		</ol>
+	{% else %}
+		{{ ui('feedback.empty', {heading: 'No sections after the hero', summary: 'Use Add section to put the course’s outline, reviews, price or your own copy on the page.'}) }}
+	{% endif %}
+</div>

@@ -1514,6 +1514,16 @@ final class CourseService
     }
 
     /**
+     * The course's active prices with their labels, in the order its pricing tab gives them.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function activePriceVariants(int $courseId): array
+    {
+        return $this->normalisePriceVariants($this->courses->priceVariants($courseId, true));
+    }
+
+    /**
      * @param list<array<string,mixed>> $variants
      * @return list<array<string,mixed>>
      */

@@ -1,13 +1,14 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.8.9 **Date time:** 2026/10/08 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.9.0 **Date time:** 2026/10/09 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.8.9 operational position
+## Current v0.9.0 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`. Annotated tag `v0.8.9` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
-- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/08 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`, the code line v0.9.0 is released from. Annotated tag `v0.9.0` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/09 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 92 permissions (10 `SYSTEM.*`, 82 business) across the five roles.
 - **Financial documents (Phase K, v0.8.9).** The baseline installs the invoice, receipt and credit note templates compiled from the standard financial document design (`FinancialDocumentDesignCompiler`, whose structure is `resources/documents/invoice.html`, `receipt.html`, `credit_note.html` and the shared `financial.css`). After that ADMIN changes the design at Commerce → Financial Documents; each save publishes a new version, and every issued document stores its values and names the version that drew it, so it is drawn the same way however the design, the business details or the customer's details change. Editing a source file changes only new installations, until the database is rebuilt.
+- **Course landing pages (Phase L, v0.9.0).** A course's marketing page is at `/landing/{slug}` and is public only while it and its course are published; its price, rating, reviews and outline are read live, so nothing needs refreshing when a course changes. Its hero picture is served by `/landing/{slug}/picture/{public_id}`, publicly only once the page is published. Every bundled theme's head includes `partials/head-meta.html.twig`, so a theme installed from an older package keeps the fixed site description until it is reinstalled. The ACL is unchanged (92 permissions).
 - **Certificate designs (v0.8.8.10).** The baseline stores the six look backgrounds (`resources/certificates/looks/*.png`) as pictures in `document_assets` and installs six designs compiled from the looks (Classic, Modern, Minimal, Legal Seal, Gold Frame and Professional CPD), with Classic the default for new courses; every course starts on it. After that, designs are made at Courses → Certificate Designs and live in the database, uploaded backgrounds, logos and signatures included (`document_assets` rows are immutable, stored once by SHA-256, and never written to `storage/`). Each issued certificate stores its values and references the design version it was drawn with, and is drawn again from them, so editing or deleting a design never changes an issued certificate. Generated seed certificates are recorded the same way, against each course's design.
 - **Category order.** Category positions are explicit and compact: 1..n within each parent, refused as a duplicate by the database. A script that inserts categories directly must place each one after its siblings (`COALESCE(MAX(position),0)+1` for its parent) or run inside a transaction that defers `course_categories_sibling_position` and renumbers before it ends.
 - **PDF fonts.** Certificates print in the bundled OFL fonts in `resources/documents/fonts/` (Cormorant Garamond, Playfair Display, IBM Plex Sans and IBM Plex Serif). Dompdf keeps their metrics in the instance's `storage/cache/dompdf-fonts`, which it creates on first use; it must be writable by PHP-FPM (`cattotest` in development), and deleting it only makes the next PDF rebuild it.
@@ -87,6 +88,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.13:** install GD first (`apt install php8.5-gd`, restart `php8.5-fpm`; `php -m` then lists `gd`), because `composer install` refuses a server without it; a v0.8.8.4 VPS without GD answered a profile image upload with HTTP 500. Publish `catto-platform.css` (the certificate preview above its form). No schema change.
 - **v0.8.8.14:** signature pictures fitted to the certificate automatically. No schema change and nothing to publish to the web root.
 - **v0.8.9:** financial documents on the document template engine (Phase K). The baseline changed (`commerce_documents` stores `document_data` and the template version; `PLATFORM.DOCUMENT.VIEW`/`MANAGE`): rebuild the database. Publish `catto-platform.css`.
+- **v0.9.0:** course landing pages (Phase L). The baseline gained `course_landing_pages` and `course_landing_sections`: rebuild the database. Publish `catto-platform.css`, `js/platform-overrides.js` and the compiled `assets/` (the `landing-sections` controller and the new Stimulus controller map; delete the served `@symfony/stimulus-bundle/controllers-i3Y_kUZ.js`), then run `composer themes:install -- --force`, because every theme's head now includes the core head metadata.
 
 ### Commerce operations
 
@@ -124,13 +126,14 @@ Configure Administration → Settings → Bank details before providing EFT inst
 Only on the owner's explicit instruction to commit and push a version:
 
 1. Update the version, `README.md` (its current release line and release history), `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks). `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit on `dev-v0.8` and create the annotated tag `vX.Y.Z.W`.
-3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.8:main` and `git push origin vX.Y.Z.W`).
+2. Commit on `dev-v0.8` and create the annotated tag: the version with a leading `v` (`v0.9.0`, `v0.8.8.14`).
+3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.8:main` and `git push origin` with the tag).
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   git archive --format=zip --prefix=cattolms-vX.Y.Z.W/ -o cattolms-vX.Y.Z.W.zip vX.Y.Z.W
-   gh release create vX.Y.Z.W cattolms-vX.Y.Z.W.zip --verify-tag --latest --title "CattoLMS vX.Y.Z.W" --notes-file <notes>
+   V=v0.9.0   # the tag being released
+   git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
+   gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
 
    Build the zip outside the code tree and attach it to the release.

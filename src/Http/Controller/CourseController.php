@@ -41,7 +41,8 @@ final class CourseController extends BaseController
         private readonly CourseFavouriteService $favourites,
         private readonly AnalyticsEventRecorder $analytics,
         private readonly CourseReviewService $reviews,
-        private readonly \CattoLearning\Bundle\BundleRepository $bundles
+        private readonly \CattoLearning\Bundle\BundleRepository $bundles,
+        private readonly \CattoLearning\Commerce\Application\CoursePurchaseOptions $purchases
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -249,6 +250,8 @@ final class CourseController extends BaseController
             'title' => (string) $course['title'],
             'course' => $course,
             'has_access' => $enrolment !== null,
+            // What the reader can do about the course: the same rules as its landing page and checkout.
+            'purchase' => $this->purchases->for($course, $user, '/courses/' . (string) $course['slug'], $course['price_variants']),
             'enrolment_status' => is_array($enrolment) ? (string) $enrolment['status'] : '',
             'can_favourite' => $user !== null,
             'favourite_return' => '/courses/' . (string) $course['slug'],

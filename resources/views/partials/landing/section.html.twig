@@ -1,0 +1,70 @@
+{#
+	One landing page section on its card: its heading, its introduction and what its kind shows. The
+	copy is plain text; the outline, prices, rating, reviews and provider come resolved from
+	LandingPageViewBuilder, and nothing here reads anything else.
+#}
+<section class="cl-landing-section cl-landing-section--{{ section.type }}" id="{{ section.anchor }}" aria-labelledby="{{ section.anchor }}-heading">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+		<div class="cl-landing-section-head">
+			<h2 class="cl-landing-section-heading" id="{{ section.anchor }}-heading">{{ section.heading }}</h2>
+			{% include '@platform/partials/landing/paragraphs.html.twig' with {paragraphs: section.paragraphs, paragraph_class: 'cl-landing-intro'} %}
+		</div>
+		{% if section.type == 'audience' or section.type == 'outcomes' %}
+			<ul class="cl-landing-checklist">
+				{% for item in section.items %}<li>{{ item }}</li>{% endfor %}
+			</ul>
+		{% elseif section.type == 'benefits' %}
+			<ul class="cl-landing-benefits">
+				{% for item in section.items %}
+					<li class="cl-landing-benefit">
+						<h3 class="cl-landing-benefit-title">{{ item.title }}</h3>
+						{% include '@platform/partials/landing/paragraphs.html.twig' with {paragraphs: item.paragraphs, paragraph_class: ''} %}
+					</li>
+				{% endfor %}
+			</ul>
+		{% elseif section.type == 'contents' %}
+			<p class="cl-landing-outline-count">{{ section.section_count }} {{ section.section_count == 1 ? 'section' : 'sections' }} · {{ section.item_count }} {{ section.item_count == 1 ? 'item' : 'items' }}</p>
+			<ol class="cl-landing-outline">
+				{% for node in section.nodes %}
+					<li class="cl-landing-outline-node{{ node.is_section ? ' is-section' : '' }}" data-depth="{{ node.depth }}">
+						<span class="cl-landing-outline-title">{{ node.title }}</span>
+						{% if node.kind %}<span class="cl-landing-outline-kind">{{ node.kind }}</span>{% endif %}
+						{% if node.free_preview %}{{ ui('feedback.badge', {label: 'Free preview', tone: 'info', size: 'small'}) }}{% endif %}
+						{% if node.description %}<span class="cl-landing-outline-description">{{ node.description }}</span>{% endif %}
+					</li>
+				{% endfor %}
+			</ol>
+		{% elseif section.type == 'instructor' %}
+			{% set provider_rows = [] %}
+			{% if section.provider %}{% set provider_rows = provider_rows|merge([{label: 'Provided by', value: section.provider}]) %}{% endif %}
+			{% if section.accreditation %}{% set provider_rows = provider_rows|merge([{label: 'Accreditation', value: section.accreditation}]) %}{% endif %}
+			{% if section.certificate %}{% set provider_rows = provider_rows|merge([{label: 'Certificate', value: 'A certificate when you pass the course'}]) %}{% endif %}
+			{% if provider_rows %}{{ ui('data.key-value-list', {items: provider_rows}) }}{% endif %}
+		{% elseif section.type == 'reviews' %}
+			{% include '@platform/partials/course-rating-summary.html.twig' with {rating: section.rating} %}
+			{% if section.reviews %}
+				{% include '@platform/partials/course-review-list.html.twig' with {reviews: section.reviews} %}
+			{% else %}
+				{{ ui('feedback.empty', {heading: 'No reviews yet', summary: 'Reviews from learners who have taken this course appear here once they have been checked.'}) }}
+			{% endif %}
+			{% if section.all_href %}<p class="cl-landing-more">{{ ui('action.link', {label: 'Read every review', variant: 'secondary', size: 'small', href: section.all_href}) }}</p>{% endif %}
+		{% elseif section.type == 'pricing' %}
+			{% if section.rating and section.rating.count > 0 %}{% include '@platform/partials/course-rating-summary.html.twig' with {rating: section.rating, rating_compact: true} %}{% endif %}
+			{% include '@platform/partials/course-purchase.html.twig' with {purchase: section.purchase, purchase_style: 'full', purchase_key: 'pricing-' ~ section.id, landing_page_id: landing.landing_page_id, purchase_inert: landing.preview} %}
+		{% elseif section.type == 'faq' %}
+			<div class="cl-landing-faq">
+				{% for item in section.items %}
+					{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: item.question})} %}
+{% block body %}
+						{% include '@platform/partials/landing/paragraphs.html.twig' with {paragraphs: item.paragraphs, paragraph_class: ''} %}
+{% endblock %}
+{% endembed %}
+				{% endfor %}
+			</div>
+		{% elseif section.type == 'cta' %}
+			{% include '@platform/partials/course-purchase.html.twig' with {purchase: section.purchase, purchase_style: 'compact', purchase_key: 'cta-' ~ section.id, landing_page_id: landing.landing_page_id, purchase_inert: landing.preview} %}
+		{% endif %}
+{% endblock %}
+{% endembed %}
+</section>

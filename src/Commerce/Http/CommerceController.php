@@ -26,7 +26,8 @@ final class CommerceController extends BaseController
         private readonly \CattoLearning\Commerce\Application\CommerceMaintenance $maintenance,
         private readonly \CattoLearning\Configuration\RuntimeSettings $settings,
         private readonly BillingProfileService $billing,
-        private readonly PromotionService $promotions)
+        private readonly PromotionService $promotions,
+        private readonly \CattoLearning\Course\Landing\LandingPageAnalytics $landingAnalytics)
     { parent::__construct($auth,$view,$requests); }
 
     private function csrf(): void
@@ -47,18 +48,31 @@ final class CommerceController extends BaseController
         $this->csrf();
         $id = (int) $this->posted('variant_id');
         $offer = $this->records->offer($id);
-        $return = '/courses/'.rawurlencode((string) $offer['slug']);
-        return $this->handle(function() use($id,$offer,$return): void {
+        // A purchase button on a published landing page names the page: the press is recorded as
+        // landing_page_cta_clicked once it is accepted, and Add to cart returns to that page.
+        $landing = $this->landingAnalytics->source((int) $this->posted('landing_page_id'), (int) $offer['course_id']);
+        $return = $landing !== null ? '/landing/'.rawurlencode((string) $landing['slug']) : '/courses/'.rawurlencode((string) $offer['slug']);
+        return $this->handle(function() use($id,$offer,$return,$landing): void {
             if ($this->posted('action') === 'request') {
                 $actor = $this->requirePermission('CATALOGUE.COURSE.REQUEST');
                 $this->administration->requestCourse($actor->id,(int)$offer['course_id'],(int)$offer['access_period_seconds'],'');
+                $this->landingClicked($landing, 'request', $id);
                 $this->flash('success','Your course request was sent to your company administrator.');
                 $this->redirect('/account/courses?tab=requests');
             }
             $this->carts->change($id);
+            $this->landingClicked($landing, $this->posted('action') === 'buy_now' ? 'buy_now' : 'add', $id);
             $this->flash('success', (string) $offer['title'].' was added to My Cart.');
             $this->redirect($this->posted('action') === 'buy_now' ? '/checkout' : $return);
         }, $return);
+    }
+
+    /** @param array<string,mixed>|null $landing */
+    private function landingClicked(?array $landing, string $action, int $variantId): void
+    {
+        if ($landing !== null) {
+            $this->landingAnalytics->clicked($landing, $action, $variantId, $this->currentUser()?->id, $this->analyticsVisitor(), $this->analyticsCampaign());
+        }
     }
 
     #[Route('/cart/remove',name:'commerce_cart_remove',methods:['POST'])]

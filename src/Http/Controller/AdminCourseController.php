@@ -76,7 +76,8 @@ final class AdminCourseController extends BaseController
         RequestStack $requests,
         private readonly CourseService $courses,
         private readonly CoursePortabilityService $portability,
-        private readonly PlatformAdministrationService $platformAdministration
+        private readonly PlatformAdministrationService $platformAdministration,
+        private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -133,6 +134,8 @@ final class AdminCourseController extends BaseController
             'title' => 'Edit ' . (string) $course['title'],
             'course' => $course,
             'course_tabs' => $tabs,
+            // The course's landing page at a glance: none, draft or published.
+            'landing_status' => $this->landingPages->statusForCourse($courseId) ?? 'none',
             'active_tab' => $activeTab,
             'tab_url' => self::tabUrl($courseId, $activeTab),
             'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,

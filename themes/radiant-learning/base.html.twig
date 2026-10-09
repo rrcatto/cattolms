@@ -4,6 +4,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>{{ page.title }} · {{ app.name }}</title>
+		{% include '@platform/partials/head-meta.html.twig' %}
 		{% for resourceUrl in platform.styles %}
 			<link href="{{ resourceUrl }}" rel="stylesheet">
 		{% endfor %}

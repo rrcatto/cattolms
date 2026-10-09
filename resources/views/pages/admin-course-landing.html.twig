@@ -1,0 +1,130 @@
+{% extends layout %}
+{% block page_body %}
+{#
+	A course's landing page in the course editor: whether it has one and whether it is public, its
+	sections in page order with Edit, Show or Hide and the move menu, Add section, and the page's
+	address, title and description. The landing-sections controller adds dragging; every action is an
+	ordinary form without JavaScript.
+#}
+{% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Landing page' %}{% set ph_title = course.title %}{% set ph_lead = 'A marketing page that sells this course, separate from its page in the catalogue. Its price, rating, reviews and outline always come from the course.' %}{% include '@platform/partials/page-head.html.twig' %}
+{{ importmap() }}
+<section class="cl-page-section section">
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 1, section_spacing: true})} %}
+{% block body %}
+	{% if not landing_page %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+			{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'This course has no landing page', summary: 'Create one to start with a hero, the course’s outline, its reviews and its price, and room for your own copy. It stays a draft, seen only in its preview, until you publish it.'})} %}
+{% block actions %}
+				<form action="/admin/courses/{{ course.id }}/landing" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Create landing page', variant: 'primary', type: 'submit', icon: 'action-add'}) }}</form>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+		{% endembed %}
+	{% else %}
+		{% set published = landing_page.status == 'published' %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'landing-status'})} %}
+{% block surface_body %}
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Status', summary: published ? 'Published: anyone can open the page at its address.' : 'Draft: only you and other course managers can see it, in its preview.'})} %}
+{% block section_actions %}
+				{{ ui('feedback.badge', {label: published ? 'Published' : 'Draft', tone: published ? 'success' : 'neutral'}) }}
+{% endblock %}
+{% endembed %}
+			<p class="cl-landing-address">Address: {% if published %}<a href="{{ landing_page.path }}">{{ landing_page.url }}</a>{% else %}<span>{{ landing_page.url }}</span>{% endif %}</p>
+			{% if not published and landing_page.problems %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Before it can be published'})} %}
+{% block body %}
+					<ul class="mb-0">{% for problem in landing_page.problems %}<li>{{ problem }}</li>{% endfor %}</ul>
+{% endblock %}
+{% endembed %}
+			{% endif %}
+			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
+{% block body %}
+				{{ ui('action.link', {label: 'Preview', variant: published ? 'secondary' : 'primary', href: '/admin/courses/' ~ course.id ~ '/landing/preview', new_window: true, icon: 'action-open'}) }}
+				{% if can_publish %}
+					{% if published %}
+						<form action="/admin/courses/{{ course.id }}/landing/unpublish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Unpublish', type: 'submit', confirm: 'Unpublish the landing page? Its address will be not found until you publish it again. Nothing on it is lost.'}) }}</form>
+					{% else %}
+						<form action="/admin/courses/{{ course.id }}/landing/publish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Publish', variant: 'primary', type: 'submit', disabled: landing_page.problems is not empty, title: landing_page.problems is not empty ? 'Put right what is listed above first.' : ''}) }}</form>
+					{% endif %}
+				{% endif %}
+				{% if not landing_page.was_published %}
+					<form action="/admin/courses/{{ course.id }}/landing/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete page', variant: 'danger', type: 'submit', icon: 'action-remove', confirm: 'Delete this landing page and everything written on it? The course is not changed.'}) }}</form>
+				{% endif %}
+{% endblock %}
+			{% endembed %}
+			{% if not can_publish %}<p class="cl-landing-note">An administrator publishes landing pages.</p>{% endif %}
+			{% if landing_page.was_published and not published %}<p class="cl-landing-note">This page has been public, so it is unpublished rather than deleted.</p>{% endif %}
+{% endblock %}
+		{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'landing-sections'})} %}
+{% block surface_body %}
+			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Sections', summary: 'The page shows them from top to bottom. The hero is always first; drag the others by their handle, or use their ⋯ menu, to change the order.'})} %}
+{% block section_actions %}
+				{{ ui('action.link', {label: 'Add section', variant: 'primary', href: '#landing-add', modal: 'landing-add', icon: 'action-add'}) }}
+{% endblock %}
+{% endembed %}
+			<div class="cl-tree-wrap cl-landing-editor" data-controller="landing-sections" data-landing-sections-url-value="/admin/courses/{{ course.id }}/landing/sections" data-action="dragstart->landing-sections#start dragover->landing-sections#over dragleave->landing-sections#leave drop->landing-sections#drop dragend->landing-sections#end submit->landing-sections#menu">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				<p class="cl-tree-help" id="landing-section-keys" data-landing-sections-target="enhanced" hidden>Drag a section by its handle and drop it on the upper or lower part of another to put it before or after it. On a focused handle, ↑ and ↓ move it, and Home and End move it to the top or bottom.</p>
+				<p class="cl-tree-status" role="status" aria-live="polite" data-landing-sections-target="status"></p>
+				<p class="cl-tree-error" role="alert" data-landing-sections-target="error" hidden></p>
+				{% if landing_page.hero %}
+					<div class="cl-landing-fixed" id="landing-section-{{ landing_page.hero.id }}">
+						{% include '@platform/partials/admin/landing-section-row.html.twig' with {row: landing_page.hero} %}
+					</div>
+				{% endif %}
+				{% include '@platform/partials/admin/landing-section-list.html.twig' %}
+			</div>
+{% endblock %}
+		{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'landing-settings'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Address and search results', summary: 'Where the page lives, and what search engines and shared links show for it. Left empty, the title and description come from the hero and the course.'}) }}
+			{% if settings_error %}
+				{{ ui('feedback.notice', {tone: 'danger', heading: 'The settings were not saved. ' ~ settings_error}) }}
+			{% endif %}
+			<form action="/admin/courses/{{ course.id }}/landing/settings" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 1})} %}
+{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address', for: 'landing-slug', required: true, help: 'Lowercase letters, numbers and hyphens: the page is at /landing/ followed by this. Changing it breaks links to the old address.'})} %}
+{% block control %}<div class="cl-landing-slug"><span aria-hidden="true">/landing/</span><input type="text" id="landing-slug" name="slug" value="{{ settings_values.slug }}" maxlength="120" required pattern="[a-z0-9]+(-[a-z0-9]+)*" {{ ui_field_attrs(props) }}></div>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Page title (optional)', for: 'landing-meta-title', help: 'Shown in the browser tab, search results and shared links. At most 120 characters.'})} %}
+{% block control %}<input type="text" id="landing-meta-title" name="meta_title" value="{{ settings_values.meta_title }}" maxlength="120" placeholder="{{ course.title }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (optional)', for: 'landing-meta-description', help: 'One or two sentences for search results and shared links. At most 300 characters; left empty, the course summary is used.'})} %}
+{% block control %}<textarea id="landing-meta-description" name="meta_description" rows="3" maxlength="300" {{ ui_field_attrs(props) }}>{{ settings_values.meta_description }}</textarea>{% endblock %}
+{% endembed %}
+{% endblock %}
+				{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
+{% endembed %}
+			</form>
+{% endblock %}
+		{% endembed %}
+	{% endif %}
+{% endblock %}
+	{% endembed %}
+</section>
+{% if landing_page %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'landing-add', title: 'Add a section', action: '/admin/courses/' ~ course.id ~ '/landing/sections'})} %}
+{% block modal_body %}
+		<input type="hidden" name="csrf" value="{{ csrf }}">
+		<fieldset class="cl-landing-add">
+			<legend class="cl-visually-hidden">Kind of section</legend>
+			{% for option in landing_page.add_options %}
+				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: option.label ~ (option.taken ? ' (already on the page)' : ''), help: option.description, full_width: true})} %}
+{% block control %}<input class="form-check-input mt-1" type="radio" name="type" value="{{ option.value }}" required{% if option.taken %} disabled{% endif %}>{% endblock %}
+{% endembed %}
+			{% endfor %}
+		</fieldset>
+{% endblock %}
+{% block modal_actions %}{{ ui('action.button', {label: 'Add section', variant: 'primary', type: 'submit', icon: 'action-add'}) }}{% endblock %}
+	{% endembed %}
+{% endif %}
+{% endblock %}
