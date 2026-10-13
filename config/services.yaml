@@ -197,6 +197,10 @@ services:
         arguments: ['%env(APP_TIMEZONE)%']
         tags: ['doctrine.middleware']
 
+    # The public legal documents (Terms, Refund Policy, Privacy Policy): their versions and the supplier.
+    CattoLearning\Legal\:
+        resource: '../src/Legal/'
+
     CattoLearning\Commerce\Application\:
         resource: '../src/Commerce/Application/'
     CattoLearning\Commerce\Infrastructure\:

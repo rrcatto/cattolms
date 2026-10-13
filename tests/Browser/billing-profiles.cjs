@@ -134,7 +134,6 @@ async function saveCompanyBilling(page, data) {
         await page.waitForURL(/\/checkout/);
         assert.deepEqual(await values(page, 'checkout-billing', ['billing_name', 'address_line_1', 'city', 'country_code']), {billing_name: 'Lerato Dlamini', address_line_1: '12 Kéré Street', city: 'Pretoria', country_code: 'ZA'}, 'checkout is filled from the saved profile');
         await page.locator('#mobile-number').fill('0821234567');
-        await page.locator('#rsa-id').fill('9001015009087');
         await page.locator('#checkout-billing-address-line-1').fill('14 Corrected Avenue');
         await page.getByRole('button', {name: 'Continue to payment'}).click();
         await page.waitForURL(/\/checkout\/payment/);

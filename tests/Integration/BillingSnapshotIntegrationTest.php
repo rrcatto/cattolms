@@ -270,7 +270,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
     /** @return array<string,string> */
     private function personal(): array
     {
-        return ['first_name' => 'Thandiwe', 'last_name' => 'Nkosi', 'mobile_number' => '0821234567', 'identification_number' => '9001015009087'];
+        return ['first_name' => 'Thandiwe', 'last_name' => 'Nkosi', 'mobile_number' => '0821234567'];
     }
 
     private function paidCourse(string $title): int

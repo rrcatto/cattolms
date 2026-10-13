@@ -9,10 +9,12 @@ use CattoLearning\Analytics\AnalyticsEventType;
 use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Document\FinancialDocuments;
+use CattoLearning\Commerce\Domain\RefundRule;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\Uuid;
+use DateTimeImmutable;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
 
@@ -27,6 +29,12 @@ use Symfony\Component\Clock\ClockInterface;
  * nothing else; each course's access is then worked out again from its remaining sources, so a course
  * another purchase, bundle, ADMIN assignment, company credit or free access still covers stays open.
  * A bundle line is refunded as the product that was bought, never course by course.
+ *
+ * The Refund Policy's rule (RefundRule) is enforced here: a refund is refused once the learner has
+ * started the course (any course, for a bundle) or seven days have passed since the purchase, and a
+ * company credit refund once seven days have passed since the credits were bought. ADMIN may
+ * approve a refused refund with a written override reason; what the rule refused and that reason
+ * are recorded with the refund, which is append-only.
  */
 final class RefundAdministrationService
 {
@@ -34,14 +42,44 @@ final class RefundAdministrationService
         private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics,
         private readonly AccessService $access, private readonly FinancialDocuments $documents) {}
 
-    public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor): int
+    /**
+     * Why the Refund Policy refuses a refund of this order line now; empty when the rule allows it.
+     * The purchase is the order's confirmed payment (its placement for an order with none).
+     *
+     * @param array<string,mixed> $order a commerce_orders row
+     * @param array<string,mixed> $item one of its commerce_order_items rows
+     * @return list<string>
+     *
+     * @phpstan-impure the answer changes as the learner starts and as time passes
+     */
+    public function ruleRefusals(array $order, array $item): array
+    {
+        $purchasedAt=new DateTimeImmutable($this->records->paidAt((int)$order['id']) ?? (string)$order['placed_at']);
+        $company=$order['company_id']!==null;
+        $started=[];
+        if (!$company) {
+            $snapshot=CommerceRepository::decode((string)$item['snapshot']);
+            $titles=array_column((array)($snapshot['courses'] ?? []),'title','course_id');
+            foreach ($this->records->startedCourses((int)$item['id']) as $course) {
+                $started[]=['title'=>(string)($titles[$course['course_id']] ?? $snapshot['course_title'] ?? 'a course'),'started_at'=>$course['started_at']];
+            }
+        }
+        return RefundRule::refusals($purchasedAt,$this->clock->now(),$started,$item['product_type']==='bundle',$company);
+    }
+
+    /**
+     * $overrideReason is ADMIN's written reason for approving a refund the Refund Policy refuses. It
+     * is required then, and ignored (nothing is recorded as an override) when the rule allows the refund.
+     */
+    public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor, string $overrideReason = ''): int
     {
         OrderService::requireCapability($actor,'PLATFORM.REFUND.MANAGE');
         if (!Uuid::isValid($requestKey)) throw new RuntimeException('Invalid refund identifier.');
         if (!in_array($basis,['statutory','service_failure','goodwill','voluntary'],true)) throw new RuntimeException('Select a refund basis.');
         $reason=trim($reason);
         if (mb_strlen($reason)<5 || mb_strlen($reason)>2000) throw new RuntimeException('Record the refund decision and its reason.');
-        return $this->transactions->run(function () use ($actor,$orderId,$itemId,$requestKey,$basis,$reason,$quantity,$amountMinor): int {
+        $overrideReason=trim($overrideReason);
+        return $this->transactions->run(function () use ($actor,$orderId,$itemId,$requestKey,$basis,$reason,$quantity,$amountMinor,$overrideReason): int {
             $order=$this->records->order($orderId);
             $this->records->lockPurchaser((int)$order['purchaser_user_id']);
             $order=$this->records->order($orderId,true);
@@ -54,6 +92,12 @@ final class RefundAdministrationService
             if ($this->records->paidTotal($orderId)<(int)$order['total_minor']) throw new RuntimeException('The order has not been fully paid.');
             $item=$this->records->orderItem($itemId,$orderId);
             $now=$this->clock->now()->format(DATE_ATOM);
+            $refusals=$this->ruleRefusals($order,$item);
+            if ($refusals!==[]) {
+                if ($overrideReason==='') throw new RuntimeException('The Refund Policy does not allow this refund. '.implode(' ',$refusals).' To approve it anyway, record an override reason.');
+                if (mb_strlen($overrideReason)<5 || mb_strlen($overrideReason)>2000) throw new RuntimeException('Record why the Refund Policy is overridden, in 5 to 2,000 characters.');
+            }
+            $policyRefusal=$refusals===[] ? null : implode(' ',$refusals);
             if ($order['company_id']!==null) {
                 if ($quantity<1 || $amountMinor!==0) throw new RuntimeException('Enter an unused credit quantity; its refund value is calculated from the historical order.');
                 $unit=intdiv((int)$item['amount_minor'],(int)$item['quantity']);
@@ -74,7 +118,7 @@ final class RefundAdministrationService
                 $remaining=self::paidAmount($item)-$this->records->refundedAmount($orderId,$itemId);
                 if ($amountMinor>$remaining) throw new RuntimeException('The refund exceeds this item’s unrefunded paid amount.');
             }
-            $id=$this->records->createRefund($requestKey,$orderId,$itemId,$quantity,$amountMinor,(string)$order['currency'],$basis,$reason,$actor->id,$now);
+            $id=$this->records->createRefund($requestKey,$orderId,$itemId,$quantity,$amountMinor,(string)$order['currency'],$basis,$reason,$actor->id,$now,$policyRefusal,$policyRefusal===null ? null : $overrideReason);
             $this->records->creditRefundFunds($id,$order['company_id']===null?(int)$order['purchaser_user_id']:null,$order['company_id']===null?null:(int)$order['company_id'],(string)$order['currency'],$amountMinor,$now);
             $itemSnapshot=CommerceRepository::decode((string)$item['snapshot']);
             $snapshot=CommerceRepository::decode((string)$order['snapshot']);
@@ -102,7 +146,7 @@ final class RefundAdministrationService
             $total=$this->records->refundedAmount($orderId);
             $transition=$total>=(int)$order['total_minor']?'mark_refunded':'mark_partially_refunded';
             $this->records->setOrderState($orderId,$this->transitions->apply('order',(string)$order['state'],$transition));
-            $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason]+($bundle?['bundle_access'=>$access]:[]),$now);
+            $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason]+($policyRefusal===null?[]:['policy_refusal'=>$policyRefusal,'override_reason'=>$overrideReason])+($bundle?['bundle_access'=>$access]:[]),$now);
             return $id;
         });
     }

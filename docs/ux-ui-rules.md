@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.9.0 (development) **Date time:** 2026/10/09 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.9.1 (development) **Date time:** 2026/10/13 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -283,6 +283,10 @@ Ordinary category results show courses filed directly in that category. Search i
 
 ## Changelog
 
+2026/10/13 SAST
+
+- Commerce rules: the one terms acceptance box both checkouts share, and the legal pages (`/terms`, `/refunds`, `/privacy`) with their writing conventions.
+
 2026/10/09 SAST
 
 - 6.14: the course landing page and its editor.
@@ -359,6 +363,8 @@ Ordinary category results show courses filed directly in that category. Search i
 - Use My Cart (`/cart`). Account → COURSES contains My Orders (`/account/orders`) and My Courses (`/account/courses`); do not add a Purchases navigation item.
 - Checkout collects sign-in, then the learner's details (personal particulars and, separately, billing details from the reusable billing profile), then payment method and invoice-email preference, before review and “Place my order”. Orders retain downloadable PDF invoices.
 - A failed payment offers another method or paying later. Unpaid orders cancel after seven days; EFT uses the unique order number as its reference.
+- Terms acceptance (owner instruction, 2026/10/13): the review step and the company credit checkout end with one required tick box, "I have read and accept the Terms and Conditions and the Refund Policy.", both documents linked from the label and opening in a new tab so the checkout keeps what was entered. Both checkouts include `partials/commerce-terms-acceptance.html.twig`; do not write a second box or different wording. The server refuses an order without it. Checkout does not ask for an identity number.
+- Legal pages (owner instruction, 2026/10/13): `/terms`, `/refunds` and `/privacy` are Core pages for everyone, signed in or not. Each opens with `partials/legal-document-head.html.twig` (version, last-updated date, contents) and then one `layout.surface` per numbered section with a `layout.section-head`; label and value lists use `data.key-value-list`. The text is plain prose in British English with hyphens, no em dashes, no semicolons and straight quotes (`LegalDocumentsTest`). Themes list the pages only through the Core `footer_navigation`.
 
 - Cart colours, opaque dropdown surfaces and button treatments belong to each theme. Core cart CSS owns geometry and interaction only. Gilded Noir uses its existing gold primary-button treatment and dark navigation surface, including buttons outside the main content area.
 

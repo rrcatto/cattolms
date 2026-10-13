@@ -67,7 +67,7 @@ if ($action === 'create') {
 } elseif ($action === 'learner' || $action === 'learner-owning-a') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     $learner = $person('learner' . (count($state['learners']) + 1), 'Sipho', 'Ndlovu', ['STUDENT'], $state['suffix']);
-    $db->executeStatement("UPDATE users SET mobile_number='0821234567', identification_number='9001015009087' WHERE id=:id", ['id' => $learner['id']]);
+    $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
     (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Sipho Ndlovu', 'address_line_1' => '7 Bundle Road', 'city' => 'Durban', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
     if ($action === 'learner-owning-a') $fixture->createEnrolment($learner['id'], (int) $state['courses']['a']['id'], (int) $state['users']['admin']);
     $state['learners'][] = $learner['id'];

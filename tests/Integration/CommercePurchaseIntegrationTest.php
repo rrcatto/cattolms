@@ -284,7 +284,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     /** @return array<string,string> */
     private function profileFields(): array
     {
-        return BillingFixture::personFields('Invoice Buyer', '10 Test Street') + ['first_name'=>'Invoice', 'last_name'=>'Buyer', 'mobile_number'=>'0821234567', 'identification_number'=>'9001015009087'];
+        return BillingFixture::personFields('Invoice Buyer', '10 Test Street') + ['first_name'=>'Invoice', 'last_name'=>'Buyer', 'mobile_number'=>'0821234567'];
     }
 
     public function testGuestCartMergesOnceAfterSignIn(): void
@@ -333,11 +333,12 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->checkoutService()->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true);
     }
 
-    public function testInvalidIdCannotAdvanceCheckout(): void
+    public function testCheckoutAdvancesWithoutAnIdentityNumberAndNeverStoresOne(): void
     {
-        $fields = $this->profileFields(); $fields['identification_number'] = '123';
-        $this->expectException(\RuntimeException::class);
+        $fields = $this->profileFields() + ['identification_number' => '9001015009087'];
         $this->checkoutService()->saveProfile($this->actor, $fields);
+        self::assertTrue($this->checkoutService()->state($this->actor)['profile_confirmed']);
+        self::assertNull($this->db->fetchOne('SELECT identification_number FROM users WHERE id=:id', ['id'=>$this->actor->id]), 'Checkout does not collect an identity number, even when one is posted.');
     }
 
     public function testDeclineCanSwitchToEftThenRetryWithoutReplacingInvoice(): void

@@ -33,11 +33,6 @@
 <input id="mobile-number" name="mobile_number" type="tel" autocomplete="tel" value="{{ profile.mobile_number }}" maxlength="60" required {{ ui_field_attrs(props) }}>
 {% endblock %}
 {% endembed %}
-                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'RSA ID number', full_width: false, for: 'rsa-id', required: true})} %}
-{% block control %}
-<input id="rsa-id" name="identification_number" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" value="{{ profile.identification_number }}" required {{ ui_field_attrs(props) }}>
-{% endblock %}
-{% endembed %}
 
 
 {% endblock %}
@@ -84,13 +79,9 @@
             <p>{{ checkout.invoice_email ? 'Email my invoice and make it available in My Orders.' : 'Make my invoice available in My Orders.' }}</p>
             <form action="/checkout/place" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">
-                <p>Unpaid orders are automatically cancelled after 7 days. Paid course access starts when you begin, or automatically 90 days after payment. Free course access starts immediately. The selected access period then runs to expiry.</p>
-                <p>Tax is not charged. For cancellation or refund assistance, <a href="/contact">contact us</a>. <a href="/privacy">Privacy information</a>.</p>
-                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I have reviewed my order and accept these purchase terms.'})} %}
-{% block control %}
-<input type="checkbox" name="accept_terms" value="yes" required>
-{% endblock %}
-{% endembed %}
+                <p>Unpaid orders are automatically cancelled after 7 days. Paid course access starts when you press Start course, or automatically 90 days after your payment is confirmed. Free course access starts immediately. The selected access period then runs to expiry.</p>
+                <p>No VAT is charged. A refund is given only within 7 days of purchase and only if you have not started the course. Your personal information is handled as the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
+                {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.button', {label: 'Place my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Edit My Cart</a>

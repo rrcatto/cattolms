@@ -64,6 +64,8 @@
         {% elseif order.state == 'fulfilled' %}{% if order.company_id|default(null) %}<p>Company credits are ready in <a href="/company/credits">Company credits</a>.{% if order.request_id|default(null) %} The linked learner request was fulfilled and the learner was enrolled.{% endif %}</p>{% else %}<p>Your courses are ready in <a href="/account/courses">My Courses</a>.</p>{% endif %}
         {% elseif order.state == 'manual_review' %}<p>Your payment has been recorded and needs an administrator’s review.</p>
         {% elseif order.state == 'cancelled' %}<p>The payment window has ended and this order has been cancelled. Your invoice remains available for your records.</p>
+        {% elseif order.state == 'refunded' %}<p>This order has been refunded. Each credit note above records a refund. The <a href="/refunds">Refund Policy</a> explains how and when refunds are paid.</p>
+        {% elseif order.state == 'partially_refunded' %}<p>Part of this order has been refunded. Each credit note above records a refund. {{ order.company_id|default(null) ? 'Credits that were not refunded remain in' : 'Anything that was not refunded in full remains in' }} <a href="{{ order.company_id|default(null) ? '/company/credits' : '/account/courses' }}">{{ order.company_id|default(null) ? 'Company credits' : 'My Courses' }}</a>. The <a href="/refunds">Refund Policy</a> explains how and when refunds are paid.</p>
         {% else %}<p>Your payment is being processed. Check this order again before making another payment. <a href="/account/orders">I’ll check later</a>.</p>{% endif %}
 
 {% endblock %}

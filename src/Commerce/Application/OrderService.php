@@ -12,6 +12,7 @@ use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Money;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -179,7 +180,9 @@ final class OrderService
     /**
      * Captures billing and consent evidence independently of mutable profile/course data. The
      * billing details are copied into the order's snapshot as they are now; a replayed placement
-     * returns the existing order and its original snapshot.
+     * returns the existing order and its original snapshot. The consent evidence is the version of
+     * the Terms and Conditions (terms_version, on the order and on each line) and of the Refund
+     * Policy (consent.refund_policy_version) the purchaser accepted, with when and in which session.
      *
      * A promo code is evaluated again here, under its row lock, and its use is taken by inserting
      * the order in the same transaction. The discount is recorded beside the lines, never in their
@@ -198,9 +201,11 @@ final class OrderService
             $cart=$this->priced($actor,true);
             self::requireValidPromotion($cart);
             if ((int)$cart['id']!==$cartId || !hash_equals((string)$cart['quote'],$quote)) throw new RuntimeException('Your cart or prices changed. Review the updated checkout.');
-            if (!$accepted) throw new RuntimeException('Accept the purchase terms before placing your order.');
+            if (!$accepted) throw new RuntimeException('Accept the Terms and Conditions and the Refund Policy before placing your order.');
             if ($cart['items']===[] && $cart['bundles']===[]) throw new RuntimeException('Your cart is empty.');
             $discount=$cart['promotion']['discount'];
+            // What the purchaser accepts by ticking the box: the Terms as published now.
+            $termsVersion=LegalDocuments::version(LegalDocuments::TERMS);
             $subtotal=Money::strictMinorUnits(0,'ZAR'); $lines=[];
             foreach($cart['items'] as $offer) {
                 $this->validateOffer($offer,$actor->id);
@@ -208,7 +213,7 @@ final class OrderService
                 if ($amount->isFree()) throw new RuntimeException('Remove free courses from the cart and accept them directly.');
                 $subtotal=$subtotal->plus($amount);
                 $lineDiscount=$discount?->lineDiscount('course:'.(int)$offer['id']) ?? 0;
-                $lines[]=['variant_id'=>(int)$offer['id'],'course_id'=>(int)$offer['course_id'],'course_title'=>(string)$offer['title'],'revision_policy'=>'purchased_course_with_published_edits','access_period_seconds'=>(int)$offer['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>$lineDiscount,'paid_minor'=>$amount->minorUnits-$lineDiscount,'promotion_eligible'=>$discount!==null && array_key_exists('course:'.(int)$offer['id'],$discount->lineDiscounts),'fulfilment_type'=>'individual_access','terms_version'=>$this->policy->termsVersion,'activation_deadline_days'=>$this->policy->activationDeadlineDays];
+                $lines[]=['variant_id'=>(int)$offer['id'],'course_id'=>(int)$offer['course_id'],'course_title'=>(string)$offer['title'],'revision_policy'=>'purchased_course_with_published_edits','access_period_seconds'=>(int)$offer['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>$lineDiscount,'paid_minor'=>$amount->minorUnits-$lineDiscount,'promotion_eligible'=>$discount!==null && array_key_exists('course:'.(int)$offer['id'],$discount->lineDiscounts),'fulfilment_type'=>'individual_access','terms_version'=>$termsVersion,'activation_deadline_days'=>$this->policy->activationDeadlineDays];
             }
             foreach($cart['bundles'] as $bundle) {
                 $this->validateBundle($bundle,$bundle['courses'],$actor->id);
@@ -222,13 +227,13 @@ final class OrderService
                     'courses'=>array_map(static fn(array $c): array => ['course_id'=>(int)$c['course_id'],'title'=>(string)$c['title'],'slug'=>(string)$c['slug']],$bundle['courses']),
                     'access_period_seconds'=>(int)$bundle['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,
                     'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>$lineDiscount,'paid_minor'=>$amount->minorUnits-$lineDiscount,'promotion_eligible'=>$discount!==null && array_key_exists($key,$discount->lineDiscounts),
-                    'revision_policy'=>'purchased_course_with_published_edits','terms_version'=>$this->policy->termsVersion,'activation_deadline_days'=>$this->policy->activationDeadlineDays];
+                    'revision_policy'=>'purchased_course_with_published_edits','terms_version'=>$termsVersion,'activation_deadline_days'=>$this->policy->activationDeadlineDays];
             }
             $discountMinor=$discount->discountMinor ?? 0;
             if ($discount!==null && $discount->currency!==$subtotal->currency) throw new RuntimeException('Your cart or prices changed. Review the updated checkout.');
             $total=$subtotal->minorUnits-$discountMinor;
             $now=$this->clock->now();
-            $snapshot=['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,'billing'=>$billing->toSnapshot(),'items'=>$lines,'subtotal_minor'=>$subtotal->minorUnits,'discount_minor'=>$discountMinor,'promotion'=>$discount?->toSnapshot(),'total_minor'=>$total,'currency'=>$subtotal->currency,'payment_method'=>$checkout['payment_method'] ?? 'dummy','invoice_email'=>$checkout['invoice_email'] ?? false,'tax_enabled'=>false,'terms_version'=>$this->policy->termsVersion,'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false],'activation_deadline_days'=>$this->policy->activationDeadlineDays];
+            $snapshot=['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,'billing'=>$billing->toSnapshot(),'items'=>$lines,'subtotal_minor'=>$subtotal->minorUnits,'discount_minor'=>$discountMinor,'promotion'=>$discount?->toSnapshot(),'total_minor'=>$total,'currency'=>$subtotal->currency,'payment_method'=>$checkout['payment_method'] ?? 'dummy','invoice_email'=>$checkout['invoice_email'] ?? false,'tax_enabled'=>false,'terms_version'=>$termsVersion,'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false,'refund_policy_version'=>LegalDocuments::version(LegalDocuments::REFUNDS)],'activation_deadline_days'=>$this->policy->activationDeadlineDays];
             $id=$this->records->place($cartId,$actor->id,$total,$subtotal->currency,$snapshot,$now->format(DATE_ATOM),$now->modify('+'.$this->policy->paymentDueDays.' days')->format(DATE_ATOM),$discount?->promotion->id,$discountMinor);
             foreach($lines as $line) $this->records->addOrderItem($id,$actor->id,$line);
             $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);

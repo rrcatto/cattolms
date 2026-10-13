@@ -1,0 +1,21 @@
+{#
+  The opening card of a public legal document: its version and last-updated date from
+  LegalDocuments (the version an order records as accepted), the page's contents and the other two
+  documents. legal_sections is the page's own list of {id, label}, one per numbered section below.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'document'})} %}
+{% block surface_body %}
+		<p data-legal-document="{{ legal.key }}" data-legal-version="{{ legal.version }}"><strong>Version {{ legal.version }}</strong> - last updated <time datetime="{{ legal.updated }}">{{ legal.updated_label }}</time>.</p>
+		<p>{{ legal_intro }}</p>
+		<nav aria-label="Contents">
+			<ol>
+				{% for section in legal_sections %}
+					<li><a href="#{{ section.id }}">{{ section.label }}</a></li>
+				{% endfor %}
+			</ol>
+		</nav>
+		<p>Read this with the
+			{%- for other in legal_documents|filter(other => other.key != legal.key) %} <a href="{{ other.path }}">{{ other.title }}</a>{{ loop.last ? '.' : ' and the' }}{% endfor %}
+			You can print this page or save it from your browser.</p>
+{% endblock %}
+{% endembed %}

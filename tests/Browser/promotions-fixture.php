@@ -71,7 +71,7 @@ if ($action === 'create') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     $key = 'learner' . (count($state['learners']) + 1);
     $learner = $person($key, 'Naledi', 'Mokoena', ['STUDENT'], $state['suffix']);
-    $db->executeStatement("UPDATE users SET mobile_number='0821234567', identification_number='9001015009087' WHERE id=:id", ['id' => $learner['id']]);
+    $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
     (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Naledi Mokoena', 'address_line_1' => '5 Promo Lane', 'city' => 'Johannesburg', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
     $state['learners'][] = $learner['id'];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));

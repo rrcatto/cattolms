@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/13 SAST
+- Refund Policy rule: commerce_refunds records, for a refund ADMIN approved although the rule refuses it, what the rule refused (policy_refusal) and ADMIN's written override reason (override_reason), set together or not at all.
 2026/10/09 SAST
 - Course marketing landing pages (Phase L): course_landing_pages (one per course, its own unique slug, draft or published, optional page title and description) and course_landing_sections (a flat ordered list of typed sections whose copy and settings are JSONB checked by type; the hero is always first, and hero, audience, outcomes, contents, instructor, reviews and pricing appear at most once).
 2026/10/08 SAST
@@ -2325,7 +2327,12 @@ CREATE TABLE commerce_refunds (
     basis TEXT NOT NULL CHECK (basis IN ('statutory','service_failure','goodwill','voluntary')),
     reason TEXT NOT NULL CHECK (length(trim(reason)) BETWEEN 5 AND 2000),
     approved_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    approved_at TIMESTAMPTZ NOT NULL
+    approved_at TIMESTAMPTZ NOT NULL,
+    -- Set together when ADMIN approved a refund the Refund Policy refuses (the learner had started,
+    -- or seven days had passed): what the rule refused, and ADMIN's written reason for overriding it.
+    policy_refusal TEXT NULL,
+    override_reason TEXT NULL CHECK (override_reason IS NULL OR length(trim(override_reason)) BETWEEN 5 AND 2000),
+    CONSTRAINT commerce_refunds_policy_override CHECK ((policy_refusal IS NULL) = (override_reason IS NULL))
 );
 CREATE INDEX commerce_refunds_order_item ON commerce_refunds(order_item_id,id);
 

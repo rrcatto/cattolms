@@ -1,6 +1,6 @@
 # Platform UI component guide
 
-**LMS:** 0.9.0 · **Updated:** 2026-10-09 · **Registry:** 35 components in `src/View/Ui/PlatformUi.php`
+**LMS:** 0.9.1 · **Updated:** 2026-10-13 · **Registry:** 35 components in `src/View/Ui/PlatformUi.php`
 
 CattoLMS reusable UI structures are platform components. A page may not independently implement a job already represented by a canonical component. Extend the component and its contract test instead of forking markup.
 
@@ -46,7 +46,7 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 | `form.grid` | `forms/form-grid.html.twig` | `body` |
 | `form.field` | `forms/field.html.twig` | `control`, `help_content` |
 | `form.actions` | `forms/form-actions.html.twig` | `primary_actions`, `secondary_actions` |
-| `form.choice` | `forms/choice-field.html.twig` | `control` |
+| `form.choice` | `forms/choice-field.html.twig` | `control`, `label_content` |
 | `form.tree-select` | `forms/tree-select.html.twig` | — |
 | `form.picture-choice` | `forms/picture-choice.html.twig` | — |
 | `form.compact-action` | `forms/compact-action.html.twig` | `body` |
@@ -99,6 +99,8 @@ Supported uses added in v0.8.8.x, each through the existing component rather tha
 - **The purchase box.** `partials/course-purchase.html.twig` draws `CoursePurchaseOptions` wherever a course is offered: the course page's Course access card (full: every price as a `form.choice` radio) and a landing page's hero, pricing and call to action (compact: the default price above the buttons). It is the one place Add to cart, Buy now, Request from my company, Start/Continue course and "not on sale" are drawn; a preview passes `purchase_inert` and its buttons are disabled.
 - **A review list.** `partials/course-review-list.html.twig` is the list of approved reviews; the course page's paged `data.dataset` and a landing page's latest few both include it.
 - **A flat sortable list.** A landing page's sections use the sortable tree markup with one level (`li.cl-tree-node[data-depth="1"]` rows without child lists, `cl-tree--landing`) and `landing_sections_controller.js`, which extends the shared sortable tree with a maximum depth of one; the hero sits above the list in `.cl-landing-fixed` without a handle. The ⋯ menu's Move to top / up / down / bottom forms move a section without JavaScript.
+- **Terms acceptance.** `partials/commerce-terms-acceptance.html.twig` is the one required tick box both checkouts end with. It is a `form.choice` whose `label_content` slot carries the links to the Terms and Conditions and the Refund Policy; the `label` property stays the plain wording. Use the slot only where a choice's label needs a link; every other choice passes `label` alone.
+- **A legal document.** `partials/legal-document-head.html.twig` opens `/terms`, `/refunds` and `/privacy` with the version and date from `LegalDocuments`, the page's contents list (`legal_sections`) and the other two documents; each numbered section below is a `layout.surface` with that id and a `layout.section-head`.
 - **Head metadata.** `partials/head-meta.html.twig` is included by every theme's head and draws the view model's `meta`: the description, and where a page sets them its canonical address, robots rule and Open Graph tags.
 - **Ordered lists with actions.** The bundle editor's course list uses Move up / Move down / Remove buttons as ordinary forms (`cl-bundle-courses`), the same pattern as course price variants; it is not a second drag-and-drop tree.
 

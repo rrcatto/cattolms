@@ -9,7 +9,7 @@
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'user_id', lk_type: 'people', lk_label: 'Staff member', lk_selected: 0, lk_required: 1, lk_empty: 'Nobody selected'} %}
 			{% include '@platform/partials/entity-lookup.html.twig' with {lk_base: '/company/lookup', lk_name: 'course_id', lk_type: 'assignable_courses', lk_label: 'Course', lk_selected: 0, lk_required: 1, lk_empty: 'No course selected'} %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period (days)', full_width: false, for: 'assign-access-days', required: true, help: 'The period starts now, not when they first open the course.'})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period (days)', full_width: false, for: 'assign-access-days', required: true, help: 'The period starts when the staff member presses Start course, not when you assign the course.'})} %}
 {% block control %}
 
 				<input id="assign-access-days" name="access_days" type="number" min="1" max="3650" value="365" required {{ ui_field_attrs(props) }}>
