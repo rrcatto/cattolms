@@ -128,4 +128,13 @@ final class CompanyWorkspaceContractTest extends TestCase
         self::assertStringContainsString("event.key === 'Escape'", $js);
     }
 
+    /** A company-assigned access period starts on Start course (grantCourse without an expiry), and the form says so. */
+    public function testTheAssignFormSaysTheAccessPeriodStartsWhenTheLearnerStarts(): void
+    {
+        $form = (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/company/enrolments.html.twig');
+        self::assertStringContainsString("help: 'The period starts when the staff member presses Start course, not when you assign the course.'", $form);
+        self::assertStringNotContainsString('The period starts now', $form);
+        $service = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Application/PlatformAdministrationService.php');
+        self::assertStringContainsString('$this->courses->grantCourse($userId, $courseId, $accessPeriodSeconds, $actorUserId);', $service, 'The assignment grants the course without an expiry from the grant date.');
+    }
 }

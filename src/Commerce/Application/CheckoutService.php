@@ -19,7 +19,10 @@ use RuntimeException;
  */
 final class CheckoutService
 {
-    /** Personal particulars the details step collects, with their maximum lengths. */
+    /**
+     * Personal particulars the details step collects, with their maximum lengths. An identity number
+     * is not one of them: checkout neither asks for nor changes it.
+     */
     private const PERSONAL = ['first_name'=>120,'last_name'=>120,'mobile_number'=>60];
 
     public function __construct(private readonly AuthService $auth,
@@ -73,8 +76,6 @@ final class CheckoutService
             $personal[$field] = trim((string) ($fields[$field] ?? ''));
             if ($personal[$field] === '' || mb_strlen($personal[$field]) > $limit) throw new RuntimeException('Complete your names and cell number.');
         }
-        $personal['identification_number'] = (string) ($fields['identification_number'] ?? '');
-        if (preg_match('/^[0-9]{13}$/D', $personal['identification_number']) !== 1) throw new RuntimeException('Enter your 13-digit RSA ID number.');
         BillingDetails::forPerson($fields);
         $this->transactions->run(function () use ($actor, $personal, $fields): void {
             $this->auth->updateProfile($actor->id, $personal);
@@ -110,7 +111,7 @@ final class CheckoutService
         $state = $this->state($actor);
         if (isset($state['completed_cart']) && (int) $state['completed_cart'] === $cartId) return isset($state['order_id']) ? (int) $state['order_id'] : null;
         if (!($state['profile_confirmed'] ?? false) || !isset($state['payment_method'])) throw new RuntimeException('Complete your details and choose a payment method first.');
-        if (!$accepted) throw new RuntimeException('Accept the purchase terms before placing your order.');
+        if (!$accepted) throw new RuntimeException('Accept the Terms and Conditions and the Refund Policy before placing your order.');
         $billing = $this->billing->forUser($actor->id) ?? throw new RuntimeException('Complete your billing details first.');
         $id = $this->transactions->run(function () use ($actor,$cartId,$quote,$billing,$state): ?int {
             $this->records->lockPurchaser($actor->id);

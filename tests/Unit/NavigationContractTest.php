@@ -217,8 +217,20 @@ final class NavigationContractTest extends TestCase
             'permissions' => (new PermissionCatalog())->keys(),
         ]);
         $keys = array_column($items, 'key');
-        foreach (['home','catalogue','help','contact','privacy','account','company','admin'] as $key) {
-            self::assertContains($key, $keys);
+        self::assertSame(['home','catalogue','help','contact','terms','refunds','privacy','account','company','admin'], $keys);
+        // The three public legal documents, for everyone: also a signed-out visitor.
+        $public = array_column($method->invoke($this->renderer(), []), 'href', 'key');
+        self::assertSame(['/terms', '/refunds', '/privacy'], [$public['terms'] ?? null, $public['refunds'] ?? null, $public['privacy'] ?? null]);
+        self::assertSame(['Terms', 'Refunds', 'Privacy'], array_slice(array_column($items, 'label'), 4, 3));
+    }
+
+    /** A theme draws the Core footer list; none may write its own link to a legal page. */
+    public function testNoBundledThemeHardCodesALegalPageLink(): void
+    {
+        $root = dirname(__DIR__, 2) . '/themes';
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() !== 'twig') continue;
+            self::assertDoesNotMatchRegularExpression('#href="/(terms|refunds|privacy)"#', (string) file_get_contents($file->getPathname()), $file->getPathname() . ' hard-codes a legal page link.');
         }
     }
 

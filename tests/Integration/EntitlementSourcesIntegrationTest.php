@@ -219,9 +219,14 @@ final class EntitlementSourcesIntegrationTest extends TestCase
         return $order;
     }
 
+    /**
+     * These scenarios refund long after the purchase and after the learner started, which the
+     * Refund Policy refuses, so each refund is an ADMIN override. The override reason is ignored
+     * when the rule allows the refund.
+     */
     private function refund(int $orderId, int $amount): void
     {
-        $this->refunds()->approve($this->admin(), $orderId, (int) $this->records->items($orderId)[0]['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, $amount);
+        $this->refunds()->approve($this->admin(), $orderId, (int) $this->records->items($orderId)[0]['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, $amount, 'Approved outside the Refund Policy to end this source.');
     }
 
     private function refunds(): RefundAdministrationService

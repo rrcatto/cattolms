@@ -141,7 +141,7 @@ final class CommerceController extends BaseController
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
         return $this->handle(function () use ($actor): void {
             $fields = [];
-            foreach (array_merge(['first_name','last_name','mobile_number','identification_number'], array_keys(BillingDetails::LIMITS)) as $field) $fields[$field] = $this->posted($field);
+            foreach (array_merge(['first_name','last_name','mobile_number'], array_keys(BillingDetails::LIMITS)) as $field) $fields[$field] = $this->posted($field);
             $this->checkout->saveProfile($actor, $fields);
             $this->redirect('/checkout/payment');
         }, '/checkout/profile');

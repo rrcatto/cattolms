@@ -311,3 +311,19 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/landing-pages.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/landing-pages-fixture.php cleanup'
 ```
+
+## Legal pages and terms acceptance
+
+`legal-pages.cjs` checks the public legal pages and the checkout acceptance box (65 checks):
+
+- **Every theme, signed out and signed in, at 1440, 820 and 390px (30).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title, version and last-updated date; every entry of the contents list is a card with a heading; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
+- **Every theme at the three widths, both checkouts (30).** The learner's review step and the company credit checkout show the one acceptance box: required, unticked, worded "I have read and accept the Terms and Conditions and the Refund Policy.", with both documents linked from the label in a new tab, whole, inside the form and before the button that places the order.
+- **Chromium and Firefox (4).** Place my order without the tick places nothing; the Terms link opens in a new tab and leaves the checkout where it was; a form that lost its `required` attribute is refused by the server with the reason, for the learner and for the company; the details step has no identity number field.
+- **Without JavaScript (1).** The three pages read on a phone, the footer link leads to the Terms and a contents entry jumps to its section.
+
+Each bundled theme is activated in turn (`legal-pages-fixture.php theme <key>`), so signed-out requests are drawn in it, and the theme that was active before the run is put back even when a check fails. Do not run it beside the canonical matrix or any other check that switches themes. The script creates and cleans up its own fixture (a paid course, a learner, a company administrator and an ADMIN); it places no order, so cleanup removes everything. If a run is killed, run the cleanup yourself: it also restores the theme. Screenshots and `results.json` are written to `/tmp/catto-legal-pages` (`CATTO_BROWSER_OUTPUT`).
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/legal-pages.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/legal-pages-fixture.php cleanup'   # only after a killed run
+```

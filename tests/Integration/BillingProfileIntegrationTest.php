@@ -124,7 +124,7 @@ final class BillingProfileIntegrationTest extends TestCase
         foreach (['value="Checkout Buyer"', 'value="3 Saved Street"', 'id="checkout-billing-address-line-1"', 'Billing details'] as $text) {
             self::assertStringContainsString($text, $page['body']);
         }
-        $fields = ['first_name' => 'Checkout', 'last_name' => 'Buyer', 'mobile_number' => '0820000000', 'identification_number' => '9001015009087', 'csrf' => $_SESSION['csrf']]
+        $fields = ['first_name' => 'Checkout', 'last_name' => 'Buyer', 'mobile_number' => '0820000000', 'csrf' => $_SESSION['csrf']]
             + BillingFixture::personFields('Checkout Buyer', '4 Corrected Street');
         $saved = InProcessPage::run($user, CommerceController::class, 'profile', [], $fields);
         self::assertSame('/checkout/payment', $saved['location']);

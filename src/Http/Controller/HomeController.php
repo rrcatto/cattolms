@@ -11,6 +11,8 @@ Description:
 Handles web requests for home operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/13 SAST
+- /privacy moved to LegalController with the other public legal pages.
 2026/10/04 SAST
 - Popular Courses replaces the course showcase: one bounded pool rotated in the browser, so the unused /courses/showcase fragment route is gone.
 2026/08/23 04:19 SAST
@@ -75,13 +77,6 @@ final class HomeController extends BaseController
             'favourite_return' => '/',
         ]);
     }
-
-    #[Route('/privacy', name: 'home_privacy', methods: ['GET'])]
-    public function privacy(): Response
-    {
-        return $this->render('privacy', ['title' => 'Privacy']);
-    }
-
 
     #[Route('/about', name: 'home_about', methods: ['GET'])]
     public function about(): Response

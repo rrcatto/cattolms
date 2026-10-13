@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/09 (v0.9.0)
+## Current delivery position — 2026/10/13 (v0.9.1)
 
-**Current LMS version:** 0.9.0 · **Date:** 2026/10/09 SAST · tag `v0.9.0` on GitHub `main`, published as a GitHub release with its source zip; released from the v0.8 code line (`dev-v0.8`). 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.9.1 · **Date:** 2026/10/13 SAST · tag `v0.9.1` on GitHub `main`, published as a GitHub release with its source zip; released from the v0.8 code line (`dev-v0.8`). 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released sequence on the v0.8 code line** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.9.1 | The public legal pages: Terms and Conditions (`/terms`), Refund Policy (`/refunds`) and Privacy Policy (`/privacy`), each with a version and date, in the Core footer of every theme; one required acceptance box naming both documents at both checkouts, with the accepted versions in the order snapshot; no identity number at checkout; the Refund Policy's rule enforced on ADMIN refunds with a recorded override; a correct message on a refunded order |
 | 0.9.0 | Course marketing landing pages (Phase L): one optional page per course at `/landing/{slug}` from ten structured section types (hero always first) in a reorderable list, with the price, rating, approved reviews and outline read live; a buy box shared with the course page; search and sharing metadata in every theme's head; `landing_page_view` and `landing_page_cta_clicked` events |
 | 0.8.9 | Invoices, receipts and credit notes on the document template engine (Phase K): issued from the immutable order, payment and refund records, each keeping its values and design version; one financial document design at Commerce → Financial Documents with a live PDF preview of made-up orders |
 | 0.8.8.14 | Certificate signature pictures of any size made transparent, trimmed, fitted above the signatory's name and centred on the line, so designs with a signature save; Professional CPD's foot 26 mm; development moved to Linux Mint |
@@ -41,7 +42,9 @@
 
 **Course landing pages (Phase L, v0.9.0, 2026/10/09).** An optional marketing page per course at `/landing/{slug}`, built from ten structured section types in a flat, reorderable list (hero always first), with the price, rating, approved reviews and outline read live from the course and one purchase box shared with the course page (`CoursePurchaseOptions`). Draft or published; ADMIN previews it with inert buttons. Not built, by instruction: several pages per course, A/B tests, custom HTML or CSS, redirects for a changed address, external analytics (Phase M).
 
-**What is next.** The owner's review of the landing pages (v0.9.0), then Phase M (external analytics integration); the owner's review of the financial documents (v0.8.9), and the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**Legal pages, terms acceptance and the Refund Policy rule (v0.9.1, 2026/10/13).** Three public Core pages - Terms and Conditions (`/terms`), Refund Policy (`/refunds`) and Privacy Policy (`/privacy`) - each with a version and a last-updated date from `CattoLearning\Legal\LegalDocuments`, listed in the Core footer of every theme. Both checkouts require one tick box that names and links the Terms and the Refund Policy, and the order's immutable snapshot records the version of each that was accepted. Checkout no longer asks for an identity number. The ADMIN refund action enforces the Refund Policy's rule (section 2d) with a recorded override. The documents describe things that are not built yet and are planned below: payment and refund payout through Stitch (section 3), identity verification with the changed certificate and the public transcript (section 7), parental consent (section 5) and deleting activity log entries and analytics events after 5 years (section 10). Detail: `HANDOFF.md` and `COMMERCE-IMPLEMENTATION-PLAN.md`.
+
+**What is next.** The owner's review of the legal pages (v0.9.1) and the points left open for the owner and an attorney (`HANDOFF.md`); the Stitch integration, which the owner has named as a separate task and which the legal pages already describe (section 3); the owner's review of the landing pages (v0.9.0), then Phase M (external analytics integration); the owner's review of the financial documents (v0.8.9), and the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 
@@ -278,6 +281,23 @@ The period comes from the zero-priced variant where one exists, and from the cou
 
 A refunded order removes the learner's access at once. Not at period end, and not left in place.
 
+### When a refund is given — owner decision, 2026/10/13
+
+Published as the Refund Policy (`/refunds`) and enforced by the ADMIN refund action (`Commerce\Domain\RefundRule`, `RefundAdministrationService`):
+
+- A refund is given only if both are true: the learner has not started the course (has not pressed Start course), and fewer than 7 days have passed since the purchase. Once the learner starts, or 7 days pass, whichever comes first, no refund is given.
+- Starting any course in a bundle ends the refund right for the whole bundle.
+- Company credits are refunded only within 7 days of buying them, and only credits no learner has started.
+- ADMIN may override the refusal with a written reason, which is kept with the refund and shown on the ADMIN order page.
+- The existing mechanics stay: per order line, a full refund of a line removes that line's access unless another source still covers the course, bundles are refunded whole, and an order a promotion made free cannot be refunded.
+- How a refund is paid: a payment made through Stitch is refunded through Stitch to the original payment method, and a direct EFT is refunded by EFT to the account the payment came from, less any bank charges the seller incurs, each within 7 days of the refund request. In the code a refund is still a credit note and an Account Funds entry; the payout is part of the Stitch work in section 3.
+
+The code counts the 7 days from the moment the order's payment was confirmed, which for a direct EFT is when ADMIN confirms it.
+
+### Access periods and age — owner decision, 2026/10/13
+
+Access periods are fixed and there is no lifetime access. A period starts when the learner presses Start course, or automatically 90 days after payment is confirmed. Unused time is not refunded. After expiry the course leaves the library and the records are kept. Learners must be 18 or older; a learner under 18 needs the consent of a parent or guardian (section 5).
+
 ### Who may buy
 
 Both, and they are separate paths:
@@ -316,6 +336,8 @@ Implement one coherent commerce domain:
 - gateway abstraction; PayFast only after simulator acceptance.
 
 The reserved ACL keys in section 1 should be reused rather than renamed or duplicated.
+
+**Payment gateway — owner decision, 2026/10/13:** payments will be processed by Stitch (Stitch Express), with direct EFT also accepted. The published Terms and Conditions, Refund Policy and Privacy Policy already say so: card details are entered on Stitch's page and never reach this site, and refunds of Stitch payments go back through Stitch. The Stitch integration, and the payout of refunds through Stitch or by EFT, are a separate task and are not built; the code still has only the simulated card and manual EFT.
 
 **Billing profiles — Phase F, committed after v0.8.8.3 and released with v0.8.8.4 (owner instruction, 2026/10/05):** each person and each company has one reusable billing profile (`user_billing_profiles`, `company_billing_profiles`), edited on Account → Profile → Billing Address and the company Billing details section and filled into both checkouts. A placed order freezes a structured `billing` snapshot that every document renders from; later profile, name or company changes never alter it. The tax/VAT number is informational only. Phase I (v0.8.8.8) built the editable template engine; Phase K moves invoices, receipts and credit notes onto it, with the structured snapshot as their input.
 
@@ -527,6 +549,8 @@ Later additions:
 - SMS provider abstraction;
 - opt-in WhatsApp, Telegram and Signal communication channels with consent/preferences.
 
+Planned (owner decision, 2026/10/13): **Parental consent for learners under 18 - how consent is obtained and recorded.** The Terms and Conditions and the Privacy Policy already state that learners must be 18 or older and that a learner under 18 needs the consent of a parent or guardian. Nothing in the code asks for an age or records a consent yet.
+
 ## 6. Social linking, sharing and referrals
 
 Allow optional learner linking of Facebook, Instagram, Google, X, Threads and TikTok where provider APIs permit it.
@@ -544,6 +568,15 @@ Social posting must remain voluntary and must not gate course completion.
 ## 7. Certificates
 
 Delivered by Phase J: certificates are rendered by the document template engine; learners open them from the course page and download a one-page PDF; the public verification page keeps a stable identity (number and public id survive a reissue); a revoked certificate says so and has no PDF; and each certificate keeps the values and version it was issued with. Delivered by certificate designs (v0.8.8.10): six installed looks and uploaded backgrounds, logos and signature pictures, wording with fields, a live PDF preview, a fit check, and a design and accreditation line per course. Not built: an ADMIN list of issued certificates and a revoke action (the `revoked_at` and `revocation_reason` columns exist, but nothing sets them yet).
+
+**Planned — identity verification, certificates without a grade and a public transcript (owner decision, 2026/10/13).** One feature. The Terms and Conditions and the Privacy Policy already describe it, so it has to be built before they are relied on:
+
+- **Identity verification**, collected only when a learner requests a certificate. Anyone may take a course under any name they choose. To be verified, a South African learner supplies their RSA ID number and a copy of their ID document, and a learner from another country supplies their passport number and a picture of their passport. The seller reviews the document, downloads it for secure offline storage and then deletes it from the website. The site keeps only the ID or passport number, the verified name, and who verified it and when. Offline copies are kept for 5 years. The purpose is to protect the credibility of certificates and transcripts.
+- **Certificate issuing** changes from "graded final passed" to "every assessment completed", pass or fail, and waits for verification. The certificate and the transcript state the name exactly as it appears on the official identity document.
+- **No grade on the certificate.** Remove the grade and the percentage from the certificate's stored values, its design fields and its public page. The certificate states only that the learner took the course: verified name, course, date, number, accreditation and provider.
+- **A new public transcript** on the document template engine, with its own public verification page like `/certificates/{public_id}`. It records each module assessment mark, the final assessment mark and the overall grade (50% modules, 50% final). Certificates and transcripts are public: anyone with the link or number can view them without signing in, including the learner's name and grades.
+
+Until it is built the code still issues a certificate when a graded final is passed, prints the grade and percentage on it and verifies nobody.
 
 ## 8. Company embedding / white-label delivery
 
@@ -594,7 +627,8 @@ Before production is declared:
 - SQL/index/N+1 review;
 - PHP 8.5.x modernisation/performance audit;
 - accessibility and browser/mobile acceptance;
-- privacy/retention policy appropriate to real user data.
+- privacy/retention policy appropriate to real user data. The Privacy Policy (`/privacy`, 2026/10/13) states the retention periods: orders and transaction records at least 5 years, the activity log, analytics events and offline identity document copies 5 years, sign-in links 30 minutes and sessions 24 hours;
+- **Automatically delete activity log entries and analytics events older than 5 years.** The code keeps both for ever today (owner decision, 2026/10/13; not built).
 
 ---
 

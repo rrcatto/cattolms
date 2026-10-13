@@ -1,6 +1,7 @@
-# Effective terms are copied into orders; changing defaults never rewrites a purchase.
+# Effective values are copied into orders; changing defaults never rewrites a purchase.
+# The terms an order records are the Terms and Conditions and Refund Policy versions in
+# src/Legal/LegalDocuments.php, not a value here.
 commerce:
-    terms_version: commerce-development-2026-09-12
     payment_due_days: 7
     activation_deadline_days: 90
     tax_enabled: false

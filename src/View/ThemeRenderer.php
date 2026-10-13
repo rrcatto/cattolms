@@ -10,6 +10,9 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/13 SAST
+- The footer navigation lists the public legal documents (Terms, Refunds, Privacy) from LegalDocuments.
+- Advanced PLATFORM_ASSET_VERSION to 0.9.1.
 2026/10/09 SAST
 - Head metadata: the view model's meta (description, canonical address, robots rule and Open Graph tags) from a page's page_meta, drawn by the core partials/head-meta.html.twig that every bundled theme's head includes; the description defaults to the one the themes carried.
 - A course landing page (landing-page) is in the course-detail page family.
@@ -79,6 +82,7 @@ use CattoLearning\Application\AdministrationSectionRegistry;
 use CattoLearning\Application\AccountSectionRegistry;
 use CattoLearning\Application\CompanySectionRegistry;
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Csrf;
 use CattoLearning\Support\SocialPlatform;
 use CattoLearning\View\Twig\ThemeTemplates;
@@ -88,7 +92,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.0';
+    private const PLATFORM_ASSET_VERSION = '0.9.1';
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -732,7 +736,8 @@ final class ThemeRenderer
             ['key'=>'catalogue','label'=>'Catalogue','href'=>'/courses'],
             ['key'=>'help','label'=>'Help','href'=>'/help'],
             ['key'=>'contact','label'=>'Contact','href'=>'/contact'],
-            ['key'=>'privacy','label'=>'Privacy','href'=>'/privacy'],
+            // Terms, Refunds and Privacy: the public legal documents, from their one registry.
+            ...LegalDocuments::footerItems(),
         ];
         if ((bool) ($data['is_authenticated'] ?? false)) $items[] = ['key'=>'account','label'=>'Account','href'=>'/account'];
         if ($this->can($data,'COMPANY.DASHBOARD.VIEW')) $items[] = ['key'=>'company','label'=>'Company','href'=>'/company'];

@@ -10,6 +10,7 @@ use CattoLearning\Commerce\Application\RefundAdministrationService;
 use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Domain\OrderTotals;
+use CattoLearning\Commerce\Domain\RefundRule;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\Support\Money;
@@ -47,6 +48,7 @@ final class PaymentAdministrationController extends BaseController
         $order=$this->records->order($id);
         $snapshot=CommerceRepository::decode((string)$order['snapshot']);
         $items=$this->records->items($id);
+        $canRefund=$actor->hasPermission('PLATFORM.REFUND.MANAGE') && in_array($order['state'],['paid','fulfilled','manual_review','partially_refunded'],true);
         foreach ($items as &$item) {
             $details=CommerceRepository::decode((string)$item['snapshot']);
             $item['is_bundle']=$item['product_type']==='bundle';
@@ -69,6 +71,8 @@ final class PaymentAdministrationController extends BaseController
             $unit=(int)$item['amount_minor']>0 && (int)$item['quantity']>0 ? intdiv((int)$item['amount_minor'],(int)$item['quantity']) : 0;
             $item['refundable_quantity']=$item['unissued'] && $unit>0 ? (int)$item['quantity']-intdiv((int)$item['refunded_minor'],$unit) : (int)($item['latest_refundable']['available_count'] ?? 0);
             $item['refund_key']=Uuid::v4();
+            // Why the Refund Policy refuses this line now; a refused refund needs ADMIN's written override reason.
+            $item['rule_refusals']=$canRefund && $item['refunded_minor']<$item['paid_minor'] ? $this->refunds->ruleRefusals($order,$item) : [];
         }
         unset($item);
         $payments=$actor->hasPermission('PLATFORM.PAYMENT.VIEW') ? $this->records->payments($id) : [];
@@ -87,7 +91,7 @@ final class PaymentAdministrationController extends BaseController
             'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'fund_balance_label'=>$actor->hasPermission('PLATFORM.REFUND.VIEW') ? Money::strictMinorUnits($this->records->fundBalance($order['company_id']===null?(int)$order['purchaser_user_id']:null,$order['company_id']===null?null:(int)$order['company_id'],(string)$order['currency']),(string)$order['currency'])->format() : null,
             'payment_method'=>$this->records->paymentMethod($id),'can_confirm'=>$actor->hasPermission('PLATFORM.PAYMENT.MANAGE') && $actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),
-            'can_reconcile'=>$actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),'can_refund'=>$actor->hasPermission('PLATFORM.REFUND.MANAGE'),
+            'can_reconcile'=>$actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),'can_refund'=>$actor->hasPermission('PLATFORM.REFUND.MANAGE'),'refund_window_days'=>RefundRule::WINDOW_DAYS,
             'can_view_payments'=>$actor->hasPermission('PLATFORM.PAYMENT.VIEW'),
             'confirmation_key'=>Uuid::v4()]);
     }
@@ -121,7 +125,7 @@ final class PaymentAdministrationController extends BaseController
         $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.REFUND.MANAGE'); $id=(int)$this->param('id');
         return $this->handle(function () use ($actor,$id): void {
             $amount=$this->posted('amount')==='' ? 0 : $this->parseAmount($this->posted('amount'));
-            $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount);
+            $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'));
             $this->flash('success','Refund approved, credited to Account Funds and documented with a credit note.');
             $this->redirect('/admin/commerce/orders/'.$id);
         },'/admin/commerce/orders/'.$id);

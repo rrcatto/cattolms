@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.0 · **Updated:** 2026-10-09
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.1 · **Updated:** 2026-10-13
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -151,6 +151,12 @@ these examples do not authorise hard-coded destinations in themes.
 The standard footer destination array is core-owned. Factory Reset, Light Default and Radiant Learning delegate
 to the site-footer partial. Factory Reset Sidebar retains its richer themed footer. Gilded Noir retains its individual footer composition using the same
 standard destinations and platform action component. Do not replace its footer with another theme's.
+
+Since v0.9.1 `footer_navigation` also carries the public legal documents - Terms (`/terms`), Refunds
+(`/refunds`) and Privacy (`/privacy`) - after Contact, for every visitor. A footer draws every entry of the
+array in the order core gives it; a theme never picks entries out of it and never writes a legal link of its
+own (`NavigationContractTest`). The legal pages themselves are ordinary platform pages on surfaces
+(`layout.surface`, `layout.section-head`, `data.key-value-list`): a theme styles them as it styles any page.
 
 Account, company and admin family models expose `sections` and `section` for composed workspace and
 standalone contexts. Their content is already-rendered platform content. Core page bodies own the

@@ -16,6 +16,7 @@ use CattoLearning\Commerce\Policy\CommercePolicy;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,CompanyRepository,Database,TransactionManager};
+use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,IntegrationContainer,PromotionFixture};
 use PHPUnit\Framework\Attributes\Group;
@@ -294,6 +295,87 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         } catch (\Doctrine\DBAL\Exception $error) {
             $this->db->executeStatement('ROLLBACK TO SAVEPOINT refunded_unit_guard');
             self::assertStringContainsString('No unrefunded credit units',$error->getMessage());
+        }
+    }
+
+    private function refunds(): RefundAdministrationService
+    {
+        $container=IntegrationContainer::get();
+        return new RefundAdministrationService($this->records,new TransactionManager($this->db),$container->get(TransitionService::class),$this->clock,$this->analytics(),$this->access,$container->get(FinancialDocuments::class));
+    }
+
+    /** Buys $quantity credits of the fixture course with the simulated card and returns the order. */
+    private function buyCredits(int $quantity): int
+    {
+        $this->purchases->add($this->buyer,$this->companyId,$this->variantId,$quantity);
+        $review=$this->purchases->review($this->buyer,$this->companyId);
+        return $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
+    }
+
+    public function testACompanyOrderIsNotPlacedUntilTheTermsAndTheRefundPolicyAreAccepted(): void
+    {
+        $this->purchases->add($this->buyer,$this->companyId,$this->variantId,2);
+        $review=$this->purchases->review($this->buyer,$this->companyId);
+        try {
+            $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,false);
+            self::fail('A company order needs the same acceptance as any order.');
+        } catch (RuntimeException $refused) {
+            self::assertSame('Accept the Terms and Conditions and the Refund Policy before placing the company order.',$refused->getMessage());
+        }
+        self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_orders WHERE company_id=:company',['company'=>$this->companyId]),'Nothing is placed, billed or charged.');
+        self::assertNull(BillingFixture::service($this->db,$this->clock)->forCompany($this->companyId),'The company billing profile is not touched either.');
+    }
+
+    public function testTheCompanyOrderSnapshotRecordsTheAcceptedTermsAndRefundPolicyVersions(): void
+    {
+        $snapshot=CommerceRepository::decode((string)$this->records->order($this->buyCredits(2))['snapshot']);
+        self::assertSame(LegalDocuments::version(LegalDocuments::TERMS),$snapshot['terms_version']);
+        self::assertSame(LegalDocuments::version(LegalDocuments::REFUNDS),$snapshot['consent']['refund_policy_version']);
+        self::assertSame($this->buyer->sessionPublicId,$snapshot['consent']['session_id']);
+        self::assertNotSame('',(string)$snapshot['consent']['accepted_at']);
+        self::assertStringNotContainsString('development',json_encode($snapshot,JSON_THROW_ON_ERROR));
+    }
+
+    public function testCompanyCreditsAreRefundedOnlyWithinSevenDaysAndOnlyWhileNoLearnerHasStartedThem(): void
+    {
+        $order=$this->buyCredits(3);
+        $item=$this->records->items($order)[0];
+        $creditId=(int)$this->db->fetchOne('SELECT id FROM course_credits WHERE commerce_order_item_id=:item',['item'=>$item['id']]);
+        $refunds=$this->refunds(); $admin=$this->financeAdmin();
+
+        // A learner who has started holds one credit for good: starting consumed it.
+        $this->db->executeStatement("INSERT INTO course_credit_allocations(credit_id,user_id,status,consumed_at) VALUES (:credit,:user,'consumed',NOW())",['credit'=>$creditId,'user'=>$this->buyer->id]);
+        try {
+            $refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'voluntary','Unused credit refund.',3,0);
+            self::fail('A credit a learner has started is not refundable.');
+        } catch (RuntimeException $refused) {
+            self::assertSame('The requested quantity exceeds unallocated credit units.',$refused->getMessage());
+        }
+        $this->clock->modify('+7 days -1 second');
+        $inside=$refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
+        self::assertNull($this->db->fetchOne('SELECT override_reason FROM commerce_refunds WHERE id=:id',['id'=>$inside]),'An unused credit inside seven days is refunded under the rule.');
+        self::assertSame(12345,$this->records->refundedAmount($order));
+
+        $this->clock->modify('+1 second');
+        try {
+            $refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
+            self::fail('Seven days after the purchase company credits are not refunded.');
+        } catch (RuntimeException $refused) {
+            self::assertStringStartsWith('The Refund Policy does not allow this refund. 7 days have passed since the credits were bought on ',$refused->getMessage());
+        }
+        self::assertSame(12345,$this->records->refundedAmount($order),'The refused refund wrote nothing.');
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT refunded_quantity FROM course_credits WHERE id=:id',['id'=>$creditId]));
+
+        $late=$refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'goodwill','Unused credit refund.',1,0,'The company asked on day five; we replied late.');
+        $refund=$this->db->fetchAssociative('SELECT policy_refusal,override_reason FROM commerce_refunds WHERE id=:id',['id'=>$late]) ?: [];
+        self::assertStringStartsWith('7 days have passed since the credits were bought on ',(string)$refund['policy_refusal']);
+        self::assertSame('The company asked on day five; we replied late.',$refund['override_reason']);
+        self::assertSame(2,(int)$this->db->fetchOne('SELECT refunded_quantity FROM course_credits WHERE id=:id',['id'=>$creditId]));
+        try {
+            $refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'goodwill','Unused credit refund.',1,0,'An override never reaches a started credit.');
+            self::fail('The started credit stays unrefundable even with an override.');
+        } catch (RuntimeException $refused) {
+            self::assertStringContainsString('Refund the newest eligible purchased credit lot first',$refused->getMessage());
         }
     }
 }

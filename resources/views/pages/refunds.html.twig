@@ -1,0 +1,108 @@
+{% extends layout %}
+{#
+  Refund Policy. The text is version controlled here; its version and date are in
+  CattoLearning\Legal\LegalDocuments and must be raised there whenever this text changes, because an
+  order records the version its purchaser accepted. The rule stated here is the one
+  CattoLearning\Commerce\Domain\RefundRule enforces in the ADMIN refund action; change them together.
+#}
+{% block page_body %}
+	{% set ph_kicker = 'Legal' %}
+	{% set ph_title = legal.title %}
+	{% set ph_lead = 'When a refund is given, how it is paid and how to ask for one.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set legal_intro = 'This policy applies to every purchase made on this site. It is part of the Terms and Conditions.' %}
+	{% set legal_sections = [
+		{id: 'rule', label: 'The rule'},
+		{id: 'bundles', label: 'Bundles'},
+		{id: 'company-credits', label: 'Company credits'},
+		{id: 'nothing-paid', label: 'Orders with nothing to pay'},
+		{id: 'access', label: 'What happens to your access'},
+		{id: 'payment', label: 'How a refund is paid'},
+		{id: 'request', label: 'How to ask for a refund'},
+		{id: 'your-rights', label: 'Your rights under the law'},
+	] %}
+	<section class="cl-page-section container cl-medium py-5">
+		{% include '@platform/partials/legal-document-head.html.twig' %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'rule'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '1. The rule'}) }}
+			<p>A refund is given only if both of these are true:</p>
+			<ol>
+				<li>you have not started the course, which means you have not pressed Start course</li>
+				<li>fewer than {{ refund_window_days }} days have passed since your purchase</li>
+			</ol>
+			<p>Once you start the course, or {{ refund_window_days }} days pass, whichever comes first, no refund is given.</p>
+			<p>Your purchase is the moment your payment is confirmed. For a payment through Stitch that is when you pay. For a direct EFT it is when we confirm that your payment has arrived in our bank account.</p>
+			<p>A refund is the amount you paid for the course. If you used a promo code, that is the price less the discount.</p>
+			<p>Unused access time is not refunded.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'bundles'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '2. Bundles'}) }}
+			<p>A bundle is refunded as a whole. A single course in a bundle is not refunded on its own.</p>
+			<p>Starting any course in the bundle ends the right to a refund for the whole bundle.</p>
+			<p>The same {{ refund_window_days }} days apply to a bundle.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'company-credits'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '3. Company credits'}) }}
+			<p>A refund for company credits is allowed only within {{ refund_window_days }} days of buying the credits, and only for credits that no learner has started.</p>
+			<p>A credit that is assigned to a staff member who has not started can be refunded once the Company Administrator removes that staff member from the course. That returns the credit to the company.</p>
+			<p>Each refunded credit is refunded at the price the company paid for it. Staff members who have started keep their access.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'nothing-paid'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '4. Orders with nothing to pay'}) }}
+			<p>A free course has nothing to refund. An order that a promo code reduced to nothing has nothing to refund.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'access'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '5. What happens to your access'}) }}
+			<p>When a course or bundle is refunded in full, the access that purchase gave you ends at once. A course you have no other access to leaves your library.</p>
+			<p>If you also have access to the same course from another purchase or from your company, that access continues.</p>
+			<p>The records of your order, your payment and the refund are kept. Your invoice and receipt stay available under My Orders in your account, and a credit note is added for the refund.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'payment'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '6. How a refund is paid'}) }}
+			<ul>
+				<li><strong>You paid through Stitch.</strong> The refund is made through Stitch to the payment method you used, within 7 days of your refund request.</li>
+				<li><strong>You paid by direct EFT.</strong> The refund is made by EFT to the bank account your payment came from, less any bank charges we incur, within 7 days of your refund request.</li>
+			</ul>
+			<p>After we make a refund, your bank may take a few working days to show it in your account.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'request'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '7. How to ask for a refund'}) }}
+			<p>Ask before the {{ refund_window_days }} days end:</p>
+			<ul>
+				<li>email <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a></li>
+				<li>or use the <a href="/contact">contact form</a></li>
+			</ul>
+			<p>Give your order number, which starts with CL-, the course or bundle you want refunded and the email address of your account. For company credits, the Company Administrator asks for the company.</p>
+			<p>We check your request against the rule above and reply to you.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'your-rights'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '8. Your rights under the law'}) }}
+			<p>This policy does not take away a right you have under the Consumer Protection Act 68 of 2008 or the Electronic Communications and Transactions Act 25 of 2002.</p>
+			<p>If you are unhappy with a decision about a refund, <a href="{{ legal_documents.terms.path }}#complaints">section 13 of the {{ legal_documents.terms.title }}</a> explains how to complain.</p>
+{% endblock %}
+{% endembed %}
+	</section>
+{% endblock %}

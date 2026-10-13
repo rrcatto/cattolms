@@ -16,6 +16,7 @@ use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
@@ -192,7 +193,7 @@ final class CompanyCreditPurchaseService
         OrderService::requireCapability($actor, 'COMPANY.CREDIT.MANAGE');
         OrderService::requireCapability($actor, 'COMMERCE.CHECKOUT.START');
         CheckoutService::validateMethod($method, $token);
-        if (!$accepted) throw new RuntimeException('Accept the purchase terms before placing the company order.');
+        if (!$accepted) throw new RuntimeException('Accept the Terms and Conditions and the Refund Policy before placing the company order.');
         if (!Uuid::isValid($key)) throw new RuntimeException('Invalid purchase identifier.');
         [$orderId,$created] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billing,$method,$emailInvoice): array {
             $this->records->lockPurchaser($actor->id);
@@ -216,8 +217,8 @@ final class CompanyCreditPurchaseService
                 'company_id'=>$companyId,'company_name'=>$review['company']['name'],'billing'=>$billing->toSnapshot(),
                 'request_id'=>$requestId,'items'=>$review['items'],
                 'total_minor'=>$review['total_minor'],'currency'=>'ZAR','payment_method'=>$method,'invoice_email'=>$emailInvoice,
-                'tax_enabled'=>false,'terms_version'=>$this->policy->termsVersion,
-                'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false]];
+                'tax_enabled'=>false,'terms_version'=>LegalDocuments::version(LegalDocuments::TERMS),
+                'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false,'refund_policy_version'=>LegalDocuments::version(LegalDocuments::REFUNDS)]];
             $id = $this->records->placeCompany($actor->id,$companyId,$requestId,$key,(int)$review['total_minor'],'ZAR',$snapshot,
                 $now->format(DATE_ATOM),$now->modify('+'.$this->policy->paymentDueDays.' days')->format(DATE_ATOM));
             foreach ($review['items'] as $line) $this->records->addCompanyOrderItem($id,$companyId,$line);

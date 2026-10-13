@@ -1,0 +1,12 @@
+{#
+  The acceptance both checkouts require before an order is placed: the Terms and Conditions and the
+  Refund Policy, named and linked beside the tick box. Placement refuses without accept_terms, and
+  the order's snapshot records the version of each that was accepted (LegalDocuments). The links
+  open in a new tab so the checkout keeps what the purchaser has entered.
+#}
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I have read and accept the Terms and Conditions and the Refund Policy.'})} %}
+{% block control %}
+<input type="checkbox" name="accept_terms" value="yes" required>
+{% endblock %}
+{% block label_content %}I have read and accept the <a href="/terms" target="_blank" rel="noopener">Terms and Conditions</a> and the <a href="/refunds" target="_blank" rel="noopener">Refund Policy</a>.{% endblock %}
+{% endembed %}

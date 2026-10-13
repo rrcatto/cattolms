@@ -1,14 +1,15 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.9.0 **Date time:** 2026/10/09 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.9.1 **Date time:** 2026/10/13 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.9.0 operational position
+## Current v0.9.1 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`, the code line v0.9.0 is released from. Annotated tag `v0.9.0` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
-- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/09 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.8`) on `dev-v0.8`, the code line v0.9.1 is released from. Annotated tag `v0.9.1` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/13 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 92 permissions (10 `SYSTEM.*`, 82 business) across the five roles.
 - **Financial documents (Phase K, v0.8.9).** The baseline installs the invoice, receipt and credit note templates compiled from the standard financial document design (`FinancialDocumentDesignCompiler`, whose structure is `resources/documents/invoice.html`, `receipt.html`, `credit_note.html` and the shared `financial.css`). After that ADMIN changes the design at Commerce → Financial Documents; each save publishes a new version, and every issued document stores its values and names the version that drew it, so it is drawn the same way however the design, the business details or the customer's details change. Editing a source file changes only new installations, until the database is rebuilt.
 - **Course landing pages (Phase L, v0.9.0).** A course's marketing page is at `/landing/{slug}` and is public only while it and its course are published; its price, rating, reviews and outline are read live, so nothing needs refreshing when a course changes. Its hero picture is served by `/landing/{slug}/picture/{public_id}`, publicly only once the page is published. Every bundled theme's head includes `partials/head-meta.html.twig`, so a theme installed from an older package keeps the fixed site description until it is reinstalled. The ACL is unchanged (92 permissions).
+- **Legal documents (v0.9.1).** `/terms`, `/refunds` and `/privacy` are public pages listed in the footer of every theme. Their supplier block prints `APP_ADMIN_EMAIL` and `APP_DOMAIN` from the instance `.env`, read each time a page is drawn: set both before the pages are shown to the public. Each document's version and last-updated date are in `src/Legal/LegalDocuments.php`, and every order records the versions its purchaser accepted, so a change to a document's text raises its version and date in the same change. The pages describe payment through Stitch, identity verification, a certificate without a grade, a public transcript, parental consent and deletion of activity records after 5 years, none of which is built yet (`ROADMAP.md`); the owner decides when they go public. The ACL is unchanged (92 permissions).
 - **Certificate designs (v0.8.8.10).** The baseline stores the six look backgrounds (`resources/certificates/looks/*.png`) as pictures in `document_assets` and installs six designs compiled from the looks (Classic, Modern, Minimal, Legal Seal, Gold Frame and Professional CPD), with Classic the default for new courses; every course starts on it. After that, designs are made at Courses → Certificate Designs and live in the database, uploaded backgrounds, logos and signatures included (`document_assets` rows are immutable, stored once by SHA-256, and never written to `storage/`). Each issued certificate stores its values and references the design version it was drawn with, and is drawn again from them, so editing or deleting a design never changes an issued certificate. Generated seed certificates are recorded the same way, against each course's design.
 - **Category order.** Category positions are explicit and compact: 1..n within each parent, refused as a duplicate by the database. A script that inserts categories directly must place each one after its siblings (`COALESCE(MAX(position),0)+1` for its parent) or run inside a transaction that defers `course_categories_sibling_position` and renumbers before it ends.
 - **PDF fonts.** Certificates print in the bundled OFL fonts in `resources/documents/fonts/` (Cormorant Garamond, Playfair Display, IBM Plex Sans and IBM Plex Serif). Dompdf keeps their metrics in the instance's `storage/cache/dompdf-fonts`, which it creates on first use; it must be writable by PHP-FPM (`cattotest` in development), and deleting it only makes the next PDF rebuild it.
@@ -89,6 +90,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.8.14:** signature pictures fitted to the certificate automatically. No schema change and nothing to publish to the web root.
 - **v0.8.9:** financial documents on the document template engine (Phase K). The baseline changed (`commerce_documents` stores `document_data` and the template version; `PLATFORM.DOCUMENT.VIEW`/`MANAGE`): rebuild the database. Publish `catto-platform.css`.
 - **v0.9.0:** course landing pages (Phase L). The baseline gained `course_landing_pages` and `course_landing_sections`: rebuild the database. Publish `catto-platform.css`, `js/platform-overrides.js` and the compiled `assets/` (the `landing-sections` controller and the new Stimulus controller map; delete the served `@symfony/stimulus-bundle/controllers-i3Y_kUZ.js`), then run `composer themes:install -- --force`, because every theme's head now includes the core head metadata.
+- **v0.9.1:** the legal pages, terms acceptance and the Refund Policy rule. The baseline changed (`commerce_refunds.policy_refusal` and `override_reason`): rebuild the database. No stylesheet, script, compiled asset or theme changed, so nothing is published to the web root. Set `APP_ADMIN_EMAIL` and `APP_DOMAIN` to the email address and domain the pages should print.
 
 ### Commerce operations
 
@@ -101,6 +103,8 @@ These versions shipped as incremental migrations. Those migrations were consolid
   - A late or changed paid order needs an explicit, reasoned manual-review release.
   - If fulfilment is impossible, ADMIN may refund the paid but unissued order from manual review.
 - **Refunds.** Refund approval creates a credit note and an Account Funds entry.
+  - Approval enforces the Refund Policy (`/refunds`, `Commerce\Domain\RefundRule`): it is refused once the learner has started the course (any course of a bundle) or 7 days after the payment was confirmed, and for company credits 7 days after they were bought. The order page shows each line as within or outside the policy, with the reasons.
+  - ADMIN may approve a refused refund by recording an override reason (5 to 2,000 characters). The reason and what the rule refused are kept with the refund and shown on the order page. An override does not make a company credit a learner has started refundable.
   - A full refund of an individual course or bundle line revokes exactly the entitlement sources that line created. Each course's access is then worked out again from its remaining sources.
   - Refunds are bounded by what each line paid after promotions.
   - Company credit refunds apply only to unused purchased units, at historical LIFO prices.
@@ -125,13 +129,13 @@ Configure Administration → Settings → Bank details before providing EFT inst
 
 Only on the owner's explicit instruction to commit and push a version:
 
-1. Update the version, `README.md` (its current release line and release history), `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks). `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit on `dev-v0.8` and create the annotated tag: the version with a leading `v` (`v0.9.0`, `v0.8.8.14`).
+1. Update the version, `README.md` (its current release line and release history), `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme, and an installed theme whose head lacks `partials/head-meta.html.twig` fails two landing page tests. Make the installed theme active again afterwards. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
+2. Commit on `dev-v0.8` and create the annotated tag: the version with a leading `v` (`v0.9.1`, `v0.8.8.14`).
 3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.8:main` and `git push origin` with the tag).
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.0   # the tag being released
+   V=v0.9.1   # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
@@ -406,11 +410,16 @@ At minimum review:
 /admin/analytics/events
 /contact
 /help
+/terms
+/refunds
+/privacy
 ```
 
 The browser checks in `tests/Browser/` cover most of these in all five themes; see its README.
 
 Also validate the accepted external theme at desktop and mobile widths.
+
+`/terms`, `/refunds` and `/privacy` are public routes too. Their text is in `resources/views/pages/`; when it changes, raise that document's version and date in `src/Legal/LegalDocuments.php` in the same change, because an order records the versions its purchaser accepted. The supplier's email address and website on them come from `APP_ADMIN_EMAIL` and `APP_DOMAIN`.
 
 `/help` is a public route and must return the learner-facing guide without an authentication cookie. Keep its instructions focused on finding courses, buying access, course structure and learning; do not turn it into an administration manual.
 

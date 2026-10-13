@@ -555,9 +555,29 @@ final class CommerceRepository
     {
         return (int)$this->db->fetchOne("SELECT COUNT(*) FROM course_credit_allocations WHERE credit_id=:id AND status IN ('assigned','consumed')", ['id'=>$creditId]);
     }
-    public function createRefund(string $key, int $orderId, int $itemId, int $quantity, int $amount, string $currency, string $basis, string $reason, int $actorId, string $now): int
+    /**
+     * When the order's payment was confirmed: the purchase a refund's days are counted from. Null
+     * for an order with no confirmed payment (unpaid, or one a promotion made free).
+     */
+    public function paidAt(int $orderId): ?string
     {
-        return (int)$this->db->fetchOne('INSERT INTO commerce_refunds(public_id,request_key,order_id,order_item_id,quantity,amount_minor,currency,basis,reason,approved_by_user_id,approved_at) VALUES (:public,:key,:order,:item,:quantity,:amount,:currency,:basis,:reason,:actor,:now) RETURNING id', ['public'=>Uuid::v4(),'key'=>$key,'order'=>$orderId,'item'=>$itemId,'quantity'=>$quantity,'amount'=>$amount,'currency'=>$currency,'basis'=>$basis,'reason'=>$reason,'actor'=>$actorId,'now'=>$now]);
+        $at = $this->db->fetchOne("SELECT MAX(e.created_at) FROM commerce_payment_events e JOIN commerce_payments p ON p.id=e.payment_id WHERE p.order_id=:id AND e.state='paid'", ['id'=>$orderId]);
+        return is_string($at) ? $at : null;
+    }
+    /**
+     * The courses of an order line the learner has started (pressed Start course), oldest source first.
+     *
+     * @return list<array{course_id:int,started_at:string}>
+     */
+    public function startedCourses(int $itemId): array
+    {
+        return array_map(static fn(array $row): array => ['course_id'=>(int)$row['course_id'],'started_at'=>(string)$row['started_at']],
+            $this->db->fetchAllAssociative('SELECT ce.course_id,ce.started_at FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE e.order_item_id=:item AND ce.started_at IS NOT NULL ORDER BY e.id', ['item'=>$itemId]));
+    }
+    /** A refund the Refund Policy refuses carries what the rule refused and ADMIN's written override reason; both are null otherwise. */
+    public function createRefund(string $key, int $orderId, int $itemId, int $quantity, int $amount, string $currency, string $basis, string $reason, int $actorId, string $now, ?string $policyRefusal = null, ?string $overrideReason = null): int
+    {
+        return (int)$this->db->fetchOne('INSERT INTO commerce_refunds(public_id,request_key,order_id,order_item_id,quantity,amount_minor,currency,basis,reason,approved_by_user_id,approved_at,policy_refusal,override_reason) VALUES (:public,:key,:order,:item,:quantity,:amount,:currency,:basis,:reason,:actor,:now,:refusal,:override) RETURNING id', ['public'=>Uuid::v4(),'key'=>$key,'order'=>$orderId,'item'=>$itemId,'quantity'=>$quantity,'amount'=>$amount,'currency'=>$currency,'basis'=>$basis,'reason'=>$reason,'actor'=>$actorId,'now'=>$now,'refusal'=>$policyRefusal,'override'=>$overrideReason]);
     }
     public function creditRefundFunds(int $refundId, ?int $userId, ?int $companyId, string $currency, int $amount, string $now): void
     {
