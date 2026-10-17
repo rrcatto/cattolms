@@ -5,7 +5,7 @@
 	{% set ph_back_label = 'My Courses' %}
 	{% set ph_title = 'Certificate' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-page-section container-fluid cl-container-wide py-5">
+	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2, summary: 'This public page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
 			{% if certificate.revoked_at %}

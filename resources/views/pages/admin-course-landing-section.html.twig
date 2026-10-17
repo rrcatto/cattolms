@@ -7,10 +7,8 @@
 	from the course.
 #}
 {% set ph_back_href = landing_home %}{% set ph_back_label = 'Landing page' %}{% set ph_kicker = 'Landing page · ' ~ course.title %}{% set ph_title = section.label %}{% set ph_lead = section.description %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section section">
-	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 1, section_spacing: true})} %}
-{% block body %}
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 		{% if error %}
 			{{ ui('feedback.notice', {tone: 'danger', heading: 'The section was not saved. ' ~ error}) }}
@@ -121,8 +119,6 @@
 {% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', href: landing_home ~ '#landing-section-' ~ section.id}) }}{% endblock %}
 			{% endembed %}
 		</form>
-{% endblock %}
-	{% endembed %}
 {% endblock %}
 	{% endembed %}
 </section>

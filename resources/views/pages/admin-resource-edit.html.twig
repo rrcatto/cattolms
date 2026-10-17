@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {% set ph_back_href = '/admin/resources' %}{% set ph_back_label = 'Resource Library' %}{% set ph_kicker = 'Resource details' %}{% set ph_title = resource.title %}{% set ph_lead = resource.original_filename ~ ' · ' ~ size_label ~ '. The stored file never changes; only its details do.' %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Edit details', summary: 'A changed type must still suit every Course Item that uses this file.'}) }}
 <form action="/admin/resources/{{ resource.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">

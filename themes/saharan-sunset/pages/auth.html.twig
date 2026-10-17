@@ -1,0 +1,19 @@
+{#
+	Sign-in family wrapper (sign in, link sent, register, company registration). The serpent panel
+	is decoration beside the unchanged platform page body, after the sign-in mockup's split layout,
+	and the whole family sits inside the page box.
+#}
+{% extends '@theme/base.html.twig' %}
+{% block page_content %}
+	<div class="cl-page-family ss-auth">
+		<div class="ss-auth-art">
+			<div class="ss-auth-copy">
+				<p class="ss-auth-eyebrow">{{ app.name }}</p>
+				<p class="ss-auth-quote">Your progress is saved on the server. Sign in on any device to continue where you stopped.</p>
+			</div>
+		</div>
+		<div class="ss-auth-body">
+			{{ block('page_body') }}
+		</div>
+	</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{#
+	A section's own actions, from its registry's actions() and filtered by permission in ThemeRenderer:
+	in the page head when the section is the page, in the section's card head when it is one of several
+	on an "All sections" page. A link goes somewhere; a button opens the form window the section draws.
+#}
+{% for action in actions %}
+	{% if action.modal %}
+		{{ ui('action.button', {label: action.label, variant: action.variant, type: 'button', modal: action.modal, icon: action.icon}) }}
+	{% else %}
+		{{ ui('action.link', {label: action.label, variant: action.variant, href: action.href, icon: action.icon}) }}
+	{% endif %}
+{% endfor %}

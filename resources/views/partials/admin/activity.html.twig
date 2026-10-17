@@ -1,18 +1,9 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Activity', eyebrow: 'Activity', summary: 'A chronological view of audited activity across the LMS. Filter it to the people, companies, courses or event types you need.'}) }}
 
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-<form class="activity-filters" action="/admin/activity" method="get">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
+<form class="activity-filters" action="/admin/activity" method="get">
 
 	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
@@ -57,8 +48,7 @@
 {% endblock %}
 {% endembed %}
 
-{% endblock %}
-{% endembed %}</form>
+</form>
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'activity', pagination: activity_pagination})} %}
 {% block results %}
 
@@ -131,5 +121,7 @@
 				</div>
 			{% endif %}
 
+{% endblock %}
+{% endembed %}
 {% endblock %}
 {% endembed %}

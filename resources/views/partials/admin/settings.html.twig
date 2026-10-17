@@ -1,14 +1,8 @@
 {# Each settings form saves independently; presentation uses the shared accordion pattern. #}
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Platform settings', eyebrow: 'Settings', summary: 'Open a section to change its settings, then use that section’s save button.'}) }}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

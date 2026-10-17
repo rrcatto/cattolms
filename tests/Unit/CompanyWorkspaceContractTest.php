@@ -7,6 +7,8 @@ Description:
 Protects the consolidated Company workspace, semantic routes, top-level navigation and scalable Companies Administration table.
 
 Changelog:
+2026/10/17 SAST
+- Add company is a section action of the Companies section (AdministrationSectionRegistry::actions), drawn by the shared section-actions partial rather than a toolbar.
 2026/08/21 10:32 SAST
 - Replaced the @companies_total_pages assertion, which pinned a hand-built pagination nav that rendered as a second, inert control beside the shared one, with an assertion that Companies carries the shared control and nothing else.
 */
@@ -109,7 +111,9 @@ final class CompanyWorkspaceContractTest extends TestCase
         $modals = (string) file_get_contents($root . '/resources/views/partials/admin/company-modals.html.twig');
         $css = (string) file_get_contents($root . '/public_html/css/catto-platform.css');
         $js = (string) file_get_contents($root . '/public_html/js/platform-overrides.js');
-        self::assertStringContainsString("modal: 'company-add'", (string) file_get_contents($root . '/resources/views/partials/admin/companies.html.twig'));
+        // Add company is the Companies section's own action (its registry), drawn in the page head or
+        // the section's card head; it opens the shared dialog.
+        self::assertContains('company-add', array_column((new \CattoLearning\Application\AdministrationSectionRegistry())->actions('companies'), 'modal'));
         // The heading is named by the dialog's aria-labelledby, so the id and the label both have
         // to be there. Which line each sits on is formatting, not contract.
         self::assertStringContainsString("id: 'company-add', title: 'Add Company'", $modals);

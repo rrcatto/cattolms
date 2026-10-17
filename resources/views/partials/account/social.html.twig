@@ -1,7 +1,4 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Links to your profiles elsewhere', eyebrow: 'Social Media', summary: 'Paste the full web address of each profile. Leave a field empty to remove that link.'}) }}
@@ -30,9 +27,6 @@
 {% endblock %}
 {% endembed %}
 		</form>
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

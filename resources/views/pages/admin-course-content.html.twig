@@ -2,7 +2,7 @@
 {% block page_body %}
 {% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course administration' %}{% set ph_kicker = 'Structure, presentation and availability' %}{% set ph_title = course.title ~ ' · Course Content' %}{% set ph_lead = 'Course Items are reusable. These rows hold only this course’s structure, display overrides, public preview setting, assessment role and relative availability. Every move is saved at once.' %}{% include '@platform/partials/page-head.html.twig' %}
 {{ importmap() }}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('action.group') with {props:ui_props('action.group',{})} %}{% block body %}{{ ui('action.link',{label:'Preview as learner',href:'/admin/courses/' ~ course.id ~ '/preview'}) }}{{ ui('action.link',{label:'Preview public course',href:'/courses/' ~ course.slug ~ '/preview?preview=1'}) }}{% endblock %}{% endembed %}
 {% set validation = course.publication_validation %}
 {% if validation.errors %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'Publication errors', section_spacing: true})} %}{% block body %}<ul>{% for error in validation.errors %}<li>{{ error }}</li>{% endfor %}</ul>{% endblock %}{% endembed %}{% endif %}

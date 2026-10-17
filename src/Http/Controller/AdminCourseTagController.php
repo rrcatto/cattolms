@@ -19,6 +19,8 @@ and a tag is cross-cutting classification, so an installation may reasonably del
 the other.
 
 Changelog:
+2026/10/17 SAST
+- No course_group: the Courses group tab strip is gone.
 
 2026/09/08 10:00 SAST
 
@@ -79,7 +81,6 @@ final class AdminCourseTagController extends BaseController
 
         return $this->render('admin-course-tags', [
             'title' => 'Course tags',
-            'course_group' => 'tags',
             // Counted in the reader's universe. A tag is a shared label; the courses carrying it
             // are business records, so an operator reading REAL is not shown a generated tally.
             'tags' => $this->courses->tags($search, $pagination->pageSize, $pagination->offset),

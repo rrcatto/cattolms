@@ -21,6 +21,8 @@ asserts both halves.
 Architectural boundary: unit. It exercises a value object and touches nothing else.
 
 Changelog:
+2026/10/17 SAST
+- Every platform names an https home page, and the footer's six marks link to an address on their own platform.
 2026/09/10 02:25 SAST
 - Created with the Profile submenu's social media page.
 */
@@ -108,5 +110,18 @@ final class SocialPlatformTest extends TestCase
         $byKey = array_column($form, 'url', 'key');
         self::assertSame('https://github.com/someone', $byKey['github']);
         self::assertSame('', $byKey['linkedin'], 'A platform with nothing stored renders an empty field, not a missing one.');
+    }
+
+    public function testEveryPlatformNamesItsHomePage(): void
+    {
+        foreach (SocialPlatform::keys() as $key) {
+            self::assertStringStartsWith('https://', SocialPlatform::home($key), $key);
+        }
+        // The footer's marks link to these until settings give a profile address, so each must be an
+        // address on its own platform.
+        foreach (['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'] as $key) {
+            self::assertSame(SocialPlatform::home($key), SocialPlatform::normalise($key, SocialPlatform::home($key)), $key);
+        }
+        self::assertSame('', SocialPlatform::home('myspace'));
     }
 }

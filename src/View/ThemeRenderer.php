@@ -10,6 +10,12 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/17 SAST
+- One width per page: PAGE_WIDTHS and pageWidth() choose wide (the default), medium, narrow or full, and a page may pass page_width; the body carries cl-width-* and the model page.width.
+- sectionActions() keeps the registry actions whose permission flag is set. A section fragment gets section_actions and section_standalone: standalone on its own page, not on All sections or in an htmx company section.
+- The Courses menu label is no longer in capitals.
+- The footer's social marks link to each platform's home page until settings supply a profile address.
+- Advanced PLATFORM_ASSET_VERSION to 0.9.2.
 2026/10/13 SAST
 - The footer navigation lists the public legal documents (Terms, Refunds, Privacy) from LegalDocuments.
 - Advanced PLATFORM_ASSET_VERSION to 0.9.1.
@@ -92,7 +98,31 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.1';
+    private const PLATFORM_ASSET_VERSION = '0.9.2';
+
+    /**
+     * How wide each page is, when it is not wide. A page chooses its width once and every row of it
+     * follows (the cl-width-* body class and the --cl-content-width variable in catto-platform.css),
+     * so a section can no longer be wider or narrower than its page head. Forms, the legal and help
+     * pages, cart and checkout are medium; the sign-in pages and the error page are narrow; Home and
+     * course landing pages run full width, which a theme without a full-width design draws as wide.
+     * A controller may pass page_width for a page whose width depends on what it shows.
+     */
+    private const PAGE_WIDTHS = [
+        'home' => 'full', 'landing-page' => 'full',
+        'about' => 'medium', 'help' => 'medium', 'contact' => 'medium',
+        'terms' => 'medium', 'refunds' => 'medium', 'privacy' => 'medium',
+        'commerce-cart' => 'medium', 'commerce-checkout' => 'medium', 'commerce-order' => 'medium',
+        'company-credit-checkout' => 'medium',
+        'admin-course-form' => 'medium', 'admin-course-import' => 'medium',
+        'admin-course-category-new' => 'medium', 'admin-course-category-edit' => 'medium',
+        'admin-course-category-move-into' => 'medium',
+        'login' => 'narrow', 'login-sent' => 'narrow', 'register' => 'narrow',
+        'company-register' => 'narrow', 'error' => 'narrow',
+    ];
+
+    /** The widths a page may have. Anything else is a mistake, never silently wide. */
+    public const PAGE_WIDTH_NAMES = ['wide', 'medium', 'narrow', 'full'];
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -324,7 +354,8 @@ final class ThemeRenderer
         // asked of each theme's body rule, because the texture is a named platform element and a
         // theme that painted its own would fork it. A theme re-colours it through the three
         // --cl-texture custom properties. Owner's instruction, 2026/09/11.
-        $bodyClass = trim('cl-page-texture ' . (string) ($data['body_class'] ?? ''));
+        $width = self::pageWidth($page, $data);
+        $bodyClass = trim('cl-page-texture cl-width-' . $width . ' ' . (string) ($data['body_class'] ?? ''));
 
         // The reader's palette, rendered into the markup rather than left for the switcher to stamp
         // on after the page has painted. The switcher stores the choice in a cookie as well as in
@@ -341,6 +372,7 @@ final class ThemeRenderer
             'title' => (string) ($data['page_title'] ?? $data['title'] ?? ''),
             'subtitle' => (string) ($data['page_kicker'] ?? ''),
             'body_class' => $bodyClass,
+            'width' => $width,
         ];
         $model['user'] = [
             'logged_in' => (bool) ($data['is_authenticated'] ?? false),
@@ -679,7 +711,7 @@ final class ThemeRenderer
             if ($profileChildren !== []) {
                 $accountChildren[] = $child('account-profile-group','Profile','/account/profile','profile',$profileChildren);
             }
-            if ($coursesChildren !== []) $accountChildren[] = $child('account-courses-group','COURSES','/account/courses','learning',$coursesChildren);
+            if ($coursesChildren !== []) $accountChildren[] = $child('account-courses-group','Courses','/account/courses','learning',$coursesChildren);
             foreach ($remainingChildren as $entry) {
                 $accountChildren[] = $entry;
             }
@@ -698,9 +730,9 @@ final class ThemeRenderer
      * The platform's own social marks, for the footer.
      *
      * Core owns the list and the symbols; where the address comes from is the installation's
-     * business. A key with no configured address still renders its mark - the row is part of the
-     * footer's shape rather than a set of links that appears once somebody fills a form in - but
-     * it renders as plain text rather than a link to nowhere.
+     * business. A mark links to the platform's own home page (SocialPlatform::home) until the
+     * installation's settings supply a profile address in platform_social, which replaces it
+     * (owner, 2026/10/17). So every mark is a link, and never a link to nowhere.
      *
      * The keys are SocialPlatform's, so a mark and a link cannot disagree about which service
      * they name.
@@ -718,7 +750,7 @@ final class ThemeRenderer
             $marks[] = [
                 'key' => $key,
                 'label' => SocialPlatform::label($key),
-                'href' => trim((string) ($configured[$key] ?? '')),
+                'href' => trim((string) ($configured[$key] ?? '')) ?: SocialPlatform::home($key),
             ];
         }
 
@@ -1013,6 +1045,20 @@ final class ThemeRenderer
         ];
     }
 
+    /**
+     * The page's width: wide unless the page is listed in PAGE_WIDTHS or its controller says.
+     *
+     * @param array<string,mixed> $data
+     */
+    public static function pageWidth(string $page, array $data = []): string
+    {
+        $width = (string) ($data['page_width'] ?? self::PAGE_WIDTHS[$page] ?? 'wide');
+        if (!in_array($width, self::PAGE_WIDTH_NAMES, true)) {
+            throw new RuntimeException('Unknown page width "' . $width . '" for ' . $page . '. A page is wide, medium, narrow or full.');
+        }
+        return $width;
+    }
+
     private function pageFamily(string $page): string
     {
         if (str_starts_with($page, 'admin-')) return 'admin';
@@ -1037,12 +1083,15 @@ final class ThemeRenderer
      */
     private function materialiseAdministrationSections(array $data): array
     {
-        $render = function (array $section) use ($data): array {
+        $render = function (array $section, bool $standalone) use ($data): array {
             $template = (string) ($section['template'] ?? '');
             if (preg_match('#^partials/admin/[a-z0-9-]+\.html\.twig$#', $template) !== 1) {
                 throw new RuntimeException('Invalid Administration section template.');
             }
-            $section['content'] = $this->fragment($template, $data);
+            // The section's actions go in the page head when the section is the page, and in its
+            // card's head when it is one of several on the "All sections" page.
+            $section['actions'] = $this->sectionActions($this->adminSections->actions((string) ($section['key'] ?? '')), $data);
+            $section['content'] = $this->fragment($template, array_merge($data, ['section_actions' => $section['actions'], 'section_standalone' => $standalone]));
             // Sections carry their sprite symbol for the same reason navigation items do: a theme
             // listing workspace sections must be able to draw an icon without knowing the key set
             // or shipping artwork of its own.
@@ -1053,14 +1102,26 @@ final class ThemeRenderer
         if (isset($data['admin_sections']) && is_array($data['admin_sections'])) {
             $sections = [];
             foreach ($data['admin_sections'] as $section) {
-                if (is_array($section)) $sections[] = $render($section);
+                if (is_array($section)) $sections[] = $render($section, false);
             }
             $data['admin_sections'] = $sections;
         }
         if (isset($data['admin_section']) && is_array($data['admin_section'])) {
-            $data['admin_section'] = $render($data['admin_section']);
+            $data['admin_section'] = $render($data['admin_section'], true);
         }
         return $data;
+    }
+
+    /**
+     * The section actions this reader may use: those whose permission flag the page carries.
+     *
+     * @param list<array{label:string,href:string,modal:string,variant:string,icon:string,when:string}> $actions
+     * @param array<string,mixed> $data
+     * @return list<array{label:string,href:string,modal:string,variant:string,icon:string,when:string}>
+     */
+    private function sectionActions(array $actions, array $data): array
+    {
+        return array_values(array_filter($actions, static fn(array $action): bool => $action['when'] === '' || (bool) ($data[$action['when']] ?? false)));
     }
 
     /**
@@ -1074,12 +1135,14 @@ final class ThemeRenderer
     {
         if (!in_array($family, ['account','company'], true)) throw new RuntimeException('Invalid section family.');
         $prefix = 'partials/' . $family . '/';
-        $render = function (array $section) use ($prefix, $family, $data): array {
+        $registry = $family === 'account' ? $this->accountSections : $this->companySections;
+        $render = function (array $section, bool $standalone) use ($prefix, $family, $data, $registry): array {
             $template = (string) ($section['template'] ?? '');
             if (!str_starts_with($template, $prefix) || preg_match('#^partials/[a-z]+/[a-z0-9-]+\.html\.twig$#', $template) !== 1) {
                 throw new RuntimeException('Invalid ' . ucfirst($family) . ' section template.');
             }
-            $section['content'] = $this->fragment($template, $data);
+            $section['actions'] = $this->sectionActions($registry->actions((string) ($section['key'] ?? '')), $data);
+            $section['content'] = $this->fragment($template, array_merge($data, ['section_actions' => $section['actions'], 'section_standalone' => $standalone]));
             // Sections carry their sprite symbol for the same reason navigation items do: a theme
             // listing workspace sections must be able to draw an icon without knowing the key set
             // or shipping artwork of its own.
@@ -1090,11 +1153,14 @@ final class ThemeRenderer
         $singular = $family . '_section';
         if (isset($data[$plural]) && is_array($data[$plural])) {
             $sections = [];
-            foreach ($data[$plural] as $section) if (is_array($section)) $sections[] = $render($section);
+            foreach ($data[$plural] as $section) if (is_array($section)) $sections[] = $render($section, false);
             $data[$plural] = $sections;
         }
         if (isset($data[$singular]) && is_array($data[$singular])) {
-            $data[$singular] = $render($data[$singular]);
+            // The Company workspace opens a section by fetching its page with htmx and keeping only the
+            // section's body, so that request draws the section as one of several: its actions in its
+            // own card, where the workspace shows them.
+            $data[$singular] = $render($data[$singular], ($_SERVER['HTTP_HX_REQUEST'] ?? '') !== 'true');
         }
         return $data;
     }

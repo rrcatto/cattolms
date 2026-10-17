@@ -1,6 +1,0 @@
-{% set course_group_tabs = [{key: 'courses', label: 'Courses', href: '/admin/courses'}] %}
-{% if can_manage_course_categories %}{% set course_group_tabs = course_group_tabs|merge([{key: 'categories', label: 'Course Categories', href: '/admin/courses/categories'}]) %}{% endif %}
-{% if can_manage_course_tags %}{% set course_group_tabs = course_group_tabs|merge([{key: 'tags', label: 'Course Tags', href: '/admin/courses/tags'}]) %}{% endif %}
-{% if can_view_requests %}{% set course_group_tabs = course_group_tabs|merge([{key: 'requests', label: 'Course Requests', href: '/admin/course/requests'}]) %}{% endif %}
-{% if can_view_enrolments %}{% set course_group_tabs = course_group_tabs|merge([{key: 'enrolments', label: 'Enrolments', href: '/admin/course/enrolments'}]) %}{% endif %}
-{{ ui('layout.tabs', {items: course_group_tabs, current: course_group|default(''), aria_label: 'Course administration'}) }}

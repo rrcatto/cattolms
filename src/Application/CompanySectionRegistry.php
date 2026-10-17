@@ -26,9 +26,28 @@ final class CompanySectionRegistry
             $this->s('training','Courses Bought','courses','/company/training','partials/company/training.html.twig','Courses this company has bought access to for its staff.'),
             $this->s('favourites','Favourites','courses','/company/favourites','partials/company/favourites.html.twig','Courses this company may want for its staff but has not bought.'),
             $this->s('performance','Performance','reports','/company/performance','partials/company/performance.html.twig','How this company\'s staff are doing, course by course.'),
-            $this->s('billing','Billing details','settings','/company/billing','partials/company/billing.html.twig','Who this company\'s invoices are made out to.'),
+            $this->s('billing','Billing Details','settings','/company/billing','partials/company/billing.html.twig','Who this company\'s invoices are made out to.'),
         ];
     }
+    /**
+     * The section's own actions: in its page head when the section is the page, and in its card's head
+     * when it is one of several on the "All sections" page. `when` names the permission flag a page
+     * carries (BaseController's can_* flags); empty means every reader of the section may use it. A link
+     * has an href; a button opens the form window (modal) the section draws.
+     *
+     * @return list<array{label:string,href:string,modal:string,variant:string,icon:string,when:string}>
+     */
+    public function actions(string $key): array
+    {
+        $link = static fn(string $label, string $href, string $variant = 'secondary', string $icon = '', string $when = ''): array => ['label' => $label, 'href' => $href, 'modal' => '', 'variant' => $variant, 'icon' => $icon, 'when' => $when];
+        $opens = static fn(string $label, string $modal, string $when = ''): array => ['label' => $label, 'href' => '', 'modal' => $modal, 'variant' => 'primary', 'icon' => 'action-add', 'when' => $when];
+        return match ($key) {
+            'people' => [$opens('Add person', 'companyAddPersonModal')],
+            'credits' => [$link('Buy credits', '/company/credits/buy', 'primary')],
+            default => [],
+        };
+    }
+
     /** @return array{key:string,label:string,icon:string,route:string,template:string,description:string} */
     public function get(string $key): array
     {

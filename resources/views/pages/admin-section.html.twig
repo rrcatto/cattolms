@@ -4,10 +4,10 @@
 	{% set ph_kicker = 'Administration' %}
 	{% set ph_title = admin_section.label %}
 	{% set ph_lead = admin_section.description %}
-	{% set ph_action_href = can_access_admin ? '/admin' : '' %}
-	{% set ph_action_label = 'All administration' %}
+	{# The section's own actions belong to the page here, so they sit in the page head. #}
+	{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig' with {actions: admin_section.actions|default([])} %}{% endset %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-page-section section cl-admin-standalone-section" data-admin-section="{{ admin_section.key }}">
+	<section class="cl-page-section" data-admin-section="{{ admin_section.key }}">
 		{{ admin_section.content|raw }}
 	</section>
 {% endblock %}

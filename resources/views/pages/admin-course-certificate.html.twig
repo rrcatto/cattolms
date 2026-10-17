@@ -2,7 +2,7 @@
 {% block page_body %}
 {{ importmap() }}
 {% set ph_back_href = '/admin/courses/' ~ course.id %}{% set ph_back_label = 'Course editor' %}{% set ph_kicker = 'Certificate' %}{% set ph_title = course.title %}{% set ph_lead = 'Whether this course gives a certificate, and which design it is drawn in.' %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 <form action="/admin/courses/{{ course.id }}/certificate" method="post" data-controller="certificate-preview" data-certificate-preview-button-value="course-certificate-preview-button">
 <input type="hidden" name="csrf" value="{{ csrf }}">
 <div class="cl-certificate-editor">

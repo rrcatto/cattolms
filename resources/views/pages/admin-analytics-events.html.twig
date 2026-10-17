@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {% set ph_back_href = '/admin/reports' %}{% set ph_back_label = 'Course Performance' %}{% set ph_kicker = 'Reports' %}{% set ph_title = 'Analytics events' %}{% set ph_lead = 'The first-party event stream, newest first, for confirming what is recorded. Counts are for the last 30 days.' %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact'})} %}{% block body %}{% for type in event_types %}{{ ui('data.stat-card', {label: type|replace({'_': ' '}), value: counts[type]|default(0)}) }}{% endfor %}{% endblock %}{% endembed %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 <form class="cl-analytics-filter" action="/admin/analytics/events" method="get">

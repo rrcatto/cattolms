@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/17 SAST
+- A fresh database's active theme is Factory Reset 2.0.2 (factory-reset-v2.0.2), the version v0.9.2 bundles.
 2026/10/13 SAST
 - Refund Policy rule: commerce_refunds records, for a refund ADMIN approved although the rule refuses it, what the rule refused (policy_refusal) and ADMIN's written override reason (override_reason), set together or not at all.
 2026/10/09 SAST
@@ -606,7 +608,7 @@ CREATE TABLE app_options (
     updated_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
 );
 INSERT INTO app_options (option_key, option_value) VALUES
-    ('active_theme', 'factory-reset-v2.0.1'),
+    ('active_theme', 'factory-reset-v2.0.2'),
     ('system_company_name', 'System Company'),
     ('acl_revision', '1');
 

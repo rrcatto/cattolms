@@ -205,7 +205,8 @@ const learnerTexts = {};
         const {ctx, page} = await open(chromium, admin());
         await page.goto(`${base}/admin/commerce/orders/${state.orders.eft}`);
         step = 'EFT order';
-        assert.match(await page.locator('main').innerText(), /Receipt REC-\d{8}/);
+        // textContent, not innerText: a theme may draw the link in capitals (Saharan Sunset does).
+        assert.match(await page.locator('main').textContent(), /Receipt REC-\d{8}/);
         const receipt = await fetchPdf(page, adminDocument('eft', doc('eft', 'receipt')) + '?download=1', 'EFT receipt');
         contains(receipt, ['EFT / bank transfer', state.bank_reference, 'Amount received', 'R 800,00'], 'the EFT receipt');
         const invoice = await fetchPdf(page, adminDocument('company', doc('company', 'invoice')), 'company invoice');

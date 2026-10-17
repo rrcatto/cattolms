@@ -384,6 +384,12 @@ body.ld-body{
 .cl-main .cl-container-course{max-width:1080px;margin-inline:auto}
 .cl-main .cl-medium{max-width:860px;margin-inline:auto}
 .cl-main .cl-narrow{max-width:620px;margin-inline:auto}
+/* Core's page rows (the page head, the identity band, each page section) take their width and
+   spacing from Core's variables: wide rows fill the page family with this theme's gutter and
+   rhythm, and the medium and narrow columns keep this theme's widths. */
+.ld-body{--cl-content-width:none;--cl-gutter:var(--ld-gutter);--cl-section-space:2.1rem}
+.ld-body.cl-width-medium{--cl-content-width:860px}
+.ld-body.cl-width-narrow{--cl-content-width:620px}
 
 .cl-page-family>.ld-workspace,.cl-page-family>.cl-ui-section-head,.cl-page-family>.section,.cl-page-family>.cl-ui-toolbar,.cl-page-family>.cl-ui-list,.cl-page-family>.cl-ui-table,.cl-page-family>.cl-admin-workspace,.cl-page-family>.cl-account-workspace,.cl-page-family>.cl-company-workspace{
   margin-left:var(--ld-gutter);

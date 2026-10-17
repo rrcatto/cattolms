@@ -1,11 +1,7 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{{ ui('layout.section-head', {heading: 'Companies on the platform', eyebrow: 'Companies', summary: 'Companies whose staff are trained, and the System Company.'}) }}
-		{% include '@platform/partials/admin/company-group-nav.html.twig' %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Companies on the platform', eyebrow: 'Companies', summary: 'Companies whose staff are trained, and the System Company.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
 
@@ -16,18 +12,6 @@
 {% endblock %}
 {% endembed %}
 
-		{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
-{% block toolbar_primary %}
-
-{% endblock %}
-{% block toolbar_actions %}
-
-			{% if can_manage_companies %}
-				{{ ui('action.button', {label: '＋ Add Company', variant: 'primary', size: 'normal', type: 'button', modal: 'company-add', icon: 'action-add'}) }}
-			{% endif %}
-
-{% endblock %}
-{% endembed %}
 		{% include '@platform/partials/admin/company-modals.html.twig' with {cm_rows: companies} %}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'companies', pagination: companies_pagination, search: {ds_name: 'companies', ds_label: 'Search course consumers', ds_value: companies_search, ds_action: '/admin/companies'}})} %}
 {% block results %}
@@ -94,9 +78,6 @@
 							{{ ui('action.link', {label: 'View all course consumers', variant: 'secondary', size: 'small', href: '/admin/companies'}) }}
 						</div>
 					{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

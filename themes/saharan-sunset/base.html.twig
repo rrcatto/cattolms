@@ -1,0 +1,63 @@
+{#
+	Saharan Sunset 1.0.1 shell. One construction for signed-in and anonymous readers: a full-width
+	sticky header with the core navigation, then the page context band and main, which the theme
+	draws as one paper box on the slanted texture, and the themed footer below them inside the page
+	frame. Home runs full width without the box. Core owns navigation, identity, page bodies, flash
+	messages and the head metadata.
+#}
+<!doctype html>
+<html lang="en-GB">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>{% if page.title %}{{ page.title }} · {% endif %}{{ app.name }}</title>
+		{% include '@platform/partials/head-meta.html.twig' %}
+		<meta name="theme-color" content="#f7f1e8">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		{% for resourceUrl in platform.styles %}
+			<link href="{{ resourceUrl }}" rel="stylesheet">
+		{% endfor %}
+		{% for resourceUrl in theme.external_styles %}
+			<link href="{{ resourceUrl }}" rel="stylesheet">
+		{% endfor %}
+		{% for resourceUrl in theme.styles %}
+			<link href="{{ resourceUrl }}" rel="stylesheet">
+		{% endfor %}
+	</head>
+	<body class="cl-body ss-body ss-family-{{ page.type ?: 'content' }} {{ page.body_class }} {{ course_content_mode ? 'cl-course-page' : '' }}" data-cl-navigation="top">
+		<a class="cl-skip-link" href="#cl-main">Skip to content</a>
+		<div class="cl-shell">
+			<header class="cl-header" data-theme-nav>
+				<div class="cl-header-inner">
+					<a class="cl-brand" href="{{ app.base_url }}" aria-label="{{ app.name }} home"><span class="cl-brand-copy"><strong>{{ app.name }}</strong><small>Self-study courses</small></span></a>
+					<button class="cl-nav-toggle" type="button" data-cl-nav-toggle aria-expanded="false" aria-controls="cl-primary-navigation">Menu</button>
+					{% include '@platform/partials/navigation.html.twig' %}
+				</div>
+			</header>
+			<div class="cl-page">
+				<section class="cl-page-context" aria-label="Page context" data-theme-breadcrumb>
+					<div class="cl-page-context-inner">
+						{{ ui('layout.breadcrumb', {items: breadcrumbs}) }}
+						{% include '@platform/partials/cart-summary.html.twig' %}
+					</div>
+				</section>
+				<div class="cl-page-frame">
+					<main class="cl-main" id="cl-main">
+						{% include '@platform/partials/flash-messages.html.twig' %}
+						{% block page_content %}{% block page_body %}{% endblock %}{% endblock %}
+					</main>
+					{% include '@theme/partials/footer.html.twig' %}
+				</div>
+			</div>
+		</div>
+		{% for resourceUrl in platform.scripts %}
+			<script src="{{ resourceUrl }}"></script>
+		{% endfor %}
+		{% for resourceUrl in theme.external_scripts %}
+			<script src="{{ resourceUrl }}"></script>
+		{% endfor %}
+		{% for resourceUrl in theme.scripts %}
+			<script src="{{ resourceUrl }}"></script>
+		{% endfor %}
+	</body>
+</html>

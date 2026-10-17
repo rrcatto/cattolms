@@ -3,7 +3,7 @@
 {% set ph_back_href = '/admin/reports/popularity' %}{% set ph_back_label = 'Course popularity' %}{% set ph_kicker = 'Course popularity' %}{% set ph_title = course.title %}{% set ph_lead = 'Rank ' ~ course.rank ~ ' with ' ~ course.score|number_format(1) ~ ' of 100 points, calculated ' ~ course.calculated_at|date('j M Y H:i') ~ ' for ' ~ course.window_start|date('j M Y') ~ ' to ' ~ course.window_end|date('j M Y') ~ '.' %}{% include '@platform/partials/page-head.html.twig' %}
 {% set p = run.parameters %}
 {% set w = p.weights %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 3})} %}{% block body %}
 {{ ui('data.stat-card', {label: 'Score', value: course.score|number_format(1), note: 'Out of 100'}) }}
 {{ ui('data.stat-card', {label: 'Rank', value: course.rank, note: 'Among ' ~ run.course_count ~ ' courses ranked'}) }}

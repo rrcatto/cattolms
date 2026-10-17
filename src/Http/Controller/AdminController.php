@@ -11,6 +11,8 @@ Description:
 Handles web requests for admin operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/17 SAST
+- No course_group or company_group: the group tab strips are gone and the menu leads to each page.
 2026/09/09 02:10 SAST
 - Strips the Twig suffix from a section template name before asking for the fragment.
 
@@ -808,12 +810,6 @@ final class AdminController extends BaseController
                 $swapping
             );
         $data = $this->withAdministrationPresentation($data, false, $definition);
-
-        // Which tab each group strip shows as current. Set before the swap branch, not after it: a
-        // section body includes its group strip, so a fragment that omitted these would render the
-        // strip with no tab marked and, in F3, on an undefined variable.
-        $data['course_group'] = match ($key) { 'courses' => 'courses', 'enrolments' => 'enrolments', 'requests' => 'requests', default => '' };
-        $data['company_group'] = match ($key) { 'companies' => 'consumers', 'company_creators' => 'creators', default => '' };
 
         // Nothing but the section body is sent back for a swap. htmx still selects the results
         // element out of it, so the markup contract is unchanged and a client that forges or omits

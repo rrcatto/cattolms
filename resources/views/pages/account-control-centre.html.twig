@@ -1,24 +1,11 @@
 {% extends layout %}
 {% block page_body %}
 	{% set ph_kicker = 'Account' %}
-	{% set ph_title = 'My account' %}
-	{% set ph_lead = 'Every part of your account in one place.' %}
+	{% set ph_title = 'All sections' %}
+	{% set ph_lead = 'Every part of your account in one place. Each one also has a page of its own.' %}
 	{# The page head brings the identity band with it. #}
 	{% include '@platform/partials/page-head.html.twig' %}
-	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Your account', eyebrow: 'All sections', summary: 'Dashboard, profile, learning, login sessions and account activity in one place.'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-	<div class="cl-account-workspace section" data-account-workspace>
+	<section class="cl-page-section cl-account-workspace" data-account-workspace>
 		{% for section in account_sections %}
 			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: (section.label), summary: (section.description), open: section.key == 'dashboard', workspace: 'account', section_key: (section.key)})} %}
 {% block body %}
@@ -33,5 +20,5 @@
 {% endblock %}
 {% endembed %}
 		{% endfor %}
-	</div>
+	</section>
 {% endblock %}

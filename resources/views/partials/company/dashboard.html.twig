@@ -1,7 +1,4 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: (company.name), eyebrow: 'Dashboard', summary: (company_platform_wide ? 'Platform-wide company overview for ADMIN.' : 'Company enrolments and account overview.')})} %}
@@ -9,20 +6,18 @@
 {{ ui('feedback.badge', {label: (company.domain), tone: 'info'}) }}
 {% endblock %}
 {% endembed %}
+		{# The figures sit in the card they summarise. #}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+		{% block body %}
 
-{% endblock %}
-{% endembed %}
+			{{ ui('data.stat-card', {value: (people_count), label: 'People'}) }}
+			{{ ui('data.stat-card', {value: (courses_count), label: 'Courses'}) }}
+			{{ ui('data.stat-card', {value: (requests_count), label: 'Requests'}) }}
+			{{ ui('data.stat-card', {value: (enrolments_count), label: 'Enrolments'}) }}
+			{{ ui('data.stat-card', {value: (credits_count), label: 'Credit pools'}) }}
 
-{% endblock %}
-{% endembed %}
-{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
-{% block body %}
-
-	{{ ui('data.stat-card', {value: (people_count), label: 'People'}) }}
-	{{ ui('data.stat-card', {value: (courses_count), label: 'Courses'}) }}
-	{{ ui('data.stat-card', {value: (requests_count), label: 'Requests'}) }}
-	{{ ui('data.stat-card', {value: (enrolments_count), label: 'Enrolments'}) }}
-	{{ ui('data.stat-card', {value: (credits_count), label: 'Credit pools'}) }}
+		{% endblock %}
+		{% endembed %}
 
 {% endblock %}
 {% endembed %}

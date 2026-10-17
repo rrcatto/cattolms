@@ -11,6 +11,8 @@ Description:
 Handles web requests for base operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/17 SAST
+- No course_group or company_group defaults: the group tab strips are gone.
 
 
 2026/09/07 14:00 SAST
@@ -295,11 +297,6 @@ abstract class BaseController
         foreach ($systemCapabilities as $flag => $permission) {
             $data[$flag] = $currentUser?->hasPermission($permission) ?? false;
         }
-        // Which link the Courses group sub-navigation shows as current. Defaulted for every render
-        // because the partial is included by three screens and an unset variable is an error under
-        // not a blank - the same trap the dataset-search universe key fell into.
-        $data['course_group'] = $data['course_group'] ?? '';
-        $data['company_group'] = $data['company_group'] ?? '';
 
         return $data;
     }

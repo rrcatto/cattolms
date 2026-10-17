@@ -1,24 +1,17 @@
 {% extends layout %}
 {% block page_body %}
-	{% set ph_back_href = '/admin/courses' %}
-	{% set ph_back_label = 'Course administration' %}
-	{% set ph_kicker = 'Course metadata' %}
-	{% set ph_title = 'Course tags' %}
+	{% set ph_kicker = 'Administration' %}
+	{% set ph_title = 'Course Tags' %}
 	{% set ph_lead = 'Cross-cutting labels a course may carry as many of as it needs.' %}
+	{# The page's main action belongs to the page, so it sits in the page head. #}
+	{% set ph_actions %}{{ ui('action.button', {label: 'Create tag', variant: 'primary', size: 'normal', type: 'button', modal: 'createTagModal', icon: 'action-add'}) }}{% endset %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	{# The plain section wrapper the other Courses pages use, so the card lands in the same place. #}
-	<section class="cl-page-section section">
-		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	<section class="cl-page-section">
+					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-				{% include '@platform/partials/admin/course-group-nav.html.twig' %}
 				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'The catalogue\'s tags', eyebrow: 'Course Tags', summary: 'Tags a course can carry. A tag crosses categories, so the same tag may appear on courses filed in different branches.'})} %}
-{% block section_actions %}
-{{ ui('action.button', {label: '＋ Create tag', variant: 'primary', size: 'normal', type: 'button', modal: 'createTagModal', icon: 'action-add'}) }}
-{% endblock %}
 {% endembed %}
 
 			{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'tags', pagination: tags_pagination, search: {ds_name: 'tags', ds_label: 'Search tags', ds_value: tags_search, ds_action: '/admin/courses/tags'}})} %}
@@ -68,11 +61,7 @@
 
 {% endblock %}
 {% endembed %}
-
-{% endblock %}
-{% endembed %}
-	</section>
-	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createTagModal', title: 'Create tag', action: '/admin/courses/tags', method: 'post'})} %}
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createTagModal', title: 'Create tag', action: '/admin/courses/tags', method: 'post'})} %}
 {% block modal_body %}
 
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
@@ -86,7 +75,6 @@
 
 {% endblock %}
 {% endembed %}
-
 {% endblock %}
 {% endembed %}
 
@@ -98,4 +86,5 @@
 
 {% endblock %}
 {% endembed %}
+	</section>
 {% endblock %}
