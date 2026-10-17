@@ -1,7 +1,7 @@
 # Commerce Implementation Plan
 
 Original plan: 12 September 2026; current-status update: 13 October 2026 (v0.9.1)
-Target: `code/cattolms-v0.8`
+Target: `code/cattolms-v0.9` (`code/cattolms-v0.8` until 2026/10/16)
 Status: Individual and company purchasing, payment administration and refunds (v0.8.7), billing profiles (Phase F), promo codes (Phase G), course bundles (Phase H) and independent entitlement sources are released through v0.8.8.4, financial documents on the document template engine (Phase K) in v0.8.9, and the purchase box shared by course and landing pages (Phase L) in v0.9.0. The public legal pages, terms acceptance with recorded versions and the Refund Policy rule are released in v0.9.1. Account Funds spending, payouts, debt, gifts and real gateways (Stitch included) are not implemented.
 
 ## Current implementation
@@ -48,7 +48,7 @@ The five `COMMERCE/20260912-1908-CattoLMS-Commerce-*-v1.1-draft` documents remai
 
 The specification's settled business rules and explicit bespoke/Omnipay decision take precedence over stale passages saying engine selection remains undecided. New commerce rules supersede conflicting pre-commerce rules in the copied LMS documentation. Preserve the original five input files and record reconciliations here.
 
-All implementation belongs in `code/current` (`code/cattolms-v0.8`), which currently identifies as v0.9.1. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
+All implementation belongs in `code/current` (`code/cattolms-v0.9`), which currently identifies as v0.9.1. Older version directories are historical references. Releases and pushes require explicit owner instruction. The schema is the one canonical baseline: a schema change for this plan is made there and the development database is rebuilt (`PROJECT-INSTRUCTIONS.md` section 2).
 
 ## 2. Original discovery baseline — historical, 12 September 2026
 

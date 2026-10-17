@@ -8,7 +8,7 @@ const base=process.env.CATTO_BASE_URL || 'https://catto.test';
 const output=process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-canonical-page';
 const state=JSON.parse(fs.readFileSync('/tmp/catto-ui-stabilisation-state.json'));
 const themes=fs.readdirSync(path.join(root,'themes')).map(slug=>JSON.parse(fs.readFileSync(path.join(root,'themes',slug,'theme.json'))).theme);
-const themeState=(...args)=>execFileSync('podman',['exec','-u','cattotest','env_php_1','php','/home/cattotest/code/cattolms-v0.8/tests/Browser/canonical-page-theme.php',...args],{stdio:'pipe'});
+const themeState=(...args)=>execFileSync('podman',['exec','-u','cattotest','env_php_1','php','/home/cattotest/code/current/tests/Browser/canonical-page-theme.php',...args],{stdio:'pipe'});
 fs.mkdirSync(output,{recursive:true});
 const results=[], failures=[];
 (async()=>{

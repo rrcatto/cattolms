@@ -1,6 +1,6 @@
 # Catto Learning LMS
 
-Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.9.1**, developed on the v0.8 code line (`code/cattolms-v0.8`, branch `dev-v0.8`). Development data is disposable; no production data or upgrade compatibility is assumed.
+Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.9.1**, developed in `code/cattolms-v0.9` on branch `dev-v0.9` (the same code line was `code/cattolms-v0.8` on `dev-v0.8` until 2026/10/16; v0.9.0 and v0.9.1 were released from it). Development data is disposable; no production data or upgrade compatibility is assumed.
 
 Source archives of each released version are on the GitHub [Releases](https://github.com/rrcatto/cattolms/releases) page, starting with v0.8.8.4.
 
