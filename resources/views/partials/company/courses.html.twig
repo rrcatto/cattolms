@@ -1,7 +1,4 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Courses this company owns', eyebrow: 'Courses Created', summary: 'Courses this company owns and offers.'}) }}
@@ -57,9 +54,6 @@
 							{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'small', href: '/company/courses'}) }}
 						</div>
 					{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

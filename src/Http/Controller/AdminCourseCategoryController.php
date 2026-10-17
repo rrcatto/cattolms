@@ -21,6 +21,8 @@ saved tree and counts, or the authoritative ones and a 422 with the reason; a pl
 redirects back to the tree with a message.
 
 Changelog:
+2026/10/17 SAST
+- No course_group: the Courses group tab strip is gone.
 2026/10/07 SAST
 - The category picker: inline creation takes the place chosen for the new category (Top level, a
   main category or a subcategory) and answers with its path; /admin/courses/categories/field draws
@@ -91,7 +93,6 @@ final class AdminCourseCategoryController extends BaseController
         $tree = $this->courses->categoryManagementTree($categories, $open, $reveal > 0 ? $reveal : null);
         return $this->render('admin-course-categories', [
             'title' => 'Course categories',
-            'course_group' => 'categories',
             'category_tree' => $tree,
             'category_statistics' => CourseService::categoryStatistics($categories),
             'open_ids' => self::openIn($tree),
@@ -142,7 +143,6 @@ final class AdminCourseCategoryController extends BaseController
         $category = $this->courses->category($categoryId);
         return $this->render('admin-course-category-edit', [
             'title' => 'Edit category · ' . (string) $category['name'],
-            'course_group' => 'categories',
             'category' => $category,
             'category_path' => $this->courses->categoryTrail($categoryId),
             'replacement_picker' => $this->courses->replacementCategoryPicker($categoryId),
@@ -211,7 +211,6 @@ final class AdminCourseCategoryController extends BaseController
         $category = $this->courses->category($categoryId);
         return $this->render('admin-course-category-move-into', [
             'title' => 'Move ' . (string) $category['name'],
-            'course_group' => 'categories',
             'category' => $category,
             'category_path' => $this->courses->categoryTrail($categoryId),
             'choices' => $this->courses->categoryDestinations($categoryId),
@@ -317,7 +316,6 @@ final class AdminCourseCategoryController extends BaseController
         }
         $data = [
             'title' => $parent === null ? 'Add category' : 'Add subcategory to ' . (string) $parent['name'],
-            'course_group' => 'categories',
             'in_modal' => $this->isHtmxRequest(),
             'create_parent' => $parent,
             'create_values' => $values,

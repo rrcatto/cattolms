@@ -1,30 +1,22 @@
-<section class="hero">
-	<div class="hero-content">
-		<div class="cl-ui-eyebrow" style="color:var(--highlight)">
-			Administration
-		</div>
-		<h1>
-			Everything important, in one place.
-		</h1>
-		<p>
-			See the health of the learning platform, deal with work that needs attention and move directly to detailed administration.
-		</p>
-		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
-{% block body %}
+{#
+	The platform at a glance. Its figures sit in a card with a heading, as every section's content does;
+	the section's actions (Manage courses, View activity) are in the page head on the Dashboard's own
+	page and in this card's head on the "All sections" page.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
 
-			{{ ui('action.link', {label: 'Manage courses', variant: 'secondary', size: 'normal', href: '/admin/courses'}) }}{{ ui('action.link', {label: 'View activity', variant: 'secondary', size: 'normal', href: '/admin/activity'}) }}
+	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Overview', eyebrow: 'Dashboard', summary: 'The health of the learning platform, the work that needs attention, and the way to each part of Administration.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
+	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+	{% block body %}
 
-{% endblock %}
-{% endembed %}
-	</div>
-</section>
-{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
-{% block body %}
+		{{ ui('data.stat-card', {value: (overview.people), label: 'People', note: 'Active platform accounts'}) }}
+		{{ ui('data.stat-card', {value: (overview.published_courses), label: 'Published courses', note: (overview.draft_courses) ~ ' drafts'}) }}
+		{{ ui('data.stat-card', {value: (overview.enrolments), label: 'Enrolments', note: 'Assigned, active or completed'}) }}
+		{{ ui('data.stat-card', {value: (overview.completion_rate) ~ '%', label: 'Completion rate', note: 'Across learner enrolments'}) }}
 
-	{{ ui('data.stat-card', {value: (overview.people), label: 'People', note: 'Active platform accounts'}) }}
-	{{ ui('data.stat-card', {value: (overview.published_courses), label: 'Published courses', note: (overview.draft_courses) ~ ' drafts'}) }}
-	{{ ui('data.stat-card', {value: (overview.enrolments), label: 'Enrolments', note: 'Assigned, active or completed'}) }}
-	{{ ui('data.stat-card', {value: (overview.completion_rate) ~ '%', label: 'Completion rate', note: 'Across learner enrolments'}) }}
+	{% endblock %}
+	{% endembed %}
 
 {% endblock %}
 {% endembed %}

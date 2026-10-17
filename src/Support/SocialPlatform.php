@@ -25,6 +25,8 @@ path pattern - platforms change their URL shapes and we would be wrong within a 
 scheme must be https, because http would be downgrading every visitor who follows it.
 
 Changelog:
+2026/10/17 SAST
+- Each platform names its home page (home()), where the footer's mark links until a profile address is set.
 2026/09/10 02:25 SAST
 - Created for the Profile submenu's social media page.
 */
@@ -38,21 +40,21 @@ final class SocialPlatform
     /**
      * Every platform, in the order a profile form renders them.
      *
-     * @var array<string,array{label:string,hosts:list<string>,placeholder:string}>
+     * @var array<string,array{label:string,hosts:list<string>,placeholder:string,home:string}>
      */
     private const CATALOGUE = [
-        'linkedin'  => ['label' => 'LinkedIn',  'hosts' => ['linkedin.com'],  'placeholder' => 'https://www.linkedin.com/in/your-name'],
-        'youtube'   => ['label' => 'YouTube',   'hosts' => ['youtube.com', 'youtu.be'], 'placeholder' => 'https://www.youtube.com/@yourchannel'],
-        'github'    => ['label' => 'GitHub',    'hosts' => ['github.com'],    'placeholder' => 'https://github.com/yourname'],
-        'google'    => ['label' => 'Google',    'hosts' => ['google.com', 'goo.gl'], 'placeholder' => 'https://www.google.com/...'],
-        'facebook'  => ['label' => 'Facebook',  'hosts' => ['facebook.com', 'fb.com', 'fb.me'], 'placeholder' => 'https://www.facebook.com/yourname'],
-        'instagram' => ['label' => 'Instagram', 'hosts' => ['instagram.com'], 'placeholder' => 'https://www.instagram.com/yourname'],
-        'x'         => ['label' => 'X',         'hosts' => ['x.com', 'twitter.com'], 'placeholder' => 'https://x.com/yourname'],
-        'threads'   => ['label' => 'Threads',   'hosts' => ['threads.net', 'threads.com'], 'placeholder' => 'https://www.threads.net/@yourname'],
-        'tiktok'    => ['label' => 'TikTok',    'hosts' => ['tiktok.com'],    'placeholder' => 'https://www.tiktok.com/@yourname'],
-        'whatsapp'  => ['label' => 'WhatsApp',  'hosts' => ['wa.me', 'whatsapp.com'], 'placeholder' => 'https://wa.me/27820000000'],
-        'telegram'  => ['label' => 'Telegram',  'hosts' => ['t.me', 'telegram.me', 'telegram.org'], 'placeholder' => 'https://t.me/yourname'],
-        'signal'    => ['label' => 'Signal',    'hosts' => ['signal.me', 'signal.group'], 'placeholder' => 'https://signal.me/#p/+27820000000'],
+        'linkedin'  => ['label' => 'LinkedIn',  'hosts' => ['linkedin.com'],  'placeholder' => 'https://www.linkedin.com/in/your-name', 'home' => 'https://www.linkedin.com/'],
+        'youtube'   => ['label' => 'YouTube',   'hosts' => ['youtube.com', 'youtu.be'], 'placeholder' => 'https://www.youtube.com/@yourchannel', 'home' => 'https://www.youtube.com/'],
+        'github'    => ['label' => 'GitHub',    'hosts' => ['github.com'],    'placeholder' => 'https://github.com/yourname', 'home' => 'https://github.com/'],
+        'google'    => ['label' => 'Google',    'hosts' => ['google.com', 'goo.gl'], 'placeholder' => 'https://www.google.com/...', 'home' => 'https://www.google.com/'],
+        'facebook'  => ['label' => 'Facebook',  'hosts' => ['facebook.com', 'fb.com', 'fb.me'], 'placeholder' => 'https://www.facebook.com/yourname', 'home' => 'https://www.facebook.com/'],
+        'instagram' => ['label' => 'Instagram', 'hosts' => ['instagram.com'], 'placeholder' => 'https://www.instagram.com/yourname', 'home' => 'https://www.instagram.com/'],
+        'x'         => ['label' => 'X',         'hosts' => ['x.com', 'twitter.com'], 'placeholder' => 'https://x.com/yourname', 'home' => 'https://x.com/'],
+        'threads'   => ['label' => 'Threads',   'hosts' => ['threads.net', 'threads.com'], 'placeholder' => 'https://www.threads.net/@yourname', 'home' => 'https://www.threads.com/'],
+        'tiktok'    => ['label' => 'TikTok',    'hosts' => ['tiktok.com'],    'placeholder' => 'https://www.tiktok.com/@yourname', 'home' => 'https://www.tiktok.com/'],
+        'whatsapp'  => ['label' => 'WhatsApp',  'hosts' => ['wa.me', 'whatsapp.com'], 'placeholder' => 'https://wa.me/27820000000', 'home' => 'https://www.whatsapp.com/'],
+        'telegram'  => ['label' => 'Telegram',  'hosts' => ['t.me', 'telegram.me', 'telegram.org'], 'placeholder' => 'https://t.me/yourname', 'home' => 'https://telegram.org/'],
+        'signal'    => ['label' => 'Signal',    'hosts' => ['signal.me', 'signal.group'], 'placeholder' => 'https://signal.me/#p/+27820000000', 'home' => 'https://signal.org/'],
     ];
 
     /** @return list<string> */
@@ -69,6 +71,15 @@ final class SocialPlatform
     public static function label(string $platform): string
     {
         return self::CATALOGUE[$platform]['label'] ?? $platform;
+    }
+
+    /**
+     * The platform's own home page: where its footer mark links until the installation sets a profile
+     * address (owner, 2026/10/17). Empty for an unknown platform.
+     */
+    public static function home(string $platform): string
+    {
+        return self::CATALOGUE[$platform]['home'] ?? '';
     }
 
     /**

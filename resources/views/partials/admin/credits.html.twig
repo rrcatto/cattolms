@@ -72,6 +72,9 @@
 {% endblock %}
 {% endembed %}
 
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Credit records', eyebrow: 'Credits', summary: 'Course credits each company holds, and how many remain.'}) }}
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'credits', pagination: credits_pagination, search: {ds_name: 'credits', ds_label: 'Search credits', ds_value: credits_search, ds_action: '/admin/course/credits'}})} %}
 {% block results %}
 
@@ -123,5 +126,7 @@
 				</div>
 			{% endif %}
 
+{% endblock %}
+{% endembed %}
 {% endblock %}
 {% endembed %}

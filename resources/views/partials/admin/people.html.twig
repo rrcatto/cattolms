@@ -1,23 +1,8 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{{ ui('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'}) }}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
-		{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
-{% block toolbar_primary %}
-
-{% endblock %}
-{% block toolbar_actions %}
-
-			{% if can_manage_people %}
-				{{ ui('action.button', {label: '＋ Add person', variant: 'primary', size: 'normal', type: 'button', modal: 'quickAddPersonModal', icon: 'action-add'}) }}
-			{% endif %}
-
-{% endblock %}
-{% endembed %}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people'}})} %}
 {% block results %}
 
@@ -81,7 +66,7 @@
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 
-											{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile'}) }}
+											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -164,9 +149,6 @@
 {% endblock %}
 {% endembed %}
 		{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

@@ -30,6 +30,8 @@ and wrapper hooks a theme may opt into. Adding to it is a decision to be stated,
 of it being a literal cl-ui-list rather than a pattern.
 
 Changelog:
+2026/10/17 SAST
+- cl-admin-standalone-section and cl-company-section are no longer behaviour hooks: rows take their width from the page width.
 2026/09/09 14:01 SAST
 - Created after four core-owned classes were found unstyled in themes that never defined them.
 */
@@ -52,9 +54,7 @@ final class CoreStyleNamespaceContractTest extends TestCase
      * @var list<string>
      */
     private const BEHAVIOUR_HOOKS = [
-        'cl-admin-standalone-section',
         'cl-company-picker',
-        'cl-company-section',
         'cl-course-head',
         'cl-course-presentation',
         'cl-rich-editor',

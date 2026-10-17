@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {% set ph_back_href = '/admin/certificates/designs' %}{% set ph_back_label = 'Certificate designs' %}{% set ph_kicker = 'Certificate design' %}{% set ph_title = 'Delete “' ~ design.name ~ '”?' %}{% set ph_lead = 'Certificates already issued with this design are not changed: they keep the design they were issued with.' %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 <div class="cl-certificate-pictures"><img class="cl-certificate-design-thumb" src="{{ design.image }}" alt=""><strong>{{ design.name }}</strong></div>
 {% if others is empty %}

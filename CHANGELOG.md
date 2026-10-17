@@ -1,6 +1,35 @@
 # Changelog
 
-**LMS version:** 0.9.1 **Date time:** 2026/10/13 SAST
+**LMS version:** 0.9.2 **Date time:** 2026/10/17 SAST
+
+## 2026-10-17 SAST — v0.9.2 One construction for every page; Saharan Sunset 1.0.1
+
+- **Release.** Version 0.9.2 at the owner's instruction: asked how to record Parts A and B of the merged UI plan before Part C (Bootstrap 6) starts on its own branch, the owner chose "Release v0.9.2". Published as GitHub release `v0.9.2` with `cattolms-v0.9.2.zip`. The plan is workspace `REPORTS/ui-merged-plan-2026-10-17.md`, built on the owner's choices of 2026-10-17. v0.9.2 is the first release from `code/cattolms-v0.9` (`dev-v0.9`) and includes the commit before it, the code line's move with Symfony 8.1.9.
+- **Deploying.** Run `composer install` (Symfony 8.1.9), publish `catto-platform.css` and run `composer themes:install`, which installs the new theme versions beside the old ones. If Factory Reset Sidebar 2.0.1 was active, activate 2.0.2: its parent requirement is exact. A Factory Reset 2.0.1 setting falls back to 2.0.2 by itself. No schema change; a fresh database starts on Factory Reset 2.0.2.
+
+- **Page width.** Each page has one width, chosen once (`ThemeRenderer::PAGE_WIDTHS`, `pageWidth()`): wide by default (at most 1320px); medium for About, Help, Contact, the legal pages, the cart, checkout and order pages, and the course and category forms; narrow for sign-in, registration and error pages; full for Home and course landing pages. The body carries `cl-width-*`. My Orders is wide.
+- **Rows.** `catto-platform.css` defines `--cl-content-width`, `--cl-gutter` and `--cl-section-space`. The page head, the identity band and every page section in `main` take their width, side gutter and spacing from them, never from Bootstrap container or spacing classes. Consecutive sections share one gap, and page head actions wrap on a phone.
+- **Page head and section actions.** The page head is the page's only `h1` and holds the page's own actions. Each section registry's `actions()`, filtered by permission in `ThemeRenderer::sectionActions()` and drawn by `partials/section-actions.html.twig`, puts a section's actions in the page head on its own page and in its card head on "All sections": Manage courses and View activity, Import HTML course and Create course, Add person, Add company, Create role and Buy credits. The dedicated pages put New bundle, New design, New promotion, Create item, Create tag and Add category there too.
+- **Fewer ways round.** "All administration", "All account sections" and "All company sections" are gone. Menu pages have no back link, because the breadcrumb is the way back, and take their kicker from their menu. The Courses and Company group tab strips are gone with their partials.
+- **Cards.** Every section's content sits in a card that opens with its own heading, in one order: heading, search and filters, pager, notice, list, pager. A grid around a single card is gone. The three "All sections" pages lost their opening card, whose sentence is now the lead. The Administration Dashboard's hero, a second `h1`, became an Overview card, and the Account and Company dashboards' figures sit in their first card. Company › People is one card whose Add person opens a form window. Activity, Credits, Reports, Themes, Company Enrolments, the two libraries, Course Reviews, Bundles, Promotions, Certificate Designs, Orders & Payments and My Orders put all their content in cards with headings.
+- **Labels and row actions.** No label carries a typed "＋" beside the add icon (UX rule 3.3). A row with one action shows a small button, and a row with two or more shows the Actions menu (UX rule 3.4); the Themes table keeps its buttons.
+- **Footer social marks.** At the owner's request (2026-10-17):
+  - The marks link to each platform's home page (`SocialPlatform::home()`) until the settings give the installation's profile address in `platform_social`; until now they were plain text.
+  - Firefox drew them black, because it does not apply the sprite's own style to `<use>` content, so they were lost on dark footers. Core's `.cl-footer-social-icon` now sets `fill: currentColor`.
+  - Gilded Noir and Factory Reset Sidebar draw the same Core marks: Gilded Noir with its own drawings, in place of its links to `#` and its Threads mark, and Factory Reset Sidebar in place of four unlinked marks and its note.
+- **Saharan Sunset 1.0.1.** The owner's theme is bundled in `themes/saharan-sunset`. It has a full-width sticky header, and every page except Home and the landing pages is one paper box on the darker stripe (#efe5d6). Home and course landing pages run full width with paper panels. The orb is the footer art, the serpent is the sign-in panel, and the head includes the Core head metadata. 1.0.0 stays installed.
+- **Theme versions.** Every bundled theme has a new version, and its package is rebuilt from its tree:
+  - Gilded Noir 2.0.3 and Light Default 2.0.2 set the three Core variables to keep their own measure;
+  - Factory Reset 2.0.2, Factory Reset Sidebar 2.0.2 and Radiant Learning 4.0.2 catch up with changes released without new versions: the head metadata include of v0.9.0 and the HTML certificate styles removed in v0.8.8.9.
+  `extras/themes` holds only the current packages.
+- **Symfony 8.1.9 and the code line.** The 37 Symfony 8.1 packages are at their latest releases (`framework-bundle` and `http-kernel` 8.1.9) with Twig 3.30.0. The code line moved to `code/cattolms-v0.9` on `dev-v0.9`, and a release pushes `dev-v0.9:main`.
+- **Tests.**
+  - `PageStructureContractTest`: rows carry no layout classes; no hero or group strip; no single-card grid; the section and "All sections" wrappers; menu pages' kickers; page widths; section actions and the windows they open; no typed plus.
+  - `tests/Browser/section-pages.cjs` with its fixture: the 48 menu pages in every theme at 1440 and 390px.
+  - The browser checks count six themes (legal pages 77, canonical 36).
+  - `financial-documents.cjs` reads the receipt link's text as written, because Saharan Sunset draws it in capitals.
+- **Docs.** UX rule 1.7 rewritten, 3.3 and the new 3.4; the Theme SDK's "Page width and rows (v0.9)"; UI-COMPONENTS' "One construction for every page (v0.9)".
+- Reports: workspace `REPORTS/ui-merged-plan-2026-10-17.md`.
 
 ## 2026-10-13 SAST — v0.9.1 Legal pages, terms acceptance and the Refund Policy rule
 

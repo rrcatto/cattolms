@@ -1,0 +1,1198 @@
+/* Saharan Sunset 1.0.1 - Catto Learning theme stylesheet.
+   Theme Package 4.0 / Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue,
+   Course detail, Sign in): warm ivory ground, sand bands, near-black ink, terracotta accent,
+   Cormorant Garamond headings and Jost text, square corners and tracked uppercase actions.
+   Construction (1.0.1): a full-width sticky header with the menu centred on the page; below it the
+   page context band and main form one paper box on the slanted texture, and every block core puts
+   in main is a full-width row of that box. Home runs full width without the box.
+   Imagery: abacus = home hero, orb = footer art and course cards without a cover, serpent = the
+   sign-in panel. No picture appears twice on one page.
+   Ownership: core owns component geometry, responsive grids, navigation behaviour and page bodies.
+   This sheet sets colours, type, borders, shadows and decorative art only on canonical classes,
+   and layout only on theme-owned ss-* elements, the shell, the box and its rows. */
+
+/* 1. Tokens ------------------------------------------------------------------------------- */
+
+body.ss-body {
+  --ss-ivory: #f7f1e8;
+  --ss-paper: #fbf6ee;
+  --ss-sand: #efe3d3;
+  --ss-sand-2: #f3eadf;
+  --ss-line: #e6d8c6;
+  --ss-line-2: #d9c8b2;
+  --ss-ink: #1f1915;
+  --ss-ink-2: #5a4e44;
+  --ss-muted: #6b5d51;
+  --ss-terra: #9a4a2a;
+  --ss-terra-deep: #7d3a20;
+  --ss-terra-soft: #f4e4d6;
+  --ss-apricot: #e8b07a;
+  --ss-peach: #efc293;
+  --ss-night: #120e0b;
+  --ss-on-dark: #fbf6ee;
+  --ss-on-dark-2: #efe4d4;
+  --ss-on-dark-3: #d4c6b4;
+  --ss-on-dark-4: #b8aa98;
+  --ss-dark-line: rgba(232, 176, 122, .28);
+
+  --ss-success: #3a5a2c;
+  --ss-success-bg: #e5ebd9;
+  --ss-warn: #74460a;
+  --ss-warn-bg: #f6e6c8;
+  --ss-danger: #8e2a1c;
+  --ss-danger-bg: #f6ddd4;
+  --ss-info: #354f60;
+  --ss-info-bg: #e2e7e6;
+
+  --ss-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --ss-ui: "Jost", "Century Gothic", "Trebuchet MS", system-ui, sans-serif;
+  --ss-shadow: 0 18px 40px rgba(31, 25, 21, .14);
+  --ss-shadow-panel: 0 24px 54px rgba(31, 25, 21, .18);
+
+  /* Layout. --ss-frame is the content width of full-width pages; --ss-box is the width of the box
+     on every other page, wide unless the page is medium or narrow. */
+  --ss-card: #fffdf9;
+  --ss-header-h: 76px;
+  --ss-frame: 1320px;
+  --ss-box: var(--ss-frame);
+  --ss-gutter: 28px;
+  --ss-box-pad: 44px;
+  --ss-box-gap: 36px;
+  --ss-box-shadow: 0 30px 60px -30px rgba(31, 25, 21, .35), 0 2px 6px rgba(31, 25, 21, .06);
+  /* Full-width pages centre each row's content to the frame by padding alone. */
+  --ss-row-pad: max(var(--ss-gutter), calc((100% - var(--ss-frame)) / 2));
+
+  /* Core custom properties, so core-drawn chrome follows the theme. */
+  --cl-border: var(--ss-line);
+  --cl-line: var(--ss-line);
+  --cl-accent: var(--ss-terra);
+  --cl-accent-soft: var(--ss-terra-soft);
+  --cl-primary: var(--ss-ink);
+  --cl-primary-soft: var(--ss-sand);
+  --cl-primary-dark: var(--ss-terra);
+  --cl-page-surface: var(--ss-paper);
+  --cl-surface: var(--ss-paper);
+  --cl-ink: var(--ss-ink);
+  --cl-page-text: var(--ss-ink);
+  --cl-page-muted: var(--ss-sand);
+  --cl-darkest: var(--ss-ink);
+  --cl-light: var(--ss-sand);
+  --cl-lightest: var(--ss-ivory);
+  --cl-on-color-1: #fbf6ee;
+  --cl-on-color-3: var(--ss-ink);
+  --cl-success: var(--ss-success);
+  --cl-warning: var(--ss-warn);
+  --cl-danger: var(--ss-danger);
+  --cl-danger-soft: var(--ss-danger-bg);
+  --cl-info: var(--ss-info);
+  --cl-radius: 0px;
+  --cl-context-surface: var(--ss-sand);
+  --cl-context-ink: var(--ss-ink);
+  --cl-identity-avatar-size: 46px;
+  /* The platform canvas keeps its slanted texture in ivory and a darker sand, so the stripes read
+     clearly around the box (owner's choice, 2026-10-17). */
+  --cl-texture-light: #f7f1e8;
+  --cl-texture-dark: #efe5d6;
+  --cl-texture-band: 14px;
+}
+/* The page chooses its width once (core's cl-width-* body class); the box follows it. Sign-in pages
+   stay wide because the serpent panel needs the room. */
+body.ss-body.cl-width-medium { --ss-box: 58rem; }
+body.ss-body.cl-width-narrow { --ss-box: 42rem; }
+body.ss-body.ss-family-auth { --ss-box: var(--ss-frame); }
+
+/* 2. Base and typography ------------------------------------------------------------------- */
+
+/* Anchors and the skip link land below the sticky header (76px, 64px at 1120px and below) rather
+   than under it. The header height token lives on the body, which html cannot read. */
+html { scroll-padding-top: 92px; }
+
+body.ss-body {
+  margin: 0;
+  background-color: var(--ss-ivory);
+  color: var(--ss-ink);
+  font-family: var(--ss-ui);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.ss-body button, .ss-body input, .ss-body select, .ss-body textarea { font-family: inherit; }
+.ss-body ::selection { background: var(--ss-peach); color: var(--ss-ink); }
+
+.ss-body h1, .ss-body h2, .ss-body h3, .ss-body h4,
+.ss-body .h1, .ss-body .h2, .ss-body .h3, .ss-body .h4 {
+  font-family: var(--ss-display);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.15;
+  color: inherit;
+}
+.ss-body h5, .ss-body h6, .ss-body .h5, .ss-body .h6 {
+  font-family: var(--ss-ui);
+  font-weight: 500;
+  letter-spacing: .02em;
+  line-height: 1.35;
+  color: inherit;
+}
+.ss-body h1, .ss-body .h1 { font-size: 2.6rem; }
+.ss-body h2, .ss-body .h2 { font-size: 2.05rem; }
+.ss-body h3, .ss-body .h3 { font-size: 1.7rem; }
+.ss-body h4, .ss-body .h4 { font-size: 1.4rem; }
+.ss-body h5, .ss-body .h5 { font-size: 1.05rem; }
+.ss-body h6, .ss-body .h6 { font-size: .95rem; }
+.ss-body :where(h1, h2, h3, h4, .h1, .h2, .h3, .h4).fw-bold { font-weight: 500 !important; }
+
+.ss-body :is(.display-1, .display-2, .display-3, .display-4, .display-5, .display-6) {
+  font-family: var(--ss-display);
+  font-weight: 400 !important;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+.ss-body .display-4 { font-size: clamp(2.6rem, 5vw, 4.25rem); }
+.ss-body .display-5 { font-size: clamp(2.2rem, 4vw, 3.25rem); }
+
+.ss-body p { margin: 0 0 .9rem; }
+.ss-body p:last-child { margin-bottom: 0; }
+.ss-body .lead { font-size: 1.07rem; font-weight: 300; line-height: 1.65; color: var(--ss-ink-2); }
+.ss-body strong, .ss-body b { font-weight: 600; }
+.ss-body small, .ss-body .small { font-size: .85rem; }
+.ss-body hr { border: 0; border-top: 1px solid var(--ss-line); opacity: 1; }
+.ss-body code, .ss-body kbd, .ss-body pre { font-size: .88em; color: var(--ss-ink); }
+.ss-body code { background: var(--ss-sand-2); padding: .08em .35em; }
+.ss-body pre { background: var(--ss-sand-2); border: 1px solid var(--ss-line); padding: 14px 16px; }
+
+/* Links. :where() keeps these below every component rule, so buttons keep their own colours. */
+:where(.ss-body) a { color: var(--ss-terra); text-decoration: none; }
+:where(.ss-body) a:hover { color: var(--ss-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+.ss-body :focus-visible { outline: 2px solid var(--ss-terra); outline-offset: 3px; }
+
+.ss-body .text-body-secondary, .ss-body .text-secondary, .ss-body .text-muted, .ss-body .muted { color: var(--ss-ink-2) !important; }
+.ss-body .text-primary, .ss-body .text-info { color: var(--ss-terra) !important; }
+.ss-body .text-warning { color: var(--ss-warn) !important; }
+.ss-body .text-success { color: var(--ss-success) !important; }
+.ss-body .text-danger { color: var(--ss-danger) !important; }
+
+/* 3. Shell: skip link, header, brand, navigation ------------------------------------------- */
+
+.ss-body .cl-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 1200;
+  padding: 12px 18px;
+  background: var(--ss-ink);
+  color: var(--ss-ivory);
+  font-size: 12px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.ss-body .cl-skip-link:focus { left: 0; color: var(--ss-ivory); }
+
+/* The header runs the full width of the window and stays at the top while the page scrolls. */
+.ss-body .cl-header {
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+  width: 100%;
+  background: rgba(247, 241, 232, .97);
+  border-bottom: 1px solid var(--ss-line);
+  box-shadow: 0 6px 18px -12px rgba(31, 25, 21, .35);
+  color: var(--ss-ink);
+}
+.ss-body .cl-header-inner {
+  max-width: none;
+  margin: 0;
+  min-height: var(--ss-header-h);
+  padding: 0 var(--ss-gutter);
+  gap: 12px 32px;
+}
+/* From 1121px the bar has three columns: the brand on the left, the menu centred on the page, and
+   the menu button's place on the right. Between 1121 and 1360px a full Administration menu is too
+   wide to centre beside the brand, so it moves to the right instead. At 1120px and below the bar is
+   core's wrapping row again, with core's menu button. */
+@media (min-width: 1121px) {
+  .ss-body .cl-header-inner {
+    display: grid;
+    grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+  }
+  .ss-body .cl-brand { grid-column: 1; justify-self: start; }
+  .ss-body .cl-navigation { grid-column: 2; justify-self: center; margin: 0; }
+  .ss-body .cl-nav-toggle { grid-column: 3; justify-self: end; }
+}
+@media (min-width: 1121px) and (max-width: 1360px) {
+  .ss-body .cl-header-inner { grid-template-columns: max-content minmax(0, 1fr) auto; }
+  /* Spanning the empty last column too, so the menu ends on the box's right edge. */
+  .ss-body .cl-navigation { grid-column: 2 / -1; justify-self: end; }
+}
+
+.ss-body .cl-brand { color: var(--ss-ink); text-decoration: none; line-height: 1; }
+.ss-body .cl-brand:hover { color: var(--ss-ink); text-decoration: none; }
+.ss-body .cl-brand-copy strong {
+  font-family: var(--ss-display);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: .02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ss-body .cl-brand-copy small {
+  margin-top: 5px;
+  font-size: 10px;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+  color: var(--ss-terra);
+  white-space: nowrap;
+}
+
+.ss-body .cl-nav-toggle {
+  border: 1px solid var(--ss-ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ss-ink);
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.ss-body .cl-nav-toggle:hover { background: var(--ss-sand); }
+
+.ss-body .cl-navigation { gap: 6px 26px; }
+
+.ss-body .cl-nav-link {
+  padding: 6px 0 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ss-ink-2);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: .08em;
+  text-decoration: none;
+}
+.ss-body .cl-nav-link:hover { color: var(--ss-ink); text-decoration: none; }
+.ss-body .cl-nav-link.is-active,
+.ss-body .cl-nav-menu.is-active > .cl-nav-link {
+  color: var(--ss-ink);
+  border-bottom-color: var(--ss-terra);
+}
+.ss-body .cl-nav-menu[open] > .cl-nav-link { color: var(--ss-ink); }
+.ss-body .cl-nav-link .cl-nav-group-caret { font-size: .9em; opacity: .7; }
+
+/* Sign in reads as the mockups' dark header button. */
+.ss-body .cl-navigation > .cl-nav-link[data-nav-item="signin"] {
+  padding: 12px 22px;
+  border: 0;
+  background: var(--ss-ink);
+  color: var(--ss-ivory);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.ss-body .cl-navigation > .cl-nav-link[data-nav-item="signin"]:hover { background: var(--ss-terra); color: var(--ss-ivory); }
+.ss-body .cl-navigation > .cl-nav-link[data-nav-item="signin"].is-active { background: var(--ss-terra); }
+
+.ss-body .cl-nav-panel,
+.ss-body .cl-nav-panel .cl-nav-subpanel {
+  padding: 8px;
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-radius: 0;
+  box-shadow: var(--ss-shadow-panel);
+  color: var(--ss-ink);
+}
+.ss-body .cl-nav-sublink {
+  padding: 9px 12px;
+  border-radius: 0;
+  color: var(--ss-ink);
+  font-size: 14px;
+  letter-spacing: .01em;
+  text-decoration: none;
+}
+.ss-body .cl-nav-sublink .cl-nav-icon { color: var(--ss-terra); opacity: .85; }
+.ss-body .cl-nav-panel .cl-nav-sublink:hover { background: var(--ss-sand); color: var(--ss-terra-deep); text-decoration: none; }
+.ss-body .cl-nav-sublink.is-active { color: var(--ss-terra-deep); box-shadow: inset 2px 0 var(--ss-terra); background: var(--ss-sand-2); }
+.ss-body .cl-nav-panel .cl-nav-group + .cl-nav-group { border-top-color: var(--ss-line); }
+.ss-body .cl-nav-group-label {
+  border-radius: 0;
+  color: var(--ss-ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  opacity: 1;
+}
+.ss-body .cl-nav-group-label:hover { background: var(--ss-sand); color: var(--ss-ink); }
+.ss-body .cl-nav-group-current > .cl-nav-group-label { color: var(--ss-terra-deep); box-shadow: inset 2px 0 var(--ss-terra); }
+.ss-body .cl-nav-form { margin: 0; }
+
+/* Desktop: the mockups show text links only, so the top-level icons are hidden there. */
+@media (min-width: 1121px) {
+  .ss-body .cl-navigation > .cl-nav-link .cl-nav-icon,
+  .ss-body .cl-navigation > .cl-nav-menu > .cl-nav-link .cl-nav-icon,
+  .ss-body .cl-navigation > .cl-nav-form .cl-nav-link .cl-nav-icon { display: none; }
+  .ss-body .cl-navigation > .cl-nav-link[data-nav-item="signin"] .cl-nav-icon { display: block; }
+}
+
+/* 4. The box: page context cap, main and its rows ------------------------------------------ */
+
+/* The page context band and main form one paper box on the texture: the band is its cap, with the
+   terracotta edge, and main its body. Both take the same width, so their edges are one line. */
+.ss-body .cl-page-context,
+.ss-body .cl-main {
+  width: calc(100% - 2 * var(--ss-gutter));
+  max-width: var(--ss-box);
+  margin-inline: auto;
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+}
+.ss-body .cl-page-context { margin-top: var(--ss-box-gap); border-top: 2px solid var(--ss-terra); border-bottom: 0; }
+.ss-body .cl-main { margin-bottom: var(--ss-box-gap); border-top: 0; box-shadow: var(--ss-box-shadow); }
+.ss-body .cl-page-context-inner {
+  max-width: none;
+  margin: 0;
+  min-height: 48px;
+  padding: 8px var(--ss-box-pad);
+  border-bottom: 1px solid var(--ss-line);
+  color: var(--ss-muted);
+  font-size: 12px;
+  letter-spacing: .06em;
+}
+.ss-body .cl-page-context .cl-ui-breadcrumb { gap: 8px; }
+.ss-body .cl-page-context .cl-ui-breadcrumb a { color: var(--ss-terra); }
+.ss-body .cl-page-context .cl-ui-breadcrumb a:hover { color: var(--ss-ink); }
+.ss-body .cl-page-context .cl-ui-breadcrumb [aria-current] { color: var(--ss-ink); }
+.ss-body .cl-page-context .cl-ui-breadcrumb-separator { opacity: 1; color: var(--ss-muted); }
+
+.ss-body .cl-page-frame { background: transparent; color: var(--ss-ink); }
+
+/* Rows. Core sizes and pads every row in main - the page head, the identity band, each page
+   section - from its width variables (--cl-content-width, --cl-gutter, --cl-section-space). In the
+   box a row fills the box and the box's padding is the row's. Consecutive sections share one gap,
+   and the last leaves a little more room above the box's edge. */
+/* Qualified with cl-body so it outranks core's medium and narrow widths: here the box itself is
+   medium or narrow, and the rows fill it. */
+body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad); --cl-section-space: 36px; }
+.ss-body .cl-main > * { margin: 0; }
+.ss-body .cl-main > .cl-flash-stack { padding: 22px var(--ss-box-pad) 0; }
+.ss-body .cl-main > .cl-page-section + .cl-page-section { padding-top: 0; }
+.ss-body .cl-main > .cl-page-section:not(:has(~ .cl-page-section)) { padding-bottom: 52px; }
+
+/* 4b. Bands that hold a Bootstrap container ----------------------------------------------- */
+
+/* The home hero and feature band and the course, bundle and landing page heads still hold a
+   Bootstrap container with spacing utilities inside their band. The band pads its content, so the
+   container sits flush; the band's own spacing beats the container's py-5, which is !important. */
+.ss-body .cl-main > * :is(.container, .container-fluid, .container-sm, .container-md, .container-lg, .container-xl, .container-xxl) {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+/* 5. Page head, kicker, back link, identity band ----------------------------------------- */
+
+/* The page head is the box's first row: no band of its own, a hairline below it. Core pads it at
+   the sides; the course, bundle and landing heads hold a container instead (see 4b). */
+.ss-body .cl-page-head { background: transparent; border-bottom: 1px solid var(--ss-line); color: var(--ss-ink); }
+.ss-body .cl-page-head-inner { padding-block: 52px 40px; }
+.ss-body .cl-main > .cl-page-head > .container { padding: 52px var(--ss-box-pad) 40px !important; }
+.ss-body .cl-page-head h1 {
+  margin: 14px 0 0;
+  font-family: var(--ss-display);
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  font-weight: 400 !important;
+  line-height: 1.04;
+}
+.ss-body .cl-page-head-compact h1 { margin: 0; font-size: 1.6rem; }
+.ss-body .cl-page-head-compact > .cl-page-head-inner { padding-block: 18px; }
+.ss-body .cl-page-head .lead { max-width: 40rem; margin-top: 16px; }
+
+.ss-body .cl-kicker,
+.ss-body .cl-ui-eyebrow {
+  color: var(--ss-terra);
+  font-family: var(--ss-ui);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: .32em;
+  text-transform: uppercase;
+}
+.ss-body .cl-kicker.text-primary, .ss-body .cl-kicker.text-warning { color: var(--ss-terra) !important; }
+
+.ss-body .cl-back-link {
+  color: var(--ss-terra);
+  font-size: 12px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.ss-body .cl-back-link:hover { color: var(--ss-ink); }
+.ss-body .cl-page-head .cl-back-link { margin-bottom: 30px; }
+
+/* The identity band is a sand strip across the box. */
+.ss-body .cl-identity-head {
+  background: var(--ss-sand-2);
+  border-bottom: 1px solid var(--ss-line);
+  color: var(--ss-ink);
+}
+.ss-body .cl-identity-head > .cl-identity-meta { padding-block: 16px; }
+.ss-body .cl-identity-avatar { border-radius: 0; }
+.ss-body .cl-identity-avatar-empty {
+  background: var(--ss-sand);
+  color: var(--ss-terra);
+  font-family: var(--ss-display);
+  font-size: 2rem;
+  font-weight: 500;
+}
+.ss-body .cl-identity-head-anonymous { color: var(--ss-ink-2); opacity: 1; }
+.ss-body .cl-identity-name { font-family: var(--ss-display); font-weight: 500; }
+.ss-body .cl-identity-head .cl-identity-name { font-size: 1.55rem; }
+.ss-body .cl-identity-email { color: var(--ss-ink-2); }
+.ss-body .cl-identity-details p { opacity: 1; }
+.ss-body .cl-identity-compact { color: var(--ss-ink); }
+
+/* 6. Surfaces, section heads, toolbars ----------------------------------------------------- */
+
+.ss-body .cl-ui-surface {
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--ss-ink);
+}
+.ss-body section.cl-ui-surface[data-tone="info"] { border-color: var(--ss-info); }
+.ss-body section.cl-ui-surface[data-tone="success"] { border-color: var(--ss-success); }
+.ss-body section.cl-ui-surface[data-tone="warning"] { border-color: var(--ss-warn); }
+.ss-body section.cl-ui-surface[data-tone="danger"] { border-color: var(--ss-danger); }
+.ss-body section.cl-ui-surface[data-tone="permanent"] { border-color: var(--ss-terra); }
+
+.ss-body .cl-ui-section-head:not(.cl-ui-surface *) {
+  padding: 22px 24px 20px;
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-radius: 0;
+  color: var(--ss-ink);
+}
+.ss-body .cl-ui-surface .cl-ui-section-head { padding-bottom: 14px; border-bottom: 1px solid var(--ss-line); }
+.ss-body .cl-ui-section-head::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  top: -1px;
+  left: -1px;
+  width: 44px;
+  height: 2px;
+  background: var(--ss-terra);
+}
+.ss-body .cl-ui-section-head h1,
+.ss-body .cl-ui-section-head h2,
+.ss-body .cl-ui-section-head h3 { font-family: var(--ss-display); font-weight: 500; font-size: 1.85rem; line-height: 1.15; }
+.ss-body .cl-ui-section-head p { color: var(--ss-ink-2); font-size: .92rem; }
+
+.ss-body .cl-ui-toolbar:not(.cl-ui-surface *):not(.cl-footer *),
+.ss-body .dataset-search:not(.cl-ui-surface *) {
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-radius: 0;
+}
+
+/* Inside the box, cards are one step lighter than the box, with a hairline. */
+.ss-body .cl-main :is(.cl-ui-surface, .cl-ui-stat-card, .cl-ui-list, .cl-ui-table, .cl-ui-empty-state, .cl-ui-accordion-section, .cl-ui-accordion-summary, .cl-course-card) { background-color: var(--ss-card); }
+
+/* Nothing in the box stands on the texture, so core's "not on the canvas" panels for section heads,
+   toolbars and searches outside a card become plain rows there. Full-width pages keep the panels,
+   because their rows do stand on the texture. Pagination keeps a light sand strip. */
+.ss-body:not(.cl-width-full) .cl-main .cl-ui-section-head:not(.cl-ui-surface *) {
+  padding: 0 0 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ss-line);
+}
+.ss-body:not(.cl-width-full) .cl-main .cl-ui-section-head:not(.cl-ui-surface *)::before { content: none; }
+.ss-body:not(.cl-width-full) .cl-main :is(.cl-ui-toolbar, .dataset-search):not(.cl-ui-surface *):not(.cl-footer *) {
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.ss-body .cl-main .pagination-row { background: var(--ss-sand-2); border-color: var(--ss-line); }
+
+/* 7. Actions ------------------------------------------------------------------------------- */
+
+.ss-body .cl-ui-action {
+  padding: 13px 24px;
+  border: 1px solid var(--ss-ink);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ss-ink);
+  font-family: var(--ss-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .18em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: none;
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
+.ss-body .cl-ui-action:hover { background: var(--ss-sand); color: var(--ss-ink); text-decoration: none; }
+.ss-body .cl-ui-action--small { padding: 8px 14px; font-size: 11px; letter-spacing: .14em; }
+.ss-body .cl-ui-action--large { padding: 16px 30px; }
+
+.ss-body .cl-ui-action--primary { background: var(--ss-ink); border-color: var(--ss-ink); color: var(--ss-ivory); }
+.ss-body .cl-ui-action--primary:hover { background: var(--ss-terra); border-color: var(--ss-terra); color: var(--ss-ivory); }
+.ss-body .cl-ui-action--secondary { background: transparent; border-color: var(--ss-ink); color: var(--ss-ink); }
+.ss-body .cl-ui-action--secondary:hover { background: var(--ss-sand); border-color: var(--ss-ink); color: var(--ss-ink); }
+.ss-body .cl-ui-action--quiet { background: transparent; border-color: transparent; color: var(--ss-terra); }
+.ss-body .cl-ui-action--quiet:hover { background: transparent; border-color: transparent; color: var(--ss-ink); text-decoration: underline; text-underline-offset: 4px; }
+.ss-body .cl-ui-action--danger { background: var(--ss-danger); border-color: var(--ss-danger); color: var(--ss-ivory); }
+.ss-body .cl-ui-action--danger:hover { background: #6e1f14; border-color: #6e1f14; color: var(--ss-ivory); }
+.ss-body .cl-ui-action:disabled,
+.ss-body .cl-ui-action[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
+
+.ss-body .cl-ui-close { border: 0; border-radius: 0; background: transparent; color: var(--ss-ink-2); font-size: 1.4rem; line-height: 1; }
+.ss-body .cl-ui-close:hover { color: var(--ss-terra); }
+
+/* Row menus: the panel is an opaque paper surface. */
+.ss-body .cl-ui-row-trigger { border-radius: 0; color: var(--ss-ink); }
+.ss-body .cl-ui-row-panel { background: var(--ss-paper); border: 1px solid var(--ss-line); border-radius: 0; box-shadow: var(--ss-shadow-panel); color: var(--ss-ink); }
+.ss-body .cl-ui-row-panel .cl-ui-action { letter-spacing: .06em; text-transform: none; font-size: 13px; }
+.ss-body .cl-ui-row-panel .cl-ui-action--secondary,
+.ss-body .cl-ui-row-panel .cl-ui-action--quiet { background: var(--ss-paper); color: var(--ss-ink); }
+.ss-body .cl-ui-row-panel .cl-ui-action--secondary:hover,
+.ss-body .cl-ui-row-panel .cl-ui-action--quiet:hover { background: var(--ss-sand); color: var(--ss-ink); }
+
+/* 8. Forms --------------------------------------------------------------------------------- */
+
+.ss-body .cl-ui-field > label,
+.ss-body .cl-ui-field-label,
+.ss-body .dataset-search label,
+.ss-body .pagination-row label {
+  color: var(--ss-ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+.ss-body .cl-main legend, .ss-body .cl-ui-picture-choice-legend { font-family: var(--ss-display); font-size: 1.3rem; font-weight: 500; color: var(--ss-ink); }
+.ss-body .cl-main fieldset { border-color: var(--ss-line); border-radius: 0; }
+.ss-body .cl-ui-required { color: var(--ss-terra); }
+.ss-body .cl-ui-field-help, .ss-body .cl-main .help, .ss-body .cl-main .form-text { color: var(--ss-muted); font-size: 13px; opacity: 1; }
+.ss-body .pagination-jump .help { opacity: 1; }
+.ss-body .cl-ui-field-error, .ss-body .cl-main .invalid-feedback { color: var(--ss-danger); font-size: 13px; font-weight: 500; }
+
+.ss-body :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="time"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), select, textarea, .form-control, .form-select) {
+  border: 1px solid var(--ss-line-2);
+  border-radius: 0;
+  background-color: var(--ss-paper);
+  color: var(--ss-ink);
+  font-family: var(--ss-ui);
+  font-size: 15px;
+  box-shadow: none;
+}
+.ss-body .cl-main :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), .form-control) { padding: 10px 14px; }
+.ss-body :is(input, select, textarea, .form-control, .form-select):focus {
+  border-color: var(--ss-terra);
+  box-shadow: 0 0 0 3px rgba(154, 74, 42, .18);
+  outline: none;
+}
+.ss-body :is(input, select, textarea):disabled { background-color: var(--ss-sand-2); color: var(--ss-muted); }
+.ss-body ::placeholder { color: var(--ss-muted); opacity: 1; }
+.ss-body .form-control-lg { font-size: 16px; }
+.ss-body input[type="checkbox"], .ss-body input[type="radio"] { accent-color: var(--ss-terra); }
+.ss-body .form-check-input { flex: 0 0 auto; width: 1.05em; height: 1.05em; border-color: var(--ss-line-2); background-color: var(--ss-paper); }
+.ss-body .cl-main :is(input[type="checkbox"], input[type="radio"]):not(.form-check-input) { flex: 0 0 auto; width: 1rem; height: 1rem; }
+.ss-body .form-check-input[type="checkbox"] { border-radius: 0; }
+.ss-body .form-check-input:checked { background-color: var(--ss-terra); border-color: var(--ss-terra); }
+.ss-body .form-check-input:focus { box-shadow: 0 0 0 3px rgba(154, 74, 42, .2); border-color: var(--ss-terra); }
+.ss-body .cl-ui-choice label { color: var(--ss-ink); }
+.ss-body .cl-ui-form-actions { border-top: 1px solid var(--ss-line); padding-top: 20px; }
+.ss-body .cl-password-toggle { border: 1px solid var(--ss-line-2); border-radius: 0; background: var(--ss-paper); color: var(--ss-ink); }
+.ss-body .cl-password-toggle:hover { border-color: var(--ss-terra); color: var(--ss-terra); }
+.ss-body .cl-rich-editor { border: 1px solid var(--ss-line-2); border-radius: 0; }
+
+.ss-body .cl-ui-tree-select-toggle { border: 1px solid var(--ss-line-2); border-radius: 0; background: var(--ss-paper); color: var(--ss-ink); }
+.ss-body .cl-ui-tree-select-panel { border: 1px solid var(--ss-line); border-radius: 0; background: var(--ss-paper); color: var(--ss-ink); box-shadow: var(--ss-shadow-panel); }
+.ss-body .cl-ui-tree-select-option { border-radius: 0; color: var(--ss-ink); }
+.ss-body .cl-ui-tree-select-option:hover { background: var(--ss-sand); }
+.ss-body .cl-ui-picture-choice-item { border-color: var(--ss-line); border-radius: 0; background: var(--ss-paper); }
+
+/* 9. Data: tables, stats, lists, key-value ------------------------------------------------- */
+
+.ss-body .cl-ui-table { border: 1px solid var(--ss-line); border-radius: 0; background: var(--ss-paper); }
+.ss-body .cl-main table { color: var(--ss-ink); }
+.ss-body .cl-main thead th {
+  background: var(--ss-sand);
+  border-bottom: 1px solid var(--ss-line-2);
+  color: var(--ss-ink-2);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.ss-body .cl-main thead th a { color: var(--ss-ink-2); }
+.ss-body .cl-main thead th a:hover { color: var(--ss-ink); }
+.ss-body .cl-main tbody td { border-bottom: 1px solid var(--ss-line); background: transparent; color: var(--ss-ink); }
+.ss-body .cl-main tbody tr:last-child > td { border-bottom: 0; }
+.ss-body .cl-main tbody tr:hover > td { background: var(--ss-sand-2); }
+.ss-body .sortable-indicator { color: var(--ss-terra); }
+
+.ss-body .cl-ui-stat-card { padding: 22px 24px; background: var(--ss-paper); border: 1px solid var(--ss-line); border-radius: 0; box-shadow: none; }
+.ss-body .cl-ui-stat-value { font-family: var(--ss-display); font-size: 2.6rem; font-weight: 400; line-height: 1; color: var(--ss-ink); }
+.ss-body .cl-ui-stat-label { margin-top: 8px; color: var(--ss-terra); font-size: 11px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; }
+.ss-body .cl-ui-stat-note { color: var(--ss-muted); font-size: 13px; }
+
+.ss-body .cl-ui-list { background: var(--ss-paper); border: 1px solid var(--ss-line); border-radius: 0; }
+.ss-body .cl-ui-list-item { border-bottom: 1px solid var(--ss-line); }
+.ss-body .cl-ui-list-item:last-child { border-bottom: 0; }
+.ss-body .cl-ui-list-item:hover { background: var(--ss-sand-2); }
+
+.ss-body .cl-ui-key-value-list dt { color: var(--ss-muted); font-weight: 400; }
+.ss-body .cl-ui-key-value-list dd { color: var(--ss-ink); }
+
+.ss-body .cl-main .avatar { border-radius: 0; background: var(--ss-sand); color: var(--ss-terra); font-family: var(--ss-display); }
+.ss-body .cl-main .timeline-dot { background: var(--ss-terra); box-shadow: 0 0 0 3px var(--ss-paper); }
+.ss-body .cl-main .timeline-item { border-bottom: 1px solid var(--ss-line); }
+
+/* 10. Feedback: badges, notices, empty states, progress ----------------------------------- */
+
+.ss-body .cl-ui-badge {
+  padding: 4px 10px;
+  border: 1px solid var(--ss-line-2);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ss-ink-2);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+.ss-body .cl-ui-badge--info { background: var(--ss-sand); border-color: var(--ss-sand); color: var(--ss-terra-deep); }
+.ss-body .cl-ui-badge--success { background: var(--ss-success-bg); border-color: var(--ss-success-bg); color: var(--ss-success); }
+.ss-body .cl-ui-badge--warning { background: var(--ss-warn-bg); border-color: var(--ss-warn-bg); color: var(--ss-warn); }
+.ss-body .cl-ui-badge--danger { background: var(--ss-danger-bg); border-color: var(--ss-danger-bg); color: var(--ss-danger); }
+.ss-body .cl-ui-badge--permanent { background: var(--ss-ink); border-color: var(--ss-ink); color: var(--ss-ivory); }
+
+.ss-body .cl-ui-notice {
+  border: 1px solid var(--ss-line);
+  border-left: 3px solid var(--ss-ink-2);
+  border-radius: 0;
+  background: var(--ss-paper);
+  color: var(--ss-ink);
+}
+.ss-body .cl-ui-notice--info { border-left-color: var(--ss-terra); background: #fbf1e7; }
+.ss-body .cl-ui-notice--success { border-left-color: var(--ss-success); background: #f1f4ea; }
+.ss-body .cl-ui-notice--warning { border-left-color: #a8711c; background: #fbf1df; }
+.ss-body .cl-ui-notice--danger { border-left-color: var(--ss-danger); background: #fbeae4; }
+.ss-body .cl-ui-notice-heading { font-weight: 600; color: var(--ss-ink); }
+.ss-body .cl-ui-notice--success .cl-ui-notice-heading { color: var(--ss-success); }
+.ss-body .cl-ui-notice--warning .cl-ui-notice-heading { color: var(--ss-warn); }
+.ss-body .cl-ui-notice--danger .cl-ui-notice-heading { color: var(--ss-danger); }
+.ss-body .cl-ui-notice--info .cl-ui-notice-heading { color: var(--ss-terra-deep); }
+
+.ss-body .cl-ui-empty-state {
+  padding: 32px 24px;
+  background: var(--ss-paper);
+  border: 1px dashed var(--ss-line-2);
+  border-radius: 0;
+  color: var(--ss-ink-2);
+  text-align: center;
+}
+.ss-body .cl-ui-empty-state h3 { color: var(--ss-ink); font-size: 1.6rem; }
+.ss-body .cl-empty-icon { color: var(--ss-terra); font-family: var(--ss-display); font-size: 1.8rem; }
+
+.ss-body .cl-ui-progress { background: var(--ss-line); border: 0; border-radius: 0; }
+.ss-body .cl-ui-progress-bar { background: var(--ss-terra); border-radius: 0; }
+
+/* 11. Overlays: modals and accordions ------------------------------------------------------ */
+
+.ss-body .cl-ui-modal { background: rgba(18, 14, 11, .62); }
+.ss-body .cl-ui-modal-card { background: var(--ss-paper); border: 1px solid var(--ss-line); border-radius: 0; box-shadow: 0 30px 80px rgba(18, 14, 11, .35); color: var(--ss-ink); }
+.ss-body .cl-ui-modal-head { border-bottom: 1px solid var(--ss-line); }
+.ss-body .cl-ui-modal-head :is(h1, h2, h3) { font-family: var(--ss-display); font-size: 1.7rem; font-weight: 500; margin: 0; }
+.ss-body .cl-ui-modal-foot { border-top: 1px solid var(--ss-line); background: var(--ss-sand-2); }
+
+.ss-body .cl-ui-accordion-section { background: var(--ss-paper); border: 1px solid var(--ss-line); border-radius: 0; }
+.ss-body .cl-ui-accordion-summary { background: var(--ss-paper); color: var(--ss-ink); }
+.ss-body .cl-ui-accordion-summary:hover { background: var(--ss-sand-2); }
+.ss-body .cl-ui-accordion-section[open] > .cl-ui-accordion-summary { border-bottom: 1px solid var(--ss-ink); }
+.ss-body .cl-ui-accordion-title { font-family: var(--ss-display); font-size: 1.45rem; font-weight: 500; line-height: 1.2; }
+.ss-body .cl-ui-accordion-description { color: var(--ss-muted); opacity: 1; }
+.ss-body .cl-ui-accordion-toggle { color: var(--ss-terra); }
+.ss-body .cl-ui-accordion-content { border-top: 0; }
+.ss-body .cl-ui-accordion-link { color: var(--ss-terra); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+.ss-body .cl-ui-accordion-link:hover { color: var(--ss-ink); }
+
+/* 12. In-page navigation: tabs, pagination, chips ------------------------------------------ */
+
+.ss-body .cl-group-nav { box-shadow: inset 0 -1px 0 var(--ss-line); }
+.ss-body .cl-group-tab {
+  border-radius: 0;
+  border-bottom-color: var(--ss-line);
+  color: var(--ss-ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  opacity: 1;
+}
+.ss-body .cl-group-tab:hover { color: var(--ss-ink); background: var(--ss-sand-2); text-decoration: none; }
+.ss-body .cl-group-tab.is-current { background: var(--ss-paper); border-color: var(--ss-line); border-bottom-color: var(--ss-paper); border-top: 2px solid var(--ss-terra); color: var(--ss-ink); }
+
+.ss-body .pagination-row { color: var(--ss-muted); font-size: 13px; }
+.ss-body .pagination-pages { opacity: 1; }
+.ss-body .pagination-row .cl-ui-action { border-color: var(--ss-line-2); background: var(--ss-paper); letter-spacing: .08em; }
+.ss-body .pagination-row .cl-ui-action:hover { border-color: var(--ss-terra); background: var(--ss-paper); color: var(--ss-terra-deep); }
+.ss-body .pagination-state { color: var(--ss-muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.ss-body .pagination-state[aria-current="page"] { padding: 6px 12px; background: var(--ss-ink); color: var(--ss-ivory); font-size: 13px; letter-spacing: 0; }
+.ss-body .pagination-gap { color: var(--ss-muted); opacity: 1; }
+
+.ss-body .cl-tag-chip, .ss-body .cl-filter-chip {
+  border: 1px solid var(--ss-line-2);
+  border-radius: 0;
+  background: var(--ss-paper);
+  color: var(--ss-ink-2);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: .06em;
+  text-decoration: none;
+}
+.ss-body .cl-tag-chip:hover, .ss-body .cl-filter-chip:hover { border-color: var(--ss-terra); color: var(--ss-terra-deep); text-decoration: none; }
+.ss-body .cl-tag-chip.is-selected, .ss-body .cl-filter-chip.is-active { background: var(--ss-ink); border-color: var(--ss-ink); color: var(--ss-ivory); box-shadow: none; }
+.ss-body .cl-category-count { color: inherit; opacity: .8; }
+
+/* 13. Catalogue: course cards ------------------------------------------------------------- */
+
+.ss-body .cl-course-card {
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-radius: 0;
+  box-shadow: none;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.ss-body .cl-course-card:hover { transform: translateY(-4px); box-shadow: var(--ss-shadow); }
+.ss-body .cl-course-card-header::after { background: linear-gradient(to top, rgba(18, 14, 11, .9) 0%, rgba(18, 14, 11, .5) 48%, rgba(18, 14, 11, .08) 100%); }
+.ss-body .cl-course-card-headline .cl-course-card-title { font-family: var(--ss-display); font-size: 1.45rem; font-weight: 500; line-height: 1.15; }
+.ss-body .cl-course-card-headline .cl-course-card-title a { color: var(--ss-on-dark); text-shadow: 0 1px 3px rgba(0, 0, 0, .55); }
+.ss-body .cl-course-card-headline .cl-favourite { background: rgba(18, 14, 11, .55); color: var(--ss-on-dark); }
+.ss-body .cl-course-card-headline .cl-favourite.is-on { color: var(--ss-peach); }
+
+/* Cards without a cover image show the orb, cropped differently along a row. */
+.ss-body .cl-course-card-art .cl-course-cover-placeholder {
+  background: var(--ss-night) url("../img/decor-orb.jpg") 18% 45% / 190% auto no-repeat;
+  color: var(--ss-peach);
+  font-family: var(--ss-display);
+  font-size: 3.2rem;
+  font-style: italic;
+  font-weight: 400;
+}
+.ss-body .cl-course-card-art .cl-course-cover-placeholder span { opacity: .55; }
+.ss-body .cl-course-cards > :nth-child(4n+2) .cl-course-cover-placeholder { background-position: 92% 20%; }
+.ss-body .cl-course-cards > :nth-child(4n+3) .cl-course-cover-placeholder { background-position: 60% 95%; }
+.ss-body .cl-course-cards > :nth-child(4n+4) .cl-course-cover-placeholder { background-position: 4% 10%; }
+
+.ss-body .cl-course-card .cl-ui-breadcrumb { color: var(--ss-muted); letter-spacing: .14em; opacity: 1; }
+.ss-body .cl-course-card .cl-ui-breadcrumb a { color: var(--ss-muted); }
+.ss-body .cl-course-card-summary { color: var(--ss-ink-2); opacity: 1; font-size: .88rem; }
+.ss-body .cl-course-card-tags-label { color: var(--ss-muted); opacity: 1; }
+.ss-body .cl-course-card .cl-ui-key-value-list dt { color: var(--ss-muted); opacity: 1; letter-spacing: .14em; }
+.ss-body .cl-course-card .cl-ui-key-value-list dd { font-weight: 500; font-variant-numeric: tabular-nums; }
+.ss-body .cl-course-card-foot { border-top-color: var(--ss-line); }
+.ss-body .cl-course-card-foot .cl-ui-action--primary { padding-left: 0; padding-right: 0; background: transparent; border-color: transparent; color: var(--ss-terra); }
+.ss-body .cl-course-card-foot .cl-ui-action--primary:hover { background: transparent; border-color: transparent; color: var(--ss-ink); }
+
+.ss-body .cl-favourite { border-color: var(--ss-line-2); border-radius: 0; color: var(--ss-ink-2); }
+.ss-body .cl-favourite.is-on { color: var(--ss-terra); border-color: var(--ss-terra); }
+.ss-body .cl-rating-summary, .ss-body .cl-rating-none { color: var(--ss-ink-2); opacity: 1; }
+.ss-body .cl-profile-image-empty { background: var(--ss-sand); color: var(--ss-terra); font-family: var(--ss-display); opacity: 1; }
+
+/* 14. Course detail ----------------------------------------------------------------------- */
+
+.ss-body .cl-course-head { background: transparent; border-bottom: 1px solid var(--ss-line); color: var(--ss-ink); }
+.ss-body .cl-course-head > .container { padding-top: 56px !important; padding-bottom: 48px !important; }
+.ss-body .cl-course-head h1 { margin: 0; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 1.04; }
+.ss-body .cl-course-head .text-white-50 { color: var(--ss-ink-2) !important; font-family: var(--ss-display); font-style: italic; font-weight: 400; }
+.ss-body .cl-course-head .lead { max-width: 40rem; }
+.ss-body .cl-course-head .cl-rating-summary, .ss-body .cl-course-head .cl-rating-none { margin-top: 12px; }
+.ss-body .cl-course-head .cl-ui-surface { padding: 26px 28px; }
+.ss-body .cl-course-head .cl-ui-key-value-list dt { color: var(--ss-muted); }
+
+.ss-body .cl-prose { font-size: 1rem; line-height: 1.75; color: var(--ss-ink); }
+.ss-body .cl-prose :is(h2, h3) { margin-top: 1.6rem; }
+.ss-body .cl-prose blockquote { margin: 1.2rem 0; padding: 4px 0 4px 18px; border-left: 2px solid var(--ss-terra); font-family: var(--ss-display); font-size: 1.3rem; font-style: italic; color: var(--ss-ink-2); }
+.ss-body .cl-prose img { max-width: 100%; height: auto; }
+
+/* 15. Home: full width, the abacus hero, the catalogue panel and the feature cards ---------- */
+
+/* Home and course landing pages have no box: core gives them the cl-width-full body class. The
+   context band, the identity band, the hero and every row run the full width, their content centred
+   to --ss-frame by padding alone, and the texture shows between the bands, the panels and the
+   footer. Core's rows take that padding through --cl-gutter. */
+body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
+.ss-body.cl-width-full :is(.cl-page-context, .cl-main) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.ss-body.cl-width-full .cl-page-context { background: var(--ss-ivory); border-bottom: 1px solid var(--ss-line); }
+.ss-body.cl-width-full .cl-page-context-inner { border-bottom: 0; padding-inline: var(--ss-row-pad); }
+/* Bands that are not core rows take the same padding. A page head that holds a container (the
+   landing hero) is padded by its band, not by the container. */
+.ss-body.cl-width-full .cl-main > :is(.cl-hero, .cl-feature-band, .cl-flash-stack, .cl-page-head:has(> .container)) { padding-inline: var(--ss-row-pad); }
+.ss-body.cl-width-full .cl-main > .cl-page-head > .container { padding-inline: 0 !important; }
+.ss-body.cl-width-full .cl-identity-head { background: var(--ss-paper); }
+
+.ss-body .cl-hero {
+  position: relative;
+  isolation: isolate;
+  background: var(--ss-night) url("../img/hero-abacus.jpg") 65% 50% / cover no-repeat;
+  color: var(--ss-on-dark);
+}
+.ss-body .cl-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(18, 14, 11, .94) 0%, rgba(18, 14, 11, .82) 38%, rgba(18, 14, 11, .38) 72%, rgba(18, 14, 11, .2) 100%);
+}
+.ss-body .cl-hero > .container { padding-top: 104px !important; padding-bottom: 88px !important; }
+.ss-body .cl-hero .min-vh-hero { min-height: 480px; }
+.ss-body .cl-hero .row > [class*="col-"] { padding-top: 0 !important; padding-bottom: 0 !important; }
+.ss-body .cl-hero h1 {
+  color: var(--ss-on-dark);
+  font-size: clamp(2.75rem, 6vw, 5.25rem);
+  line-height: 1.02;
+  text-wrap: pretty;
+}
+.ss-body .cl-hero .lead { max-width: 35rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
+.ss-body .cl-hero .cl-kicker { color: var(--ss-apricot); }
+.ss-body .cl-hero .text-warning, .ss-body .cl-hero .text-primary { color: var(--ss-apricot) !important; }
+.ss-body .cl-hero :focus-visible { outline-color: var(--ss-apricot); }
+.ss-body .cl-hero .cl-ui-action--primary { background: var(--ss-ivory); border-color: var(--ss-ivory); color: var(--ss-ink); }
+.ss-body .cl-hero .cl-ui-action--primary:hover { background: var(--ss-peach); border-color: var(--ss-peach); color: var(--ss-ink); }
+.ss-body .cl-hero .cl-ui-action--secondary { background: transparent; border-color: rgba(251, 246, 238, .6); color: var(--ss-on-dark); }
+.ss-body .cl-hero .cl-ui-action--secondary:hover { background: rgba(251, 246, 238, .12); border-color: var(--ss-on-dark); color: var(--ss-on-dark); }
+.ss-body .cl-hero-panel {
+  padding: 30px 32px;
+  background: rgba(18, 14, 11, .72);
+  border: 1px solid var(--ss-dark-line);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--ss-on-dark-2);
+}
+.ss-body .cl-hero-panel h2 { margin: 12px 0 14px; color: var(--ss-on-dark); font-size: 2rem; font-weight: 400; }
+.ss-body .cl-hero-panel ul { margin: 0; padding: 0; list-style: none; }
+.ss-body .cl-hero-panel li { padding: 10px 0; border-top: 1px solid var(--ss-dark-line); font-size: .95rem; }
+
+/* The catalogue stands on the texture as one paper panel holding its introduction and Popular
+   Courses, the course cards one step lighter inside it. The catalogue's row is the panel. */
+.ss-body.ss-family-home .cl-main > .cl-page-section {
+  width: auto;
+  margin: 72px var(--ss-row-pad) 36px;
+  padding: 48px 48px 52px;
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-top: 2px solid var(--ss-terra);
+  box-shadow: var(--ss-box-shadow);
+}
+.ss-family-home .cl-main > .cl-page-section > .cl-ui-surface { padding: 0; background: transparent; border: 0; }
+.ss-family-home .cl-main > .cl-page-section .cl-kicker,
+.ss-family-home .cl-main > .cl-page-section .cl-ui-eyebrow { color: var(--ss-terra-deep) !important; }
+.ss-family-home .cl-main > .cl-page-section .lead { color: var(--ss-ink-2) !important; }
+.ss-family-home .cl-popular-courses { margin-top: 44px; }
+.ss-family-home .cl-popular-courses .cl-ui-section-head { padding: 0 0 6px; background: transparent; border: 0; }
+.ss-family-home .cl-popular-courses .cl-ui-section-head p { color: var(--ss-ink-2); }
+
+/* Feature band: three paper cards on the texture with a terracotta top edge. The orb that used to
+   lie behind this band is now the footer art. */
+.ss-body .cl-main > .cl-feature-band { padding-top: 36px !important; padding-bottom: 88px !important; background: transparent; }
+.ss-body .cl-feature {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  column-gap: 18px;
+  padding: 30px 30px 32px;
+  background: var(--ss-card);
+  border: 1px solid var(--ss-line);
+  border-top: 2px solid var(--ss-terra);
+  box-shadow: 0 18px 36px -24px rgba(31, 25, 21, .35);
+}
+.ss-body .cl-feature span { grid-row: span 2; color: var(--ss-terra); font-family: var(--ss-display); font-size: 2.4rem; line-height: 1; }
+.ss-body .cl-feature h3 { margin: 0 0 8px; color: var(--ss-ink); font-size: 1.75rem; font-weight: 400; }
+.ss-body .cl-feature p { margin: 0; color: var(--ss-ink-2); font-weight: 300; }
+
+/* 15b. Course landing pages: full width like Home ---------------------------------------- */
+
+/* Core gives a landing page the cl-width-full body class, so the full-width frame of section 15
+   applies: no box, and each row centred to --ss-frame. The ADMIN preview's notice is a row of its
+   own above the hero. */
+.ss-body.cl-width-full .cl-main > .cl-page-section:has(+ .cl-landing-hero) { padding-block: 24px 0; }
+
+/* Hero: a night band across the window, the headline in ivory, the price and buy buttons on a
+   paper card with the terracotta edge, and the course's picture framed on the right. */
+.ss-body .cl-main > .cl-landing-hero {
+  position: relative;
+  isolation: isolate;
+  border-bottom: 0;
+  background:
+    radial-gradient(circle at 78% 26%, rgba(232, 176, 122, .16), rgba(18, 14, 11, 0) 54%),
+    linear-gradient(180deg, #19130f 0%, var(--ss-night) 100%);
+  color: var(--ss-on-dark);
+}
+.ss-body .cl-main > .cl-landing-hero > .container { padding-top: 88px !important; padding-bottom: 84px !important; }
+.ss-body .cl-landing-headline { margin-top: 18px; color: var(--ss-on-dark); font-family: var(--ss-display); font-size: clamp(2.6rem, 5.4vw, 4.75rem); font-weight: 400; line-height: 1.02; }
+.ss-body .cl-landing-hero .lead { max-width: 36rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
+.ss-body .cl-landing-hero .cl-ui-badge { background: transparent; border-color: var(--ss-dark-line); color: var(--ss-apricot); }
+.ss-body .cl-landing-hero .cl-rating-summary { color: var(--ss-on-dark-2); }
+.ss-body .cl-landing-hero-copy > .cl-ui-surface {
+  padding: 26px 28px;
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-top: 2px solid var(--ss-terra);
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .7);
+  color: var(--ss-ink);
+}
+.ss-body .cl-landing-hero-picture :is(img, .cl-landing-hero-cover) { border: 1px solid var(--ss-dark-line); box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .8); }
+.ss-body .cl-landing-hero :focus-visible { outline-color: var(--ss-apricot); }
+
+/* Sections: each one a paper panel on the texture, like Home's catalogue panel. */
+.ss-body.cl-width-full .cl-main > .cl-landing-sections { padding-block: 56px 80px; }
+.ss-body .cl-landing-sections { gap: 36px; }
+.ss-body .cl-landing-section > .cl-ui-surface {
+  padding: 44px 48px 48px;
+  background: var(--ss-paper);
+  border: 1px solid var(--ss-line);
+  border-top: 2px solid var(--ss-terra);
+  box-shadow: var(--ss-box-shadow);
+}
+.ss-body .cl-landing-section-head { margin-bottom: 24px; }
+.ss-body .cl-landing-section-heading { margin-bottom: 10px; color: var(--ss-ink); font-family: var(--ss-display); font-size: clamp(2rem, 3.4vw, 2.75rem); font-weight: 400; line-height: 1.08; }
+.ss-body .cl-landing-intro { color: var(--ss-ink-2); font-size: 1.02rem; font-weight: 300; }
+.ss-body .cl-landing-checklist > li { color: var(--ss-ink); font-size: 1rem; }
+
+/* Benefits: lighter cards with the terracotta edge, as Home's feature cards are. */
+.ss-body .cl-landing-benefit { padding: 26px 26px 28px; background: var(--ss-card); border-color: var(--ss-line); border-top: 2px solid var(--ss-terra); }
+.ss-body .cl-landing-benefit-title { font-family: var(--ss-display); font-size: 1.6rem; font-weight: 400; line-height: 1.15; }
+.ss-body .cl-landing-benefit p { color: var(--ss-ink-2); font-weight: 300; }
+
+/* Contents: the outline as ruled rows, its sections in the display face. */
+.ss-body .cl-landing-outline, .ss-body .cl-landing-outline-node { border-color: var(--ss-line); }
+.ss-body .cl-landing-outline-count { color: var(--ss-muted); opacity: 1; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; }
+.ss-body .cl-landing-outline-node.is-section .cl-landing-outline-title { font-family: var(--ss-display); font-size: 1.35rem; font-weight: 500; }
+.ss-body .cl-landing-outline-kind { color: var(--ss-muted); opacity: 1; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
+
+/* Pricing: framed all round in terracotta, the one panel that asks for the decision. */
+.ss-body .cl-landing-section--pricing > .cl-ui-surface { border: 2px solid var(--ss-terra); }
+
+/* Call to action: a sand panel rather than a dark band, so two dark bands never stack above the
+   footer. */
+.ss-body .cl-landing-section--cta > .cl-ui-surface { background: var(--ss-sand); border-color: var(--ss-line-2); border-top-color: var(--ss-terra); }
+
+/* 16. Sign-in family: the serpent panel beside the page body, inside the box -------------- */
+
+.ss-auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: calc(100vh - var(--ss-header-h) - 2 * var(--ss-box-gap) - 50px);
+}
+.ss-auth-art {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  min-height: 360px;
+  padding: 48px;
+  background: var(--ss-night) url("../img/footer-serpent.jpg") 62% 55% / cover no-repeat;
+  color: var(--ss-on-dark);
+}
+.ss-auth-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(0deg, rgba(18, 14, 11, .92) 0%, rgba(18, 14, 11, .5) 45%, rgba(18, 14, 11, .1) 75%);
+}
+.ss-auth-copy { max-width: 29rem; }
+.ss-auth-eyebrow { margin: 0 0 14px; color: var(--ss-apricot); font-size: 11px; letter-spacing: .32em; text-transform: uppercase; }
+.ss-auth-quote { margin: 0; color: var(--ss-on-dark); font-family: var(--ss-display); font-size: 2.1rem; line-height: 1.15; }
+.ss-auth-body { min-width: 0; background: transparent; }
+.ss-auth-body .cl-page-head { border-bottom: 0; }
+.ss-body .ss-auth-body > .cl-page-section { padding-inline: var(--ss-box-pad); padding-bottom: 72px; }
+.ss-auth-body .cl-page-section > .cl-ui-surface { border-top: 2px solid var(--ss-terra); }
+
+/* 17. Company context and cart chrome ------------------------------------------------------ */
+
+.ss-body .company-context { background: var(--ss-sand); border: 1px solid var(--ss-line-2); border-left: 3px solid var(--ss-terra); border-radius: 0; color: var(--ss-ink); }
+.ss-body .company-context h2 { font-family: var(--ss-display); font-size: 1.35rem; font-weight: 500; }
+.ss-body .company-context p { color: var(--ss-ink-2); opacity: 1; }
+
+.ss-body .cl-cart-menu > summary { border-radius: 0; color: var(--ss-ink); }
+.ss-body .cl-cart-menu > summary:hover { background: var(--ss-sand); }
+.ss-body .cl-cart-count { background: var(--ss-terra); color: var(--ss-ivory); border-radius: 0; }
+.ss-body .cl-cart-prompt { color: var(--ss-ink-2); }
+.ss-body .cl-cart-panel { background: var(--ss-paper); border-color: var(--ss-line); border-radius: 0; box-shadow: var(--ss-shadow-panel); color: var(--ss-ink); }
+.ss-body .cl-cart-heading { font-family: var(--ss-display); font-size: 1.4rem; font-weight: 500; color: var(--ss-ink); }
+.ss-body .cl-cart-line { border-color: var(--ss-line); }
+
+/* 18. Footer: the orb behind a veil, full width below the box ------------------------------ */
+
+.ss-body .cl-footer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--ss-night);
+  color: var(--ss-on-dark-3);
+}
+/* The orb sits left of centre in its picture, so the art is mirrored to bring the orb to the right,
+   away from the brand and the first column of text. */
+.ss-footer-art {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  transform: scaleX(-1);
+  background: var(--ss-night) url("../img/decor-orb.jpg") 0% 50% / cover no-repeat;
+}
+.ss-footer-veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(0deg, rgba(18, 14, 11, .95) 0%, rgba(18, 14, 11, 0) 36%),
+    linear-gradient(90deg, rgba(18, 14, 11, .97) 0%, rgba(18, 14, 11, .9) 46%, rgba(18, 14, 11, .45) 78%, rgba(18, 14, 11, .25) 100%);
+}
+.ss-body .cl-footer-inner {
+  display: block;
+  max-width: var(--ss-frame);
+  margin: 0 auto;
+  padding: 88px var(--ss-gutter) 0;
+}
+.ss-body .cl-footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 48px;
+}
+.ss-body .cl-footer-section p { margin: 16px 0 0; max-width: 26rem; color: var(--ss-on-dark-3); font-size: 14px; font-weight: 300; }
+.ss-body .cl-footer-section h2 {
+  margin: 4px 0 0;
+  color: var(--ss-apricot);
+  font-family: var(--ss-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+.ss-body .cl-footer .ss-footer-brand { margin: 0; color: var(--ss-on-dark); font-family: var(--ss-display); font-size: 2rem; font-weight: 400; line-height: 1.1; }
+.ss-body .cl-footer-nav { display: block; margin-top: 18px; font-size: 14px; }
+.ss-body .cl-footer-nav ul { display: grid; grid-template-columns: repeat(2, minmax(0, max-content)); gap: 10px 40px; margin: 0; padding: 0; list-style: none; }
+.ss-body .cl-footer-nav a { color: var(--ss-on-dark-3); font-weight: 400; text-decoration: none; }
+.ss-body .cl-footer-nav a:hover { color: var(--ss-on-dark); text-decoration: underline; text-underline-offset: 4px; }
+.ss-body .cl-footer :focus-visible { outline-color: var(--ss-apricot); }
+.ss-body .cl-footer-social { margin-top: 24px; gap: 10px; }
+.ss-body .cl-footer-social a,
+.ss-body .cl-footer-social > li > span {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid rgba(232, 176, 122, .5);
+  border-radius: 0;
+  background: rgba(18, 14, 11, .6);
+  color: var(--ss-on-dark-2);
+  opacity: 1;
+}
+.ss-body .cl-footer-social a:hover { background: var(--ss-apricot); border-color: var(--ss-apricot); color: var(--ss-night); }
+.ss-body .cl-footer-section-contact .cl-ui-action { margin-top: 22px; }
+.ss-body .cl-footer .cl-ui-action--primary { background: var(--ss-ivory); border-color: var(--ss-ivory); color: var(--ss-ink); }
+.ss-body .cl-footer .cl-ui-action--primary:hover { background: var(--ss-peach); border-color: var(--ss-peach); color: var(--ss-ink); }
+.ss-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 72px;
+  padding: 22px 0 32px;
+  border-top: 1px solid var(--ss-dark-line);
+  color: var(--ss-on-dark-4);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+/* 19. Responsive --------------------------------------------------------------------------- */
+
+@media (max-width: 1120px) {
+  body.ss-body { --ss-gutter: 18px; --ss-box-pad: 28px; --ss-box-gap: 24px; --ss-header-h: 64px; }
+  html { scroll-padding-top: 80px; }
+  .ss-body .cl-header-inner { padding-top: 10px; padding-bottom: 10px; }
+  .ss-body .cl-navigation { padding: 6px 0 14px; border-top: 1px solid var(--ss-line); }
+  .ss-body .cl-nav-link { padding: 12px 2px; border-bottom: 1px solid var(--ss-line); font-size: 14px; }
+  .ss-body .cl-nav-link.is-active, .ss-body .cl-nav-menu.is-active > .cl-nav-link { border-bottom-color: var(--ss-terra); }
+  .ss-body .cl-navigation > .cl-nav-link[data-nav-item="signin"] { margin-top: 10px; padding: 13px 18px; }
+  .ss-body .cl-nav-panel, .ss-body .cl-nav-panel .cl-nav-subpanel { margin: 4px 0 8px; background: var(--ss-sand-2); box-shadow: none; }
+  .ss-body .cl-nav-link .cl-nav-icon { color: var(--ss-terra); }
+  .ss-body .cl-hero > .container { padding-top: 72px !important; padding-bottom: 64px !important; }
+}
+
+@media (max-width: 900px) {
+  .ss-auth { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .ss-auth-art { min-height: 300px; padding: 32px var(--ss-box-pad); }
+  .ss-auth-quote { font-size: 1.7rem; }
+  .ss-body .cl-footer-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .ss-body .cl-footer-section-lead { grid-column: 1 / -1; }
+  .ss-body .cl-hero .min-vh-hero { min-height: 0; }
+  .ss-body .cl-hero { background-position: 70% 50%; }
+  .ss-body .cl-hero::before { background: linear-gradient(90deg, rgba(18, 14, 11, .92) 0%, rgba(18, 14, 11, .7) 100%); }
+  .ss-body.ss-family-home .cl-main > .cl-page-section { margin-top: 48px; padding: 32px 24px 36px; }
+  .ss-body .cl-main > .cl-feature-band { padding-bottom: 64px !important; }
+}
+
+/* Phones: the box runs edge to edge, without side borders. */
+@media (max-width: 560px) {
+  body.ss-body { --ss-gutter: 0px; --ss-box-pad: 18px; --ss-box-gap: 16px; font-size: 15px; }
+  body.ss-body.cl-width-full { --ss-row-pad: 16px; }
+  .ss-body .cl-page-context, .ss-body .cl-main { border-left: 0; border-right: 0; }
+  .ss-body .cl-header-inner { padding-inline: 16px; }
+  .ss-body .cl-brand-copy strong { font-size: 24px; }
+  .ss-body .cl-brand-copy small { letter-spacing: .24em; }
+  .ss-body .cl-page-head:not(.cl-page-head-compact) > :is(.cl-page-head-inner, .container, .container-fluid) { padding-top: 36px !important; padding-bottom: 30px !important; }
+  .ss-body .cl-page-head .cl-back-link { margin-bottom: 20px; }
+  .ss-body .cl-ui-section-head:not(.cl-ui-surface *) { padding: 18px 18px 16px; }
+  .ss-body .cl-ui-section-head h2, .ss-body .cl-ui-section-head h3 { font-size: 1.55rem; }
+  .ss-body .cl-ui-action { padding: 12px 16px; letter-spacing: .1em; }
+  .ss-body .cl-ui-action--small { padding: 7px 10px; letter-spacing: .06em; }
+  .ss-body .cl-ui-row-actions .cl-ui-action { padding: 6px 9px; font-size: 11px; letter-spacing: .03em; }
+  .ss-body .cl-feature { padding: 24px 20px; grid-template-columns: 44px minmax(0, 1fr); column-gap: 14px; }
+  .ss-body .cl-footer-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  .ss-body .cl-footer-inner { padding: 64px 18px 0; }
+  .ss-footnote { margin-top: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-body *, .ss-body *::before, .ss-body *::after { transition-duration: .001ms !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+  .ss-body .cl-course-card:hover { transform: none; }
+}
+
+@media print {
+  .ss-body .cl-header, .ss-body .cl-footer, .ss-body .cl-page-context, .ss-auth-art, .ss-body .cl-skip-link { display: none !important; }
+  body.ss-body { background: #fff; color: #000; }
+  .ss-auth { display: block; min-height: 0; }
+  .ss-body .cl-hero, .ss-body .cl-feature-band { background: #fff; color: #000; }
+  .ss-body .cl-hero::before, .ss-body .cl-feature-band::before { display: none; }
+}
+
+@media (forced-colors: active) {
+  .ss-body .cl-ui-surface, .ss-body .cl-course-card, .ss-body .cl-ui-modal-card, .ss-body .cl-cart-panel, .ss-body .cl-nav-panel { border: 1px solid CanvasText; }
+  .ss-footer-art, .ss-footer-veil { display: none; }
+}

@@ -1,0 +1,48 @@
+{#
+	Saharan Sunset footer. The orb artwork, mirrored so the orb sits on the right, and its veil are
+	decoration behind three semantic footer sections. Destinations come from the core footer_navigation model and the social marks
+	from footer_social and the platform sprite; nothing here is a theme-maintained route list.
+#}
+<footer class="cl-footer">
+	<div class="ss-footer-art" aria-hidden="true"></div>
+	<div class="ss-footer-veil" aria-hidden="true"></div>
+	<div class="cl-footer-inner">
+		<div class="cl-footer-grid">
+			<section class="cl-footer-section cl-footer-section-lead" aria-label="About {{ app.name }}">
+				<p class="ss-footer-brand">{{ app.name }}</p>
+				<p>Self-study courses with graded assessments and certificates, for individuals and for companies enrolling their people.</p>
+				{% if footer_social is defined and footer_social %}
+					<ul class="cl-footer-social" aria-label="Social media">
+						{% for mark in footer_social %}
+							<li>
+								{% if mark.href %}
+									<a href="{{ mark.href }}" aria-label="{{ mark.label }}" rel="noopener noreferrer" target="_blank"><svg class="cl-footer-social-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#social-{{ mark.key }}"></use></svg></a>
+								{% else %}
+									<span title="{{ mark.label }}"><svg class="cl-footer-social-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="{{ platform.icon_sprite }}#social-{{ mark.key }}"></use></svg><span class="cl-visually-hidden">{{ mark.label }}</span></span>
+								{% endif %}
+							</li>
+						{% endfor %}
+					</ul>
+				{% endif %}
+			</section>
+			<section class="cl-footer-section cl-footer-section-links" aria-labelledby="ss-footer-explore">
+				<h2 id="ss-footer-explore">Explore</h2>
+				<nav class="cl-footer-nav" aria-label="Footer navigation">
+					<ul>
+						{% for footer_link in footer_navigation %}
+							<li><a href="{{ footer_link.href }}">{{ footer_link.label }}</a></li>
+						{% endfor %}
+					</ul>
+				</nav>
+			</section>
+			<section class="cl-footer-section cl-footer-section-contact" aria-labelledby="ss-footer-contact">
+				<h2 id="ss-footer-contact">Get in touch</h2>
+				<p>Questions about a course, your account or company enrolment? Send us a message.</p>
+				{{ ui('action.link', {label: 'Open the contact form', href: '/contact', variant: 'primary'}) }}
+			</section>
+		</div>
+		<div class="ss-footnote">
+			<span>&copy; {{ "now"|date("Y") }} {{ app.name }}. All rights reserved.</span>
+		</div>
+	</div>
+</footer>

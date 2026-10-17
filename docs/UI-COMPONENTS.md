@@ -1,6 +1,6 @@
 # Platform UI component guide
 
-**LMS:** 0.9.1 · **Updated:** 2026-10-13 · **Registry:** 35 components in `src/View/Ui/PlatformUi.php`
+**LMS:** 0.9.2 · **Updated:** 2026-10-17 · **Registry:** 35 components in `src/View/Ui/PlatformUi.php`
 
 CattoLMS reusable UI structures are platform components. A page may not independently implement a job already represented by a canonical component. Extend the component and its contract test instead of forking markup.
 
@@ -144,9 +144,15 @@ Each shell places `main.cl-main` and `footer.cl-footer` beside one another insid
 
 `CanonicalPageConstructionTest` renders both states through every bundled theme and checks actual landmarks, semantic sections, menu nesting, logout method/CSRF and GN decoration. The browser test `tests/Browser/canonical-page.cjs` checks served pages at 1440, 820 and 390px, navigation controls, no-JavaScript links, overflow and main/footer position.
 
+### One construction for every page (v0.9)
+
+Main holds rows: the flash stack, the page head (the only `h1`), the identity band and one or more `section.cl-page-section`, with a theme's `div.cl-page-family` and form windows as the only other children. The page's width is chosen once (`ThemeRenderer::pageWidth`, the `cl-width-*` body class) and every row follows it ([Theme SDK](THEME-SDK.md#page-width-and-rows-v09)). Each section's content sits on a `layout.surface` that opens with its `layout.section-head`; a `layout.section-grid` wraps two or more cards and never one. The section pages (`admin-section`, `account-section`, `company-section`) and the three "All sections" pages render their content in page sections; the "All sections" pages have no card repeating their page head.
+
+The page head takes a list of actions: a page sets `ph_actions` to captured markup (`{% set ph_actions %}…{% endset %}`) for its own main actions, and `ph_action_href` remains for a sub-page's single secondary link. A section's own actions are defined once, in its registry's `actions()` (`AdministrationSectionRegistry`, `AccountSectionRegistry`, `CompanySectionRegistry`: a link or a button that opens a form window the section draws, with the `can_*` flag it needs), and drawn by `partials/section-actions.html.twig`: in the page head when the section is the page, and in the section's card head when it is one of several (`section_standalone` false; the Company workspace fetches a section with htmx, which draws it that way). `PageStructureContractTest` checks the rows, the grids, the widths, the menu page heads and the actions; `tests/Browser/section-pages.cjs` opens every Account, Company and Administration menu page in every bundled theme at 1440 and 390px.
+
 ### Shared page ownership in v0.8.5
 
-The registry has 35 components (the tabbed course editor added `layout.tabs`, which also renders the Courses and Companies group navigation; the catalogue's `form.tree-select` replaced the category grid, tile, filter rail and filter pill, and since v0.8.8.12 is the category picker everywhere; certificate designs added `form.picture-choice`); canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
+The registry has 35 components (the tabbed course editor added `layout.tabs`; the catalogue's `form.tree-select` replaced the category grid, tile, filter rail and filter pill, and since v0.8.8.12 is the category picker everywhere; certificate designs added `form.picture-choice`); canonical shell partials do not introduce a parallel component API. Theme shells compose the following core partials:
 
 | Concern | Core source |
 | --- | --- |

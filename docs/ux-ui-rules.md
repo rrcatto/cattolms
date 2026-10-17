@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.9.1 (development) **Date time:** 2026/10/13 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.9.2 (development) **Date time:** 2026/10/17 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -54,16 +54,19 @@ The test is what the reader is doing: filling several things in and then committ
 
 **1.6b Preserve theme individuality within the shared functional component system.** Gilded Noir consumes the same components as every theme. Its engraved canvas, gold actions, typography, navigation identity chip and individual footer remain theme-owned. Themes decorate canonical selectors; they must not replace component DOM, required spacing, GET/POST semantics, behaviour hooks or accessibility.
 
-**1.7 Every page is built the same way.** Page head, then the shared identity band (Gilded Noir uses compact header identity), then the body on cards:
+**1.7 Every page is built the same way.** Page head, then the shared identity band (Gilded Noir uses compact header identity), then one or more page sections, each holding its content on cards:
 
 ```text
-page-head partial
-identity partial (where the theme presents it)
-layout.section-grid
-  layout.surface
+page-head partial         the only h1; on a menu page the kicker is the menu, the title the menu entry
+                          and the lead its description; the page's actions
+identity partial          (where the theme presents it)
+section.cl-page-section   one per region of the page
+  layout.surface          one card per job; two or more cards sit in a layout.section-grid
     layout.section-head
-    composed form/data/feedback components
+    search and filters, pager, notice, table or list, pager
 ```
+
+The page chooses its width once (`ThemeRenderer::pageWidth`: wide by default; medium for forms, the legal and help pages, cart and checkout; narrow for the sign-in pages and the error page; full for Home and course landing pages) and every row follows it: the page head, the identity band and each page section take their width and spacing from Core's variables, never from Bootstrap container or spacing classes. A section grid around a single card is a wrapper, not a layout, so a single card sits directly in its section. A section's own actions (Create course, Add person and the like, from its registry's `actions()`) sit in the page head when the section is the page, and in its card's head on the "All sections" pages. Menu pages have no back link and no "All … sections" button: the breadcrumb and the menu lead there. There are no group tab strips: the menu leads to each page. → Enforced by `PageStructureContractTest` and `tests/Browser/section-pages.cjs` (owner's decisions, 2026-10-16 and 2026-10-17).
 
 The eyebrow names the section and comes from the section registry, so the card, the menu entry and the page head cannot disagree about what a section is called. A page with several cards repeats the card, not the grid. Section heads use the explicit `.cl-ui-section-head-content` child before the actions slot. The content starts physically left and expands; actions stay right, including when they wrap. Root decorative pseudo-elements must be absolutely positioned and non-interactive. Never fix a flex-item decoration by adding `text-align` alone. → Enforced by `tools/validate-ui-contracts.php`, section tests and `tests/Browser/ui-stabilisation.cjs`.
 
@@ -73,11 +76,11 @@ Company context is an opaque, visibly tinted banner, not an ordinary white card.
 
 The check is the delivered HTML, not the template: walk every text node's ancestors and look for one that paints a background. A partial can look carded in source and still render bare once a wrapper decides otherwise.
 
-**1.9 The page frame contains main and footer.** All five themes use `div.cl-shell`, a top `header.cl-header` or `aside.cl-sidebar`, `div.cl-page`, `section.cl-page-context` with its inner wrapper, and `div.cl-page-frame`. Exactly one `main.cl-main` and its following `footer.cl-footer` are siblings inside that frame. Layout/framing wrappers are divs; meaningful page regions remain sections. Course presentation can adjust the frame surface/width without changing these landmarks.
+**1.9 The page frame contains main and footer.** Every bundled theme uses `div.cl-shell`, a top `header.cl-header` or `aside.cl-sidebar`, `div.cl-page`, `section.cl-page-context` with its inner wrapper, and `div.cl-page-frame`. Exactly one `main.cl-main` and its following `footer.cl-footer` are siblings inside that frame. Layout/framing wrappers are divs; meaningful page regions remain sections. Course presentation can adjust the frame surface/width without changing these landmarks.
 
-**1.10 Shared page concepts use canonical classes.** The core navigation partial renders the core model using `cl-navigation` and `cl-nav-*`. Top navigation: Radiant Learning, Light Default, Gilded Noir. Sidebar navigation: Factory Reset and Factory Reset Sidebar. Authentication changes entries, identity and actions, never the shell construction. No hard-coded guest menu or old/new class aliases.
+**1.10 Shared page concepts use canonical classes.** The core navigation partial renders the core model using `cl-navigation` and `cl-nav-*`. Top navigation: Radiant Learning, Light Default, Gilded Noir, Saharan Sunset. Sidebar navigation: Factory Reset and Factory Reset Sidebar. Authentication changes entries, identity and actions, never the shell construction. No hard-coded guest menu or old/new class aliases.
 
-Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-actions`. Identity uses `cl-identity` plus `cl-identity-head` or `cl-identity-compact`, with shared avatar/meta/name/email/ roles classes. Gilded Noir's compact identity stays in the header navigation; core omits its full page band rather than rendering and hiding a duplicate. Ordinary content sections use `section.cl-page-section`; specialised course/admin/catalogue sections retain their own classes. The Theme SDK contains the canonical class table and shell sample. Structural rendering contracts and the browser matrix cover all five themes in both states at desktop, tablet and mobile widths.
+Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-actions`. Identity uses `cl-identity` plus `cl-identity-head` or `cl-identity-compact`, with shared avatar/meta/name/email/ roles classes. Gilded Noir's compact identity stays in the header navigation; core omits its full page band rather than rendering and hiding a duplicate. Ordinary content sections use `section.cl-page-section`; specialised course/admin/catalogue sections retain their own classes. The Theme SDK contains the canonical class table and shell sample. Structural rendering contracts and the browser matrix cover every bundled theme in both states at desktop, tablet and mobile widths.
 
 ---
 
@@ -105,7 +108,9 @@ Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-ac
 
 **3.2 Button labels are short.** "Manage", "Edit", "Remove" — not "Manage this company's people". The context is the row.
 
-**3.3 Actions may carry an optional sprite icon beside their label.** The canonical action calls the `icon` helper. Decorative icons are hidden from assistive technology; meaningful icons need a label.
+**3.3 Actions may carry an optional sprite icon beside their label.** The canonical action calls the `icon` helper. Decorative icons are hidden from assistive technology; meaningful icons need a label. A label never repeats the icon: "Add person", not "＋ Add person" beside the add icon.
+
+**3.4 One action is a small button; two or more go in the Actions menu.** A row with a single action shows it as a small secondary button; a row with two or more shows the Actions menu (`action.row` with `menu: true`). Owner's answer, 2026-10-16. The Themes table is the one exception: its Activate, Preview and Uninstall stay inline, because the control that recovers from a broken theme must not depend on that theme drawing a menu.
 
 ---
 
@@ -171,7 +176,7 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.7 Site footer.** Every footer uses `cl-footer` and follows `main.cl-main` inside `div.cl-page-frame`. Factory Reset, Light Default and Radiant Learning delegate to `partials/site-footer.html.twig`. Gilded Noir and Factory Reset Sidebar keep their distinctive rich footers while using the same shared footer vocabulary and core `footer_navigation` destinations. Gilded Noir retains `gn-footer-art`, `gn-footer-veil` and `gn-footnote`. → Enforced by `CanonicalPageConstructionTest` and the browser matrices.
 
-**6.8 Social marks.** Brand glyphs in the core sprite as `social-<key>`, keyed to `SocialPlatform` so a mark and a link cannot disagree about which service they name. These are the one exception to rule 5.3's stroked style: a brand mark is a solid shape, and outlining one leaves the letterforms inside Facebook and LinkedIn with no interior. The sprite carries `symbol[id^="social-"] { fill: currentColor; stroke: none }` for exactly that reason.
+**6.8 Social marks.** Brand glyphs in the core sprite as `social-<key>`, keyed to `SocialPlatform` so a mark and a link cannot disagree about which service they name. These are the one exception to rule 5.3's stroked style: a brand mark is a solid shape, and outlining one leaves the letterforms inside Facebook and LinkedIn with no interior. The sprite carries `symbol[id^="social-"] { fill: currentColor; stroke: none }` for exactly that reason, and `.cl-footer-social-icon` says the same in the page's CSS, because Firefox does not apply an external sprite's own styles to `<use>` content and drew the marks black (owner, 2026-10-17). Each mark is a link: to its platform's home page until the settings give a profile address (owner, 2026-10-17).
 
 **6.9 Popular courses.** The home page shows Popular Courses (owner instruction, 2026/10/05, replacing the nine-course showcase). The server loads one pool of sixteen courses with the page: the stored popularity ranking first, topped up with the newest published courses when the ranking holds fewer, never the same course twice and never a course that is not published. The pool arrives whole as four groups of the shared catalogue course grid, each card the ordinary course card with its rating and favourite star. One group shows at a time, the highest-ranked first; the `popular-courses` controller shows the next every twenty seconds with a short fade and cycles back, without requesting anything from the server. Rotation waits while the pointer is over the grid, while focus is inside it and while the tab is in the background, so a card never disappears under a reader; Pause and Resume are real buttons, rendered hidden and revealed by the controller, and focus stays on the control that replaces the one pressed. A reader who prefers reduced motion starts paused and sees groups change without the fade. Groups not shown carry the `hidden` attribute, so they are out of sight, out of the tab order and out of the accessibility tree. Without JavaScript the first group simply stays. A card on the home page is not a course view. Core hooks: `#popular-courses`, `#popular-courses-groups`, `[data-popular-courses-target="group"]`; settings in `CourseService::POPULAR_*`. → Enforced by `HomePopularCoursesPageTest`, `PopularCoursePoolIntegrationTest` and `tests/Browser/popular-courses.cjs`.
 
@@ -282,6 +287,12 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/17 SAST
+
+- 1.7: one construction for every page - the page's width chosen once, rows on Core's width variables, sections on cards with a grid only around two or more, section actions in the page head, no back links on menu pages, no group tabs.
+- 3.3 and 3.4: no typed plus beside the add icon; one row action is a small button, two or more the Actions menu.
+- 6.8: the page's CSS gives the social marks the link colour too, because Firefox drew them black; each mark links to its platform's home page until the settings give a profile address.
 
 2026/10/13 SAST
 

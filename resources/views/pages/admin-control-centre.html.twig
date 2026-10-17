@@ -2,24 +2,10 @@
 {% block page_body %}
 {{ importmap() }}
 	{% set ph_kicker = 'Administration' %}
-	{% set ph_title = 'Platform administration' %}
-	{% set ph_lead = 'Every top-level Administration area is available in one workspace. Open only the sections you need.' %}
+	{% set ph_title = 'All sections' %}
+	{% set ph_lead = 'Every top-level Administration area is available in one workspace. Open only the sections you need. Each one also has a page of its own.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	{# Every workspace opens on a card, as its sections do. #}
-	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-
-			{{ ui('layout.section-head', {heading: 'Platform administration', eyebrow: 'All sections', summary: 'Every administration section in one place. Each one also has a page of its own.'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-	<section class="cl-admin-workspace section" data-admin-workspace>
+	<section class="cl-page-section cl-admin-workspace" data-admin-workspace>
 		{% for section in admin_sections %}
 			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: (section.label), summary: (section.description), open: section.key == 'dashboard', workspace: 'admin', section_key: (section.key)})} %}
 {% block body %}

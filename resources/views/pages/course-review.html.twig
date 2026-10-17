@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {% set ph_back_href = '/courses/' ~ course.slug %}{% set ph_back_label = course.title %}{% set ph_kicker = 'Course review' %}{% set ph_title = 'Rate this course' %}{% set ph_lead = course.title %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {% if not eligible %}
 {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}{% block body %}Only learners who have had access to this course can review it.{% endblock %}{% endembed %}

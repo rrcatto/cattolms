@@ -3,11 +3,14 @@
 	{% set ph_kicker = 'Company' %}
 	{% set ph_title = company_section.label %}
 	{% set ph_lead = company_section.description %}
-	{% set ph_action_href = '/company' %}
-	{% set ph_action_label = 'All company sections' %}
+	{# The section's own actions belong to the page here, so they sit in the page head. #}
+	{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig' with {actions: company_section.actions|default([])} %}{% endset %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-company-section">
+	{# The company banner is a row of its own, above the section it applies to. #}
+	<section class="cl-page-section" aria-label="Company">
 		{% include '@platform/partials/company-context.html.twig' %}
+	</section>
+	<section class="cl-page-section" data-company-section="{{ company_section.key }}">
 {#
 		The body is wrapped so the consolidated workspace can pull exactly this part of the page
 		into an accordion section when the reader opens it, without also pulling the heading and

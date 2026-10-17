@@ -20,6 +20,8 @@ plus the chrome every controller render supplies - so a partial that starts read
 variable keeps failing here until the service genuinely produces it on every code path.
 
 Changelog:
+2026/10/17 SAST
+- No course_group or company_group: the group tab strips are gone.
 2026/09/04 21:00 SAST
 - The pagination payload is now built by PlatformAdministrationService::paginationPayload() rather than copied here, so the render tests feed the partial exactly what production produces.
 2026/08/24 17:45 SAST
@@ -243,10 +245,7 @@ final class RenderHarness
             'csrf' => 'token', 'app_name' => 'Catto', 'app_url' => '', 'current_uri' => '/',
             'is_authenticated' => true, 'is_platform_admin' => true, 'is_company_admin' => true,
             'is_course_owner' => false, 'is_course_editor' => false, 'user_email' => 'a@b.c',
-            // The Courses group sub-navigation, included by the course list and the taxonomy
-            // screens. BaseController defaults course_group on every render for the same reason
-            // this fixture carries it: F3 turns an unset template variable into a 500.
-            'course_group' => '', 'company_group' => '', 'can_manage_course_categories' => true, 'can_manage_course_tags' => true, 'can_manage_enrolments' => true, 'can_manage_company_favourites' => true, 'can_view_requests' => true, 'can_view_enrolments' => true,
+            'can_manage_course_categories' => true, 'can_manage_course_tags' => true, 'can_manage_enrolments' => true, 'can_manage_company_favourites' => true, 'can_view_requests' => true, 'can_view_enrolments' => true,
             'user_name' => 'A', 'permissions' => [], 'role_keys' => [], 'flash_messages' => [],
             'title' => '', 'page_title' => '', 'page_kicker' => '', 'active_nav' => '', 'body_class' => '',
             'preview_page_size' => 25, 'is_preview' => false,

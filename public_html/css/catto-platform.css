@@ -549,7 +549,10 @@
    enough to read as inactive, never so far that it disappears. */
 
 .cl-footer-social>li>span{opacity:.72}
-.cl-footer-social-icon{width:22px;height:22px;display:block;stroke-width:1.9}/* The rounded table's top corners.
+/* A brand mark is a solid shape in the link's colour (UX rule 6.8). The sprite's own style says so, but Firefox
+   does not apply an external sprite's styles to <use> content, so the page's CSS says it too. */
+.cl-footer-social-icon{width:22px;height:22px;display:block;fill:currentColor;stroke:none}
+/* The rounded table's top corners.
 
    A theme gives .cl-ui-table a border-radius, but core forces overflow:visible on it so the row
    actions menu can be drawn outside the wrapper - and a border-radius only clips children while
@@ -1158,9 +1161,30 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-page-context-inner{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;width:100%;min-width:0}
 .cl-page-head-inner{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .cl-page-head-content{flex:1 1 18rem;min-width:0;text-align:left}
-.cl-page-head-actions{display:flex;gap:.5rem;flex:0 0 auto;margin-left:auto}
+.cl-page-head-actions{display:flex;flex-wrap:wrap;gap:.5rem;flex:0 1 auto;min-width:0;margin-left:auto}
 .cl-page-head-compact .cl-page-head-content{display:flex;align-items:center;flex-wrap:wrap;gap:.75rem}
 .cl-page-section{min-width:0}
+/* Page width and row spacing. A page chooses its width once - ThemeRenderer puts cl-width-wide (the
+   default), cl-width-medium, cl-width-narrow or cl-width-full on the body - and every row in main
+   (the page head, the identity band, each page section) takes its width and spacing from these
+   variables, not from Bootstrap container and spacing classes. The defaults draw what those classes
+   drew: Bootstrap's 1320px container with its .75rem gutter, 3rem above and below, and the 54rem and
+   38rem medium and narrow columns. Full is drawn as wide unless a theme draws it otherwise. A theme
+   changes a width, the gutter or the rhythm by setting the variables, never per page. */
+.cl-body{--cl-content-width:1320px;--cl-gutter:.75rem;--cl-section-space:3rem}
+.cl-body.cl-width-medium{--cl-content-width:54rem}
+.cl-body.cl-width-narrow{--cl-content-width:38rem}
+/* A theme's page-family wrapper (div.cl-page-family) is transparent here: its sections are rows too. */
+.cl-page-head-inner,.cl-identity-head>.cl-identity-meta,:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section{width:100%;max-width:var(--cl-content-width);margin-inline:auto;padding-inline:var(--cl-gutter)}
+.cl-page-head-inner{padding-block:var(--cl-section-space)}
+.cl-page-head-compact>.cl-page-head-inner{padding-block:1rem}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section{padding-block:var(--cl-section-space)}
+/* Consecutive sections (a company page's banner and its body) share one gap rather than two. */
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section+.cl-page-section{padding-top:0}
+/* A page section's own padding is the space at its edges, so its first and last spaced block (a card
+   with section spacing) does not add its margin to it. Between blocks the margins stay. */
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section>.cl-ui-spaced:first-child{margin-top:0}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section>.cl-ui-spaced:last-child{margin-bottom:0}
 .cl-flash-stack{display:grid;gap:.5rem;margin-bottom:1rem}
 .cl-identity{min-width:0}
 .cl-identity-meta{min-width:0}

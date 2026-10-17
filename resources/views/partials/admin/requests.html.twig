@@ -1,10 +1,6 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{% include '@platform/partials/admin/course-group-nav.html.twig' %}
 		{{ ui('layout.section-head', {heading: 'Course Requests', eyebrow: 'Course Requests', summary: 'Approve or reject learner requests for course access.'}) }}
 		{% if requests_status_filters %}
 			<nav class="cl-filter-chips" aria-label="Filter by status">
@@ -88,9 +84,6 @@
 							{{ ui('action.link', {label: 'View all requests', variant: 'secondary', size: 'small', href: '/admin/requests'}) }}
 						</div>
 					{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

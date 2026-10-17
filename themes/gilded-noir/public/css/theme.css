@@ -1849,6 +1849,12 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 .cl-main .contact-form{ max-width: 720px; }
 .cl-main .cl-narrow { max-width: 680px; }
 .cl-main .cl-medium { max-width: 860px; }
+/* Core's page rows (the page head, the identity band, each page section) take their width and
+   spacing from Core's variables: wide rows fill main, which draws the gutter itself, and the medium
+   and narrow columns keep this theme's widths. */
+.gn-body { --cl-content-width: none; --cl-gutter: 0px; }
+.gn-body.cl-width-medium { --cl-content-width: 860px; }
+.gn-body.cl-width-narrow { --cl-content-width: 680px; }
 
 .gn-family-error .cl-main { text-align: center; padding-top: 50px; padding-bottom: 60px; }
 .gn-family-error .cl-main h1,.gn-family-error .cl-main .display-1 { color: var(--gn-gold-deep); }

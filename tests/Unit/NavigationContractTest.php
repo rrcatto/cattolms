@@ -13,6 +13,7 @@ use CattoLearning\Application\AccountSectionRegistry;
 use CattoLearning\Application\AdministrationSectionRegistry;
 use CattoLearning\Application\CompanySectionRegistry;
 use CattoLearning\Auth\PermissionCatalog;
+use CattoLearning\Support\SocialPlatform;
 use CattoLearning\View\ThemeRenderer;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -71,7 +72,8 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account/social', $accountChildren['account-social']['href'] ?? null);
         self::assertSame('/account/courses', $accountChildren['account-learning']['href'] ?? null);
         self::assertSame('/account/orders', $accountChildren['account-orders']['href'] ?? null);
-        self::assertSame('COURSES', $accountChildren['account-courses-group']['label'] ?? null);
+        // Title case like every other menu group (owner's decision, 2026-10-17).
+        self::assertSame('Courses', $accountChildren['account-courses-group']['label'] ?? null);
         self::assertCount(2, $accountChildren['account-courses-group']['children']);
         self::assertArrayNotHasKey('commerce', $byKey);
         self::assertSame('/account/sessions', $accountChildren['account-sessions']['href'] ?? null);
@@ -234,6 +236,36 @@ final class NavigationContractTest extends TestCase
         }
     }
 
+
+    /** The footer's social marks link to each platform's home page until the settings give a profile address (owner, 2026-10-17). */
+    public function testFooterSocialMarksLinkToTheirPlatformUntilAnAddressIsSet(): void
+    {
+        $method = new ReflectionMethod(ThemeRenderer::class, 'footerSocial');
+        $marks = array_column($method->invoke($this->renderer(), []), 'href', 'key');
+        self::assertSame(['facebook', 'whatsapp', 'x', 'linkedin', 'instagram', 'youtube'], array_keys($marks));
+        foreach ($marks as $key => $href) self::assertSame(SocialPlatform::home($key), $href, $key . ' links to its home page by default.');
+        $configured = array_column($method->invoke($this->renderer(), ['platform_social' => ['linkedin' => 'https://www.linkedin.com/company/catto-learning']]), 'href', 'key');
+        self::assertSame('https://www.linkedin.com/company/catto-learning', $configured['linkedin'], 'A profile address replaces the default.');
+        self::assertSame(SocialPlatform::home('youtube'), $configured['youtube']);
+        // Firefox does not apply the sprite's own style to <use> content, so the page's CSS gives a mark its colour.
+        self::assertMatchesRegularExpression('/\.cl-footer-social-icon\{[^}]*fill:currentColor;stroke:none/', (string) file_get_contents(dirname(__DIR__, 2) . '/public_html/css/catto-platform.css'));
+    }
+
+    /** Every bundled theme draws Core's social marks; none writes social links of its own or a link to nowhere. */
+    public function testEveryBundledThemeDrawsTheCoreSocialMarks(): void
+    {
+        $root = dirname(__DIR__, 2) . '/themes';
+        foreach (glob($root . '/*/theme.json') ?: [] as $manifest) {
+            $footer = dirname($manifest) . '/partials/footer.html.twig';
+            $source = is_file($footer) ? (string) file_get_contents($footer) : '';
+            if ($source === '' || str_contains($source, '@platform/partials/site-footer.html.twig') || !str_contains($source, 'cl-footer-social')) continue;
+            self::assertStringContainsString('footer_social', $source, basename(dirname($manifest)) . ' draws social marks of its own instead of footer_social.');
+        }
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() !== 'twig') continue;
+            self::assertStringNotContainsString('href="#"', (string) file_get_contents($file->getPathname()), $file->getPathname() . ' has a link to nowhere.');
+        }
+    }
 
     public function testFactoryResetRendersCoreNavigationArraysInsteadOfHardCodedMenus(): void
     {

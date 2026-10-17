@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {% set ph_back_href = '/admin/reports' %}{% set ph_back_label = 'Course Performance' %}{% set ph_kicker = 'Reports' %}{% set ph_title = 'Course popularity' %}{% set ph_lead = 'The stored popularity ranking of published courses, with the signals and points behind every score. Open a course for its full breakdown. The ranking is recalculated by the popularity:recalculate console command.' %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% if run %}
 {% set weights = run.parameters.weights %}
 {% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 4})} %}{% block body %}

@@ -1,6 +1,6 @@
 # Catto Learning LMS
 
-Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.9.1**, developed in `code/cattolms-v0.9` on branch `dev-v0.9` (the same code line was `code/cattolms-v0.8` on `dev-v0.8` until 2026/10/16; v0.9.0 and v0.9.1 were released from it). Development data is disposable; no production data or upgrade compatibility is assumed.
+Catto Learning is a Symfony 8.1, Twig and PostgreSQL learning-management and course-commerce platform. The current development release is **v0.9.2**, developed in `code/cattolms-v0.9` on branch `dev-v0.9` (the same code line was `code/cattolms-v0.8` on `dev-v0.8` until 2026/10/16; v0.9.0 and v0.9.1 were released from it). Development data is disposable; no production data or upgrade compatibility is assumed.
 
 Source archives of each released version are on the GitHub [Releases](https://github.com/rrcatto/cattolms/releases) page, starting with v0.8.8.4.
 
@@ -73,6 +73,7 @@ The development database is disposable test data. It was last recreated on 2026/
 - **v0.8.9:** invoices, receipts and credit notes on the document template engine (Phase K): each keeps the values and design version it was issued with, and Commerce → Financial Documents sets their logo, typeface, accent colour and notes under a live PDF preview.
 - **v0.9.0:** course marketing landing pages (Phase L): one optional page per course at `/landing/{slug}`, built from ten structured section types with the price, rating, reviews and outline read live from the course; a buy box shared with the course page; search and sharing metadata in every theme's head; first-party landing page analytics.
 - **v0.9.1:** the public legal pages (`/terms`, `/refunds`, `/privacy`) with versions and the supplier's details; terms acceptance naming both documents at both checkouts, with the accepted versions in the order; no identity number at checkout; the Refund Policy's rule enforced on ADMIN refunds, with a recorded override; a correct message on a refunded order.
+- **v0.9.2:** one construction for every page: each page has one width, the page head is its only main heading and holds its actions, and every section sits in a card with its own heading, with no "All … sections" buttons, back links on menu pages or group tabs; Saharan Sunset 1.0.1 bundled, with Home and course landing pages full width; every bundled theme at a new version with its package rebuilt; footer social marks that link to each platform until profile addresses are set, and show in Firefox; Symfony 8.1.9.
 
 Git publication does not deploy the VPS.
 
@@ -84,7 +85,7 @@ Course import is an owner-authored workflow. HTML and JSON imports, subsequent e
 
 Recurring interface structures are implemented once in the `PlatformUi` registry under `resources/views/ui/`. Views compose the registry with Twig's `ui()`, `ui_template()` and `ui_props()` APIs. The system covers layout, actions, forms, tables, datasets, statistics, lists, feedback, overlays, icons and catalogue components.
 
-This prevents independently generated views from drifting in markup, spacing, accessibility, responsive behavior and progressive enhancement. Shared search, pagination, sortable headers, entity lookup, course cards and navigation remain canonical partials. Gilded Noir and Factory Reset Sidebar retain their own footer markup and shell treatment. In v0.8.5, all five themes use the canonical page vocabulary: one shell for both authentication states, shared navigation, and main/footer siblings inside `cl-page-frame`. The component gallery is available at `/admin/system/ui-components` for an administrator with the existing system settings permission.
+This prevents independently generated views from drifting in markup, spacing, accessibility, responsive behavior and progressive enhancement. Shared search, pagination, sortable headers, entity lookup, course cards and navigation remain canonical partials. Gilded Noir and Factory Reset Sidebar retain their own footer markup and shell treatment. In v0.8.5, all five themes use the canonical page vocabulary: one shell for both authentication states, shared navigation, and main/footer siblings inside `cl-page-frame`. Since v0.9.2 every page is built the same way: the page head (the only main heading, holding the page's actions), the identity band, then sections, each in a card that opens with its own heading, at the one width the page chooses (UX rule 1.7). The component gallery is available at `/admin/system/ui-components` for an administrator with the existing system settings permission.
 
 Form controls use the bounded `ui_field_attrs(props)` helper for help/error ARIA relationships. Assessment editors clone server-rendered Twig question and option prototypes; JavaScript only reindexes those controls. Themes consume the same functional DOM while retaining their own visual design, including Gilded Noir. Section-heading content starts at the left with actions at the right. Pagination remains one horizontal row and scrolls on narrow screens. Company-context banners use opaque theme tints; the core footer pairs its palette surface with a contrasting foreground. These rendered contracts are exercised in the [browser regression suite](tests/Browser/README.md).
 
@@ -95,7 +96,7 @@ Form controls use the bounded `ui_field_attrs(props)` helper for help/error ARIA
 - Controllers stay thin; application and domain services hold rules; repositories contain DBAL SQL behind the `Database` interface.
 - Twig templates are strict and auto-escaped. Theme packages are filesystem-authoritative and use schema 4.0 / Template API 2.0.
 - Symfony UX, Stimulus, htmx and AssetMapper provide progressive enhancement. There is no npm build step and no React, Vue or Svelte application.
-- Bundled themes are Factory Reset, Factory Reset Sidebar, Light Default, Radiant Learning and Gilded Noir.
+- Bundled themes are Factory Reset, Factory Reset Sidebar, Light Default, Radiant Learning, Gilded Noir and Saharan Sunset.
 
 ## Local development
 

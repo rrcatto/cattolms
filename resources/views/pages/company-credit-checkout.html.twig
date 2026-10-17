@@ -3,7 +3,7 @@
     {% set ph_back_href = '/company/credits/buy' %}{% set ph_back_label = 'Edit credits' %}
     {% set ph_kicker = 'Company purchasing' %}{% set ph_title = 'Review company credit order' %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="cl-page-section container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+    <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
         <h2 class="h4">{{ basket.company.name }}</h2>
         {% if basket.request_id %}<p>After confirmed payment, one matching credit will be allocated to the pending learner request and the learner will be enrolled.</p>{% endif %}
         {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}

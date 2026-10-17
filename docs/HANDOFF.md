@@ -1,4 +1,65 @@
-# Catto Learning 0.9.1 — Development Handoff
+# Catto Learning 0.9.2 — Development Handoff
+
+## v0.9.2 handoff — 2026/10/17 (one construction for every page; Saharan Sunset 1.0.1)
+
+The owner compared the Claude web app's page structure plan with Claude Code's and chose the page structure and the Bootstrap 6 approach on 2026-10-17. The owner then approved the merged plan ("yes, proceed"; workspace `REPORTS/ui-merged-plan-2026-10-17.md`). In the Part A review the owner chose the full-width landing design, the darker stripe and 1.0.1 active at the end of Part B; at the Part B checkpoint, new versions for Gilded Noir and Light Default and the legal pages check. Asked how to record Parts A and B before Part C, the owner chose:
+- to release them as v0.9.2;
+- to raise the themes whose source had changed without new versions;
+- that themes keep their fixed look in dark mode.
+
+v0.9.2 is the first release from `code/cattolms-v0.9` (`dev-v0.9`), on top of v0.9.1 (`4ad7541`) and the code line's move with Symfony 8.1.9 (`ea17b93`).
+
+- **Release.** Annotated tag and GitHub release `v0.9.2` with `cattolms-v0.9.2.zip`. Gates on the release code:
+  - `composer qa` with a cold cache and Saharan Sunset 1.0.1 active: 1148 PHPUnit tests and release validation of 0.9.2, with Classic as the default certificate design for the run (see Development state);
+  - Twig lint (246 files), AssetMapper compilation (no compiled asset changed), Composer validation and `git diff --check`;
+  - the UI matrix (86), canonical (36) and legal pages (77) browser checks.
+
+  Earlier the same day, before the version and footer changes, every other browser suite passed in Chromium and Firefox:
+
+  | Suite | Result |
+  | --- | --- |
+  | Section pages | 576 views |
+  | Category tree | 22 |
+  | Category picker | 17 |
+  | Course Content tree | 41 |
+  | Course reviews | 9 |
+  | Bundles | 8 |
+  | Promotions | 9 |
+  | Certificates | 11 |
+  | Financial documents | 9 |
+  | Landing pages | 13 |
+  | Billing profiles | 10 |
+  | Popular courses | 13 |
+
+  The version is 0.9.2 in `composer.json` (lock hash refreshed), the API and MCP status, `PLATFORM_ASSET_VERSION`, the validators and the headers of the release's new files. `README.md`, `CHANGELOG.md` and every `docs/` file describe v0.9.2.
+- **Construction.**
+  - `ThemeRenderer::PAGE_WIDTHS` and `pageWidth()` give each page one width (`cl-width-*`, `page.width`).
+  - `catto-platform.css` defines `--cl-content-width` (1320px), `--cl-gutter` (.75rem) and `--cl-section-space` (3rem). Rows (`.cl-page-head-inner`, `.cl-identity-head > .cl-identity-meta`, `main > .cl-page-section`) take their width and spacing from them, and consecutive sections share one gap.
+  - The page head (`partials/page-head.html.twig`) is the only `h1`; `ph_actions` carries the page's actions, and `partials/section-actions.html.twig` draws a section's registry `actions()`.
+  - Section pages render `section.cl-page-section[data-…-section]`, and the company banner is its own row.
+- **Content.**
+  - Every section's content sits in a card that opens with its section head, and grids hold two or more cards.
+  - The Administration Dashboard hero became an Overview card, and Company People was rebuilt with `companyAddPersonModal`.
+  - The group tab partials (`course-group-nav`, `company-group-nav`) are deleted, and `course_group` and `company_group` are gone from the controllers.
+  - Row actions follow UX rule 3.4, and no label has a typed "＋".
+- **Themes.**
+  - Saharan Sunset 1.0.1 is bundled.
+  - Gilded Noir 2.0.3 and Light Default 2.0.2 set the Core variables.
+  - Factory Reset 2.0.2, Factory Reset Sidebar 2.0.2 (parent requirement 2.0.2) and Radiant Learning 4.0.2 catch up with the head metadata include of v0.9.0 and the certificate styles removed in v0.8.8.9, both released without new versions.
+  - Every package was rebuilt with `composer themes:package`, superseded packages were removed, and the baseline seeds `factory-reset-v2.0.2`.
+  - In the development instance the new versions are installed beside the old ones. Gilded Noir 2.0.2 and Light Default 2.0.1, which Part B had refreshed in place, are back to their v0.9.1 files.
+- **Footer social marks** (owner, 2026-10-17):
+  - `ThemeRenderer::footerSocial()` links each mark to `SocialPlatform::home()` until `platform_social` gives a profile address. Nothing sets `platform_social` yet: a Settings field per platform is the place for it, and is not built.
+  - Core's `.cl-footer-social-icon` sets `fill: currentColor`, because Firefox ignores the sprite's own style and drew the marks black.
+  - Gilded Noir and Factory Reset Sidebar draw the Core marks: Gilded Noir lost its links to `#` and its Threads mark.
+- **Tests.** `PageStructureContractTest` (8 tests); `tests/Browser/section-pages.cjs` with `section-pages-fixture.php`; six-theme counts in the browser README; `financial-documents.cjs` reads the receipt link's text as written.
+- **Development state.**
+  - Saharan Sunset 1.0.1 is the active theme; the owner activated it.
+  - The owner's default certificate design is Modern (2026-10-16). Three certificate integration tests and `certificates.cjs` expect Classic, the installed default, so the gate makes Classic the default while they run and then restores Modern.
+  - Playwright's Firefox (revision 1555) was installed on 2026-10-17; it had been missing since Playwright's install on 2026-10-16.
+  - The Bootstrap 6.0.0-alpha.1 files in `public_html/css` and `js` are untracked and not served until Part C.
+- **Known.** The tables that scroll the page sideways on phones in some themes (Company Enrolments, Administration Enrolments, Themes, Activity) remain a separate task (owner, 2026-10-16). `section-pages.cjs` reports them as known.
+- **Next.** Part C, Bootstrap 6, on its own branch (`dev-v0.9-bootstrap6`): the plan's steps C1 to C11, starting with a baseline of every page in every theme before the switch.
 
 ## v0.9.1 handoff — 2026/10/13 (legal pages, terms acceptance and the Refund Policy rule)
 

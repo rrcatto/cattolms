@@ -6,7 +6,7 @@
 	{% set ph_title = course.title %}
 	{% set ph_lead = '/'~(course.slug) %}
 	{% include '@platform/partials/page-head.html.twig' %}
-	<section class="cl-page-section container-fluid cl-container-wide py-5">
+	<section class="cl-page-section">
 		<nav aria-label="Course tools">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content'}) }}

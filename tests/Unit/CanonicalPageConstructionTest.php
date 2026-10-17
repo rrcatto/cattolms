@@ -14,7 +14,7 @@ final class CanonicalPageConstructionTest extends TestCase
 {
     public function testEveryThemeUsesCanonicalLandmarksInBothAuthenticationStates(): void
     {
-        foreach (['radiant-learning', 'light-default', 'gilded-noir', 'factory-reset', 'factory-reset-sidebar'] as $slug) {
+        foreach (['radiant-learning', 'light-default', 'gilded-noir', 'factory-reset', 'factory-reset-sidebar', 'saharan-sunset'] as $slug) {
             $structures = [];
             foreach ([false, true] as $authenticated) {
                 $html = CanonicalPageFixture::render($slug, $authenticated);

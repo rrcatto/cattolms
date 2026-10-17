@@ -1,22 +1,7 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{{ ui('layout.section-head', {heading: 'Roles and permissions', eyebrow: 'Roles & ACL', summary: 'Roles, permissions and access-control assignments.'}) }}
-		{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
-{% block toolbar_primary %}
-
-{% endblock %}
-{% block toolbar_actions %}
-
-			{% if can_manage_roles %}
-				{{ ui('action.button', {label: '＋ Create role', variant: 'primary', size: 'normal', type: 'button', modal: 'createRoleModal', icon: 'action-add'}) }}
-			{% endif %}
-
-{% endblock %}
-{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Roles and permissions', eyebrow: 'Roles & ACL', summary: 'Roles, permissions and access-control assignments.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
 {% block body %}
 
@@ -119,9 +104,6 @@
 {% endblock %}
 {% endembed %}
 		{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

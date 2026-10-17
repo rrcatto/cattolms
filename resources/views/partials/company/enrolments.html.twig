@@ -31,6 +31,9 @@
 {% endembed %}
 {% endif %}
 
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Enrolments', eyebrow: 'Enrolments', summary: 'Each staff member on each course, and how far they have got.'}) }}
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'enrolments', pagination: enrolments_pagination, search: {ds_name: 'enrolments', ds_label: 'Search enrolments', ds_value: enrolments_search, ds_action: '/company/enrolments'}})} %}
 {% block results %}
 
@@ -91,5 +94,7 @@
 				</div>
 			{% endif %}
 
+{% endblock %}
+{% endembed %}
 {% endblock %}
 {% endembed %}

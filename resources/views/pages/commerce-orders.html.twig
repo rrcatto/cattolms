@@ -1,9 +1,10 @@
 {% extends layout %}
 {% block page_body %}
-    {% set ph_kicker = 'My Orders' %}{% set ph_title = 'My Orders' %}
+    {% set ph_kicker = 'Account' %}{% set ph_title = 'My Orders' %}{% set ph_lead = 'Orders you have placed, with their payment status and documents.' %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="cl-page-section container cl-medium py-5">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+    <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
+        {{ ui('layout.section-head', {heading: 'Your orders', eyebrow: 'My Orders', summary: 'Newest first. Open an order for its payment and its documents.'}) }}
 
         <p><a href="/cart">My Cart</a> · <a href="/courses">Browse courses</a></p>
         {% include '@platform/partials/commerce-orders.html.twig' %}

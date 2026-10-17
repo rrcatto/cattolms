@@ -69,8 +69,9 @@ foreach (['companies' => 'companies.html.twig', 'company_creators' => 'company-c
     // reads - a second, inert pagination row on the same screen. Assert it stays gone.
     $need(!str_contains($companies, '/admin/companies?page='), $file . ' must not reintroduce a hand-built pagination nav; its ?page= parameter is never read.');
     $need(!str_contains($companies, $dataset . '_total_pages'), $file . ' pagination is owned by the shared control; a total-pages variable belongs to the retired hand-built nav.');
-    // Both halves reach the other, and neither carries a copy of the create and edit dialogs.
-    $need(str_contains($companies, 'partials/admin/company-group-nav.html.twig'), $file . ' must render the Companies tab strip.');
+    // The menu reaches both halves; neither draws a tab strip (owner's decision, 2026-10-16: no
+    // group tabs), and neither carries a copy of the create and edit dialogs.
+    $need(!str_contains($companies, 'group-nav'), $file . ' must not draw a group tab strip; the menu leads to each page.');
     $need(str_contains($companies, 'partials/admin/company-modals.html.twig'), $file . ' must include the shared company dialogs.');
 }
 
@@ -207,7 +208,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is built as a plain array now rather than written into F3's hive, so these look
 // for the assignment rather than for set(). What is being protected is unchanged: every page is
 // given navigation, a footer and its section keys, whichever engine renders it.
-foreach (["PLATFORM_ASSET_VERSION = '0.9.1'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.9.2'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer contract missing: ' . $token);
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);

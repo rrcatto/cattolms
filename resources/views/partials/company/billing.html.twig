@@ -3,10 +3,7 @@
 	separate from any administrator's own billing details, and copied into each order when it is
 	placed, so a change here never alters an order or document that already exists.
 #}
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Billing details', eyebrow: 'Billing', summary: 'Who this company’s invoices are made out to. Credit purchases are filled in from these details.'}) }}
@@ -27,9 +24,6 @@
 {% endembed %}
 			</form>
 		{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

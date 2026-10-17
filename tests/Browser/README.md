@@ -27,7 +27,7 @@ three pages; the large development dataset supplies that fixture. The gallery su
 multi-page pagination examples independently of the database size.
 
 The matrix covers the component gallery, Reports, People, Company, Account, Catalogue and Help in
-all five bundled themes at 1440px and 390px. Checks measure heading content/action positions,
+every bundled theme at 1440px and 390px. Checks measure heading content/action positions,
 non-layout decoration, nowrap pagination groups and their actual shared centre line, horizontal
 scrolling, opaque coloured company banners, footer identity/contrast, Reports/automatic stat-grid columns and document
 overflow. Company and Account accordions are opened. Screenshots accompany the computed results.
@@ -38,8 +38,8 @@ run this browser matrix separately before the full QA gate after UI/theme change
 
 ## Canonical page construction
 
-`canonical-page.cjs` covers all five themes in anonymous and authenticated states at 1440, 820
-and 390px: 30 page/state/viewport combinations. It checks the shared landmarks, main/footer
+`canonical-page.cjs` covers every bundled theme in anonymous and authenticated states at 1440, 820
+and 390px: 36 page/state/viewport combinations. It checks the shared landmarks, main/footer
 siblings, semantic sections, navigation geometry, document overflow, mobile toggle and Escape,
 keyboard access to nested menus, mobile Menu-label contrast, and desktop flyouts versus inline
 sidebar/mobile groups.
@@ -71,6 +71,28 @@ also accounts for margins and the desktop sidebar width, including on the galler
 With JavaScript disabled, mobile top navigation stays in normal flow so its expanded links cannot
 cover pagination or other page controls. The component matrix exercises native Next and jump
 navigation as a regression for that behaviour.
+
+## Section pages
+
+`section-pages.cjs` opens every Account, Company and Administration menu page (48) in every bundled
+theme at 1440 and 390px through the theme preview, so nothing is activated. It checks the one
+construction every page shares (UX rule 1.7, `PageStructureContractTest`): exactly one `h1`; only page
+rows directly in main (flash stack, page head, identity band, page sections, a theme's page-family
+wrapper, form windows); no words standing on the page texture; the first card's edge on the page
+head's text edge; the same gap above the footer on every page of a theme; and no sideways scrolling.
+The four pages whose tables scroll the page sideways at 390px in some themes (Company
+Enrolments, Administration Enrolments, Themes, Activity) are a separate task (owner, 2026-10-16):
+the runner reports them as known rather than failing. Screenshots and `results.json` go
+to `/tmp/catto-section-pages` (`CATTO_BROWSER_OUTPUT`); `CATTO_THEMES` and `CATTO_WIDTHS` narrow a run.
+Its identity is an ADMIN who is also an administrator of the System Company:
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/section-pages-fixture.php create'
+podman exec -u cattotest env_php_1 cat /tmp/catto-section-pages-state.json > /tmp/catto-section-pages-state.json
+chmod 600 /tmp/catto-section-pages-state.json
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/section-pages.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/section-pages-fixture.php cleanup'
+```
 
 ## Course Content tree
 
@@ -193,8 +215,8 @@ company Billing details save and survive a reload; the learner's checkout is fil
 profile, a correction there is saved to it, and the placed order shows the billing it was placed
 with, still after the profile changes, with its invoice PDF opening; the company credit checkout is
 filled from the company's details and its order is billed to the company; both forms save as
-ordinary forms without JavaScript and fit a 390px phone; and an ADMIN sees both forms in all five
-themes at 1440 and 390px without overflow. Orders are immutable, so each run leaves its two orders,
+ordinary forms without JavaScript and fit a 390px phone; and an ADMIN sees both forms in every
+bundled theme at 1440 and 390px without overflow. Orders are immutable, so each run leaves its two orders,
 their purchasers and the retired fixture course in the disposable development database.
 
 ```sh
@@ -213,7 +235,7 @@ keep it; and the review fits a 390px phone. Without JavaScript the code is appli
 as ordinary forms. An ADMIN creates a promotion (the code stored upper case), has a rejected value
 kept for correction, edits, deactivates it (checkout then refuses it), reactivates, finds it by search
 and status, and deletes it while unused. The checkout promo section, the promotions list and the
-editor render in all five themes at 1440 and 390px without sideways scrolling.
+editor render in every bundled theme at 1440 and 390px without sideways scrolling.
 `promotions-fixture.php create` makes two paid courses, an ADMIN and two promotions; the script asks
 it for a fresh learner per purchase and runs `create` and `cleanup` itself. Orders are immutable, so
 each run leaves its orders, their learners, the retired courses and the promotion they used.
@@ -232,7 +254,7 @@ places the order and finds every course in the library, with the order page and 
 bundle as the item bought; the bundle page and cart fit a 390px phone. A learner who already has one
 of the courses is told so on the bundle page. Without JavaScript a bundle is bought and an ADMIN
 reorders its courses. The bundle catalogue and page, the cart and the ADMIN list and editor render in
-all five themes at 1440 and 390px without sideways scrolling. The script creates and cleans up
+every bundled theme at 1440 and 390px without sideways scrolling. The script creates and cleans up
 `bundles-fixture.php` itself; orders are immutable, so each run leaves its orders, their learners, the
 bundle they bought, its retired courses and the promotion used.
 
@@ -259,7 +281,7 @@ after 4.5 seconds.
 - **Duplicate, default and delete.** A duplicate becomes the default for new courses and is deleted with Classic as the replacement; deleting the course's design moves the course to Minimal, and the issued certificate still prints exactly as it did.
 - **No JavaScript.** A design without the Learner name field is refused with the typed words kept; typed `[Learner name]` and `[Course title]` fields preview and save; the course page saves a design.
 - **Access.** A learner is refused the design pages, the course certificate page and the previews.
-- **Themes.** The list, an editor, the course page and the certificate page fit all five themes at 1440 and 390px; at 1440 the editor's and the course page's preview is above the form at nearly the full width (UX rule 6.12).
+- **Themes.** The list, an editor, the course page and the certificate page fit every bundled theme at 1440 and 390px; at 1440 the editor's and the course page's preview is above the form at nearly the full width (UX rule 6.12).
 - **Firefox.** CKEditor's Insert field fills the preview, and the certificate page shows and serves the same PDF.
 
 `cleanup` removes the course, its enrolments and certificates and the identities, makes the recorded default design the default again, and deletes the run's designs as the list does (archived and renamed). Published versions and stored pictures are immutable and stay.
@@ -283,7 +305,7 @@ requests are routed so their bodies can be read, as in `certificates.cjs`.
 - **ADMIN.** The order pages serve the EFT receipt (bank reference and amount) and the company's invoice (the company billed, its administrator as purchaser, the credits per unit).
 - **Access.** Another learner is refused the design page, its previews, the learner's invoice and the ADMIN document route.
 - **No JavaScript and keyboard.** Update preview draws the unsaved form into the frame and Save keeps it; a document is chosen with the arrow keys and Save is reached with Tab.
-- **Themes.** The design page and an ADMIN order page fit all five themes at 1440 and 390px, with the preview an A4 portrait page above the form (UX rule 6.13).
+- **Themes.** The design page and an ADMIN order page fit every bundled theme at 1440 and 390px, with the preview an A4 portrait page above the form (UX rule 6.13).
 - **Firefox.** The preview follows the sample order choice and a receipt downloads as in Chromium.
 
 The fixture places its orders through the real commerce services (a card payment, a 100% promotion, an EFT confirmed by ADMIN, a company credit purchase and a refund), so their documents are issued as a checkout issues them. `cleanup` saves the recorded design again as the current one and signs everyone out; orders are immutable, so each run leaves its orders, their purchasers and the retired courses.
@@ -302,7 +324,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 - **Order.** A section dragged by its handle and another moved with ↑ on its handle are saved and survive a reload; without JavaScript the ⋯ menu's Move to bottom moves a section; Firefox repeats a drag.
 - **Preview and publication.** Preview opens in a new tab with the buttons disabled, `noindex` and no canonical address; Publish makes the page public and the course editor says so; Unpublish takes it down (not found) and keeps every section, and a page that has been public offers no Delete.
 - **Visitor.** The published page shows the hero, the lists, the outline (never the fixture's lesson, bonds or question text), the approved review, both prices and a question that opens; its canonical address is set. Add to cart from the hero returns to the landing page, with JavaScript and without. A learner who has the course is offered Continue course and no Add to cart; a course with no active price says it is not on sale.
-- **Themes.** The page, the editor and a section form fit all five themes at 1440 and 390px without sideways scrolling; the hero's Add to cart is whole and at least 32px tall, and the buy box's price has a contrast of at least 4.5:1 against its card.
+- **Themes.** The page, the editor and a section form fit every bundled theme at 1440 and 390px without sideways scrolling; the hero's Add to cart is whole and at least 32px tall, and the buy box's price has a contrast of at least 4.5:1 against its card.
 
 The fixture makes two published courses (one with two prices, an outline with protected content and an approved review; one not on sale with a published landing page), an ADMIN, a course owner, a learner who has the first course and one who does not. The check places no order, so `cleanup` removes everything.
 
@@ -314,10 +336,10 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 ## Legal pages and terms acceptance
 
-`legal-pages.cjs` checks the public legal pages and the checkout acceptance box (65 checks):
+`legal-pages.cjs` checks the public legal pages and the checkout acceptance box (77 checks):
 
-- **Every theme, signed out and signed in, at 1440, 820 and 390px (30).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title, version and last-updated date; every entry of the contents list is a card with a heading; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
-- **Every theme at the three widths, both checkouts (30).** The learner's review step and the company credit checkout show the one acceptance box: required, unticked, worded "I have read and accept the Terms and Conditions and the Refund Policy.", with both documents linked from the label in a new tab, whole, inside the form and before the button that places the order.
+- **Every theme, signed out and signed in, at 1440, 820 and 390px (36).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title, version and last-updated date; every entry of the contents list is a card with a heading; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
+- **Every theme at the three widths, both checkouts (36).** The learner's review step and the company credit checkout show the one acceptance box: required, unticked, worded "I have read and accept the Terms and Conditions and the Refund Policy.", with both documents linked from the label in a new tab, whole, inside the form and before the button that places the order.
 - **Chromium and Firefox (4).** Place my order without the tick places nothing; the Terms link opens in a new tab and leaves the checkout where it was; a form that lost its `required` attribute is refused by the server with the reason, for the learner and for the company; the details step has no identity number field.
 - **Without JavaScript (1).** The three pages read on a phone, the footer link leads to the Terms and a contents entry jumps to its section.
 

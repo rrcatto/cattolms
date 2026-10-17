@@ -4,7 +4,7 @@
     {% set ph_kicker = 'Company purchasing' %}{% set ph_title = 'Buy course credits' %}
     {% set ph_lead = 'Select courses, access periods and quantities for ' ~ basket.company.name ~ '. Credits become available only after payment is confirmed.' %}
     {% include '@platform/partials/page-head.html.twig' %}
-    <section class="cl-page-section container py-5">
+    <section class="cl-page-section">
         {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}{% block body %}
             {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
                 {{ ui('layout.section-head', {heading: 'Available course access', heading_level: 2, summary: 'Search published paid courses. Each access period is a separate credit type.'}) }}

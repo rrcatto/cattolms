@@ -11,6 +11,8 @@ Description:
 Defines the presentation-neutral Platform Administration section catalogue shared by the consolidated Administration workspace, standalone section routes and Theme API.
 
 Changelog:
+2026/10/17 SAST
+- actions(): each section's own actions (label, a link or the form window it opens, variant, icon and the permission flag that shows it): Manage courses and View activity, Import HTML course and Create course, Add person, Add company and Create role. On the section's own page they sit in the page head; on All sections, in the section's card head.
 2026/09/09 02:10 SAST
 - Section templates name the Twig file.
 
@@ -61,6 +63,28 @@ final class AdministrationSectionRegistry
             $this->section('ui_components', 'UI Components', 'themes', '/admin/system/ui-components', 'partials/admin/ui-components.html.twig', 'Canonical platform components and semantic states, using sample data.'),
             $this->section('settings', 'Settings', 'settings', '/admin/settings', 'partials/admin/settings.html.twig', 'Platform identity, outgoing mail, bank details and maintenance.'),
         ];
+    }
+
+    /**
+     * The section's own actions: in its page head when the section is the page, and in its card's head
+     * when it is one of several on the "All sections" page. `when` names the permission flag a page
+     * carries (BaseController's can_* flags); empty means every reader of the section may use it. A link
+     * has an href; a button opens the form window (modal) the section draws.
+     *
+     * @return list<array{label:string,href:string,modal:string,variant:string,icon:string,when:string}>
+     */
+    public function actions(string $key): array
+    {
+        $link = static fn(string $label, string $href, string $variant = 'secondary', string $icon = '', string $when = ''): array => ['label' => $label, 'href' => $href, 'modal' => '', 'variant' => $variant, 'icon' => $icon, 'when' => $when];
+        $opens = static fn(string $label, string $modal, string $when = ''): array => ['label' => $label, 'href' => '', 'modal' => $modal, 'variant' => 'primary', 'icon' => 'action-add', 'when' => $when];
+        return match ($key) {
+            'dashboard' => [$link('Manage courses', '/admin/courses'), $link('View activity', '/admin/activity')],
+            'courses' => [$link('Import HTML course', '/admin/courses/import'), $link('Create course', '/admin/courses/new', 'primary', 'action-add')],
+            'people' => [$opens('Add person', 'quickAddPersonModal', 'can_manage_people')],
+            'companies', 'company_creators' => [$opens('Add company', 'company-add', 'can_manage_companies')],
+            'roles' => [$opens('Create role', 'createRoleModal', 'can_manage_roles')],
+            default => [],
+        };
     }
 
     /**

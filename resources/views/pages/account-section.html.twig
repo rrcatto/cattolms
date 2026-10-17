@@ -3,9 +3,11 @@
 	{% set ph_kicker = 'Account' %}
 	{% set ph_title = account_section.label %}
 	{% set ph_lead = account_section.description %}
-	{% set ph_action_href = '/account' %}
-	{% set ph_action_label = 'All account sections' %}
+	{# The section's own actions belong to the page here, so they sit in the page head. #}
+	{% set ph_actions %}{% include '@platform/partials/section-actions.html.twig' with {actions: account_section.actions|default([])} %}{% endset %}
 	{# The page head brings the identity band with it, on this page as on every other. #}
 	{% include '@platform/partials/page-head.html.twig' %}
-	{{ account_section.content|raw }}
+	<section class="cl-page-section" data-account-section="{{ account_section.key }}">
+		{{ account_section.content|raw }}
+	</section>
 {% endblock %}

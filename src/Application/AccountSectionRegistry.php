@@ -34,6 +34,20 @@ final class AccountSectionRegistry
         foreach ($this->all() as $section) if ($section['key']===$key) return $section;
         throw new InvalidArgumentException('Unknown Account section: '.$key);
     }
+    /**
+     * The section's own actions: in its page head when the section is the page, and in its card's head
+     * when it is one of several on the "All sections" page. `when` names the permission flag a page
+     * carries (BaseController's can_* flags); empty means every reader of the section may use it. A link
+     * has an href; a button opens the form window (modal) the section draws.
+     *
+     * @return list<array{label:string,href:string,modal:string,variant:string,icon:string,when:string}>
+     */
+    public function actions(string $key): array
+    {
+        // No Account section has an action of its own: each one is a form or a list of the reader's own.
+        return [];
+    }
+
     /** @return array{key:string,label:string,icon:string,route:string,template:string,description:string} */
     private function s(string $key,string $label,string $icon,string $route,string $template,string $description): array
     { return compact('key','label','icon','route','template','description'); }

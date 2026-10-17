@@ -1,77 +1,14 @@
-{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/company/people'}})} %}
-{% block results %}
-
-		{% embed ui_template('layout.toolbar') with {props: ui_props('layout.toolbar', {})} %}
-{% block toolbar_primary %}
-
-				<div class="cl-ui-eyebrow">
-					People
-				</div>
-				<h2>
-					People
-				</h2>
-				<p class="muted small">
-					People in the company you are administering.
-				</p>
-
-{% endblock %}
-{% block toolbar_actions %}
-
-			{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: '＋ Add person'})} %}
-{% block body %}
-
-				<form class="popover-form" action="/company/people" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
-{% block body %}
-{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{#
+	Company People: one card that opens with its heading, then the search, the pager and the table.
+	Add person opens a form window, as it does in Administration › People; the button is in the page
+	head on this section's own page and in this card's head on the company workspace.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-					<input type="hidden" name="csrf" value="{{ csrf }}">
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-						<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-						<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-						<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="STUDENT">Student</option><option value="COURSE_EDITOR">CourseEditor</option><option value="COURSE_OWNER">CourseOwner</option><option value="COMPANY_ADMIN">CompanyAdministrator</option></select>
-
-{% endblock %}
-{% endembed %}
-					<div class="cl-ui-field--full">
-						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}
-{{ ui('action.button', {label: 'Create account', variant: 'primary', size: 'normal', icon: 'action-add'}) }}
-{% endblock %}
-{% endembed %}
-					</div>
-
-{% endblock %}
-{% endembed %}
-{% endblock %}
-{% endembed %}</form>
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
+	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'People', eyebrow: 'People', summary: 'People in the company you are administering.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/company/people'}})} %}
+{% block results %}
 
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 {% block header %}
@@ -206,6 +143,55 @@
 					{{ ui('action.link', {label: 'View all people', variant: 'secondary', size: 'small', href: '/company/people'}) }}
 				</div>
 			{% endif %}
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'companyAddPersonModal', title: 'Add person', action: '/company/people', method: 'post'})} %}
+{% block modal_body %}
+
+		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', full_width: false, for: 'field-people-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+						<input name="first_name" required id="field-people-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', full_width: false, for: 'field-people-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+						<input name="last_name" required id="field-people-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company email', full_width: true, for: 'field-people-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
+{% block control %}
+
+						<input type="email" name="email" required id="field-people-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+{% block control %}
+
+						<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="STUDENT">Student</option><option value="COURSE_EDITOR">CourseEditor</option><option value="COURSE_OWNER">CourseOwner</option><option value="COMPANY_ADMIN">CompanyAdministrator</option></select>
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% block modal_actions %}
+
+		{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}
+		{{ ui('action.button', {label: 'Create account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+
+{% endblock %}
+{% endembed %}
 
 {% endblock %}
 {% endembed %}

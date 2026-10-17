@@ -1,7 +1,7 @@
 {% extends layout %}
 {% block page_body %}
 {% set content_href = '/admin/courses/' ~ course.id ~ '/content' %}{% set ph_back_href = content_href %}{% set ph_back_label = 'Course Content' %}{% set ph_kicker = course.title %}{% set ph_title = 'Move into a section' %}{% set ph_lead = 'Choose where the rows go. They move with everything inside them and are placed last in the destination. Destinations that would exceed three levels, or that are inside the rows being moved, are not offered.' %}{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-page-section container-fluid cl-container-wide py-5">
+<section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Moving', heading_level: 2}) }}
 <ul>{% for row in moving %}<li>{{ row.node_type == 'section' ? row.section_title : (row.display_title_override ?: row.item_title) }}</li>{% endfor %}</ul>

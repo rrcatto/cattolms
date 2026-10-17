@@ -1,15 +1,16 @@
 # Catto Learning Development Operations
 
-**LMS:** 0.9.1 **Date time:** 2026/10/13 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.9.2 **Date time:** 2026/10/17 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
 
-## Current v0.9.1 operational position
+## Current v0.9.2 operational position
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.9`) on `dev-v0.9`. Until 2026/10/16 the same code line was `code/cattolms-v0.8` on `dev-v0.8`, which v0.9.0 and v0.9.1 were released from and which is kept for reference. Repointing `code/current` needs the Symfony caches in `runtime/storage/cache/symfony/` deleted and `env_php_1` and `env_commerce-worker_1` restarted: the compiled container holds absolute code paths, and `cache:clear` cannot start with the old one. Annotated tag `v0.9.1` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
+- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.9`) on `dev-v0.9`. Until 2026/10/16 the same code line was `code/cattolms-v0.8` on `dev-v0.8`, which v0.9.0 and v0.9.1 were released from and which is kept for reference. Repointing `code/current` needs the Symfony caches in `runtime/storage/cache/symfony/` deleted and `env_php_1` and `env_commerce-worker_1` restarted: the compiled container holds absolute code paths, and `cache:clear` cannot start with the old one. Annotated tag `v0.9.2` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
 - **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/13 from the one canonical baseline (bundled themes, seed names, a 100,000-record dataset from `php tools/seed-generate.php 100000` and a popularity recalculation); rebuild it the same way whenever needed.
 - **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 92 permissions (10 `SYSTEM.*`, 82 business) across the five roles.
 - **Financial documents (Phase K, v0.8.9).** The baseline installs the invoice, receipt and credit note templates compiled from the standard financial document design (`FinancialDocumentDesignCompiler`, whose structure is `resources/documents/invoice.html`, `receipt.html`, `credit_note.html` and the shared `financial.css`). After that ADMIN changes the design at Commerce → Financial Documents; each save publishes a new version, and every issued document stores its values and names the version that drew it, so it is drawn the same way however the design, the business details or the customer's details change. Editing a source file changes only new installations, until the database is rebuilt.
 - **Course landing pages (Phase L, v0.9.0).** A course's marketing page is at `/landing/{slug}` and is public only while it and its course are published; its price, rating, reviews and outline are read live, so nothing needs refreshing when a course changes. Its hero picture is served by `/landing/{slug}/picture/{public_id}`, publicly only once the page is published. Every bundled theme's head includes `partials/head-meta.html.twig`, so a theme installed from an older package keeps the fixed site description until it is reinstalled. The ACL is unchanged (92 permissions).
 - **Legal documents (v0.9.1).** `/terms`, `/refunds` and `/privacy` are public pages listed in the footer of every theme. Their supplier block prints `APP_ADMIN_EMAIL` and `APP_DOMAIN` from the instance `.env`, read each time a page is drawn: set both before the pages are shown to the public. Each document's version and last-updated date are in `src/Legal/LegalDocuments.php`, and every order records the versions its purchaser accepted, so a change to a document's text raises its version and date in the same change. The pages describe payment through Stitch, identity verification, a certificate without a grade, a public transcript, parental consent and deletion of activity records after 5 years, none of which is built yet (`ROADMAP.md`); the owner decides when they go public. The ACL is unchanged (92 permissions).
+- **Page construction and themes (v0.9.2).** Every page chooses one width (`ThemeRenderer::PAGE_WIDTHS`), and its rows take their width, gutter and spacing from `--cl-content-width`, `--cl-gutter` and `--cl-section-space` in `catto-platform.css`, which a theme may set. Six themes are bundled, Saharan Sunset 1.0.1 among them, each at a new version with its package in `extras/themes`. Installed older versions stay beside the new ones; Factory Reset Sidebar 2.0.1 needs Factory Reset 2.0.1, which is no longer bundled, so activate 2.0.2.
 - **Certificate designs (v0.8.8.10).** The baseline stores the six look backgrounds (`resources/certificates/looks/*.png`) as pictures in `document_assets` and installs six designs compiled from the looks (Classic, Modern, Minimal, Legal Seal, Gold Frame and Professional CPD), with Classic the default for new courses; every course starts on it. After that, designs are made at Courses → Certificate Designs and live in the database, uploaded backgrounds, logos and signatures included (`document_assets` rows are immutable, stored once by SHA-256, and never written to `storage/`). Each issued certificate stores its values and references the design version it was drawn with, and is drawn again from them, so editing or deleting a design never changes an issued certificate. Generated seed certificates are recorded the same way, against each course's design.
 - **Category order.** Category positions are explicit and compact: 1..n within each parent, refused as a duplicate by the database. A script that inserts categories directly must place each one after its siblings (`COALESCE(MAX(position),0)+1` for its parent) or run inside a transaction that defers `course_categories_sibling_position` and renumbers before it ends.
 - **PDF fonts.** Certificates print in the bundled OFL fonts in `resources/documents/fonts/` (Cormorant Garamond, Playfair Display, IBM Plex Sans and IBM Plex Serif). Dompdf keeps their metrics in the instance's `storage/cache/dompdf-fonts`, which it creates on first use; it must be writable by PHP-FPM (`cattotest` in development), and deleting it only makes the next PDF rebuild it.
@@ -91,6 +92,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
 - **v0.8.9:** financial documents on the document template engine (Phase K). The baseline changed (`commerce_documents` stores `document_data` and the template version; `PLATFORM.DOCUMENT.VIEW`/`MANAGE`): rebuild the database. Publish `catto-platform.css`.
 - **v0.9.0:** course landing pages (Phase L). The baseline gained `course_landing_pages` and `course_landing_sections`: rebuild the database. Publish `catto-platform.css`, `js/platform-overrides.js` and the compiled `assets/` (the `landing-sections` controller and the new Stimulus controller map; delete the served `@symfony/stimulus-bundle/controllers-i3Y_kUZ.js`), then run `composer themes:install -- --force`, because every theme's head now includes the core head metadata.
 - **v0.9.1:** the legal pages, terms acceptance and the Refund Policy rule. The baseline changed (`commerce_refunds.policy_refusal` and `override_reason`): rebuild the database. No stylesheet, script, compiled asset or theme changed, so nothing is published to the web root. Set `APP_ADMIN_EMAIL` and `APP_DOMAIN` to the email address and domain the pages should print.
+- **v0.9.2:** one construction for every page, Saharan Sunset 1.0.1 and new versions of every bundled theme. No schema change. Run `composer install` (Symfony 8.1.9), publish `catto-platform.css` and run `composer themes:install`, which installs the new versions beside the old ones; if Factory Reset Sidebar 2.0.1 was active, activate 2.0.2. A Factory Reset 2.0.1 setting falls back to 2.0.2 by itself, and a fresh database starts on it.
 
 ### Commerce operations
 
@@ -130,12 +132,12 @@ Configure Administration → Settings → Bank details before providing EFT inst
 Only on the owner's explicit instruction to commit and push a version:
 
 1. Update the version, `README.md` (its current release line and release history), `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme, and an installed theme whose head lacks `partials/head-meta.html.twig` fails two landing page tests. Make the installed theme active again afterwards. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit on `dev-v0.9` and create the annotated tag: the version with a leading `v` (`v0.9.1`, `v0.8.8.14`).
+2. Commit on `dev-v0.9` and create the annotated tag: the version with a leading `v` (`v0.9.2`, `v0.8.8.14`).
 3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.9:main` and `git push origin` with the tag).
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.1   # the tag being released
+   V=v0.9.2   # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
@@ -246,7 +248,7 @@ GD is required from v0.7 for the profile image (an upload is validated, cropped 
 
 ## Bundled themes
 
-The platform ships five themes as source trees under `themes/` in the code root: Factory Reset, Factory Reset Sidebar, Gilded Noir, Light Default and Radiant Learning. They are versioned and committed with the code.
+The platform ships six themes as source trees under `themes/` in the code root: Factory Reset, Factory Reset Sidebar, Gilded Noir, Light Default, Radiant Learning and Saharan Sunset. They are versioned and committed with the code.
 
 ```bash
 composer themes:install            # install any that are missing, and publish every one's assets
@@ -254,7 +256,7 @@ composer themes:install -- --force # replace installed themes at the same versio
 composer themes:package            # rebuild extras/themes/*.zip from the trees
 ```
 
-`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up with all five. On an existing instance run `themes:install` after deploying a release: it leaves every already-installed theme exactly as it is and republishes browser assets, which is what a deployment that overlays the code root but not the public web root needs.
+`smoke:install` runs `themes:install` before `themes:sync`, so a fresh instance comes up with all six. On an existing instance run `themes:install` after deploying a release: it leaves every already-installed theme exactly as it is and republishes browser assets, which is what a deployment that overlays the code root but not the public web root needs.
 
 **`--force` is not an upgrade path.** An installed theme is an immutable release; replacing one at the same version produces two builds wearing one version number. On a server whose themes are accepted releases, use a new version instead.
 
@@ -415,7 +417,7 @@ At minimum review:
 /privacy
 ```
 
-The browser checks in `tests/Browser/` cover most of these in all five themes; see its README.
+The browser checks in `tests/Browser/` cover most of these in every bundled theme; see its README.
 
 Also validate the accepted external theme at desktop and mobile widths.
 
@@ -519,7 +521,7 @@ Install changed theme sources through ThemeManager, using `themes:install -- --f
 
 Run the canonical shell and component matrices serially using the [browser instructions](../tests/Browser/README.md), then Twig lint and full `composer qa`. The canonical matrix temporarily activates themes for anonymous requests; restore its saved active theme before removing its isolated identity, including after an interrupted run. Component checks alone do not verify shell construction.
 
-For an authorized release, increment changed theme versions and the child’s exact parent requirement, rebuild `extras/themes` from final source, and validate packages. Do not overwrite accepted installed versions with development `--force`. v0.8.6 retains Factory Reset/Sidebar/Light Default 2.0.1, Gilded Noir 2.0.2 and Radiant Learning 4.0.1. Git publication does not deploy or certify the VPS. Push the reviewed development commit to `main` directly without checking out branches in the served directory.
+For an authorized release, increment changed theme versions and the child’s exact parent requirement, rebuild `extras/themes` from final source, and validate packages. Do not overwrite accepted installed versions with development `--force`. v0.9.2 ships Factory Reset and Factory Reset Sidebar 2.0.2, Gilded Noir 2.0.3, Light Default 2.0.2, Radiant Learning 4.0.2 and Saharan Sunset 1.0.1. Git publication does not deploy or certify the VPS. Push the reviewed development commit to `main` directly without checking out branches in the served directory.
 
 ### v0.8.6 installation order
 

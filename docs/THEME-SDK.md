@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.1 · **Updated:** 2026-10-13
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.2 · **Updated:** 2026-10-17
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -158,6 +158,11 @@ array in the order core gives it; a theme never picks entries out of it and neve
 own (`NavigationContractTest`). The legal pages themselves are ordinary platform pages on surfaces
 (`layout.surface`, `layout.section-head`, `data.key-value-list`): a theme styles them as it styles any page.
 
+Since v0.9.2 the footer's social marks come only from `footer_social`: Facebook, WhatsApp, X, LinkedIn,
+Instagram and YouTube, each a link to its platform's home page (`SocialPlatform::home()`) until the settings
+give the installation's profile address in `platform_social`. A theme may draw the marks from its own sprite,
+as Gilded Noir does, but never writes a social link of its own or a link to `#` (`NavigationContractTest`).
+
 Account, company and admin family models expose `sections` and `section` for composed workspace and
 standalone contexts. Their content is already-rendered platform content. Core page bodies own the
 canonical accordions and controls; a theme styles them instead of rebuilding the workspace.
@@ -243,12 +248,12 @@ administration, company, catalogue/tag, bundle (`/bundles`, a bundle page), cart
 the promo code review step), order and learning pages at desktop/tablet/mobile sizes, with the
 category picker opened on the catalogue and on a course's edit form, and the Course Content and
 course category trees. To see an installed theme without activating it, add
-`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.2`) to a page while
+`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.3`) to a page while
 signed in with `SYSTEM.THEME.VIEW`; an unknown key leaves the live theme in place. The browser
-checks in `tests/Browser/` cover all five bundled themes at 1440 and 390px.
+checks in `tests/Browser/` cover every bundled theme at 1440 and 390px.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
 pagination, htmx replacement and plain GET/POST fallbacks. Gilded Noir, Light Default, Factory Reset
-Radiant Learning and Factory Reset Sidebar all need individual visual checks. The component ownership contracts scan bundled theme templates as well as platform views.
+Radiant Learning, Factory Reset Sidebar and Saharan Sunset all need individual visual checks. The component ownership contracts scan bundled theme templates as well as platform views.
 
 ## Canonical shared page vocabulary
 
@@ -300,7 +305,29 @@ Radiant Learning and Factory Reset Sidebar all need individual visual checks. Th
 | footer navigation | `cl-footer-nav` |
 | footer social links | `cl-footer-social` |
 
-Existing canonical component classes such as `cl-ui-*`, `cl-cart-*`, `cl-container-wide`, `cl-narrow`, `cl-medium` and other established core classes remain part of the same core vocabulary.
+Existing canonical component classes such as `cl-ui-*`, `cl-cart-*` and other established core classes remain part of the same core vocabulary.
+
+### Page width and rows (v0.9)
+
+A page chooses its width once. Core puts `cl-width-wide` (the default), `cl-width-medium`, `cl-width-narrow`
+or `cl-width-full` on the body beside `cl-page-texture`, so every theme receives it through the
+`page.body_class` it already prints, and `page.width` names it. The rows in main - `cl-page-head-inner`,
+the identity band's `cl-identity-meta` and each `section.cl-page-section` directly in main or in a
+theme's `div.cl-page-family` - take their width and spacing from three variables:
+
+| Variable | Core default | Meaning |
+|---|---|---|
+| `--cl-content-width` | `1320px`; `54rem` medium; `38rem` narrow | a row's largest width, centred |
+| `--cl-gutter` | `.75rem` | a row's padding at the sides |
+| `--cl-section-space` | `3rem` | a row's padding above and below |
+
+Rows carry no Bootstrap container or spacing classes (`container*`, `cl-container-wide`, `cl-medium`,
+`cl-narrow`, `py-*`; `PageStructureContractTest`), so a theme sets the variables, never per page:
+Gilded Noir and Light Default fill their frame (`--cl-content-width: none`) with their own gutter and
+column widths, and Saharan Sunset draws the page context band and main as one box whose rows fill it.
+Full is drawn as wide unless a theme draws full-width pages differently; Saharan Sunset draws Home and
+course landing pages without its box. The bands that still hold a container (the home hero and feature
+band, and the course, bundle and landing page heads) keep it until the Bootstrap 6 step.
 
 Theme-specific elements may use theme-owned classes such as `gn-ribbon`, `gn-footer-art`, or future third-party theme classes.
 

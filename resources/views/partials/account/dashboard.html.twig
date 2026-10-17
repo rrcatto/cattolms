@@ -1,30 +1,22 @@
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Your learning at a glance', eyebrow: 'Dashboard', summary: 'Learning progress, course history and account statistics.'}) }}
+		{# The figures sit in the card they summarise. #}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+		{% block body %}
+
+			{{ ui('data.stat-card', {value: (account_stats.current_courses), label: 'Current courses', note: 'Assigned or in progress'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.completed_courses), label: 'Completed', note: 'Courses completed'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.certificates), label: 'Certificates', note: 'Issued certificates'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.average_progress) ~ '%', label: 'Current progress', note: 'Average active-course progress'}) }}
+
+		{% endblock %}
+		{% endembed %}
 
 {% endblock %}
 {% endembed %}
-
-{% endblock %}
-{% endembed %}
-{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
-{% block body %}
-
-	{{ ui('data.stat-card', {value: (account_stats.current_courses), label: 'Current courses', note: 'Assigned or in progress'}) }}
-	{{ ui('data.stat-card', {value: (account_stats.completed_courses), label: 'Completed', note: 'Courses completed'}) }}
-	{{ ui('data.stat-card', {value: (account_stats.certificates), label: 'Certificates', note: 'Issued certificates'}) }}
-	{{ ui('data.stat-card', {value: (account_stats.average_progress) ~ '%', label: 'Current progress', note: 'Average active-course progress'}) }}
-
-{% endblock %}
-{% endembed %}
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 'auto', section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Course history', eyebrow: 'Course History', summary: 'Every course assigned to this account, including completion result and certificate status.'}) }}
@@ -81,9 +73,6 @@
 {% endblock %}
 {% endembed %}
 			{% endif %}
-
-{% endblock %}
-{% endembed %}
 
 {% endblock %}
 {% endembed %}

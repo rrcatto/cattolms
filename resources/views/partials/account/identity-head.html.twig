@@ -1,7 +1,7 @@
 {% if identity_placement|default('page') == 'page' %}
 {% set identity_signed_in = is_authenticated is defined and is_authenticated %}
 <section class="cl-identity cl-identity-head" aria-label="Account identity">
-	<div class="container-fluid cl-container-wide cl-identity-meta">
+	<div class="cl-identity-meta">
 		{% if identity_signed_in %}
 			{% if identity_image is defined and identity_image %}
 				<img class="cl-identity-avatar" src="{{ identity_image }}" alt="" width="72" height="72">
