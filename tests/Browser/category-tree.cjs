@@ -26,7 +26,7 @@ const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-category-tree';
 const root = path.resolve(__dirname, '..', '..');
 fs.mkdirSync(output, {recursive: true});
 
-const php = (command) => execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `cd /home/cattotest/code/cattolms-v0.8 && SHELL_VERBOSITY=-1 php tests/Browser/category-tree-fixture.php ${command} ${statePath} 2>/dev/null`], {encoding: 'utf8'});
+const php = (command) => execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `cd /home/cattotest/code/current && SHELL_VERBOSITY=-1 php tests/Browser/category-tree-fixture.php ${command} ${statePath} 2>/dev/null`], {encoding: 'utf8'});
 let state = JSON.parse(execFileSync('podman', ['exec', container, 'cat', statePath], {encoding: 'utf8'}));
 const reset = () => { state = JSON.parse(php('reset').trim().split('\n').pop()); };
 const tokens = [...state.tokens];

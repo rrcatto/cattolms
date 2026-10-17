@@ -5,18 +5,18 @@ administrator session. Component checks select theme previews without changing t
 the canonical matrix temporarily activates themes and restores the original. Both use bundled manifests' actual versions. They fail if authentication redirects or the wrong theme loads.
 No Node dependency or frontend build is added; use an existing Playwright installation.
 
-Run from the v0.8 repository on the host (adjust the instance/container paths if necessary). In the
+Run from the code repository (`code/current`) on the host (adjust the instance/container paths if necessary). In the
 development pod (`docs/OPERATIONS.md`, "Local development environment") Playwright is
 installed on the host, so `CATTO_PLAYWRIGHT_MODULE` is `$HOME/tools/playwright/node_modules/playwright`;
 the runners accept the local mkcert certificate (`ignoreHTTPSErrors`), which Playwright's Firefox does not trust:
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/ui-stabilisation-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/ui-stabilisation-fixture.php create'
 podman exec -u cattotest env_php_1 cat /tmp/catto-ui-stabilisation-state.json > /tmp/catto-ui-stabilisation-state.json
 chmod 600 /tmp/catto-ui-stabilisation-state.json
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/ui-stabilisation.cjs
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/canonical-page.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/ui-stabilisation-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/ui-stabilisation-fixture.php cleanup'
 ```
 
 Always run cleanup after a failed browser check too. Delete the host copy of the session state
@@ -86,9 +86,9 @@ scenario resets the fixture course (`reset`; `empty` removes every row) and read
 from the server.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-content-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-content-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-content-tree.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-content-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-content-fixture.php cleanup'
 ```
 
 The runner reads the fixture state and resets the tree through `podman exec` (`CATTO_PHP_CONTAINER`,
@@ -115,9 +115,9 @@ The fixture builds `A > A1 > A1x, A > A2 · B > B1 · G · D > D1 > D1x` after t
 the shipped ones and rebuilds it before each scenario, and `cleanup` also removes the identity.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/category-tree.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php cleanup'
 ```
 
 ## Category picker
@@ -142,9 +142,9 @@ reduced motion and scrolls with `behavior: 'instant'`: a smooth scroll still run
 Playwright moves the anchored popover.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/category-picker.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/category-tree-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/category-tree-fixture.php cleanup'
 ```
 
 ## Course reviews
@@ -160,9 +160,9 @@ entitled learner, a second learner with an approved review and an ADMIN; the run
 learner's review through `podman exec` before each scenario.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-review-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-review-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/course-reviews.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/course-review-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/course-review-fixture.php cleanup'
 ```
 
 ## Popular courses
@@ -180,9 +180,9 @@ holds, so run `php bin/console popularity:recalculate` first on a fresh database
 `popular-courses-fixture.php` creates the signed-in learner whose favourites it toggles.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/popular-courses-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/popular-courses-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/popular-courses.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/popular-courses-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/popular-courses-fixture.php cleanup'
 ```
 
 ## Billing profiles
@@ -198,9 +198,9 @@ themes at 1440 and 390px without overflow. Orders are immutable, so each run lea
 their purchasers and the retired fixture course in the disposable development database.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/billing-profiles-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/billing-profiles-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/billing-profiles.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/billing-profiles-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/billing-profiles-fixture.php cleanup'
 ```
 
 ## Promo codes
@@ -265,9 +265,9 @@ after 4.5 seconds.
 `cleanup` removes the course, its enrolments and certificates and the identities, makes the recorded default design the default again, and deletes the run's designs as the list does (archived and renamed). Published versions and stored pictures are immutable and stay.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/certificates-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/certificates-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/certificates.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/certificates-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/certificates-fixture.php cleanup'
 ```
 
 ## Financial documents
@@ -289,9 +289,9 @@ requests are routed so their bodies can be read, as in `certificates.cjs`.
 The fixture places its orders through the real commerce services (a card payment, a 100% promotion, an EFT confirmed by ADMIN, a company credit purchase and a refund), so their documents are issued as a checkout issues them. `cleanup` saves the recorded design again as the current one and signs everyone out; orders are immutable, so each run leaves its orders, their purchasers and the retired courses.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/financial-documents-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/financial-documents-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/financial-documents.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/financial-documents-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/financial-documents-fixture.php cleanup'
 ```
 
 ## Course landing pages
@@ -307,9 +307,9 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8
 The fixture makes two published courses (one with two prices, an outline with protected content and an approved review; one not on sale with a published landing page), an ADMIN, a course owner, a learner who has the first course and one who does not. The check places no order, so `cleanup` removes everything.
 
 ```sh
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/landing-pages-fixture.php create'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/landing-pages-fixture.php create'
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/landing-pages.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/landing-pages-fixture.php cleanup'
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/landing-pages-fixture.php cleanup'
 ```
 
 ## Legal pages and terms acceptance
@@ -325,5 +325,5 @@ Each bundled theme is activated in turn (`legal-pages-fixture.php theme <key>`),
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/legal-pages.cjs
-podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/cattolms-v0.8 && php tests/Browser/legal-pages-fixture.php cleanup'   # only after a killed run
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/legal-pages-fixture.php cleanup'   # only after a killed run
 ```
