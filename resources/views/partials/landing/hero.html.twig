@@ -5,18 +5,18 @@
 	hero is hidden or removed still opens with the course title.
 #}
 <section class="cl-page-head cl-landing-hero" aria-labelledby="landing-title">
-	<div class="container py-5">
+	<div class="cl-container py-12">
 		<div class="cl-landing-hero-grid{{ hero and hero.picture ? ' has-picture' : '' }}">
 			<div class="cl-landing-hero-copy">
 				{% if landing.course.category_name or landing.course.level %}
-					<div class="d-flex flex-wrap gap-2 mb-3">
+					<div class="d-flex flex-wrap gap-3 mb-5">
 						{% if landing.course.category_name %}{{ ui('feedback.badge', {label: landing.course.category_name, tone: 'neutral'}) }}{% endif %}
 						{% if landing.course.level %}{{ ui('feedback.badge', {label: landing.course.level, tone: 'neutral'}) }}{% endif %}
 					</div>
 				{% endif %}
 				<h1 class="cl-landing-headline" id="landing-title">{{ hero ? hero.headline : landing.course.title }}</h1>
 				{% if hero %}
-					{% include '@platform/partials/landing/paragraphs.html.twig' with {paragraphs: hero.paragraphs, paragraph_class: 'lead'} %}
+					{% include '@platform/partials/landing/paragraphs.html.twig' with {paragraphs: hero.paragraphs, paragraph_class: 'cl-lead'} %}
 					{% if hero.rating and hero.rating.count > 0 %}
 						{% include '@platform/partials/course-rating-summary.html.twig' with {rating: hero.rating} %}
 					{% endif %}

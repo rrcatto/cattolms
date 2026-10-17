@@ -1,4 +1,4 @@
-/* Saharan Sunset 1.0.1 - Catto Learning theme stylesheet.
+/* Saharan Sunset 1.0.2 - Catto Learning theme stylesheet.
    Theme Package 4.0 / Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue,
    Course detail, Sign in): warm ivory ground, sand bands, near-black ink, terracotta accent,
    Cormorant Garamond headings and Jost text, square corners and tracked uppercase actions.
@@ -10,7 +10,9 @@
    Ownership: core owns component geometry, responsive grids, navigation behaviour and page bodies.
    This sheet sets colours, type, borders, shadows and decorative art only on canonical classes,
    and layout only on theme-owned ss-* elements, the shell, the box and its rows. */
-
+/* Bootstrap 6 safety net (UX rule 7.10): this theme's accent for native controls and its focus outline colour,
+   first so that every rule below still wins at the same specificity. */
+.ss-body{accent-color:var(--ss-terra)}
 /* 1. Tokens ------------------------------------------------------------------------------- */
 
 body.ss-body {
@@ -144,18 +146,18 @@ body.ss-body {
 .ss-body h6, .ss-body .h6 { font-size: .95rem; }
 .ss-body :where(h1, h2, h3, h4, .h1, .h2, .h3, .h4).fw-bold { font-weight: 500 !important; }
 
-.ss-body :is(.display-1, .display-2, .display-3, .display-4, .display-5, .display-6) {
+.ss-body :is(.cl-display-1, .cl-display-2, .cl-display-3, .cl-display-4, .cl-display-5, .cl-display-6) {
   font-family: var(--ss-display);
   font-weight: 400 !important;
   letter-spacing: 0;
   line-height: 1.05;
 }
-.ss-body .display-4 { font-size: clamp(2.6rem, 5vw, 4.25rem); }
-.ss-body .display-5 { font-size: clamp(2.2rem, 4vw, 3.25rem); }
+.ss-body .cl-display-4 { font-size: clamp(2.6rem, 5vw, 4.25rem); }
+.ss-body .cl-display-5 { font-size: clamp(2.2rem, 4vw, 3.25rem); }
 
 .ss-body p { margin: 0 0 .9rem; }
 .ss-body p:last-child { margin-bottom: 0; }
-.ss-body .lead { font-size: 1.07rem; font-weight: 300; line-height: 1.65; color: var(--ss-ink-2); }
+.ss-body .cl-lead { font-size: 1.07rem; font-weight: 300; line-height: 1.65; color: var(--ss-ink-2); }
 .ss-body strong, .ss-body b { font-weight: 600; }
 .ss-body small, .ss-body .small { font-size: .85rem; }
 .ss-body hr { border: 0; border-top: 1px solid var(--ss-line); opacity: 1; }
@@ -169,11 +171,11 @@ body.ss-body {
 
 .ss-body :focus-visible { outline: 2px solid var(--ss-terra); outline-offset: 3px; }
 
-.ss-body .text-body-secondary, .ss-body .text-secondary, .ss-body .text-muted, .ss-body .muted { color: var(--ss-ink-2) !important; }
-.ss-body .text-primary, .ss-body .text-info { color: var(--ss-terra) !important; }
-.ss-body .text-warning { color: var(--ss-warn) !important; }
+.ss-body .cl-text-muted, .ss-body .cl-text-secondary, .ss-body .text-muted, .ss-body .muted { color: var(--ss-ink-2) !important; }
+.ss-body .cl-text-primary, .ss-body .text-info { color: var(--ss-terra) !important; }
+.ss-body .cl-text-warning { color: var(--ss-warn) !important; }
 .ss-body .text-success { color: var(--ss-success) !important; }
-.ss-body .text-danger { color: var(--ss-danger) !important; }
+.ss-body .cl-text-danger { color: var(--ss-danger) !important; }
 
 /* 3. Shell: skip link, header, brand, navigation ------------------------------------------- */
 
@@ -388,7 +390,7 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
 /* The home hero and feature band and the course, bundle and landing page heads still hold a
    Bootstrap container with spacing utilities inside their band. The band pads its content, so the
    container sits flush; the band's own spacing beats the container's py-5, which is !important. */
-.ss-body .cl-main > * :is(.container, .container-fluid, .container-sm, .container-md, .container-lg, .container-xl, .container-xxl) {
+.ss-body .cl-main > * :is(.cl-container, .container-fluid, .container-sm, .container-md, .container-lg, .container-xl, .container-xxl) {
   width: 100%;
   max-width: none;
   margin-inline: 0;
@@ -401,7 +403,7 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
    the sides; the course, bundle and landing heads hold a container instead (see 4b). */
 .ss-body .cl-page-head { background: transparent; border-bottom: 1px solid var(--ss-line); color: var(--ss-ink); }
 .ss-body .cl-page-head-inner { padding-block: 52px 40px; }
-.ss-body .cl-main > .cl-page-head > .container { padding: 52px var(--ss-box-pad) 40px !important; }
+.ss-body .cl-main > .cl-page-head > .cl-container { padding: 52px var(--ss-box-pad) 40px !important; }
 .ss-body .cl-page-head h1 {
   margin: 14px 0 0;
   font-family: var(--ss-display);
@@ -411,7 +413,7 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
 }
 .ss-body .cl-page-head-compact h1 { margin: 0; font-size: 1.6rem; }
 .ss-body .cl-page-head-compact > .cl-page-head-inner { padding-block: 18px; }
-.ss-body .cl-page-head .lead { max-width: 40rem; margin-top: 16px; }
+.ss-body .cl-page-head .cl-lead { max-width: 40rem; margin-top: 16px; }
 
 .ss-body .cl-kicker,
 .ss-body .cl-ui-eyebrow {
@@ -422,7 +424,7 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
   letter-spacing: .32em;
   text-transform: uppercase;
 }
-.ss-body .cl-kicker.text-primary, .ss-body .cl-kicker.text-warning { color: var(--ss-terra) !important; }
+.ss-body .cl-kicker.cl-text-primary, .ss-body .cl-kicker.cl-text-warning { color: var(--ss-terra) !important; }
 
 .ss-body .cl-back-link {
   color: var(--ss-terra);
@@ -585,7 +587,7 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
 .ss-body .pagination-jump .help { opacity: 1; }
 .ss-body .cl-ui-field-error, .ss-body .cl-main .invalid-feedback { color: var(--ss-danger); font-size: 13px; font-weight: 500; }
 
-.ss-body :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="time"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), select, textarea, .form-control, .form-select) {
+.ss-body :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="date"], input[type="datetime-local"], input[type="time"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), select, textarea, .cl-input, .cl-select) {
   border: 1px solid var(--ss-line-2);
   border-radius: 0;
   background-color: var(--ss-paper);
@@ -594,21 +596,21 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
   font-size: 15px;
   box-shadow: none;
 }
-.ss-body .cl-main :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), .form-control) { padding: 10px 14px; }
-.ss-body :is(input, select, textarea, .form-control, .form-select):focus {
+.ss-body .cl-main :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), .cl-input) { padding: 10px 14px; }
+.ss-body :is(input, select, textarea, .cl-input, .cl-select):focus {
   border-color: var(--ss-terra);
   box-shadow: 0 0 0 3px rgba(154, 74, 42, .18);
   outline: none;
 }
 .ss-body :is(input, select, textarea):disabled { background-color: var(--ss-sand-2); color: var(--ss-muted); }
 .ss-body ::placeholder { color: var(--ss-muted); opacity: 1; }
-.ss-body .form-control-lg { font-size: 16px; }
+.ss-body .cl-input-lg { font-size: 16px; }
 .ss-body input[type="checkbox"], .ss-body input[type="radio"] { accent-color: var(--ss-terra); }
-.ss-body .form-check-input { flex: 0 0 auto; width: 1.05em; height: 1.05em; border-color: var(--ss-line-2); background-color: var(--ss-paper); }
-.ss-body .cl-main :is(input[type="checkbox"], input[type="radio"]):not(.form-check-input) { flex: 0 0 auto; width: 1rem; height: 1rem; }
-.ss-body .form-check-input[type="checkbox"] { border-radius: 0; }
-.ss-body .form-check-input:checked { background-color: var(--ss-terra); border-color: var(--ss-terra); }
-.ss-body .form-check-input:focus { box-shadow: 0 0 0 3px rgba(154, 74, 42, .2); border-color: var(--ss-terra); }
+.ss-body .cl-check { flex: 0 0 auto; width: 1.05em; height: 1.05em; border-color: var(--ss-line-2); background-color: var(--ss-paper); }
+.ss-body .cl-main :is(input[type="checkbox"], input[type="radio"]):not(.cl-check) { flex: 0 0 auto; width: 1rem; height: 1rem; }
+.ss-body .cl-check[type="checkbox"] { border-radius: 0; }
+.ss-body .cl-check:checked { background-color: var(--ss-terra); border-color: var(--ss-terra); }
+.ss-body .cl-check:focus { box-shadow: 0 0 0 3px rgba(154, 74, 42, .2); border-color: var(--ss-terra); }
 .ss-body .cl-ui-choice label { color: var(--ss-ink); }
 .ss-body .cl-ui-form-actions { border-top: 1px solid var(--ss-line); padding-top: 20px; }
 .ss-body .cl-password-toggle { border: 1px solid var(--ss-line-2); border-radius: 0; background: var(--ss-paper); color: var(--ss-ink); }
@@ -813,10 +815,10 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
 /* 14. Course detail ----------------------------------------------------------------------- */
 
 .ss-body .cl-course-head { background: transparent; border-bottom: 1px solid var(--ss-line); color: var(--ss-ink); }
-.ss-body .cl-course-head > .container { padding-top: 56px !important; padding-bottom: 48px !important; }
+.ss-body .cl-course-head > .cl-container { padding-top: 56px !important; padding-bottom: 48px !important; }
 .ss-body .cl-course-head h1 { margin: 0; font-size: clamp(2.5rem, 5vw, 4.25rem); line-height: 1.04; }
-.ss-body .cl-course-head .text-white-50 { color: var(--ss-ink-2) !important; font-family: var(--ss-display); font-style: italic; font-weight: 400; }
-.ss-body .cl-course-head .lead { max-width: 40rem; }
+.ss-body .cl-course-head .cl-text-light-muted { color: var(--ss-ink-2) !important; font-family: var(--ss-display); font-style: italic; font-weight: 400; }
+.ss-body .cl-course-head .cl-lead { max-width: 40rem; }
 .ss-body .cl-course-head .cl-rating-summary, .ss-body .cl-course-head .cl-rating-none { margin-top: 12px; }
 .ss-body .cl-course-head .cl-ui-surface { padding: 26px 28px; }
 .ss-body .cl-course-head .cl-ui-key-value-list dt { color: var(--ss-muted); }
@@ -845,8 +847,8 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
 .ss-body.cl-width-full .cl-page-context-inner { border-bottom: 0; padding-inline: var(--ss-row-pad); }
 /* Bands that are not core rows take the same padding. A page head that holds a container (the
    landing hero) is padded by its band, not by the container. */
-.ss-body.cl-width-full .cl-main > :is(.cl-hero, .cl-feature-band, .cl-flash-stack, .cl-page-head:has(> .container)) { padding-inline: var(--ss-row-pad); }
-.ss-body.cl-width-full .cl-main > .cl-page-head > .container { padding-inline: 0 !important; }
+.ss-body.cl-width-full .cl-main > :is(.cl-hero, .cl-feature-band, .cl-flash-stack, .cl-page-head:has(> .cl-container)) { padding-inline: var(--ss-row-pad); }
+.ss-body.cl-width-full .cl-main > .cl-page-head > .cl-container { padding-inline: 0 !important; }
 .ss-body.cl-width-full .cl-identity-head { background: var(--ss-paper); }
 
 .ss-body .cl-hero {
@@ -863,7 +865,7 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
   pointer-events: none;
   background: linear-gradient(90deg, rgba(18, 14, 11, .94) 0%, rgba(18, 14, 11, .82) 38%, rgba(18, 14, 11, .38) 72%, rgba(18, 14, 11, .2) 100%);
 }
-.ss-body .cl-hero > .container { padding-top: 104px !important; padding-bottom: 88px !important; }
+.ss-body .cl-hero > .cl-container { padding-top: 104px !important; padding-bottom: 88px !important; }
 .ss-body .cl-hero .min-vh-hero { min-height: 480px; }
 .ss-body .cl-hero .row > [class*="col-"] { padding-top: 0 !important; padding-bottom: 0 !important; }
 .ss-body .cl-hero h1 {
@@ -872,9 +874,9 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
   line-height: 1.02;
   text-wrap: pretty;
 }
-.ss-body .cl-hero .lead { max-width: 35rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
+.ss-body .cl-hero .cl-lead { max-width: 35rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
 .ss-body .cl-hero .cl-kicker { color: var(--ss-apricot); }
-.ss-body .cl-hero .text-warning, .ss-body .cl-hero .text-primary { color: var(--ss-apricot) !important; }
+.ss-body .cl-hero .cl-text-warning, .ss-body .cl-hero .cl-text-primary { color: var(--ss-apricot) !important; }
 .ss-body .cl-hero :focus-visible { outline-color: var(--ss-apricot); }
 .ss-body .cl-hero .cl-ui-action--primary { background: var(--ss-ivory); border-color: var(--ss-ivory); color: var(--ss-ink); }
 .ss-body .cl-hero .cl-ui-action--primary:hover { background: var(--ss-peach); border-color: var(--ss-peach); color: var(--ss-ink); }
@@ -906,7 +908,7 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
 .ss-family-home .cl-main > .cl-page-section > .cl-ui-surface { padding: 0; background: transparent; border: 0; }
 .ss-family-home .cl-main > .cl-page-section .cl-kicker,
 .ss-family-home .cl-main > .cl-page-section .cl-ui-eyebrow { color: var(--ss-terra-deep) !important; }
-.ss-family-home .cl-main > .cl-page-section .lead { color: var(--ss-ink-2) !important; }
+.ss-family-home .cl-main > .cl-page-section .cl-lead { color: var(--ss-ink-2) !important; }
 .ss-family-home .cl-popular-courses { margin-top: 44px; }
 .ss-family-home .cl-popular-courses .cl-ui-section-head { padding: 0 0 6px; background: transparent; border: 0; }
 .ss-family-home .cl-popular-courses .cl-ui-section-head p { color: var(--ss-ink-2); }
@@ -947,9 +949,9 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
     linear-gradient(180deg, #19130f 0%, var(--ss-night) 100%);
   color: var(--ss-on-dark);
 }
-.ss-body .cl-main > .cl-landing-hero > .container { padding-top: 88px !important; padding-bottom: 84px !important; }
+.ss-body .cl-main > .cl-landing-hero > .cl-container { padding-top: 88px !important; padding-bottom: 84px !important; }
 .ss-body .cl-landing-headline { margin-top: 18px; color: var(--ss-on-dark); font-family: var(--ss-display); font-size: clamp(2.6rem, 5.4vw, 4.75rem); font-weight: 400; line-height: 1.02; }
-.ss-body .cl-landing-hero .lead { max-width: 36rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
+.ss-body .cl-landing-hero .cl-lead { max-width: 36rem; color: var(--ss-on-dark-2); font-size: 1.1rem; }
 .ss-body .cl-landing-hero .cl-ui-badge { background: transparent; border-color: var(--ss-dark-line); color: var(--ss-apricot); }
 .ss-body .cl-landing-hero .cl-rating-summary { color: var(--ss-on-dark-2); }
 .ss-body .cl-landing-hero-copy > .cl-ui-surface {
@@ -1142,7 +1144,7 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
   .ss-body .cl-navigation > .cl-nav-link[data-nav-item="signin"] { margin-top: 10px; padding: 13px 18px; }
   .ss-body .cl-nav-panel, .ss-body .cl-nav-panel .cl-nav-subpanel { margin: 4px 0 8px; background: var(--ss-sand-2); box-shadow: none; }
   .ss-body .cl-nav-link .cl-nav-icon { color: var(--ss-terra); }
-  .ss-body .cl-hero > .container { padding-top: 72px !important; padding-bottom: 64px !important; }
+  .ss-body .cl-hero > .cl-container { padding-top: 72px !important; padding-bottom: 64px !important; }
 }
 
 @media (max-width: 900px) {
@@ -1166,7 +1168,7 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
   .ss-body .cl-header-inner { padding-inline: 16px; }
   .ss-body .cl-brand-copy strong { font-size: 24px; }
   .ss-body .cl-brand-copy small { letter-spacing: .24em; }
-  .ss-body .cl-page-head:not(.cl-page-head-compact) > :is(.cl-page-head-inner, .container, .container-fluid) { padding-top: 36px !important; padding-bottom: 30px !important; }
+  .ss-body .cl-page-head:not(.cl-page-head-compact) > :is(.cl-page-head-inner, .cl-container, .container-fluid) { padding-top: 36px !important; padding-bottom: 30px !important; }
   .ss-body .cl-page-head .cl-back-link { margin-bottom: 20px; }
   .ss-body .cl-ui-section-head:not(.cl-ui-surface *) { padding: 18px 18px 16px; }
   .ss-body .cl-ui-section-head h2, .ss-body .cl-ui-section-head h3 { font-size: 1.55rem; }

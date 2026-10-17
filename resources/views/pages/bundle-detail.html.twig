@@ -1,14 +1,14 @@
 {% extends layout %}
 {% block page_body %}
 	<section class="cl-page-head cl-course-head">
-		<div class="container py-5">
-			<div class="row g-4 align-items-center">
-				<div class="col-lg-8">
-					<div class="d-flex flex-wrap gap-2 mb-3">{{ ui('feedback.badge', {label: 'Course bundle', tone: 'neutral'}) }}</div>
-					<div class="cl-course-detail-headline"><h1 class="display-4 fw-bold">{{ bundle.title }}</h1></div>
-					{% if bundle.short_description %}<p class="lead mt-3 mb-0">{{ bundle.short_description }}</p>{% endif %}
+		<div class="cl-container py-12">
+			<div class="row g-7 align-items-center">
+				<div class="lg:col-8">
+					<div class="d-flex flex-wrap gap-3 mb-5">{{ ui('feedback.badge', {label: 'Course bundle', tone: 'neutral'}) }}</div>
+					<div class="cl-course-detail-headline"><h1 class="cl-display-4 fw-bold">{{ bundle.title }}</h1></div>
+					{% if bundle.short_description %}<p class="cl-lead mt-5 mb-0">{{ bundle.short_description }}</p>{% endif %}
 				</div>
-				<div class="col-lg-4">
+				<div class="lg:col-4">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 						{{ ui('data.key-value-list', {items: [{label: 'Courses', value: bundle.course_count}, {label: 'Access to each course', value: bundle.access_label ?? '—'}, {label: 'Access starts', value: 'When you start each course'}]}) }}
 					{% endblock %}{% endembed %}
@@ -19,8 +19,8 @@
 	<section class="cl-page-section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}{% block body %}
 			<div>
-				{% if bundle.description_html %}<div class="cl-prose mb-5">{{ bundle.description_html|raw }}</div>{% endif %}
-				<h2 class="h3 mb-3" id="bundle-courses-heading">Courses in this bundle</h2>
+				{% if bundle.description_html %}<div class="cl-prose mb-12">{{ bundle.description_html|raw }}</div>{% endif %}
+				<h2 class="h3 mb-5" id="bundle-courses-heading">Courses in this bundle</h2>
 				<ol aria-labelledby="bundle-courses-heading">{% for course in bundle.courses %}<li>{{ course.title }}</li>{% endfor %}</ol>
 				{{ ui('catalogue.course-grid', {courses: bundle.course_cards}) }}
 			</div>

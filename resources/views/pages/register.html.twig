@@ -19,7 +19,7 @@
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'registration-email', required: true})} %}{% block control %}<input type="email" id="registration-email" name="email" value="{{ email|default('') }}" autocomplete="email" required>{% endblock %}{% endembed %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send registration link', variant: 'primary', size: 'large', type: 'submit'}) }}{% endblock %}{% endembed %}
             </form>
-            <p class="small text-secondary mt-3 mb-0">Already have an account? <a href="/login">Sign in</a>.</p>
+            <p class="small cl-text-secondary mt-5 mb-0">Already have an account? <a href="/login">Sign in</a>.</p>
         {% endblock %}
         {% endembed %}
     </section>

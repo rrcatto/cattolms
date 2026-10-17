@@ -23,11 +23,11 @@
 			<input type="hidden" name="course_id" value="{{ purchase.course_id }}">
 			{% if landing_page_id|default(0) %}<input type="hidden" name="landing_page_id" value="{{ landing_page_id }}">{% endif %}
 			{% if purchase_style == 'full' %}
-				<div class="vstack gap-2 mb-3">
+				<div class="vstack gap-3 mb-5">
 					{% for price in purchase.variants %}
 						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: price.price_label ~ ' · ' ~ price.access_period_label ~ ' access' ~ (price.label ? ' · ' ~ price.label : '')})} %}
 {% block control %}
-<input class="form-check-input mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.id == purchase.default_variant.id ? 'checked' : '' }} required>
+<input class="cl-check mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.id == purchase.default_variant.id ? 'checked' : '' }} required>
 {% endblock %}
 {% endembed %}
 					{% endfor %}

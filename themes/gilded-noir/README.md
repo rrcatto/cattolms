@@ -1,6 +1,6 @@
 # Gilded Noir
 
-Theme version **2.0.3** for CattoLMS **v0.9** and later. Theme Package 4.0 / Twig Template API 2.0. Version 2.0.3 sets Core's page width settings to the theme's own measure (UX rule 1.7): rows run the width of its frame, medium pages are 860px and narrow pages 680px. Its head includes the Core head metadata.
+Theme version **2.0.4** for CattoLMS **v0.9.3** and later. Theme Package 4.0 / Twig Template API 2.0. Version 2.0.3 sets Core's page width settings to the theme's own measure (UX rule 1.7): rows run the width of its frame, medium pages are 860px and narrow pages 680px. Its head includes the Core head metadata. Version 2.0.4 runs on Bootstrap 6 (CattoLMS v0.9.3): it declares its colour scheme (light), sets its checkbox and radio colour (`accent-color`) and focus outline colour, and styles Core's classes in place of Bootstrap 5's.
 
 This standalone theme retains its engraved canvas, gold and ivory styling, ribbon, artwork and rich footer, including `gn-footer-art`, `gn-footer-veil` and `gn-footnote`. The shared compact identity appears in the header; the full page identity band is omitted. Theme JavaScript decorates the scrolled header; core owns menu interaction. There is no selectable palette list.
 

@@ -11,6 +11,8 @@ Description:
 Provides course-domain functionality for content block renderer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/10/17 SAST
+- Core markup instead of Bootstrap components (Part C): an accordion is a details element that opens with or without JavaScript, callouts are Core notices (cl-ui-notice), a table block scrolls in cl-content-table, and blocks are spaced with 6.0's mb-7.
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -47,25 +49,25 @@ final class ContentBlockRenderer
             $childHtml = $children !== [] ? $this->renderBlocks($children, $blockId . '-child') : '';
 
             if ($type === 'accordion') {
+                // A details element: it opens with or without JavaScript, so it needs no Bootstrap script.
                 $open = (bool) ($settings['initially_open'] ?? false);
-                $html .= '<div class="accordion mb-4" id="' . htmlspecialchars($blockId, ENT_QUOTES, 'UTF-8') . '">';
-                $html .= '<div class="accordion-item"><h2 class="accordion-header">';
-                $html .= '<button class="accordion-button' . ($open ? '' : ' collapsed') . '" type="button" data-bs-toggle="collapse" data-bs-target="#' . $blockId . '-panel" aria-expanded="' . ($open ? 'true' : 'false') . '">';
-                $html .= htmlspecialchars($title !== '' ? $title : 'More information', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button></h2>';
-                $html .= '<div id="' . $blockId . '-panel" class="accordion-collapse collapse' . ($open ? ' show' : '') . '"><div class="accordion-body">' . $content . $childHtml . '</div></div></div></div>';
+                $html .= '<details class="cl-content-accordion" id="' . htmlspecialchars($blockId, ENT_QUOTES, 'UTF-8') . '"' . ($open ? ' open' : '') . '>';
+                $html .= '<summary class="cl-content-accordion-summary"><h2 class="cl-content-accordion-title">';
+                $html .= htmlspecialchars($title !== '' ? $title : 'More information', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h2></summary>';
+                $html .= '<div class="cl-content-accordion-body">' . $content . $childHtml . '</div></details>';
                 continue;
             }
 
             $class = match ($type) {
                 'terminal' => 'cl-content-terminal',
-                'callout' => 'alert alert-info',
-                'warning' => 'alert alert-warning',
-                'table' => 'table-responsive',
+                'callout' => 'cl-ui-notice cl-ui-notice--info',
+                'warning' => 'cl-ui-notice cl-ui-notice--warning',
+                'table' => 'cl-content-table',
                 'download' => 'cl-content-download',
                 'image' => 'cl-content-image',
                 default => 'cl-content-html',
             };
-            $html .= '<section class="' . $class . ' mb-4">';
+            $html .= '<section class="' . $class . ' mb-7">';
             if ($title !== '') {
                 $html .= '<h2 class="h4">' . htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</h2>';
             }

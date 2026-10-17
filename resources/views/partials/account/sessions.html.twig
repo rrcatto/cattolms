@@ -9,17 +9,17 @@
 				{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
 
-					<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+					<div class="d-flex flex-column md:flex-row justify-content-between gap-5">
 						<div>
 							<strong>{{ session.user_agent }}</strong>
 							{% if session.is_current %}
 								{{ ui('feedback.badge', {label: 'Current', tone: 'success'}) }}
 							{% endif %}
-							<div class="small text-secondary mt-2">
+							<div class="small cl-text-secondary mt-3">
 								Created {{ session.created_at }} · Last active {{ session.last_seen_at }} · Expires {{ session.expires_at }}
 							</div>
 							{% if session.revoked_at %}
-								<div class="text-danger small">
+								<div class="cl-text-danger small">
 									Revoked {{ session.revoked_at }}
 								</div>
 							{% endif %}

@@ -4,21 +4,21 @@
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course title', span: 'two-thirds', for: 'title', required: true})} %}
 {% block control %}
 
-		<input class="form-control" id="title" name="title" value="{{ course.title }}" maxlength="240" required {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="title" name="title" value="{{ course.title }}" maxlength="240" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', span: 'third', for: 'slug'})} %}
 {% block control %}
 
-		<input class="form-control" id="slug" name="slug" value="{{ course.slug }}" placeholder="generated-from-title" {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="slug" name="slug" value="{{ course.slug }}" placeholder="generated-from-title" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subtitle', full_width: true, for: 'subtitle'})} %}
 {% block control %}
 
-		<input class="form-control" id="subtitle" name="subtitle" value="{{ course.subtitle }}" maxlength="320" {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="subtitle" name="subtitle" value="{{ course.subtitle }}" maxlength="320" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -32,21 +32,21 @@
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Level', span: 'quarter', for: 'level'})} %}
 {% block control %}
 
-		<input class="form-control" id="level" name="level" value="{{ course.level }}" placeholder="Beginner" {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="level" name="level" value="{{ course.level }}" placeholder="Beginner" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Estimated minutes', span: 'quarter', for: 'minutes'})} %}
 {% block control %}
 
-		<input class="form-control" id="minutes" type="number" min="0" name="estimated_minutes" value="{{ course.estimated_minutes }}" {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="minutes" type="number" min="0" name="estimated_minutes" value="{{ course.estimated_minutes }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Default access period in days', span: 'third', for: 'access-days', required: true})} %}
 {% block control %}
 
-		<input class="form-control" id="access-days" type="number" min="1" name="access_days" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>
+		<input class="cl-input" id="access-days" type="number" min="1" name="access_days" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
@@ -55,15 +55,15 @@
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Catalogue summary', full_width: true, for: 'summary'})} %}
 {% block control %}
 
-		<textarea class="form-control" id="summary" name="summary" rows="3" {{ ui_field_attrs(props) }}>{{ course.summary }}</textarea>
+		<textarea class="cl-input" id="summary" name="summary" rows="3" {{ ui_field_attrs(props) }}>{{ course.summary }}</textarea>
 
 {% endblock %}
 {% endembed %}
-{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Course introduction',for:'course-introduction',full_width:true})} %}{% block control %}<textarea class="form-control cl-rich-editor" id="course-introduction" name="introduction_html" rows="6" {{ ui_field_attrs(props) }}>{{ course.introduction_html|default('') }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props:ui_props('form.field',{label:'Course introduction',for:'course-introduction',full_width:true})} %}{% block control %}<textarea class="cl-input cl-rich-editor" id="course-introduction" name="introduction_html" rows="6" {{ ui_field_attrs(props) }}>{{ course.introduction_html|default('') }}</textarea>{% endblock %}{% endembed %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Full description', full_width: true, for: 'description'})} %}
 {% block control %}
 
-		<textarea class="form-control cl-rich-editor" id="description" name="description_html" rows="10" {{ ui_field_attrs(props) }}>{{ course.description_html }}</textarea>
+		<textarea class="cl-input cl-rich-editor" id="description" name="description_html" rows="10" {{ ui_field_attrs(props) }}>{{ course.description_html }}</textarea>
 
 {% endblock %}
 {% endembed %}

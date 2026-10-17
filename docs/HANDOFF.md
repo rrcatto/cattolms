@@ -1,4 +1,21 @@
-# Catto Learning 0.9.2 — Development Handoff
+# Catto Learning 0.9.3 — Development Handoff
+
+## v0.9.3 handoff — 2026/10/17 (Bootstrap 6 underneath)
+
+After v0.9.2 the owner said to continue to Part C of the merged UI plan, and chose that themes keep their fixed look in a dark operating system. Part C was built and verified on the local branch `dev-v0.9-bootstrap6` (from `a6b0fc4`). The owner signed off the comparison theme by theme ([review page](https://claude.ai/artifact/GWmTGgEKCzXd6hXF7iEAiX)), kept the item editor's tables at their own width, chose new theme versions by the third number, and said "release it". `dev-v0.9` was fast-forwarded to the release commit, which is tagged `v0.9.3` and pushed to GitHub `main` with GitHub release `v0.9.3` (`cattolms-v0.9.3.zip`). The served checkout stays on `dev-v0.9-bootstrap6`, at the same commit. `CHANGELOG.md` has the full entry.
+
+- **Bootstrap.** Only 6.0.0-alpha.1's reboot, grid and utilities files load (`ThemeRenderer`), with no Bootstrap script. `catto-platform.css` keeps 5.3.8's cascade with unlayered rules: the 5.3.8 reboot values 6.0 changed, Core classes for what 6.0 dropped (`cl-input`, `cl-select`, `cl-check`, `cl-label`, `cl-lead`, `cl-display-*`, `cl-container`, `cl-text-*`, `cl-bg-subtle`, `cl-box`, `cl-border-bottom`, `cl-mono`), and every utility the markup uses as an `!important` rule. Files, checksums and updating: `OPERATIONS.md`, "Bootstrap".
+- **Themes.** Each declares `color_scheme` (light), writes it on `<html>`, sets `accent-color` and its focus colour, and uses Core's classes. Their versions are Saharan Sunset 1.0.2, Gilded Noir 2.0.4, Light Default 2.0.3, Radiant Learning 4.0.3, Factory Reset 2.0.3 and Factory Reset Sidebar 2.0.3; every package was rebuilt and `extras/themes` holds only the current ones. In the development instance the new versions are installed beside the old ones, and the old versions, which `--force` had refreshed during Part C, are back to their v0.9.2 files, installed and published.
+- **Comparison.** A 5.3.8 baseline (session scratchpad, `partC/baseline`) against the switch: 1,500 page views and 1,176 lesson reads. Every difference is explained (the review page has them theme by theme). The comparison found and fixed: Core's restated values in a layer losing to theme rules, utilities losing to Core and theme rules, the link underline, Bootstrap's accent colour reaching the reader, the reader and iframes following a dark operating system, the white scrollbar strip in five themes, and a gap in the page construction test.
+- **Gates.** Before the version change:
+  - `composer qa` from a cold cache with Saharan Sunset 1.0.1 active: 1,156 tests (1,148 and the 8 of `BootstrapSixContractTest`). Classic was the default certificate design while it and `certificates.cjs` ran; Modern was restored.
+  - Twig lint (246 files), AssetMapper compilation (no compiled asset changed), Composer validation and `git diff --check`.
+  - Browser, in Chromium and Firefox: UI matrix 86, canonical 36, Bootstrap safety net 42 (new, including its two mutation checks), section pages 576 views (8 known), category tree 22, category picker 17, Course Content tree 41, course reviews 9, bundles 8, promotions 9, certificates 11, financial documents 9, landing pages 13, legal pages 77, billing profiles 10, popular courses 13.
+  After the version change, with Saharan Sunset 1.0.2 active: `composer qa` from a cold cache (1,156 tests), Twig lint (246), AssetMapper compilation, Composer validation, `git diff --check`, and the UI matrix (86), canonical (36), Bootstrap safety net (42) and legal pages (77) browser checks.
+- **Development state.**
+  - The runtime web root serves the three 6.0 files and still holds 5.3.8's `css/bootstrap.min.css` and `js/bootstrap.bundle.min.js`, which only the released `dev-v0.9` tree loads.
+  - Saharan Sunset 1.0.2 is active: the owner's Saharan Sunset moved from 1.0.1, whose installed files are v0.9.2's again, to its Bootstrap 6 version. The owner's default certificate design is Modern; the gate made Classic the default while it ran and restored Modern.
+- **Next.** The tables that scroll sideways on phones (Company Enrolments, Administration Enrolments, Themes, Activity), then Phase M.
 
 ## v0.9.2 handoff — 2026/10/17 (one construction for every page; Saharan Sunset 1.0.1)
 

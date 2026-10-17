@@ -24,7 +24,7 @@
 {% endif %}
 <form action="/learn/{{ course.slug }}/review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 {% include '@platform/partials/course-rating-input.html.twig' with {rating_value: review ? review.rating : 0} %}
-{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your review', for: 'review-comment', full_width: true, help: 'Optional. Up to ' ~ max_comment ~ ' characters. Reviews are published under your first name and the initial of your surname once they have been checked.'})} %}{% block control %}<textarea class="form-control" id="review-comment" name="comment" rows="6" maxlength="{{ max_comment }}" {{ ui_field_attrs(props) }}>{{ review ? review.comment : '' }}</textarea>{% endblock %}{% endembed %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your review', for: 'review-comment', full_width: true, help: 'Optional. Up to ' ~ max_comment ~ ' characters. Reviews are published under your first name and the initial of your surname once they have been checked.'})} %}{% block control %}<textarea class="cl-input" id="review-comment" name="comment" rows="6" maxlength="{{ max_comment }}" {{ ui_field_attrs(props) }}>{{ review ? review.comment : '' }}</textarea>{% endblock %}{% endembed %}
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: review ? 'Update review' : 'Submit review', variant: 'primary', type: 'submit'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Back to the course', href: '/courses/' ~ course.slug}) }}{% endblock %}{% endembed %}
 </form>
 {% endif %}

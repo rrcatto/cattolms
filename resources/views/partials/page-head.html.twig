@@ -3,8 +3,8 @@
 		<div class="cl-page-head-content">
 			{% if ph_back_href|default('') %}<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label|default('Back', true) }}</a>{% endif %}
 			{% if ph_kicker|default('') %}<span class="cl-kicker d-block">{{ ph_kicker }}</span>{% endif %}
-			<h1 class="{{ ph_compact|default(false) ? 'h5 mb-0' : 'display-5 fw-bold' }}">{{ ph_title }}</h1>
-			{% if ph_lead|default('') %}<p class="lead mb-0">{{ ph_lead }}</p>{% endif %}
+			<h1 class="{{ ph_compact|default(false) ? 'h5 mb-0' : 'cl-display-5 fw-bold' }}">{{ ph_title }}</h1>
+			{% if ph_lead|default('') %}<p class="cl-lead mb-0">{{ ph_lead }}</p>{% endif %}
 		</div>
 		{#
 			The page's actions: ph_actions is captured markup (a {% set %} block of ui() actions) for a

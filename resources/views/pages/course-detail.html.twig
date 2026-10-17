@@ -1,10 +1,10 @@
 {% extends layout %}
 {% block page_body %}
 	<section class="cl-page-head cl-course-head">
-		<div class="container py-5">
-			<div class="row g-4 align-items-center">
-				<div class="col-lg-8">
-					<div class="d-flex flex-wrap gap-2 mb-3">
+		<div class="cl-container py-12">
+			<div class="row g-7 align-items-center">
+				<div class="lg:col-8">
+					<div class="d-flex flex-wrap gap-3 mb-5">
 						{% if course.category_name %}
 							{% if course.category_name %}
 								{{ ui('feedback.badge', {label: (course.category_name), tone: 'neutral'}) }}
@@ -15,7 +15,7 @@
 						{% endif %}
 					</div>
 					<div class="cl-course-detail-headline">
-						<h1 class="display-4 fw-bold">
+						<h1 class="cl-display-4 fw-bold">
 							{{ course.title }}
 						</h1>
 {#
@@ -29,16 +29,16 @@
 						{% endif %}
 					</div>
 					{% if course.subtitle %}
-						<p class="h4 text-white-50">
+						<p class="h4 cl-text-light-muted">
 							{{ course.subtitle }}
 						</p>
 					{% endif %}
 					{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
-					<p class="lead mt-3 mb-0">
+					<p class="cl-lead mt-5 mb-0">
 						{{ course.summary }}
 					</p>
 				</div>
-				<div class="col-lg-4">
+				<div class="lg:col-4">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
 {{ ui('data.key-value-list', {items: [{label: 'Course Items', value: (course.item_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'When you start'}]}) }}
@@ -53,10 +53,10 @@
 {% block body %}
 
 			<div>
-				<div class="cl-prose mb-5">
+				<div class="cl-prose mb-12">
 					{{ course.description_html|raw }}
 				</div>
-				<h2 class="h3 mb-3">Course Content</h2>
+				<h2 class="h3 mb-5">Course Content</h2>
                 <ol>
                 {% for node in course.structure %}
                     <li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>
@@ -65,7 +65,7 @@
                 {% if course.has_public_preview %}
                     {{ ui('action.link', {label: 'Preview this course', href: '/courses/' ~ course.slug ~ '/preview', variant: 'secondary'}) }}
                 {% endif %}
-				<h2 class="h3 mt-5 mb-3">
+				<h2 class="h3 mt-12 mb-5">
 					Grading
 				</h2>
 
@@ -99,7 +99,7 @@
 {% endembed %}
 
 				<section id="reviews" aria-labelledby="course-reviews-heading">
-					<h2 class="h3 mt-5 mb-3" id="course-reviews-heading">Reviews</h2>
+					<h2 class="h3 mt-12 mb-5" id="course-reviews-heading">Reviews</h2>
 					{% if rating.count > 0 %}
 						<div class="cl-rating-overview">
 							{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}

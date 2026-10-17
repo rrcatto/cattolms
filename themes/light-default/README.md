@@ -1,6 +1,6 @@
 # Light Default
 
-Theme version **2.0.2** for CattoLMS **v0.9** and later. Theme Package 4.0 / Twig Template API 2.0. Version 2.0.2 sets Core's page width settings to the theme's own measure (UX rule 1.7): rows run the width of the boxed frame with the theme's gutter and 2.1rem between sections, medium pages are 860px and narrow pages 620px. Its head includes the Core head metadata.
+Theme version **2.0.3** for CattoLMS **v0.9.3** and later. Theme Package 4.0 / Twig Template API 2.0. Version 2.0.2 sets Core's page width settings to the theme's own measure (UX rule 1.7): rows run the width of the boxed frame with the theme's gutter and 2.1rem between sections, medium pages are 860px and narrow pages 620px. Its head includes the Core head metadata. Version 2.0.3 runs on Bootstrap 6 (CattoLMS v0.9.3): it declares its colour scheme (light), sets its checkbox and radio colour (`accent-color`) and focus outline colour, and styles Core's classes in place of Bootstrap 5's.
 
 This standalone theme uses the shared site footer. Its fourteen page-family wrappers are `div.cl-page-family` containers around core page bodies, not an independent tab or navigation system. Its palettes are Carnival Cotton Candy, Coastal Blue, Forest & Sand and Plum & Rose.
 

@@ -10,6 +10,10 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/17 SAST (Part C)
+- Bootstrap 6 underneath: the reboot, grid and utilities files load before catto-platform.css, and no Bootstrap script loads.
+- color_scheme: the theme's colour scheme, which its <html> writes as data-bs-theme.
+- Advanced PLATFORM_ASSET_VERSION to 0.9.3.
 2026/10/17 SAST
 - One width per page: PAGE_WIDTHS and pageWidth() choose wide (the default), medium, narrow or full, and a page may pass page_width; the body carries cl-width-* and the model page.width.
 - sectionActions() keeps the registry actions whose permission flag is set. A section fragment gets section_actions and section_standalone: standalone on its own page, not on All sections or in an htmx company section.
@@ -98,7 +102,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.2';
+    private const PLATFORM_ASSET_VERSION = '0.9.3';
 
     /**
      * How wide each page is, when it is not wide. A page chooses its width once and every row of it
@@ -299,19 +303,29 @@ final class ThemeRenderer
         $model['app_name'] = $appName;
         $model['app_url'] = $appUrl;
         $model['theme_name'] = (string) $themeInfo['name'];
+        // The theme's <html> carries it as data-bs-theme, so Bootstrap's light-dark() colours follow the theme.
+        $model['color_scheme'] = (string) ($themeInfo['color_scheme'] ?? 'light');
         $model['theme_asset_url'] = $assetUrl;
         $model['theme_preview_active'] = $previewActive;
         $model['csrf'] = $csrf;
         $model['current_uri'] = (string) ($_SERVER['REQUEST_URI'] ?? '/');
 
         $navigation = $this->navigation($data, $csrf);
-        $platformStyles = [$this->platformAsset('/css/bootstrap.min.css'), $this->platformAsset('/css/catto-platform.css')];
+        // Bootstrap 6 underneath (6.0.0-alpha.1): only its reboot, grid and utilities files, the reboot first
+        // because it declares the cascade layer order. Core's stylesheet follows, unlayered, so it and the
+        // theme win over every Bootstrap rule (Part C, REPORTS/ui-merged-plan-2026-10-17.md).
+        $platformStyles = [
+            $this->platformAsset('/css/bootstrap-reboot.min.css'),
+            $this->platformAsset('/css/bootstrap-grid.min.css'),
+            $this->platformAsset('/css/bootstrap-utilities.min.css'),
+            $this->platformAsset('/css/catto-platform.css'),
+        ];
         if ((bool) ($data['load_ckeditor'] ?? false) || (bool) ($data['load_certificate_editor'] ?? false)) $platformStyles[] = $this->platformAsset('/css/ckeditor5.css');
         // htmx is a platform-owned progressive enhancement: every surface that uses it renders
         // and works server-side first, so the page degrades to plain navigation if the script
-        // is absent. Supplied with the other vendor browser assets under the public root.
+        // is absent. Supplied with the other vendor browser assets under the public root. There is
+        // no Bootstrap script: nothing uses one, and any later need comes through the importmap.
         $platformScripts = [
-            $this->platformAsset('/js/bootstrap.bundle.min.js'),
             $this->platformAsset('/js/htmx.min.js'),
             $this->platformAsset('/js/platform-overrides.js'),
         ];

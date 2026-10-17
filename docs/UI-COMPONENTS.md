@@ -104,6 +104,28 @@ Supported uses added in v0.8.8.x, each through the existing component rather tha
 - **Head metadata.** `partials/head-meta.html.twig` is included by every theme's head and draws the view model's `meta`: the description, and where a page sets them its canonical address, robots rule and Open Graph tags.
 - **Ordered lists with actions.** The bundle editor's course list uses Move up / Move down / Remove buttons as ordinary forms (`cl-bundle-courses`), the same pattern as course price variants; it is not a second drag-and-drop tree.
 
+## Core classes under Bootstrap 6
+
+Only Bootstrap 6's reboot, grid and utilities files are loaded (`THEME-SDK.md`, "Bootstrap underneath"), so a class a component or page needs for a field, a lead or a coloured word is Core's, in `catto-platform.css`, drawing 5.3.8's look in plain colours that themes restyle:
+
+| Job | Core class | 5.3.8 class it replaces |
+|---|---|---|
+| Text field, text area, file field | `cl-input`, larger `cl-input-lg` | `form-control`, `form-control-lg` |
+| Select | `cl-select` | `form-select` |
+| Checkbox or radio | `cl-check` | `form-check-input` |
+| A label outside `form.field` | `cl-label` | `form-label` |
+| Lead paragraph | `cl-lead` | `lead` |
+| Display heading | `cl-display-2`, `cl-display-4`, `cl-display-5` | `display-2`, `display-4`, `display-5` |
+| Fixed-width band | `cl-container` | `container` |
+| Coloured text | `cl-text-muted`, `cl-text-secondary`, `cl-text-primary`, `cl-text-danger`, `cl-text-warning`, `cl-text-warning-strong`, `cl-text-light-muted` | `text-body-secondary`, `text-secondary`, `text-primary`, `text-danger`, `text-warning`, `text-warning-emphasis`, `text-white-50` |
+| Subtle background | `cl-bg-subtle` | `bg-body-tertiary` |
+| Bordered box; a rule below a row | `cl-box`; `cl-border-bottom` | `border rounded`; `border-bottom` |
+| Monospace | `cl-mono` | `font-monospace` |
+
+Content blocks (`ContentBlockRenderer`) draw Core markup too: an accordion is `details.cl-content-accordion` with `summary.cl-content-accordion-summary`, which opens with or without JavaScript; a callout is `cl-ui-notice cl-ui-notice--info` and a warning `cl-ui-notice cl-ui-notice--warning`; a table block scrolls inside `cl-content-table`.
+
+Utilities keep Bootstrap's names on 6.0's scale (`d-flex`, `mb-5`, `gap-3`, `lg:col-8`). Core states each one its own and the themes' markup uses as an `!important` rule with 5.3.8's value, so a utility new to a template needs its rule in `catto-platform.css` too (`BootstrapSixContractTest`).
+
 ## Themes and review
 
 Themes own palette, typography, borders, radii, shadows and decorative chrome. Core owns component structure, required spacing, responsive geometry, htmx targets, focus and native form/navigation semantics. Gilded Noir retains its canvas, gold treatment, navigation identity and individual footer. Theme templates cannot implement another card/table/field/modal for the same job.

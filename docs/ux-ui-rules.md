@@ -216,6 +216,8 @@ When duplicating a palette selector to match both forms, rewrite each selector i
 
 **7.9 Palette colours are ordered darkest to lightest.** The platform reads the five positionally: colour 1 is the darkest and drives navigation and ink, colour 3 is the middle tone the footer takes, colour 5 is the lightest and drives the page canvas. A palette handed over in the order someone happened to write it puts a mid tone where the ink belongs. The shipped palettes are Carnival Cotton Candy, Coastal Blue and Forest & Sand.
 
+**7.10 Bootstrap is underneath, and no colour depends on it.** Core loads only Bootstrap 6's reboot, grid and utilities files: no Bootstrap component and no Bootstrap script. Bootstrap 6 needs cascade layers (Chrome and Edge 99, Firefox 97, Safari 15.4, all 2022); that is the browser floor. A browser below it ignores all of Bootstrap 6, grid and utilities included, and a browser without `light-dark()` loses Bootstrap's colour tokens. So Core and every theme state the colours a reader needs in plain values (hex, rgb, hsl or a name, or a theme's own custom property defined with one), never only through a `--bs-*` token or `light-dark()`: the body's text and background, link colours, the `:focus-visible` outline colour, and field text, background and border colours. Each theme also sets `accent-color`, declares its colour scheme (`color_scheme` in `theme.json`, written on `<html>` as `data-bs-theme`) and keeps its look when the operating system is dark. → Enforced by `BootstrapSixContractTest` and `tests/Browser/bootstrap-safety-net.cjs`.
+
 ---
 
 ## 8. Catalogue and public pages
@@ -290,6 +292,7 @@ Ordinary category results show courses filed directly in that category. Search i
 
 2026/10/17 SAST
 
+- 7.10: Bootstrap 6 underneath (reboot, grid and utilities only); the browser floor is cascade layers; the colours a reader needs are stated in plain values by Core and every theme; a theme declares its colour scheme and keeps its look in a dark operating system.
 - 1.7: one construction for every page - the page's width chosen once, rows on Core's width variables, sections on cards with a grid only around two or more, section actions in the page head, no back links on menu pages, no group tabs.
 - 3.3 and 3.4: no typed plus beside the add icon; one row action is a small button, two or more the Actions menu.
 - 6.8: the page's CSS gives the social marks the link colour too, because Firefox drew them black; each mark links to its platform's home page until the settings give a profile address.

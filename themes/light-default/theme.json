@@ -5,10 +5,11 @@
   "theme": {
     "name": "Light Default",
     "slug": "light-default",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "author": "Richard Catto",
     "created_at": "2026-08-20T19:05:00+02:00",
-    "description": "Light application theme: compact typography, a full-width sticky translucent top navigation bar outside a rounded boxed content frame, a slanted textured page canvas, and palette-coloured page-heading bands across every LMS surface."
+    "description": "Light application theme: compact typography, a full-width sticky translucent top navigation bar outside a rounded boxed content frame, a slanted textured page canvas, and palette-coloured page-heading bands across every LMS surface.",
+    "color_scheme": "light"
   },
   "parent": null,
   "styles": [],
