@@ -1,4 +1,8 @@
 /* Canonical page construction. Theme colours, typography and decorative chrome. */
+/* Bootstrap 6 safety net (UX rule 7.10): this theme's accent for native controls and its focus outline colour,
+   first so that every rule below still wins at the same specificity. */
+body{accent-color:var(--primary)}
+:focus-visible{outline-color:var(--primary)}
 .company-context{
   --cl-context-surface:color-mix(in srgb,var(--primary,#6a5acd) 22%,white);
   --cl-context-ink:#18212b;
@@ -39,8 +43,8 @@ body[data-palette="citrus"]{--primary:#61E8E1;--primary-rgb:97,232,225;--on-prim
 
 .cl-flash-stack{display:grid;gap:8px;margin-bottom:18px}[data-flash-message]{padding:13px 15px;border-radius:12px;border:1px solid var(--line);background:#fff}[data-flash-message].cl-ui-notice--success{border-color:#a8dcc1;background:#effaf4}[data-flash-message].cl-ui-notice--danger{border-color:#efbcbc;background:#fff2f2}[data-flash-message].cl-ui-notice--warning{border-color:#f1d38e;background:#fff9e9}
 
-.container,.container-lg,.container-xl{max-width:1320px}.container-fluid.cl-container-wide{max-width:1600px;margin-inline:auto}.cl-container-course{max-width:1540px;margin-inline:auto}.text-body-secondary{color:var(--muted)!important}.bg-body-tertiary{background:var(--bg)!important}
-.form-control,.form-select{border-color:var(--line)!important}.cl-ui-notice{border-radius:12px}
+.cl-container,.container-lg,.container-xl{max-width:1320px}.container-fluid.cl-container-wide{max-width:1600px;margin-inline:auto}.cl-container-course{max-width:1540px;margin-inline:auto}.cl-text-muted{color:var(--muted)!important}.cl-bg-subtle{background:var(--bg)!important}
+.cl-input,.cl-select{border-color:var(--line)!important}.cl-ui-notice{border-radius:12px}
 
 .editor-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.editor-choice{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}.editor-choice input{width:auto}#danger{scroll-margin-top:110px}
 @media(max-width:1180px){
@@ -61,7 +65,7 @@ body[data-palette="citrus"]{--primary:#61E8E1;--primary-rgb:97,232,225;--on-prim
   background-size: cover;
   color: #fff;
 }
-.cl-hero h1,.cl-hero h2,.cl-hero .lead,.cl-hero p,.cl-hero li{ color: #fff; }
+.cl-hero h1,.cl-hero h2,.cl-hero .cl-lead,.cl-hero p,.cl-hero li{ color: #fff; }
 .cl-kicker{
   display: inline-block;
   color: var(--cl-accent);
@@ -85,7 +89,7 @@ body[data-palette="citrus"]{--primary:#61E8E1;--primary-rgb:97,232,225;--on-prim
   border-bottom: 1px solid rgba(255,255,255,.08);
 }
 .cl-page-head h1,.cl-page-head h2{ color: var(--on-primary); }
-.cl-page-head .lead{ color: color-mix(in srgb,var(--on-primary) 82%,transparent); }
+.cl-page-head .cl-lead{ color: color-mix(in srgb,var(--on-primary) 82%,transparent); }
 .cl-back-link{ color: var(--on-primary); text-decoration: none; font-weight: 700; }
 .cl-back-link:hover{ color: var(--on-primary); text-decoration: underline; }
 .cl-band{ background: #e8eef0; border-block: 1px solid var(--cl-line); }

@@ -31,7 +31,7 @@
 					<legend>Picture</legend>
 					{% for choice in [{value: 'cover', label: 'The course’s cover artwork'}, {value: 'resource', label: 'A picture from the Resource Library'}, {value: 'none', label: 'No picture'}] %}
 						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.label})} %}
-{% block control %}<input class="form-check-input mt-1" type="radio" name="image" value="{{ choice.value }}"{{ values.image == choice.value ? ' checked' : '' }}>{% endblock %}
+{% block control %}<input class="cl-check mt-1" type="radio" name="image" value="{{ choice.value }}"{{ values.image == choice.value ? ' checked' : '' }}>{% endblock %}
 {% endembed %}
 					{% endfor %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Picture from the Resource Library', for: 'landing-picture', help: pictures ? 'Used when A picture from the Resource Library is chosen.' : 'The Resource Library has no pictures yet.'})} %}
@@ -83,10 +83,10 @@
 					</fieldset>
 				{% elseif section.type == 'contents' %}
 					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show the items inside each section', help: 'Otherwise only the sections are listed.'})} %}
-{% block control %}<input class="form-check-input mt-1" type="checkbox" name="show_items" value="1"{{ values.show_items ? ' checked' : '' }}>{% endblock %}
+{% block control %}<input class="cl-check mt-1" type="checkbox" name="show_items" value="1"{{ values.show_items ? ' checked' : '' }}>{% endblock %}
 {% endembed %}
 					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Show descriptions', help: 'Each item’s own description, as a short line of text.'})} %}
-{% block control %}<input class="form-check-input mt-1" type="checkbox" name="show_descriptions" value="1"{{ values.show_descriptions ? ' checked' : '' }}>{% endblock %}
+{% block control %}<input class="cl-check mt-1" type="checkbox" name="show_descriptions" value="1"{{ values.show_descriptions ? ' checked' : '' }}>{% endblock %}
 {% endembed %}
 					<p class="cl-landing-note">The outline is read from the course every time the page is shown: titles and kinds only, never what is inside a lesson or an assessment.</p>
 				{% elseif section.type == 'instructor' %}
@@ -102,7 +102,7 @@
 						<legend>While the course has no approved reviews</legend>
 						{% for choice in [{value: 'hide', label: 'Leave the section out'}, {value: 'show', label: 'Show it, saying there are no reviews yet'}] %}
 							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.label})} %}
-{% block control %}<input class="form-check-input mt-1" type="radio" name="when_empty" value="{{ choice.value }}"{{ values.when_empty == choice.value ? ' checked' : '' }}>{% endblock %}
+{% block control %}<input class="cl-check mt-1" type="radio" name="when_empty" value="{{ choice.value }}"{{ values.when_empty == choice.value ? ' checked' : '' }}>{% endblock %}
 {% endembed %}
 						{% endfor %}
 					</fieldset>

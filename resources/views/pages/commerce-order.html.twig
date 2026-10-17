@@ -25,7 +25,7 @@
             <p>{{ ui('action.link', {label: 'View ' ~ document.kind|replace({'_': ' '}) ~ ' ' ~ document.number, variant: 'secondary', size: 'normal', href: '/account/orders/' ~ (order.id) ~ '/documents/' ~ (document.id), new_window: true}) }} <a href="/account/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download {{ document.number }} (PDF)</a></p>
         {% endfor %}
         {% if payment_method == 'eft' or order.details.payment_method|default('') == 'eft' %}
-            <h2 class="h5 mt-4">EFT bank account details</h2>
+            <h2 class="h5 mt-7">EFT bank account details</h2>
             <p>Use your unique order number as the payment reference: <strong>CL-{{ '%08d'|format(order.id) }}</strong>.</p>
             {% if bank_details.configured %}
                 {{ ui('data.key-value-list', {items: [{label: 'Bank name', value: (bank_details.bank_name)}, {label: 'Account name', value: (bank_details.account_name)}, {label: 'Account number', value: (bank_details.account_number)}, {label: 'Branch code', value: (bank_details.branch_code)}]}) }}

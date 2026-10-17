@@ -43,7 +43,7 @@
 		{% endfor %}
 	{% endblock %}{% endembed %}
 	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active: the code can be used within its dates and limits'})} %}{% block control %}<input type="checkbox" name="active" value="1" {{ form.active ? 'checked' : '' }}>{% endblock %}{% endembed %}
-	<fieldset class="cl-promotion-courses mt-3">
+	<fieldset class="cl-promotion-courses mt-5">
 		<legend class="h6">Selected courses</legend>
 		<p class="help">Used when the promotion applies to selected courses: only those courses in a cart are discounted, and the others keep their full price. A bundle is never discounted because it contains a selected course.</p>
 		{% for course in form.courses %}
@@ -54,7 +54,7 @@
 		{% if form.courses %}<p class="help">Clear a course’s box to remove it when you save.</p>{% endif %}
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_course_id', lk_type: 'courses', lk_label: 'Add a course', lk_empty: 'Search for a course to add', lk_selected: 0, lk_required: 0} %}
 	</fieldset>
-	<fieldset class="cl-promotion-courses mt-3">
+	<fieldset class="cl-promotion-courses mt-5">
 		<legend class="h6">Selected bundles</legend>
 		<p class="help">Used when the promotion applies to selected bundles: only those bundles in a cart are discounted.</p>
 		{% for bundle in form.bundles %}

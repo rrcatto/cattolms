@@ -38,8 +38,9 @@ use RuntimeException;
 
 final class PageStructureContractTest extends TestCase
 {
-    /** Classes a row may not carry: Bootstrap width and spacing, Core's retired widths, the legacy hooks. */
-    private const ROW_LAYOUT_CLASS = '/^(container(-fluid|-sm|-md|-lg|-xl|-xxl)?|cl-container-wide|cl-medium|cl-narrow|p[ytb]-(?:[a-z]+-)?\d|section|cl-admin-standalone-section)$/';
+    /** Classes a row may not carry: Bootstrap width and spacing (5.3.8's and 6.0's names, and Core's cl-container
+     *  for 5.3.8's container), Core's retired widths, the legacy hooks. */
+    private const ROW_LAYOUT_CLASS = '/^(container(-fluid|-sm|-md|-lg|-xl|-xxl)?|cl-container|cl-container-wide|cl-medium|cl-narrow|((sm|md|lg|xl|2xl):)?p[ytb]-(?:[a-z]+-)?\d+|section|cl-admin-standalone-section)$/';
 
     /** The menu pages that are not registry sections, with the menu they belong to. */
     private const MENU_PAGES = [

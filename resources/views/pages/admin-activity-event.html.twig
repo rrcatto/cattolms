@@ -12,7 +12,7 @@
 
 			{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: (event.event_label), heading_level: 2, summary: 'Event #' ~ (event.id) ~ ' · ' ~ (event.created_at) ~ ' · ' ~ (event.source_label)})} %}
 {% block section_actions %}
-<div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+<div class="d-flex flex-column md:flex-row justify-content-between gap-5">
 					<div>
 						<span class="cl-kicker">{{ event.family_label }}</span>
 
@@ -24,32 +24,32 @@
 {% endblock %}
 {% endembed %}
 
-				<div class="row g-4 mb-4">
-					<div class="col-md-4">
+				<div class="row g-7 mb-7">
+					<div class="md:col-4">
 						<strong>Actor</strong>
 						<div>
 							{{ event.actor_name }}
 						</div>
 					</div>
-					<div class="col-md-4">
+					<div class="md:col-4">
 						<strong>Company</strong>
 						<div>
 							{{ event.company_name ?: '—' }}
 						</div>
 					</div>
-					<div class="col-md-4">
+					<div class="md:col-4">
 						<strong>Subject</strong>
 						<div>
 							{{ event.subject }}
 						</div>
 					</div>
-					<div class="col-md-4">
+					<div class="md:col-4">
 						<strong>IP address</strong>
 						<div>
 							{{ event.ip_address ?: '—' }}
 						</div>
 					</div>
-					<div class="col-md-8">
+					<div class="md:col-8">
 						<strong>GeoIP location</strong>
 						<div>
 							{{ event.geo_location }}
@@ -70,7 +70,7 @@
 				<h2 class="h5">
 					Structured metadata
 				</h2>
-				<pre class="p-3 bg-body-tertiary border rounded mb-0 cl-wrap-anywhere">{{ event.metadata_text }}</pre>
+				<pre class="p-5 cl-bg-subtle cl-box mb-0 cl-wrap-anywhere">{{ event.metadata_text }}</pre>
 
 {% endblock %}
 {% endembed %}

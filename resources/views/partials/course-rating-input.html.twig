@@ -4,7 +4,7 @@
 	visible labels; the radios are visually hidden but stay focusable, and the focused star shows a ring.
 #}
 <fieldset class="cl-rating-input">
-	<legend class="form-label">{{ rating_legend|default('Your rating') }} <span class="cl-visually-hidden">(required)</span></legend>
+	<legend class="cl-label">{{ rating_legend|default('Your rating') }} <span class="cl-visually-hidden">(required)</span></legend>
 	<div class="cl-rating-options">
 		{% for stars in 1..5 %}
 			<label class="cl-rating-option">

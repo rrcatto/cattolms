@@ -34,7 +34,8 @@ and the cards as it styles them everywhere; it never restyles the purchase box o
     "version": "1.0.0",
     "author": "Example",
     "created_at": "2026-09-15T12:00:00+02:00",
-    "description": "A CattoLMS presentation theme."
+    "description": "A CattoLMS presentation theme.",
+    "color_scheme": "light"
   },
   "parent": null,
   "styles": [],
@@ -47,6 +48,10 @@ Core loads `public/css/theme.css`; do not list it again in styles. A child names
 standalone parent by its name and version, may inherit the base, and must supply a non-empty CSS
 override. Child-of-child inheritance is unsupported. `ThemePackageValidator` enforces the manifest,
 paths and template boundary. Installed files are authoritative; the database registry is rebuildable.
+`theme.color_scheme` is `light` or `dark` (`light` when absent): the scheme the theme's colours are
+made for. Core writes it on `<html>` as `data-bs-theme`, so Bootstrap's own colours and the browser's
+form controls and scrollbars match it. A theme keeps its look when the visitor's operating system is
+dark; it does not follow `prefers-color-scheme`.
 
 ## Twig composition
 
@@ -236,6 +241,44 @@ progress, payment state, persistence or core modal/dropdown behaviour. All essen
 forms work without JavaScript. Fonts and other declared external resources use HTTPS. Required core
 resources remain present even when a theme adds its own resources.
 
+## Bootstrap underneath
+
+Core loads Bootstrap 6.0.0-alpha.1's reboot, grid and utilities files, then `catto-platform.css`, then
+the theme's CSS. No Bootstrap component CSS (buttons, cards, forms, tables, alerts, navs) and no
+Bootstrap JavaScript is loaded: a theme never styles a Bootstrap component class and never relies on
+`data-bs-*` behaviour.
+
+- **Layers.** Bootstrap 6 keeps every rule in a cascade layer. A theme's rules are unlayered, so they
+  win over all of Bootstrap whatever their specificity; do not put theme rules in a layer. Core's rules
+  are unlayered too, the 5.3.8 reboot values it restates included, so a theme meets Core on
+  specificity as it did under 5.3.8: a theme's `h2` rule still loses to the `h3` class on an `h2`.
+- **Utilities.** Core states every utility its markup uses as an `!important` rule with 5.3.8's
+  value, as 5.3.8's were. A utility in a theme template must be one of them (`BootstrapSixContractTest`
+  fails otherwise); for anything else a theme writes its own class.
+- **Core classes.** Fields are `cl-input` (with `cl-input-lg`), `cl-select`, `cl-check` and
+  `cl-label`. The 5.3.8 classes 6.0 dropped are `cl-lead`, `cl-display-2`, `cl-display-4`,
+  `cl-display-5`, `cl-container`, `cl-text-muted`, `cl-text-secondary`, `cl-text-primary`,
+  `cl-text-danger`, `cl-text-warning`, `cl-text-warning-strong`, `cl-text-light-muted`, `cl-bg-subtle`,
+  `cl-box`, `cl-border-bottom` and `cl-mono`. They draw 5.3.8's look in plain colours; restyle them by
+  these names. Responsive classes take the prefix form (`lg:col-8`, written `.lg\:col-8` in CSS), and
+  spacing utilities use 6.0's scale (`3` = .5rem, `5` = 1rem, `7` = 1.5rem, `12` = 3rem).
+- **Safety net (UX rule 7.10).** State these in plain values (hex, rgb, hsl or a name, or a custom
+  property of the theme's own defined with one), never only through `var(--bs-…)` or `light-dark()`:
+  - the body's text and background;
+  - link colours;
+  - the `:focus-visible` outline colour;
+  - field text, background and border colours.
+  A browser older than cascade layers ignores all of Bootstrap 6, and one without `light-dark()` loses
+  its tokens; with the safety net both keep the theme's colours. Set `accent-color` on the theme's root
+  or body too, so checkboxes, radios and ranges take the theme's colour. `BootstrapSixContractTest` and
+  `tests/Browser/bootstrap-safety-net.cjs` check every bundled theme.
+- **Scrollbar gutter.** Bootstrap 6 keeps the scrollbar gutter stable, so the page no longer shifts
+  when a scrollbar appears; a short page keeps the strip empty. A fixed background (the page texture)
+  does not reach the strip, which shows the canvas: the body's background colour when `html` has none.
+  Core gives `body.cl-page-texture` the texture's light colour for it. A theme that draws its own body
+  background gives it a solid background colour too (Gilded Noir: `#0b0b0c`), or paints `html`; never
+  leave the strip white (`bootstrap-safety-net.cjs`).
+
 ## Development validation
 
 Use `composer themes:install -- --force` to replace bundled installed themes during development,
@@ -248,7 +291,7 @@ administration, company, catalogue/tag, bundle (`/bundles`, a bundle page), cart
 the promo code review step), order and learning pages at desktop/tablet/mobile sizes, with the
 category picker opened on the catalogue and on a course's edit form, and the Course Content and
 course category trees. To see an installed theme without activating it, add
-`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.3`) to a page while
+`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.4`) to a page while
 signed in with `SYSTEM.THEME.VIEW`; an unknown key leaves the live theme in place. The browser
 checks in `tests/Browser/` cover every bundled theme at 1440 and 390px.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
@@ -327,7 +370,9 @@ Gilded Noir and Light Default fill their frame (`--cl-content-width: none`) with
 column widths, and Saharan Sunset draws the page context band and main as one box whose rows fill it.
 Full is drawn as wide unless a theme draws full-width pages differently; Saharan Sunset draws Home and
 course landing pages without its box. The bands that still hold a container (the home hero and feature
-band, and the course, bundle and landing page heads) keep it until the Bootstrap 6 step.
+band, and the course, bundle and landing page heads) hold Core's `cl-container`, which keeps 5.3.8's
+container steps (1140px from 1200px wide, 1320px from 1400px). Bootstrap 6's own containers step
+differently (960px from 1024px, 1200px from 1280px, 1440px from 1536px).
 
 Theme-specific elements may use theme-owned classes such as `gn-ribbon`, `gn-footer-art`, or future third-party theme classes.
 

@@ -6,14 +6,14 @@
 	#}
 	{% include '@platform/partials/account/identity-head.html.twig' %}
 	<section class="cl-hero" style="--cl-hero-image:url('/img/hero-learning.svg')">
-		<div class="container py-5 py-lg-6">
+		<div class="cl-container py-12 py-lg-6">
 			<div class="row align-items-center min-vh-hero">
-				<div class="col-lg-7 py-5">
+				<div class="lg:col-7 py-12">
 					<span class="cl-kicker">Practical self-study learning</span>
-					<h1 class="display-2 fw-bold mt-3">
+					<h1 class="cl-display-2 fw-bold mt-5">
 						Learn useful things. Prove what you know.
 					</h1>
-					<p class="lead mt-4">
+					<p class="cl-lead mt-7">
 						Structured modules, meaningful assessments and a course library that remembers your progress securely.
 					</p>
 					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
@@ -29,9 +29,9 @@
 {% endblock %}
 {% endembed %}
 				</div>
-				<div class="col-lg-5 d-none d-lg-block">
+				<div class="lg:col-5 d-none lg:d-block">
 					<div class="cl-hero-panel">
-						<span class="cl-kicker text-warning">Built for real learning</span>
+						<span class="cl-kicker cl-text-warning">Built for real learning</span>
 						<h2>
 							Read. Practise. Assess. Complete.
 						</h2>
@@ -60,16 +60,16 @@
 {% block surface_body %}
 
 		<div class="row align-items-end">
-			<div class="col-lg-8">
-				<span class="cl-kicker text-primary">Course catalogue</span>
-				<h2 class="display-5 fw-bold mb-2">
+			<div class="lg:col-8">
+				<span class="cl-kicker cl-text-primary">Course catalogue</span>
+				<h2 class="cl-display-5 fw-bold mb-3">
 					Choose your next practical skill
 				</h2>
-				<p class="lead text-body-secondary mb-0">
+				<p class="cl-lead cl-text-muted mb-0">
 					Courses are designed for independent study, with module assessments and recorded results.
 				</p>
 			</div>
-			<div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+			<div class="lg:col-4 lg:text-end mt-5 lg:mt-0">
 				{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'normal', href: '/courses'}) }}
 			</div>
 		</div>
@@ -111,10 +111,10 @@
 {% endembed %}
 		{% endif %}
 	</section>
-	<section class="cl-feature-band py-5 py-lg-6">
-		<div class="container">
-			<div class="row g-4">
-				<div class="col-md-4">
+	<section class="cl-feature-band py-12 py-lg-6">
+		<div class="cl-container">
+			<div class="row g-7">
+				<div class="md:col-4">
 					<div class="cl-feature">
 						<span>01</span>
 						<h3>
@@ -125,7 +125,7 @@
 						</p>
 					</div>
 				</div>
-				<div class="col-md-4">
+				<div class="md:col-4">
 					<div class="cl-feature">
 						<span>02</span>
 						<h3>
@@ -136,7 +136,7 @@
 						</p>
 					</div>
 				</div>
-				<div class="col-md-4">
+				<div class="md:col-4">
 					<div class="cl-feature">
 						<span>03</span>
 						<h3>

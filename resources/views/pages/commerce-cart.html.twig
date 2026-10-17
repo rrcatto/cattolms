@@ -7,7 +7,7 @@
 
         <p><a href="/courses">Continue shopping</a> · <a href="/bundles">Course bundles</a></p>
         {% for item in cart.items %}
-            <div class="border-bottom py-3">
+            <div class="cl-border-bottom py-5">
                 <h2 class="h5"><a href="/courses/{{ item.slug }}">{{ item.title }}</a></h2>
                 <p>{{ item.days }} days of access · {{ item.price_label }}</p>
                 <form action="/cart/remove" method="post">
@@ -17,7 +17,7 @@
             </div>
         {% endfor %}
         {% for bundle in cart.bundles %}
-            <div class="border-bottom py-3">
+            <div class="cl-border-bottom py-5">
                 {% include '@platform/partials/commerce-bundle-line.html.twig' %}
                 <form action="/cart/remove-bundle" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="bundle_offer_id" value="{{ bundle.id }}">
@@ -28,7 +28,7 @@
         {% if cart.count == 0 %}<p>Your cart is empty. <a href="/courses">Browse courses</a> or <a href="/bundles">course bundles</a>.</p>{% endif %}
         {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
         {% if cart.count > 0 %}
-            <div class="mt-4">{{ ui('data.key-value-list', {items: cart.totals}) }}</div>
+            <div class="mt-7">{{ ui('data.key-value-list', {items: cart.totals}) }}</div>
             {% if cart.promo.code %}<p class="help">Promo code {{ cart.promo.code }} is on this cart{{ cart.promo.applied ? '' : ' but no longer applies' }}. You can change it when you review your order at checkout.</p>{% endif %}
             {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}

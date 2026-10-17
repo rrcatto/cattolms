@@ -72,6 +72,31 @@ With JavaScript disabled, mobile top navigation stays in normal flow so its expa
 cover pagination or other page controls. The component matrix exercises native Next and jump
 navigation as a regression for that behaviour.
 
+## Bootstrap safety net
+
+`bootstrap-safety-net.cjs` checks UX rule 7.10 in Chromium and Firefox, in every bundled theme
+through the theme preview (nothing is activated), on the UI components page, the account page and
+the catalogue, and on Core's reader (the public preview of the first catalogue course that has one,
+whose `<html>` is always light), at 1440px. It reads the body's text and background, a link, the
+text, background and border of a text field, a select and a text area, the accent of a checkbox, and
+the keyboard focus outline four times:
+- as served;
+- with the operating system dark (themes keep their fixed look, and `<html>` carries
+  `data-bs-theme="light"`);
+- with Bootstrap's three files removed, as a browser without cascade layers sees the page;
+- with every `--bs-*` token made invalid, as a browser without `light-dark()` sees it.
+
+Each reading must equal the served one, and the page's colour scheme stays light. A theme page
+must also give the canvas behind the scrollbar gutter a colour (html's, or the body's). It uses the UI matrix's identity, so create that fixture
+and copy its state first (above), then run it and clean up as there:
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/bootstrap-safety-net.cjs
+```
+
+`CATTO_BROWSERS` narrows the browsers; results and failure screenshots go to
+`/tmp/catto-bootstrap-safety-net` (`CATTO_BROWSER_OUTPUT`).
+
 ## Section pages
 
 `section-pages.cjs` opens every Account, Company and Administration menu page (48) in every bundled

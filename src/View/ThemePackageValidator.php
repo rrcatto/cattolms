@@ -10,6 +10,8 @@ Description:
 Validates Catto Learning Theme Package 4.0 ZIP files and installed filesystem themes. Theme source remains filesystem-only; standalone themes require base.html, every theme requires non-empty public/css/theme.css, and children identify one exact parent name and version.
 
 Changelog:
+2026/10/17 SAST
+- theme.color_scheme, optional: light or dark, light when absent.
 2026/09/09 02:10 SAST
 - Theme Package 4.0 / Template API 2.0. A standalone theme ships base.html.twig declaring the page_content and page_body blocks; a page-family wrapper extends the base and renders block('page_body'). Twig templates are an accepted file type.
 2026/08/16 21:36 SAST
@@ -191,6 +193,12 @@ final class ThemePackageValidator
         }
         if (strtotime((string) $theme['created_at']) === false) {
             throw new RuntimeException('theme.created_at must be an ISO date-time value.');
+        }
+        // Optional, light when absent: the colour scheme Bootstrap's light-dark() colours follow on this theme's
+        // pages, written on <html> as data-bs-theme. A theme keeps one look; it does not follow the visitor's
+        // dark mode (owner, 2026/10/17).
+        if (array_key_exists('color_scheme', $theme) && !in_array($theme['color_scheme'], ['light', 'dark'], true)) {
+            throw new RuntimeException('theme.color_scheme must be light or dark.');
         }
 
         $parent = $manifest['parent'] ?? null;

@@ -4,6 +4,10 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/10/17 SAST (Part C)
+- Bootstrap 6 underneath: 5.3.8's reboot values as plain rules, so lessons read as written; the safety-net colours; Core's field, display, lead, colour, container, box and monospace classes (cl-input, cl-select, cl-check, cl-label, cl-lead, cl-display-*, cl-text-*, cl-bg-subtle, cl-container, cl-box, cl-border-bottom, cl-mono); the content block accordion (a details element) and its scrolling table; every utility the markup uses, !important as 5.3.8's were; the 5.3.8 link underline. All unlayered, as 5.3.8's rules were, so themes meet them on specificity. The unused .cl-narrow and .cl-medium rules are gone: no markup has carried them since Part B.
+2026/10/17 SAST
+- One construction for every page (v0.9.2): the page width variables (--cl-content-width, --cl-gutter, --cl-section-space) and the rows that take them; consecutive sections share one gap; page head actions wrap; the footer's social marks take the link colour.
 2026/10/09 SAST
 - Course landing pages: the hero in the page-head band with its picture beside the copy, the section cards (checklists, benefit cards, the outline, questions, reviews), the shared purchase box (.cl-course-purchase) and the landing page editor (.cl-landing-*).
 2026/10/08 SAST
@@ -38,6 +42,181 @@
    - Stage D: appended the company-context control block as its own commented section.
      2026/08/23 04:19 SAST - Added the genuine-administrator data-universe control.
      2026/08/21 11:04 SAST - Added the shared pagination control and bounded entity lookups. */
+/* Bootstrap 6 underneath (6.0.0-alpha.1, Part C of REPORTS/ui-merged-plan-2026-10-17.md). Only its reboot,
+   grid and utilities files load. Bootstrap 6 keeps every rule in a cascade layer (colors, config, root, reboot,
+   layout, content, forms, components, custom, helpers, utilities, in that order), so any unlayered rule here or
+   in a theme wins over all of it, and its utilities are no longer !important. Under 5.3.8 Bootstrap's rules were
+   unlayered, so a theme's rule met them on specificity (a theme's h2 rule lost to the h3 class on an h2), and its
+   utilities were !important. This block keeps that cascade, and the look Core, the themes and the courses were
+   made in, with these unlayered rules:
+   - the safety net: body text and background, links, the focus outline and fields in plain values, here and in
+     every theme, never only Bootstrap tokens, so a browser older than cascade layers, which ignores all of
+     Bootstrap 6, still shows the theme's colours (UX rule 7.10);
+   - 5.3.8's reboot values that 6.0 changed (fonts, heading sizes, weights and margins, list indent, code, kbd,
+     mark, hr, captions, legends, the link underline, an iframe taking the page's colour scheme, the browser's
+     own accent colour, which each theme sets on its body and Core's reader keeps);
+   - Core's classes for the 5.3.8 classes 6.0 no longer loads (cl-lead, cl-display-*, cl-container,
+     cl-content-table), and for 5.3.8 utilities (cl-text-*, cl-bg-subtle, cl-box, cl-border-bottom, cl-mono),
+     which stay !important;
+   - every utility Core's and the themes' markup uses, !important as 5.3.8's were. */
+/* No background on html: the body's background then fills the whole canvas, the scrollbar gutter Bootstrap 6
+   keeps stable included, as it did under 5.3.8. A theme that paints html paints the gutter with it. */
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue","Noto Sans","Liberation Sans",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+a{color:#0d6efd;text-decoration:underline}
+a:hover{color:#0a58ca}
+a:not([href]):not([class]),a:not([href]):not([class]):hover{color:inherit;text-decoration:none}
+:focus-visible{outline-color:#0d6efd}
+/* Fields: the 5.3.8 look, as Core classes. */
+.cl-label{margin-bottom:.5rem}
+.cl-input,.cl-select{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;appearance:none;background-color:#fff;background-clip:padding-box;border:1px solid #dee2e6;border-radius:.375rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+.cl-select{padding-right:2.25rem;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");background-repeat:no-repeat;background-position:right .75rem center;background-size:16px 12px}
+.cl-select[multiple],.cl-select[size]:not([size="1"]){padding-right:.75rem;background-image:none}
+.cl-input:focus,.cl-select:focus{color:#212529;background-color:#fff;border-color:#86b7fe;outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+.cl-input::placeholder{color:rgba(33,37,41,.75);opacity:1}
+.cl-input:disabled,.cl-select:disabled{background-color:#e9ecef;opacity:1}
+.cl-input[type=file]{overflow:hidden}
+.cl-input[type=file]:not(:disabled):not([readonly]){cursor:pointer}
+.cl-input::file-selector-button{padding:.375rem .75rem;margin:-.375rem -.75rem;margin-inline-end:.75rem;color:#212529;background-color:#f8f9fa;pointer-events:none;border-color:inherit;border-style:solid;border-width:0;border-inline-end-width:1px;border-radius:0;transition:color .15s ease-in-out,background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+.cl-input:hover:not(:disabled):not([readonly])::file-selector-button{background-color:#e9ecef}
+textarea.cl-input{min-height:calc(1.5em + .75rem + 2px)}
+.cl-input-lg{min-height:calc(1.5em + 1rem + 2px);padding:.5rem 1rem;font-size:1.25rem;border-radius:.5rem}
+.cl-input-lg::file-selector-button{padding:.5rem 1rem;margin:-.5rem -1rem;margin-inline-end:1rem}
+.cl-check{flex-shrink:0;width:1em;height:1em;margin-top:.25em;vertical-align:top;appearance:none;background-color:#fff;background-repeat:no-repeat;background-position:center;background-size:contain;border:1px solid #dee2e6;print-color-adjust:exact}
+.cl-check[type=checkbox]{border-radius:.25em}
+.cl-check[type=radio]{border-radius:50%}
+.cl-check:active{filter:brightness(90%)}
+.cl-check:focus{border-color:#86b7fe;outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+.cl-check:checked{background-color:#0d6efd;border-color:#0d6efd}
+.cl-check:checked[type=checkbox]{background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e")}
+.cl-check:checked[type=radio]{background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='2' fill='%23fff'/%3e%3c/svg%3e")}
+.cl-check[type=checkbox]:indeterminate{background-color:#0d6efd;border-color:#0d6efd;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10h8'/%3e%3c/svg%3e")}
+.cl-check:disabled{pointer-events:none;filter:none;opacity:.5}
+@media (prefers-reduced-motion:reduce){.cl-input,.cl-select,.cl-input::file-selector-button{transition:none}}
+/* 5.3.8's reboot values that 6.0 changed. */
+@media (prefers-reduced-motion:no-preference){:root{scroll-behavior:smooth}}
+hr{margin:1rem 0;color:inherit;border:0;border-top:1px solid;opacity:.25}
+a{text-underline-offset:auto}
+iframe{color-scheme:inherit}
+:root{accent-color:auto}
+.h1,.h2,.h3,.h4,.h5,.h6,h1,h2,h3,h4,h5,h6{margin-top:0;margin-bottom:.5rem;font-weight:500;line-height:1.2;color:inherit}
+.h1,h1{font-size:calc(1.375rem + 1.5vw)}
+.h2,h2{font-size:calc(1.325rem + .9vw)}
+.h3,h3{font-size:calc(1.3rem + .6vw)}
+.h4,h4{font-size:calc(1.275rem + .3vw)}
+@media (min-width:1200px){.h1,h1{font-size:2.5rem}.h2,h2{font-size:2rem}.h3,h3{font-size:1.75rem}.h4,h4{font-size:1.5rem}}
+.h5,h5{font-size:1.25rem}
+.h6,h6{font-size:1rem}
+p{margin-top:0;margin-bottom:1rem}
+abbr[title]{text-decoration:underline dotted;cursor:help;text-decoration-skip-ink:none}
+address{margin-bottom:1rem;font-style:normal;line-height:inherit}
+ol,ul{padding-left:2rem}
+dl,ol,ul{margin-top:0;margin-bottom:1rem}
+ol ol,ol ul,ul ol,ul ul{margin-bottom:0}
+dt{font-weight:700}
+dd{margin-bottom:.5rem;margin-left:0}
+blockquote{margin:0 0 1rem}
+b,strong{font-weight:bolder}
+.small,small{font-size:.875em}
+.mark,mark{padding:.1875em;color:#212529;background-color:#fff3cd}
+sub,sup{position:relative;font-size:.75em;line-height:0;vertical-align:baseline}
+sub{bottom:-.25em}
+sup{top:-.5em}
+code,kbd,pre,samp{font-family:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:1em}
+pre{display:block;margin-top:0;margin-bottom:1rem;overflow:auto;font-size:.875em;color:inherit}
+pre code{font-size:inherit;color:inherit;word-break:normal}
+code{font-size:.875em;color:#d63384;word-wrap:break-word}
+a>code{color:inherit}
+kbd{padding:.1875rem .375rem;font-size:.875em;color:#fff;background-color:#212529;border-radius:.25rem}
+kbd kbd{padding:0;font-size:1em}
+figure{margin:0 0 1rem}
+img,svg{vertical-align:middle}
+table{caption-side:bottom;border-collapse:collapse}
+caption{padding-top:.5rem;padding-bottom:.5rem;color:rgba(33,37,41,.75);text-align:left}
+th{text-align:inherit;text-align:-webkit-match-parent}
+tbody,td,tfoot,th,thead,tr{border-color:inherit;border-style:solid;border-width:0}
+label{display:inline-block}
+button{border-radius:0}
+button:focus:not(:focus-visible){outline:0}
+button,input,optgroup,select,textarea{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}
+button,select{text-transform:none}
+textarea{resize:vertical}
+fieldset{min-width:0;padding:0;margin:0;border:0}
+legend{float:left;width:100%;padding:0;margin-bottom:.5rem;line-height:inherit;font-size:calc(1.275rem + .3vw)}
+@media (min-width:1200px){legend{font-size:1.5rem}}
+legend+*{clear:left}
+summary{display:list-item;cursor:pointer}
+/* Core's classes for the 5.3.8 classes 6.0 no longer loads, with 5.3.8's values. */
+.cl-container{width:100%;padding-right:.75rem;padding-left:.75rem;margin-right:auto;margin-left:auto}
+@media (min-width:576px){.cl-container{max-width:540px}}
+@media (min-width:768px){.cl-container{max-width:720px}}
+@media (min-width:992px){.cl-container{max-width:960px}}
+@media (min-width:1200px){.cl-container{max-width:1140px}}
+@media (min-width:1400px){.cl-container{max-width:1320px}}
+.cl-lead{font-size:1.25rem;font-weight:300}
+.cl-display-2,.cl-display-4,.cl-display-5{font-weight:300;line-height:1.2}
+.cl-display-2{font-size:calc(1.575rem + 3.9vw)}
+.cl-display-4{font-size:calc(1.475rem + 2.7vw)}
+.cl-display-5{font-size:calc(1.425rem + 2.1vw)}
+@media (min-width:1200px){.cl-display-2{font-size:4.5rem}.cl-display-4{font-size:3.5rem}.cl-display-5{font-size:3rem}}
+.cl-content-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cl-box{border:1px solid #dee2e6!important;border-radius:.375rem!important}
+.cl-border-bottom{border-bottom:1px solid #dee2e6!important}
+.cl-mono{font-family:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace!important}
+.cl-text-muted{color:rgba(33,37,41,.75)!important}
+.cl-text-secondary{color:#6c757d!important}
+.cl-text-primary{color:#0d6efd!important}
+.cl-text-danger{color:#dc3545!important}
+.cl-text-warning{color:#ffc107!important}
+.cl-text-warning-strong{color:#664d03!important}
+.cl-text-light-muted{color:rgba(255,255,255,.5)!important}
+.cl-bg-subtle{background-color:#f8f9fa!important}
+/* The utilities Core's and the bundled themes' markup use, !important as 5.3.8's were: under 6.0 a utility sits in a
+   layer and loses to any Core or theme rule, but this markup was written for utilities that win (d-block on the
+   page head's kicker, mb-0 on a lead paragraph). 6.0's names and breakpoints (md 768px, lg 1024px), 5.3.8's values.
+   A utility this markup does not use comes from Bootstrap 6 alone. BootstrapSixContractTest keeps the list complete. */
+.mb-0{margin-bottom:0!important}
+.mb-1{margin-bottom:.25rem!important}
+.mb-3{margin-bottom:.5rem!important}
+.mb-5{margin-bottom:1rem!important}
+.mb-7{margin-bottom:1.5rem!important}
+.mb-12{margin-bottom:3rem!important}
+.mt-0{margin-top:0!important}
+.mt-1{margin-top:.25rem!important}
+.mt-3{margin-top:.5rem!important}
+.mt-5{margin-top:1rem!important}
+.mt-7{margin-top:1.5rem!important}
+.mt-12{margin-top:3rem!important}
+.p-5{padding:1rem!important}
+.py-5{padding-top:1rem!important;padding-bottom:1rem!important}
+.py-12{padding-top:3rem!important;padding-bottom:3rem!important}
+.gap-3{gap:.5rem!important}
+.gap-5{gap:1rem!important}
+.d-none{display:none!important}
+.d-block{display:block!important}
+.d-flex{display:flex!important}
+.flex-column{flex-direction:column!important}
+.flex-wrap{flex-wrap:wrap!important}
+.justify-content-between{justify-content:space-between!important}
+.align-items-center{align-items:center!important}
+.align-items-end{align-items:flex-end!important}
+.text-end{text-align:right!important}
+.text-uppercase{text-transform:uppercase!important}
+.fw-bold{font-weight:700!important}
+.visually-hidden{width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.visually-hidden:not(caption){position:absolute!important}
+@media (min-width:768px){.md\:flex-row{flex-direction:row!important}}
+@media (min-width:1024px){.lg\:d-block{display:block!important}.lg\:mt-0{margin-top:0!important}.lg\:text-end{text-align:right!important}}
+/* Content blocks (ContentBlockRenderer): an accordion is a details element that opens with or without JavaScript. */
+.cl-content-accordion{margin-bottom:1.5rem;border:1px solid #dee2e6;border-radius:.375rem;background-color:#fff;color:#212529}
+.cl-content-accordion-summary{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;font-size:1rem;list-style:none;cursor:pointer}
+.cl-content-accordion-summary::-webkit-details-marker{display:none}
+.cl-content-accordion-title{margin:0;font-size:1rem;font-weight:400;line-height:1.5;color:inherit}
+.cl-content-accordion-summary::after{content:"";flex:0 0 1.25rem;width:1.25rem;height:1.25rem;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23212529' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M2 5L8 11L14 5'/%3e%3c/svg%3e");background-repeat:no-repeat;background-size:1.25rem;transition:transform .2s ease-in-out}
+.cl-content-accordion[open]>.cl-content-accordion-summary{color:#052c65;background-color:#cfe2ff;box-shadow:inset 0 -1px 0 #dee2e6}
+.cl-content-accordion[open]>.cl-content-accordion-summary::after{transform:rotate(-180deg)}
+.cl-content-accordion-summary:focus-visible{outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+.cl-content-accordion-body{padding:1rem 1.25rem}
+@media (prefers-reduced-motion:reduce){.cl-content-accordion-summary::after{transition:none}}
 .cl-options{margin-left:0!important;display:grid;gap:.65rem}.cl-option{display:grid!important;grid-template-columns:1.25rem minmax(0,1fr);align-items:start!important;justify-content:start!important;gap:.7rem;width:100%;text-align:left!important}.cl-option input[type="radio"]{width:1rem!important;height:1rem!important;min-width:1rem;max-width:1rem;margin:.28rem 0 0!important;padding:0!important;justify-self:start}.cl-option>span{display:block;min-width:0;text-align:left!important}
 
 .cl-admin-workspace{display:grid;gap:1rem}.cl-ui-accordion-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}.cl-ui-accordion-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:800}.cl-ui-accordion-description{font-size:.875rem;opacity:.72}.cl-ui-accordion-toggle{justify-self:end}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-ui-accordion-link{white-space:nowrap}.cl-ui-accordion-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-ui-accordion-summary{grid-template-columns:1fr;gap:.35rem}.cl-ui-accordion-link{justify-self:start}}.cl-ui-modal[hidden],.cl-ui-modal[aria-hidden="true"]{display:none!important}.cl-ui-modal.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.cl-ui-modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
@@ -449,16 +628,6 @@
    - .cl-question-editor / .cl-option-editor were carded in four themes and bare in Light Default,
      where every question and answer option in the assessment editor ran together. */
 
-/* Compounded with .container deliberately. Every use of these sits on a Bootstrap container, and
-   Factory Reset and Radiant Learning each redeclare a bare `.container{max-width:1320px}` in their
-   own sheet - same specificity as a bare `.cl-narrow`, loaded afterwards, so the width constraint
-   lost and the form stayed full width. The compound outranks it while staying below the
-   `.theme-main .cl-narrow` form both Gilded Noir and Light Default already use, so those two keep
-   the widths they were accepted with. The bare rules stay for any future use off a container. */
-.cl-narrow{max-width:38rem;margin-inline:auto}
-.cl-medium{max-width:54rem;margin-inline:auto}
-.container.cl-narrow{max-width:38rem}
-.container.cl-medium{max-width:54rem}
 .cl-page-head-row{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}/* Controls sitting in a row line up with each other.
 
    A row of actions is rarely all one element: a plain button, a button inside a form because it
@@ -955,8 +1124,12 @@ label.cl-ui-tree-select-option{position:relative}
    Qualified with body so it outranks a theme's own `body{background:...}` without !important:
    that rule is a single element selector, and this is an element plus a class. Attached rather
    than scrolling, so the bands stay put instead of sliding under a long page - the texture is the
-   surface the page sits on, not part of its content. */
-body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2)) fixed}/* The profile image, on the header and on its own panel.
+   surface the page sits on, not part of its content.
+
+   The texture's light colour is also the body's background colour, under the bands. A fixed background
+   covers the viewport only, and Bootstrap 6 keeps the scrollbar gutter beside it; the body's colour
+   passes to the whole canvas (html paints none), so the gutter takes the page's ground, not white. */
+body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle),var(--cl-texture-dark) 0 var(--cl-texture-band),var(--cl-texture-light) var(--cl-texture-band) calc(var(--cl-texture-band) * 2)) fixed var(--cl-texture-light)}/* The profile image, on the header and on its own panel.
 
    Sized in the markup as well as here, so the page does not reflow between the layout arriving and
    the image arriving - a 128px hole that becomes a 128px picture, rather than nothing that becomes

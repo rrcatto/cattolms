@@ -40,7 +40,7 @@ final class CanonicalPageFixture
             'identity_placement' => $slug === 'gilded-noir' ? 'navigation' : 'page',
             'identity_display_name' => 'Reader', 'identity_name' => 'Course Reader', 'identity_email' => 'reader@example.test', 'identity_role' => 'ADMIN',
             'identity_roles' => ['ADMIN'], 'identity_status' => 'Active',
-            'course_content_mode' => false, 'theme_preview_active' => false,
+            'course_content_mode' => false, 'theme_preview_active' => false, 'color_scheme' => 'light',
             'navigation' => $navigation, 'footer_navigation' => [$item('help', '/help')],
             'breadcrumbs' => [['label' => 'Help', 'href' => null, 'current' => true]],
             'cart_summary' => ['count' => 0, 'items' => [], 'total_label' => 'R0.00'],

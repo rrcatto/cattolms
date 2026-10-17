@@ -40,16 +40,16 @@
 								{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
 
-									<div class="d-flex flex-wrap justify-content-between gap-3">
+									<div class="d-flex flex-wrap justify-content-between gap-5">
 										<div>
 											<strong>{{ diagnostic.title }}</strong>
-											<div class="text-body-secondary">
+											<div class="cl-text-muted">
 												Key: {{ diagnostic.assessment_key }} · {{ diagnostic.questions|length }} questions
 											</div>
 										</div>
 										<div class="text-end">
 											{{ ui('feedback.badge', {label: 'Suggested threshold ' ~ (diagnostic.pass_mark) ~ '%', tone: 'info'}) }}
-											<small class="d-block text-body-secondary mt-1">Guidance only; does not affect grade or completion</small>
+											<small class="d-block cl-text-muted mt-1">Guidance only; does not affect grade or completion</small>
 										</div>
 									</div>
 
@@ -69,17 +69,17 @@
 
 						{{ ui('layout.section-head', {heading: 'Final assessment detected', heading_level: 2, summary: 'This assessment will be imported separately from the module assessments.'}) }}
 
-							<div class="d-flex flex-wrap justify-content-between gap-3">
+							<div class="d-flex flex-wrap justify-content-between gap-5">
 								<div>
 									<strong>{{ analysis.final_assessment.title }}</strong>
-									<div class="text-body-secondary">
+									<div class="cl-text-muted">
 										{{ analysis.display_final_question_count }} questions
 									</div>
 								</div>
 								<div class="text-end">
 									{{ ui('feedback.badge', {label: 'Pass mark ' ~ (analysis.final_assessment.pass_mark) ~ '%', tone: 'info'}) }}
 									{% if analysis.final_assessment.required %}
-										<small class="d-block text-body-secondary mt-1">Required final assessment</small>
+										<small class="d-block cl-text-muted mt-1">Required final assessment</small>
 									{% endif %}
 								</div>
 							</div>
@@ -143,12 +143,12 @@
 							{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
 
-								<div class="d-flex gap-3">
+								<div class="d-flex gap-5">
 									<span class="cl-module-number">{{ module.position }}</span>
 									<div>
 										<strong>{{ module.title }}</strong>
 										{% if module.subtitle %}
-											<small class="d-block text-body-secondary">{{ module.subtitle }}</small>
+											<small class="d-block cl-text-muted">{{ module.subtitle }}</small>
 										{% endif %}
 										{{ ui('feedback.badge', {label: (module.content_blocks|default([])|length) ~ ' content blocks', tone: 'neutral'}) }}
 										{% if module.assessment %}
@@ -179,22 +179,22 @@
 							<h2 class="h4">
 								HTML parser report
 							</h2>
-							<p class="text-body-secondary small">
+							<p class="cl-text-muted small">
 								Parser diagnostics inspect document markup only. JavaScript and CSS bodies are excluded so HTML fragments stored inside course scripts/styles cannot be misreported as broken page structure.
 							</p>
 							{% if analysis.parser_compatibility_count %}
-								<p class="mb-2">
+								<p class="mb-3">
 									<strong>{{ analysis.parser_compatibility_count }}</strong> legacy-parser compatibility notice{{ analysis.parser_compatibility_count == 1 ? '' : 's' }} were ignored. These are normally caused by valid modern HTML5 elements such as <code>&lt;section&gt;</code>, <code>&lt;details&gt;</code> and <code>&lt;summary&gt;</code>; they do not indicate lost course content.
 								</p>
 							{% endif %}
 							{% if analysis.parser_structural_count %}
-								<p class="text-warning-emphasis">
+								<p class="cl-text-warning-strong">
 									<strong>{{ analysis.parser_structural_count }} structural parser warning{{ analysis.parser_structural_count == 1 ? '' : 's' }}</strong> remain and should be reviewed before import.
 								</p>
 								<ul class="mb-0">
 									{% for parser_message in analysis.parser_messages %}
 										<li>
-											{{ parser_message.message }} <small class="text-body-secondary">({{ parser_message.count }} occurrence{{ parser_message.count == 1 ? '' : 's' }}, first near line {{ parser_message.first_line }})</small>
+											{{ parser_message.message }} <small class="cl-text-muted">({{ parser_message.count }} occurrence{{ parser_message.count == 1 ? '' : 's' }}, first near line {{ parser_message.first_line }})</small>
 										</li>
 									{% endfor %}
 								</ul>
@@ -271,7 +271,7 @@
 {% endembed %}
 								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Replace existing course shell (optional)', help: 'Courses you own or administer are listed. Replacement resets their learner test work; purchased entitlements retain their financial history.', for: 'field-admin-course-import-preview', required: false})} %}
 {% block control %}
-<select id="field-admin-course-import-preview" class="form-select mb-3" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
+<select id="field-admin-course-import-preview" class="cl-select mb-5" name="replace_course_id" {{ ui_field_attrs(props) }}><option value="0">Create a new course</option>
 							{% for existing in replaceable_courses %}
 								<option value="{{ existing.id }}"{% if existing_course and existing_course.id == existing.id %} selected{% endif %}>{{ existing.title }}</option>
 							{% endfor %}

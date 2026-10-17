@@ -10,6 +10,8 @@ Description:
 Manages filesystem-authoritative Catto Learning Theme Package 4.0 installations with a rebuildable PostgreSQL metadata registry. Themes are installed side-by-side by name+version, browser files are copied to public_html/themes, child themes inherit only from one exact standalone parent release, and Factory Reset is the shipped default rather than a universal fallback.
 
 Changelog:
+2026/10/17 SAST
+- A theme names its colour scheme (color_scheme, light when the manifest has none).
 2026/10/07 SAST
 - Staging a theme package checks that storage/tmp/theme-imports is writable and says so when it is
   not, logging the PHP reason instead of printing the copy warning into the response.
@@ -189,6 +191,7 @@ final class ThemeManager
             'version' => (string) $meta['version'],
             'author' => (string) $meta['author'],
             'description' => (string) $meta['description'],
+            'color_scheme' => ($meta['color_scheme'] ?? 'light') === 'dark' ? 'dark' : 'light',
             'manifest' => $manifest,
             'manifest_sha256' => hash_file('sha256', $root . '/theme.json') ?: '',
             'root' => $root,
@@ -691,6 +694,7 @@ final class ThemeManager
             'version' => (string) $meta['version'],
             'author' => (string) $meta['author'],
             'description' => (string) $meta['description'],
+            'color_scheme' => ($meta['color_scheme'] ?? 'light') === 'dark' ? 'dark' : 'light',
             'manifest' => $manifest,
             'manifest_sha256' => hash_file('sha256', $root . '/theme.json') ?: '',
             'root' => $root,

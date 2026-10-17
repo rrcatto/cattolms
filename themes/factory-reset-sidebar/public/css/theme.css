@@ -1,4 +1,8 @@
 /* Canonical page construction. Theme colours, typography and decorative chrome. */
+/* Bootstrap 6 safety net (UX rule 7.10): this theme's accent for native controls and its focus outline colour,
+   first so that every rule below still wins at the same specificity. */
+.factory-sidebar-theme{accent-color:var(--fs-accent)}
+.factory-sidebar-theme :focus-visible{outline-color:var(--fs-accent)}
 .company-context{
   --cl-context-surface:color-mix(in srgb,var(--fs-accent) 45%,white);
   --cl-context-ink:var(--fs-dark);

@@ -119,7 +119,7 @@
 			<legend class="cl-visually-hidden">Kind of section</legend>
 			{% for option in landing_page.add_options %}
 				{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: option.label ~ (option.taken ? ' (already on the page)' : ''), help: option.description, full_width: true})} %}
-{% block control %}<input class="form-check-input mt-1" type="radio" name="type" value="{{ option.value }}" required{% if option.taken %} disabled{% endif %}>{% endblock %}
+{% block control %}<input class="cl-check mt-1" type="radio" name="type" value="{{ option.value }}" required{% if option.taken %} disabled{% endif %}>{% endblock %}
 {% endembed %}
 			{% endfor %}
 		</fieldset>

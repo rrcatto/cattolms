@@ -53,10 +53,10 @@
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Verified account emails', for: 'test-access-emails', span: 'two-thirds', required: true, help: 'Enter one email per line. Every person must have an active, verified account.'})} %}
-{% block control %}<textarea class="form-control" id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}
+{% block control %}<textarea class="cl-input" id="test-access-emails" name="emails" rows="5" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'test-access-days', span: 'third', required: true, help: 'The countdown begins when you grant access.'})} %}
-{% block control %}<input class="form-control" id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
@@ -65,7 +65,7 @@
 {% endblock %}
 {% endembed %}
 				</form>
-				<div class="mt-4">{{ ui('layout.section-head', {heading: 'Current direct grants', heading_level: 2, summary: test_grants|length ~ (test_grants|length == 1 ? ' grant.' : ' grants.')}) }}</div>
+				<div class="mt-7">{{ ui('layout.section-head', {heading: 'Current direct grants', heading_level: 2, summary: test_grants|length ~ (test_grants|length == 1 ? ' grant.' : ' grants.')}) }}</div>
 				{% if test_grants %}
 					{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
 						{% for grant in test_grants %}{% include '@platform/partials/admin-test-grant.html.twig' with {grant: grant, context: 'course'} %}{% endfor %}
@@ -73,7 +73,7 @@
 				{% else %}
 					{{ ui('feedback.empty', {heading: 'No direct grants', summary: 'Nobody has been given test access to this course yet.'}) }}
 				{% endif %}
-				<div class="mt-4">{{ ui('layout.section-head', {heading: 'Your own testing', heading_level: 2, summary: 'Preview uses the real course player without affecting learner records. Adding the course to your library gives you a persistent, non-preview enrolment.'}) }}</div>
+				<div class="mt-7">{{ ui('layout.section-head', {heading: 'Your own testing', heading_level: 2, summary: 'Preview uses the real course player without affecting learner records. Adding the course to your library gives you a persistent, non-preview enrolment.'}) }}</div>
 				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 					{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
@@ -93,14 +93,14 @@
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', for: 'owner-company', required: true, help: 'Newly imported courses default to the System Company.'})} %}
 {% block control %}
-							<select class="form-select" name="owner_company_id" required id="owner-company" {{ ui_field_attrs(props) }}>
+							<select class="cl-select" name="owner_company_id" required id="owner-company" {{ ui_field_attrs(props) }}>
 							{% for ownerCompany in owner_companies %}<option value="{{ ownerCompany.id }}" {{ ownerCompany.id==course.owner_company_id ? 'selected' : '' }}>{{ ownerCompany.name }}</option>{% endfor %}
 							</select>
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning person', for: 'owner-person', required: true, help: 'Newly imported courses default to the administrator who performed the import.'})} %}
 {% block control %}
-							<select class="form-select" name="owner_user_id" required id="owner-person" {{ ui_field_attrs(props) }}>
+							<select class="cl-select" name="owner_user_id" required id="owner-person" {{ ui_field_attrs(props) }}>
 							{% for ownerPerson in owner_people %}<option value="{{ ownerPerson.id }}" {{ ownerPerson.id==course.owner_user_id ? 'selected' : '' }}>{{ ownerPerson.name }} · {{ ownerPerson.email }}</option>{% endfor %}
 							</select>
 {% endblock %}
@@ -153,14 +153,14 @@
 								</td>
 								{% if editing_price_id == price.id %}
 									<td>
-										<input class="form-control" form="{{ price_form }}" type="number" min="1" name="access_period_value" value="{{ price.access_period_value }}" required aria-label="Period">
-										<select class="form-select" form="{{ price_form }}" name="access_period_unit" aria-label="Unit">{% for unit in ['days', 'weeks', 'months', 'years'] %}<option value="{{ unit }}" {{ price.access_period_unit==unit ? 'selected' : '' }}>{{ unit|capitalize }}</option>{% endfor %}</select>
+										<input class="cl-input" form="{{ price_form }}" type="number" min="1" name="access_period_value" value="{{ price.access_period_value }}" required aria-label="Period">
+										<select class="cl-select" form="{{ price_form }}" name="access_period_unit" aria-label="Unit">{% for unit in ['days', 'weeks', 'months', 'years'] %}<option value="{{ unit }}" {{ price.access_period_unit==unit ? 'selected' : '' }}>{{ unit|capitalize }}</option>{% endfor %}</select>
 									</td>
 									<td>
-										<input class="form-control" form="{{ price_form }}" name="price" value="{{ price.price_input }}" inputmode="decimal" required aria-label="Price">
-										<input class="form-control text-uppercase" form="{{ price_form }}" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required aria-label="Currency">
+										<input class="cl-input" form="{{ price_form }}" name="price" value="{{ price.price_input }}" inputmode="decimal" required aria-label="Price">
+										<input class="cl-input text-uppercase" form="{{ price_form }}" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required aria-label="Currency">
 									</td>
-									<td><input class="form-control" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label"></td>
+									<td><input class="cl-input" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label"></td>
 									<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}{% block control %}<input type="checkbox" form="{{ price_form }}" name="is_active" value="1" {{ price.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}</td>
 									<td>
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
@@ -197,25 +197,25 @@
 				{% else %}
 					{{ ui('feedback.empty', {heading: 'No price options', summary: 'A course needs at least one active price option and exactly one active default price before it can be published.'}) }}
 				{% endif %}
-				<form class="mt-4" action="/admin/courses/{{ course.id }}/pricing" method="post">
+				<form class="mt-7" action="/admin/courses/{{ course.id }}/pricing" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Add a price option', heading_level: 2}) }}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', for: 'new-price-period', span: 'quarter', required: true})} %}
-{% block control %}<input class="form-control" id="new-price-period" type="number" min="1" name="access_period_value" value="12" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-period" type="number" min="1" name="access_period_value" value="12" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'new-price-unit', span: 'quarter'})} %}
-{% block control %}<select class="form-select" id="new-price-unit" name="access_period_unit" {{ ui_field_attrs(props) }}><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select>{% endblock %}
+{% block control %}<select class="cl-select" id="new-price-unit" name="access_period_unit" {{ ui_field_attrs(props) }}><option value="days">Days</option><option value="weeks">Weeks</option><option value="months" selected>Months</option><option value="years">Years</option></select>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', for: 'new-price-amount', span: 'quarter', required: true})} %}
-{% block control %}<input class="form-control" id="new-price-amount" name="price" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-amount" name="price" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', for: 'new-price-currency', span: 'quarter', required: true})} %}
-{% block control %}<input class="form-control text-uppercase" id="new-price-currency" name="currency_code" value="ZAR" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input text-uppercase" id="new-price-currency" name="currency_code" value="ZAR" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Label', for: 'new-price-label'})} %}
-{% block control %}<input class="form-control" id="new-price-label" name="label" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="new-price-label" name="label" placeholder="12-month access" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_active" value="1" checked>{% endblock %}{% endembed %}
 						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Make this the default catalogue price', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_default" value="1">{% endblock %}{% endembed %}
@@ -268,7 +268,7 @@
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Presentation stylesheet (CSS)', for: 'presentation-css', full_width: true, help: course.presentation_css ? (course.presentation_css|length) ~ ' characters stored. Edit the CSS directly; it is saved exactly as written. Clear the box and save to remove it.' : 'No stylesheet is stored, so imported HTML classes use only the standard LMS styling. Paste CSS here or import it from the original HTML file below.'})} %}
-{% block control %}<textarea class="form-control font-monospace" id="presentation-css" name="presentation_css" rows="24" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{{ course.presentation_css }}</textarea>{% endblock %}
+{% block control %}<textarea class="cl-input cl-mono" id="presentation-css" name="presentation_css" rows="24" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{{ course.presentation_css }}</textarea>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save stylesheet', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
@@ -277,13 +277,13 @@
 {% endblock %}
 {% endembed %}
 				</form>
-				<form class="mt-4" action="/admin/courses/{{ course.id }}/presentation" method="post" enctype="multipart/form-data">
+				<form class="mt-7" action="/admin/courses/{{ course.id }}/presentation" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Import from the original HTML file', heading_level: 2, summary: 'Replaces the stylesheet above with the presentation CSS and authored stylesheet imports found in the file. Modules, assessments, grades, enrolments and course IDs are not changed.'}) }}
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Original HTML course file', for: 'presentation-file', span: 'two-thirds', required: true})} %}
-{% block control %}<input class="form-control" id="presentation-file" type="file" name="course_html" accept=".html,.htm,text/html" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% block control %}<input class="cl-input" id="presentation-file" type="file" name="course_html" accept=".html,.htm,text/html" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Import and replace stylesheet', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
@@ -315,21 +315,21 @@
 {% block body %}
 						{% for band_index, band in course.grade_bands %}
 							<tr>
-								<td><input class="form-control" name="grade_label[{{ band_index }}]" value="{{ band.grade_label }}" maxlength="120" aria-label="Label"></td>
-								<td><input class="form-control" name="grade_code[{{ band_index }}]" value="{{ band.grade_code }}" maxlength="24" aria-label="Code"></td>
-								<td><input class="form-control" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ band_index }}]" value="{{ band.minimum_label }}" aria-label="From percentage"></td>
+								<td><input class="cl-input" name="grade_label[{{ band_index }}]" value="{{ band.grade_label }}" maxlength="120" aria-label="Label"></td>
+								<td><input class="cl-input" name="grade_code[{{ band_index }}]" value="{{ band.grade_code }}" maxlength="24" aria-label="Code"></td>
+								<td><input class="cl-input" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ band_index }}]" value="{{ band.minimum_label }}" aria-label="From percentage"></td>
 								<td>{{ band.maximum_label }}%</td>
-								<td><input class="form-check-input" type="checkbox" name="is_passing[{{ band_index }}]" value="1" {{ band.is_passing ? 'checked' : '' }} aria-label="Passing"></td>
+								<td><input class="cl-check" type="checkbox" name="is_passing[{{ band_index }}]" value="1" {{ band.is_passing ? 'checked' : '' }} aria-label="Passing"></td>
 								<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Remove'})} %}{% block control %}<input type="checkbox" name="remove_band[{{ band_index }}]" value="1">{% endblock %}{% endembed %}</td>
 							</tr>
 						{% endfor %}
 						{% set new_index = course.grade_bands|length %}
 						<tr>
-							<td><input class="form-control" name="grade_label[{{ new_index }}]" maxlength="120" placeholder="New band label" aria-label="New band label"></td>
-							<td><input class="form-control" name="grade_code[{{ new_index }}]" maxlength="24" placeholder="Code" aria-label="New band code"></td>
-							<td><input class="form-control" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ new_index }}]" placeholder="From" aria-label="New band from percentage"></td>
+							<td><input class="cl-input" name="grade_label[{{ new_index }}]" maxlength="120" placeholder="New band label" aria-label="New band label"></td>
+							<td><input class="cl-input" name="grade_code[{{ new_index }}]" maxlength="24" placeholder="Code" aria-label="New band code"></td>
+							<td><input class="cl-input" type="number" min="0" max="100" step="0.01" name="minimum_percentage[{{ new_index }}]" placeholder="From" aria-label="New band from percentage"></td>
 							<td>—</td>
-							<td><input class="form-check-input" type="checkbox" name="is_passing[{{ new_index }}]" value="1" checked aria-label="New band passing"></td>
+							<td><input class="cl-check" type="checkbox" name="is_passing[{{ new_index }}]" value="1" checked aria-label="New band passing"></td>
 							<td></td>
 						</tr>
 {% endblock %}
@@ -340,7 +340,7 @@
 {% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
 {% endembed %}
 				</form>
-				<div class="mt-4">{{ ui('layout.section-head', {heading: 'What learners see', heading_level: 2, summary: 'Shown on the public course page and wherever [grading-scale] appears in course content.'}) }}</div>
+				<div class="mt-7">{{ ui('layout.section-head', {heading: 'What learners see', heading_level: 2, summary: 'Shown on the public course page and wherever [grading-scale] appears in course content.'}) }}</div>
 				{% set learner_scale = [] %}
 				{% for band in course.grade_bands %}{% set learner_scale = learner_scale|merge([{label: band.grade_label ~ (band.is_passing ? '' : ' (not passing)'), value: band.range_label}]) %}{% endfor %}
 				{{ ui('data.key-value-list', {items: learner_scale}) }}
@@ -363,7 +363,7 @@
 						{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', for: 'course-status', span: 'third'})} %}
-{% block control %}<select class="form-select" id="course-status" name="status" {{ ui_field_attrs(props) }}>{% for state in course_states %}<option value="{{ state }}" {{ state == course.status ? 'selected' : '' }}>{{ state|capitalize }}</option>{% endfor %}</select>{% endblock %}
+{% block control %}<select class="cl-select" id="course-status" name="status" {{ ui_field_attrs(props) }}>{% for state in course_states %}<option value="{{ state }}" {{ state == course.status ? 'selected' : '' }}>{{ state|capitalize }}</option>{% endfor %}</select>{% endblock %}
 {% endembed %}
 							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings', span: 'two-thirds'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
 							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}

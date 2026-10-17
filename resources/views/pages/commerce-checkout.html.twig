@@ -37,7 +37,7 @@
 
 {% endblock %}
 {% endembed %}
-                <h3 class="h5 mt-4">Billing details</h3>
+                <h3 class="h5 mt-7">Billing details</h3>
                 <p>Who your invoice is made out to. {{ billing.saved ? 'Your saved billing details are filled in; any change you make is saved for next time.' : 'These are saved for your next purchase.' }}</p>
                 {% include '@platform/partials/billing-fields.html.twig' with {billing_prefix: 'checkout-billing'} %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
@@ -56,7 +56,7 @@
 <input type="checkbox" name="invoice_email" value="yes" {{ checkout.invoice_email|default(false) ? 'checked' : '' }}>
 {% endblock %}
 {% endembed %}
-                <p class="mt-3">Your PDF invoice will also be available in Account → COURSES → My Orders.</p>
+                <p class="mt-5">Your PDF invoice will also be available in Account → COURSES → My Orders.</p>
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.button', {label: 'Review my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/checkout/profile">Back to my details</a>
@@ -69,7 +69,7 @@
             {% for bundle in cart.bundles %}{% include '@platform/partials/commerce-bundle-line.html.twig' %}{% endfor %}
             {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
             {% include '@platform/partials/commerce-promo-code.html.twig' %}
-            <h3 class="h5 mt-4">Order total</h3>
+            <h3 class="h5 mt-7">Order total</h3>
             {{ ui('data.key-value-list', {items: cart.totals}) }}
             {% if cart.total_minor == 0 %}<p>Nothing to pay: the promotion covers this order, so it completes when you place it.</p>{% endif %}
             <h3 class="h5">Billed to</h3>
