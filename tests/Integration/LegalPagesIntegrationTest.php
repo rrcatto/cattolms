@@ -83,8 +83,9 @@ final class LegalPagesIntegrationTest extends TestCase
 
         foreach ([$anonymous, $signedIn] as $html) {
             self::assertMatchesRegularExpression('#<h1[^>]*>' . preg_quote($title, '#') . '</h1>#', $html);
-            self::assertStringContainsString('data-legal-document="' . $key . '" data-legal-version="' . $document['version'] . '"', $html, 'The version the code references is on the page.');
-            self::assertStringContainsString('<strong>Version ' . $document['version'] . '</strong> - last updated <time datetime="' . $document['updated'] . '">' . $document['updated_label'] . '</time>.', $html);
+            self::assertStringContainsString('data-legal-document="' . $key . '"', $html);
+            self::assertStringContainsString('<strong>Last updated <time datetime="' . $document['updated'] . '">' . $document['updated_label'] . '</time>.</strong>', $html, 'The page shows its date and no version (owner, 2026-10-17).');
+            self::assertStringNotContainsString('data-legal-version', $html);
             foreach (['/terms' => 'Terms', '/refunds' => 'Refunds', '/privacy' => 'Privacy'] as $href => $label) {
                 self::assertMatchesRegularExpression('#<footer.*<a href="' . $href . '">' . $label . '</a>.*</footer>#s', $html, 'The Core footer lists ' . $label . '.');
             }
@@ -102,24 +103,30 @@ final class LegalPagesIntegrationTest extends TestCase
 
         $terms = $this->html('/terms');
         self::assertStringContainsString('1. Supplier information', $terms);
+        // The page prints whatever the Site Owner says (.env or Settings): no detail is written into the code.
+        $supplier = IntegrationContainer::get()->get(LegalDocuments::class)->supplier();
         foreach ([
-            'Full name' => 'Example Person',
-            'Legal status' => 'Sole proprietor. Not a registered company.',
-            'Trading name' => 'Catto Learning',
-            'Physical address' => '1 Example Street, Example Town, 0000, South Africa',
-            'Telephone' => '+27 00 000 0000',
+            'Full name' => $supplier['legal_name'],
+            'Legal status' => $supplier['legal_status'],
+            'Registration number' => $supplier['registration_number'],
+            'Trading name' => $supplier['trading_name'],
+            'Physical address' => $supplier['physical_address'],
+            'Address for legal service' => $supplier['physical_address'],
+            'Self-regulatory bodies and codes of conduct' => $supplier['memberships'],
+            'Accreditation' => $supplier['accreditation'],
+            'Telephone' => $supplier['phone'],
             'Email address' => $email,
             'Website' => $domain,
-            'Information Officer' => 'Example Person',
+            'Information Officer' => $supplier['information_officer'],
         ] as $label => $value) {
-            self::assertStringContainsString('<dt>' . $label . '</dt><dd>' . htmlspecialchars($value, ENT_QUOTES) . '</dd>', $terms, $label);
+            self::assertStringContainsString('<dt>' . $label . '</dt><dd>' . htmlspecialchars((string) $value, ENT_QUOTES) . '</dd>', $terms, $label);
         }
         self::assertStringContainsString('href="mailto:' . $email . '"', $terms);
 
         $privacy = $this->html('/privacy');
         self::assertStringContainsString('<dt>Email address</dt><dd>' . $email . '</dd>', $privacy);
         self::assertStringContainsString('<dt>Website</dt><dd>' . $domain . '</dd>', $privacy);
-        self::assertStringContainsString('<dt>Information Officer</dt><dd>Example Person</dd>', $privacy);
+        self::assertStringContainsString('<dt>Information Officer</dt><dd>' . htmlspecialchars((string) $supplier['information_officer'], ENT_QUOTES) . '</dd>', $privacy);
         self::assertStringContainsString('href="https://inforegulator.org.za"', $privacy);
         self::assertStringContainsString('href="mailto:' . $email . '"', $this->html('/refunds'), 'A refund is asked for at the configured address.');
 

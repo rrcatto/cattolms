@@ -1,11 +1,10 @@
 {#
-  The opening card of a public legal document: its version and last-updated date from
-  LegalDocuments (the version an order records as accepted), the page's contents and the other two
-  documents. legal_sections is the page's own list of {id, label}, one per numbered section below.
+  The opening card of a public legal document: its last-updated date from LegalDocuments (no version
+  number, owner 2026-10-17), the page's contents and the other two documents. legal_sections is the page's own list of {id, label}, one per numbered section below.
 #}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'document'})} %}
 {% block surface_body %}
-		<p data-legal-document="{{ legal.key }}" data-legal-version="{{ legal.version }}"><strong>Version {{ legal.version }}</strong> - last updated <time datetime="{{ legal.updated }}">{{ legal.updated_label }}</time>.</p>
+		<p data-legal-document="{{ legal.key }}"><strong>Last updated <time datetime="{{ legal.updated }}">{{ legal.updated_label }}</time>.</strong></p>
 		<p>{{ legal_intro }}</p>
 		<nav aria-label="Contents">
 			<ol>

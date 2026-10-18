@@ -188,6 +188,8 @@ final class LearningController extends BaseController
         $slug = (string) $this->param('slug');
         $preview = $this->previewMode();
         return $this->handle(function () use ($user, $slug, $preview): void {
+            // Starting begins the access period and ends any refund (owner, 2026-10-17): the learner ticks that first.
+            if (!$preview && $this->posted('confirm_start') !== 'yes') throw new \RuntimeException('Tick the box to confirm that starting begins your access period and that a started course can no longer be refunded.');
             $this->learning->start($user->id, $slug, $preview);
             $this->flash('success', 'The course has started. Your access period begins now.');
             $this->redirect('/learn/' . rawurlencode($slug) . ($preview ? '?preview=1' : ''));

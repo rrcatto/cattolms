@@ -280,19 +280,6 @@ final class CompanySuspensionIntegrationTest extends TestCase
         );
     }
 
-    // --- the System Company ---------------------------------------------------------------------------
-
-    /** The System Company cannot be suspended, and the refusal is at repository level. */
-    public function testTheSystemCompanyCannotBeSuspended(): void
-    {
-        $system = $this->companies->systemCompany();
-        self::assertNotNull($system, 'The REAL System Company must exist.');
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageMatches('/System Company cannot be disabled/i');
-        $this->administration->setCompanyStatus((int) $system['id'], 'disabled', $this->adminUserId);
-    }
-
     // --- the message ------------------------------------------------------------------------------------
 
     /** The suspended-company message explains the situation rather than blaming the account. */

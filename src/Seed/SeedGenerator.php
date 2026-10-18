@@ -278,12 +278,12 @@ final class SeedGenerator
             // is undeliverable unless the mail router rewrites it to the operator's inbox.
             $domain = GeneratedDomainRouter::generatedDomain(Slug::from($name));
             $meta[] = ['name' => $name, 'domain' => $domain];
-            $rows[] = [Uuid::v4(), $name, $domain, 'active', false];
+            $rows[] = [Uuid::v4(), $name, $domain, 'active'];
         }
 
         $ids = $this->write(
             'companies',
-            ['public_id', 'name', 'domain', 'status', 'is_system'],
+            ['public_id', 'name', 'domain', 'status'],
             $rows,
             true
         );

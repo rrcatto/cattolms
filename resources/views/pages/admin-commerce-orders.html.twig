@@ -1,19 +1,45 @@
+{#
+	Orders & Payments: every order, newest first, filtered by dates, state and kind of buyer, searched by
+	order number, name, email or account reference, sorted and paged (MoneyRecords::orders). A row opens
+	the order, where payments, evidence and refunds are handled.
+#}
 {% extends layout %}
 {% block page_body %}
-    {% set ph_kicker = 'Administration' %}{% set ph_title = 'Orders & Payments' %}
-    {% set ph_lead = 'Review settlement, bank evidence, refunds and orders requiring attention.' %}
-    {% include '@platform/partials/page-head.html.twig' %}
-    <section class="cl-page-section">
-        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-            {{ ui('layout.section-head', {heading: 'Orders', eyebrow: 'Orders & Payments', summary: 'Find an order by its number or the purchaser\'s email.'}) }}
-            <form action="/admin/commerce/orders" method="get">
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Find order number or purchaser email', for: 'commerce-order-search'})} %}{% block control %}<input id="commerce-order-search" name="search" value="{{ search }}" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Search orders', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
-            </form>
-            <p>The most recent 100 matching orders are shown. A bank receipt requires recorded evidence and a matching full amount before access or credits are issued.</p>
-            {% if orders %}{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}{% block header %}<tr><th>Order</th><th>Purchaser</th><th>Placed</th><th>Amount</th><th>Status</th><th>Action</th></tr>{% endblock %}{% block body %}
-                {% for order in orders %}<tr><td>CL-{{ '%08d'|format(order.id) }}</td><td>{{ order.purchaser_name ?: order.purchaser_email ?: 'Account' }}{% if order.company_id %} · Company{% endif %}</td><td>{{ order.placed_at|date('d M Y H:i') }}</td><td>{{ order.total_label }}</td><td>{{ ui('feedback.badge', {label: order.state|replace({'_':' '})|capitalize, tone: order.state == 'manual_review' ? 'warning' : (order.state == 'fulfilled' ? 'success' : 'neutral')}) }}</td><td>{{ ui('action.link', {label: 'Review', variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id}) }}</td></tr>{% endfor %}
-            {% endblock %}{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'No orders match this search.'}) }}{% endif %}
-        {% endblock %}{% endembed %}
-    </section>
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Orders & Payments' %}
+	{% set ph_lead = 'Review settlement, bank evidence, refunds and orders requiring attention.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Find orders', eyebrow: 'Orders & Payments', summary: 'Both dates are included. A bank receipt needs recorded evidence before access or credits are issued.'}) }}
+		<form action="/admin/commerce/orders" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Placed from', full_width: false, for: 'orders-from'})} %}{% block control %}<input type="date" id="orders-from" name="from" value="{{ filters.from }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Placed to', full_width: false, for: 'orders-to'})} %}{% block control %}<input type="date" id="orders-to" name="to" value="{{ filters.to }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'State', full_width: false, for: 'orders-state'})} %}{% block control %}<select id="orders-state" name="state" {{ ui_field_attrs(props) }}><option value="">Every state</option>{% for key, label in states %}<option value="{{ key }}" {{ filters.state == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bought by', full_width: false, for: 'orders-account'})} %}{% block control %}<select id="orders-account" name="account" {{ ui_field_attrs(props) }}><option value="">People and companies</option><option value="person" {{ filters.account == 'person' ? 'selected' : '' }}>People</option><option value="company" {{ filters.account == 'company' ? 'selected' : '' }}>Companies</option></select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: true, for: 'orders-q'})} %}{% block control %}<input id="orders-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Order number, name, email or account reference" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/orders'}) }}{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</form>
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Orders'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'orders', pagination: orders_pagination})} %}{% block results %}
+			{% if rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% for sh in orders_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: orders_region, sort_results: orders_results} %}{% endfor %}</tr>{% endblock %}
+			{% block body %}
+				{% for order in rows %}
+					<tr data-order-id="{{ order.id }}">
+						<td class="small">{{ order.when }}</td>
+						<td>{{ order.number }}</td>
+						<td>{{ order.company_name ?: order.purchaser_name ?: order.purchaser_email }}{% if order.company_id %} · Company{% endif %}</td>
+						<td>{{ ui('feedback.badge', {label: order.state_label, tone: order.state == 'manual_review' ? 'warning' : (order.state == 'fulfilled' ? 'success' : 'neutral')}) }}</td>
+						<td>{{ order.total_label }}</td>
+						<td>{{ order.paid_label }}</td>
+						<td class="cell-actions">{{ ui('action.link', {label: 'Review', variant: 'secondary', size: 'small', href: order.href, aria_label: 'Review order ' ~ order.number}) }}</td>
+					</tr>
+				{% endfor %}
+			{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: filtered ? 'No order matches these filters.' : 'No orders yet.'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
 {% endblock %}

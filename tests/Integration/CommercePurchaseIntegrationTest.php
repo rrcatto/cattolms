@@ -9,12 +9,13 @@ use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Tests\Support\FakeMailer;
-use CattoLearning\Commerce\Application\{AccessService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,PaymentAdministrationService,RefundAdministrationService,CartService,CheckoutService,CommerceMaintenance};
+use CattoLearning\Application\PlatformAdministrationService;
+use CattoLearning\Commerce\Application\{AccessService,CompanyCreditFulfilment,CoursePurchaseOptions,FulfilmentService,OrderService,PaymentService,PaymentAdministrationService,RefundAdministrationService,CartService,CheckoutService,CommerceMaintenance};
 use CattoLearning\Commerce\Contract\PaymentGatewayInterface;
 use CattoLearning\Commerce\Domain\{PaymentRequest,PaymentResult};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
@@ -54,11 +55,11 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->records=new CommerceRepository($this->db);
         $tx=new TransactionManager($this->db);
         $transitions=$container->get(TransitionService::class);
-        $this->orders=new OrderService($this->records,$tx,new CommercePolicy(dirname(__DIR__,2)),$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->orders=new OrderService($this->records,$tx,WalletFixture::settings($this->db),$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock));
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyCredits=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
         $this->fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyCredits,$this->analytics(),PromotionFixture::service($this->db,$this->clock));
-        $this->payments=$this->paymentService(new OmnipayPaymentGatewayAdapter('test',$this->clock));
+        $this->payments=$this->paymentService(new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'),$this->clock));
     }
     /** Records into this test's transaction, stamped by this test's clock. */
     private function analytics(): AnalyticsEventRecorder
@@ -73,7 +74,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
     }
     private function paymentService(PaymentGatewayInterface $gateway): PaymentService
     {
-        return new PaymentService($this->records,new TransactionManager($this->db),$this->orders,$gateway,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
+        return new PaymentService($this->records,new TransactionManager($this->db),$this->orders,$gateway,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
     }
     private function place(): int
     {
@@ -129,12 +130,12 @@ final class CommercePurchaseIntegrationTest extends TestCase
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $admin=$this->financeAdmin(); $key=Uuid::v4();
-        $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
-        $service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
+        $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345,'The course started on payment; refund mechanics under test.');
+        $service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345,'The course started on payment; refund mechanics under test.');
         self::assertCount(1,$this->events('course_refunded'),'A replayed refund request is not a second refund.');
-        $last=$service->approve($admin,$id,(int)$item['id'],Uuid::v4(),'service_failure','Full remaining remedy.',1,10000);
+        $last=$service->approve($admin,$id,(int)$item['id'],Uuid::v4(),'service_failure','Full remaining remedy.',1,10000,'The course started on payment; refund mechanics under test.');
         $events=$this->events('course_refunded');
         self::assertCount(2,$events);
         self::assertSame([$id,(int)$item['id'],$this->course,$this->actor->id,'course_refunded:refund:'.$first],[(int)$events[0]['order_id'],(int)$events[0]['order_item_id'],(int)$events[0]['course_id'],(int)$events[0]['user_id'],$events[0]['idempotency_key']]);
@@ -209,29 +210,28 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertSame('cancelled',$this->records->order($id)['state']);
         self::assertCount(1,$this->records->documents($id));
     }
-    public function testAutomaticActivationDoesNotMarkLearningStartedAndExpiryIsExact(): void
+    public function testAPaidCourseStartsOnPaymentAndItsAccessEndsExactly(): void
     {
+        $paidAt=$this->clock->now();
         $id=$this->place();$this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $enrolment=(int)$this->db->fetchOne('SELECT e.enrolment_id FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE ce.user_id=:user', ['user'=>$this->actor->id]);
-        $this->clock->modify('+90 days -1 second');
-        self::assertSame('awaiting_activation',$this->access->reconcile($enrolment)['state']);
-        $this->clock->modify('+1 second');
+        $source=$this->records->sources($enrolment)[0];
+        self::assertSame(['active',$paidAt->getTimestamp()],[$source['state'],(new \DateTimeImmutable((string)$source['access_started_at']))->getTimestamp()],'The course started when the payment was confirmed (owner, 2026-10-17).');
+        self::assertNotNull($this->db->fetchOne('SELECT started_at FROM course_enrolments WHERE id=:id',['id'=>$enrolment]),'The course opens at once.');
+        $this->clock->modify('+1 day -1 second');
         self::assertSame('active',$this->access->reconcile($enrolment)['state']);
-        self::assertNull($this->db->fetchOne('SELECT started_at FROM course_enrolments WHERE id=:id',['id'=>$enrolment]));
-        $this->clock->modify('+1 day');
-        self::assertSame('expired',$this->access->reconcile($enrolment)['state']);
-        self::assertSame('assigned',$this->db->fetchOne('SELECT status FROM course_enrolments WHERE id=:id',['id'=>$enrolment]));
+        $this->clock->modify('+1 second');
+        self::assertSame('expired',$this->access->reconcile($enrolment)['state'],'One day after the payment the access period has ended.');
         $this->expectException(\InvalidArgumentException::class);$this->access->assertAccess($enrolment);
     }
-    public function testVoluntaryStartDoesNotRestartAnAutomaticallyRunningClock(): void
+    public function testPressingStartAfterPaymentDoesNotRestartTheClock(): void
     {
         $id=$this->place();$this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $enrolment=(int)$this->db->fetchOne('SELECT e.enrolment_id FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE ce.user_id=:user', ['user'=>$this->actor->id]);
-        $this->clock->modify('+90 days +1 hour');
-        $this->access->start($enrolment);$e=$this->records->sources($enrolment)[0];
-        self::assertNotSame($e['access_started_at'],$this->db->fetchOne('SELECT started_at FROM course_enrolments WHERE id=:id',['id'=>$enrolment]));
-        $this->clock->modify('+1 hour');$this->access->start($enrolment);
-        self::assertSame($e['access_expires_at'],$this->records->sources($enrolment)[0]['access_expires_at']);
+        $expires=$this->records->sources($enrolment)[0]['access_expires_at'];
+        $this->clock->modify('+1 hour');
+        self::assertTrue($this->access->start($enrolment));
+        self::assertSame($expires,$this->records->sources($enrolment)[0]['access_expires_at']);
     }
     public function testFreeAcceptanceStartsAccessWithoutFinancialDocuments(): void
     {
@@ -311,9 +311,9 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertSame(0, $this->records->orderCount($this->actor->id));
         $this->orders->changeCart($this->actor, $this->variant);
         $cart = $this->orders->cart($this->actor);
-        $id = $checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true);
+        $id = $checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true, true);
         self::assertNotNull($id);
-        self::assertSame($id, $checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true));
+        self::assertSame($id, $checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true, true));
         self::assertSame('awaiting_payment', $this->records->order($id)['state']);
         self::assertSame('eft', $this->records->paymentMethod($id));
         self::assertSame([], $this->records->payments($id));
@@ -330,7 +330,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->orders->changeCart($this->actor, $this->variant);
         $cart = $this->orders->cart($this->actor);
         $this->expectException(\RuntimeException::class);
-        $this->checkoutService()->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true);
+        $this->checkoutService()->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true, true);
     }
 
     public function testCheckoutAdvancesWithoutAnIdentityNumberAndNeverStoresOne(): void
@@ -348,7 +348,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $checkout->selectMethod($this->actor, 'dummy', 'demo_failure', false);
         $this->orders->changeCart($this->actor, $this->variant);
         $cart = $this->orders->cart($this->actor);
-        $id = $checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true);
+        $id = $checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true, true);
         self::assertNotNull($id);
         self::assertSame('failed', $this->records->payments($id)[0]['state']);
         $invoice = $this->records->documents($id)[0];
@@ -371,7 +371,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertStringStartsWith('%PDF-', $bytes);
         self::assertSame($bytes, $pdfs->pdf($invoice));
         $mailer = new FakeMailer();
-        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, $pdfs, $mailer, new TransactionManager($this->db), $this->clock);
+        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, $pdfs, $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock));
         $maintenance->deliverInvoices(); $maintenance->deliverInvoices();
         $messages = array_values(array_filter($mailer->messages, fn (array $m): bool => ($m['number'] ?? '') === $invoice['number']));
         self::assertCount(1, $messages);
@@ -386,7 +386,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $checkout = $this->checkoutService();
         $checkout->saveProfile($this->actor, $this->profileFields());
         $checkout->selectMethod($this->actor, 'eft', 'demo_success', true);
-        self::assertNull($checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true));
+        self::assertNull($checkout->place($this->actor, (int) $cart['id'], (string) $cart['quote'], true, true));
         self::assertSame(0, $this->records->orderCount($this->actor->id));
         self::assertSame([], $this->orders->cart($this->actor)['items']);
     }
@@ -410,20 +410,15 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertCount(2,$this->records->documents($id));
     }
 
-    public function testBankAmountMismatchCannotCreatePaymentOrAccess(): void
+    public function testABankPaymentBelowTheTotalLeavesTheOrderWaitingForTheRest(): void
     {
         $id=$this->place(); $this->records->selectPaymentMethod($id,'eft');
         $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
-        try {
-            $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),100,'2026-09-12T11:00:00+02:00','BANK-MISMATCH','Amount did not match invoice.');
-            self::fail('A partial bank receipt cannot fulfil the order.');
-        } catch (\RuntimeException $error) {
-            self::assertStringContainsString('exact order total',$error->getMessage());
-        }
-        self::assertSame([],$this->records->payments($id));
-        self::assertSame('awaiting_payment',$this->records->order($id)['state']);
+        $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),100,'2026-09-12T11:00:00+02:00','BANK-PART','One rand of the order arrived.');
+        self::assertSame([['manual_bank',100,'paid']],array_map(static fn(array $p): array => [$p['gateway'],(int)$p['amount_minor'],$p['state']],$this->records->payments($id)),'What arrived is recorded (owner, 2026-10-17)');
+        self::assertSame(['awaiting_payment',12245],[$this->records->order($id)['state'],$this->records->dueAmount($id)],'and the order waits for the rest');
+        self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]),'with no access yet.');
     }
-
     public function testLateBankPaymentNeedsExplicitReconciliationBeforeFulfilment(): void
     {
         $id=$this->place(); $this->records->selectPaymentMethod($id,'eft'); $this->clock->modify('+8 days');
@@ -437,32 +432,88 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
     }
 
-    public function testBankReceiptAfterAutomaticCancellationIsPreservedForReview(): void
+    public function testABankReceiptAfterTheCancellationBecomesWalletCredit(): void
     {
         $id=$this->place(); $this->records->selectPaymentMethod($id,'eft'); $this->clock->modify('+8 days');
         self::assertTrue($this->orders->cancelDue($id));
         $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,$this->fulfilment,IntegrationContainer::get()->get(TransitionService::class),$this->clock);
         $service->confirmBank($this->financeAdmin(),$id,Uuid::v4(),12345,'2026-09-20T11:00:00+02:00','BANK-CANCELLED-'.Uuid::v4(),'Receipt arrived after order cancellation.');
-        self::assertSame('manual_review',$this->records->order($id)['state']);
+        self::assertSame('cancelled',$this->records->order($id)['state'],'The order stays cancelled');
         self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_manual_payment_evidence WHERE order_id=:id',['id'=>$id]));
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN commerce_order_items i ON i.id=e.order_item_id WHERE i.order_id=:id',['id'=>$id]));
+        self::assertSame(12345,WalletFixture::wallets($this->db,$this->clock)->balance(\CattoLearning\Commerce\Wallet\WalletOwner::person($this->actor->id)),'and the money is the payer\'s wallet credit.');
     }
-
     public function testPartialThenFullRefundCreditsFundsAndRevokesOnlyAfterFullItemRefund(): void
     {
         $id=$this->place(); $this->payments->purchase($this->actor,$id,Uuid::v4(),'demo_success');
         $item=$this->records->items($id)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $admin=$this->financeAdmin(); $key=Uuid::v4();
-        $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345);
-        self::assertSame($first,$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345));
+        $first=$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345,'The course started on payment; refund mechanics under test.');
+        self::assertSame($first,$service->approve($admin,$id,(int)$item['id'],$key,'goodwill','Partial goodwill remedy.',1,2345,'The course started on payment; refund mechanics under test.'));
         self::assertSame('partially_refunded',$this->records->order($id)['state']);
-        self::assertSame('awaiting_activation',$this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:item',['item'=>$item['id']]));
-        $service->approve($admin,$id,(int)$item['id'],Uuid::v4(),'service_failure','Full remaining remedy.',1,10000);
+        self::assertSame('active',$this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:item',['item'=>$item['id']]),'A partial refund leaves the access running.');
+        $service->approve($admin,$id,(int)$item['id'],Uuid::v4(),'service_failure','Full remaining remedy.',1,10000,'The course started on payment; refund mechanics under test.');
         self::assertSame('refunded',$this->records->order($id)['state']);
         self::assertSame('revoked',$this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:item',['item'=>$item['id']]));
-        self::assertSame(12345,(int)$this->db->fetchOne('SELECT SUM(amount_minor) FROM commerce_fund_entries WHERE account_id IN (SELECT id FROM commerce_fund_accounts WHERE owner_user_id=:user)',['user'=>$this->actor->id]));
+        self::assertSame(12345,WalletFixture::wallets($this->db,$this->clock)->balance(\CattoLearning\Commerce\Wallet\WalletOwner::person($this->actor->id)));
         self::assertSame(2,(int)$this->db->fetchOne("SELECT COUNT(*) FROM commerce_documents WHERE order_id=:id AND kind='credit_note'",['id'=>$id]));
         self::assertStringStartsWith('%PDF-',IntegrationContainer::get()->get(FinancialDocuments::class)->pdf($this->records->documents($id)[2]));
+    }
+    /** Makes the user an active member of a new company: a company account. */
+    private function joinCompany(int $userId): void
+    {
+        $company=(int)$this->db->fetchOne("INSERT INTO companies (public_id,name,domain,status,created_by_user_id) VALUES (:public,:name,:domain,'active',:user) RETURNING id",
+            ['public'=>Uuid::v4(),'name'=>'Member fixture','domain'=>'member-'.bin2hex(random_bytes(5)).'.invalid','user'=>$userId]);
+        $this->db->executeStatement("INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:company,:user,'student','active',NOW())",['company'=>$company,'user'=>$userId]);
+    }
+
+    /** Owner, 2026-10-18: a company learner account never buys; its courses come from its company. */
+    public function testACompanyAccountCannotBuyAnyCourseOrBundleFreeOrPaid(): void
+    {
+        $this->orders->changeCart($this->actor,$this->variant);
+        $this->joinCompany($this->actor->id);
+        self::assertFalse($this->orders->mayBuy($this->actor));
+        $cart=$this->orders->cart($this->actor);
+        try {
+            $this->orders->place($this->actor,(int)$cart['id'],(string)$cart['quote'],BillingFixture::person('Buyer Billing'),true);
+            self::fail('A course already in the cart is not bought by a company account.');
+        } catch (\RuntimeException $e) { self::assertSame(OrderService::COMPANY_ACCOUNT,$e->getMessage()); }
+        $this->orders->changeCart($this->actor,$this->variant,true);
+        self::assertSame([],$this->orders->cart($this->actor)['items'],'It can still empty a cart it had before.');
+        try { $this->orders->changeCart($this->actor,$this->variant); self::fail('Add to cart is refused.'); }
+        catch (\RuntimeException $e) { self::assertSame(OrderService::COMPANY_ACCOUNT,$e->getMessage()); }
+        try { $this->orders->validateBundle([],[],$this->actor->id); self::fail('A bundle is refused.'); }
+        catch (\RuntimeException $e) { self::assertSame(OrderService::COMPANY_ACCOUNT,$e->getMessage()); }
+        $this->db->executeStatement('UPDATE course_price_variants SET price_minor_units=0 WHERE id=:id',['id'=>$this->variant]);
+        try { $this->fulfilment->acceptFree($this->actor,$this->variant); self::fail('A free course is refused.'); }
+        catch (\RuntimeException $e) { self::assertSame(OrderService::COMPANY_ACCOUNT,$e->getMessage()); }
+        self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_orders WHERE purchaser_user_id=:u',['u'=>$this->actor->id]));
+        self::assertFalse($this->records->hasOpenEnrolment($this->actor->id,$this->course));
+        self::assertFalse((new CartService($this->auth($this->actor),$this->orders,$this->records))->summary()['buyer'],'It is shown no cart.');
+    }
+
+    public function testTheCoursePageOffersACompanyAccountOnlyARequestAndAPrivateAccountOnlyBuying(): void
+    {
+        $options=IntegrationContainer::get()->get(CoursePurchaseOptions::class);
+        $course=['id'=>$this->course,'slug'=>'frozen','status'=>'published'];
+        $viewer=new CurrentUser($this->actor->id,Uuid::v4(),'buyer@example.invalid','Buyer',['STUDENT'],['CATALOGUE.COURSE.REQUEST','COMMERCE.CART.MANAGE'],Uuid::v4());
+        $private=$options->for($course,$viewer,'/courses/frozen');
+        self::assertSame(['available',true,false,''],[$private['state'],$private['can_buy'],$private['can_request'],$private['company_note']],'A private account belongs to no company: it buys and has no company to ask.');
+        self::assertTrue($this->orders->mayBuy($viewer));
+        $guest=$options->for($course,null,'/courses/frozen');
+        self::assertSame([true,false],[$guest['can_buy'],$guest['can_request']]);
+        $this->joinCompany($this->actor->id);
+        $company=$options->for($course,$viewer,'/courses/frozen');
+        self::assertSame(['available',false,true,OrderService::COMPANY_ACCOUNT],[$company['state'],$company['can_buy'],$company['can_request'],$company['company_note']]);
+    }
+
+    public function testOnlyACompanyAccountCanAskItsCompanyForACourse(): void
+    {
+        $requests=IntegrationContainer::get()->get(PlatformAdministrationService::class);
+        try { $requests->requestCourse($this->actor->id,$this->course,86400,''); self::fail('A private account has no company to ask.'); }
+        catch (\InvalidArgumentException $e) { self::assertSame('Only a company account can ask its company for a course.',$e->getMessage()); }
+        $this->joinCompany($this->actor->id);
+        self::assertGreaterThan(0,$requests->requestCourse($this->actor->id,$this->course,86400,''));
     }
 }

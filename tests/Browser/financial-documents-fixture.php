@@ -122,7 +122,7 @@ if ($action === 'create') {
     $paid = $place($learnerActor, [$courses['a']['variant']], [$bundle['offer']], $ten);
     $container->get(PaymentService::class)->purchase($learnerActor, $paid, Uuid::v4(), 'demo_success');
     $line = array_values(array_filter($records->items($paid), static fn(array $item): bool => (int) $item['course_id'] === $courses['a']['id']))[0];
-    $container->get(RefundAdministrationService::class)->approve($adminActor, $paid, (int) $line['id'], Uuid::v4(), 'goodwill', 'The learner asked for this course to be refunded.', 1, 108000);
+    $container->get(RefundAdministrationService::class)->approve($adminActor, $paid, (int) $line['id'], Uuid::v4(), 'goodwill', 'The learner asked for this course to be refunded.', 1, 108000, 'The course started on payment; a refund for the credit note sample.');
     $zero = $place($learnerActor, [$courses['d']['variant']], [], $free);
     $container->get(PaymentService::class)->settleWithoutPayment($learnerActor, $zero);
     $eft = $place($buyer($eftBuyer), [$courses['b']['variant']], [], null, 'eft');

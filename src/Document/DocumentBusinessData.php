@@ -8,13 +8,16 @@ Date time: 2026/10/07 SAST
 Version: 0.8.8.9
 
 Description:
-The business.* values every document type's templates may use, from what CattoLMS actually holds:
-the platform name from Settings, the System Company's billing profile (legal name, address and tax
-number), the contact address platform mail carries, and the installation's web address. A value
-that is not configured is absent, so a template's {{#if}} leaves it out rather than printing a
-blank label.
+The business.* values every document type's templates may use: the seller, which is the Site Owner
+(owner, 2026-10-18), from Configuration\SiteOwner - its trading name, legal name, registration number,
+tax number, address, telephone, email address and website. A value that is not set is absent, so a
+template's {{#if}} leaves it out rather than printing a blank label. A document captures these in its
+stored values when it is issued, so a later change never alters an issued document.
 
 Changelog:
+2026/10/18 SAST
+- The seller is the Site Owner, no longer the System Company's billing profile; business.registration_number
+  and business.phone added.
 2026/10/07 SAST
 - Created for certificates on the document template engine (Phase J); invoices use it in Phase K.
 */
@@ -23,33 +26,26 @@ declare(strict_types=1);
 
 namespace CattoLearning\Document;
 
-use CattoLearning\Commerce\Infrastructure\BillingProfileRepository;
-use CattoLearning\Configuration\RuntimeSettings;
-use CattoLearning\Infrastructure\Persistence\CompanyRepository;
-use CattoLearning\Support\Env;
+use CattoLearning\Configuration\SiteOwner;
 
 final class DocumentBusinessData
 {
-    public function __construct(
-        private readonly RuntimeSettings $settings,
-        private readonly CompanyRepository $companies,
-        private readonly BillingProfileRepository $billing,
-    ) {}
+    public function __construct(private readonly SiteOwner $owner) {}
 
     /** @return array<string,mixed> */
     public function values(): array
     {
-        $system = $this->companies->systemCompany();
-        $profile = $system === null ? null : $this->billing->forCompany((int) $system['id']);
-        $website = rtrim(Env::string('APP_URL'), '/');
-        $email = $this->settings->contactEmail();
+        $value = fn(string $field): ?string => $this->owner->value($field) !== '' ? $this->owner->value($field) : null;
+        $website = $value('website');
         return [
-            'business.name' => $this->settings->platformName(),
-            'business.legal_name' => $profile?->name,
-            'business.address' => $profile === null ? null : $profile->addressLines(),
-            'business.tax_number' => $profile?->taxRegistrationNumber,
-            'business.email' => $email !== '' ? $email : null,
-            'business.website' => preg_match('#^https?://#i', $website) === 1 ? $website : null,
+            'business.name' => $this->owner->value('trading_name'),
+            'business.legal_name' => $value('legal_name'),
+            'business.registration_number' => $value('registration_number'),
+            'business.address' => $this->owner->addressLines() === [] ? null : $this->owner->addressLines(),
+            'business.tax_number' => $value('tax_number'),
+            'business.phone' => $value('phone'),
+            'business.email' => $value('email'),
+            'business.website' => $website === null ? null : 'https://' . $website,
         ];
     }
 }

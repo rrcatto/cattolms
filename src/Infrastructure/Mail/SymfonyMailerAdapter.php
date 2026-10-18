@@ -32,6 +32,7 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Mail;
 
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Support\Env;
 use RuntimeException;
 use Symfony\Component\Mailer\Mailer;
@@ -41,7 +42,7 @@ use Symfony\Component\Mime\Email;
 
 class SymfonyMailerAdapter implements MailerInterface
 {
-    public function __construct(private readonly RuntimeSettings $settings)
+    public function __construct(private readonly RuntimeSettings $settings, private readonly ?SiteMode $site = null)
     {
     }
 
@@ -114,6 +115,30 @@ class SymfonyMailerAdapter implements MailerInterface
             . $decision . '.</p><p>' . $this->escape($detail) . '</p>',
             "Your request for {$courseTitle} was {$decision}.\n\n{$detail}"
         );
+    }
+
+    public function sendWalletExpiryReminder(string $email, string $name, array $lines, string $walletUrl): void
+    {
+        $html = '';
+        $text = '';
+        foreach ($lines as $line) {
+            $html .= '<li>' . $this->escape($line['amount']) . ' expires on ' . $this->escape($line['expires']) . '</li>';
+            $text .= '- ' . $line['amount'] . ' expires on ' . $line['expires'] . "\n";
+        }
+        $this->send(
+            $email,
+            'Your wallet credit is expiring soon',
+            '<p>Hello ' . $this->escape($name) . ',</p><p>Some of your wallet credit will expire if it is not spent:</p><ul>' . $html . '</ul>'
+            . '<p>Spend it on a course before then. <a href="' . $this->escape($walletUrl) . '">Open your wallet</a></p>',
+            "Hello {$name},\n\nSome of your wallet credit will expire if it is not spent:\n\n{$text}\nSpend it on a course before then: {$walletUrl}"
+        );
+    }
+
+    public function sendAdministratorMessage(string $email, string $subject, string $body): void
+    {
+        $paragraphs = array_filter(array_map('trim', preg_split('/\R{2,}/', $body) ?: []), static fn(string $p): bool => $p !== '');
+        $html = implode('', array_map(fn(string $p): string => '<p>' . nl2br($this->escape($p)) . '</p>', $paragraphs));
+        $this->send($email, $subject, $html, $body);
     }
 
     public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void
@@ -189,6 +214,12 @@ class SymfonyMailerAdapter implements MailerInterface
             throw new RuntimeException('Cannot send email to an invalid address.');
         }
 
+        // Every email from a demo site says so (SiteMode, owner 2026-10-18), in its subject and first line.
+        if ($this->site?->isDemo() ?? false) {
+            $subject = SiteMode::EMAIL_PREFIX . $subject;
+            $html = '<p><strong>' . $this->escape(SiteMode::EMAIL_NOTICE) . '</strong></p>' . $html;
+            $text = SiteMode::EMAIL_NOTICE . "\n\n" . $text;
+        }
         $configuration = $this->settings->mailConfiguration();
         $mailer = new Mailer(Transport::fromDsn($configuration['dsn']));
         $from = new Address($configuration['from_address'], $configuration['from_name']);

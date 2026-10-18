@@ -48,7 +48,6 @@ final class CourseContentEditorPageTest extends TestCase
         $suffix = $this->suffix = $this->fixture->suffix();
         $this->owner = $this->fixture->createUser('Content Editor ' . $suffix, 'content-editor-' . $suffix . '@seed.test');
         $this->fixture->grantRole($this->owner, 'ADMIN');
-        $this->fixture->attachToSystemCompany($this->owner);
         $company = $this->fixture->createCompany($this->owner, 'Content Editor ' . $suffix, 'content-editor-' . $suffix . '.seed.test');
         $this->course = $this->fixture->createCourse($this->owner, $company, 'content-editor-' . $suffix, 'Content Editor ' . $suffix);
         $this->section = $this->items->addSection($this->course, ['title' => 'Week one'], $this->owner);

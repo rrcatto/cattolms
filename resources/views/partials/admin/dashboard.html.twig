@@ -94,3 +94,49 @@
 
 {% endblock %}
 {% endembed %}
+{% if attention_items is defined and attention_items is not null %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Transactions that need attention', eyebrow: 'Recent activity', summary: 'Money matters waiting for you, oldest first. Open one to see it and to email the person.'}) }}
+	{% if attention_items %}
+	{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+	{% block body %}
+		{% for entry in attention_items %}
+		{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+		{# The title is the link, so each says where it goes (a list of links all named Open does not). #}
+		{% block body %}<strong><a href="{{ entry.href }}">{{ entry.title }}</a></strong><p>{{ entry.summary }}</p>{% endblock %}
+		{% endembed %}
+		{% endfor %}
+	{% endblock %}
+	{% endembed %}
+	{% else %}{{ ui('feedback.empty', {summary: 'Nothing needs your attention.'}) }}{% endif %}
+{% endblock %}
+{% endembed %}
+{% endif %}
+{# The money of a period (MoneyRecords::dashboard, owner 2026-10-18): each figure opens the list it adds up, for the same period. #}
+{% if money is defined and money is not null %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Money', eyebrow: money.period.label, summary: money.period.from ~ ' to ' ~ money.period.to ~ '. What came in and went out, what the wallets hold, and the orders placed. Open a figure for what it adds up.'}) }}
+	<form action="/admin/dashboard" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'money-period'})} %}{% block control %}<select id="money-period" name="money_period" {{ ui_field_attrs(props) }}>{% for key, label in money.periods %}<option value="{{ key }}" {{ money.period.key == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From (with Dates)', full_width: false, for: 'money-from'})} %}{% block control %}<input type="date" id="money-from" name="money_from" value="{{ money.period.key == 'custom' ? money.period.from : '' }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To (with Dates)', full_width: false, for: 'money-to'})} %}{% block control %}<input type="date" id="money-to" name="money_to" value="{{ money.period.key == 'custom' ? money.period.to : '' }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Open the Money Ledger for this period', variant: 'secondary', size: 'normal', href: money.ledger_href}) }}{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</form>
+	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}{% block body %}
+		{% for figure in money.figures %}{{ ui('data.stat-card', figure) }}{% endfor %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
+		<div>
+			<h3 class="h5">Money in by {{ money.chart_unit }}</h3>
+			{% if money.chart %}{% include '@platform/partials/distribution-chart.html.twig' with {dc_rows: money.chart, dc_label: 'Money in by ' ~ money.chart_unit} %}{% else %}<p>No money came in during this period.</p>{% endif %}
+		</div>
+		<div>
+			<h3 class="h5">Money received by method</h3>
+			{% if money.by_method %}{% include '@platform/partials/distribution-chart.html.twig' with {dc_rows: money.by_method, dc_label: 'Money received by method'} %}{% else %}<p>No payment was received during this period.</p>{% endif %}
+		</div>
+	{% endblock %}{% endembed %}
+{% endblock %}
+{% endembed %}
+{% endif %}

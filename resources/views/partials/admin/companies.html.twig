@@ -1,16 +1,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Companies on the platform', eyebrow: 'Companies', summary: 'Companies whose staff are trained, and the System Company.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
-		{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
-{% block body %}
-
-			<div>
-				<strong>System Company:</strong> the permanent host organisation. It cannot be disabled or deleted.
-			</div>
-
-{% endblock %}
-{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Companies on the platform', eyebrow: 'Companies', summary: 'Companies whose staff are trained.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
 		{% include '@platform/partials/admin/company-modals.html.twig' with {cm_rows: companies} %}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'companies', pagination: companies_pagination, search: {ds_name: 'companies', ds_label: 'Search course consumers', ds_value: companies_search, ds_action: '/admin/companies'}})} %}
@@ -32,9 +23,6 @@
 								<tr>
 									<td title="{{ company.name }} · {{ company.domain }}">
 										<strong>{{ company.name }}</strong>
-										{% if company.is_system %}
-											{{ ui('feedback.badge', {label: 'System', tone: 'permanent'}) }}
-										{% endif %}
 									</td>
 									<td>
 										{{ company.people_count }}

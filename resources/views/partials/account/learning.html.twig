@@ -15,9 +15,9 @@
 
 										<tr>
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Course'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Status'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Status', wide: true}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Progress'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access', wide: true}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Actions'}} %}
 										</tr>
 
@@ -88,7 +88,7 @@
 
 										<tr>
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 60, label: 'Course'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Result'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Result', wide: true}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Grade'}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
 										</tr>
@@ -146,7 +146,7 @@
 
 										<tr>
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 70, label: 'Course'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Level'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Level', wide: true}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
 										</tr>
 
@@ -164,7 +164,7 @@
 												<td class="small">
 													{{ course.level ?: '—' }}
 												</td>
-												<td>
+												<td class="cell-actions">
 													{{ ui('action.link', {label: 'View', variant: 'primary', size: 'small', href: '/courses/' ~ (course.slug)}) }}
 												</td>
 											</tr>
@@ -201,7 +201,7 @@
 
 										<tr>
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 58, label: 'Course'}} %}
-											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Requested'}} %}
+											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Requested', wide: true}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Status'}} %}
 											{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
 										</tr>
@@ -220,7 +220,7 @@
 												<td>
 													{{ ui('feedback.badge', {label: (request.status), tone: request.status=='pending' ? 'warning' : 'info'}) }}
 												</td>
-												<td>
+												<td class="cell-actions">
 													{{ ui('action.link', {label: 'View course', variant: 'secondary', size: 'small', href: '/courses/' ~ (request.slug)}) }}
 												</td>
 											</tr>

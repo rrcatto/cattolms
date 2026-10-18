@@ -1,0 +1,40 @@
+{# A wallet's balance, expiring credit, optional correction form and statement (WalletController). #}
+    <section class="cl-page-section">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Balance', eyebrow: ph_title, summary: is_company ? 'Credit the company can spend on course credits. It is not paid out as cash.' : 'Credit you can spend on any course. It is not paid out as cash.'}) }}
+            {{ ui('data.key-value-list', {items: [{label: 'Wallet balance', value: balance_label}]}) }}
+            <p>Each credit expires {{ expiry_words }} after it was added, if it has not been spent. The oldest credit is spent first, and we email a reminder {{ reminder_words }} before any credit expires. Wallet credit earns no interest.</p>
+            {% if expiring %}
+            {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Credit expiring soon'})} %}{% block body %} {% for credit in expiring %}{{ credit.amount_label }} expires on {{ credit.expires_label }}.{% if not loop.last %} {% endif %}{% endfor %} Spend it on {{ is_company ? 'course credits' : 'a course' }} before then.{% endblock %}{% endembed %}
+            {% endif %}
+            {% if can_correct|default(false) %}
+            <form action="{{ correct_href }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+                <h3 class="h5">Make a correction</h3>
+                <p class="help">A correction is a new line in the statement. Nothing earlier changes. A positive amount adds credit; a negative amount takes credit away, oldest first.</p>
+                {% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount (ZAR)', for: 'correction-amount', required: true, help: 'Such as 150.00 or -150.00'})} %}{% block control %}<input id="correction-amount" name="amount" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason', for: 'correction-reason', required: true})} %}{% block control %}<textarea id="correction-reason" name="reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                {% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the correction', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+            {% endif %}
+        {% endblock %}{% endembed %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Statement', eyebrow: 'Every movement', summary: 'Newest first, with the balance after each movement.'}) }}
+            {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'statement', pagination: statement_pagination})} %}
+            {% block results %}
+            {% if rows %}
+            {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+            {% block body %}
+            {% for row in rows %}
+            {% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+            {% block body %}{{ row.occurred_at|date('j M Y H:i') }} · <strong>{{ row.label }}</strong>{% if row.order_label %} · {{ row.order_label }}{% endif %}{% if row.memo %} · {{ row.memo }}{% endif %} · {% if row.in_label %}+{{ row.in_label }}{% else %}−{{ row.out_label }}{% endif %} · balance {{ row.balance_label }}{% endblock %}
+            {% endembed %}
+            {% endfor %}
+            {% endblock %}
+            {% endembed %}
+            {% else %}{{ ui('feedback.empty', {summary: 'Nothing has moved in this wallet yet.'}) }}{% endif %}
+            {% endblock %}
+            {% endembed %}
+        {% endblock %}{% endembed %}
+    </section>

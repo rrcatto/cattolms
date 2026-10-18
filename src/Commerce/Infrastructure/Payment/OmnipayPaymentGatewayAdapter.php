@@ -3,6 +3,7 @@
 declare(strict_types=1);
 namespace CattoLearning\Commerce\Infrastructure\Payment;
 
+use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Commerce\Contract\PaymentGatewayInterface;
 use CattoLearning\Commerce\Domain\PaymentRequest;
 use CattoLearning\Commerce\Domain\PaymentResult;
@@ -11,17 +12,20 @@ use Symfony\Component\Clock\ClockInterface;
 use RuntimeException;
 use Throwable;
 
-/** Executes the initial Dummy driver through Omnipay; simulation tokens never contain customer cards. */
+/**
+ * Executes the initial Dummy driver through Omnipay; simulation tokens never contain customer cards.
+ * Simulated card payments work only on a demo site (SiteMode), never on a live one, whatever APP_ENV says.
+ */
 final class OmnipayPaymentGatewayAdapter implements PaymentGatewayInterface
 {
-    public function __construct(private readonly string $environment, private readonly ClockInterface $clock) {}
+    public function __construct(private readonly SiteMode $site, private readonly ClockInterface $clock) {}
     public function id(): string { return 'dummy'; }
     /** @return list<string> */
     public function capabilities(): array { return ['purchase']; }
     public function purchase(PaymentRequest $request): PaymentResult
     {
-        if (!in_array($this->environment, ['development','dev','test'], true)) {
-            throw new RuntimeException('The Dummy payment gateway is unavailable outside development and tests.');
+        if (!$this->site->isDemo()) {
+            throw new RuntimeException('Simulated card payments are available only on a demo site.');
         }
         if (!in_array($request->methodToken, ['demo_success','demo_failure'], true)) {
             throw new RuntimeException('Choose a simulated payment outcome.');

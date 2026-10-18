@@ -1,9 +1,11 @@
 {#
   The acceptance both checkouts require before an order is placed: the Terms and Conditions and the
   Refund Policy, named and linked beside the tick box. Placement refuses without accept_terms, and
-  the order's snapshot records the version of each that was accepted (LegalDocuments). The links
-  open in a new tab so the checkout keeps what the purchaser has entered.
+  the order's snapshot records when they were accepted (consent.accepted_at), which with each
+  document's date shows the wording that applied. The links open in a new tab so the checkout keeps
+  what the purchaser has entered. On a demo site (SiteMode) it first says the purchase is a simulation.
 #}
+{% if site_demo|default(false) %}{{ ui('feedback.notice', {tone: 'warning', heading: site_simulation}) }}{% endif %}
 {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I have read and accept the Terms and Conditions and the Refund Policy.'})} %}
 {% block control %}
 <input type="checkbox" name="accept_terms" value="yes" required>

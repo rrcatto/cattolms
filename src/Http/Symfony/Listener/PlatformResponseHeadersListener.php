@@ -10,8 +10,9 @@ Version: 0.7
 Description:
 Puts the platform's standing response headers on every response the Symfony kernel returns.
 
-Architectural boundary: HTTP edge. It reads nothing and decides nothing; it only ensures a header
-set is present.
+Architectural boundary: HTTP edge. It decides nothing; it only ensures a header set is present. On a
+demo site (SiteMode, owner 2026-10-18) that set includes X-Robots-Tag: noindex, nofollow, so search
+engines list no page, PDF or picture of it; pages say the same in their robots meta tag.
 
 Why it exists. Fat-Free emitted X-Frame-Options, X-XSS-Protection and X-Content-Type-Options on every
 response it serves, so every page and every API document the platform has ever returned carries
@@ -23,6 +24,8 @@ listener rather than something a base controller does.
 A header a controller set deliberately is left alone.
 
 Changelog:
+2026/10/18 SAST
+- X-Robots-Tag: noindex, nofollow on every response of a demo site.
 2026/09/08 21:10 SAST
 - Created with the Symfony routing seam.
 */
@@ -31,6 +34,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Symfony\Listener;
 
+use CattoLearning\Configuration\SiteMode;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -43,6 +47,8 @@ final class PlatformResponseHeadersListener implements EventSubscriberInterface
         'X-Content-Type-Options' => 'nosniff',
     ];
 
+    public function __construct(private readonly ?SiteMode $site = null) {}
+
     /** @return array<string,string> */
     public static function getSubscribedEvents(): array
     {
@@ -52,7 +58,8 @@ final class PlatformResponseHeadersListener implements EventSubscriberInterface
     public function onResponse(ResponseEvent $event): void
     {
         $headers = $event->getResponse()->headers;
-        foreach (self::HEADERS as $name => $value) {
+        $set = self::HEADERS + (($this->site?->isDemo() ?? false) ? ['X-Robots-Tag' => 'noindex, nofollow'] : []);
+        foreach ($set as $name => $value) {
             if (!$headers->has($name)) {
                 $headers->set($name, $value);
             }

@@ -40,6 +40,7 @@ final class PlatformExtension extends AbstractExtension
         return [
             new TwigFilter('ucfirst', self::ucfirst(...)),
             new TwigFilter('urlencode', self::urlencode(...)),
+            new TwigFilter('account_reference', self::accountReference(...)),
         ];
     }
 
@@ -47,6 +48,12 @@ final class PlatformExtension extends AbstractExtension
     public static function ucfirst(?string $value): string
     {
         return ucfirst((string) $value);
+    }
+
+    /** An account reference as people read and type it: CL-20261017-0001-U. */
+    public static function accountReference(?string $value): string
+    {
+        return \CattoLearning\Support\AccountReference::format((string) $value);
     }
 
     /** Percent-encodes a value for a query string, where a space is a plus sign. */

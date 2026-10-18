@@ -23,8 +23,7 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
-use CattoLearning\Commerce\Domain\RefundRule;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Commerce\Settings\CommerceSettings;
 use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -38,7 +37,7 @@ final class LegalController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly LegalDocuments $legal,
-        private readonly CommercePolicy $policy
+        private readonly CommerceSettings $settings
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -70,9 +69,14 @@ final class LegalController extends BaseController
             'legal' => $document,
             'legal_documents' => $this->legal->all(),
             'supplier' => $this->legal->supplier(),
-            'refund_window_days' => RefundRule::WINDOW_DAYS,
-            'activation_deadline_days' => $this->policy->activationDeadlineDays,
-            'payment_due_days' => $this->policy->paymentDueDays,
+            // The periods and fees the documents state, from the commerce settings in force now.
+            'refund_window' => $this->settings->refundWindow()->words(),
+            'payment_due' => $this->settings->paymentDue()->words(),
+            'wallet_expiry' => $this->settings->walletExpiry()->words(),
+            'wallet_reminder' => $this->settings->walletReminder()->words(),
+            'stitch_fee' => $this->settings->stitchFee()->words(),
+            'stitch_refund_fee' => $this->settings->stitchRefundFee()->words(),
+            'eft_refund_fee' => $this->settings->eftRefundFee()->words(),
         ]);
     }
 }

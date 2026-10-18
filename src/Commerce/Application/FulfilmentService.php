@@ -44,7 +44,12 @@ final class FulfilmentService
             if ($this->records->fulfilledItem((int)$item['id'])) continue;
             $snapshot=CommerceRepository::decode((string)$item['snapshot']);
             $now=$this->clock->now();
-            $enrolment=$this->records->createEntitlement((int)$item['id'],(int)$item['beneficiary_user_id'],(int)$item['course_id'],(int)$item['access_period_seconds'],'paid_order',$snapshot,$now->format(DATE_ATOM),$now->modify('+'.(int)$snapshot['activation_deadline_days'].' days')->format(DATE_ATOM));
+            // Every course starts the moment its payment is confirmed (owner, 2026-10-17): the source's
+            // activation deadline is now, so it is active from fulfilment.
+            $enrolment=$this->records->createEntitlement((int)$item['id'],(int)$item['beneficiary_user_id'],(int)$item['course_id'],(int)$item['access_period_seconds'],'paid_order',$snapshot,$now->format(DATE_ATOM),$now->format(DATE_ATOM));
+            // Started on payment: the access period runs from now and the learner's start is recorded
+            // now too, so the course opens straight away and its timing counts from the payment.
+            $this->access->start($enrolment);
             $this->records->audit((int)$order['id'],null,'entitlement.created',['enrolment_id'=>$enrolment,'order_item_id'=>$item['id']],$now->format(DATE_ATOM));
             $this->records->enqueue('entitlement:'.$enrolment,'entitlement.created',['enrolment_id'=>$enrolment,'user_id'=>$item['beneficiary_user_id'],'course_title'=>$snapshot['course_title']],$now->format(DATE_ATOM));
         }
@@ -71,7 +76,8 @@ final class FulfilmentService
         $snapshot=CommerceRepository::decode((string)$item['snapshot']);
         $user=(int)$item['beneficiary_user_id'];
         $now=$this->clock->now();
-        $deadline=$now->modify('+'.(int)$snapshot['activation_deadline_days'].' days')->format(DATE_ATOM);
+        // Every course in the bundle starts when its payment is confirmed (owner, 2026-10-17).
+        $deadline=$now->format(DATE_ATOM);
         $shared=[];
         foreach($this->records->bundleGrants((int)$item['id']) as $grant) $shared[(int)$grant['course_id']]=(bool)$grant['shared_at_grant'];
         foreach((array)$snapshot['courses'] as $course) {
@@ -83,13 +89,14 @@ final class FulfilmentService
             else $enrolment=$this->records->createEnrolment($user,$courseId,(int)$item['access_period_seconds'],'bundle',(int)$item['id'],$now->format(DATE_ATOM));
             $source=$this->records->addSource((int)$item['id'],$enrolment,'bundle',(int)$item['access_period_seconds'],
                 ['course_id'=>$courseId,'course_title'=>(string)$course['title'],'bundle_id'=>(int)$snapshot['bundle_id'],'bundle_title'=>(string)$snapshot['bundle_title'],
-                    'order_item_id'=>(int)$item['id'],'access_period_seconds'=>(int)$item['access_period_seconds'],'activation_deadline_days'=>(int)$snapshot['activation_deadline_days']],
+                    'order_item_id'=>(int)$item['id'],'access_period_seconds'=>(int)$item['access_period_seconds'],'start'=>'immediate'],
                 $now->format(DATE_ATOM),$deadline);
             $this->records->recordBundleGrant((int)$item['id'],$courseId,$enrolment,$source,$held,$now->format(DATE_ATOM));
             $this->records->audit((int)$order['id'],null,'entitlement.created',['enrolment_id'=>$enrolment,'entitlement_id'=>$source,'order_item_id'=>(int)$item['id'],'course_id'=>$courseId,'bundle_id'=>(int)$snapshot['bundle_id'],'shared'=>$held],$now->format(DATE_ATOM));
             $this->records->enqueue('entitlement:'.$source,'entitlement.created',['enrolment_id'=>$enrolment,'user_id'=>$user,'course_title'=>(string)$course['title']],$now->format(DATE_ATOM));
-            // A learner who already started the course has this source running from now.
-            $this->access->reconcile($enrolment);
+            // The source runs from now, whether or not the learner already had the course, and the
+            // course counts as started on payment.
+            $this->access->start($enrolment);
             $shared[$courseId]=$held;
         }
         $this->analytics->recordSafely(AnalyticsEventType::BundlePurchased, AnalyticsSource::Checkout,

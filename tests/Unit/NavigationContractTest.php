@@ -74,7 +74,8 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account/orders', $accountChildren['account-orders']['href'] ?? null);
         // Title case like every other menu group (owner's decision, 2026-10-17).
         self::assertSame('Courses', $accountChildren['account-courses-group']['label'] ?? null);
-        self::assertCount(2, $accountChildren['account-courses-group']['children']);
+        self::assertCount(3, $accountChildren['account-courses-group']['children'], 'My Courses, My Orders and My Wallet.');
+        self::assertSame('/account/wallet', $accountChildren['account-wallet']['href'] ?? null);
         self::assertArrayNotHasKey('commerce', $byKey);
         self::assertSame('/account/sessions', $accountChildren['account-sessions']['href'] ?? null);
         self::assertSame('/account/activity', $accountChildren['account-activity']['href'] ?? null);

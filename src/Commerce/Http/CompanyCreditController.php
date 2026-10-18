@@ -9,6 +9,10 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\CompanyCreditPurchaseService;
 use CattoLearning\Commerce\Application\CommerceMaintenance;
 use CattoLearning\Commerce\Domain\BillingDetails;
+use CattoLearning\Commerce\Settings\CommerceSettings;
+use CattoLearning\Commerce\Wallet\WalletOwner;
+use CattoLearning\Commerce\Wallet\WalletService;
+use CattoLearning\Support\Money;
 use CattoLearning\Company\SelectedCompanyContext;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\View\ThemeRenderer;
@@ -23,7 +27,9 @@ final class CompanyCreditController extends BaseController
         AuthService $auth, ThemeRenderer $view, RequestStack $requests,
         private readonly SelectedCompanyContext $companyContext,
         private readonly CompanyCreditPurchaseService $purchases,
-        private readonly CommerceMaintenance $maintenance
+        private readonly CommerceMaintenance $maintenance,
+        private readonly WalletService $wallets,
+        private readonly CommerceSettings $settings
     ) { parent::__construct($auth,$view,$requests); }
 
     private function companyId(CurrentUser $actor): int
@@ -91,8 +97,13 @@ final class CompanyCreditController extends BaseController
             $companyId=$this->companyId($actor);
             $basket=$this->purchases->startCheckout($actor,$companyId);
             if ($basket['items'] === []) $this->redirect('/company/credits/buy');
+            // The company wallet pays as much as it holds when the administrator chooses it (owner, 2026-10-17);
+            // a learner's request purchase is paid by card so the learner is enrolled at once.
+            $balance=$basket['request_id']===null ? $this->wallets->spendable(WalletOwner::company($companyId),'ZAR') : 0;
             return $this->render('company-credit-checkout',['title'=>'Company credit checkout','active_nav'=>'company','basket'=>$basket,
-                'billing'=>$this->purchases->billingForm($actor,$companyId),'billing_fields'=>BillingDetails::formFields(false)]);
+                'billing'=>$this->purchases->billingForm($actor,$companyId),'billing_fields'=>BillingDetails::formFields(false),
+                'wallet_balance_minor'=>$balance,'wallet_balance_label'=>Money::ofMinorUnits($balance,'ZAR')->format(),
+                'payment_due'=>$this->settings->paymentDue()->words(),'refund_window'=>$this->settings->refundWindow()->words()]);
         },'/company/credits/buy');
     }
 
@@ -104,7 +115,7 @@ final class CompanyCreditController extends BaseController
             $id=$this->purchases->place($actor,$this->companyId($actor),(string)($_POST['purchase_key'] ?? ''),
                 (string)($_POST['quote'] ?? ''),BillingDetails::forCompany($_POST),
                 (string)($_POST['payment_method'] ?? ''),(string)($_POST['method_token'] ?? ''),
-                ($_POST['invoice_email'] ?? '') === 'yes',($_POST['accept_terms'] ?? '') === 'yes');
+                ($_POST['invoice_email'] ?? '') === 'yes',($_POST['accept_terms'] ?? '') === 'yes',($_POST['use_wallet'] ?? '') === 'yes');
             $this->maintenance->deliverInvoices(1);
             $this->maintenance->deliverCompanyCourseNotices(2);
             $this->redirect('/account/orders/'.$id);

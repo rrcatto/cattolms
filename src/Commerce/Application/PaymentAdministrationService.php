@@ -15,7 +15,13 @@ use DateTimeImmutable;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
 
-/** ADMIN-only bank evidence and explicit release of fully paid manual-review orders. */
+/**
+ * ADMIN-only bank evidence and explicit release of fully paid manual-review orders.
+ *
+ * An EFT is recorded for the amount the bank shows (owner, 2026-10-17). One that covers what is due
+ * pays the order, and any excess becomes wallet credit; one that falls short is recorded and the order
+ * waits for the rest. Both appear under Transactions that need attention.
+ */
 final class PaymentAdministrationService
 {
     public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
@@ -29,7 +35,7 @@ final class PaymentAdministrationService
         if (!Uuid::isValid($requestKey)) throw new RuntimeException('Invalid confirmation identifier.');
         $bankReference=trim($bankReference); $reason=trim($reason);
         if ($amountMinor<=0 || mb_strlen($bankReference)<3 || mb_strlen($bankReference)>200 || mb_strlen($reason)<5 || mb_strlen($reason)>2000) {
-            throw new RuntimeException('Enter the exact received amount, a bank reference and a written reason.');
+            throw new RuntimeException('Enter the amount received, a bank reference and a written reason.');
         }
         if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/',$receivedAt)) throw new RuntimeException('Enter the received date and time with a timezone offset.');
         try { $received=new DateTimeImmutable($receivedAt); }
@@ -45,12 +51,12 @@ final class PaymentAdministrationService
                 return [(string)$existing['id'],(string)$order['currency']];
             }
             if (!in_array($order['state'],['awaiting_payment','cancelled'],true) || $this->records->paymentMethod($orderId)!=='eft') throw new RuntimeException('This order cannot accept an EFT confirmation.');
-            if ($amountMinor!==(int)$order['total_minor']) throw new RuntimeException('Full payment must match the exact order total; record discrepancies for review instead of fulfilling.');
+            if ($order['state']==='awaiting_payment' && $this->records->dueAmount($orderId)<=0) throw new RuntimeException('Nothing is left to pay on this order.');
             foreach ($this->records->payments($orderId) as $payment) {
-                if (in_array($payment['state'],['created','pending','paid','partially_refunded','refunded'],true)) throw new RuntimeException('A payment is already recorded or being processed for this order.');
+                if (in_array($payment['state'],['created','pending'],true)) throw new RuntimeException('A payment is already being processed for this order.');
             }
             $now=$this->clock->now()->format(DATE_ATOM);
-            $id=$this->records->createPayment($order,$requestKey,'manual_bank',$now);
+            $id=$this->records->createPayment($order,$requestKey,'manual_bank',$now,$amountMinor);
             $this->records->setPaymentState($id,$this->transitions->apply('payment','created','submit'),null);
             $this->records->recordManualEvidence($id,$orderId,$amountMinor,(string)$order['currency'],$received->format(DATE_ATOM),$bankReference,$reason,$actor->id,$now);
             $this->records->audit($orderId,$actor->id,'payment.bank_evidence_confirmed',['payment_id'=>$id,'amount_minor'=>$amountMinor,'received_at'=>$received->format(DATE_ATOM),'bank_reference'=>$bankReference,'reason'=>$reason],$now);

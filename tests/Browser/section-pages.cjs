@@ -7,10 +7,10 @@
    - the first card's edge on the page head's text edge (on the "All sections" pages the first card is
      the first section's accordion, which holds that section's own cards);
    - the same gap above the footer on every page of a theme;
-   - no sideways scrolling.
-   Four pages whose tables scroll the page sideways at 390px in some themes are a separate task
-   (owner, 2026-10-16), so they are reported as known rather than failed. Screenshots go beside
-   results.json.
+   - no sideways scrolling;
+   - nothing standing out past a table's edge, and no action cut off by its cell (an action column is
+     never narrower than its control, at either width).
+   Screenshots go beside results.json.
    Fixture: php tests/Browser/section-pages-fixture.php create|cleanup (in env_php_1). */
 const {chromium} = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs'), path = require('node:path');
@@ -23,21 +23,19 @@ const themes = fs.readdirSync(path.join(root, 'themes')).filter(slug => fs.exist
 const only = (process.env.CATTO_THEMES || '').split(',').filter(Boolean);
 const widths = (process.env.CATTO_WIDTHS || '1440,390').split(',').map(Number);
 
-// The 48 menu pages: Account, Company and Administration, as their menus list them.
+// The 55 menu pages: Account, Company and Administration, as their menus list them.
 const pages = [
   '/account', '/account/dashboard', '/account/profile', '/account/billing', '/account/emails', '/account/social',
-  '/account/courses', '/account/orders', '/account/sessions', '/account/activity',
+  '/account/courses', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
   '/company', '/company/dashboard', '/company/people', '/company/requests', '/company/enrolments', '/company/performance',
-  '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/billing',
+  '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/wallet', '/company/billing',
   '/admin', '/admin/dashboard', '/admin/courses', '/admin/course-items', '/admin/resources', '/admin/courses/categories',
   '/admin/courses/tags', '/admin/course-reviews', '/admin/bundles', '/admin/certificates/designs', '/admin/course/requests',
   '/admin/course/enrolments', '/admin/people', '/admin/companies', '/admin/companies/creators', '/admin/course/credits',
-  '/admin/commerce/orders', '/admin/promotions', '/admin/commerce/documents', '/admin/activity', '/admin/reports',
+  '/admin/commerce/orders', '/admin/commerce/refund-requests', '/admin/wallets', '/admin/promotions', '/admin/commerce/documents',
+  '/admin/commerce/ledger', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
   '/admin/reports/companies', '/admin/themes', '/admin/roles', '/admin/seed', '/admin/settings', '/admin/system/ui-components',
 ];
-// Sideways scrolling at 390px the owner has kept as a separate task (2026-10-16).
-const knownNarrowOverflow = new Set(['/company/enrolments', '/admin/course/enrolments', '/admin/themes', '/admin/activity']);
-
 const inspect = () => {
   const main = document.querySelector('main.cl-main');
   const allowed = ['cl-flash-stack', 'cl-page-head', 'cl-identity-head', 'cl-page-section', 'cl-page-family', 'cl-ui-modal'];
@@ -68,7 +66,29 @@ const inspect = () => {
   const rows = [...main.children].filter(c => c.getClientRects().length && !['SCRIPT', 'LINK', 'STYLE', 'TEMPLATE'].includes(c.tagName));
   const last = rows[rows.length - 1];
   const footer = document.querySelector('.cl-footer');
+  // Anything standing out past its table's right edge (a menu's open panel aside), unless a box
+  // inside the table scrolls or clips it; and every action control cut off by its own cell.
+  const clipped = (el, stop) => { for (let a = el.parentElement; a && a !== stop; a = a.parentElement) if (getComputedStyle(a).overflowX !== 'visible') return true; return false; };
+  const tableSpill = [], cutActions = [];
+  for (const table of main.querySelectorAll('.cl-ui-table')) {
+    const edge = table.getBoundingClientRect().right;
+    if (!table.getClientRects().length) continue;
+    for (const el of table.querySelectorAll('*')) {
+      if (el.closest('.cl-ui-row-panel')) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height && r.right > edge + 1 && !clipped(el, table)) { tableSpill.push(`${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 20)}" by ${Math.round(r.right - edge)}px`); break; }
+    }
+    for (const control of table.querySelectorAll('td .cl-ui-action, td .cl-ui-row-trigger')) {
+      if (control.closest('.cl-ui-row-panel') || !control.getClientRects().length) continue;
+      const td = control.closest('td'), cs = getComputedStyle(td);
+      const right = td.getBoundingClientRect().right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+      const name = `"${control.textContent.trim().replace(/\s+/g, ' ').slice(0, 20)}"`;
+      if (control.getBoundingClientRect().right > right + 1) { cutActions.push(`${name} by ${Math.round(control.getBoundingClientRect().right - right)}px`); break; }
+      if (control.scrollWidth > control.clientWidth + 1) { cutActions.push(`${name} squeezed to ${control.clientWidth}px`); break; }
+    }
+  }
   return {
+    tableSpill, cutActions,
     h1: main.querySelectorAll('h1').length,
     strays, bare: bare.slice(0, 6), bareCount: bare.length,
     headLeft: h1 ? Math.round(h1.getBoundingClientRect().left) : null,
@@ -83,7 +103,7 @@ const inspect = () => {
 (async () => {
   fs.mkdirSync(output, {recursive: true});
   const browser = await chromium.launch({headless: true});
-  const results = [], failures = [], known = [];
+  const results = [], failures = [];
   for (const theme of themes.filter(t => !only.length || only.includes(t.slug))) {
     const key = `${theme.slug}-v${theme.version}`;
     for (const width of widths) {
@@ -102,7 +122,9 @@ const inspect = () => {
         if (r.strays.length) failures.push(`${label}: not a page row in main: ${r.strays.join(', ')}`);
         if (r.bareCount) failures.push(`${label}: words on the texture: ${JSON.stringify(r.bare)}`);
         if (r.headLeft !== null && r.cardLeft !== null && Math.abs(r.headLeft - r.cardLeft) > 3) failures.push(`${label}: first card at ${r.cardLeft}px, page head text at ${r.headLeft}px`);
-        if (r.overflowX) (width < 600 && knownNarrowOverflow.has(route) ? known : failures).push(`${label}: scrolls sideways`);
+        if (r.overflowX) failures.push(`${label}: scrolls sideways`);
+        if (r.tableSpill.length) failures.push(`${label}: stands out of its table: ${r.tableSpill.join(', ')}`);
+        if (r.cutActions.length) failures.push(`${label}: an action wider than its cell: ${r.cutActions.join(', ')}`);
         if (r.gapAboveFooter !== null) gaps.set(route, r.gapAboveFooter);
         const file = `${theme.slug}__${route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}__${width}.jpg`;
         await page.screenshot({path: path.join(output, file), type: 'jpeg', quality: 60, fullPage: true});
@@ -115,9 +137,8 @@ const inspect = () => {
     }
   }
   await browser.close();
-  fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({failures, known, results}, null, 1));
-  console.log(`${results.length} page views, ${failures.length} failures, ${known.length} known (kept separate).`);
+  fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({failures, results}, null, 1));
+  console.log(`${results.length} page views, ${failures.length} failures.`);
   failures.slice(0, 80).forEach(f => console.log('FAIL', f));
-  known.forEach(k => console.log('KNOWN', k));
   process.exit(failures.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -1,0 +1,10 @@
+{#
+  The purchaser's agreement that the courses start as soon as payment is confirmed (owner, 2026-10-17).
+  Unticked, required, and refused by the server without it (CheckoutService::place, accept_start). The
+  wording is OrderService::IMMEDIATE_START, recorded in the order's consent.
+#}
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: immediate_start})} %}
+{% block control %}
+<input type="checkbox" name="accept_start" value="yes" required>
+{% endblock %}
+{% endembed %}

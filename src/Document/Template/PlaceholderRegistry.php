@@ -45,22 +45,32 @@ final class PlaceholderRegistry
     {
         return $this->sets[$type->value] ??= match ($type) {
             DocumentType::Certificate => new PlaceholderSet([...self::business(), ...self::certificate()]),
-            DocumentType::Invoice => new PlaceholderSet([...self::business(), ...self::customer(), ...self::order(), ...self::invoice(), ...self::promotion(), ...self::bank()], [self::lines(false)]),
-            DocumentType::Receipt => new PlaceholderSet([...self::business(), ...self::customer(), ...self::order(), ...self::receipt(), ...self::promotion()], [self::lines(false)]),
-            DocumentType::CreditNote => new PlaceholderSet([...self::business(), ...self::customer(), ...self::order(false), ...self::creditNote()], [self::lines(true)]),
+            DocumentType::Invoice => new PlaceholderSet([...self::document(), ...self::business(), ...self::customer(), ...self::order(), ...self::invoice(), ...self::promotion(), ...self::bank()], [self::lines(false)]),
+            DocumentType::Receipt => new PlaceholderSet([...self::document(), ...self::business(), ...self::customer(), ...self::order(), ...self::receipt(), ...self::promotion()], [self::lines(false)]),
+            DocumentType::CreditNote => new PlaceholderSet([...self::document(), ...self::business(), ...self::customer(), ...self::order(false), ...self::creditNote()], [self::lines(true)]),
         };
+    }
+
+    /** @return list<PlaceholderDefinition> */
+    private static function document(): array
+    {
+        return [
+            self::p('document.simulation', 'On a document of an order placed on a demo site, that it is a simulation; empty, and false in a condition, otherwise.'),
+        ];
     }
 
     /** @return list<PlaceholderDefinition> */
     private static function business(): array
     {
         return [
-            self::p('business.name', 'The platform name from Settings.', PlaceholderKind::Text, true),
-            self::p('business.legal_name', 'The System Company’s billing name.'),
-            self::p('business.address', 'The System Company’s billing address, one line after another.', PlaceholderKind::Address),
-            self::p('business.tax_number', 'The System Company’s tax or VAT number.'),
-            self::p('business.email', 'The address replies to platform mail go to.'),
-            self::p('business.website', 'The installation’s web address.', PlaceholderKind::Url),
+            self::p('business.name', 'The Site Owner’s trading name, from Settings.', PlaceholderKind::Text, true),
+            self::p('business.legal_name', 'The Site Owner’s legal name.'),
+            self::p('business.registration_number', 'The Site Owner’s registration number, when it is a company.'),
+            self::p('business.address', 'The Site Owner’s address, one line after another.', PlaceholderKind::Address),
+            self::p('business.tax_number', 'The Site Owner’s tax or VAT number.'),
+            self::p('business.phone', 'The Site Owner’s telephone number.'),
+            self::p('business.email', 'The Site Owner’s email address.'),
+            self::p('business.website', 'The Site Owner’s website.', PlaceholderKind::Url),
         ];
     }
 
@@ -75,6 +85,7 @@ final class PlaceholderRegistry
             self::p('customer.company_name', 'The company a company order was placed for.'),
             self::p('customer.purchaser_name', 'The person who placed the order.'),
             self::p('customer.email', 'The purchaser’s email address.'),
+            self::p('customer.account_reference', 'The purchaser’s or company’s account reference, for example CL-20261017-0001-U, quoted as the EFT payment reference.'),
         ];
     }
 
@@ -127,6 +138,7 @@ final class PlaceholderRegistry
             self::p('credit_note.basis', 'The refund basis, for example Goodwill.', PlaceholderKind::Text, true),
             self::p('credit_note.reason', 'The reason recorded for the refund.', PlaceholderKind::Multiline),
             self::p('credit_note.invoice_number', 'The number of the invoice being credited.'),
+            self::p('credit_note.settlement', 'Where the refund went and what was deducted, one line each.', PlaceholderKind::Multiline),
         ];
     }
 

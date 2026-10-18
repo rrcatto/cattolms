@@ -90,7 +90,7 @@
 
 			<tr>
 				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Theme'}} %}
-				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Version'}} %}
+				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Version', wide: true}} %}
 				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Status'}} %}
 				{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Actions'}} %}
 			</tr>
@@ -145,8 +145,8 @@
 							{{ ui('feedback.badge', {label: 'installed', tone: 'neutral'}) }}
 						{% endif %}
 					</td>
-					<td class="cell-actions" data-no-row-menu="the control that recovers from a broken theme must not itself depend on that theme rendering a menu">
-						{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+					<td class="cell-actions" data-no-row-menu="the control that recovers from a broken theme must not itself depend on that theme rendering a menu; on a phone the Core-drawn Actions menu holds them (owner, 2026-10-17)">
+						{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true})} %}
 {% block body %}
 
 							{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/?theme_preview=' ~ (themeItem.key|urlencode), new_window: true}) }}

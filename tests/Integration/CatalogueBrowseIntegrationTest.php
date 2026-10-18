@@ -514,15 +514,16 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         self::assertGreaterThan(0, $index->query('//nav[@aria-label="All tags"]//a[@href]')->length);
     }
 
-    public function testVocabularyIncludesUnusedTagsAndEmptyCategories(): void
+    /** A tag no published course carries is not in the cloud (owner, 2026-10-18); an empty category is still a place to browse. */
+    public function testUnusedTagsAreLeftOutAndEmptyCategoriesStay(): void
     {
         $empty = $this->fixture->createCategory('Empty ' . $this->fixture->suffix(), 'empty-' . $this->fixture->suffix());
         $picker = $this->service->catalogueCategoryPicker(null);
         self::assertContains((string) $empty, array_column($picker['items'], 'value'));
+        self::assertArrayHasKey($this->tagId, array_column($this->service->tagIndex(), null, 'id'));
         $this->db->executeStatement('DELETE FROM course_tags WHERE tag_id = :tag', ['tag' => $this->tagId]);
-        $tags = array_column($this->service->tagIndex(), null, 'id');
-        self::assertArrayHasKey($this->tagId, $tags);
-        self::assertSame(0, (int) $tags[$this->tagId]['course_count']);
+        self::assertArrayNotHasKey($this->tagId, array_column($this->service->tagIndex(), null, 'id'), 'A tag with no courses is not listed.');
+        foreach ($this->service->tagIndex() as $tag) self::assertGreaterThan(0, (int) $tag['course_count']);
         $page = $this->page('/courses/category/empty-' . $this->fixture->suffix());
         self::assertSame(0, $page->query('//article[contains(@class,"cl-course-card")]')->length);
         self::assertSame(1, $page->query('//*[contains(@class,"cl-ui-empty-state")]')->length);

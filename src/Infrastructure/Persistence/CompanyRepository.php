@@ -11,6 +11,8 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for company records.
 
 Changelog:
+2026/10/18 SAST
+- No System Company (owner, 2026-10-18): systemCompany(), ensureSystemCompany(), the sweep that put every company-less person into it and assignSystemCompanyOwner() are gone. createManaged() names seven columns for its seven values again (Administration > Create company had been failing).
 2026/09/08 19:52 SAST
 - Depends on the Database interface rather than naming Doctrine's Connection, so the bound PDO parameter type is inferred from the PHP value.
 
@@ -101,7 +103,12 @@ final class CompanyRepository
         return $row === false ? null : $row;
     }
 
-    /** @return array<string,mixed>|null */
+    /**
+     * The person's active company, or null for a private account, which belongs to no company.
+     *
+     * @return array<string,mixed>|null
+     * @phpstan-impure membership changes between calls (joining, leaving, registering a company)
+     */
     public function findForUser(int $userId): ?array
     {
         // SQL is justified because company membership and company details are joined.
@@ -157,146 +164,13 @@ final class CompanyRepository
         return $this->databaseBoolean($rows[0]['suspended'] ?? false);
     }
 
-    /**
-     * The System Company.
-     *
-     * @return array<string,mixed>|null
-     */
-    public function systemCompany(): ?array
+    /** Whether the person holds the ADMIN role: the Site Owner's human face, who belongs to no company. */
+    public function userIsPlatformAdministrator(int $userId): bool
     {
-        $row = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE is_system = TRUE LIMIT 1'
+        return (bool) $this->db->fetchOne(
+            "SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = :user_id AND r.role_key = 'ADMIN'",
+            ['user_id' => $userId]
         );
-
-        return $row === false ? null : $row;
-    }
-
-    /**
-     * The System Company, created if a genuine bootstrap needs it.
-     *
-     * This *resolves and bootstraps*. It deliberately no longer assigns the caller to the company
-     * it returns, because that conflated three separate things and produced a defect that took a
-     * GET request down: resolving a company, creating missing infrastructure, and making somebody
-     * a business member of it.
-     *
-     * The membership write is now the caller's decision, and only a workflow that genuinely
-     * requires membership should make it - see assignSystemCompanyOwner(). Rendering a page is not
-     * such a workflow. A REAL administrator viewing the SEED System Company must not become a
-     * member of it: their authority over seed data comes from ADMIN capability plus a deliberate
-     * universe scope, never from business membership.
-     *
-     * @return array<string,mixed>
-     */
-    public function ensureSystemCompany(int $actorUserId, string $name, string $domain): array
-    {
-        // There is one System Company.
-        $configuredDomain = strtolower(trim($domain));
-        $configuredDomain = ltrim($configuredDomain !== '' ? $configuredDomain : 'local', '.');
-
-        $existing = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE is_system = TRUE LIMIT 1'
-        );
-
-        if ($existing === false) {
-            // No System Company yet. Adopt an existing company on the configured
-            // domain if there is one - preferring a company the actor already belongs to - rather
-            // than creating a second organisation alongside it.
-            $adopt = $this->db->fetchAssociative(
-                "SELECT c.id FROM companies c
-                 LEFT JOIN company_users cu ON cu.company_id=c.id AND cu.user_id=:user_id AND cu.status='active'
-                 WHERE c.status='active' AND lower(c.domain)=:domain
-                 ORDER BY (cu.user_id IS NOT NULL) DESC, c.created_at ASC
-                 LIMIT 1",
-                ['user_id' => $actorUserId, 'domain' => $configuredDomain]
-            );
-
-            if ($adopt !== false) {
-                $companyId = (int) $adopt['id'];
-                $adopted = $this->findById($companyId);
-                $this->db->executeStatement(
-                    'UPDATE companies
-                        SET is_system = TRUE, name = :name,
-                            updated_at = :updated_at
-                      WHERE id = :id',
-                    [
-                        'name' => trim((string) ($adopted['name'] ?? '')) !== ''
-                            ? (string) $adopted['name']
-                            : (trim($name) !== '' ? trim($name) : 'System Company'),
-                        'updated_at' => gmdate('Y-m-d H:i:sP'),
-                        'id' => $companyId,
-                    ]
-                );
-            } else {
-                $now = gmdate('Y-m-d H:i:sP');
-                $created = $this->db->fetchAllAssociative(
-                    // seed_token is NULL, which is what the mapper wrote by leaving it unset. The
-                    // REAL System Company is the only one this path creates: the SEED one is
-                    // created by the seed generator with its reserved infrastructure token and is
-                    // never created on demand.
-                    'INSERT INTO companies
-                        (public_id, name, domain, status, is_system,
-                         created_by_user_id, created_at, updated_at)
-                     VALUES
-                        (:public_id, NULL, :name, :domain, :status, TRUE,
-                         :created_by_user_id, :created_at, :updated_at)
-                     RETURNING id',
-                    [
-                        'public_id' => Uuid::v4(),
-                        'name' => trim($name) !== '' ? trim($name) : 'System Company',
-                        'domain' => $configuredDomain,
-                        'status' => 'active',
-                        'created_by_user_id' => $actorUserId,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ]
-                );
-                $companyId = (int) ($created[0]['id'] ?? 0);
-            }
-        } else {
-            $companyId = (int) $existing['id'];
-            $currentDomain = strtolower(trim((string) $existing['domain']));
-            $legacyGenerated = $currentDomain === 'system.' . $configuredDomain
-                || preg_match('/^system-\d+\.' . preg_quote($configuredDomain, '/') . '$/', $currentDomain) === 1;
-            if ($legacyGenerated && !$this->domainExistsForOther($configuredDomain, $companyId)) {
-                $this->db->executeStatement(
-                    'UPDATE companies SET domain = :domain, updated_at = :updated_at WHERE id = :id',
-                    ['domain' => $configuredDomain, 'updated_at' => gmdate('Y-m-d H:i:sP'), 'id' => $companyId]
-                );
-            }
-        }
-
-        return $this->findById($companyId) ?? throw new RuntimeException('System Company could not be loaded.');
-    }
-
-    public function assignUnassignedUsersToSystemCompany(int $companyId): int
-    {
-        // This sweep runs on ordinary Administration page loads: every company-less active user
-        // is attached to the System Company.
-        $rows = $this->db->fetchAllAssociative(
-            'INSERT INTO company_users (company_id,user_id,company_role,status,created_at)
-             SELECT c.id,u.id,\'student\',\'active\',NOW()
-             FROM users u
-             JOIN companies c ON c.id=:company_id
-             WHERE u.status=\'active\' AND NOT EXISTS (
-                 SELECT 1 FROM company_users cu WHERE cu.user_id=u.id AND cu.status=\'active\'
-             )
-             ON CONFLICT (company_id,user_id)
-             DO UPDATE SET status=\'active\', company_role=EXCLUDED.company_role
-             RETURNING user_id',
-            ['company_id' => $companyId]
-        );
-        return count($rows);
-    }
-
-    /**
-     * Makes the actor the owner of a System Company it has just bootstrapped.
-     *
-     * Split out of ensureSystemCompany() so the membership write is a deliberate act with a
-     * visible caller rather than a side effect of a lookup.
-     */
-    public function assignSystemCompanyOwner(int $companyId, int $actorUserId): void
-    {
-        $this->assignUser($companyId, $actorUserId, 'owner');
     }
 
     public function assignUser(int $companyId, int $userId, string $companyRole = 'student'): void
@@ -346,14 +220,14 @@ final class CompanyRepository
     {
         $now = gmdate('Y-m-d H:i:sP');
         $rows = $this->db->fetchAllAssociative(
-            // seed_token is stated rather than defaulted. A company created from Administration
-            // is REAL by definition - there is no parent row to inherit provenance from - and
-            // writing NULL explicitly records that decision where the guard can see it.
+            // Seven columns and seven values. Administration > Create company failed from 2026-09-09
+            // to 2026-10-18 because a ninth value, a leftover NULL for the removed seed_token,
+            // followed eight columns (CompanyManagementIntegrationTest creates one through the page).
             'INSERT INTO companies
-                (public_id, name, domain, status, is_system,
+                (public_id, name, domain, status,
                  created_by_user_id, created_at, updated_at)
              VALUES
-                (:public_id, NULL, :name, :domain, :status, FALSE,
+                (:public_id, :name, :domain, :status,
                  :created_by_user_id, :created_at, :updated_at)
              RETURNING id',
             [
@@ -393,11 +267,8 @@ final class CompanyRepository
         if (!in_array($status, ['active','disabled'], true)) {
             throw new RuntimeException('Invalid company status.');
         }
-        $company = $this->findById($companyId)
+        $this->findById($companyId)
             ?? throw new RuntimeException('The company does not exist.');
-        if ($this->databaseBoolean($company['is_system']) && $status !== 'active') {
-            throw new RuntimeException('The System Company cannot be disabled.');
-        }
 
         $this->db->executeStatement(
             'UPDATE companies SET status = :status, updated_at = :updated_at WHERE id = :id',

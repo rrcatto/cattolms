@@ -12,11 +12,10 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\{AccessService,CompanyCreditFulfilment,CompanyCreditPurchaseService,FulfilmentService,OrderService,PaymentService,PaymentAdministrationService,RefundAdministrationService,CommerceMaintenance};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,CompanyRepository,Database,TransactionManager};
-use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,IntegrationContainer,PromotionFixture};
 use PHPUnit\Framework\Attributes\Group;
@@ -63,15 +62,15 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $this->clock=new MockClock('2026-09-23T12:00:00+02:00');
         $this->records=new CommerceRepository($this->db);
         $tx=new TransactionManager($this->db);
-        $policy=new CommercePolicy(dirname(__DIR__,2));
+        $policy=WalletFixture::settings($this->db);
         $transitions=$container->get(TransitionService::class);
-        $this->orders=new OrderService($this->records,$tx,$policy,$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->orders=new OrderService($this->records,$tx,$policy,$transitions,$this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock));
         $this->access=new AccessService($this->records,$tx,$transitions,$this->clock);
         $companyFulfilment=new CompanyCreditFulfilment($this->records,$container->get(AdministrationRepository::class),$container->get(CourseRepository::class),$this->clock);
         $fulfilment=new FulfilmentService($this->records,$transitions,$this->access,$tx,$this->orders,$this->clock,$companyFulfilment,$this->analytics(),PromotionFixture::service($this->db,$this->clock));
-        $this->payments=new PaymentService($this->records,$tx,$this->orders,new OmnipayPaymentGatewayAdapter('test',$this->clock),$fulfilment,$transitions,$this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->payments=new PaymentService($this->records,$tx,$this->orders,new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'),$this->clock),$fulfilment,$transitions,$this->clock,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $this->purchases=new CompanyCreditPurchaseService($this->records,$container->get(CompanyRepository::class),
-            $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock,$this->analytics(),BillingFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+            $container->get(AdministrationRepository::class),$tx,$policy,$transitions,$this->payments,$this->clock,$this->analytics(),BillingFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), $this->orders);
     }
 
     /** Records into this test's transaction, stamped by this test's clock. */
@@ -212,7 +211,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertGreaterThan(0,(int)$row['enrolment_id']);
         self::assertNotNull($row['commerce_order_item_id']);
         $mailer=new FakeMailer();
-        $maintenance=new CommerceMaintenance($this->records,$this->orders,$this->access,IntegrationContainer::get()->get(FinancialDocuments::class),$mailer,new TransactionManager($this->db),$this->clock);
+        $maintenance=new CommerceMaintenance($this->records,$this->orders,$this->access,IntegrationContainer::get()->get(FinancialDocuments::class),$mailer,new TransactionManager($this->db),$this->clock,WalletFixture::wallets($this->db,$this->clock));
         $maintenance->deliverCompanyCourseNotices(2);
         self::assertSame(['course_request_decision','course_enrolment_notice'],array_column($mailer->messages,'type'));
     }
@@ -238,10 +237,10 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$order]));
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE user_id=:user AND course_id=:course',['user'=>$learner,'course'=>$this->courseId]));
         $item=$this->records->items($order)[0];
-        $refunds=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $refunds=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $refunds->approve($this->financeAdmin(),$order,(int)$item['id'],Uuid::v4(),'service_failure','Request changed before fulfilment; refund the unissued credit.',1,0);
         self::assertSame('refunded',$this->records->order($order)['state']);
-        self::assertSame((int)$item['amount_minor'],(int)$this->db->fetchOne('SELECT SUM(amount_minor) FROM commerce_fund_entries WHERE account_id IN (SELECT id FROM commerce_fund_accounts WHERE owner_company_id=:company)',['company'=>$this->companyId]));
+        self::assertSame((int)$item['amount_minor'],WalletFixture::wallets($this->db,$this->clock)->balance(\CattoLearning\Commerce\Wallet\WalletOwner::company($this->companyId)));
     }
 
     private function financeAdmin(): CurrentUser
@@ -275,7 +274,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $review=$this->purchases->review($this->buyer,$this->companyId);
         $newer=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_success',false,true);
         $oldItem=$this->records->items($older)[0]; $newItem=$this->records->items($newer)[0];
-        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $service=new RefundAdministrationService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock,$this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         try {
             $service->approve($this->financeAdmin(),$older,(int)$oldItem['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
             self::fail('LIFO must reject the older eligible lot.');
@@ -285,7 +284,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $service->approve($this->financeAdmin(),$newer,(int)$newItem['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
         self::assertSame(15000,$this->records->refundedAmount($newer));
         self::assertSame(1,(int)$this->db->fetchOne('SELECT refunded_quantity FROM course_credits WHERE commerce_order_item_id=:item',['item'=>$newItem['id']]));
-        self::assertSame(15000,(int)$this->db->fetchOne('SELECT SUM(e.amount_minor) FROM commerce_fund_entries e JOIN commerce_fund_accounts a ON a.id=e.account_id WHERE a.owner_company_id=:company',['company'=>$this->companyId]));
+        self::assertSame(15000,WalletFixture::wallets($this->db,$this->clock)->balance(\CattoLearning\Commerce\Wallet\WalletOwner::company($this->companyId)));
         $creditId=(int)$this->db->fetchOne('SELECT id FROM course_credits WHERE commerce_order_item_id=:item',['item'=>$newItem['id']]);
         $this->db->executeStatement("INSERT INTO course_credit_allocations(credit_id,user_id,status) VALUES (:credit,:user,'assigned')",['credit'=>$creditId,'user'=>$this->buyer->id]);
         $this->db->executeStatement('SAVEPOINT refunded_unit_guard');
@@ -301,7 +300,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
     private function refunds(): RefundAdministrationService
     {
         $container=IntegrationContainer::get();
-        return new RefundAdministrationService($this->records,new TransactionManager($this->db),$container->get(TransitionService::class),$this->clock,$this->analytics(),$this->access,$container->get(FinancialDocuments::class));
+        return new RefundAdministrationService($this->records,new TransactionManager($this->db),$container->get(TransitionService::class),$this->clock,$this->analytics(),$this->access,$container->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
     }
 
     /** Buys $quantity credits of the fixture course with the simulated card and returns the order. */
@@ -326,11 +325,12 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertNull(BillingFixture::service($this->db,$this->clock)->forCompany($this->companyId),'The company billing profile is not touched either.');
     }
 
-    public function testTheCompanyOrderSnapshotRecordsTheAcceptedTermsAndRefundPolicyVersions(): void
+    public function testTheCompanyOrderSnapshotRecordsWhenTheTermsWereAccepted(): void
     {
         $snapshot=CommerceRepository::decode((string)$this->records->order($this->buyCredits(2))['snapshot']);
-        self::assertSame(LegalDocuments::version(LegalDocuments::TERMS),$snapshot['terms_version']);
-        self::assertSame(LegalDocuments::version(LegalDocuments::REFUNDS),$snapshot['consent']['refund_policy_version']);
+        self::assertArrayNotHasKey('terms_version',$snapshot,'No version numbers (owner, 2026-10-17).');
+        self::assertArrayNotHasKey('refund_policy_version',$snapshot['consent']);
+        self::assertFalse($snapshot['consent']['immediate_service'],'Credits start only when a staff member presses Start course.');
         self::assertSame($this->buyer->sessionPublicId,$snapshot['consent']['session_id']);
         self::assertNotSame('',(string)$snapshot['consent']['accepted_at']);
         self::assertStringNotContainsString('development',json_encode($snapshot,JSON_THROW_ON_ERROR));
@@ -355,20 +355,21 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $inside=$refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
         self::assertNull($this->db->fetchOne('SELECT override_reason FROM commerce_refunds WHERE id=:id',['id'=>$inside]),'An unused credit inside seven days is refunded under the rule.');
         self::assertSame(12345,$this->records->refundedAmount($order));
+        self::assertSame(12345,WalletFixture::wallets($this->db,$this->clock)->balance(\CattoLearning\Commerce\Wallet\WalletOwner::company($this->companyId)),'Company credits are refunded as company wallet credit.');
 
         $this->clock->modify('+1 second');
         try {
             $refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'voluntary','Unused credit refund.',1,0);
             self::fail('Seven days after the purchase company credits are not refunded.');
         } catch (RuntimeException $refused) {
-            self::assertStringStartsWith('The Refund Policy does not allow this refund. 7 days have passed since the credits were bought on ',$refused->getMessage());
+            self::assertStringStartsWith('The Refund Policy does not allow this refund. The refund period of 7 days from the credit purchase on ',$refused->getMessage());
         }
         self::assertSame(12345,$this->records->refundedAmount($order),'The refused refund wrote nothing.');
         self::assertSame(1,(int)$this->db->fetchOne('SELECT refunded_quantity FROM course_credits WHERE id=:id',['id'=>$creditId]));
 
         $late=$refunds->approve($admin,$order,(int)$item['id'],Uuid::v4(),'goodwill','Unused credit refund.',1,0,'The company asked on day five; we replied late.');
         $refund=$this->db->fetchAssociative('SELECT policy_refusal,override_reason FROM commerce_refunds WHERE id=:id',['id'=>$late]) ?: [];
-        self::assertStringStartsWith('7 days have passed since the credits were bought on ',(string)$refund['policy_refusal']);
+        self::assertStringStartsWith('The refund period of 7 days from the credit purchase on ',(string)$refund['policy_refusal']);
         self::assertSame('The company asked on day five; we replied late.',$refund['override_reason']);
         self::assertSame(2,(int)$this->db->fetchOne('SELECT refunded_quantity FROM course_credits WHERE id=:id',['id'=>$creditId]));
         try {

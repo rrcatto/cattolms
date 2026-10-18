@@ -1,13 +1,15 @@
+{# The simulated card is offered only on a demo site (SiteMode); a live site has no card payment until Stitch is built. #}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Payment method', full_width: false, for: 'payment-method', required: true})} %}
 {% block control %}
 
     <select id="payment-method" name="payment_method" required {{ ui_field_attrs(props) }}>
-        <option value="dummy" {{ selected_method == 'dummy' ? 'selected' : '' }}>Card (simulated)</option>
-        {% if allow_eft|default(true) %}<option value="eft" {{ selected_method == 'eft' ? 'selected' : '' }}>EFT / bank transfer</option>{% endif %}
+        {% if site_demo|default(false) %}<option value="dummy" {{ selected_method == 'dummy' ? 'selected' : '' }}>Card (simulated)</option>{% endif %}
+        {% if allow_eft|default(true) %}<option value="eft" {{ selected_method == 'eft' or not site_demo|default(false) ? 'selected' : '' }}>EFT / bank transfer</option>{% endif %}
     </select>
 
 {% endblock %}
 {% endembed %}
+{% if site_demo|default(false) %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For card testing only. No money is charged. This option does not apply to EFT.'})} %}
 {% block control %}
 
@@ -18,4 +20,5 @@
 
 {% endblock %}
 {% endembed %}
+{% endif %}
 {% if allow_eft|default(true) %}<p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>{% endif %}

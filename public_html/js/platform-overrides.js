@@ -444,3 +444,86 @@ document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
         if (!cart.contains(event.target)) cart.open = false;
     });
 });
+/*
+  A table row's tooltip (owner, 2026-10-17). On a phone a table shows only its essential columns, in
+  7pt, and cuts long values short, so a row may not say everything it holds. Pointing at a row,
+  tapping it on a touch screen or moving focus into it shows the whole row as "Label: value" lines.
+  The text goes into the tooltip element the table component renders empty; nothing here builds
+  markup. Rows where nothing is hidden or cut short show no tooltip, and the action cell is left out
+  because its controls are already on screen. An open row menu is never covered: the tooltip hides
+  while the pointer is on the actions and sits below the menu panel's layer.
+*/
+(function () {
+    'use strict';
+    var tip = null, current = null;
+    var ROW = '.cl-ui-table > table > tbody > tr';
+    var INTERACTIVE = 'a, button, summary, input, select, textarea, label, details, .cell-actions';
+    function tipElement() {
+        if (tip && tip.isConnected) return tip;
+        tip = document.querySelector('.cl-ui-table-tip');
+        // Fixed to the window, so it is moved out of any card a theme gives a transform or filter.
+        if (tip && tip.parentElement !== document.body) document.body.appendChild(tip);
+        return tip;
+    }
+    function clean(text) {
+        return (text || '').replace(/[↑-↕▲▼]/g, '').replace(/\s+/g, ' ').trim();
+    }
+    function cutShort(cell) {
+        if (cell.scrollWidth > cell.clientWidth + 1) return true;
+        return Array.prototype.some.call(cell.querySelectorAll('*'), function (element) {
+            return element.scrollWidth > element.clientWidth + 1 && getComputedStyle(element).overflowX !== 'visible';
+        });
+    }
+    function summary(row) {
+        var table = row.closest('table');
+        var heads = table ? table.querySelectorAll(':scope > thead > tr:first-child > th') : [];
+        var needed = false, lines = [];
+        Array.prototype.forEach.call(row.children, function (cell, index) {
+            if (cell.classList.contains('cell-actions')) return;
+            var text = clean(cell.textContent);
+            if (!text) return;
+            if (getComputedStyle(cell).display === 'none' || cutShort(cell)) needed = true;
+            var label = heads[index] ? clean(heads[index].textContent) : '';
+            lines.push(label ? label + ': ' + text : text);
+        });
+        return needed ? lines.join('\n') : '';
+    }
+    function hide() {
+        if (tip) tip.hidden = true;
+        current = null;
+    }
+    function show(row) {
+        var element = tipElement();
+        var text = element ? summary(row) : '';
+        if (!text) { hide(); return; }
+        element.textContent = text;
+        element.hidden = false;
+        current = row;
+        var rect = row.getBoundingClientRect(), box = element.getBoundingClientRect();
+        var left = Math.max(8, Math.min(rect.left + 8, window.innerWidth - box.width - 8));
+        var top = rect.bottom + 6;
+        if (top + box.height > window.innerHeight - 8) top = Math.max(8, rect.top - box.height - 6);
+        element.style.left = left + 'px';
+        element.style.top = top + 'px';
+    }
+    document.addEventListener('pointerover', function (event) {
+        if (event.pointerType === 'touch') return;
+        var row = event.target.closest && event.target.closest(ROW);
+        if (!row || event.target.closest('.cell-actions')) { hide(); return; }
+        if (row !== current) show(row);
+    });
+    document.addEventListener('pointerup', function (event) {
+        if (event.pointerType !== 'touch') return;
+        var row = event.target.closest && event.target.closest(ROW);
+        if (!row || event.target.closest(INTERACTIVE)) { hide(); return; }
+        if (row === current) hide(); else show(row);
+    });
+    document.addEventListener('focusin', function (event) {
+        var row = event.target.closest && event.target.closest(ROW);
+        if (row && !event.target.closest('.cell-actions')) show(row); else hide();
+    });
+    document.addEventListener('keydown', function (event) { if (event.key === 'Escape') hide(); });
+    document.addEventListener('toggle', function (event) { if (event.target.matches && event.target.matches('.cl-ui-row-menu') && event.target.open) hide(); }, true);
+    window.addEventListener('scroll', hide, {passive: true});
+    window.addEventListener('resize', hide);
+})();

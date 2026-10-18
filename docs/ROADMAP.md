@@ -1,13 +1,14 @@
 # Catto Learning Development Roadmap
 
-## Current delivery position — 2026/10/17 (v0.9.3)
+## Current delivery position — 2026/10/18 (v0.9.4)
 
-**Current LMS version:** 0.9.3 · **Date:** 2026/10/17 SAST · tag `v0.9.3` on GitHub `main`, published as a GitHub release with its source zip, on the v0.9 code line (`dev-v0.9`), whose first release was v0.9.2. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
+**Current LMS version:** 0.9.4 · **Date:** 2026/10/18 SAST · tag `v0.9.4` on GitHub `main`, published as a GitHub release with its source zip, on the v0.9 code line (`dev-v0.9`), whose first release was v0.9.2. 0.5.8.3 remains installed on the VPS and needs an update only when the owner asks for it. Only the project owner decides future scope, release numbers and Git publication.
 
 **Released sequence on the v0.8 and v0.9 code lines** (newest first; `CHANGELOG.md` and `HANDOFF.md` hold the detail):
 
 | Version | Delivered |
 |---|---|
+| 0.9.4 | The commerce launch work (immediate start, the money ledger and wallets, refunds to the wallet or as money back with fees, refund requests, the Refund Policy rule, commerce settings, account references); only private accounts buy; the demo site or live site setting; the Site Owner in place of the System Company, with the commerce settings inside Settings and Create company fixed; the money records (Money Ledger, Payment Events, Commerce Trail, Orders & Payments filters, the dashboard's Money section); one page width; a real tag cloud; tables on phones; Gilded Noir 2.0.5 (released before the owner's review, 2026/10/18) |
 | 0.9.3 | Bootstrap 6 underneath (6.0.0-alpha.1, only its reboot, grid and utilities files, no Bootstrap script) with Core classes for fields and text and 5.3.8's look kept; a plain-colour safety net in Core and every theme with a browser check; themes keep their look in a dark operating system; checkboxes and radios in each theme's colour; every bundled theme at a new version |
 | 0.9.2 | One construction for every page: one width per page, the page head as the only main heading holding the page's actions, every section in a card with its own heading, no "All … sections" buttons, back links on menu pages or group tabs; Saharan Sunset 1.0.1 bundled, with Home and course landing pages full width; every bundled theme at a new version with its package rebuilt; Symfony 8.1.9 |
 | 0.9.1 | The public legal pages: Terms and Conditions (`/terms`), Refund Policy (`/refunds`) and Privacy Policy (`/privacy`), each with a version and date, in the Core footer of every theme; one required acceptance box naming both documents at both checkouts, with the accepted versions in the order snapshot; no identity number at checkout; the Refund Policy's rule enforced on ADMIN refunds with a recorded override; a correct message on a refunded order |
@@ -50,7 +51,11 @@
 
 **Bootstrap 6 underneath (v0.9.3, 2026/10/17).** Part C of the merged UI plan: Bootstrap 6 (6.0.0-alpha.1, only its reset, grid and utilities files) with Core classes for fields and text and 5.3.8's look kept, a plain-colour safety net in Core and every theme, and themes that keep their look in a dark operating system. Every page in every theme and every lesson of the owner's courses was compared with 5.3.8 and signed off by the owner theme by theme; every bundled theme has a new version.
 
-**What is next.** The four tables that scroll sideways on phones. The owner's review of the legal pages (v0.9.1) and the points left open for the owner and an attorney (`HANDOFF.md`); the Stitch integration, which the owner has named as a separate task and which the legal pages already describe (section 3); the owner's review of the landing pages (v0.9.0), then Phase M (external analytics integration); the owner's review of the financial documents (v0.8.9), and the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
+**Commerce for the launch on 2 November 2026 (built 2026/10/17, released in v0.9.4).** The owner approved the launch list of the design (workspace `REPORTS/commerce-wallets-design-2026-10-17.md`, section 17) and it is built: every course starts as soon as its payment is confirmed, with a consent box at checkout; account references for people and companies, quoted on EFT instructions; EFT payments of any amount (too little waits, too much goes to the wallet); an append-only money ledger and wallets replacing Account Funds (credit expires after 3 years, oldest spent first, a reminder email, the wallet pays all or part of an order or of company credits); refund requests on the order page, refunds as wallet credit or money back net of the Stitch and EFT fees, and payouts recorded with their reference; the Commerce Settings page; Transactions that need attention on the ADMIN dashboard with Email this person; course timing on the learner dashboard; and the legal pages without version numbers. Detail: section 2d, section 3 and `HANDOFF.md`.
+
+**Built since (2026/10/18, released in v0.9.4).** Only private accounts buy (a company account never buys for itself); the demo site or live site setting (`APP_SITE_MODE`); the money records under Credits & Orders (Money Ledger, Payment Events and Commerce Trail, each filtered, searched, sorted and paged with a page per entry, Orders & Payments the same, and the dashboard's money figures opening the lists they add up); every page at the one standard width except Home and course landing pages; a real tag cloud (only tags in use, sized by courses); and the Site Owner in place of the System Company (`.env` and Settings, the seller on every legal page and document, private accounts in no company, courses no company owns belonging to the Site Owner, Commerce settings inside Settings) with Administration → Create company fixed. Detail: `CHANGELOG.md` and `HANDOFF.md`.
+
+**What is next.** v0.9.4 waits for the owner's review (it may be rolled back to v0.9.3). Asked for on 2026/10/18: the account reference first on every financial document, order and ledger record; a Record EFT payment page that starts from the reference on the bank statement; and data made only by following the workflows (a clean database and a step-by-step walkthrough of one person buying one course). After launch (owner, 2026-10-17): exports of the ledger and statements as CSV, XLSX, ODS and PDF, business-wide and per account, needed by the first month-end on 30 November 2026; Start course confirmation through the API and MCP (deferred, below). On the list for discussion before anything is built (owner, 2026/10/18): the production readiness check and the GO LIVE switch (section 10), flash messages (deferred, below) and a mailing list plugin for existing accounts (section 5). The owner's review of the legal pages (v0.9.1) and the points left open for the owner and an attorney (`HANDOFF.md`); the Stitch integration, which the owner has named as a separate task and which the legal pages already describe (section 3); the owner's review of the landing pages (v0.9.0), then Phase M (external analytics integration); the owner's review of the financial documents (v0.8.9), and the owner's Canva certificate designs (upload them as backgrounds, or add them as installed looks). After it, no phase is scheduled; the owner sets the order of further work. Candidates recorded in this roadmap include later commerce (Account Funds spending, payouts, debt, gifts, real gateways — section 3 and `COMMERCE-IMPLEMENTATION-PLAN.md`), featured/promoted placements and similar courses (3e), curated testimonials (3f), further analytics coverage (9b), production readiness (10) and the deferred items at the end.
 
 ## Delivery sequence of 2026/09/24 — completed in v0.8.7
 
@@ -287,7 +292,22 @@ The period comes from the zero-priced variant where one exists, and from the cou
 
 A refunded order removes the learner's access at once. Not at period end, and not left in place.
 
-### When a refund is given — owner decision, 2026/10/13
+### Immediate start, wallets and refunds — owner decisions, 2026/10/17
+
+These replace the 2026/10/13 rule below, which is kept as the record. Published in the Terms and the Refund Policy and enforced by `Commerce\Domain\RefundRule` and `RefundAdministrationService`:
+
+- **Every course starts on payment.** A bought course, and every course of a bundle, starts as soon as its payment is confirmed; the buyer agrees to that in a second required box at checkout (`OrderService::IMMEDIATE_START`, recorded in the order's consent). There is no start date and no automatic start after 90 days. A company-assigned course starts when the staff member presses Start course and confirms it.
+- **A started course is never refunded:** no money back and no wallet credit. Its content has been supplied and cannot be returned. A course that has not started (company credits no learner has started) is refundable within the refund window, 7 days from the confirmed payment by default. The statutory rights of a buyer of a faulty course are not affected; a learner reports one through a refund request, and ADMIN may approve a refund the rule refuses with a private written reason.
+- **Where a refund goes.** Wallet credit or money back, chosen by the learner when asking and by ADMIN when approving; company credits only as wallet credit. What was paid from the wallet always goes back to the credit it came from, with its own expiry.
+- **Deductions.** Card, money back: the Stitch transaction fee and the Stitch refund fee. Card, wallet credit: the Stitch transaction fee. EFT, money back: the EFT refund fee tiers. EFT, wallet credit: nothing. ADMIN may refund less than a line (to deduct other costs).
+- **Money back** is paid outside the LMS (the Stitch dashboard or an EFT to an account the customer gives) within 7 days of the request, and ADMIN records the date and reference. No customer bank details are stored.
+- **Wallet credit** comes from refunds, overpaid EFTs and cancelled orders' payments; it expires after 3 years (CPA section 63), is spent oldest first, is reminded about 30 days before it expires, earns no interest and is never paid out as cash (no cash-outs). The wallet pays all or part of an order, and a company's wallet pays for credits.
+- **EFT amounts.** A payment below what is due leaves the order waiting for the rest; one above it pays the order and credits the excess to the wallet. An order not paid in full in time is cancelled and what was paid becomes wallet credit, as does money arriving after the cancellation.
+- **Legal pages** carry a last-updated date and no version number; a purchase is made on the wording in force when it was made, and changes apply to later purchases only.
+- **Settings.** The fees, the reference prefix, the wallet expiry and reminder, the refund window, the payment due period and the payment link lifetime are commerce settings (`.env` defaults, Administration → Settings (its commerce sections) overrides), and the legal pages print the values in force.
+- **Account reference numbers keep rising** (owner, 2026/10/18). The number part comes from one database sequence and never starts again at 0001 each day, so CL-20261017-0001 can be followed by CL-20261018-0002. The owner reads it as a count of accounts.
+
+### When a refund is given — owner decision, 2026/10/13 (replaced 2026/10/17)
 
 Published as the Refund Policy (`/refunds`) and enforced by the ADMIN refund action (`Commerce\Domain\RefundRule`, `RefundAdministrationService`):
 
@@ -302,7 +322,7 @@ The code counts the 7 days from the moment the order's payment was confirmed, wh
 
 ### Access periods and age — owner decision, 2026/10/13
 
-Access periods are fixed and there is no lifetime access. A period starts when the learner presses Start course, or automatically 90 days after payment is confirmed. Unused time is not refunded. After expiry the course leaves the library and the records are kept. Learners must be 18 or older; a learner under 18 needs the consent of a parent or guardian (section 5).
+Access periods are fixed and there is no lifetime access. A bought course's period starts when its payment is confirmed (owner, 2026/10/17; until then it started when the learner pressed Start course, or automatically 90 days after payment). Unused time is not refunded. After expiry the course leaves the library and the records are kept. Learners must be 18 or older; a learner under 18 needs the consent of a parent or guardian (section 5).
 
 ### Who may buy
 
@@ -310,6 +330,7 @@ Both, and they are separate paths:
 
 - **An individual** buys their own course from the public catalogue and is enrolled on payment. No company, no credit - there is nobody to hand it to later.
 - **Inside a company, only an administrator buys.** Staff favourite courses and request access; they cannot spend the company's money.
+- **A company account never buys a course for itself** (owner, 2026/10/18). Company learner accounts cannot buy any course. Only the Company Administrator (the company's buyer) or ADMIN buys courses for a company. A company person who wants a course for themselves registers a separate private individual account, which is completely separate from their company learner account. So nobody can buy a course that their company has already given them. A Company Administrator who wants a course buys a company credit and assigns it to their own account. **Built (2026/10/18, v0.9.4):** a company account is an active member of a company (`CommerceRepository::isCompanyAccount`), and a private account belongs to no company; it sees no Add to cart, Buy now or cart, and the cart, bundles, free courses and placement refuse it with `OrderService::COMPANY_ACCOUNT`. It is offered Request from my company, which a private account, having no company, no longer is.
 
 ---
 
@@ -326,7 +347,7 @@ Doing the first is worth little on its own if the catalogue stays in one languag
 
 ## 3. Commerce — built through v0.8.8.4; later money work remains
 
-The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. v0.8.7 added company credit purchasing, ADMIN bank evidence confirmation, manual-review reconciliation and refund/credit-note/Account Funds records; v0.8.8.4 added billing profiles, promo codes, course bundles and independent entitlement sources (below). `src/Commerce/`, `src/Bundle/` and their integration tests are the implementation source. The bullets below are the original broader domain target, most of which is now built; the PayFast/real gateway, Account Funds spending, payouts, debt and gifts remain. Further commerce work requires a scope decision by the owner.
+The individual foundation is implemented: guest and signed-in carts, staged checkout, Dummy card simulations, manual EFT instructions, persisted orders and invoices, payment attempts, idempotent fulfilment, free-course access and access deadlines. v0.8.7 added company credit purchasing, ADMIN bank evidence confirmation, manual-review reconciliation and refund/credit-note/Account Funds records; v0.8.8.4 added billing profiles, promo codes, course bundles and independent entitlement sources (below). The launch work of 2026/10/17 (v0.9.4) replaced Account Funds with an append-only money ledger and spendable wallets, and added payments in parts, refund requests, refund deductions and recorded payouts (section 2d). `src/Commerce/`, `src/Bundle/` and their integration tests are the implementation source. The bullets below are the original broader domain target, most of which is now built; the Stitch integration, exports of the ledger, debt and gifts remain. Further commerce work requires a scope decision by the owner.
 
 Implement one coherent commerce domain:
 
@@ -557,6 +578,8 @@ Later additions:
 
 Planned (owner decision, 2026/10/13): **Parental consent for learners under 18 - how consent is obtained and recorded.** The Terms and Conditions and the Privacy Policy already state that learners must be 18 or older and that a learner under 18 needs the consent of a parent or guardian. Nothing in the code asks for an age or records a consent yet.
 
+Planned (owner, 2026/10/18; to discuss before it is built): **A mailing list plugin that emails existing accounts only.** The owner wants a plugin version of their own mailing list application, ctnlist (a separate repository on Symfony 8.1 and DBAL, which sends campaign mail through the owner's catto-mail sending service). It takes its audience from the LMS's own accounts and cannot import, or send to, addresses that have no account. It is how the whole site is told when the legal pages change: the Terms promise an email at least 30 days before a change that affects an account or wallet credit, and the Privacy Policy an email before a change to how existing information is used. Until the plugin exists nothing in the LMS sends those emails. Points to settle: how ctnlist becomes a plugin (the LMS has had `src/Plugin/PluginManager.php` since v0.5.7.5.1), and which mail every account receives (notices about the Terms) and which needs the person's consent (anything that markets).
+
 ## 6. Social linking, sharing and referrals
 
 Allow optional learner linking of Facebook, Instagram, Google, X, Threads and TikTok where provider APIs permit it.
@@ -636,7 +659,79 @@ Before production is declared:
 - privacy/retention policy appropriate to real user data. The Privacy Policy (`/privacy`, 2026/10/13) states the retention periods: orders and transaction records at least 5 years, the activity log, analytics events and offline identity document copies 5 years, sign-in links 30 minutes and sessions 24 hours;
 - **Automatically delete activity log entries and analytics events older than 5 years.** The code keeps both for ever today (owner decision, 2026/10/13; not built).
 
+### Production readiness check and the GO LIVE switch — owner idea, 2026/10/18 (on the list, not built)
+
+The owner's idea, to be discussed before it is built:
+
+- **Check production readiness.** A button in ADMIN opens a list of every task and setting that must be right before the site goes live. Each line is PASS (green) or FAIL (red) and says what to fix.
+- **GO LIVE.** When every line passes, ADMIN presses GO LIVE and the site switches to live production. From then on its data must be kept and backed up, and ADMIN can see at a glance whether the database is expendable (test) or must be preserved (live).
+- **Before going live** the production site shows "SITE IS IN TEST / DEVELOPMENT PHASE - NO ORDERS ARE BEING ACCEPTED UNTIL WE GO LIVE" on the front page, and no orders are accepted. Going live removes it.
+- **The demo site never refuses orders** (owner, 2026/10/18). demo.example.com is the demo, test and development site, where things are tested. It always takes test orders, its data is always expendable, and the owner intends to keep it in that role and never make it go live. Only the production site refuses orders until it goes live. The production site, which will sell to the public, will have its own domain, bought when it goes live; there is none yet.
+- **The demo site says so on every page** (owner, 2026/10/18; built, v0.9.4). In case the public finds demo.example.com, every page says: "This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation." It is one setting, `APP_SITE_MODE=demo|live` in `.env`, which Administration → Settings → Site mode can override; anything but live is demo (`OPERATIONS.md`, "Demo site or live site").
+- **The checkout says so too** (owner, 2026/10/18; built). While a site is a demo, its checkout states that the purchase is not real, that it is a simulation and that nothing is being bought or sold.
+- **So do simulated documents and emails** (owner, 2026/10/18; built). An order placed on a demo site is marked as a simulation in its snapshot, so its order page, invoice, receipt and credit note say so for good; every email from a demo site starts its subject with [DEMO] and its text with a line saying so. A demo site also keeps out of search engines and shows fake bank details labelled as fake (owner, 2026/10/18; built).
+- **Going live never resets the database** (owner, 2026/10/18). By then the production site holds the owner's imported courses and the time spent setting it up, and GO LIVE keeps all of it. So the production site is never given seed data or test orders: orders, payments and the ledger can never be deleted, so a test order there would stay for good.
+- **For the first 7 days after going live** a message says that the site is now live and hides itself after 15 seconds. Where it appears belongs to the flash messages discussion (deferred, below).
+
+A first draft of the checks, from the settings and tasks in the code today (to be agreed). "Automatic" means the LMS can test it itself, and "by hand" means ADMIN ticks it with a date and a name:
+
+| Area | Check | How |
+|---|---|---|
+| Server | `APP_ENV` is `prod` and `APP_DEBUG` is off | automatic |
+| Server | `APP_KEY` is set and is not the example value | automatic |
+| Server | `APP_URL` and `APP_DOMAIN` are the production domain (none chosen yet) on https, and the cookies are secure only (`AUTH_COOKIE_SECURE`, `PHP_SESSION_SECURE`) | automatic |
+| Server | The commerce worker (`commerce:maintain`) ran in the last 2 minutes | automatic, once the worker records when it last ran |
+| Server | The popularity calculation ran in the last 2 hours | automatic |
+| Server | Backups are made, and a restore has been tested | by hand |
+| Email | The mail server is a real one, not Mailpit or a null mailer (`MAILER_DSN` or the Settings override) | automatic |
+| Email | The sender address is on the site's domain, and a test email reached ADMIN | automatic, with a Send test email button |
+| Email | `APP_ADMIN_EMAIL` is a mailbox that someone reads | by hand |
+| Payments | The Site Owner's EFT bank details are complete (Administration → Settings → Site Owner) | automatic |
+| Payments | Stitch is connected with live keys and its webhook checked, and the Dummy gateway is off | automatic; fails until Stitch is built |
+| Payments | The Stitch transaction fee and refund fee are entered, so the Refund Policy no longer says "none at present" | automatic |
+| Payments | The EFT refund fees, refund window, wallet expiry and reminder, payment due period, payment link lifetime and account reference prefix are the launch values | by hand |
+| Payments | The financial documents design has its logo and notes (Commerce → Financial Documents) | automatic for the logo |
+| Legal | The owner (and an attorney) reviewed the Terms, the Refund Policy and the Privacy Policy at their current last-updated dates | by hand, again after each date changes |
+| Legal | The Site Owner's details are complete and real, not the `.env.example` placeholders (names, legal form, registration number for a company, address, phone, email, website, Information Officer) | automatic |
+| Content | At least one course is published with a price | automatic |
+| Content | The active theme and the default certificate design are the launch choices | by hand |
+| Content | The footer's social links go to the real profiles, not each platform's home page | automatic, once the Settings field exists (none yet) |
+| Test data | No seed-generated people, companies or courses remain | automatic |
+| Test data | No test accounts (`@example.test` and the browser check fixtures), test orders or Dummy gateway payments remain | automatic |
+| Test data | Tester accounts and test access are removed, and every ADMIN is a real person | automatic for testers, by hand for ADMINs |
+
+Points to settle in the discussion:
+
+- Whether the production site's backups start when its setup starts, since that work is kept, rather than at GO LIVE.
+- Whether GO LIVE can be undone, and by whom.
+- How the production site refuses orders before it goes live. `APP_SITE_MODE` has two values (owner, 2026/10/18): set to demo, the production site would take simulated orders, which must never reach its database; set to live, it would take real ones. The GO LIVE work needs a third state or the switch itself to refuse orders until then.
+- What changes for development once the site is live: "all data is TEST data" and the single baseline migration end; schema changes then need real migrations, and resets, seed generation and the browser check fixtures must refuse to run on a live database.
+
 ---
+
+## Deferred — News and announcements (owner, 2026/10/18: not to be built now)
+
+A built-in news system for announcements and press releases, not an external blog product:
+
+- ADMIN publishes posts on the site. There are no comments.
+- Posts appear in an RSS feed that people can subscribe to.
+- Subscribers can choose to receive new posts by email. That needs a bulk email facility that sends a post to the subscribers who opted in, which may be the same facility as the mailing list plugin for existing accounts (section 5).
+
+## Deferred — Flash messages (owner, 2026/10/18: to discuss before building)
+
+Today a flash message is a one-off notice that a page sets after an action ("Saved.", or what went wrong). `partials/flash-messages.html.twig` draws them as `feedback.notice` items in a `cl-flash-stack` at the top of the main content, below the page context band that holds the breadcrumbs and the cart summary, in every theme and in the course reader. Each shows once and stays until the visitor closes it or leaves the page.
+
+The owner's idea:
+
+- Messages that stay, and messages that hide themselves after a set time.
+- Messages made by the system (such as the test-phase message and the "site is now live" message of section 10) and messages ADMIN writes (for example, notice of planned maintenance on Saturday night).
+- One place on the page for them in every theme, possibly in the page context band, next to the breadcrumbs and before the cart.
+
+Points to settle: who sees an ADMIN message (everyone, signed-in people, learners, one company); when it starts and ends; whether a visitor can close it and whether it stays closed; how a message that hides itself stays readable for slow readers and screen readers; and how the band holds it at phone width, where it is narrow.
+
+## Deferred — Start course through the API and MCP
+
+The commerce design for launch gives Start course a confirmation, because starting a course ends the refund right. The API (`POST /api/v1/courses/{slug}/start`) and the MCP tool `start_course` can also start a course for a learner, and they will not ask for that confirmation at launch. Making them ask for it is not needed for launch and is deferred (owner, 2026-10-17: launch-critical work only before 2 November 2026).
 
 ## Deferred — Course-item revisions
 

@@ -50,6 +50,14 @@
             <h2 class="h4">Payment and invoice</h2>
             <form action="/checkout/payment" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}">
+                {% if wallet_balance_minor > 0 %}
+                {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Use my wallet credit (' ~ wallet_balance_label ~ ' available)'})} %}
+{% block control %}
+<input type="checkbox" name="use_wallet" value="yes" {{ checkout.use_wallet|default(true) ? 'checked' : '' }}>
+{% endblock %}
+{% endembed %}
+                <p>Your wallet pays as much of the order as it holds, oldest credit first. Choose how to pay anything left.</p>
+                {% endif %}
                 {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: checkout.payment_method|default('dummy')} %}
                 {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email my invoice to ' ~ (user_email)})} %}
 {% block control %}
@@ -72,16 +80,21 @@
             <h3 class="h5 mt-7">Order total</h3>
             {{ ui('data.key-value-list', {items: cart.totals}) }}
             {% if cart.total_minor == 0 %}<p>Nothing to pay: the promotion covers this order, so it completes when you place it.</p>{% endif %}
+            {% if wallet_applied_minor > 0 %}
+            {{ ui('data.key-value-list', {items: [{label: 'Paid from your wallet', value: wallet_applied_label}, {label: 'To pay', value: to_pay_label}]}) }}
+            {% if to_pay_minor == 0 %}<p>Your wallet pays the whole order, so it completes when you place it.</p>{% endif %}
+            {% endif %}
             <h3 class="h5">Billed to</h3>
             {% include '@platform/partials/billing-address.html.twig' %}
             <p><a href="/checkout/profile">Change billing details</a></p>
-            <p>Payment: {{ checkout.payment_method == 'eft' ? 'EFT / bank transfer' : 'Card (simulated)' }}. <a href="/checkout/payment">Change</a></p>
+            {% if to_pay_minor > 0 %}<p>Payment{{ wallet_applied_minor > 0 ? ' of what is left' : '' }}: {{ checkout.payment_method == 'eft' ? 'EFT / bank transfer' : 'Card (simulated)' }}. <a href="/checkout/payment">Change</a></p>{% endif %}
             <p>{{ checkout.invoice_email ? 'Email my invoice and make it available in My Orders.' : 'Make my invoice available in My Orders.' }}</p>
             <form action="/checkout/place" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">
-                <p>Unpaid orders are automatically cancelled after 7 days. Paid course access starts when you press Start course, or automatically 90 days after your payment is confirmed. Free course access starts immediately. The selected access period then runs to expiry.</p>
-                <p>No VAT is charged. A refund is given only within 7 days of purchase and only if you have not started the course. Your personal information is handled as the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
+                <p>An order that is not paid within {{ payment_due_words }} is cancelled automatically. Every course starts as soon as your payment is confirmed (for an EFT, when we confirm we have received it), and its access period then runs to its end.</p>
+                <p>No VAT is charged. Once a course has started, its content has been supplied and it cannot be cancelled for a refund. This does not affect your rights if a course is faulty, is not as described or cannot be provided. Your personal information is handled as the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> describes.</p>
                 {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
+                {% include '@platform/partials/commerce-start-acceptance.html.twig' %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.button', {label: 'Place my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Edit My Cart</a>

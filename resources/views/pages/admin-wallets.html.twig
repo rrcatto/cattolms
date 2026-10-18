@@ -1,0 +1,27 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_kicker = 'Administration' %}{% set ph_title = 'Wallets' %}{% set ph_lead = 'Every person’s and company’s wallet, largest balance first. Open one for its statement and to record a correction.' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+        {{ ui('layout.section-head', {heading: 'Wallets', eyebrow: 'Balances', summary: 'Search by name or account reference.'}) }}
+        <form method="get" action="/admin/wallets" class="cl-row-inline">
+            <input name="wallets_q" value="{{ wallets_search }}" placeholder="Name or account reference" class="cl-flex-fill cl-input" aria-label="Search wallets">
+            {{ ui('action.button', {label: 'Search', variant: 'primary', size: 'normal', type: 'submit'}) }}
+        </form>
+        {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'wallets', pagination: wallets_pagination})} %}
+        {% block results %}
+        {% if rows %}
+        {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+        {% block body %}
+        {% for row in rows %}
+        {% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+        {% block body %}<a href="{{ row.href }}">{{ row.owner_name }}</a> · {{ row.owner_company_id ? 'Company' : 'Person' }} · {{ row.reference_label }} · {{ row.balance_label }}{% endblock %}
+        {% endembed %}
+        {% endfor %}
+        {% endblock %}
+        {% endembed %}
+        {% else %}{{ ui('feedback.empty', {summary: wallets_search ? 'No wallet matches that search.' : 'No one has wallet credit yet.'}) }}{% endif %}
+        {% endblock %}
+        {% endembed %}
+    {% endblock %}{% endembed %}</section>
+{% endblock %}

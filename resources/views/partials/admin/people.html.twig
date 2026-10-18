@@ -62,7 +62,7 @@
 									<td>
 										{{ person.last_login_at ?: 'Never' }}
 									</td>
-									<td>
+									<td class="cell-actions">
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 
@@ -118,7 +118,7 @@
 
 {% endblock %}
 {% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Initial role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The person is initially added to the System Company. Open their full profile afterwards only if they belong to another company.'})} %}
+								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Initial role', full_width: true, for: 'field-people-4-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The person starts as a private account, in no company. To place them in a company, open their full profile afterwards. A Company Administrator needs a company, so choose one there.'})} %}
 {% block control %}
 
 									<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>

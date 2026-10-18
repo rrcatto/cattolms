@@ -66,7 +66,7 @@ section.cl-page-section   one per region of the page
     search and filters, pager, notice, table or list, pager
 ```
 
-The page chooses its width once (`ThemeRenderer::pageWidth`: wide by default; medium for forms, the legal and help pages, cart and checkout; narrow for the sign-in pages and the error page; full for Home and course landing pages) and every row follows it: the page head, the identity band and each page section take their width and spacing from Core's variables, never from Bootstrap container or spacing classes. A section grid around a single card is a wrapper, not a layout, so a single card sits directly in its section. A section's own actions (Create course, Add person and the like, from its registry's `actions()`) sit in the page head when the section is the page, and in its card's head on the "All sections" pages. Menu pages have no back link and no "All … sections" button: the breadcrumb and the menu lead there. There are no group tab strips: the menu leads to each page. → Enforced by `PageStructureContractTest` and `tests/Browser/section-pages.cjs` (owner's decisions, 2026-10-16 and 2026-10-17).
+Every page is the one standard width (`ThemeRenderer::pageWidth`: wide), the width of every other boxed page; only Home and course landing pages run full width, and the course reader has its own layout. There are no narrow or medium pages (owner, 2026-10-18). Every row follows the page's width: the page head, the identity band and each page section take their width and spacing from Core's variables, never from Bootstrap container or spacing classes. A section grid around a single card is a wrapper, not a layout, so a single card sits directly in its section. A section's own actions (Create course, Add person and the like, from its registry's `actions()`) sit in the page head when the section is the page, and in its card's head on the "All sections" pages. Menu pages have no back link and no "All … sections" button: the breadcrumb and the menu lead there. There are no group tab strips: the menu leads to each page. → Enforced by `PageStructureContractTest` and `tests/Browser/section-pages.cjs` (owner's decisions, 2026-10-16 and 2026-10-17).
 
 The eyebrow names the section and comes from the section registry, so the card, the menu entry and the page head cannot disagree about what a section is called. A page with several cards repeats the card, not the grid. Section heads use the explicit `.cl-ui-section-head-content` child before the actions slot. The content starts physically left and expands; actions stay right, including when they wrap. Root decorative pseudo-elements must be absolutely positioned and non-interactive. Never fix a flex-item decoration by adding `text-align` alone. → Enforced by `tools/validate-ui-contracts.php`, section tests and `tests/Browser/ui-stabilisation.cjs`.
 
@@ -90,7 +90,7 @@ Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-ac
 
 **2.2 Space is allocated to need, not shared out evenly.** A name or title column carries the most text and gets the most width; a numeric column gets what its digits need and no more; the actions column gets what its control needs. Sizing every column the same is the defect this rule exists to prevent.
 
-**2.3 No horizontal scrolling on a table that fits.** `.cl-ui-table` provides `overflow-x:auto` as a last resort for genuinely wide data; it is not a substitute for sizing the columns. If a table scrolls sideways at a normal desktop width, its widths are wrong.
+**2.3 No horizontal scrolling, at any width.** A table never scrolls sideways and never pushes the page sideways. The declared widths keep it inside its box, so `.cl-ui-table` does not scroll: it lets a row menu out instead, because the menu's panel must escape its cell. Long values truncate (rule 2.4); the action column is the one column measured (rule 2.8).
 
 **2.4 Rows do not wrap into unreadable stacks.** Cells that can hold long values truncate or wrap within their own column; a cell never forces the row to grow to several lines because a neighbouring column was starved.
 
@@ -99,6 +99,16 @@ Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-ac
 **2.6 Every table header is the shared sortable header partial.** `partials/sortable-header.html.twig` renders the label, the sort state and the declared width. A hand-written `<th>` in a data table is a defect.
 
 **2.7 Every table paginates and searches through the shared controls.** `partials/pagination.html.twig` and `partials/dataset-search.html.twig`, always both, never a second implementation. Search is server-side over the whole dataset, never a filter over rendered rows. Bounded fixed lists — Roles, Themes, a course's own modules — are exempt from pagination, because a control that can only ever say "Page 1 of 1" is noise. When a paginated dataset has one page, its summary is `Page 1 of 1`; multiple pages use `Showing X–Y of N · Page P of T`. The pagination bar and every internal group remain a single horizontal line at every width. Overflow scrolls within the bar; themes must never wrap or stack it.
+
+**2.8 An action column is never narrower than its control.** A cell that holds a row's actions is `td.cell-actions`. A table with one uses the browser's automatic layout with every other cell at `max-width:0`, so only the action cells are measured: the column takes the larger of its declared share and its control, and the other columns share the rest in their declared proportions. While the control fits, the columns are exactly the declared shares, as in fixed layout. Outside a table, a row of actions wraps when it does not fit. Without it, a share of a phone-width table (13% is about 40px) let a Remove button push the page sideways and squeezed a Details button until its label vanished (roadmap item, 2026-10-17). → Enforced by `TableRowContractTest` and `tests/Browser/section-pages.cjs` (nothing stands out of a table, no action is cut off, no sideways scrolling, every theme at 1440 and 390px).
+
+**2.9 On a phone a table shows its essential columns, in 7pt, with the whole row one tap away.** Owner instruction, 2026-10-17: squeezing every column into a phone at the desktop size "produces an unworkable mess". At 700px and narrower:
+- **Columns.** A table keeps the columns that say what a row is and what can be done with it. The others are marked where the table's columns are declared: `PlatformAdministrationService::PHONE_HIDDEN_COLUMNS` for the dataset tables, `wide: true` on a template's header. The shared header writes `data-phone="hide"`, and Core hides that whole column. A column that holds a form field in any row is never hidden, because hiding it would make the field impossible to edit.
+- **Text.** The table's text, headings, badges and in-row buttons are 7pt. Long values are cut short with an ellipsis.
+- **Tooltip.** Pointing at a row, tapping it or moving focus into it shows the whole row as "Label: value" lines, whenever something in it is hidden or cut short. The table component renders the tooltip empty, and Core's script fills it with text.
+- **Several actions.** Several actions kept in a row become one Actions menu (`action.row` with `narrow_menu`).
+
+→ Enforced by `TableRowContractTest::testAPhoneTableShowsItsEssentialColumns` and `tests/Browser/section-pages.cjs`.
 
 ---
 
@@ -110,7 +120,7 @@ Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-ac
 
 **3.3 Actions may carry an optional sprite icon beside their label.** The canonical action calls the `icon` helper. Decorative icons are hidden from assistive technology; meaningful icons need a label. A label never repeats the icon: "Add person", not "＋ Add person" beside the add icon.
 
-**3.4 One action is a small button; two or more go in the Actions menu.** A row with a single action shows it as a small secondary button; a row with two or more shows the Actions menu (`action.row` with `menu: true`). Owner's answer, 2026-10-16. The Themes table is the one exception: its Activate, Preview and Uninstall stay inline, because the control that recovers from a broken theme must not depend on that theme drawing a menu.
+**3.4 One action is a small button; two or more go in the Actions menu.** A row with a single action shows it as a small secondary button; a row with two or more shows the Actions menu (`action.row` with `menu: true`). Owner's answer, 2026-10-16. The Themes table is the one exception on a wide screen: its Activate, Preview and Uninstall stay inline, because the control that recovers from a broken theme must not depend on that theme drawing a menu. On a phone they go in Core's Actions menu, like every other row with several actions (rule 2.9, owner, 2026-10-17).
 
 ---
 
@@ -228,7 +238,7 @@ When duplicating a palette selector to match both forms, rewrite each selector i
 
 Ordinary category results show courses filed directly in that category. Search includes the active category and all descendants; clearing search returns to direct browsing. Category links and card breadcrumbs use `/courses/category/{slug}`. Recursive public accordions, lazy-open fragments and the old `open` query parameter are obsolete.
 
-**8.3 `/courses/tags` exposes the complete tag vocabulary as server-rendered links.** An optional TagCloud.js sphere animates at most 80 labels beside the vocabulary on desktop; the two areas stack on narrower screens. The vocabulary is a visible, keyboard-scrollable pane, never a disclosure. Reduced motion disables the animation, and script failure leaves every real tag link usable. Selecting `/courses/tag/{slug}` marks that tag, retains the browser and scopes search to the tag. Tag chips on cards and in the browser use the same canonical component.
+**8.3 `/courses/tags` is a tag cloud of the tags in use, as server-rendered links.** Only tags that label at least one published course are listed. The more courses a tag labels, the bigger it is: five sizes on a logarithmic scale (`CourseTagController::weighted`), so the most used tags stand out at a glance (owner, 2026-10-18). An optional TagCloud.js sphere animates the 30 most used, each at its size, beside the list on desktop; the two areas stack on narrower screens. The vocabulary is a visible, keyboard-scrollable pane, never a disclosure. Reduced motion disables the animation, and script failure leaves every real tag link usable. Selecting `/courses/tag/{slug}` marks that tag, retains the browser and scopes search to the tag. Tag chips on cards and in the browser use the same canonical component.
 
 **8.4 Public pages render for a signed-out visitor.** A catalogue or tag page must not report the visitor as logged out or refuse to render because there is no session.
 
@@ -262,7 +272,7 @@ Ordinary category results show courses filed directly in that category. Search i
 
 **10.2 A generated company's domain is `<name>.invalid`,** and mail to it is redirected to the system domain.
 
-**10.3 There is exactly one System company.**
+**10.3 There is no System Company; the Site Owner hosts the site.** The business hosting the site is the Site Owner (`Configuration\SiteOwner`, `.env` and Settings), not a company row. Nobody belongs to it, not even ADMIN. A private account belongs to no company, and a course no company owns belongs to the Site Owner (owner, 2026-10-18).
 
 **10.4 Company type is not a choice between alternatives.** A company can be both a client and a course provider, so these are independent flags, and they are inferred from what the company does — creating courses makes it a provider, buying courses makes it a client — rather than selected on a form.
 
@@ -289,6 +299,11 @@ Ordinary category results show courses filed directly in that category. Search i
 ---
 
 ## Changelog
+
+2026/10/17 SAST (tables on phones)
+
+- 2.3 and 2.8: no table scrolls or pushes the page sideways at any width, and an action column is never narrower than its control.
+- 2.9: on a phone a table shows its essential columns, in 7pt, with the whole row in a tooltip and one Actions menu for several actions. 3.4: the Themes table uses that menu on a phone.
 
 2026/10/17 SAST
 

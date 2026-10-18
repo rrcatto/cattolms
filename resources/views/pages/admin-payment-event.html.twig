@@ -1,0 +1,31 @@
+{# One payment event in full (MoneyRecords::paymentEvent): the state reported, its payment and what was recorded with it. #}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = '/admin/commerce/payment-events' %}{% set ph_back_label = 'Payment Events' %}
+	{% set ph_kicker = 'Payment Events' %}{% set ph_title = 'Payment event ' ~ event.id %}
+	{% set ph_lead = event.state_label ~ ' · ' ~ event.amount_label ~ ' · ' ~ event.when %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Event', summary: 'As it was recorded.'}) }}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'State reported', value: event.state_label},
+			{label: 'When', value: event.when},
+			{label: 'Order', value: event.order_label},
+			{label: 'Payment', value: event.payment_id},
+			{label: 'Gateway', value: event.gateway ~ ' (' ~ event.method_label ~ ')'},
+			{label: 'Amount', value: event.amount_label},
+			{label: 'Gateway reference', value: event.provider_reference ?: '—'},
+			{label: 'The payment now', value: event.payment_state_label},
+			{label: 'Event key', value: event.event_key},
+		]}) }}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+			{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href}) }}
+			{{ ui('action.link', {label: 'Every event of this payment', variant: 'secondary', size: 'small', href: event.payment_events_href}) }}
+			{{ ui('action.link', {label: 'Ledger rows of this order', variant: 'secondary', size: 'small', href: event.order_ledger_href}) }}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Details', summary: 'Everything recorded with the event.'}) }}
+		{% if event.lines %}{{ ui('data.key-value-list', {items: event.lines}) }}{% else %}{{ ui('feedback.empty', {summary: 'Nothing else was recorded.'}) }}{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -1,11 +1,14 @@
+{{#if document.simulation}}<p class="simulation">{{ document.simulation }}</p>{{/if}}
 <table class="head">
 	<tr>
 		<td>
 			[[logo]]
 			<p class="business">{{ business.name }}</p>
 			{{#if business.legal_name}}<p>{{ business.legal_name }}</p>{{/if}}
+			{{#if business.registration_number}}<p>Registration number: {{ business.registration_number }}</p>{{/if}}
 			{{#if business.address}}<p>{{ business.address }}</p>{{/if}}
 			{{#if business.tax_number}}<p>Tax/VAT number: {{ business.tax_number }}</p>{{/if}}
+			{{#if business.phone}}<p>{{ business.phone }}</p>{{/if}}
 			{{#if business.email}}<p>{{ business.email }}</p>{{/if}}
 			{{#if business.website}}<p>{{ business.website }}</p>{{/if}}
 		</td>
@@ -55,6 +58,6 @@
 
 {{#if bank.account_number}}
 <h2>Paying by EFT</h2>
-<p>{{ bank.name }} · {{ bank.account_name }} · Account {{ bank.account_number }} · Branch {{ bank.branch_code }}<br>Use {{ order.number }} as the payment reference.</p>
+<p>{{ bank.name }} · {{ bank.account_name }} · Account {{ bank.account_number }} · Branch {{ bank.branch_code }}<br>{{#if customer.account_reference}}Use your account reference {{ customer.account_reference }} as the payment reference.{{else}}Use {{ order.number }} as the payment reference.{{/if}}</p>
 {{/if}}
 [[note]]

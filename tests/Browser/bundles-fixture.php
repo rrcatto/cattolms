@@ -5,7 +5,8 @@ declare(strict_types=1);
 // Development-only fixture for bundles.cjs: four published paid courses from a provider company
 // (R500, R700, R400 and R300), an ADMIN, and a promotion for all bundles (10% off). `learner` adds a
 // fresh signed-in learner with names, ID number and billing details saved; `learner-owning-a` adds
-// one who already has course A. `cleanup` removes what the database allows: orders, their documents,
+// one who already has course A; `company-learner` one who is a member of the provider company, a
+// company account, which never buys. `cleanup` removes what the database allows: orders, their documents,
 // purchasers, the courses and bundles they bought and the promotion they used are immutable history
 // and stay behind. The development database is disposable; a reset removes them.
 
@@ -64,12 +65,13 @@ if ($action === 'create') {
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created bundles fixture.\n";
-} elseif ($action === 'learner' || $action === 'learner-owning-a') {
+} elseif ($action === 'learner' || $action === 'learner-owning-a' || $action === 'company-learner') {
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     $learner = $person('learner' . (count($state['learners']) + 1), 'Sipho', 'Ndlovu', ['STUDENT'], $state['suffix']);
     $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
     (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Sipho Ndlovu', 'address_line_1' => '7 Bundle Road', 'city' => 'Durban', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
     if ($action === 'learner-owning-a') $fixture->createEnrolment($learner['id'], (int) $state['courses']['a']['id'], (int) $state['users']['admin']);
+    if ($action === 'company-learner') $fixture->addCompanyMember((int) $state['company'], $learner['id']);
     $state['learners'][] = $learner['id'];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     echo json_encode(['id' => $learner['id'], 'token' => $session($learner['id'], $learner['email'])], JSON_THROW_ON_ERROR) . "\n";
@@ -107,5 +109,5 @@ if ($action === 'create') {
     unlink($statePath);
     echo "Removed what the bundles fixture could; orders and what they refer to remain.\n";
 } else {
-    throw new RuntimeException('Usage: php tests/Browser/bundles-fixture.php create|learner|learner-owning-a|cleanup [state-path]');
+    throw new RuntimeException('Usage: php tests/Browser/bundles-fixture.php create|learner|learner-owning-a|company-learner|cleanup [state-path]');
 }

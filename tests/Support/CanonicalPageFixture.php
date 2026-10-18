@@ -43,7 +43,7 @@ final class CanonicalPageFixture
             'course_content_mode' => false, 'theme_preview_active' => false, 'color_scheme' => 'light',
             'navigation' => $navigation, 'footer_navigation' => [$item('help', '/help')],
             'breadcrumbs' => [['label' => 'Help', 'href' => null, 'current' => true]],
-            'cart_summary' => ['count' => 0, 'items' => [], 'total_label' => 'R0.00'],
+            'cart_summary' => ['count' => 0, 'items' => [], 'total_label' => 'R0.00', 'buyer' => true],
             'flash_messages' => [['type' => 'success', 'message' => 'Saved']],
             'ph_title' => 'Help', 'ph_kicker' => 'Learning', 'ph_lead' => 'Use the site', 'ph_action_href' => '/courses', 'ph_action_label' => 'Courses',
         ]);

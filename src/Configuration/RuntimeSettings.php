@@ -46,23 +46,11 @@ final class RuntimeSettings
     private const MAIL_FROM_NAME = 'mail_from_name';
     private const MAIL_REPLY_TO = 'mail_reply_to';
 
-    /**
-     * The SEED System Company's name and mail domain.
-     *
-     * These follow the same resolution as every other administrator-overridable setting -
-     * `app_options` row, then `.env`, then a built-in default - so `.env` remains the deployment
-     * default and Administration provides the runtime override.
-     *
-     * The domain matters more than it looks. It is both the displayed domain of the shared SEED
-     * System Company row *and* the address seed mail is actually delivered to. If Settings wrote
-     * only `companies.domain`, the displayed domain and the delivery domain would silently
-     * diverge, which is worse than not offering the field at all. `GeneratedDomainRouter` is therefore
-     * built from this value rather than from `Env` directly.
-     */
-
     public function __construct(
         private readonly OptionRepository $options,
-        private readonly SecretCipher $cipher
+        private readonly SecretCipher $cipher,
+        private readonly ?SiteMode $site = null,
+        private readonly ?SiteOwner $owner = null
     ) {
     }
 
@@ -78,33 +66,27 @@ final class RuntimeSettings
     }
 
     /**
-     * Current EFT instructions are administrator-managed database settings, never deployment defaults.
+     * The Site Owner's bank account for EFT payments (SiteOwner: .env, overridden at Administration >
+     * Settings > Site Owner). Configured only when all four details are set.
+     *
      * @return array{bank_name:string,account_name:string,account_number:string,branch_code:string,configured:bool}
      */
     public function bankDetails(): array
     {
-        $saved = json_decode($this->options->get('commerce_bank_details', '{}'), true, 512, JSON_THROW_ON_ERROR);
-        $details = [];
-        foreach (['bank_name','account_name','account_number','branch_code'] as $field) {
-            $details[$field] = (string) ($saved[$field] ?? '');
-        }
-        return $details + ['configured'=>!in_array('', $details, true)];
+        return $this->owner?->bankDetails() ?? ['bank_name' => '', 'account_name' => '', 'account_number' => '', 'branch_code' => '', 'configured' => false];
     }
 
-    /** Validates the whole section before replacing its single app_options record.
-     * @param array<string,mixed> $input
+    /**
+     * The bank account customers are told to pay into: on a demo site fake details, each labelled as
+     * fake (SiteMode::FAKE_BANK_DETAILS), so nobody pays real money for a simulated order; on a live
+     * site the Site Owner's.
+     *
+     * @return array{bank_name:string,account_name:string,account_number:string,branch_code:string,configured:bool,fake:bool}
      */
-    public function saveBankDetails(array $input, int $actorUserId): void
+    public function payableBankDetails(): array
     {
-        $details = [];
-        foreach (['bank_name','account_name','account_number','branch_code'] as $field) {
-            $value = trim((string) ($input[$field] ?? ''));
-            if ($value === '' || mb_strlen($value) > 160) throw new InvalidArgumentException('Complete all four bank details fields (up to 160 characters each).');
-            $details[$field] = $value;
-        }
-        if (preg_match('/^[0-9]{1,34}$/D', $details['account_number']) !== 1) throw new InvalidArgumentException('Enter the bank account number using digits only.');
-        if (preg_match('/^[0-9]{6}$/D', $details['branch_code']) !== 1) throw new InvalidArgumentException('Enter the six-digit branch code.');
-        $this->options->set('commerce_bank_details', json_encode($details, JSON_THROW_ON_ERROR), $actorUserId);
+        if ($this->site?->isDemo() ?? true) return SiteMode::FAKE_BANK_DETAILS + ['configured' => true, 'fake' => true];
+        return $this->bankDetails() + ['fake' => false];
     }
 
     public function platformName(): string

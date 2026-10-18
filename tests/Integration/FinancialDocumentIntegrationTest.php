@@ -40,7 +40,7 @@ use CattoLearning\Commerce\Http\FinancialDocumentDesignController;
 use CattoLearning\Commerce\Http\PaymentAdministrationController;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Document\DocumentTemplateRepository;
@@ -88,12 +88,12 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
         $this->promotions = PromotionFixture::service($this->db, $this->clock);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $this->promotions, $this->documents);
+        $this->orders = new OrderService($this->records, $tx, WalletFixture::settings($this->db), $transitions, $this->clock, $this->promotions, $this->documents, WalletFixture::wallets($this->db, $this->clock));
         $this->access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $credits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $analytics = new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $this->access, $tx, $this->orders, $this->clock, $credits, $analytics, $this->promotions);
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock, $this->documents);
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'), $this->clock), $this->fulfilment, $transitions, $this->clock, $this->documents, WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $this->owner = $this->fixture->createUser('Document course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Document provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.documents.example.test');
         foreach (['Conveyancing 1' => 120000, 'Deeds Office Practice' => 80000, 'Bonds' => 50000, 'Notarial Practice' => 70000] as $title => $price) {
@@ -151,7 +151,8 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $this->db->executeStatement("UPDATE bundles SET title='Renamed Bundle' WHERE id=:id", ['id' => $bundle['id']]);
         $this->db->executeStatement('DELETE FROM bundle_courses WHERE bundle_id=:id AND course_id=:course', ['id' => $bundle['id'], 'course' => $this->course['Notarial Practice']['id']]);
         $this->db->executeStatement("UPDATE promotions SET name='Renamed offer', discount_value=5000, active=FALSE WHERE code=:code", ['code' => $code]);
-        $this->db->executeStatement("INSERT INTO app_options (option_key, option_value) VALUES ('platform_name', 'Renamed Platform') ON CONFLICT (option_key) DO UPDATE SET option_value = EXCLUDED.option_value");
+        // The seller is the Site Owner (owner, 2026-10-18): a new trading name reaches documents issued from then on only.
+        $this->db->executeStatement("INSERT INTO app_options (option_key, option_value) VALUES ('site_owner.trading_name', 'Renamed Seller') ON CONFLICT (option_key) DO UPDATE SET option_value = EXCLUDED.option_value");
 
         $again = $this->only($orderId, 'invoice');
         self::assertSame($invoice, $again, 'The stored document is untouched.');
@@ -164,7 +165,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
             self::assertStringNotContainsString($later, $html, $later);
         }
         $later = $this->place($this->buyer('Later Buyer'), ['Deeds Office Practice']);
-        self::assertStringContainsString('Renamed Platform', $this->documents->render($this->only($later, 'invoice'))->html, 'A document issued later has the business details as they are then.');
+        self::assertStringContainsString('Renamed Seller', $this->documents->render($this->only($later, 'invoice'))->html, 'A document issued later has the business details as they are then.');
     }
 
     public function testANewDesignDrawsDocumentsIssuedFromThenOnAndNeverOnesAlreadyIssued(): void
@@ -224,11 +225,11 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $this->payments->purchase($buyer, $orderId, Uuid::v4(), 'demo_success');
         $item = $this->records->items($orderId)[0];
         $refunds = new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock,
-            new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock), $this->access, $this->documents);
-        $first = $refunds->approve($this->admin(), $orderId, (int) $item['id'], Uuid::v4(), 'goodwill', 'A first goodwill amount.', 1, 30000);
+            new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock), $this->access, $this->documents, WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
+        $first = $refunds->approve($this->admin(), $orderId, (int) $item['id'], Uuid::v4(), 'goodwill', 'A first goodwill amount.', 1, 30000, 'The course started on payment; refund mechanics under test.');
         $firstNote = $this->db->fetchAssociative("SELECT * FROM commerce_documents WHERE source_key=:k", ['k' => 'refund:' . $first]) ?: [];
         $firstHtml = $this->documents->render($firstNote)->html;
-        $refunds->approve($this->admin(), $orderId, (int) $item['id'], Uuid::v4(), 'service_failure', 'The rest of what was paid.', 1, 78000);
+        $refunds->approve($this->admin(), $orderId, (int) $item['id'], Uuid::v4(), 'service_failure', 'The rest of what was paid.', 1, 78000, 'The course started on payment; refund mechanics under test.');
 
         $notes = array_values(array_filter($this->records->documents($orderId), static fn(array $d): bool => $d['kind'] === 'credit_note'));
         self::assertCount(2, $notes, 'One credit note per refund.');
@@ -288,7 +289,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
         self::assertStringContainsString('drawn in the receipt design, version ' . $receipt['template_version_number'], $page['body']);
 
         $mailer = new FakeMailer();
-        (new CommerceMaintenance($this->records, $this->orders, $this->access, $this->documents, $mailer, new TransactionManager($this->db), $this->clock))->deliverInvoices();
+        (new CommerceMaintenance($this->records, $this->orders, $this->access, $this->documents, $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock)))->deliverInvoices();
         $sent = array_values(array_filter($mailer->messages, static fn(array $m): bool => ($m['number'] ?? '') === $invoice['number']));
         self::assertCount(1, $sent);
         self::assertSame($this->documents->pdf($invoice), $sent[0]['pdf'], 'The emailed invoice is the same document as the download.');

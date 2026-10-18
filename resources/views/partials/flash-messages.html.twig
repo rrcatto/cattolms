@@ -1,1 +1,7 @@
+{# A demo site (SiteMode) says so at the top of every page, in a stack of its own that dismissing a message never removes. #}
+{% if site_demo|default(false) %}
+<div class="cl-flash-stack" data-demo-site>
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Demo site'})} %}{% block body %} {{ site_demo_notice }}{% endblock %}{% endembed %}
+</div>
+{% endif %}
 {% if flash_messages|default([]) %}<div class="cl-flash-stack" aria-live="polite">{% for message in flash_messages %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: message.type == 'error' ? 'danger' : message.type, flash: true})} %}{% block body %}{{ message.message }}{% endblock %}{% endembed %}{% endfor %}</div>{% endif %}

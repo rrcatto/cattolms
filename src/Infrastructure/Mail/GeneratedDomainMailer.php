@@ -66,6 +66,16 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendCourseRequestDecision($this->router->deliveryAddress($email), $courseTitle, $approved);
     }
 
+    public function sendWalletExpiryReminder(string $email, string $name, array $lines, string $walletUrl): void
+    {
+        $this->mailer->sendWalletExpiryReminder($this->router->deliveryAddress($email), $name, $lines, $walletUrl);
+    }
+
+    public function sendAdministratorMessage(string $email, string $subject, string $body): void
+    {
+        $this->mailer->sendAdministratorMessage($this->router->deliveryAddress($email), $subject, $body);
+    }
+
     public function sendCourseEnrolmentNotice(string $email, string $courseTitle, string $courseSlug): void
     {
         $this->mailer->sendCourseEnrolmentNotice($this->router->deliveryAddress($email), $courseTitle, $courseSlug);

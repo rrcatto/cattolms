@@ -8,6 +8,7 @@ use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Bundle\BundleRepository;
 use CattoLearning\Bundle\BundleService;
+use CattoLearning\Commerce\Application\OrderService;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -21,7 +22,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class BundleController extends BaseController
 {
     public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests,
-        private readonly BundleService $bundles, private readonly BundleRepository $records)
+        private readonly BundleService $bundles, private readonly BundleRepository $records, private readonly OrderService $orders)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -41,6 +42,8 @@ final class BundleController extends BaseController
     public function show(): Response
     {
         $bundle = $this->bundles->detail((string) $this->param('slug'), $this->currentUser()) ?? throw $this->notFound('This bundle does not exist.');
-        return $this->render('bundle-detail', ['title' => (string) $bundle['title'], 'active_nav' => 'catalogue', 'bundle' => $bundle]);
+        // A company account never buys (OrderService::COMPANY_ACCOUNT): it reads why instead of the buttons.
+        return $this->render('bundle-detail', ['title' => (string) $bundle['title'], 'active_nav' => 'catalogue', 'bundle' => $bundle,
+            'company_note' => $this->orders->mayBuy($this->currentUser()) ? '' : OrderService::COMPANY_ACCOUNT]);
     }
 }

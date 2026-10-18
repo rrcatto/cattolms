@@ -109,7 +109,7 @@ services:
     # section types and copy rules.
     CattoLearning\Course\:
         resource: '../src/Course/'
-        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php,Landing/LandingCopy.php,Landing/LandingSectionType.php}'
+        exclude: '../src/Course/{CatalogueFilter.php,CourseRatingSummary.php,CourseTiming.php,*Exception.php,Popularity/PopularityModel.php,Popularity/CoursePopularityMetrics.php,Popularity/CoursePopularityScore.php,Certificate/CertificateDesign.php,Certificate/CertificateLook.php,Certificate/CertificateLooks.php,Certificate/CertificateWording.php,Certificate/CertificateImage.php,Landing/LandingCopy.php,Landing/LandingSectionType.php}'
 
     # BundleRules is a set of static rules, not a service.
     CattoLearning\Bundle\:
@@ -163,6 +163,7 @@ services:
 
     CattoLearning\Company\:
         resource: '../src/Company/'
+        exclude: '../src/Company/{CompanyScope.php,NoCompanyChosen.php}'
 
     # Support/ is value objects with private constructors and static factories, which is why it is
     # not registered wholesale - doing so makes the container refuse to compile. GeoIpLocator is the
@@ -197,7 +198,8 @@ services:
         arguments: ['%env(APP_TIMEZONE)%']
         tags: ['doctrine.middleware']
 
-    # The public legal documents (Terms, Refund Policy, Privacy Policy): their versions and the supplier.
+    # The public legal documents (Terms, Refund Policy, Privacy Policy): their dates and footer entries.
+    # The seller they name is the Site Owner (Configuration\SiteOwner).
     CattoLearning\Legal\:
         resource: '../src/Legal/'
 
@@ -208,14 +210,17 @@ services:
     CattoLearning\Commerce\Document\:
         resource: '../src/Commerce/Document/'
         exclude: '../src/Commerce/Document/{FinancialDocumentDesign.php,FinancialDocumentSamples.php}'
-    CattoLearning\Commerce\Policy\:
-        resource: '../src/Commerce/Policy/'
+    # Commerce settings (.env defaults with database overrides) and the money ledger and wallets.
+    CattoLearning\Commerce\Settings\:
+        resource: '../src/Commerce/Settings/'
+        exclude: '../src/Commerce/Settings/{ProcessorFee.php,FeeTiers.php}'
+    CattoLearning\Commerce\Wallet\:
+        resource: '../src/Commerce/Wallet/'
+        exclude: '../src/Commerce/Wallet/{WalletOwner.php,LedgerKind.php}'
     CattoLearning\Commerce\Workflow\:
         resource: '../src/Commerce/Workflow/'
     CattoLearning\Commerce\Contract\PaymentGatewayInterface: '@CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter'
-    CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter:
-        arguments:
-            $environment: '%kernel.environment%'
+    CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter: ~
 
     CattoLearning\Commerce\Http\:
         resource: '../src/Commerce/Http/'

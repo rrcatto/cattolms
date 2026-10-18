@@ -114,6 +114,7 @@ async function applyCode(page, code, keyboard = true) {
             await toReview(page, fixture);
             await applyCode(page, code, false);
             await page.locator('input[name=accept_terms]').check();
+            await page.locator('input[name=accept_start]').check();
             await submit(page, page.getByRole('button', {name: 'Place my order'}));
             assert.match(page.url(), /\/account\/orders\/\d+/);
             assert.deepEqual(await totals(page), discounted, 'the order shows the promotion it was placed with');
@@ -146,6 +147,7 @@ async function applyCode(page, code, keyboard = true) {
         assert.deepEqual(await totals(page), [['Total', rand(17345)]]);
         await applyCode(page, code, false);
         await page.locator('input[name=accept_terms]').check();
+        await page.locator('input[name=accept_start]').check();
         await submit(page, page.getByRole('button', {name: 'Place my order'}));
         assert.deepEqual(await totals(page), discounted, 'the order was placed with the discount as an ordinary form post');
         await ctx.close();

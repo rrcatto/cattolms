@@ -13,7 +13,7 @@ use CattoLearning\Commerce\Domain\PaymentResult;
 use CattoLearning\Commerce\Http\{CommerceController,PaymentAdministrationController};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\{CourseRepository, LearningService};
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
@@ -63,11 +63,11 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
         $this->promotions = PromotionFixture::service($this->db, $this->clock);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $this->promotions,IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->orders = new OrderService($this->records, $tx, WalletFixture::settings($this->db), $transitions, $this->clock, $this->promotions,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock));
         $access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $access, $tx, $this->orders, $this->clock, $companyCredits, $this->analytics(), $this->promotions);
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'), $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $this->billing = BillingFixture::service($this->db, $this->clock);
         $this->owner = $this->fixture->createUser('Bundle course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Bundle provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.bundle.example.test');
@@ -102,7 +102,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $entitlements = $this->db->fetchAllAssociative("SELECT e.source, e.state, e.order_item_id, ce.course_id, ce.source_type, ce.access_period_seconds FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE e.order_item_id=:item ORDER BY ce.course_id", ['item' => $line['id']]);
         self::assertCount(3, $entitlements);
         foreach ($entitlements as $entitlement) {
-            self::assertSame(['bundle', 'awaiting_activation', (int) $line['id'], 'bundle', 31536000], [$entitlement['source'], $entitlement['state'], (int) $entitlement['order_item_id'], $entitlement['source_type'], (int) $entitlement['access_period_seconds']], 'Bundle → order → order item → course provenance.');
+            self::assertSame(['bundle', 'active', (int) $line['id'], 'bundle', 31536000], [$entitlement['source'], $entitlement['state'], (int) $entitlement['order_item_id'], $entitlement['source_type'], (int) $entitlement['access_period_seconds']], 'Bundle → order → order item → course provenance.');
         }
         $learning = IntegrationContainer::get()->get(LearningService::class);
         foreach (['A', 'B', 'C'] as $key) self::assertSame($this->course[$key]['id'], (int) $learning->courseHome($buyer->id, $this->course[$key]['slug'])['id'], 'Course ' . $key . ' opens like any course bought on its own.');
@@ -190,10 +190,10 @@ final class BundlePurchaseIntegrationTest extends TestCase
         self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_enrolments WHERE user_id=:u AND course_id=:c AND status IN ('assigned','active','completed')", ['u' => $buyer->id, 'c' => $this->course['A']['id']]), 'Course A is still one course in the library.');
         self::assertSame([3, 1], [$this->events('bundle_purchased', $buyer->id)[0]['metadata']['courses_granted'], $this->events('bundle_purchased', $buyer->id)[0]['metadata']['courses_already_held']]);
 
-        $this->refunds()->approve($this->admin(), $orderId, (int) $line['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 120000);
+        $this->refunds()->approve($this->admin(), $orderId, (int) $line['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 120000, 'The course started on payment; refund mechanics under test.');
         self::assertSame([$this->course['A']['id']], $this->openCourses($buyer), 'Refunding the bundle ends B and C and keeps A, which the ADMIN assignment still grants.');
-        self::assertSame(['awaiting_activation', 'revoked'], array_column($this->records->sources($existing), 'state'), 'Only the bundle source was revoked; the ADMIN assignment still waits for the learner to start.');
-        self::assertSame('assigned', (string) $this->db->fetchOne('SELECT status FROM course_enrolments WHERE id=:id', ['id' => $existing]));
+        self::assertSame(['active', 'revoked'], array_column($this->records->sources($existing), 'state'), 'Only the bundle source was revoked; the ADMIN assignment, started with the purchase, keeps running.');
+        self::assertSame('active', (string) $this->db->fetchOne('SELECT status FROM course_enrolments WHERE id=:id', ['id' => $existing]), 'The course started with the purchase.');
     }
 
     public function testOverlappingBundlesShareCoursesWithoutDuplicateAccessAndEachRefundRespectsTheOther(): void
@@ -213,9 +213,9 @@ final class BundlePurchaseIntegrationTest extends TestCase
         self::assertSame([(int) $lineX['id'], (int) $lineY['id']], array_map('intval', array_column($this->records->sources($courseB), 'order_item_id')), 'Course B has a source from each bundle behind its one enrolment.');
 
         $refunds = $this->refunds();
-        $refunds->approve($this->admin(), $orderId, (int) $lineX['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 100000);
+        $refunds->approve($this->admin(), $orderId, (int) $lineX['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 100000, 'The course started on payment; refund mechanics under test.');
         self::assertSame($this->ids(['B', 'C']), $this->openCourses($buyer), 'Refunding X ends A; B stays, because Y still covers it.');
-        $refunds->approve($this->admin(), $orderId, (int) $lineY['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 90000);
+        $refunds->approve($this->admin(), $orderId, (int) $lineY['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 90000, 'The course started on payment; refund mechanics under test.');
         self::assertSame([], $this->openCourses($buyer), 'Refunding Y too ends B and C.');
     }
 
@@ -233,12 +233,12 @@ final class BundlePurchaseIntegrationTest extends TestCase
 
         $refunds = $this->refunds();
         try {
-            $refunds->approve($this->admin(), $orderId, (int) $line['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 108001);
+            $refunds->approve($this->admin(), $orderId, (int) $line['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 108001, 'The course started on payment; refund mechanics under test.');
             self::fail('A refund above what was paid for the bundle is refused.');
         } catch (RuntimeException $refused) {
             self::assertSame('The refund exceeds this item’s unrefunded paid amount.', $refused->getMessage());
         }
-        $refundId = $refunds->approve($this->admin(), $orderId, (int) $line['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 108000);
+        $refundId = $refunds->approve($this->admin(), $orderId, (int) $line['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 108000, 'The course started on payment; refund mechanics under test.');
         $note = $this->db->fetchAssociative("SELECT * FROM commerce_documents WHERE order_id=:o AND kind='credit_note'", ['o' => $orderId]) ?: [];
         $noteSnapshot = CommerceRepository::decode((string) $note['snapshot']);
         self::assertSame(['bundle', 'Discounted Bundle', 108000], [$noteSnapshot['items'][0]['fulfilment_type'], $noteSnapshot['items'][0]['bundle_title'], $noteSnapshot['total_minor']]);
@@ -297,7 +297,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $quote = $this->orders->cart($buyer);
         $this->bundleService()->setStatus($this->admin(), $bundle['id'], 'retired');
         try {
-            $this->checkout($buyer)->place($buyer, (int) $quote['id'], (string) $quote['quote'], true);
+            $this->checkout($buyer)->place($buyer, (int) $quote['id'], (string) $quote['quote'], true, true);
             self::fail('A retired bundle cannot be bought.');
         } catch (RuntimeException $refused) {
             self::assertSame('Your cart or prices changed. Review your order again.', $refused->getMessage());
@@ -415,7 +415,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
         foreach ($offers as $offer) $this->orders->changeBundle($buyer, $offer);
         $this->ready($buyer);
         $cart = $this->orders->cart($buyer);
-        return (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        return (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
     }
 
     /** @return list<int> courses the learner has open access to, by id */
@@ -447,7 +447,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
 
     private function refunds(): RefundAdministrationService
     {
-        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
     }
 
     private function bundleService(): BundleService

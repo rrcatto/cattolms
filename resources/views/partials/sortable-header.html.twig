@@ -3,10 +3,14 @@
 	string - style="width:NN%" produced by an expression - Twig autoescapes the quotes, and the
 	browser receives style=&quot;width:26%&quot; as text. Every column width on every table was
 	inert for exactly that reason.
+
+	sh.wide marks a column a phone does not show (data-phone="hide"): Core hides the whole column
+	at 700px and narrower, and the row's tooltip still shows its value.
 #}
 {% if sh.sortable %}
 	<th class="sortable-header {{ sh.active ? 'is-sorted' : '' }}"
 	    {% if sh.width %}style="width:{{ sh.width }}%"{% endif %}
+	    {% if sh.wide|default(false) %}data-phone="hide"{% endif %}
 	    {% if sh.active %}aria-sort="{{ sh.direction == 'desc' ? 'descending' : 'ascending' }}"{% endif %}>
 		<a href="{{ sh.href }}"
 			   hx-get="{{ sh.href }}" hx-target="#{{ sort_region }}" hx-select="#{{ sort_results }}"
@@ -15,7 +19,7 @@
 		</a>
 	</th>
 {% else %}
-	<th {% if sh.width %}style="width:{{ sh.width }}%"{% endif %}>
+	<th {% if sh.width %}style="width:{{ sh.width }}%"{% endif %} {% if sh.wide|default(false) %}data-phone="hide"{% endif %}>
 		{{ sh.label }}
 	</th>
 {% endif %}

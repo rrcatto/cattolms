@@ -319,12 +319,23 @@ final class CommerceRepository
     {
         return $this->db->fetchAllAssociative('SELECT * FROM commerce_payments WHERE order_id=:id ORDER BY created_at,id', ['id'=>$orderId]);
     }
-    /** @param array<string,mixed> $order */
-    public function createPayment(array $order, string $key, string $gateway, string $now): string
+    /**
+     * A payment attempt for $amount, or for the whole order total when none is given. An order can be
+     * paid in parts: from the wallet when it is placed, then by card or EFT for the rest.
+     *
+     * @param array<string,mixed> $order
+     */
+    public function createPayment(array $order, string $key, string $gateway, string $now, ?int $amount = null): string
     {
         $id=Uuid::v4();
-        $this->db->executeStatement("INSERT INTO commerce_payments(id,order_id,request_key,gateway,state,amount_minor,currency,created_at) VALUES (:id,:order,:key,:gateway,'created',:amount,:currency,:now)", ['id'=>$id,'order'=>$order['id'],'key'=>$key,'gateway'=>$gateway,'amount'=>$order['total_minor'],'currency'=>$order['currency'],'now'=>$now]);
+        $this->db->executeStatement("INSERT INTO commerce_payments(id,order_id,request_key,gateway,state,amount_minor,currency,created_at) VALUES (:id,:order,:key,:gateway,'created',:amount,:currency,:now)", ['id'=>$id,'order'=>$order['id'],'key'=>$key,'gateway'=>$gateway,'amount'=>$amount ?? $order['total_minor'],'currency'=>$order['currency'],'now'=>$now]);
         return $id;
+    }
+
+    /** What is still to pay on an order: its total less the payments received, never below nothing. */
+    public function dueAmount(int $orderId): int
+    {
+        return max(0, (int)$this->order($orderId)['total_minor'] - $this->paidTotal($orderId));
     }
     public function setPaymentState(string $id, string $state, ?string $reference): void
     {
@@ -334,6 +345,14 @@ final class CommerceRepository
     public function paymentEvent(string $id, string $key, string $state, array $payload, string $now): bool
     {
         return $this->db->executeStatement('INSERT INTO commerce_payment_events(payment_id,event_key,state,payload,created_at) VALUES (:id,:key,:state,:payload,:now) ON CONFLICT(event_key) DO NOTHING', ['id'=>$id,'key'=>$key,'state'=>$state,'payload'=>self::json($payload),'now'=>$now]) === 1;
+    }
+    /**
+     * A company account: an active member of an active company. A private account belongs to no
+     * company (owner, 2026-10-18). Company accounts never buy for themselves.
+     */
+    public function isCompanyAccount(int $userId): bool
+    {
+        return (bool)$this->db->fetchOne("SELECT 1 FROM company_users cu JOIN companies c ON c.id=cu.company_id WHERE cu.user_id=:user AND cu.status='active' AND c.status='active'", ['user'=>$userId]);
     }
     public function hasOpenEnrolment(int $userId, int $courseId): bool
     {
@@ -506,10 +525,6 @@ final class CommerceRepository
         return (string) ($this->db->fetchOne('SELECT payment_method FROM commerce_order_preferences WHERE order_id=:id', ['id'=>$orderId]) ?: 'dummy');
     }
     /** @return list<array<string,mixed>> */
-    public function administrationOrders(string $search = '', int $limit = 100): array
-    {
-        return $this->db->fetchAllAssociative("SELECT o.id,o.state,o.total_minor,o.currency,o.placed_at,o.company_id,o.request_id,u.display_name AS purchaser_name,ue.email AS purchaser_email FROM commerce_orders o JOIN users u ON u.id=o.purchaser_user_id LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE WHERE (:search='' OR o.id::text=:search OR ue.email ILIKE :pattern) ORDER BY o.id DESC LIMIT :limit", ['search'=>$search,'pattern'=>'%'.str_replace(['%','_'],['\\%','\\_'],$search).'%','limit'=>$limit]);
-    }
     /** @return array<string,mixed>|null */
     public function manualEvidence(string $paymentId): ?array
     {
@@ -526,7 +541,7 @@ final class CommerceRepository
     /** @return list<array<string,mixed>> */
     public function refunds(int $orderId): array
     {
-        return $this->db->fetchAllAssociative('SELECT r.*,u.display_name AS actor_name FROM commerce_refunds r JOIN users u ON u.id=r.approved_by_user_id WHERE r.order_id=:id ORDER BY r.id', ['id'=>$orderId]);
+        return $this->db->fetchAllAssociative('SELECT r.*,u.display_name AS actor_name,p.paid_at AS payout_paid_at,p.external_reference AS payout_reference FROM commerce_refunds r JOIN users u ON u.id=r.approved_by_user_id LEFT JOIN commerce_refund_payouts p ON p.refund_id=r.id WHERE r.order_id=:id ORDER BY r.id', ['id'=>$orderId]);
     }
     public function refundedAmount(int $orderId, ?int $itemId = null): int
     {
@@ -565,28 +580,105 @@ final class CommerceRepository
         return is_string($at) ? $at : null;
     }
     /**
-     * The courses of an order line the learner has started (pressed Start course), oldest source first.
+     * The courses of an order line whose access has started, oldest first: on payment (every course
+     * starts then, owner 2026-10-17) or when the learner pressed Start course.
      *
      * @return list<array{course_id:int,started_at:string}>
      */
     public function startedCourses(int $itemId): array
     {
         return array_map(static fn(array $row): array => ['course_id'=>(int)$row['course_id'],'started_at'=>(string)$row['started_at']],
-            $this->db->fetchAllAssociative('SELECT ce.course_id,ce.started_at FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE e.order_item_id=:item AND ce.started_at IS NOT NULL ORDER BY e.id', ['item'=>$itemId]));
+            $this->db->fetchAllAssociative('SELECT ce.course_id,COALESCE(e.access_started_at,ce.started_at) AS started_at FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE e.order_item_id=:item AND COALESCE(e.access_started_at,ce.started_at) IS NOT NULL ORDER BY e.id', ['item'=>$itemId]));
     }
-    /** A refund the Refund Policy refuses carries what the rule refused and ADMIN's written override reason; both are null otherwise. */
-    public function createRefund(string $key, int $orderId, int $itemId, int $quantity, int $amount, string $currency, string $basis, string $reason, int $actorId, string $now, ?string $policyRefusal = null, ?string $overrideReason = null): int
+    /**
+     * A refund the Refund Policy refuses carries what the rule refused and ADMIN's written override
+     * reason; both are null otherwise. $settlement is how it was worked out (owner, 2026-10-17):
+     * request_id, destination (wallet or money_back), method (how the refunded part was paid),
+     * wallet_part_minor, deductions, net_minor and, for money back, payout_due_at.
+     *
+     * @param array{request_id?:?int,destination?:string,method?:string,wallet_part_minor?:int,deductions?:list<array{kind:string,label:string,amount_minor:int}>,net_minor?:int,payout_due_at?:?string} $settlement
+     */
+    public function createRefund(string $key, int $orderId, int $itemId, int $quantity, int $amount, string $currency, string $basis, string $reason, int $actorId, string $now, ?string $policyRefusal = null, ?string $overrideReason = null, array $settlement = []): int
     {
-        return (int)$this->db->fetchOne('INSERT INTO commerce_refunds(public_id,request_key,order_id,order_item_id,quantity,amount_minor,currency,basis,reason,approved_by_user_id,approved_at,policy_refusal,override_reason) VALUES (:public,:key,:order,:item,:quantity,:amount,:currency,:basis,:reason,:actor,:now,:refusal,:override) RETURNING id', ['public'=>Uuid::v4(),'key'=>$key,'order'=>$orderId,'item'=>$itemId,'quantity'=>$quantity,'amount'=>$amount,'currency'=>$currency,'basis'=>$basis,'reason'=>$reason,'actor'=>$actorId,'now'=>$now,'refusal'=>$policyRefusal,'override'=>$overrideReason]);
+        return (int)$this->db->fetchOne('INSERT INTO commerce_refunds(public_id,request_key,order_id,order_item_id,quantity,amount_minor,currency,basis,reason,approved_by_user_id,approved_at,policy_refusal,override_reason,refund_request_id,destination,method,wallet_part_minor,deductions,net_minor,payout_due_at) VALUES (:public,:key,:order,:item,:quantity,:amount,:currency,:basis,:reason,:actor,:now,:refusal,:override,:request,:destination,:method,:wallet,CAST(:deductions AS JSONB),:net,:due) RETURNING id', ['public'=>Uuid::v4(),'key'=>$key,'order'=>$orderId,'item'=>$itemId,'quantity'=>$quantity,'amount'=>$amount,'currency'=>$currency,'basis'=>$basis,'reason'=>$reason,'actor'=>$actorId,'now'=>$now,'refusal'=>$policyRefusal,'override'=>$overrideReason,
+            'request'=>$settlement['request_id'] ?? null,'destination'=>$settlement['destination'] ?? 'wallet','method'=>$settlement['method'] ?? 'none','wallet'=>$settlement['wallet_part_minor'] ?? 0,'deductions'=>self::json($settlement['deductions'] ?? []),'net'=>$settlement['net_minor'] ?? 0,'due'=>$settlement['payout_due_at'] ?? null]);
     }
-    public function creditRefundFunds(int $refundId, ?int $userId, ?int $companyId, string $currency, int $amount, string $now): void
+
+    /** A money-back refund ADMIN paid outside the LMS, with its reference. */
+    public function recordRefundPayout(int $refundId, string $method, int $amount, string $paidAt, string $reference, int $actorId, string $now): void
     {
-        $this->db->executeStatement('INSERT INTO commerce_fund_accounts(owner_user_id,owner_company_id,currency) VALUES (:user,:company,:currency) ON CONFLICT DO NOTHING', ['user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
-        $this->db->executeStatement('INSERT INTO commerce_fund_entries(account_id,refund_id,amount_minor,created_at) SELECT id,:refund,:amount,:now FROM commerce_fund_accounts WHERE owner_user_id IS NOT DISTINCT FROM :user AND owner_company_id IS NOT DISTINCT FROM :company AND currency=:currency', ['refund'=>$refundId,'amount'=>$amount,'now'=>$now,'user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
+        $this->db->executeStatement('INSERT INTO commerce_refund_payouts(refund_id,method,amount_minor,paid_at,external_reference,recorded_by_user_id,recorded_at) VALUES (:refund,:method,:amount,:paid,:reference,:actor,:now)', ['refund'=>$refundId,'method'=>$method,'amount'=>$amount,'paid'=>$paidAt,'reference'=>$reference,'actor'=>$actorId,'now'=>$now]);
     }
-    public function fundBalance(?int $userId, ?int $companyId, string $currency): int
+
+    /** @return array<string,mixed>|null */
+    public function refund(int $refundId): ?array
     {
-        return (int)$this->db->fetchOne('SELECT COALESCE(SUM(e.amount_minor),0) FROM commerce_fund_accounts a LEFT JOIN commerce_fund_entries e ON e.account_id=a.id WHERE a.owner_user_id IS NOT DISTINCT FROM CAST(:user AS BIGINT) AND a.owner_company_id IS NOT DISTINCT FROM CAST(:company AS BIGINT) AND a.currency=:currency', ['user'=>$userId,'company'=>$companyId,'currency'=>$currency]);
+        return $this->db->fetchAssociative('SELECT r.*,p.paid_at,p.external_reference AS payout_reference FROM commerce_refunds r LEFT JOIN commerce_refund_payouts p ON p.refund_id=r.id WHERE r.id=:id', ['id'=>$refundId]) ?: null;
+    }
+
+    /** A refund request, made in the LMS by the purchaser or a Company Administrator. */
+    public function createRefundRequest(int $orderId, int $itemId, int $userId, ?int $companyId, int $quantity, string $destination, string $reason, string $refusals, string $now): int
+    {
+        return (int)$this->db->fetchOne('INSERT INTO commerce_refund_requests(public_id,order_id,order_item_id,requested_by_user_id,company_id,quantity,destination,customer_reason,rule_refusals,requested_at) VALUES (:public,:order,:item,:user,:company,:quantity,:destination,:reason,:refusals,:now) RETURNING id', ['public'=>Uuid::v4(),'order'=>$orderId,'item'=>$itemId,'user'=>$userId,'company'=>$companyId,'quantity'=>$quantity,'destination'=>$destination,'reason'=>$reason,'refusals'=>$refusals,'now'=>$now]);
+    }
+    /** @return array<string,mixed>|null */
+    public function refundRequest(int $id, bool $lock = false): ?array
+    {
+        return $this->db->fetchAssociative('SELECT * FROM commerce_refund_requests WHERE id=:id'.($lock?' FOR UPDATE':''), ['id'=>$id]) ?: null;
+    }
+    /** @return array<string,mixed>|null */
+    public function openRefundRequestForItem(int $itemId): ?array
+    {
+        return $this->db->fetchAssociative("SELECT * FROM commerce_refund_requests WHERE order_item_id=:item AND status='requested'", ['item'=>$itemId]) ?: null;
+    }
+    /** @return list<array<string,mixed>> */
+    public function refundRequestsForOrder(int $orderId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT * FROM commerce_refund_requests WHERE order_id=:order ORDER BY requested_at,id', ['order'=>$orderId]);
+    }
+    /**
+     * Open refund requests, oldest first, with the order line, the requester and how many refunds
+     * the requester asked for before.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function openRefundRequests(int $limit = 200): array
+    {
+        return $this->db->fetchAllAssociative("SELECT r.*,o.total_minor,o.currency,o.state AS order_state,i.product_type,i.snapshot AS item_snapshot,u.display_name AS requester_name,u.account_reference AS requester_reference,c.name AS company_name,
+                (SELECT COUNT(*) FROM commerce_refund_requests p WHERE p.requested_by_user_id=r.requested_by_user_id AND p.id<>r.id) AS earlier_requests
+            FROM commerce_refund_requests r JOIN commerce_orders o ON o.id=r.order_id JOIN commerce_order_items i ON i.id=r.order_item_id JOIN users u ON u.id=r.requested_by_user_id LEFT JOIN companies c ON c.id=r.company_id
+            WHERE r.status='requested' ORDER BY r.requested_at,r.id LIMIT ".max(1,$limit));
+    }
+    public function openRefundRequestCount(): int
+    {
+        return (int)$this->db->fetchOne("SELECT COUNT(*) FROM commerce_refund_requests WHERE status='requested'");
+    }
+    public function decideRefundRequest(int $id, string $status, int $actorId, string $now, string $note): void
+    {
+        $this->db->executeStatement('UPDATE commerce_refund_requests SET status=:status,decided_by_user_id=:actor,decided_at=:now,decision_note=:note WHERE id=:id', ['status'=>$status,'actor'=>$actorId,'now'=>$now,'note'=>$note,'id'=>$id]);
+    }
+
+    public function userName(int $userId): string
+    {
+        return (string)$this->db->fetchOne("SELECT COALESCE(NULLIF(u.display_name,''),ue.email,'Person') FROM users u LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE WHERE u.id=:id", ['id'=>$userId]);
+    }
+    public function companyName(int $companyId): string
+    {
+        return (string)$this->db->fetchOne('SELECT name FROM companies WHERE id=:id', ['id'=>$companyId]);
+    }
+    public function userAccountReference(int $userId): string
+    {
+        return (string)$this->db->fetchOne('SELECT account_reference FROM users WHERE id=:id', ['id'=>$userId]);
+    }
+    public function companyAccountReference(int $companyId): string
+    {
+        return (string)$this->db->fetchOne('SELECT account_reference FROM companies WHERE id=:id', ['id'=>$companyId]);
+    }
+
+    /** What a line's earlier refunds returned to the wallet from its wallet payment. */
+    public function refundedWalletPart(int $orderId, int $itemId): int
+    {
+        return (int)$this->db->fetchOne('SELECT COALESCE(SUM(wallet_part_minor),0) FROM commerce_refunds WHERE order_id=:order AND order_item_id=:item', ['order'=>$orderId,'item'=>$itemId]);
     }
     public function pdf(int $documentId): ?string
     {
@@ -601,5 +693,6 @@ final class CommerceRepository
     /** @return array<string,mixed> */
     public static function decode(string $json): array { return json_decode($json,true,512,JSON_THROW_ON_ERROR); }
     /** @param array<string,mixed> $data */
+    /** @param array<mixed> $data */
     private static function json(array $data): string { return json_encode($data,JSON_THROW_ON_ERROR); }
 }

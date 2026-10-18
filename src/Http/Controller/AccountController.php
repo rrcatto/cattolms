@@ -355,8 +355,12 @@ final class AccountController extends BaseController
         $current = array_values(array_filter($courses, static fn(array $course): bool => in_array((string) ($course['status'] ?? ''), ['assigned','active'], true)));
         $completed = array_values(array_filter($courses, static fn(array $course): bool => (string) ($course['status'] ?? '') === 'completed'));
         $progressValues = array_map(static fn(array $course): int => (int) ($course['progress_percentage'] ?? 0), $current);
+        $profile = $this->auth->profile($userId);
         return [
             'account_courses' => $courses,
+            // The courses still running or waiting to start, each a card with its timing (owner, 2026-10-17).
+            'account_current_courses' => $current,
+            'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($profile['account_reference'] ?? '')),
             'account_stats' => [
                 'current_courses' => count($current),
                 'completed_courses' => count($completed),
@@ -501,6 +505,7 @@ final class AccountController extends BaseController
                 ? ''
                 : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
             'profile_image_size' => ProfileImage::SIZE,
+            'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($profile['account_reference'] ?? '')),
         ];
     }
 

@@ -122,7 +122,10 @@ final class AdminController extends BaseController
         private readonly MailerInterface $mailer,
         private readonly RoleAdministrationService $roleAdministration,
         private readonly SelectedCompanyContext $companyContext,
-        private readonly CompanyCreditPurchaseService $creditPurchases
+        private readonly CompanyCreditPurchaseService $creditPurchases,
+        private readonly \CattoLearning\Commerce\Application\TransactionAttention $attention,
+        private readonly \CattoLearning\Commerce\Application\MoneyRecords $money,
+        private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -423,6 +426,7 @@ final class AdminController extends BaseController
             ? $this->platformAdministration->lookupEntities('courses', $courseSearch)
             : [];
         return $this->render('admin-person-profile', $data + [
+            'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($data['profile']['account_reference'] ?? '')),
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
             'target_user_id' => $target,
@@ -699,16 +703,51 @@ final class AdminController extends BaseController
         }, '/admin/settings?section=identity#settings-identity');
     }
 
-    #[Route('/admin/settings/bank', name: 'admin_save_bank_details', methods: ['POST'])]
-    public function saveBankDetails(): Response
+    /** The Site Owner's details (owner, 2026-10-18); every change goes to the Activity log. */
+    #[Route('/admin/settings/site-owner', name: 'admin_save_site_owner', methods: ['POST'])]
+    public function saveSiteOwner(): Response
     {
         $this->requireCsrf();
         $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
         return $this->handle(function () use ($user): void {
-            $this->platformAdministration->saveBankDetails($_POST, $user->id);
-            $this->flash('success', 'Bank details were saved. EFT orders now display these details.');
-            $this->redirect('/admin/settings?section=bank#settings-bank');
-        }, '/admin/settings?section=bank#settings-bank');
+            $this->platformAdministration->saveSiteOwner($_POST, $user->id);
+            $this->flash('success', 'The Site Owner details were saved. Documents already issued and orders already placed keep the details they had.');
+            $this->redirect('/admin/settings?section=site-owner#settings-site-owner');
+        }, '/admin/settings?section=site-owner#settings-site-owner');
+    }
+
+    #[Route('/admin/settings/site-owner/reset', name: 'admin_reset_site_owner', methods: ['POST'])]
+    public function resetSiteOwner(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->resetSiteOwner($user->id);
+            $this->flash('success', 'The Site Owner details now follow .env.');
+            $this->redirect('/admin/settings?section=site-owner#settings-site-owner');
+        }, '/admin/settings?section=site-owner#settings-site-owner');
+    }
+
+    #[Route('/admin/settings/site-mode', name: 'admin_save_site_mode', methods: ['POST'])]
+    public function saveSiteMode(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $this->platformAdministration->saveSiteMode((string) ($_POST['site_mode'] ?? ''), $user->id);
+            $this->flash('success', ($_POST['site_mode'] ?? '') === 'live' ? 'This site is now live.' : 'This site is now a demo site.');
+            $this->redirect('/admin/settings?section=site#settings-site');
+        }, '/admin/settings?section=site#settings-site');
+    }
+
+    #[Route('/admin/settings/site-mode/reset', name: 'admin_reset_site_mode', methods: ['POST'])]
+    public function resetSiteMode(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->platformAdministration->resetSiteMode($user->id);
+        $this->flash('success', 'The site mode now follows APP_SITE_MODE in .env.');
+        $this->redirect('/admin/settings?section=site#settings-site');
     }
 
     #[Route('/admin/settings/platform-name/reset', name: 'admin_reset_platform_name', methods: ['POST'])]
@@ -866,9 +905,18 @@ final class AdminController extends BaseController
             $data['active_theme_name'] = $this->themes->activeTheme();
             $data['theme_registry_out_of_sync'] = $this->themes->registryOutOfSync();
         }
+        // Transactions that need attention, on the dashboard (owner, 2026-10-17).
+        if (in_array('dashboard', $sectionKeys, true)) {
+            $data['attention_items'] = $this->currentUser()?->hasPermission('PLATFORM.PAYMENT.VIEW') ? $this->attention->items() : null;
+            // The money of a period, each figure opening the list it adds up (owner, 2026-10-18).
+            $data['money'] = $this->currentUser()?->hasPermission('PLATFORM.PAYMENT.VIEW') ? $this->money->dashboard($this->request()->query->all()) : null;
+        }
         if (in_array('settings', $sectionKeys, true)) {
             $data['maintenance'] = $this->maintenance->pending();
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
+            // The commerce settings are sections of Settings (owner, 2026-10-18: one settings area).
+            $data['commerce_fields'] = \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView($this->commerceSettings);
+            $data['can_manage_settings'] = $this->currentUser()?->hasPermission('SYSTEM.SETTING.MANAGE') ?? false;
         }
         if (in_array('roles', $sectionKeys, true)) {
             $data['roles_acl'] = $this->roleAdministration->roles();

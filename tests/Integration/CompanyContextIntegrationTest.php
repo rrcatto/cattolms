@@ -179,23 +179,16 @@ final class CompanyContextIntegrationTest extends TestCase
     // --- the platform administrator ------------------------------------------------------------
 
     /**
-     * With nothing selected, a platform administrator administers the REAL System Company.
-     *
-     * The former default was a synthetic "All companies" row with id 0, which no mutation could
-     * act on - so every write from that state fell back to the actor's own membership. The
-     * workspace now always resolves one concrete company.
+     * With nothing selected and no company of their own, a platform administrator chooses one first:
+     * there is no default company (owner, 2026-10-18: no System Company), and never a synthetic
+     * "All companies" context no mutation could act on.
      */
-    public function testTheSystemCompanyIsTheDefaultForAPlatformAdministrator(): void
+    public function testAPlatformAdministratorWithNoCompanyChoosesOneFirst(): void
     {
-        $context = $this->context->resolve($this->platformAdmin());
-
-        self::assertSame('selected', $context['mode']);
-        self::assertFalse($context['platform_wide']);
-        self::assertGreaterThan(0, $context['company_id'], 'There must always be a concrete company to act on.');
-        self::assertTrue(
-            in_array($context['company']['is_system'] ?? false, [true, 1, '1', 't', 'true'], true),
-            'The default must be the System Company.'
-        );
+        $user = $this->platformAdmin();
+        self::assertSame(0, $this->context->contextCompanyId($user), 'the picker sees no company, rather than being sent to itself');
+        $this->expectException(\CattoLearning\Company\NoCompanyChosen::class);
+        $this->context->resolve($user);
     }
 
     /** Selecting company A puts every section into company A. */
@@ -294,12 +287,9 @@ final class CompanyContextIntegrationTest extends TestCase
             ['id' => $this->real['a']]
         );
 
-        $context = $this->context->resolve($user);
-        self::assertNotSame($this->real['a'], $context['company_id'], 'A disabled company must not stay in context.');
-        self::assertTrue(
-            in_array($context['company']['is_system'] ?? false, [true, 1, '1', 't', 'true'], true),
-            'It falls back to the System Company default.'
-        );
+        self::assertNotSame($this->real['a'], $this->context->contextCompanyId($user), 'A disabled company must not stay in context.');
+        $this->expectException(\CattoLearning\Company\NoCompanyChosen::class);
+        $this->context->resolve($user);
     }
 
     /** A disabled company cannot be selected in the first place. */

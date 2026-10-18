@@ -40,9 +40,7 @@ namespace CattoLearning\Course;
 
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Support\Env;
 use CattoLearning\Support\Slug;
 use InvalidArgumentException;
 use RuntimeException;
@@ -60,7 +58,6 @@ final class CoursePortabilityService
         private readonly CourseItemRepository $courseItemRecords,
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
-        private readonly OptionRepository $options,
         private readonly string $storageRoot,
         private readonly string $bundledImportRoot
     ) {
@@ -420,19 +417,14 @@ final class CoursePortabilityService
         ];
     }
 
-    private function defaultOwnerCompanyId(int $userId): int
+    /** A course ADMIN imports belongs to the Site Owner: no owning company (owner, 2026-10-18). */
+    private function defaultOwnerCompanyId(int $userId): ?int
     {
-        // Decision D5: course portability is REAL-only in both directions, so the owning
-        // company here is always the genuine System Company. There is deliberately no seed
-        // branch: a seed identity never reaches this code, and if one ever did, importing into
-        // the REAL universe is exactly what must not happen silently.
-        $systemCompany = $this->companies->systemCompany()
-            ?? $this->companies->ensureSystemCompany(
-                $userId,
-                $this->options->get('system_company_name', 'System Company'),
-                Env::string('APP_DOMAIN', 'local')
-            );
-        return (int) $systemCompany['id'];
+        if ($this->companies->userIsPlatformAdministrator($userId)) {
+            return null;
+        }
+        $company = $this->companies->findForUser($userId);
+        return $company === null ? null : (int) $company['id'];
     }
 
     /** @return array<string,mixed> */

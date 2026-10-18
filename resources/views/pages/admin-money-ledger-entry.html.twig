@@ -1,0 +1,47 @@
+{#
+	One ledger row in full (MoneyRecords::ledgerEntry), with links to its order, account, payment and
+	trail, and the rows that belong with it: its corrections and the other rows of its order or refund.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = '/admin/commerce/ledger' %}{% set ph_back_label = 'Money Ledger' %}
+	{% set ph_kicker = 'Money Ledger' %}{% set ph_title = 'Ledger entry ' ~ entry.id %}
+	{% set ph_lead = entry.kind_label ~ ' · ' ~ entry.amount_label ~ ' · ' ~ entry.when %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Entry', summary: 'As it was recorded. A ledger row is never changed.'}) }}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'Entry', value: entry.kind_label},
+			{label: 'Amount', value: entry.amount_label},
+			{label: 'Money', value: entry.money_label},
+			{label: 'Wallet credit', value: entry.wallet_label},
+			{label: 'Method', value: entry.method_label},
+			{label: 'When it happened', value: entry.when},
+			{label: 'When it was recorded', value: entry.recorded},
+			{label: 'Account', value: (entry.account_name ?: '—') ~ (entry.reference_label ? ' · ' ~ entry.reference_label : '') ~ (entry.account_email ? ' · ' ~ entry.account_email : '')},
+			{label: 'Order', value: entry.order_label ?: '—'},
+			{label: 'Order state', value: entry.order_state ? entry.order_state|replace({'_': ' '})|capitalize : '—'},
+			{label: 'Payment', value: entry.payment_id ? entry.payment_id ~ (entry.payment_gateway ? ' · ' ~ entry.payment_gateway : '') ~ (entry.payment_state ? ' · ' ~ entry.payment_state|replace({'_': ' '}) : '') : '—'},
+			{label: 'Refund', value: entry.refund_id ? 'Refund ' ~ entry.refund_id ~ (entry.refund_basis ? ' · ' ~ entry.refund_basis|replace({'_': ' '}) : '') : '—'},
+			{label: 'Document', value: entry.document_number ?: '—'},
+			{label: 'Reference', value: entry.external_reference ?: '—'},
+			{label: 'Recorded by', value: entry.actor_name ?: 'The system'},
+			{label: 'Note', value: entry.memo ?: '—'},
+		]}) }}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+			{% if entry.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: entry.order_href}) }}{{ ui('action.link', {label: 'Ledger rows of this order', variant: 'secondary', size: 'small', href: entry.order_ledger_href}) }}{{ ui('action.link', {label: 'Trail of this order', variant: 'secondary', size: 'small', href: entry.order_trail_href}) }}{% endif %}
+			{% if entry.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: entry.account_href}) }}{% endif %}
+			{% if entry.payment_events_href %}{{ ui('action.link', {label: 'Payment events', variant: 'secondary', size: 'small', href: entry.payment_events_href}) }}{% endif %}
+			{% if entry.corrects_href %}{{ ui('action.link', {label: 'The entry this corrects', variant: 'secondary', size: 'small', href: entry.corrects_href}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Rows that belong with it', summary: 'Its corrections, and the other rows of its order or refund, oldest first.'}) }}
+		{% if entry.related %}
+		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Entry'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Method', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Money'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Wallet', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: ''}} %}</tr>{% endblock %}
+		{% block body %}{% for row in entry.related %}<tr><td class="small">{{ row.when }}</td><td>{{ row.kind_label }}</td><td>{{ row.method_label }}</td><td>{{ row.money_label }}</td><td>{{ row.wallet_label }}</td><td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open ledger entry ' ~ row.id}) }}</td></tr>{% endfor %}{% endblock %}
+		{% endembed %}
+		{% else %}{{ ui('feedback.empty', {summary: 'No other row belongs with this one.'}) }}{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -49,7 +49,6 @@ final class CourseItemEditReturnTest extends TestCase
         $this->suffix = $this->fixture->suffix();
         $this->owner = $this->fixture->createUser('Item editor ' . $this->suffix, 'item-editor-' . $this->suffix . '@seed.test');
         $this->fixture->grantRole($this->owner, 'ADMIN');
-        $this->fixture->attachToSystemCompany($this->owner);
         $company = $this->fixture->createCompany($this->owner, 'Item editor ' . $this->suffix, 'item-editor-' . $this->suffix . '.seed.test');
         $this->course = $this->fixture->createCourse($this->owner, $company, 'item-editor-' . $this->suffix, 'Item editor ' . $this->suffix);
         $this->otherCourse = $this->fixture->createCourse($this->owner, $company, 'item-editor-other-' . $this->suffix, 'Item editor other ' . $this->suffix);

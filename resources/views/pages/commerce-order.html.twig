@@ -6,6 +6,7 @@
 {% block surface_body %}
 
         <p><a href="/account/orders">My Orders</a> · {% if order.company_id|default(null) %}<a href="/company/credits">Company credits</a>{% else %}<a href="/account/courses">My Courses</a>{% endif %}</p>
+        {% if order.details.simulation|default(false) %}{{ ui('feedback.notice', {tone: 'warning', heading: site_simulation}) }}{% endif %}
         <p>Status: <strong>{{ order.state|replace({'_':' '})|capitalize }}</strong></p>
         {% for item in order.details.items %}
             {% if item.fulfilment_type|default('') == 'bundle' %}
@@ -14,6 +15,25 @@
                 <p class="help">Includes: {{ item.courses|map(c => c.title)|join(', ') }}</p>
             {% else %}
                 <p><strong>{{ item.course_title }}</strong> · {{ item.access_period_seconds / 86400 }} days · {% if order.company_id|default(null) %}{{ item.quantity }} credits · {% endif %}{{ item.price_label }}</p>
+            {% endif %}
+            {% if item.refund %}
+                {% if item.refund.open %}
+                    <p class="help">You asked for a refund on {{ item.refund.open.requested_at|date('j M Y') }} ({{ item.refund.open.destination == 'money_back' ? 'money back' : 'wallet credit' }}). It is waiting for a decision.</p>
+                    <form action="/account/refund-requests/{{ item.refund.open.id }}/withdraw" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_id" value="{{ order.id }}">{{ ui('action.button', {label: 'Withdraw my refund request', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+                {% elseif item.refund.last and item.refund.last.status == 'refused' %}
+                    <p class="help">Your refund request was refused on {{ item.refund.last.decided_at|date('j M Y') }}: {{ item.refund.last.decision_note }}</p>
+                {% endif %}
+                {% if item.refund.can_request %}
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Ask for a refund', id: 'refund-request-' ~ item.item_id})} %}{% block body %}
+                        {% if item.refund.refusals %}<p>{{ item.refund.refusals|join(' ') }} If the course is faulty, is not as described or cannot be provided, tell us below and we will look at it.</p>{% endif %}
+                        <form action="/account/orders/{{ order.id }}/refund-request" method="post">
+                            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="item_id" value="{{ item.item_id }}">
+                            {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why are you asking for a refund?', for: 'refund-reason-' ~ item.item_id, required: true, full_width: true})} %}{% block control %}<textarea id="refund-reason-{{ item.item_id }}" name="reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                            {% if order.company_id|default(null) %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unused credits to refund', for: 'refund-quantity-' ~ item.item_id, required: true, help: 'Credits are refunded only as wallet credit in the company wallet, and only credits no learner has started.'})} %}{% block control %}<input id="refund-quantity-{{ item.item_id }}" type="number" name="quantity" min="1" max="{{ item.quantity }}" value="1" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}{% else %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'If it is refunded', for: 'refund-destination-' ~ item.item_id, required: true, help: 'Wallet credit can be spent on any course. A refund of a card payment is what we received, less Stitch’s transaction and refund fees. What you paid from your wallet goes back to your wallet.'})} %}{% block control %}<select id="refund-destination-{{ item.item_id }}" name="destination" {{ ui_field_attrs(props) }}><option value="wallet">Wallet credit</option><option value="money_back">Money back</option></select>{% endblock %}{% endembed %}{% endif %}
+                            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send my refund request', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+                        </form>
+                    {% endblock %}{% endembed %}
+                {% endif %}
             {% endif %}
         {% endfor %}
         {# The totals as the order was placed, from its snapshot: a later change to the promotion never alters them. #}
@@ -26,7 +46,9 @@
         {% endfor %}
         {% if payment_method == 'eft' or order.details.payment_method|default('') == 'eft' %}
             <h2 class="h5 mt-7">EFT bank account details</h2>
-            <p>Use your unique order number as the payment reference: <strong>CL-{{ '%08d'|format(order.id) }}</strong>.</p>
+            <p>Use your account reference as the payment reference: <strong>{{ account_reference }}</strong>.{% if due_minor > 0 and order.state == 'awaiting_payment' %} Amount to pay: <strong>{{ due_label }}</strong>.{% endif %}</p>
+            <p class="help">Our bank details never change by email. If you receive a message telling you otherwise, do not pay and contact us.</p>
+            {% if bank_details.fake|default(false) %}{{ ui('feedback.notice', {tone: 'warning', heading: 'These bank details are fake: this is a demo site. Do not pay.'}) }}{% endif %}
             {% if bank_details.configured %}
                 {{ ui('data.key-value-list', {items: [{label: 'Bank name', value: (bank_details.bank_name)}, {label: 'Account name', value: (bank_details.account_name)}, {label: 'Account number', value: (bank_details.account_number)}, {label: 'Branch code', value: (bank_details.branch_code)}]}) }}
             {% else %}
@@ -34,7 +56,7 @@
             {% endif %}
         {% endif %}
         {% if can_pay %}
-            <p>Unpaid orders are automatically cancelled after 7 days. Please pay by {{ order.payment_due_at|date('d M Y H:i') }}.</p>
+            <p>An order that is not paid within {{ payment_due_words }} is cancelled automatically. Please pay by {{ order.payment_due_at|date('d M Y H:i') }}.{% if due_minor < order.total_minor %} {{ due_label }} is still to pay.{% endif %}</p>
             {% if payment_method == 'eft' %}
                 <p>{{ order.company_id|default(null) ? 'Company credits will be issued once payment is confirmed.' : 'Your courses will be available once your payment is confirmed.' }}</p>
             {% elseif order.payments and (order.payments|last).state == 'failed' %}
@@ -63,7 +85,7 @@
             {% endif %}
         {% elseif order.state == 'fulfilled' %}{% if order.company_id|default(null) %}<p>Company credits are ready in <a href="/company/credits">Company credits</a>.{% if order.request_id|default(null) %} The linked learner request was fulfilled and the learner was enrolled.{% endif %}</p>{% else %}<p>Your courses are ready in <a href="/account/courses">My Courses</a>.</p>{% endif %}
         {% elseif order.state == 'manual_review' %}<p>Your payment has been recorded and needs an administrator’s review.</p>
-        {% elseif order.state == 'cancelled' %}<p>The payment window has ended and this order has been cancelled. Your invoice remains available for your records.</p>
+        {% elseif order.state == 'cancelled' %}<p>The payment window has ended and this order has been cancelled. Anything you paid towards it is in your wallet. Your invoice remains available for your records.</p>
         {% elseif order.state == 'refunded' %}<p>This order has been refunded. Each credit note above records a refund. The <a href="/refunds">Refund Policy</a> explains how and when refunds are paid.</p>
         {% elseif order.state == 'partially_refunded' %}<p>Part of this order has been refunded. Each credit note above records a refund. {{ order.company_id|default(null) ? 'Credits that were not refunded remain in' : 'Anything that was not refunded in full remains in' }} <a href="{{ order.company_id|default(null) ? '/company/credits' : '/account/courses' }}">{{ order.company_id|default(null) ? 'Company credits' : 'My Courses' }}</a>. The <a href="/refunds">Refund Policy</a> explains how and when refunds are paid.</p>
         {% else %}<p>Your payment is being processed. Check this order again before making another payment. <a href="/account/orders">I’ll check later</a>.</p>{% endif %}

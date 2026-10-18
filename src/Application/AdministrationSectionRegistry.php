@@ -49,7 +49,7 @@ final class AdministrationSectionRegistry
             $this->section('dashboard', 'Dashboard', 'dashboard', '/admin/dashboard', 'partials/admin/dashboard.html.twig', 'Platform health, priorities and recent activity.'),
             $this->section('courses', 'Courses', 'courses', '/admin/courses', 'partials/admin/courses.html.twig', 'Create, import, review and maintain courses.'),
             $this->section('people', 'People', 'people', '/admin/people', 'partials/admin/people.html.twig', 'People, roles, organisations and learner access.'),
-            $this->section('companies', 'Companies', 'companies', '/admin/companies', 'partials/admin/companies.html.twig', 'Companies whose staff are trained, and the System Company.'),
+            $this->section('companies', 'Companies', 'companies', '/admin/companies', 'partials/admin/companies.html.twig', 'Companies whose staff are trained.'),
             $this->section('company_creators', 'Course Creators', 'companies', '/admin/companies/creators', 'partials/admin/company-creators.html.twig', 'Companies that own courses and offer them to others.'),
             $this->section('requests', 'Course Requests', 'requests', '/admin/course/requests', 'partials/admin/requests.html.twig', 'Learner requests for course access, approved or rejected.'),
             $this->section('enrolments', 'Enrolments', 'enrolments', '/admin/course/enrolments', 'partials/admin/enrolments.html.twig', 'Learner access to courses, and how far each has got.'),
@@ -61,7 +61,7 @@ final class AdministrationSectionRegistry
             $this->section('roles', 'Roles & ACL', 'roles', '/admin/roles', 'partials/admin/roles.html.twig', 'Roles, permissions and access-control assignments.'),
             $this->section('seed', 'Seed Database', 'seed', '/admin/seed', 'partials/admin/seed.html.twig', 'Generate a set of data so the platform can be seen with something in it.'),
             $this->section('ui_components', 'UI Components', 'themes', '/admin/system/ui-components', 'partials/admin/ui-components.html.twig', 'Canonical platform components and semantic states, using sample data.'),
-            $this->section('settings', 'Settings', 'settings', '/admin/settings', 'partials/admin/settings.html.twig', 'Platform identity, outgoing mail, bank details and maintenance.'),
+            $this->section('settings', 'Settings', 'settings', '/admin/settings', 'partials/admin/settings.html.twig', 'Site mode, the Site Owner, platform identity, outgoing mail, commerce and maintenance.'),
         ];
     }
 

@@ -8,7 +8,7 @@
     "controllers\/landing_sections_controller.js": "\/assets\/controllers\/landing_sections_controller-JHfO7SB.js",
     "controllers\/popular_courses_controller.js": "\/assets\/controllers\/popular_courses_controller-LIn23Tr.js",
     "controllers\/profile_image_controller.js": "\/assets\/controllers\/profile_image_controller-fJXZPmN.js",
-    "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-yi-Ny1Y.js",
+    "controllers\/tag_cloud_controller.js": "\/assets\/controllers\/tag_cloud_controller-dxBxbzy.js",
     "lib\/sortable_tree_controller.js": "\/assets\/lib\/sortable_tree_controller-_P-gJwF.js",
     "vendor\/@hotwired\/stimulus\/stimulus.index.js": "\/assets\/vendor\/@hotwired\/stimulus\/stimulus.index-ryewcoo.js",
     "vendor\/TagCloud\/TagCloud.index.js": "\/assets\/vendor\/TagCloud\/TagCloud.index-r_BOY6F.js"

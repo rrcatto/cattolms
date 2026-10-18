@@ -27,7 +27,10 @@ final class CommerceController extends BaseController
         private readonly \CattoLearning\Configuration\RuntimeSettings $settings,
         private readonly BillingProfileService $billing,
         private readonly PromotionService $promotions,
-        private readonly \CattoLearning\Course\Landing\LandingPageAnalytics $landingAnalytics)
+        private readonly \CattoLearning\Course\Landing\LandingPageAnalytics $landingAnalytics,
+        private readonly \CattoLearning\Commerce\Wallet\WalletService $wallets,
+        private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings,
+        private readonly \CattoLearning\Commerce\Application\RefundRequestService $refundRequests)
     { parent::__construct($auth,$view,$requests); }
 
     private function csrf(): void
@@ -39,7 +42,7 @@ final class CommerceController extends BaseController
     public function cart(): Response
     {
         $cart = $this->carts->summary();
-        return $this->render('commerce-cart', ['title'=>'My Cart', 'cart'=>$cart]);
+        return $this->render('commerce-cart', ['title'=>'My Cart', 'cart'=>$cart, 'company_account'=>OrderService::COMPANY_ACCOUNT]);
     }
 
     #[Route('/cart/add',name:'commerce_select',methods:['POST'])]
@@ -121,6 +124,10 @@ final class CommerceController extends BaseController
         if ($this->currentUser() === null) $this->redirect('/login?return=%2Fcheckout');
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START');
         $cart = $this->carts->summary();
+        if (!$cart['buyer']) {
+            $this->flash('warning', OrderService::COMPANY_ACCOUNT);
+            $this->redirect('/cart');
+        }
         if ($cart['count'] === 0) $this->redirect('/cart');
         $this->checkout->begin($actor, $cart);
         $state = $this->checkout->state($actor);
@@ -129,10 +136,18 @@ final class CommerceController extends BaseController
         if ($step === 'review' && !isset($state['payment_method'])) $this->redirect('/checkout/payment');
         $profile = $this->auth->profile($actor->id);
         $saved = $this->billing->forUser($actor->id);
+        // Wallet credit can pay part or all of the order (owner, 2026-10-17).
+        $balance = $this->wallets->spendable(\CattoLearning\Commerce\Wallet\WalletOwner::person($actor->id));
+        $total = (int) ($cart['total_minor'] ?? 0);
+        $applied = ($state['use_wallet'] ?? false) ? min($balance, $total) : 0;
         return $this->render('commerce-checkout', ['title'=>'Checkout', 'step'=>$step, 'cart'=>$cart, 'profile'=>$profile, 'checkout'=>$state,
             'billing'=>$this->billing->userForm($actor->id, $profile), 'billing_fields'=>BillingDetails::formFields(true),
             // The review shows the billing profile placement will copy into the order.
-            'billing_lines'=>$saved === null ? [] : $saved->documentLines()]);
+            'billing_lines'=>$saved === null ? [] : $saved->documentLines(),
+            'wallet_balance_minor'=>$balance, 'wallet_balance_label'=>Money::ofMinorUnits($balance)->format(),
+            'wallet_applied_label'=>Money::ofMinorUnits($applied)->format(), 'wallet_applied_minor'=>$applied,
+            'to_pay_label'=>Money::ofMinorUnits(max(0, $total - $applied))->format(), 'to_pay_minor'=>max(0, $total - $applied),
+            'payment_due_words'=>$this->commerceSettings->paymentDue()->words(), 'immediate_start'=>OrderService::IMMEDIATE_START]);
     }
 
     #[Route('/checkout/profile', name:'commerce_checkout_profile', methods:['POST'])]
@@ -152,7 +167,7 @@ final class CommerceController extends BaseController
     {
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
         return $this->handle(function () use ($actor): void {
-            $this->checkout->selectMethod($actor, $this->posted('payment_method'), $this->posted('method_token'), $this->posted('invoice_email') === 'yes');
+            $this->checkout->selectMethod($actor, $this->posted('payment_method'), $this->posted('method_token'), $this->posted('invoice_email') === 'yes', $this->posted('use_wallet') === 'yes');
             $this->redirect('/checkout/review');
         }, '/checkout/payment');
     }
@@ -183,7 +198,7 @@ final class CommerceController extends BaseController
         $actor = $this->requirePermission('COMMERCE.CHECKOUT.START'); $this->csrf();
         return $this->handle(function () use ($actor): void {
             try {
-                $id = $this->checkout->place($actor, (int) $this->posted('cart_id'), $this->posted('quote'), $this->posted('accept_terms') === 'yes');
+                $id = $this->checkout->place($actor, (int) $this->posted('cart_id'), $this->posted('quote'), $this->posted('accept_terms') === 'yes', $this->posted('accept_start') === 'yes');
             } catch (PromotionRejected $rejected) {
                 // The code stopped applying after the review was shown. It is taken off the cart so the
                 // review shows the corrected total, and nothing is placed until the purchaser confirms it.
@@ -217,9 +232,47 @@ final class CommerceController extends BaseController
         $this->orders->cancelDue($id);$order=$this->orders->view($actor,$id);
         $canPay=$order['state']==='awaiting_payment';
         foreach($order['payments'] as $p) if (in_array($p['state'],['pending','created','paid'],true)) $canPay=false;
-        foreach($order['details']['items'] as &$line) $line['price_label']=Money::strictMinorUnits((int)$line['line_total_minor'],(string)$line['currency'])->format();
+        // Each line with what a refund request can say about it now (owner, 2026-10-17).
+        // A learner asks about their own order; a Company Administrator about the company's unused credits.
+        $mayAsk=$order['company_id']===null ? $actor->hasPermission('COMMERCE.REFUND.REQUEST') : $actor->hasPermission('COMPANY.CREDIT.MANAGE');
+        $refundLines=$mayAsk ? $this->refundRequests->linesFor($this->records->order($id)) : [];
+        $itemIds=array_column($this->records->items($id),'id');
+        foreach($order['details']['items'] as $index=>&$line) {
+            $line['price_label']=Money::strictMinorUnits((int)$line['line_total_minor'],(string)$line['currency'])->format();
+            $line['item_id']=(int)($itemIds[$index] ?? 0);
+            $line['refund']=$refundLines[$line['item_id']] ?? null;
+        }
         unset($line);
-        return $this->render('commerce-order',['title'=>'Order '.$id,'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->bankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
+        $reference=$order['company_id']!==null ? $this->records->companyAccountReference((int)$order['company_id']) : $this->records->userAccountReference($actor->id);
+        $due=$this->records->dueAmount($id);
+        return $this->render('commerce-order',['title'=>'Order '.$id,'account_reference'=>\CattoLearning\Support\AccountReference::format($reference),
+            'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),'payment_due_words'=>$this->commerceSettings->paymentDue()->words(),'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->payableBankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
+    }
+
+    #[Route('/account/orders/{id}/refund-request',name:'commerce_refund_request',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    public function refundRequest(): Response
+    {
+        $actor=$this->requireUser();$this->csrf();$id=(int)$this->param('id');
+        return $this->handle(function() use($actor,$id): void {
+            $order=$this->records->order($id);
+            // The services check the permission: COMMERCE.REFUND.REQUEST for a learner, COMPANY.CREDIT.MANAGE for credits.
+            if ($order['company_id']!==null) $this->refundRequests->requestForCompany($actor,(int)$order['company_id'],$id,(int)$this->posted('item_id'),(int)$this->posted('quantity'),$this->posted('reason'));
+            else $this->refundRequests->requestForOwnOrder($actor,$id,(int)$this->posted('item_id'),$this->posted('destination')==='money_back'?'money_back':'wallet',$this->posted('reason'));
+            $this->flash('success','Your refund request was sent. You will see the decision on this order.');
+            $this->redirect('/account/orders/'.$id);
+        },'/account/orders/'.$id);
+    }
+
+    #[Route('/account/refund-requests/{id}/withdraw',name:'commerce_refund_request_withdraw',requirements:['id'=>'[0-9]+'],methods:['POST'])]
+    public function withdrawRefundRequest(): Response
+    {
+        $actor=$this->requirePermission('COMMERCE.REFUND.REQUEST');$this->csrf();
+        $order=(int)$this->posted('order_id');
+        return $this->handle(function() use($actor,$order): void {
+            $this->refundRequests->withdraw($actor,(int)$this->param('id'));
+            $this->flash('success','Your refund request was withdrawn.');
+            $this->redirect('/account/orders/'.$order);
+        },'/account/orders/'.$order);
     }
 
     #[Route('/account/orders/{id}/pay',name:'commerce_pay',requirements:['id'=>'[0-9]+'],methods:['POST'])]

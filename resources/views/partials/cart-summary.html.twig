@@ -1,3 +1,5 @@
+{# A company account never buys (OrderService::COMPANY_ACCOUNT), so it has no cart. #}
+{% if cart_summary.buyer %}
 <div class="cl-cart-chrome">
     {% if cart_summary.count > 0 %}<span class="cl-cart-prompt">Proceed to checkout now</span>{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'small', href: '/checkout'}) }}{% endif %}
     <details class="cl-cart-menu">
@@ -13,3 +15,4 @@
         </div>
     </details>
 </div>
+{% endif %}

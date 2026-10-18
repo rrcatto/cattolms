@@ -42,7 +42,7 @@ final class FinancialDocumentDesign
     public const STANDARD_NOTES = [
         'invoice' => 'Tax is not charged. An invoice is not proof of payment.',
         'receipt' => 'Thank you. This receipt confirms payment of the order above.',
-        'credit_note' => 'The amount is credited to Account Funds. This document does not record a bank payout.',
+        'credit_note' => 'Wallet credit can be spent on courses and is not paid out as cash. Money back is paid separately and is not recorded on this document.',
     ];
 
     /** @param array<string,string> $notes document type value => its closing note */

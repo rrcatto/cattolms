@@ -64,19 +64,13 @@
 {#
 							Company type is shown, not chosen. It is derived from what the company
 							actually does, so there is nothing here to submit and no way for the
-							stored answer to disagree with the real one. The System Company is the
-							one exception, because being the System Company is a property of the
-							installation rather than of anything the company has done.
+							stored answer to disagree with the real one.
 #}
 							<div class="cl-ui-field--full">
 								<span class="cl-inferred-label">Company type</span>
 								<div class="chip-row">
-									{% if company.is_system %}
-										{{ ui('feedback.badge', {label: 'System company', tone: 'permanent'}) }}
-									{% else %}
-										{{ ui('feedback.badge', {label: (company.is_client ? 'Client' : 'Not yet a client'), tone: company.is_client ? 'success' : 'neutral'}) }}
-										{{ ui('feedback.badge', {label: (company.is_course_provider ? 'Course provider' : 'Not a course provider'), tone: company.is_course_provider ? 'success' : 'neutral'}) }}
-									{% endif %}
+									{{ ui('feedback.badge', {label: (company.is_client ? 'Client' : 'Not yet a client'), tone: company.is_client ? 'success' : 'neutral'}) }}
+									{{ ui('feedback.badge', {label: (company.is_course_provider ? 'Course provider' : 'Not a course provider'), tone: company.is_course_provider ? 'success' : 'neutral'}) }}
 								</div>
 								<div class="help">
 									Client once it holds course credits or has staff; course provider once it owns a course. A company can be both, and neither is chosen here.
@@ -91,10 +85,10 @@
 
 						{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}
 						{{ ui('action.button', {label: 'Save company', variant: 'primary', size: 'normal', type: 'submit'}) }}
-					{% if not company.is_system %}{{ ui('action.button', {label: (company.status=='active' ? 'Disable company' : 'Enable company'), variant: company.status=='active' ? 'danger' : 'secondary', size: 'small', form: 'company-edit-' ~ (company.id) ~ '-status'}) }}{% endif %}
+					{{ ui('action.button', {label: (company.status=='active' ? 'Disable company' : 'Enable company'), variant: company.status=='active' ? 'danger' : 'secondary', size: 'small', form: 'company-edit-' ~ (company.id) ~ '-status'}) }}
 {% endblock %}
 {% block additional_forms %}
-{% if not company.is_system %}<form action="/admin/companies/{{ company.id }}/status" method="post" id="company-edit-{{ company.id }}-status"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ company.status=='active' ? 'disabled' : 'active' }}"></form>{% endif %}
+<form action="/admin/companies/{{ company.id }}/status" method="post" id="company-edit-{{ company.id }}-status"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ company.status=='active' ? 'disabled' : 'active' }}"></form>
 {% endblock %}
 {% endembed %}
 	{% endfor %}

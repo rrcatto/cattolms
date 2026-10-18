@@ -71,12 +71,10 @@ use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Popularity\CoursePopularityRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
-use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\Money;
-use CattoLearning\Support\Env;
 use CattoLearning\Support\Slug;
 use CattoLearning\Commerce\Application\AccessService;
 use InvalidArgumentException;
@@ -100,7 +98,6 @@ final class CourseService
         private readonly CourseRepository $courses,
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
-        private readonly OptionRepository $options,
         private readonly CourseHtml $courseHtml,
         private readonly LegacyHtmlCourseImporter $importer,
         private readonly CourseItemService $courseItems,
@@ -1057,10 +1054,14 @@ final class CourseService
     /** @param array<string,mixed> $input */
     public function updateCoursePeople(int $courseId, array $input, int $actorUserId): void
     {
-        $ownerCompanyId = (int) ($input['owner_company_id'] ?? 0);
+        // No owning company (0) gives the course to the Site Owner (owner, 2026-10-18).
+        $ownerCompanyId = max(0, (int) ($input['owner_company_id'] ?? 0));
         $ownerUserId = (int) ($input['owner_user_id'] ?? 0);
-        if ($ownerCompanyId < 1 || $ownerUserId < 1) {
-            throw new InvalidArgumentException('Select both an owning company and an owning person.');
+        if ($ownerUserId < 1) {
+            throw new InvalidArgumentException('Select the owning person.');
+        }
+        if ($ownerCompanyId > 0 && $this->companies->findById($ownerCompanyId) === null) {
+            throw new InvalidArgumentException('That company does not exist.');
         }
         $editorIds = $input['editor_user_ids'] ?? [];
         if (!is_array($editorIds)) {
@@ -1446,13 +1447,10 @@ final class CourseService
      */
     private function withDefaultOwnership(array $data, int $userId): array
     {
-        $systemCompany = $this->companies->systemCompany()
-            ?? $this->companies->ensureSystemCompany(
-                $userId,
-                $this->options->get('system_company_name', 'System Company'),
-                Env::string('APP_DOMAIN', 'local')
-            );
-        $data['owner_company_id'] = (int) $systemCompany['id'];
+        // A course created by ADMIN belongs to the Site Owner (no owning company); one created by a
+        // member of a customer company belongs to that company (owner, 2026-10-18).
+        $company = $this->companies->userIsPlatformAdministrator($userId) ? null : $this->companies->findForUser($userId);
+        $data['owner_company_id'] = $company === null ? null : (int) $company['id'];
         $data['owner_user_id'] = $userId;
         return $data;
     }

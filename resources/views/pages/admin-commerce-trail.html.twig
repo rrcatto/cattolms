@@ -1,0 +1,44 @@
+{#
+	The Commerce Trail (owner, 2026-10-18): the history behind orders and course access
+	(commerce_audit_events, which the database never lets change), filtered by dates, event and order,
+	searched by event, person, order number or detail, sorted and paged. A row opens its own page.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Commerce Trail' %}
+	{% set ph_lead = 'What happened to every order and every course access, newest first. Nothing here can be changed or deleted.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Find events', summary: 'Both dates are included. Search by event, person, order number or detail.'}) }}
+		<form action="/admin/commerce/trail" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% if filters.order_id %}<input type="hidden" name="order" value="{{ filters.order_id }}">{% endif %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'trail-from'})} %}{% block control %}<input type="date" id="trail-from" name="from" value="{{ filters.from }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'trail-to'})} %}{% block control %}<input type="date" id="trail-to" name="to" value="{{ filters.to }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Event', full_width: false, for: 'trail-event'})} %}{% block control %}<select id="trail-event" name="event" {{ ui_field_attrs(props) }}><option value="">Every event</option>{% for key, label in events %}<option value="{{ key }}" {{ filters.event == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: true, for: 'trail-q'})} %}{% block control %}<input id="trail-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Event, person, order number or detail" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/trail'}) }}{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</form>
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Events'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'trail', pagination: trail_pagination})} %}{% block results %}
+			{% if rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% for sh in trail_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: trail_region, sort_results: trail_results} %}{% endfor %}</tr>{% endblock %}
+			{% block body %}
+				{% for row in rows %}
+					<tr data-trail-id="{{ row.id }}">
+						<td class="small">{{ row.when }}</td>
+						<td>{{ row.event_label }}</td>
+						<td>{% if row.order_href %}<a href="{{ row.order_href }}">{{ row.order_label }}</a>{% else %}—{% endif %}</td>
+						<td>{{ row.actor_label }}</td>
+						<td class="small">{{ row.summary ?: '—' }}</td>
+						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open trail event ' ~ row.id}) }}</td>
+					</tr>
+				{% endfor %}
+			{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: filtered ? 'No event matches these filters.' : 'Nothing has been recorded yet.'}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

@@ -10,7 +10,10 @@
 </header>
 <div class="course-introduction-copy">{{ course.introduction_html|raw }}</div>
 {% if not course.enrolment.started_at %}
-<form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit'}) }}</form>
+{# Starting begins the access period and cannot be undone, so the learner confirms it first (owner, 2026-10-17). #}
+<form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand that starting begins my access period of ' ~ course.access_period_label ~ ', which then runs to its end, and that a started course can no longer be refunded.'})} %}{% block control %}<input type="checkbox" name="confirm_start" value="yes" required>{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit'}) }}{% endblock %}{% endembed %}</form>
 {% elseif course.structure|default([])|length %}
 <nav class="cl-course-item-paging" aria-label="Course content">
 <span></span>{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ preview_query}) }}

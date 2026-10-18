@@ -291,7 +291,7 @@ administration, company, catalogue/tag, bundle (`/bundles`, a bundle page), cart
 the promo code review step), order and learning pages at desktop/tablet/mobile sizes, with the
 category picker opened on the catalogue and on a course's edit form, and the Course Content and
 course category trees. To see an installed theme without activating it, add
-`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.4`) to a page while
+`?theme_preview={slug}-v{version}` (for example `?theme_preview=gilded-noir-v2.0.5`) to a page while
 signed in with `SYSTEM.THEME.VIEW`; an unknown key leaves the live theme in place. The browser
 checks in `tests/Browser/` cover every bundled theme at 1440 and 390px.
 Check labels/help/errors, empty states, actions, modal focus and stacking, accordion expansion,
@@ -352,15 +352,16 @@ Existing canonical component classes such as `cl-ui-*`, `cl-cart-*` and other es
 
 ### Page width and rows (v0.9)
 
-A page chooses its width once. Core puts `cl-width-wide` (the default), `cl-width-medium`, `cl-width-narrow`
-or `cl-width-full` on the body beside `cl-page-texture`, so every theme receives it through the
+Every page is the one standard width. Core puts `cl-width-wide` on the body beside `cl-page-texture`, or
+`cl-width-full` on Home and course landing pages; there are no narrow or medium pages (owner, 2026-10-18),
+so a theme must not narrow a page or a form in it. The class reaches every theme through the
 `page.body_class` it already prints, and `page.width` names it. The rows in main - `cl-page-head-inner`,
 the identity band's `cl-identity-meta` and each `section.cl-page-section` directly in main or in a
 theme's `div.cl-page-family` - take their width and spacing from three variables:
 
 | Variable | Core default | Meaning |
 |---|---|---|
-| `--cl-content-width` | `1320px`; `54rem` medium; `38rem` narrow | a row's largest width, centred |
+| `--cl-content-width` | `1320px` | a row's largest width, centred |
 | `--cl-gutter` | `.75rem` | a row's padding at the sides |
 | `--cl-section-space` | `3rem` | a row's padding above and below |
 

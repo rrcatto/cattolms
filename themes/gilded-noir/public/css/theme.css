@@ -1832,8 +1832,6 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 
 .cl-main .cl-import-preview { border: 1px solid var(--gn-line); border-radius: var(--gn-radius-lg); padding: 18px; background: var(--gn-paper); }
 
-.gn-family-auth .cl-main,.gn-family-error .cl-main { max-width: 720px; margin: 0 auto; }
-.cl-main .contact-form{ max-width: 720px; }
 .cl-main .cl-narrow { max-width: 680px; }
 .cl-main .cl-medium { max-width: 860px; }
 /* Core's page rows (the page head, the identity band, each page section) take their width and

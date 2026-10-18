@@ -10,6 +10,8 @@ development pod (`docs/OPERATIONS.md`, "Local development environment") Playwrig
 installed on the host, so `CATTO_PLAYWRIGHT_MODULE` is `$HOME/tools/playwright/node_modules/playwright`;
 the runners accept the local mkcert certificate (`ignoreHTTPSErrors`), which Playwright's Firefox does not trust:
 
+The fixture's identity is an ADMIN who administers a test company of its own, so `/company` opens (there is no System Company, owner 2026-10-18); cleanup removes both.
+
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/ui-stabilisation-fixture.php create'
 podman exec -u cattotest env_php_1 cat /tmp/catto-ui-stabilisation-state.json > /tmp/catto-ui-stabilisation-state.json
@@ -99,17 +101,16 @@ CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node test
 
 ## Section pages
 
-`section-pages.cjs` opens every Account, Company and Administration menu page (48) in every bundled
+`section-pages.cjs` opens every Account, Company and Administration menu page (53, the five wallet, refund and settings pages added 2026-10-17) in every bundled
 theme at 1440 and 390px through the theme preview, so nothing is activated. It checks the one
 construction every page shares (UX rule 1.7, `PageStructureContractTest`): exactly one `h1`; only page
 rows directly in main (flash stack, page head, identity band, page sections, a theme's page-family
 wrapper, form windows); no words standing on the page texture; the first card's edge on the page
-head's text edge; the same gap above the footer on every page of a theme; and no sideways scrolling.
-The four pages whose tables scroll the page sideways at 390px in some themes (Company
-Enrolments, Administration Enrolments, Themes, Activity) are a separate task (owner, 2026-10-16):
-the runner reports them as known rather than failing. Screenshots and `results.json` go
+head's text edge; the same gap above the footer on every page of a theme; no sideways scrolling;
+nothing standing out past a table's edge; and no action control cut off or squeezed by its cell
+(UX rule 2.8). Screenshots and `results.json` go
 to `/tmp/catto-section-pages` (`CATTO_BROWSER_OUTPUT`); `CATTO_THEMES` and `CATTO_WIDTHS` narrow a run.
-Its identity is an ADMIN who is also an administrator of the System Company:
+Its identity is an ADMIN who administers a test company of its own, because there is no System Company (owner, 2026-10-18) and the Company workspace needs a company; cleanup removes both:
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/section-pages-fixture.php create'
@@ -277,7 +278,8 @@ remove one, set the price and publish it. In Chromium and Firefox a learner sees
 saving), adds it to the cart with the keyboard, applies a promotion for all bundles at checkout,
 places the order and finds every course in the library, with the order page and invoice showing the
 bundle as the item bought; the bundle page and cart fit a 390px phone. A learner who already has one
-of the courses is told so on the bundle page. Without JavaScript a bundle is bought and an ADMIN
+of the courses is told so on the bundle page, and a company account (owner, 2026-10-18) reads why it
+cannot buy and is offered no buttons. Without JavaScript a bundle is bought and an ADMIN
 reorders its courses. The bundle catalogue and page, the cart and the ADMIN list and editor render in
 every bundled theme at 1440 and 390px without sideways scrolling. The script creates and cleans up
 `bundles-fixture.php` itself; orders are immutable, so each run leaves its orders, their learners, the
@@ -363,7 +365,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 `legal-pages.cjs` checks the public legal pages and the checkout acceptance box (77 checks):
 
-- **Every theme, signed out and signed in, at 1440, 820 and 390px (36).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title, version and last-updated date; every entry of the contents list is a card with a heading; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
+- **Every theme, signed out and signed in, at 1440, 820 and 390px (36).** `/terms`, `/refunds` and `/privacy` answer in that theme without a redirect, with their title and last-updated date (no version since 2026-10-17); every entry of the contents list is a card with a heading; all prose is on a card; no label of a label and value list runs into its value; nothing scrolls sideways; and the Core footer shows Terms, Refunds and Privacy.
 - **Every theme at the three widths, both checkouts (36).** The learner's review step and the company credit checkout show the one acceptance box: required, unticked, worded "I have read and accept the Terms and Conditions and the Refund Policy.", with both documents linked from the label in a new tab, whole, inside the form and before the button that places the order.
 - **Chromium and Firefox (4).** Place my order without the tick places nothing; the Terms link opens in a new tab and leaves the checkout where it was; a form that lost its `required` attribute is refused by the server with the reason, for the learner and for the company; the details step has no identity number field.
 - **Without JavaScript (1).** The three pages read on a phone, the footer link leads to the Terms and a contents entry jumps to its section.
@@ -373,4 +375,34 @@ Each bundled theme is activated in turn (`legal-pages-fixture.php theme <key>`),
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/legal-pages.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/legal-pages-fixture.php cleanup'   # only after a killed run
+```
+
+## Wallets, refunds and commerce settings
+
+`demo-site.cjs` checks a demo site (`APP_SITE_MODE=demo`, owner 2026-10-18). catto.test is a demo site: `env/.env` says `APP_SITE_MODE=demo`.
+
+- **Chromium (6).** Signed out, the home page, catalogue, a course, sign-in and the Terms say they are a demo site and carry `noindex, nofollow` in their robots meta and `X-Robots-Tag`; the notice shows without JavaScript; checkout offers the simulated card and says the purchase is a simulation; an EFT order says it is a simulation, shows fake bank details labelled as fake and the account reference, and its invoice says the same (checked by `demo-site-fixture.php order`); a sign-in email starts with `[DEMO]` and says it comes from a demo site (Mailpit, `CATTO_MAILPIT_URL`). ADMIN sets Site mode to live: no notice, no demo robots rule, only EFT at checkout, and the earlier order still a simulation; Reset returns to `APP_SITE_MODE`. With `APP_DEBUG` on, Symfony itself sends `X-Robots-Tag: noindex`, so the live check looks only for the absence of the demo site's own rule.
+- **Firefox (1).** The notice and the checkout statement.
+- **Every theme at 1440, 820 and 390px.** The home page, catalogue, a course and the order show the notice, with one `h1` and no sideways scrolling. Each theme is activated in turn and the one that was active is put back.
+
+The script creates and cleans up its own fixture (two paid courses, an ADMIN and a learner); cleanup removes sessions, carts and any saved site mode and retires the courses. Orders and their documents stay. Phone screenshots go to `/tmp/catto-demo-site` (`CATTO_BROWSER_OUTPUT`).
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/demo-site.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/demo-site-fixture.php cleanup'   # only after a killed run
+```
+
+`commerce-wallets.cjs` checks the launch commerce work of 2026-10-17 and the money records of 2026-10-18 (303 checks):
+
+- **Chromium and Firefox, a fresh learner each (12).** A private learner is offered no Request from my company. A company learner (owner, 2026-10-18) is offered only Request from my company, with the reason it cannot buy; it has no cart in the header, checkout sends it to My Cart with that reason, and its request reaches its company. The learner's R200.00 of wallet credit pays part of a R300.00 course and the rest is chosen as EFT; checkout keeps the form until both boxes are ticked; the order page quotes the account reference and the R100.00 still to pay. ADMIN confirms an EFT of R150.00: the course starts and R50.00 goes to the wallet, which My Wallet and its statement show, and the dashboard says the course started on payment. The ADMIN dashboard lists the overpayment; ADMIN opens it, sends the prepared email (Mailpit receives it, `CATTO_MAILPIT_URL`) and marks it dealt with. The learner asks for money back on the order page; ADMIN approves it at Refund Requests with an override reason, the wallet part goes back to the wallet, and ADMIN records the payout on the order. Start course on an ADMIN-assigned course needs its confirmation box, and a form without it is refused by the server.
+- **Without JavaScript (1).** A refund request is sent and withdrawn, and Start course works, as plain forms.
+- **Commerce settings (1).** A Stitch fee saved in its section of Administration → Settings is printed by the Refund Policy, a reminder longer than the credit expiry is refused with its reason, and Reset brings back the `.env` default.
+- **Money records (1).** The dashboard's Money received figure opens the Money Ledger filtered to payments; a search by account reference finds the learner's payment and overpayment; an entry opens on its own page; the order's Commerce Trail and Payment Events list its rows and an event opens on its own page.
+- **Every theme at 1440, 820 and 390px (288).** My Wallet, the learner dashboard, the learner's order, the three legal pages, the ADMIN dashboard, Settings, Refund Requests, Wallets, a learner's wallet, the ADMIN order page, Orders & Payments, the Money Ledger, Commerce Trail and Payment Events answer in that theme with one `h1` and no sideways scrolling. Learners cannot preview a theme, so each theme is activated in turn (`commerce-wallets-fixture.php theme <key>`) and the theme that was active is put back even when a check fails; do not run it beside another check that switches themes.
+
+The script creates and cleans up its own fixture (two paid courses, an ADMIN, a learner per scenario with wallet credit and an assigned course, and a member of a client company); cleanup removes sessions, carts and every commerce setting override, and retires the courses. Orders, the ledger and what they refer to are immutable and stay. Phone screenshots are written to `/tmp/catto-commerce-wallets` (`CATTO_BROWSER_OUTPUT`).
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/commerce-wallets.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/commerce-wallets-fixture.php cleanup'   # only after a killed run
 ```

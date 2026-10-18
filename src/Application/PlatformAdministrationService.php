@@ -12,6 +12,9 @@ Implements Catto Learning business and application logic for platform administra
 
 Changelog:
 
+2026/10/18 SAST
+- The Site Owner replaces the System Company (owner, 2026-10-18): no sweep puts people into a company, the person form may choose no company (a private account) and ends a membership when it does, a Company Administrator needs a company, saving settings changes no membership, and siteOwnerView(), saveSiteOwner() and resetSiteOwner() edit the Site Owner, logging each changed field with its old and new value (site_owner.updated). Only a company account may ask its company for a course.
+
 2026/09/08 11:30 SAST
 
 - Timestamps in lists are trimmed to the minute; they were printed to the microsecond with an offset and were the widest column on several screens.
@@ -96,6 +99,7 @@ namespace CattoLearning\Application;
 use CattoLearning\Auth\RoleCatalog;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Configuration\SiteOwner;
 use CattoLearning\Infrastructure\Mail\MailerInterface;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
@@ -117,6 +121,9 @@ use RuntimeException;
 
 final class PlatformAdministrationService
 {
+    /** Why a Company Administrator cannot be made without a company (owner, 2026-10-18). */
+    public const COMPANY_ADMIN_NEEDS_COMPANY = 'A Company Administrator needs a company. Choose the company they administer.';
+
     /**
      * The timestamp columns every list normaliser trims, and the fields they live in.
      *
@@ -427,7 +434,9 @@ final class PlatformAdministrationService
         private readonly MailerInterface $mailer,
         private readonly GeoIpLocator $geoIp,
         private readonly EntityLookupRepository $lookups,
-        private readonly AuthSessionRepository $sessions
+        private readonly AuthSessionRepository $sessions,
+        private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
+        private readonly ?SiteOwner $owner = null
     ) {
     }
 
@@ -688,6 +697,33 @@ final class PlatformAdministrationService
     }
 
     /**
+     * The columns a phone does not show, by dataset and column key (owner, 2026-10-17).
+     *
+     * A phone-width table cannot hold every column at a readable size, so at 700px and narrower
+     * it keeps the columns that say what a row is and what can be done with it, and drops the
+     * rest. The whole row is still one tap away in the row's tooltip. The admin and company
+     * tables share some dataset names; their column keys do not collide, so one list serves both.
+     */
+    private const PHONE_HIDDEN_COLUMNS = [
+        'courses' => ['category', 'ownership', 'learners', 'started', 'updated'],
+        'people' => ['company', 'courses', 'created', 'last_login', 'account'],
+        'requests' => ['company', 'requested'],
+        'enrolments' => ['progress'],
+        'credits' => ['period', 'total', 'assigned', 'consumed'],
+        'activity' => ['actor', 'company', 'subject', 'ip', 'location'],
+        'company_report' => ['people', 'completed'],
+        'course_report' => ['status', 'started', 'completed', 'average'],
+        'company_favourites' => ['provider', 'category', 'standing', 'added'],
+        'companies' => ['people', 'enrolments'],
+        'company_creators' => ['courses'],
+        // The money records (owner, 2026-10-18): a phone keeps when, what and how much.
+        'ledger' => ['account', 'order', 'method', 'wallet'],
+        'trail' => ['order', 'actor', 'details'],
+        'payments' => ['order', 'method', 'reference'],
+        'orders' => ['placed', 'purchaser', 'paid'],
+    ];
+
+    /**
      * The column headers for one sortable list.
      *
      * Each entry carries the URL that applies it, the direction that click would request, and
@@ -738,7 +774,7 @@ final class PlatformAdministrationService
             [$label, $width] = array_pad(explode('|', $label, 2), 2, '');
 
             if (!in_array($key, $sortable, true)) {
-                $headers[] = ['key' => $key, 'label' => $label, 'width' => $width, 'sortable' => false, 'active' => false, 'direction' => '', 'href' => ''];
+                $headers[] = ['key' => $key, 'label' => $label, 'width' => $width, 'wide' => in_array($key, self::PHONE_HIDDEN_COLUMNS[$dataset] ?? [], true), 'sortable' => false, 'active' => false, 'direction' => '', 'href' => ''];
                 continue;
             }
 
@@ -747,6 +783,7 @@ final class PlatformAdministrationService
                 'key' => $key,
                 'label' => $label,
                 'width' => $width,
+                'wide' => in_array($key, self::PHONE_HIDDEN_COLUMNS[$dataset] ?? [], true),
                 'sortable' => true,
                 'active' => $sort->isOn($key),
                 'direction' => $sort->isOn($key) ? $sort->direction : '',
@@ -968,7 +1005,7 @@ final class PlatformAdministrationService
                 'companies',
                 fn(int $l, int $o): array => $this->administration->companies($l, $o, '', null, 'consumers'),
                 fn(array $rows): array => $this->normaliseCompanies($rows)
-            ) + ['system_company' => $this->systemCompanyContext($actorUserId)],
+            ),
             'company_creators' => $bounded(
                 'company_creators',
                 fn(int $l, int $o): array => $this->administration->companies($l, $o, '', null, 'creators'),
@@ -1157,8 +1194,7 @@ final class PlatformAdministrationService
             // The search term is read here rather than inside the helper so each dataset's wiring is
             // greppable from its own section, which is what DatasetSearchWiringTest asserts: a box
             // whose term the service never reads types into nothing.
-            'companies' => $this->companyAudienceSection('companies', 'consumers', self::searchTerm('companies', $activityFilters), $activityFilters, $scope)
-                + ['system_company' => $this->systemCompanyContext($actorUserId)],
+            'companies' => $this->companyAudienceSection('companies', 'consumers', self::searchTerm('companies', $activityFilters), $activityFilters, $scope),
             'company_creators' => $this->companyAudienceSection('company_creators', 'creators', self::searchTerm('company_creators', $activityFilters), $activityFilters, $scope),
             // Two sections since v0.6, each with its own route, because a reader could not link to,
             // bookmark or reload one of them while both lived behind in-page tab buttons.
@@ -1342,49 +1378,17 @@ final class PlatformAdministrationService
             })(),
             'themes' => [],
             'ui_components' => ['can_favourite' => false, 'gallery_pagination' => self::paginationPayload('gallery', Pagination::create(2, 25, 75), '/admin/system/ui-components', 'Sample records')],
-            'settings' => (function () use ($actorUserId): array {
-                $systemCompany = $this->systemCompanyContext($actorUserId);
-
+            'settings' => (function (): array {
                 return [
-                    'system_company' => $systemCompany,
                     'platform_name' => $this->settings->platformName(),
                     'platform_name_source' => $this->settings->platformNameSource(),
                     'mail_settings' => $this->settings->mailAdminView(),
-                    'bank_details' => $this->settings->bankDetails(),
-                    'system_company_name' => $this->options->get('system_company_name', (string) $systemCompany['name']),
-                    'system_company_domain' => (string) $systemCompany['domain'],
+                    'site_mode' => $this->site === null ? null : ['mode' => $this->site->mode(), 'source' => $this->site->source(), 'environment' => $this->site->environmentMode()],
+                    'site_owner' => $this->siteOwnerView(),
                 ];
             })(),
             default => throw new InvalidArgumentException('Unknown Administration section: ' . $section),
         };
-    }
-
-    /** @return array<string,mixed> */
-    private function systemCompanyContext(int $actorUserId): array
-    {
-        // This runs while rendering a page, so it must not make the viewer a member of what they
-        // are viewing. It used to, and that took /admin/companies?universe=seed down with a 500:
-        // resolving the SEED System Company also tried to make the genuine REAL administrator its
-        // owner, which the cross-universe guard correctly refused. Worse, the refusal came after
-        // the deactivating half of that membership write had already committed.
-        //
-        // A read resolves. Only a workflow that genuinely needs membership assigns it.
-        $systemCompany = $this->companies->systemCompany();
-
-        if ($systemCompany === null) {
-            $systemCompany = $this->companies->ensureSystemCompany(
-                $actorUserId,
-                $this->options->get('system_company_name', 'System Company'),
-                Env::string('APP_DOMAIN', 'local')
-            );
-        }
-
-        // The sweep is universe-scoped on both halves and remains a legitimate invariant: an
-        // active identity with no company belongs to its own universe's System Company. It never
-        // touches the viewing administrator, because that identity already has a membership.
-        $this->companies->assignUnassignedUsersToSystemCompany((int) $systemCompany['id']);
-
-        return $systemCompany;
     }
 
     /**
@@ -1963,18 +1967,14 @@ final class PlatformAdministrationService
         if ($firstName === '' || $lastName === '') {
             throw new InvalidArgumentException('Enter the person’s first and last names.');
         }
+        // No company chosen means a private account, which belongs to no company (owner, 2026-10-18).
         $companyId = max(0, (int) ($input['company_id'] ?? 0));
-        if ($companyId < 1) {
-            $system = $this->companies->ensureSystemCompany(
-                $actorUserId,
-                $this->options->get('system_company_name', 'System Company'),
-                Env::string('APP_DOMAIN', 'local')
-            );
-            $companyId = (int) $system['id'];
-        }
         $role = strtoupper(trim((string) ($input['role'] ?? RoleCatalog::STUDENT))) ?: RoleCatalog::STUDENT;
         if (!in_array($role, $this->normalAssignableRoleKeys(), true)) {
             throw new InvalidArgumentException('Choose a valid genuine-data role.');
+        }
+        if ($role === RoleCatalog::COMPANY_ADMIN && $companyId < 1) {
+            throw new InvalidArgumentException(self::COMPANY_ADMIN_NEEDS_COMPANY);
         }
         $sendNotice = !empty($input['send_notice']);
 
@@ -2044,19 +2044,18 @@ final class PlatformAdministrationService
             $this->users->replacePrimaryEmail($userId, $primaryEmail);
             $this->users->replaceSecondaryEmail($userId, $secondaryEmail);
             $this->roles->replaceUserRoles($userId, $roles);
+            // No company chosen ends the person's membership: a private account belongs to no company.
             $companyId = max(0, (int) ($input['company_id'] ?? 0));
             if ($companyId < 1) {
-                $system = $this->companies->ensureSystemCompany(
-                    $actorUserId,
-                    $this->options->get('system_company_name', 'System Company'),
-                    Env::string('APP_DOMAIN', 'local')
-                );
-                $companyId = (int) $system['id'];
+                if (in_array(RoleCatalog::COMPANY_ADMIN, $roles, true)) throw new InvalidArgumentException(self::COMPANY_ADMIN_NEEDS_COMPANY);
+                $current = $this->companies->findForUser($userId);
+                if ($current !== null) $this->companies->removeUser((int) $current['id'], $userId);
+            } else {
+                $companyRole = in_array(RoleCatalog::COMPANY_ADMIN, $roles, true) ? 'administrator'
+                    : (in_array(RoleCatalog::COURSE_OWNER, $roles, true) ? 'course_owner'
+                    : (in_array(RoleCatalog::COURSE_EDITOR, $roles, true) ? 'course_editor' : 'student'));
+                $this->companies->assignUser($companyId, $userId, $companyRole);
             }
-            $companyRole = in_array(RoleCatalog::COMPANY_ADMIN, $roles, true) ? 'administrator'
-                : (in_array(RoleCatalog::COURSE_OWNER, $roles, true) ? 'course_owner'
-                : (in_array(RoleCatalog::COURSE_EDITOR, $roles, true) ? 'course_editor' : 'student'));
-            $this->companies->assignUser($companyId, $userId, $companyRole);
             $this->audit->record($actorUserId, 'user.updated_by_administrator', ['user_id' => $userId]);
         });
     }
@@ -2088,9 +2087,6 @@ final class PlatformAdministrationService
             throw new InvalidArgumentException('That company email domain is already registered.');
         }
         $this->companies->updateManaged($companyId, $name, $domain);
-        if (in_array($company['is_system'] ?? false, [true,1,'1','t','true'], true)) {
-            $this->options->set('system_company_name', $name, $actorUserId);
-        }
         $this->audit->record($actorUserId, 'company.updated', ['company_id' => $companyId]);
     }
 
@@ -2359,41 +2355,76 @@ final class PlatformAdministrationService
     }
 
     /** @param array<string,mixed> $input */
+    /**
+     * The platform name. Saving settings never changes anyone's company membership (owner, 2026-10-18).
+     *
+     * @param array<string,mixed> $input
+     */
     public function saveSettings(array $input, int $actorUserId): void
     {
         $platformName = trim((string) ($input['platform_name'] ?? ''));
-        $companyName = trim((string) ($input['system_company_name'] ?? ''));
-        $companyDomain = strtolower(trim((string) ($input['system_company_domain'] ?? Env::string('APP_DOMAIN', 'local'))));
         if ($platformName !== '') {
             $this->options->set('platform_name', $platformName, $actorUserId);
-        }
-        if ($companyName !== '') {
-            if ($companyDomain === '' || str_contains($companyDomain, '@') || str_contains($companyDomain, '/') || filter_var('admin@' . $companyDomain, FILTER_VALIDATE_EMAIL) === false) {
-                throw new InvalidArgumentException('Enter one valid System Company domain, for example example.co.za.');
-            }
-            $this->options->set('system_company_name', $companyName, $actorUserId);
-            $system = $this->companies->ensureSystemCompany($actorUserId, $companyName, Env::string('APP_DOMAIN', 'local'));
-            // Saving Settings is a deliberate administrative act in the genuine universe, so the
-            // administrator owning the System Company they just configured is correct here. It is
-            // stated explicitly rather than happening inside a lookup.
-            $this->companies->assignSystemCompanyOwner((int) $system['id'], $actorUserId);
-            if ($this->companies->domainExistsForOther($companyDomain, (int) $system['id'])) {
-                throw new InvalidArgumentException('That company email domain is already registered.');
-            }
-            $this->companies->updateManaged((int) $system['id'], $companyName, $companyDomain);
         }
         $this->audit->record($actorUserId, 'platform.settings_updated');
     }
 
-    /** Bank settings are saved independently of platform identity and SMTP configuration.
+    /**
+     * The Site Owner's details, as Settings shows and edits them: each with its value in force, its
+     * .env value and whether Settings overrides it.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function siteOwnerView(): ?array
+    {
+        if ($this->owner === null) return null;
+        $fields = [];
+        foreach (SiteOwner::FIELDS as $field => [$env, $label]) {
+            $fields[$field] = ['label' => $label, 'value' => $this->owner->value($field), 'env' => $env, 'environment' => $this->owner->environmentValue($field), 'source' => $this->owner->source($field)];
+        }
+        return ['fields' => $fields, 'legal_forms' => SiteOwner::LEGAL_FORMS, 'overridden' => in_array('database', array_column($fields, 'source'), true)];
+    }
+
+    /**
+     * Saves the Site Owner's details and records every change in the Activity log: who made it, when,
+     * and each changed field with its old and new value (owner, 2026-10-18).
+     *
      * @param array<string,mixed> $input
      */
-    public function saveBankDetails(array $input, int $actorUserId): void
+    public function saveSiteOwner(array $input, int $actorUserId): void
     {
-        $this->transactions->run(function () use ($input, $actorUserId): void {
-            $this->settings->saveBankDetails($input, $actorUserId);
-            $this->audit->record($actorUserId, 'platform.bank_details_updated');
+        $owner = $this->owner ?? throw new InvalidArgumentException('The Site Owner cannot be changed here.');
+        $this->transactions->run(function () use ($owner, $input, $actorUserId): void {
+            $changes = $owner->save($input, $actorUserId);
+            if ($changes !== []) $this->audit->record($actorUserId, 'site_owner.updated', ['changes' => $changes]);
         });
+    }
+
+    /** Removes every Site Owner override, so .env decides again, and records what changed. */
+    public function resetSiteOwner(int $actorUserId): void
+    {
+        $owner = $this->owner ?? throw new InvalidArgumentException('The Site Owner cannot be changed here.');
+        $this->transactions->run(function () use ($owner, $actorUserId): void {
+            $changes = $owner->reset();
+            if ($changes !== []) $this->audit->record($actorUserId, 'site_owner.updated', ['changes' => $changes, 'reset_to' => '.env']);
+        });
+    }
+
+    /** Demo or live (SiteMode): saved as an override of APP_SITE_MODE. */
+    public function saveSiteMode(string $mode, int $actorUserId): void
+    {
+        $site = $this->site ?? throw new InvalidArgumentException('The site mode cannot be changed here.');
+        $this->transactions->run(function () use ($site, $mode, $actorUserId): void {
+            $site->save($mode, $actorUserId);
+            $this->audit->record($actorUserId, 'platform.site_mode_changed', ['mode' => $site->mode()]);
+        });
+    }
+
+    /** Removes the override, so APP_SITE_MODE in .env decides again. */
+    public function resetSiteMode(int $actorUserId): void
+    {
+        $this->site?->reset();
+        $this->audit->record($actorUserId, 'platform.setting_reset', ['setting' => 'site_mode', 'source' => '.env']);
     }
 
     public function resetPlatformName(int $actorUserId): void
@@ -2501,10 +2532,15 @@ final class PlatformAdministrationService
         if (!$allowedPeriod) {
             throw new InvalidArgumentException('Choose one of the active access options configured for this course.');
         }
+        // Only a company account asks its company for a course; a private account, which belongs to
+        // no company, buys its own (owner, 2026-10-18).
         $company = $this->companies->findForUser($userId);
+        if ($company === null) {
+            throw new InvalidArgumentException('Only a company account can ask its company for a course.');
+        }
         $id = $this->administration->createRequest(
             $userId,
-            $company !== null ? (int) $company['id'] : null,
+            (int) $company['id'],
             $courseId,
             $accessPeriodSeconds,
             $note
@@ -2651,8 +2687,6 @@ final class PlatformAdministrationService
     private function normaliseCompanies(array $rows): array
     {
         foreach ($rows as &$row) {
-            $isSystem = in_array($row['is_system'] ?? false, [true, 1, '1', 't', 'true'], true);
-            $row['is_system'] = $isSystem;
             // What a company is, is what it does. A provider owns courses; a client holds credits
             // or has staff. Both are true of a company that does both, which is the whole reason
             // the stored single choice was removed. The two facts arrive as columns on the query
@@ -2664,7 +2698,7 @@ final class PlatformAdministrationService
             if ($row['is_course_provider']) $roles[] = 'Course provider';
             // A company that has done neither yet is a client: it was created to have staff trained,
             // and that is the state every new company starts in.
-            $row['company_type_label'] = $isSystem ? 'System company' : ($roles === [] ? 'Client' : implode(' · ', $roles));
+            $row['company_type_label'] = $roles === [] ? 'Client' : implode(' · ', $roles);
             $row['status_label'] = ucfirst((string) ($row['status'] ?? ''));
         }
         unset($row);

@@ -10,6 +10,11 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/18 SAST (v0.9.4)
+- One page width: every page is wide except Home and course landing pages (full); medium and narrow are gone.
+- Demo site: site_demo, site_demo_notice and site_simulation reach every page, and a demo site is noindex, nofollow.
+- Credits & Orders lists Money Ledger, Payment Events and Commerce Trail; Commerce Settings is part of Settings.
+- Advanced PLATFORM_ASSET_VERSION to 0.9.4.
 2026/10/17 SAST (Part C)
 - Bootstrap 6 underneath: the reboot, grid and utilities files load before catto-platform.css, and no Bootstrap script loads.
 - color_scheme: the theme's colour scheme, which its <html> writes as data-bs-theme.
@@ -102,31 +107,21 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.3';
+    private const PLATFORM_ASSET_VERSION = '0.9.4';
 
     /**
-     * How wide each page is, when it is not wide. A page chooses its width once and every row of it
-     * follows (the cl-width-* body class and the --cl-content-width variable in catto-platform.css),
-     * so a section can no longer be wider or narrower than its page head. Forms, the legal and help
-     * pages, cart and checkout are medium; the sign-in pages and the error page are narrow; Home and
-     * course landing pages run full width, which a theme without a full-width design draws as wide.
-     * A controller may pass page_width for a page whose width depends on what it shows.
+     * Every page is the one standard width (wide), the width of every other boxed page (owner,
+     * 2026-10-18: no narrow pages). Only Home and course landing pages differ: they run full width,
+     * which a theme without a full-width design draws as wide. The course reader has its own layout.
+     * A page's width follows from this alone (the cl-width-* body class and --cl-content-width in
+     * catto-platform.css), so a section can never be wider or narrower than its page head.
      */
     private const PAGE_WIDTHS = [
         'home' => 'full', 'landing-page' => 'full',
-        'about' => 'medium', 'help' => 'medium', 'contact' => 'medium',
-        'terms' => 'medium', 'refunds' => 'medium', 'privacy' => 'medium',
-        'commerce-cart' => 'medium', 'commerce-checkout' => 'medium', 'commerce-order' => 'medium',
-        'company-credit-checkout' => 'medium',
-        'admin-course-form' => 'medium', 'admin-course-import' => 'medium',
-        'admin-course-category-new' => 'medium', 'admin-course-category-edit' => 'medium',
-        'admin-course-category-move-into' => 'medium',
-        'login' => 'narrow', 'login-sent' => 'narrow', 'register' => 'narrow',
-        'company-register' => 'narrow', 'error' => 'narrow',
     ];
 
     /** The widths a page may have. Anything else is a mistake, never silently wide. */
-    public const PAGE_WIDTH_NAMES = ['wide', 'medium', 'narrow', 'full'];
+    public const PAGE_WIDTH_NAMES = ['wide', 'full'];
     public function __construct(
         private readonly Environment $twig,
         private readonly ThemeTemplates $templates,
@@ -136,7 +131,8 @@ final class ThemeRenderer
         private readonly AccountSectionRegistry $accountSections,
         private readonly CompanySectionRegistry $companySections,
         private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null,
-        private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null
+        private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null,
+        private readonly ?\CattoLearning\Configuration\SiteMode $site = null
     ) {
     }
 
@@ -280,7 +276,7 @@ final class ThemeRenderer
      */
     public function viewModel(string $page, array $data, string $themeKey, bool $previewActive): array
     {
-        $model = ['cart_summary'=>$this->carts?->summary() ?? ['items'=>[], 'count'=>0, 'total_label'=>'R 0.00']];
+        $model = ['cart_summary'=>$this->carts?->summary() ?? ['items'=>[], 'count'=>0, 'total_label'=>'R 0.00', 'buyer'=>true]];
 
         foreach ([
             'title' => '', 'page_title' => '', 'page_kicker' => '', 'active_nav' => '', 'body_class' => '',
@@ -309,6 +305,7 @@ final class ThemeRenderer
         $model['theme_preview_active'] = $previewActive;
         $model['csrf'] = $csrf;
         $model['current_uri'] = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $model = $this->siteModeScalars() + $model;
 
         $navigation = $this->navigation($data, $csrf);
         // Bootstrap 6 underneath (6.0.0-alpha.1): only its reboot, grid and utilities files, the reboot first
@@ -399,6 +396,8 @@ final class ThemeRenderer
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
         $model['meta'] = self::pageMeta((array) ($data['page_meta'] ?? []));
+        // A demo site asks search engines not to list any page (PlatformResponseHeadersListener says so too).
+        if ($model['site_demo']) $model['meta']['robots'] = 'noindex, nofollow';
         $model['sidebar'] = '';
 
         return array_merge($model, $this->pageFamilyObjects($family, $data));
@@ -551,6 +550,8 @@ final class ThemeRenderer
                 $billing = $visibleCompanySections['billing'];
                 $companyChildren[] = $child('company-billing',$billing['label'],$billing['route'],$billing['icon']);
             }
+            // The company's wallet credit (owner, 2026-10-17), beside its billing details.
+            if ($this->can($data, 'COMPANY.WALLET.VIEW')) $companyChildren[] = $child('company-wallet','Wallet','/company/wallet','credits');
 
             $items[] = $item('company','Company','/company','▤',$active==='company',children:$companyChildren);
         }
@@ -651,6 +652,21 @@ final class ThemeRenderer
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
                 $grandchildren[] = $child('admin-commerce-orders', 'Orders & Payments', '/admin/commerce/orders', 'credits');
             }
+            // The money records (owner, 2026-10-18): every ledger row, every payment state and the commerce trail.
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PAYMENT.VIEW')) {
+                $grandchildren[] = $child('admin-money-ledger', 'Money Ledger', '/admin/commerce/ledger', 'credits');
+                $grandchildren[] = $child('admin-payment-events', 'Payment Events', '/admin/commerce/payment-events', 'credits');
+            }
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
+                $grandchildren[] = $child('admin-commerce-trail', 'Commerce Trail', '/admin/commerce/trail', 'credits');
+            }
+            // Refunds asked for in the LMS, every wallet, and the commerce settings (owner, 2026-10-17).
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.REFUND.VIEW')) {
+                $grandchildren[] = $child('admin-refund-requests', 'Refund Requests', '/admin/commerce/refund-requests', 'credits');
+            }
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.WALLET.VIEW')) {
+                $grandchildren[] = $child('admin-wallets', 'Wallets', '/admin/wallets', 'credits');
+            }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PROMOTION.VIEW')) {
                 $grandchildren[] = $child('admin-promotions', 'Promotions', '/admin/promotions', 'credits');
             }
@@ -698,6 +714,7 @@ final class ThemeRenderer
             $profileChildren = [];
             $coursesChildren = [];
             if ($this->can($data, 'COMMERCE.ORDER.VIEW')) $coursesChildren[] = $child('account-orders','My Orders','/account/orders','requests');
+            if ($this->can($data, 'COMMERCE.WALLET.VIEW')) $coursesChildren[] = $child('account-wallet','My Wallet','/account/wallet','credits');
             $dashboardChild = null;
             $remainingChildren = [];
 
@@ -1068,7 +1085,7 @@ final class ThemeRenderer
     {
         $width = (string) ($data['page_width'] ?? self::PAGE_WIDTHS[$page] ?? 'wide');
         if (!in_array($width, self::PAGE_WIDTH_NAMES, true)) {
-            throw new RuntimeException('Unknown page width "' . $width . '" for ' . $page . '. A page is wide, medium, narrow or full.');
+            throw new RuntimeException('Unknown page width "' . $width . '" for ' . $page . '. A page is wide, or full for Home and course landing pages.');
         }
         return $width;
     }
@@ -1258,7 +1275,20 @@ final class ThemeRenderer
             'app_name' => $this->settings->platformName(),
             'app_url' => rtrim(Env::string('APP_URL'), '/'),
             'current_uri' => (string) ($_SERVER['REQUEST_URI'] ?? '/'),
-        ];
+        ] + $this->siteModeScalars();
+    }
+
+    /**
+     * Whether this is a demo site (SiteMode, owner 2026-10-18) and what a demo site says: every page
+     * draws site_demo_notice (partials/flash-messages.html.twig), a checkout and an order
+     * site_simulation, and the payment method offers the simulated card only on a demo site.
+     *
+     * @return array{site_demo:bool,site_demo_notice:string,site_simulation:string}
+     */
+    private function siteModeScalars(): array
+    {
+        return ['site_demo' => $this->site?->isDemo() ?? false, 'site_demo_notice' => \CattoLearning\Configuration\SiteMode::NOTICE,
+            'site_simulation' => \CattoLearning\Configuration\SiteMode::SIMULATION];
     }
 
     /** @param array<string,mixed> $data */

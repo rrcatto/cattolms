@@ -17,7 +17,7 @@ final class CommercePaymentContractTest extends TestCase
 {
     public function testActualDummySuccessAndFailurePreserveMerchantIdentity(): void
     {
-        $gateway=new OmnipayPaymentGatewayAdapter('test',new MockClock('2026-09-12T12:00:00+02:00'));
+        $gateway=new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'),new MockClock('2026-09-12T12:00:00+02:00'));
         foreach(['demo_success'=>'paid','demo_failure'=>'failed'] as $token=>$state) {
             $id=Uuid::v4(); $money=Money::strictMinorUnits(12345,'ZAR');
             $result=$gateway->purchase(new PaymentRequest($id,$money,$token));
@@ -31,7 +31,7 @@ final class CommercePaymentContractTest extends TestCase
     public function testDummyIsRejectedInProduction(): void
     {
         $this->expectException(\RuntimeException::class);
-        (new OmnipayPaymentGatewayAdapter('production',new MockClock()))->purchase(new PaymentRequest(Uuid::v4(),Money::strictMinorUnits(100,'ZAR'),'demo_success'));
+        (new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('live'),new MockClock()))->purchase(new PaymentRequest(Uuid::v4(),Money::strictMinorUnits(100,'ZAR'),'demo_success'));
     }
     public function testPaymentAmountSerializationNeverLosesAnIntegerCent(): void
     {

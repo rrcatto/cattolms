@@ -18,13 +18,19 @@ a page never offers what checkout would then turn down.
 - ordered: an order of theirs already holds the course (placed, awaiting payment or under review);
   they are sent to their orders rather than offered it again.
 - available: the course is published and has an active price; the prices, the default one first
-  chosen, Add to cart and Buy now, and Request from my company for those who may.
+  chosen, and what this visitor may do with them. A private account, or someone not signed in, may
+  buy (Add to cart, Buy now: can_buy). A company account never buys (owner, 2026-10-18,
+  OrderService::COMPANY_ACCOUNT); it may ask its company for the course instead (Request from my
+  company: can_request), which a private account, having no company, is not offered.
 - unavailable: the course is not published or has no active price; nothing to buy.
 
 A visitor who is not signed in can add to the cart as before (checkout asks them to sign in) and
 is also offered Sign in, so a learner who already has the course can reach it.
 
 Changelog:
+2026/10/18 SAST
+- A company account is offered Request from my company and never Add to cart or Buy now; a private
+  account is offered buying and never Request from my company (can_buy, can_request).
 2026/10/09 SAST
 - Created for course marketing landing pages (Phase L); the course page's own buy box uses it too.
 */
@@ -62,7 +68,9 @@ final class CoursePurchaseOptions
             'continue' => null,
             'variants' => [],
             'default_variant' => null,
+            'can_buy' => true,
             'can_request' => false,
+            'company_note' => '',
             'sign_in_href' => $viewer === null ? '/login?return=' . rawurlencode($returnTo) : '',
             'orders_href' => '/account/orders',
         ];
@@ -91,11 +99,14 @@ final class CoursePurchaseOptions
                 break;
             }
         }
+        $company = $viewer !== null && $this->records->isCompanyAccount($viewer->id);
         return [
             'state' => 'available',
             'variants' => $variants,
             'default_variant' => $default ?? $variants[0],
-            'can_request' => $viewer !== null && $viewer->hasPermission('CATALOGUE.COURSE.REQUEST'),
+            'can_buy' => !$company,
+            'can_request' => $company && $viewer->hasPermission('CATALOGUE.COURSE.REQUEST'),
+            'company_note' => $company ? OrderService::COMPANY_ACCOUNT : '',
         ] + $options;
     }
 }

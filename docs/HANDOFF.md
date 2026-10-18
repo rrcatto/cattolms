@@ -1,4 +1,70 @@
-# Catto Learning 0.9.3 — Development Handoff
+# Catto Learning 0.9.4 — Development Handoff
+
+## v0.9.4 handoff — 2026/10/18 (commerce for the launch, the Site Owner, money records, the demo site)
+
+Released at the owner's instruction to keep the work, before the owner's review of it; the owner may roll it back to v0.9.3, which stays tagged and released. It carries: the commerce launch work (immediate start, the money ledger and wallets, refunds to the wallet or as money back with fees, refund requests, the Refund Policy rule, commerce settings, account references); only private accounts buy; the demo site or live site setting; the Site Owner in place of the System Company, with the commerce settings inside Settings and Create company fixed; the money records (Money Ledger, Payment Events, Commerce Trail, Orders & Payments filters, the dashboard's Money section); one page width; a real tag cloud; tables on phones; Gilded Noir 2.0.5. The sections below hold the detail and their gates.
+
+Next, as the owner asked on 2026/10/18:
+- The account reference is the first thing shown on every invoice, receipt and credit note and on every order and ledger record.
+- A Record EFT payment page that starts from the reference on the bank statement, so that nobody has to find the order first.
+- Data made only by following the workflows, not by random generation: a clean database and a step-by-step walkthrough from one person buying one course to the documents and emails it produces.
+
+## The Site Owner, money records, page widths and the tag cloud — 2026/10/18 (released in v0.9.4)
+
+- **The Site Owner** replaces the System Company: `Configuration\SiteOwner` (`SITE_OWNER_*` in `.env`, overridden at Administration → Settings → Site Owner, every change in the Activity log). Private accounts belong to no company; courses no company owns belong to the Site Owner; the legal pages, invoices, receipts, credit notes and certificates name it; each legal page is dated by the later of its text and the Site Owner's last change; orders keep the accepted documents' dates and the Site Owner's details. The commerce settings are sections of Settings. Administration → Create company works again. `CHANGELOG.md` has the detail; `OPERATIONS.md`, "The Site Owner and its bank details".
+- **For the owner.** The local `env/.env` now carries the Site Owner details the legal pages printed before (it is not in the repository), so catto.test still shows them; the code and tests hold only placeholders. The public site needs its real details in its own `.env` or in Settings before it goes live. `LICENSE`, `composer.json` and Light Default's `theme.json` still name the software's author, which is authorship, not the Site Owner.
+- **Money records** under Administration → Credits & Orders (Money Ledger, Payment Events, Commerce Trail) and the dashboard's Money section, each figure opening the list it adds up.
+- **One page width** for every page but Home and course landing pages; Gilded Noir 2.0.5. **A real tag cloud**: only tags in use, sized by courses.
+- **Database.** Rebuilt from the baseline for the schema change (no `companies.is_system`, `courses.owner_company_id` nullable); Saharan Sunset 1.0.2 active, Modern the default certificate design.
+- **Gate (2026-10-18, local catto.test in the rootless Podman pod `pod_env`, PHP 8.5 in `env_php_1`, PostgreSQL in `env_postgres_1`, `APP_SITE_MODE=demo`, Saharan Sunset 1.0.2 active, Chromium and Firefox from `~/tools/playwright` on the Linux host).** Database rebuilt from the baseline. `composer qa` passed: 1,193 PHPUnit tests (Classic the default certificate design for the run, Modern restored), PHPStan, architecture, runtime-hazard, UI-contract and release validation. Twig lint (261 files), Composer validation, `git diff --check`. Every browser suite, run serially, with 0 failures: demo site 78, commerce and money records 303, bundles 9, promotions 9, billing profiles 10, financial documents 9, landing pages 13, legal pages 77, certificates 11, Course Content tree 41, category tree 22, category picker 17, course reviews 9, popular courses 13, UI matrix 86, canonical pages 36, Bootstrap safety net 42, section pages 660 and 330 page views (55 pages). The UI matrix first failed on `/company` because its administrator belonged to no company. Its fixture now gives the administrator a test company of its own, and the rerun passed.
+
+## Demo site or live site — 2026/10/18 (released in v0.9.4)
+
+The owner's instruction: demo.example.com is the demo, test and development site and never goes live, so it must say so, with one `.env` setting the in-app settings override. Built: `APP_SITE_MODE=demo|live` (`Configuration\SiteMode`, Administration → Settings → Site mode; anything but live is demo). A demo site says so on every page and in every email (`[DEMO]`), states at checkout that the purchase is a simulation, marks its orders and their documents as simulations for good, keeps out of search engines (robots meta and `X-Robots-Tag`), shows fake bank details labelled as fake, offers the simulated card and lets the seed tools run; a live site does none of that. The invoice now quotes the account reference. `CHANGELOG.md` has the detail; `OPERATIONS.md`, "Demo site or live site".
+
+- **For the owner.** demo.example.com needs `APP_SITE_MODE=demo` (or no value) when it is updated; the public site will need `APP_SITE_MODE=live`. The local `env/.env` now has `APP_SITE_MODE=demo` and the nine `COMMERCE_*` defaults it lacked (owner, 2026-10-18), so catto.test is a demo site; the app reads the file itself, and the next `create-pod.sh --recreate` copies them into `env/.env.podman` too.
+- **Database.** Rebuilt from the baseline, so the installed invoice, receipt and credit note templates carry the new lines; Saharan Sunset 1.0.2 is active and Modern is the default certificate design again.
+- **Gate.** After a rebuild of the development database: `composer qa` passed (751 unit, 15 architecture and 420 integration tests; Classic for the run, Modern restored), Twig lint (255), release validation and `git diff --check`. Every browser suite, one at a time, with 0 failures: `demo-site.cjs` 78, `commerce-wallets.cjs` 230, bundles 9, promotions 9, billing profiles 10, financial documents 9, landing pages 13, legal pages 77, certificates 11 (Classic for the run), Course Content tree 41, category tree 22, category picker 17, course reviews 9, popular courses 13, UI matrix 86, canonical 36, Bootstrap safety net 42, section pages 636 views at 1440 and 390px and 318 at 820px.
+
+## Commerce for the launch on 2 November 2026 — 2026/10/17 (released in v0.9.4)
+
+The owner's launch brief, designed in workspace `REPORTS/commerce-wallets-design-2026-10-17.md` (the owner answered every question and approved section 17: "yes, build the 2 November list"), is built on `dev-v0.9-bootstrap6` beside the phone tables work, and both are released in v0.9.4. The full entry is in `CHANGELOG.md`; the report is workspace `REPORTS/commerce-launch-2026-10-17.md`.
+
+- **What changed for people.**
+  - Every course starts as soon as its payment is confirmed, and the buyer ticks a second box at checkout to agree; Start course on an assigned course asks for confirmation.
+  - Every person and company has an account reference, quoted on EFT instructions.
+  - Wallets replace Account Funds: credit from refunds, overpaid EFTs and cancelled orders, expiring after 3 years, spent oldest first, reminded about once, never paid out as cash; it pays all or part of an order, and a company's wallet pays for credits.
+  - A started course is never refunded; refunds go to the wallet or as money back, less the Stitch and EFT fees, and money back is paid outside the LMS and recorded.
+  - Learners and Company Administrators ask for refunds on the order page; ADMIN decides at Commerce → Refund Requests.
+  - Only private accounts buy (owner, 2026-10-18). A company account (an active member of a company) sees no Add to cart, Buy now or cart, and the cart, bundles, free courses and placement refuse it (`OrderService::COMPANY_ACCOUNT`); it may Request from my company, which a private account is no longer offered. A Company Administrator buys company credits and may assign one to their own account.
+  - ADMIN has Commerce Settings, Wallets and, on the dashboard, Transactions that need attention with an email form.
+  - The legal pages carry dates, not versions, and state the new rules, the address for legal service, no memberships or accreditation and the Ombud.
+- **Code.** `src/Commerce/Wallet/` (ledger kinds, wallet repository and service), `src/Commerce/Settings/` (settings, fees), `Support\Duration`, `Support\AccountReference`, `Course\CourseTiming`, `RefundRequestService`, `TransactionAttention` with `AttentionRepository`, four controllers (wallets, refund requests, settings, attention) and their pages. `OrderService`, `PaymentService`, `PaymentAdministrationService`, `FulfilmentService`, `CompanyCreditPurchaseService`, `CheckoutService`, `RefundAdministrationService`, `RefundRule`, `CommerceMaintenance`, `LegalDocuments` and `LegalController` changed. `CommercePolicy` and `config/commerce.yaml` are gone.
+- **Schema.** In the baseline (the development database was rebuilt, then Saharan Sunset 1.0.2 activated and Modern made the default certificate design again). 97 permissions.
+- **Before launch, for the owner.** Set the real Stitch transaction and refund fees (Commerce Settings or `COMMERCE_STITCH_FEE`/`COMMERCE_STITCH_REFUND_FEE`): both default to nothing, and the Refund Policy prints "none at present" until they are set. Review the Terms, Refund Policy and Privacy Policy.
+- **Gate.** `composer qa` from a cold cache: 1,173 tests (746 unit, 15 architecture, 412 integration), with Classic as the default certificate design for the run and Modern restored; Twig lint (255), AssetMapper, Composer validation, `git diff --check`. Browser: `commerce-wallets.cjs` 228/0, section pages 636 and 318 views (53 pages) with 0 failures, UI matrix 86, canonical 36, safety net 42, legal pages 77, financial documents 9, billing profiles 10, promotions 9, bundles 8, certificates 11. After the buying rule (2026-10-18): `composer qa` after a cache clear passed (1,176 tests: 746 unit, 15 architecture, 415 integration; Classic for the run, Modern restored), Twig lint (255), release validation and `git diff --check`; browser, one at a time: `commerce-wallets.cjs` 230/0, bundles 9, promotions 9, billing profiles 10, financial documents 9, landing pages 13, legal pages 77, UI matrix 86, canonical 36, Bootstrap safety net 42.
+
+## Tables on phones — 2026/10/17 (released in v0.9.4)
+
+After v0.9.3 the owner said to continue. The roadmap's next item, the four tables that scrolled sideways on phones, is built and verified on `dev-v0.9-bootstrap6` and released in v0.9.4. The owner's sign-off is open ([review page](https://claude.ai/artifact/W1fQ41QsBidmMzetz2PDrU); `CHANGELOG.md` has the full entry).
+
+- **Core.**
+  - A table with an action column (`td.cell-actions`) uses automatic layout with every other cell at `max-width:0`, so the action column is never narrower than its control (UX rule 2.8).
+  - On a phone (UX rule 2.9, the owner's instruction):
+    - only the essential columns (`PHONE_HIDDEN_COLUMNS`, `wide: true`, `data-phone="hide"`);
+    - 7pt text;
+    - a tooltip with the whole row;
+    - one Actions menu for several actions (`action.row` `narrow_menu`).
+  - Row actions outside a table wrap. The Activity search field keeps room to type.
+- **Templates.** Eight action cells became `td.cell-actions`; Orders and the Resource Library declare column widths (the Resource Library's are estimated: it is empty in development).
+- **Gate.**
+  - `composer qa` from a cold cache: 1,158 tests (1,156 and the action column and phone table tests). Classic was the default certificate design for the run; Modern was restored.
+  - Twig lint (246), AssetMapper compilation (no compiled asset changed), Composer validation and `git diff --check`.
+  - Browser:
+    - section pages 576 views with 0 failures (the 8 known views are gone, and the new table checks pass);
+    - UI matrix 86, canonical 36, Bootstrap safety net 42;
+    - financial documents 9, billing profiles 10, promotions 9, bundles 8, Course Content tree 41.
+- **Found, not changed.** Form fields that stand out of their card on narrow screens (`CHANGELOG.md`).
 
 ## v0.9.3 handoff — 2026/10/17 (Bootstrap 6 underneath)
 

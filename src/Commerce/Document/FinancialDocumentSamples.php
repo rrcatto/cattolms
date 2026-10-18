@@ -107,7 +107,8 @@ final class FinancialDocumentSamples
         $refund['refund_line'] = ['price_minor' => 179000, 'discount_minor' => 17900, 'paid_minor' => 161100, 'quantity' => 1, 'promotion_code' => 'SPRING10'];
         $refund['total_minor'] = 161100;
         $refund['refund_basis'] = 'goodwill';
-        $refund['refund_reason'] = "The learner could not attend the practical assessment.\nCredited to Account Funds at their request.";
+        $refund['refund_reason'] = "The learner could not attend the practical assessment.\nCredited to the wallet at their request.";
+        $refund['refund_settlement'] = ['destination' => 'wallet', 'wallet_part_minor' => 0, 'deductions' => [], 'net_minor' => 161100];
         return [
             'row' => ['id' => 412, 'placed_at' => '2026-10-01T09:30:00+02:00', 'payment_due_at' => '2026-10-08T09:30:00+02:00'],
             'snapshot' => $snapshot,

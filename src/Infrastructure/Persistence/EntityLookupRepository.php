@@ -161,7 +161,7 @@ final class EntityLookupRepository
             'SELECT c.id, c.name AS label, c.domain AS detail
              FROM companies c
              WHERE (c.name ILIKE :term OR c.domain ILIKE :term)' . '' . '
-             ORDER BY c.is_system DESC, c.name, c.id
+             ORDER BY c.name, c.id
              LIMIT ' . self::MAX_RESULTS,
             ['term' => $term]
         ));

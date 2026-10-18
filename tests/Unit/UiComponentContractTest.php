@@ -186,7 +186,7 @@ final class UiComponentContractTest extends TestCase
         $tagBrowser = $templates['resources/views/ui/catalogue/tag-browser.html.twig'];
         self::assertStringNotContainsString('<details', $tagBrowser);
         self::assertStringNotContainsString('|slice', $tagBrowser, 'The server must emit the complete tag vocabulary.');
-        self::assertStringContainsString('data-tag-cloud-limit-value="80"', $tagBrowser);
+        self::assertStringContainsString('data-tag-cloud-limit-value="30"', $tagBrowser, 'The sphere animates the 30 most used tags; more overlap into an unreadable ball.');
     }
 
     public function testCoursePresentationNavigationComposesCanonicalActions(): void

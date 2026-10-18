@@ -83,11 +83,11 @@ final class CourseTagController extends BaseController
         return $this->render('course-tags', [
             'title' => $tag !== null ? 'Courses tagged ' . (string) $tag['name'] : 'Browse by tag',
             'page_kicker' => 'Every label in the catalogue',
-            'tag_index' => $this->weighted($this->courses->tagIndex()),
-            // The sphere animates a bounded subset of tags. All 378 spinning at once is a ball of
-            // overlapping words nobody can read or click; the full list stays beside it as the
-            // fallback, so nothing is hidden - only the animation is bounded.
-            'cloud_limit' => 80,
+            'tag_index' => self::weighted($this->courses->tagIndex()),
+            // The sphere animates the 30 most used tags. More spinning at once is a ball of
+            // overlapping words nobody can read or click; the full list stays beside it, so nothing
+            // is hidden - only the animation is bounded.
+            'cloud_limit' => 30,
             'selected_tag' => $tag ?? [],
             'showing_courses' => $showing,
             'courses' => $courses,
@@ -116,23 +116,25 @@ final class CourseTagController extends BaseController
     }
 
     /**
-     * The vocabulary, sized for a cloud.
+     * The vocabulary, sized for a cloud: the more courses a tag labels, the bigger it is, so the most
+     * used tags stand out at a glance (owner, 2026-10-18).
      *
-     * Five steps rather than a continuous scale: a cloud sized by raw proportion is unreadable the
-     * moment one tag runs away with the catalogue, and a reader cannot tell 14pt from 15pt anyway.
+     * Five steps on a logarithmic scale between the least and the most used tag. A linear scale put
+     * every tag in the smallest step as soon as one tag ran away with the catalogue; on a log scale a
+     * tag with 2 courses, one with 20 and one with 200 are three clearly different sizes. When every
+     * tag labels the same number of courses they are all the middle size.
      *
      * @param list<array<string,mixed>> $tags
      * @return list<array<string,mixed>>
      */
-    private function weighted(array $tags): array
+    public static function weighted(array $tags): array
     {
-        $largest = 0;
-        foreach ($tags as $tag) {
-            $largest = max($largest, (int) $tag['course_count']);
-        }
+        $counts = array_map(static fn(array $tag): int => max(1, (int) $tag['course_count']), $tags);
+        $low = $counts === [] ? 1 : min($counts);
+        $high = $counts === [] ? 1 : max($counts);
         foreach ($tags as &$tag) {
-            $count = (int) $tag['course_count'];
-            $tag['weight'] = $largest === 0 || $count === 0 ? 0 : (int) ceil($count / $largest * 5);
+            $count = max(1, (int) $tag['course_count']);
+            $tag['weight'] = $high === $low ? 3 : 1 + (int) round(4 * (log($count) - log($low)) / (log($high) - log($low)));
         }
         unset($tag);
 

@@ -1,0 +1,36 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_kicker = 'Transactions that need attention' %}{% set ph_title = item.title %}{% set ph_lead = item.summary %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'What happened', eyebrow: item.order_label, summary: item.open ? 'Still open.' : 'Resolved: it no longer appears on the dashboard.'}) }}
+            {{ ui('data.key-value-list', {items: [{label: 'Purchaser', value: item.person.name ~ (item.company_name ? ' for ' ~ item.company_name : '')}, {label: 'Email', value: item.person.email}, {label: 'Account reference', value: item.account_reference}]}) }}
+            <p><a href="/admin/commerce/orders/{{ item.order_id }}">Open order {{ item.order_label }}</a>{% if item.kind == 'refund_request' %} · <a href="/admin/commerce/refund-requests">Refund Requests</a>{% endif %}</p>
+            {% if item.ledger %}<h3 class="h5">Money ledger for this order</h3>
+            {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+                {% for row in item.ledger %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}{{ row.at|date('j M Y H:i') }} · {{ row.label }} · {{ row.amount }}{% if row.memo %} · {{ row.memo }}{% endif %}{% endblock %}{% endembed %}{% endfor %}
+            {% endblock %}{% endembed %}{% endif %}
+            {% if item.can_dismiss and can_act %}
+            <form action="/admin/commerce/attention/{{ item.kind }}/{{ item.reference }}/dismiss" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Note (optional)', for: 'dismiss-note', full_width: true})} %}{% block control %}<input id="dismiss-note" name="note" maxlength="2000" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as dealt with', variant: 'secondary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+            {% endif %}
+        {% endblock %}{% endembed %}
+        {% if can_act %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Email this person', eyebrow: 'To ' ~ item.person.email, summary: 'Change the text as you need. It is sent through the platform’s mail and kept with this item.'}) }}
+            <form action="/admin/commerce/attention/{{ item.kind }}/{{ item.reference }}/email" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subject', for: 'attention-subject', required: true, full_width: true})} %}{% block control %}<input id="attention-subject" name="subject" value="{{ item.subject }}" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Message', for: 'attention-body', required: true, full_width: true})} %}{% block control %}<textarea id="attention-body" name="body" rows="10" maxlength="10000" required {{ ui_field_attrs(props) }}>{{ item.body }}</textarea>{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send email', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+            </form>
+            {% if item.emails %}<h3 class="h5">Emails sent</h3>
+            {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+                {% for email in item.emails %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}{{ email.sent_at|date('j M Y H:i') }} · {{ email.sender }} to {{ email.recipient }} · <strong>{{ email.subject }}</strong>{% endblock %}{% endembed %}{% endfor %}
+            {% endblock %}{% endembed %}{% endif %}
+        {% endblock %}{% endembed %}
+        {% endif %}
+    </section>
+{% endblock %}

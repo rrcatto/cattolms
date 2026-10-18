@@ -51,6 +51,9 @@ final class PageStructureContractTest extends TestCase
         'admin-promotions' => 'Administration', 'admin-financial-documents' => 'Administration',
         'admin-control-centre' => 'Administration', 'account-control-centre' => 'Account',
         'company-control-centre' => 'Company', 'commerce-orders' => 'Account', 'library' => 'Account',
+        'admin-refund-requests' => 'Administration', 'admin-wallets' => 'Administration',
+        'admin-money-ledger' => 'Administration', 'admin-commerce-trail' => 'Administration', 'admin-payment-events' => 'Administration',
+        'commerce-wallet' => 'Account', 'company-wallet' => 'Company',
     ];
 
     private static function views(): string
@@ -161,11 +164,14 @@ final class PageStructureContractTest extends TestCase
     {
         self::assertSame('wide', ThemeRenderer::pageWidth('admin-section'));
         self::assertSame('wide', ThemeRenderer::pageWidth('commerce-orders'), 'My Orders is as wide as the other Account pages (owner, 2026-10-17).');
-        self::assertSame('medium', ThemeRenderer::pageWidth('help'));
-        self::assertSame('narrow', ThemeRenderer::pageWidth('login'));
+        // Every page is the standard width except Home and course landing pages (owner, 2026-10-18).
+        foreach (['help', 'about', 'contact', 'terms', 'refunds', 'privacy', 'commerce-cart', 'commerce-checkout', 'commerce-order', 'login', 'register', 'error', 'admin-course-form'] as $page) {
+            self::assertSame('wide', ThemeRenderer::pageWidth($page), $page . ' is the standard width.');
+        }
+        self::assertSame(['wide', 'full'], ThemeRenderer::PAGE_WIDTH_NAMES, 'There are no narrow or medium pages.');
         self::assertSame('full', ThemeRenderer::pageWidth('home'));
         self::assertSame('full', ThemeRenderer::pageWidth('landing-page'), 'Course landing pages run full width like Home (owner, 2026-10-17).');
-        self::assertSame('medium', ThemeRenderer::pageWidth('admin-section', ['page_width' => 'medium']));
+        self::assertSame('full', ThemeRenderer::pageWidth('admin-section', ['page_width' => 'full']));
         foreach (array_keys((new \ReflectionClassConstant(ThemeRenderer::class, 'PAGE_WIDTHS'))->getValue()) as $page) {
             self::assertFileExists(self::views() . '/pages/' . $page . '.html.twig', 'PAGE_WIDTHS names ' . $page . ', which is not a page.');
         }

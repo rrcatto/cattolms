@@ -2,6 +2,7 @@
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Your learning at a glance', eyebrow: 'Dashboard', summary: 'Learning progress, course history and account statistics.'}) }}
+		<p>Your account reference: <strong>{{ account_reference_label }}</strong>. Quote it as the reference when you pay by EFT.</p>
 		{# The figures sit in the card they summarise. #}
 		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
 		{% block body %}
@@ -16,6 +17,21 @@
 
 {% endblock %}
 {% endembed %}
+	{% if account_current_courses|default([]) %}
+	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
+	{% block body %}
+		{% for course in account_current_courses %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+		{% block surface_body %}
+			{{ ui('layout.section-head', {heading: course.title, eyebrow: 'Your course', heading_level: 3}) }}
+			{% for line in course.timing.lines %}<p>{{ line }}</p>{% endfor %}
+			<p>{{ ui('action.link', {label: course.timing.state == 'not_started' ? 'Review and start' : 'Open course', variant: 'primary', size: 'small', href: '/learn/' ~ course.slug}) }}</p>
+		{% endblock %}
+		{% endembed %}
+		{% endfor %}
+	{% endblock %}
+	{% endembed %}
+	{% endif %}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
@@ -28,8 +44,8 @@
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 50, label: 'Course'}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Grade'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Certificate'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Grade', wide: true}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Certificate', wide: true}} %}
 					</tr>
 
 {% endblock %}

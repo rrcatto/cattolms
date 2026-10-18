@@ -584,11 +584,11 @@ final class CompanyController extends BaseController
         return $this->handle(function () use ($user): void {
             $companyId = (int) ($_POST['company_id'] ?? 0);
             if ($companyId === 0) {
-                // Back to the default rather than to a synthetic "all companies" context, which
-                // no mutation could ever act on.
+                // There is no default company to return to (owner, 2026-10-18): forget the choice
+                // and choose again, never a synthetic "all companies" context no mutation could act on.
                 $this->companyContext->clear();
-                $this->flash('success', 'Returned to the default company.');
-                $this->redirect('/company');
+                $this->flash('info', 'Choose the company you want to administer.');
+                $this->redirect('/company/picker');
             }
 
             $company = $this->companyContext->select($user, $companyId);

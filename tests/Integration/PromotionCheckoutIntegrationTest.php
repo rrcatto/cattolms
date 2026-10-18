@@ -18,7 +18,7 @@ use CattoLearning\Commerce\Domain\{PaymentResult,PromotionRejected};
 use CattoLearning\Commerce\Http\{CommerceController,PaymentAdministrationController};
 use CattoLearning\Commerce\Infrastructure\{CommerceRepository,PromotionRepository};
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,AuditRepository,Database,TransactionManager};
@@ -205,24 +205,24 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $this->promotions->apply($buyer, $code);
         $cart = $this->orders->cart($buyer);
         $this->clock->modify('+10 minutes');
-        $this->expectRejected('That promo code has expired.', fn() => $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true), 'Valid when the review was shown is not enough.');
+        $this->expectRejected('That promo code has expired.', fn() => $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true), 'Valid when the review was shown is not enough.');
         self::assertSame(0, $this->orderCount($buyer));
 
         $this->db->executeStatement('UPDATE promotions SET ends_at=NULL WHERE id=:id', ['id' => $id]);
         $this->db->executeStatement("UPDATE promotions SET course_scope='selected' WHERE id=:id", ['id' => $id]);
         $this->db->executeStatement('INSERT INTO promotion_courses(promotion_id,course_id) VALUES (:p,:c)', ['p' => $id, 'c' => $this->fixture->createCourse($this->owner, $this->provider, 'promo-other-' . $this->fixture->suffix(), 'Other course', 'published')]);
-        $this->expectRejected('That promo code does not apply to anything in your cart.', fn() => $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true), 'The cart\'s courses left the promotion.');
+        $this->expectRejected('That promo code does not apply to anything in your cart.', fn() => $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true), 'The cart\'s courses left the promotion.');
 
         $this->db->executeStatement("UPDATE promotions SET course_scope='all', maximum_total_uses=1 WHERE id=:id", ['id' => $id]);
         $other = $this->buyer();
         $this->fill($other, $this->variantA);
         $this->promotions->apply($other, $code);
         $this->placeDirect($other);
-        $this->expectRejected('That promo code has reached its usage limit.', fn() => $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true), 'Another customer took the last use meanwhile.');
+        $this->expectRejected('That promo code has reached its usage limit.', fn() => $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true), 'Another customer took the last use meanwhile.');
 
         $this->db->executeStatement('UPDATE promotions SET maximum_total_uses=NULL, discount_value=1500 WHERE id=:id', ['id' => $id]);
         try {
-            $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+            $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
             self::fail('A changed discount must be reviewed before ordering.');
         } catch (\RuntimeException $changed) {
             self::assertNotInstanceOf(PromotionRejected::class, $changed);
@@ -242,7 +242,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $cart = $this->orders->cart($buyer);
         $this->db->executeStatement('UPDATE promotions SET active=false WHERE id=:id', ['id' => $id]);
 
-        $page = InProcessPage::run($buyer, CommerceController::class, 'place', [], ['csrf' => $_SESSION['csrf'], 'cart_id' => (string) $cart['id'], 'quote' => (string) $cart['quote'], 'accept_terms' => 'yes']);
+        $page = InProcessPage::run($buyer, CommerceController::class, 'place', [], ['csrf' => $_SESSION['csrf'], 'cart_id' => (string) $cart['id'], 'quote' => (string) $cart['quote'], 'accept_terms' => 'yes', 'accept_start' => 'yes']);
         self::assertSame('/checkout/review', $page['location']);
         self::assertSame(['type' => 'warning', 'message' => 'Promo code ' . $code . ' was removed from your order. That promo code is not currently available. Check your new total before placing your order.'], end($_SESSION['flash']));
         self::assertNull($this->cartPromotion($buyer));
@@ -270,7 +270,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         }
         foreach (['action="/checkout/promo/remove"', 'action="/checkout/promo"', 'name="promo_code"'] as $markup) self::assertStringContainsString($markup, $review['body']);
         $cart = $this->orders->cart($buyer);
-        $placed = InProcessPage::run($buyer, CommerceController::class, 'place', [], ['csrf' => $_SESSION['csrf'], 'cart_id' => (string) $cart['id'], 'quote' => (string) $cart['quote'], 'accept_terms' => 'yes'] + $forged);
+        $placed = InProcessPage::run($buyer, CommerceController::class, 'place', [], ['csrf' => $_SESSION['csrf'], 'cart_id' => (string) $cart['id'], 'quote' => (string) $cart['quote'], 'accept_terms' => 'yes', 'accept_start' => 'yes'] + $forged);
         $order = $this->records->order((int) substr((string) $placed['location'], strlen('/account/orders/')));
         self::assertSame([15610, 1735], [(int) $order['total_minor'], (int) $order['discount_minor']], 'The order carries the server\'s figures, not the forged ones.');
     }
@@ -284,7 +284,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $id = PromotionFixture::create($this->db, $this->owner, ['code' => $code, 'name' => 'Spring offer']);
         $this->promotions->apply($buyer, $code);
         $cart = $this->orders->cart($buyer);
-        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         $order = $this->records->order($orderId);
         self::assertSame('fulfilled', $order['state']);
         $snapshot = CommerceRepository::decode((string) $order['snapshot']);
@@ -323,7 +323,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         PromotionFixture::create($this->db, $this->owner, ['code' => $code]);
         $this->promotions->apply($buyer, $code);
         $cart = $this->orders->cart($buyer);
-        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         $items = [];
         foreach ($this->records->items($orderId) as $item) $items[(int) $item['course_id']] = $item;
         // 1735 over 12345 and 5000: shares 1234.79… and 500.20…; the left-over cent goes to the larger remainder.
@@ -336,13 +336,13 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $itemB = (int) $items[$this->courseB]['id'];
         foreach ([12345, 11111] as $tooMuch) {
             try {
-                $refunds->approve($admin, $orderId, $itemA, Uuid::v4(), 'voluntary', 'Customer request', 1, $tooMuch);
+                $refunds->approve($admin, $orderId, $itemA, Uuid::v4(), 'voluntary', 'Customer request', 1, $tooMuch, 'The course started on payment; refund mechanics under test.');
                 self::fail('A refund above what was paid for the line must be refused.');
             } catch (\RuntimeException $refused) {
                 self::assertSame('The refund exceeds this item’s unrefunded paid amount.', $refused->getMessage());
             }
         }
-        $refundA = $refunds->approve($admin, $orderId, $itemA, Uuid::v4(), 'voluntary', 'Customer request', 1, 11110);
+        $refundA = $refunds->approve($admin, $orderId, $itemA, Uuid::v4(), 'voluntary', 'Customer request', 1, 11110, 'The course started on payment; refund mechanics under test.');
         self::assertSame('partially_refunded', $this->records->order($orderId)['state']);
         self::assertSame('revoked', (string) $this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:id', ['id' => $itemA]), 'Refunding everything paid for the line is a full refund.');
         $note = $this->db->fetchAssociative("SELECT * FROM commerce_documents WHERE order_id=:o AND kind='credit_note' AND source_key=:k", ['o' => $orderId, 'k' => 'refund:' . $refundA]) ?: [];
@@ -355,14 +355,14 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         // The line as it was paid: its price, its share of the promotion, what was paid and what this refund credits.
         foreach ([$this->rand(12345), '−' . $this->rand(1235), $this->rand(11110), 'Discount from promotion ' . $code] as $shown) self::assertStringContainsString(htmlspecialchars($shown, ENT_QUOTES), $noteHtml, $shown);
 
-        $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 4000);
+        $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 4000, 'The course started on payment; refund mechanics under test.');
         try {
-            $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 501);
+            $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 501, 'The course started on payment; refund mechanics under test.');
             self::fail('Only R5.00 of what was paid for course B is left to refund.');
         } catch (\RuntimeException $refused) {
             self::assertSame('The refund exceeds this item’s unrefunded paid amount.', $refused->getMessage());
         }
-        $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 500);
+        $refunds->approve($admin, $orderId, $itemB, Uuid::v4(), 'voluntary', 'Customer request', 1, 500, 'The course started on payment; refund mechanics under test.');
         self::assertSame([15610, 15610, 'refunded'], [$this->records->refundedAmount($orderId), (int) $this->records->order($orderId)['total_minor'], $this->records->order($orderId)['state']], 'Everything paid, and no more, was refunded.');
         self::assertSame(15610, (int) $this->db->fetchOne("SELECT COALESCE(SUM((snapshot->>'total_minor')::bigint),0) FROM commerce_documents WHERE order_id=:o AND kind='credit_note'", ['o' => $orderId]), 'The credit notes add up to what was paid.');
     }
@@ -379,7 +379,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         self::assertSame(['total' => 0, 'customer' => 0], $repository->usage($id, $buyer->id), 'Typing a code and viewing checkout holds nothing: an abandoned checkout uses nothing.');
 
         $cart = $this->orders->cart($buyer);
-        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         self::assertSame('awaiting_payment', $this->records->order($orderId)['state'], 'The simulated card was declined.');
         self::assertSame(['total' => 1, 'customer' => 1], $repository->usage($id, $buyer->id), 'The unpaid order holds a use against the limits');
         self::assertSame(['redeemed' => 0, 'pending' => 1, 'discount_minor' => 0], $repository->usageSummary($id), 'but a failed payment redeems nothing.');
@@ -414,7 +414,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $this->promotions->apply($buyer, $code);
         self::assertSame(0, $this->summary($buyer)['total_minor']);
         $cart = $this->orders->cart($buyer);
-        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         $order = $this->records->order($orderId);
         self::assertSame(['fulfilled', 0, 17345], [$order['state'], (int) $order['total_minor'], (int) $order['discount_minor']]);
         self::assertSame([], $this->records->payments($orderId), 'Nothing was charged.');
@@ -423,7 +423,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         self::assertSame(['invoice'], array_column($this->records->documents($orderId), 'kind'), 'An invoice for nothing; no receipt, because nothing was received.');
         self::assertStringContainsString(htmlspecialchars($this->rand(0), ENT_QUOTES), $this->documentsHtml($orderId)['invoice']);
         try {
-            $this->refunds()->approve($this->admin(), $orderId, (int) $this->records->items($orderId)[0]['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 1);
+            $this->refunds()->approve($this->admin(), $orderId, (int) $this->records->items($orderId)[0]['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 1, 'The course started on payment; refund mechanics under test.');
             self::fail('A line nothing was paid for cannot be refunded.');
         } catch (\RuntimeException $refused) {
             self::assertSame('The refund exceeds this item’s unrefunded paid amount.', $refused->getMessage());
@@ -508,11 +508,11 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $promotions = PromotionFixture::service($db, $this->clock);
         // Documents are issued through this connection's repository, inside its transaction.
         $documents = new FinancialDocuments($records, $container->get(FinancialDocumentDataBuilder::class), $container->get(DocumentTemplateRenderer::class), $container->get(DocumentPdfRenderer::class));
-        $orders = new OrderService($records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $promotions, $documents);
+        $orders = new OrderService($records, $tx, WalletFixture::settings($db), $transitions, $this->clock, $promotions, $documents, WalletFixture::wallets($db, $this->clock));
         $access = new AccessService($records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $fulfilment = new FulfilmentService($records, $transitions, $access, $tx, $orders, $this->clock, $companyCredits, new AnalyticsEventRecorder(new AnalyticsEventRepository($db), $this->clock), $promotions);
-        $payments = new PaymentService($records, $tx, $orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $fulfilment, $transitions, $this->clock, $documents);
+        $payments = new PaymentService($records, $tx, $orders, new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'), $this->clock), $fulfilment, $transitions, $this->clock, $documents, WalletFixture::wallets($db, $this->clock), WalletFixture::settings($db));
         return [$records, $orders, $fulfilment, $payments, $promotions];
     }
 
@@ -576,7 +576,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
     private function refunds(): RefundAdministrationService
     {
         return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock,
-            new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+            new AnalyticsEventRecorder(new AnalyticsEventRepository($this->db), $this->clock),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
     }
 
     private function administration(): PromotionAdministrationService

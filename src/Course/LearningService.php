@@ -148,6 +148,8 @@ final class LearningService
     private function decorateLibrary(array $items): array
     {
         foreach ($items as &$item) {
+            // What the course card says about its timing (owner, 2026-10-17).
+            $item['timing'] = CourseTiming::of($item, new \DateTimeImmutable());
             $assessmentCount = max(0, (int) ($item['assessment_count'] ?? 0));
             $assessed = max(0, (int) ($item['submitted_assessment_count'] ?? 0));
             $item['progress_percentage'] = $assessmentCount > 0 ? min(100, (int) round($assessed / $assessmentCount * 100)) : 0;
@@ -185,6 +187,7 @@ final class LearningService
         $course['structure'] = $this->courseItems->availability((int) $course['id'], empty($enrolment['started_at']) ? null : (string) $enrolment['started_at'], false);
         $course['progress'] = $this->courseItemRecords->assessmentProgress((int) $enrolment['id'], (int) $course['id']);
         $course['is_preview'] = $preview;
+        $course['access_period_label'] = $this->durationLabel((int) ($enrolment['access_period_seconds'] ?? 0));
         $course['remaining_access_label'] = empty($enrolment['expires_at']) ? '' : CourseItemService::duration((int) ceil(max(0, (strtotime((string) $enrolment['expires_at']) ?: time()) - time()) / 60));
         $certificate = $this->certificates->forEnrolment((int) $enrolment['id']);
         $course['certificate'] = $certificate !== null && $certificate['revoked_at'] === null ? $certificate : null;

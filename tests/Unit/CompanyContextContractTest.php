@@ -187,7 +187,7 @@ final class CompanyContextContractTest extends TestCase
                 'picker_pagination' => null,
                 'picker_companies' => [[
                     'id' => 7, 'name' => 'Table Bay Logistics', 'domain' => 'tablebay.test',
-                    'status' => 'active', 'status_label' => 'Active', 'is_system' => false,
+                    'status' => 'active', 'status_label' => 'Active',
                 ]],
             ],
         ];

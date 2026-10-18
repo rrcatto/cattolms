@@ -6,6 +6,7 @@
 {{ ui('feedback.badge', {label: (company.domain), tone: 'info'}) }}
 {% endblock %}
 {% endembed %}
+		{% if company.account_reference|default('') %}<p>Company account reference: <strong>{{ company.account_reference|account_reference }}</strong>. Quote it when the company pays by EFT or writes to us.</p>{% endif %}
 		{# The figures sit in the card they summarise. #}
 		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
 		{% block body %}
@@ -34,9 +35,9 @@
 
 					<tr>
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Company'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Domain'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 24, label: 'Domain', wide: true}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'People'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Courses', wide: true}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Enrolments'}} %}
 					</tr>
 

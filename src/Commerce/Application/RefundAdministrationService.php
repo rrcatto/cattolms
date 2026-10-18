@@ -11,36 +11,51 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\RefundRule;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
+use CattoLearning\Commerce\Settings\CommerceSettings;
+use CattoLearning\Commerce\Wallet\LedgerKind;
+use CattoLearning\Commerce\Wallet\WalletOwner;
+use CattoLearning\Commerce\Wallet\WalletService;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
+use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use DateTimeImmutable;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
 
 /**
- * Explicit ADMIN refund decisions; credited value enters the purchaser's append-only Account Funds ledger.
+ * Explicit ADMIN refund decisions (owner, 2026-10-17).
  *
  * A line can return at most what was paid for it: its price less its share of the order's promotion
- * discount (commerce_order_items.discount_minor, allocated at placement). The undiscounted catalogue
- * price is never the basis of a refund.
+ * discount. Of that, the share the order paid from the wallet (the line's wallet_minor) always goes back
+ * to the wallet credit it came from, keeping that credit's expiry. The rest was paid by card (Stitch) or
+ * EFT and goes where the purchaser chose: wallet credit, or money back paid outside the LMS (a company
+ * is always refunded as wallet credit). The owner's deductions apply to that rest:
+ * - card, money back: the line's share of the Stitch transaction fee and Stitch's refund fee;
+ * - card, wallet credit: the line's share of the Stitch transaction fee;
+ * - EFT, money back: the EFT refund fee for the amount;
+ * - EFT, wallet credit: nothing.
+ * Each part is its own ledger row, and the refund records the wallet part, the deductions and the net.
+ * A money-back refund is due within 7 days of the request; ADMIN records its reference when it is paid.
  *
  * Refunding all that was paid for a line revokes the entitlement sources that line created and
- * nothing else; each course's access is then worked out again from its remaining sources, so a course
- * another purchase, bundle, ADMIN assignment, company credit or free access still covers stays open.
- * A bundle line is refunded as the product that was bought, never course by course.
+ * nothing else. A bundle line is refunded as the product that was bought, never course by course.
  *
- * The Refund Policy's rule (RefundRule) is enforced here: a refund is refused once the learner has
- * started the course (any course, for a bundle) or seven days have passed since the purchase, and a
- * company credit refund once seven days have passed since the credits were bought. ADMIN may
- * approve a refused refund with a written override reason; what the rule refused and that reason
- * are recorded with the refund, which is append-only.
+ * The Refund Policy's rule (RefundRule) is enforced here: a started course is not refunded, and every
+ * course starts on payment; an unstarted course and company credits only within the refund window.
+ * A refund asked for in the LMS is judged by the rule as it stood when it was asked. ADMIN may approve a
+ * refused refund with a written override reason, recorded with the refund and shown on the ADMIN order
+ * page only.
  */
 final class RefundAdministrationService
 {
+    /** A money-back refund is paid within this many days of the request (Refund Policy). */
+    public const PAYOUT_DAYS = 7;
+
     public function __construct(private readonly CommerceRepository $records, private readonly TransactionManager $transactions,
         private readonly TransitionService $transitions, private readonly ClockInterface $clock, private readonly AnalyticsEventRecorder $analytics,
-        private readonly AccessService $access, private readonly FinancialDocuments $documents) {}
+        private readonly AccessService $access, private readonly FinancialDocuments $documents, private readonly WalletService $wallets,
+        private readonly CommerceSettings $settings) {}
 
     /**
      * Why the Refund Policy refuses a refund of this order line now; empty when the rule allows it.
@@ -64,22 +79,73 @@ final class RefundAdministrationService
                 $started[]=['title'=>(string)($titles[$course['course_id']] ?? $snapshot['course_title'] ?? 'a course'),'started_at'=>$course['started_at']];
             }
         }
-        return RefundRule::refusals($purchasedAt,$this->clock->now(),$started,$item['product_type']==='bundle',$company);
+        return RefundRule::refusals($purchasedAt,$this->clock->now(),$this->settings->refundWindow(),$started,$item['product_type']==='bundle',$company);
+    }
+
+    /**
+     * Works out a refund without recording it: the wallet part, the rest and how it was paid, the
+     * deductions and the net, for the refund form and for approve().
+     *
+     * @param array<string,mixed> $order
+     * @param array<string,mixed> $item
+     * @return array{gross:int,wallet_part:int,external:int,method:string,deductions:list<array{kind:string,label:string,amount_minor:int}>,net:int}
+     */
+    public function quote(array $order, array $item, int $grossMinor, string $destination): array
+    {
+        $paid=self::paidAmount($item);
+        if ($order['company_id']!==null) $destination='wallet';
+        $snapshot=CommerceRepository::decode((string)$item['snapshot']);
+        $walletLine=(int)($snapshot['wallet_minor'] ?? 0);
+        $refunded=$this->records->refundedAmount((int)$order['id'],(int)$item['id']);
+        $walletRefunded=$this->records->refundedWalletPart((int)$order['id'],(int)$item['id']);
+        $walletLeft=max(0,$walletLine-$walletRefunded);
+        $externalLeft=max(0,($paid-$walletLine)-($refunded-$walletRefunded));
+        $gross=min($grossMinor,$walletLeft+$externalLeft);
+        $walletPart=$walletLeft+$externalLeft===0 ? 0 : min($walletLeft,(int)round($gross*$walletLeft/($walletLeft+$externalLeft)));
+        $external=$gross-$walletPart;
+        $method=$this->externalMethod((int)$order['id']);
+        $deductions=[];
+        if ($external>0 && $method==='stitch') {
+            $fee=$this->transactionFeeShare((int)$order['id'],$external);
+            if ($fee>0) $deductions[]=['kind'=>'stitch_transaction_fee','label'=>'Stitch transaction fee on this payment','amount_minor'=>$fee];
+            if ($destination==='money_back') {
+                $refundFee=$this->settings->stitchRefundFee()->on($external);
+                if ($refundFee>0) $deductions[]=['kind'=>'stitch_refund_fee','label'=>'Stitch refund fee','amount_minor'=>$refundFee];
+            }
+        }
+        if ($external>0 && $method==='eft' && $destination==='money_back') {
+            $fee=$this->settings->eftRefundFee()->feeFor($external);
+            if ($fee>0) $deductions[]=['kind'=>'eft_refund_fee','label'=>'EFT refund fee','amount_minor'=>$fee];
+        }
+        // Deductions never take more than the refunded money: each takes what the ones before it left.
+        $taken=0; $kept=[];
+        foreach ($deductions as $deduction) {
+            $amount=min($deduction['amount_minor'],$external-$taken);
+            if ($amount<=0) continue;
+            $deduction['amount_minor']=$amount;
+            $taken+=$amount;
+            $kept[]=$deduction;
+        }
+        $deductions=$kept;
+        return ['gross'=>$gross,'wallet_part'=>$walletPart,'external'=>$external,'method'=>$external>0?$method:'none','deductions'=>$deductions,'net'=>$external-$taken];
     }
 
     /**
      * $overrideReason is ADMIN's written reason for approving a refund the Refund Policy refuses. It
      * is required then, and ignored (nothing is recorded as an override) when the rule allows the refund.
+     * $destination is wallet or money_back; a company refund is always wallet credit. $requestId names
+     * the refund request being approved, whose rule verdict at request time is the one applied.
      */
-    public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor, string $overrideReason = ''): int
+    public function approve(CurrentUser $actor, int $orderId, int $itemId, string $requestKey, string $basis, string $reason, int $quantity, int $amountMinor, string $overrideReason = '', string $destination = 'wallet', ?int $requestId = null): int
     {
         OrderService::requireCapability($actor,'PLATFORM.REFUND.MANAGE');
         if (!Uuid::isValid($requestKey)) throw new RuntimeException('Invalid refund identifier.');
         if (!in_array($basis,['statutory','service_failure','goodwill','voluntary'],true)) throw new RuntimeException('Select a refund basis.');
+        if (!in_array($destination,['wallet','money_back'],true)) throw new RuntimeException('Choose where the refund goes: wallet credit or money back.');
         $reason=trim($reason);
         if (mb_strlen($reason)<5 || mb_strlen($reason)>2000) throw new RuntimeException('Record the refund decision and its reason.');
         $overrideReason=trim($overrideReason);
-        return $this->transactions->run(function () use ($actor,$orderId,$itemId,$requestKey,$basis,$reason,$quantity,$amountMinor,$overrideReason): int {
+        return $this->transactions->run(function () use ($actor,$orderId,$itemId,$requestKey,$basis,$reason,$quantity,$amountMinor,$overrideReason,$destination,$requestId): int {
             $order=$this->records->order($orderId);
             $this->records->lockPurchaser((int)$order['purchaser_user_id']);
             $order=$this->records->order($orderId,true);
@@ -91,14 +157,18 @@ final class RefundAdministrationService
             if (!in_array($order['state'],['fulfilled','paid','manual_review','partially_refunded'],true)) throw new RuntimeException('Only a settled order can be refunded.');
             if ($this->records->paidTotal($orderId)<(int)$order['total_minor']) throw new RuntimeException('The order has not been fully paid.');
             $item=$this->records->orderItem($itemId,$orderId);
-            $now=$this->clock->now()->format(DATE_ATOM);
-            $refusals=$this->ruleRefusals($order,$item);
+            $now=$this->clock->now();
+            $request=$requestId===null ? null : $this->records->refundRequest($requestId);
+            if ($request!==null && ((int)$request['order_item_id']!==$itemId || $request['status']!=='requested')) throw new RuntimeException('This refund request is not open for this order line.');
+            $refusals=$request!==null ? ((string)$request['rule_refusals']==='' ? [] : [(string)$request['rule_refusals']]) : $this->ruleRefusals($order,$item);
             if ($refusals!==[]) {
                 if ($overrideReason==='') throw new RuntimeException('The Refund Policy does not allow this refund. '.implode(' ',$refusals).' To approve it anyway, record an override reason.');
                 if (mb_strlen($overrideReason)<5 || mb_strlen($overrideReason)>2000) throw new RuntimeException('Record why the Refund Policy is overridden, in 5 to 2,000 characters.');
             }
             $policyRefusal=$refusals===[] ? null : implode(' ',$refusals);
-            if ($order['company_id']!==null) {
+            $company=$order['company_id']!==null;
+            if ($company) {
+                $destination='wallet';
                 if ($quantity<1 || $amountMinor!==0) throw new RuntimeException('Enter an unused credit quantity; its refund value is calculated from the historical order.');
                 $unit=intdiv((int)$item['amount_minor'],(int)$item['quantity']);
                 if ($unit*(int)$item['quantity']!==(int)$item['amount_minor']) throw new RuntimeException('Historical credit price is not divisible by quantity.');
@@ -118,8 +188,12 @@ final class RefundAdministrationService
                 $remaining=self::paidAmount($item)-$this->records->refundedAmount($orderId,$itemId);
                 if ($amountMinor>$remaining) throw new RuntimeException('The refund exceeds this item’s unrefunded paid amount.');
             }
-            $id=$this->records->createRefund($requestKey,$orderId,$itemId,$quantity,$amountMinor,(string)$order['currency'],$basis,$reason,$actor->id,$now,$policyRefusal,$policyRefusal===null ? null : $overrideReason);
-            $this->records->creditRefundFunds($id,$order['company_id']===null?(int)$order['purchaser_user_id']:null,$order['company_id']===null?null:(int)$order['company_id'],(string)$order['currency'],$amountMinor,$now);
+            $quote=$this->quote($order,$item,$amountMinor,$destination);
+            $requestedAt=$request!==null ? new DateTimeImmutable((string)$request['requested_at']) : $now;
+            $id=$this->records->createRefund($requestKey,$orderId,$itemId,$quantity,$amountMinor,(string)$order['currency'],$basis,$reason,$actor->id,$now->format(DATE_ATOM),$policyRefusal,$policyRefusal===null ? null : $overrideReason,
+                ['request_id'=>$requestId,'destination'=>$destination,'method'=>$quote['method'],'wallet_part_minor'=>$quote['wallet_part'],'deductions'=>$quote['deductions'],'net_minor'=>$quote['net'],
+                    'payout_due_at'=>$destination==='money_back' && $quote['net']>0 ? $requestedAt->modify('+'.self::PAYOUT_DAYS.' days')->format(DATE_ATOM) : null]);
+            $this->recordLedger($order,$item,$id,$quote,$destination);
             $itemSnapshot=CommerceRepository::decode((string)$item['snapshot']);
             $snapshot=CommerceRepository::decode((string)$order['snapshot']);
             $bundle=$item['product_type']==='bundle';
@@ -133,22 +207,117 @@ final class RefundAdministrationService
             $snapshot['refund_id']=$id;
             $snapshot['refund_basis']=$basis;
             $snapshot['refund_reason']=$reason;
-            $this->documents->issueCreditNote($orderId,$id,$snapshot,$now,$actor->id);
+            $snapshot['refund_settlement']=['destination'=>$destination,'wallet_part_minor'=>$quote['wallet_part'],'deductions'=>$quote['deductions'],'net_minor'=>$quote['net']];
+            $this->documents->issueCreditNote($orderId,$id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $fullyRefunded=$this->records->refundedAmount($orderId,$itemId)>=self::paidAmount($item);
             $access=['revoked'=>0,'kept'=>0];
-            if ($order['company_id']===null && $fullyRefunded) {
+            if (!$company && $fullyRefunded) {
                 $sources=$this->records->sourcesForItem($itemId);
                 $open=$this->access->revoke($sources,'refund:'.$id);
                 $access=['revoked'=>count($sources),'kept'=>count(array_filter($open))];
             }
+            if ($request!==null) $this->records->decideRefundRequest((int)$request['id'],'approved',$actor->id,$now->format(DATE_ATOM),$reason);
             if ($bundle) $this->recordBundleRefund($order,$item,$id,$amountMinor,$fullyRefunded,$access);
             else $this->recordRefund($order,$item,$id,$quantity,$amountMinor,$fullyRefunded);
             $total=$this->records->refundedAmount($orderId);
             $transition=$total>=(int)$order['total_minor']?'mark_refunded':'mark_partially_refunded';
             $this->records->setOrderState($orderId,$this->transitions->apply('order',(string)$order['state'],$transition));
-            $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason]+($policyRefusal===null?[]:['policy_refusal'=>$policyRefusal,'override_reason'=>$overrideReason])+($bundle?['bundle_access'=>$access]:[]),$now);
+            $this->records->audit($orderId,$actor->id,'refund.approved',['refund_id'=>$id,'order_item_id'=>$itemId,'quantity'=>$quantity,'amount_minor'=>$amountMinor,'basis'=>$basis,'reason'=>$reason,'destination'=>$destination,'net_minor'=>$quote['net']]+($policyRefusal===null?[]:['policy_refusal'=>$policyRefusal,'override_reason'=>$overrideReason])+($bundle?['bundle_access'=>$access]:[]),$now->format(DATE_ATOM));
             return $id;
         });
+    }
+
+    /**
+     * Records that a money-back refund was paid outside the LMS, through the Stitch dashboard or by
+     * EFT, with its reference: the ledger's refund_paid row (and Stitch's charge to the business for a
+     * card refund).
+     */
+    public function recordPayout(CurrentUser $actor, int $refundId, string $paidAt, string $reference): void
+    {
+        OrderService::requireCapability($actor,'PLATFORM.REFUND.MANAGE');
+        $reference=trim($reference);
+        if (mb_strlen($reference)<3 || mb_strlen($reference)>200) throw new RuntimeException('Enter the Stitch or bank reference of the refund payment.');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$paidAt)) throw new RuntimeException('Enter the date the refund was paid.');
+        $paid=new DateTimeImmutable($paidAt.' 12:00:00');
+        if ($paid>$this->clock->now()->modify('+1 day')) throw new RuntimeException('The payment date cannot be in the future.');
+        $this->transactions->run(function () use ($actor,$refundId,$paid,$reference): void {
+            $refund=$this->records->refund($refundId) ?? throw new RuntimeException('Refund not found.');
+            $order=$this->records->order((int)$refund['order_id']);
+            $this->records->lockPurchaser((int)$order['purchaser_user_id']);
+            $refund=$this->records->refund($refundId) ?? throw new RuntimeException('Refund not found.');
+            if ($refund['destination']!=='money_back' || (int)$refund['net_minor']<=0) throw new RuntimeException('This refund went to the wallet; there is nothing to pay out.');
+            if ($refund['paid_at']!==null) throw new RuntimeException('This refund is already recorded as paid.');
+            $method=(string)$refund['method']==='stitch' ? 'stitch' : 'eft';
+            $now=$this->clock->now()->format(DATE_ATOM);
+            $this->records->recordRefundPayout($refundId,$method,(int)$refund['net_minor'],$paid->format(DATE_ATOM),$reference,$actor->id,$now);
+            $owner=WalletOwner::forOrder($order);
+            $refs=['order_id'=>(int)$order['id'],'order_item_id'=>(int)$refund['order_item_id'],'refund_id'=>$refundId,'external_reference'=>$reference,'actor_user_id'=>$actor->id];
+            $this->wallets->record('refund_paid',$owner,(int)$refund['net_minor'],(string)$refund['currency'],$method,$refs,$paid->format(DATE_ATOM));
+            foreach (CommerceRepository::decode((string)$refund['deductions']) as $deduction) {
+                if (($deduction['kind'] ?? '')==='stitch_refund_fee') $this->wallets->record('processor_refund_fee',null,(int)$deduction['amount_minor'],(string)$refund['currency'],'stitch',$refs+['memo'=>'Stitch refund fee'],$paid->format(DATE_ATOM));
+            }
+            $this->records->audit((int)$order['id'],$actor->id,'refund.paid_out',['refund_id'=>$refundId,'method'=>$method,'reference'=>$reference],$now);
+        });
+    }
+
+    /**
+     * How to pay a money-back refund, for ADMIN: through the Stitch dashboard for a card payment, or
+     * by EFT for an EFT payment.
+     *
+     * @param array<string,mixed> $refund a commerce_refunds row
+     */
+    public static function payoutInstruction(array $refund): string
+    {
+        $amount=Money::strictMinorUnits((int)$refund['net_minor'],(string)$refund['currency'])->format();
+        return (string)$refund['method']==='stitch'
+            ? 'Refund '.$amount.' through the Stitch dashboard to the card that paid for this order, then record the Stitch refund reference here.'
+            : 'Pay '.$amount.' by EFT to the bank account the purchaser gives you, then record the bank reference here.';
+    }
+
+    /**
+     * The ledger rows for one refund: the wallet part back to the credit it came from, the rest as new
+     * wallet credit or as money owed, and each deduction.
+     *
+     * @param array<string,mixed> $order
+     * @param array<string,mixed> $item
+     * @param array{gross:int,wallet_part:int,external:int,method:string,deductions:list<array{kind:string,label:string,amount_minor:int}>,net:int} $quote
+     */
+    private function recordLedger(array $order, array $item, int $refundId, array $quote, string $destination): void
+    {
+        $owner=WalletOwner::forOrder($order);
+        $currency=(string)$order['currency'];
+        $refs=['order_id'=>(int)$order['id'],'order_item_id'=>(int)$item['id'],'refund_id'=>$refundId];
+        if ($quote['wallet_part']>0) $this->wallets->returnOrderPayment($owner,(int)$order['id'],$currency,'refund_to_wallet',$quote['wallet_part'],$refs);
+        if ($quote['net']>0) {
+            if ($destination==='wallet') $this->wallets->credit($owner,'refund_to_wallet',$quote['net'],$currency,$quote['method'],$refs);
+            else $this->wallets->record('refund_owed',$owner,$quote['net'],$currency,$quote['method'],$refs);
+        }
+        foreach ($quote['deductions'] as $deduction) {
+            $this->wallets->record('refund_deduction',$owner,$deduction['amount_minor'],$currency,$quote['method'],$refs+['memo'=>$deduction['label']]);
+        }
+    }
+
+    /** stitch when the order's money (beyond the wallet) came by card, eft when it came by EFT. */
+    private function externalMethod(int $orderId): string
+    {
+        $method='none';
+        foreach ($this->records->payments($orderId) as $payment) {
+            if ($payment['gateway']==='wallet' || !in_array($payment['state'],['paid','partially_refunded','refunded'],true)) continue;
+            $method=LedgerKind::methodForGateway((string)$payment['gateway']);
+        }
+        return $method;
+    }
+
+    /** The share of the order's recorded Stitch fees that belongs to $external of its card payments. */
+    private function transactionFeeShare(int $orderId, int $external): int
+    {
+        $fees=0; $paid=0;
+        foreach ($this->records->payments($orderId) as $payment) {
+            if ($payment['gateway']==='wallet' || !in_array($payment['state'],['paid','partially_refunded','refunded'],true)) continue;
+            $paid+=(int)$payment['amount_minor'];
+            $fees+=$this->wallets->processorFee((string)$payment['id']);
+        }
+        return $paid<=0 ? 0 : (int)round($fees*$external/$paid);
     }
 
     /**

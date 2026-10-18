@@ -116,14 +116,6 @@ final class CompanySuspensionContractTest extends TestCase
         );
     }
 
-    /** The System Company invariant stays at repository level, not in a hidden button. */
-    public function testTheSystemCompanyRefusalIsAtRepositoryLevel(): void
-    {
-        $repository = self::source('src/Infrastructure/Persistence/CompanyRepository.php');
-
-        self::assertStringContainsString('The System Company cannot be disabled.', $repository);
-    }
-
     /** The message names the company as the reason, and does not blame the reader's account. */
     public function testTheSuspensionMessageIsUsableByANonTechnicalReader(): void
     {

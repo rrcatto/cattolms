@@ -84,10 +84,20 @@ final class CheckoutService
         $_SESSION['checkout'][$actor->id] = ['profile_confirmed'=>true];
     }
 
-    public function selectMethod(CurrentUser $actor, string $method, string $token, bool $emailInvoice): void
+    /**
+     * The payment step: the method for what the wallet does not cover, and whether to use wallet
+     * credit (owner, 2026-10-17). With $useWallet and a wallet that covers the whole order, the method
+     * may be wallet.
+     */
+    public function selectMethod(CurrentUser $actor, string $method, string $token, bool $emailInvoice, bool $useWallet = false): void
     {
         if (!($this->state($actor)['profile_confirmed'] ?? false)) throw new RuntimeException('Complete your details first.');
-        self::validateMethod($method, $token);
+        if ($method === 'wallet') {
+            if (!$useWallet) throw new RuntimeException('Choose a payment method.');
+        } else {
+            $this->orders->requirePaymentMethod($method, $token);
+        }
+        $_SESSION['checkout'][$actor->id]['use_wallet'] = $useWallet;
         $_SESSION['checkout'][$actor->id]['payment_method'] = $method;
         $_SESSION['checkout'][$actor->id]['method_token'] = $token;
         $_SESSION['checkout'][$actor->id]['invoice_email'] = $emailInvoice;
@@ -104,14 +114,17 @@ final class CheckoutService
      * A replay of the review submission returns its original order instead of charging again. A
      * promo code that no longer applies stops placement with a PromotionRejected carrying the reason;
      * the caller removes it and returns the purchaser to review the corrected total. An order a
-     * promotion discounts to zero is settled at once, with no payment.
+     * promotion discounts to zero is settled at once, with no payment, and so is an order the wallet
+     * pays in full. $startAccepted is the purchaser's tick that the courses start as soon as payment
+     * is confirmed (OrderService::IMMEDIATE_START); both boxes are required.
      */
-    public function place(CurrentUser $actor, int $cartId, string $quote, bool $accepted): ?int
+    public function place(CurrentUser $actor, int $cartId, string $quote, bool $accepted, bool $startAccepted = false): ?int
     {
         $state = $this->state($actor);
         if (isset($state['completed_cart']) && (int) $state['completed_cart'] === $cartId) return isset($state['order_id']) ? (int) $state['order_id'] : null;
         if (!($state['profile_confirmed'] ?? false) || !isset($state['payment_method'])) throw new RuntimeException('Complete your details and choose a payment method first.');
         if (!$accepted) throw new RuntimeException('Accept the Terms and Conditions and the Refund Policy before placing your order.');
+        if (!$startAccepted) throw new RuntimeException('Confirm that your courses start as soon as your payment is confirmed.');
         $billing = $this->billing->forUser($actor->id) ?? throw new RuntimeException('Complete your billing details first.');
         $id = $this->transactions->run(function () use ($actor,$cartId,$quote,$billing,$state): ?int {
             $this->records->lockPurchaser($actor->id);
@@ -131,13 +144,14 @@ final class CheckoutService
         $_SESSION['checkout'][$actor->id]['completed_cart'] = $cartId;
         $_SESSION['checkout'][$actor->id]['order_id'] = $id;
         if ($id !== null && (int) $this->records->order($id)['total_minor'] === 0) $this->payments->settleWithoutPayment($actor, $id);
-        elseif ($id !== null && $state['payment_method'] === 'dummy') $this->payments->purchase($actor, $id, (string) $state['payment_key'], (string) $state['method_token']);
+        elseif ($id !== null && $this->records->dueAmount($id) === 0) $this->payments->settlePaidByWallet($actor, $id);
+        elseif ($id !== null && $this->records->paymentMethod($id) === 'dummy') $this->payments->purchase($actor, $id, (string) $state['payment_key'], (string) $state['method_token']);
         return $id;
     }
 
     public function retry(CurrentUser $actor, int $orderId, string $key, string $method, string $token): void
     {
-        self::validateMethod($method, $token);
+        $this->orders->requirePaymentMethod($method, $token);
         $this->orders->view($actor, $orderId);
         if ($this->records->paymentForRequest($orderId, $key) !== null) return;
         $this->orders->cancelDue($orderId);

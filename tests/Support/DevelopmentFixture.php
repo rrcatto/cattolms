@@ -88,12 +88,21 @@ final class DevelopmentFixture
     public function createCompany(int $actorUserId, string $name, string $domain): int
     {
         $id = (int) $this->db->fetchAllAssociative(
-            "INSERT INTO companies (public_id,name,domain,status,is_system,created_by_user_id)
-             VALUES (:public_id,:name,:domain,'active',FALSE,:actor) RETURNING id",
+            "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
+             VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
             ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
         )[0]['id'];
         $this->companies[] = $id;
         return $id;
+    }
+
+    /** Makes the user an active member of the company: a company account, which never buys for itself. */
+    public function addCompanyMember(int $companyId, int $userId, string $companyRole = 'student'): void
+    {
+        $this->db->executeStatement(
+            "INSERT INTO company_users (company_id,user_id,company_role,status,created_at) VALUES (:company,:user,:role,'active',NOW())",
+            ['company' => $companyId, 'user' => $userId, 'role' => $companyRole]
+        );
     }
 
     public function createCourse(int $ownerUserId, int $ownerCompanyId, string $slug, string $title, string $status = 'draft'): int

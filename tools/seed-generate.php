@@ -36,6 +36,7 @@ declare(strict_types=1);
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Auth\RoleCatalog;
+use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
 use CattoLearning\Seed\SeedDatabaseService;
@@ -44,12 +45,12 @@ use CattoLearning\Support\Env;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-if (Env::string('APP_ENV', 'production') !== 'development') {
-    fwrite(STDERR, "Refusing to run: APP_ENV is not development.\n");
+$container = CliBootstrap::boot()['container'];
+// Test data belongs on a demo site only (APP_SITE_MODE, or its Settings override), never a live one.
+if (!$container->get(SiteMode::class)->isDemo()) {
+    fwrite(STDERR, "Refusing to run: this is a live site (APP_SITE_MODE).\n");
     exit(1);
 }
-
-$container = CliBootstrap::boot()['container'];
 $users = $container->get(UserRepository::class);
 $roles = $container->get(RoleRepository::class);
 

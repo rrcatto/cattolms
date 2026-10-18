@@ -56,4 +56,18 @@ interface MailerInterface
     public function sendInvoice(string $email, string $number, string $pdf): void;
 
     public function sendTestMessage(string $email): void;
+
+    /**
+     * Reminds a wallet's owner that credit will expire (owner, 2026-10-17). Each line is one credit:
+     * its amount and expiry date as shown, oldest expiry first.
+     *
+     * @param list<array{amount:string,expires:string}> $lines
+     */
+    public function sendWalletExpiryReminder(string $email, string $name, array $lines, string $walletUrl): void;
+
+    /**
+     * A plain message ADMIN wrote about a transaction that needs attention: the subject and text as
+     * written, sent as text and as simple HTML paragraphs.
+     */
+    public function sendAdministratorMessage(string $email, string $subject, string $body): void;
 }

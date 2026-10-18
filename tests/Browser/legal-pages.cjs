@@ -1,7 +1,7 @@
 /* The public legal pages and the checkout acceptance in a real browser.
  *
  * In every bundled theme, signed out and signed in, at 1440, 820 and 390px: /terms, /refunds and
- * /privacy answer in that theme with their title, version and last-updated date, a contents list
+ * /privacy answer in that theme with their title and last-updated date (no version), a contents list
  * whose every entry is a card on the page, all prose on cards, no value overlapping its label and
  * no sideways scrolling; and the Core footer lists Terms, Refunds and Privacy. In every theme at
  * the three widths the learner's checkout review and the company credit checkout show the one
@@ -178,8 +178,8 @@ function assertAcceptance(facts, label) {
                             const facts = await documentFacts(session.page);
                             assert.equal(facts.h1, title, url);
                             assert.equal(facts.key, key, `${url} names its document`);
-                            assert.match(facts.version, /^\d+\.\d+$/, `${url} carries its version`);
-                            assert.match(facts.stamp, new RegExp(`^Version ${facts.version.replace('.', '\\.')} - last updated \\d{1,2} [A-Z][a-z]+ \\d{4}\\.$`), `${url} shows its version and date`);
+                            assert.equal(facts.version, undefined, `${url} carries no version (owner, 2026-10-17)`);
+                            assert.match(facts.stamp, /^Last updated \d{1,2} [A-Z][a-z]+ \d{4}\.$/, `${url} shows its date`);
                             assert.ok(facts.contents >= 8 && facts.missing.length === 0, `${url}: every contents entry is a card with a heading (missing: ${facts.missing.join(', ')})`);
                             assert.equal(facts.loose, 0, `${url}: all prose is on a card`);
                             assert.equal(facts.outside, 0, `${url}: every card and its text is on screen`);
@@ -235,7 +235,8 @@ function assertAcceptance(facts, label) {
                 await terms.close();
                 assert.equal(new URL(page.url()).pathname, '/checkout/review', 'and the checkout stays where it was');
 
-                // A form that lost its required attribute still cannot place the order.
+                // A form that lost its required attribute still cannot place the order (the start box is ticked).
+                await page.locator('input[name=accept_start]').check();
                 await page.locator('input[name=accept_terms]').evaluate((box) => box.removeAttribute('required'));
                 await Promise.all([page.waitForNavigation(), submit.click()]);
                 assert.equal(new URL(page.url()).pathname, '/checkout/review');

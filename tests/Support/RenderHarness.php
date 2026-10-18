@@ -255,7 +255,6 @@ final class RenderHarness
             'activity_filters' => ['from' => '', 'to' => '', 'family' => '', 'actor_id' => 0,
                 'course_id' => 0, 'company_id' => 0, 'q' => '', 'after_id' => 0],
             'roles' => [['role_key' => 'STUDENT', 'role_name' => 'Student']],
-            'system_company' => ['id' => 1, 'name' => 'System', 'domain' => 's.test'],
             'company' => ['id' => 1, 'name' => 'C', 'domain' => 'c.test'],
             'company_platform_wide' => false,
         ];
@@ -315,7 +314,7 @@ final class RenderHarness
                 'certificate_name' => 'A B', 'mobile_number' => '', 'middle_names' => '',
             ]],
             'companies' => [[
-                'id' => 1, 'name' => 'C', 'domain' => 'c.test', 'status' => 'active', 'is_system' => false,
+                'id' => 1, 'name' => 'C', 'domain' => 'c.test', 'status' => 'active',
                 'is_client' => true, 'is_course_provider' => false, 'company_type_label' => 'Client',
                 'status_label' => 'Active', 'people_count' => 1, 'owned_course_count' => 0,
                 'enrolment_count' => 0, 'created_at' => '2026-01-01',

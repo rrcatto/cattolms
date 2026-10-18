@@ -132,6 +132,7 @@ SQL);
         $bindings = [];
 
         $term = trim($search);
+        $term = self::referenceTerm($term);
         if ($term !== '' && $columns !== []) {
             $matches = array_map(static fn(string $column): string => $column . ' ILIKE :search_term', $columns);
             $conditions[] = '(' . implode(' OR ', $matches) . ')';
@@ -154,6 +155,7 @@ SQL);
     private static function andSearch(string $search, array $columns): array
     {
         $term = trim($search);
+        $term = self::referenceTerm($term);
         if ($term === '' || $columns === []) {
             return ['', []];
         }
@@ -166,13 +168,23 @@ SQL);
         ];
     }
 
+    /**
+     * The trimmed term as typed, except an account reference typed as shown (CL-20261017-0001-U, or the start
+     * of one with its date) loses its hyphens, because references are stored without them.
+     */
+    private static function referenceTerm(string $term): string
+    {
+        return preg_match('/^[A-Za-z]{1,3}-[0-9]{8}(?:-[0-9]{0,18}(?:-[0-9A-Za-z]?)?)?$/', $term) === 1 ? str_replace('-', '', $term) : $term;
+    }
+
     /** Columns each shared dataset search matches on; the page and its count use the same list. */
     // Each expression is written to match a trigram index in the baseline migration's
     // SEARCH_INDEXES character for character. A predicate that differs
     // from its index - even by a cast - simply will not use it, and the search silently falls back
     // to a sequential scan. DatasetSearchIndexTest asserts the pairing.
     private const FULLNAME = "(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,''))";
-    private const PEOPLE_SEARCH = [self::FULLNAME, 'u.display_name::text', 'ue.email::text'];
+    // A person is found by their account reference too; referenceTerm() takes the hyphens out of one typed as shown.
+    private const PEOPLE_SEARCH = [self::FULLNAME, 'u.display_name::text', 'ue.email::text', 'u.account_reference::text'];
 
     /**
      * The learner-facing lists all search one thing: the course title. They are already narrowed
@@ -219,7 +231,7 @@ SQL);
      * appear on two consecutive report pages or on neither.
      */
     private const COURSE_REPORT_ORDER = 'c.title, c.id';
-    private const COMPANY_REPORT_ORDER = 'co.is_system DESC, co.name, co.id';
+    private const COMPANY_REPORT_ORDER = 'co.name, co.id';
 
     /**
      * The LIMIT/OFFSET clause for a paginated query, from the one shared clamp.
@@ -483,7 +495,7 @@ SQL;
     }
 
     /** Columns the Companies search matches on; used by both the page and the count. */
-    private const COMPANY_SEARCH = ['c.name::text', 'c.domain::text'];
+    private const COMPANY_SEARCH = ['c.name::text', 'c.domain::text', 'c.account_reference::text'];
 
     /**
      * The Companies ordering: the System Company first, then alphabetically, then by id.
@@ -492,7 +504,7 @@ SQL;
      * different data universes, and without it either could take the other's place on a page
      * boundary between one view and the next.
      */
-    private const COMPANY_ORDER = 'c.is_system DESC, c.name, c.id';
+    private const COMPANY_ORDER = 'c.name, c.id';
 
     /**
      * The columns Administration Companies may be sorted by.

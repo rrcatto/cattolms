@@ -25,9 +25,9 @@
                 </form>
             </div>
         {% endfor %}
-        {% if cart.count == 0 %}<p>Your cart is empty. <a href="/courses">Browse courses</a> or <a href="/bundles">course bundles</a>.</p>{% endif %}
+        {% if not cart.buyer %}{{ ui('feedback.notice', {tone: 'info', heading: company_account}) }}{% elseif cart.count == 0 %}<p>Your cart is empty. <a href="/courses">Browse courses</a> or <a href="/bundles">course bundles</a>.</p>{% endif %}
         {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
-        {% if cart.count > 0 %}
+        {% if cart.count > 0 and cart.buyer %}
             <div class="mt-7">{{ ui('data.key-value-list', {items: cart.totals}) }}</div>
             {% if cart.promo.code %}<p class="help">Promo code {{ cart.promo.code }} is on this cart{{ cart.promo.applied ? '' : ' but no longer applies' }}. You can change it when you review your order at checkout.</p>{% endif %}
             {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}

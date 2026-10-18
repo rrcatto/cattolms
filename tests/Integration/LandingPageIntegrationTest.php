@@ -373,6 +373,19 @@ final class LandingPageIntegrationTest extends TestCase
         $this->landing->create($this->course, $this->owner);
         $this->complete();
         $this->landing->publish($this->course, $this->admin);
+        // A demo site asks search engines to list no page at all (SiteMode); the page's own rules show on a live one.
+        self::assertStringContainsString('<meta name="robots" content="noindex, nofollow">', $this->html('/landing/' . $this->slug));
+        $environment = $_ENV;
+        $_ENV['APP_SITE_MODE'] = 'live';
+        try {
+            $this->namesItself();
+        } finally {
+            $_ENV = $environment;
+        }
+    }
+
+    private function namesItself(): void
+    {
         $html = $this->html('/landing/' . $this->slug);
         $base = rtrim(Env::string('APP_URL'), '/');
         self::assertStringContainsString('<title>Become a conveyancer · ', $html, 'Without a page title, the headline.');

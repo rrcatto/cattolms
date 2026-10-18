@@ -7,7 +7,43 @@
 {% endblock %}
 {% endembed %}
 <div class="cl-admin-workspace">
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'Platform name and host organisation.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
+    {% if site_mode|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site mode', summary: site_mode.mode == 'live' ? 'Live: real orders.' : 'Demo: test and development, nothing real.', id: 'settings-site', open: settings_open_section|default('') == 'site'})} %}
+{% block body %}
+
+			<p>This site is {{ site_mode.mode == 'live' ? 'live' : 'a demo site' }}. {% if site_mode.source == 'database' %}This is saved here and overrides <span class="mono">APP_SITE_MODE</span>, which says {{ site_mode.environment }}.{% elseif site_mode.source == 'environment' %}<span class="mono">APP_SITE_MODE</span> in <span class="mono">.env</span> sets it.{% else %}<span class="mono">APP_SITE_MODE</span> is not set in <span class="mono">.env</span>, so it is a demo site.{% endif %}</p>
+			<p>A demo site says so on every page and in every email, keeps out of search engines, marks every order and its documents as a simulation, shows fake bank details labelled as fake, and offers the simulated card. A live site does none of that and takes EFT until card payments are built.</p>
+			<form action="/admin/settings/site-mode" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Site mode', full_width: false, for: 'site-mode', required: true})} %}
+{% block control %}
+<select id="site-mode" name="site_mode" required {{ ui_field_attrs(props) }}>
+	<option value="demo" {{ site_mode.mode == 'demo' ? 'selected' : '' }}>Demo: test and development, nothing real</option>
+	<option value="live" {{ site_mode.mode == 'live' ? 'selected' : '' }}>Live: real orders</option>
+</select>
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+{{ ui('action.button', {label: 'Save site mode', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Change the site mode? A live site takes real orders and real money.'}) }}
+{% endblock %}
+{% endembed %}
+
+{% endblock %}
+{% endembed %}</form>
+			{% if site_mode.source == 'database' %}
+			<form action="/admin/settings/site-mode/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Reset site mode to .env', variant: 'danger', size: 'small', confirm: 'Remove the saved site mode and follow APP_SITE_MODE in .env?', icon: 'action-remove'}) }}
+			</form>
+			{% endif %}
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Platform identity', summary: 'The platform name.', id: 'settings-identity', open: settings_open_section|default('') == 'identity'})} %}
 {% block body %}
 
 		<form action="/admin/settings" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
@@ -23,25 +59,6 @@
 {% block help_content %}
 
 					{{ ui('feedback.badge', {label: (platform_name_source=='database' ? 'Database override' : '.env default'), tone: 'info', size: 'small'}) }} Overrides <span class="mono">APP_NAME</span>. The same effective name is used by the web interface, API and outgoing email.
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'System Company name', full_width: true, for: 'field-settings-2-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The permanent host organisation. It cannot be deleted, but its name is yours to control.'})} %}
-{% block control %}
-
-				<input name="system_company_name" value="{{ system_company_name }}" id="field-settings-2-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'System Company domain', full_width: true, for: 'field-settings-3-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
-{% block control %}
-
-				<input name="system_company_domain" value="{{ system_company_domain }}" required id="field-settings-3-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% block help_content %}
-
-					Initially defaults from <span class="mono">APP_DOMAIN</span>. Enter only the domain, for example <span class="mono">demo.example.com</span>.
 
 {% endblock %}
 {% endembed %}
@@ -175,50 +192,45 @@
 
 {% endblock %}
 {% endembed %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Bank details', summary: 'The bank account customers use for EFT payments.', id: 'settings-bank', open: settings_open_section|default('') == 'bank'})} %}
+    {# The Site Owner (owner, 2026-10-18): the business hosting the site, which the legal pages, financial
+       documents, certificates and EFT instructions name. Each detail has a .env default; a value saved here
+       replaces it until Reset. Every change is in the Activity log with its old and new value. #}
+    {% if site_owner|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Site Owner', summary: 'The business hosting the site, and its bank account for EFT payments.', id: 'settings-site-owner', open: settings_open_section|default('') == 'site-owner'})} %}
 {% block body %}
 
-            <p>Customers paying by EFT see these details on their orders. Updates apply to existing orders as well as new orders.</p>
-            {% if not bank_details.configured %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning'})} %}
-{% block body %}
-Add bank details before accepting EFT payments.
-{% endblock %}
-{% endembed %}{% endif %}
-            <form action="/admin/settings/bank" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+			<p>The legal pages, invoices, receipts, credit notes, certificates and EFT instructions name the Site Owner. A course no company owns is the Site Owner's. Nobody belongs to it: ADMIN acts for it. A document keeps the details it was issued with, and an order those its buyer accepted.</p>
+			<form action="/admin/settings/site-owner" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
-                <input type="hidden" name="csrf" value="{{ csrf }}">
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bank name', full_width: false, for: 'bank-name', required: true})} %}
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% for key, field in site_owner.fields %}
+					{% set help = field.source == 'database' ? 'Set here. .env (' ~ field.env ~ ') says: ' ~ (field.environment ?: 'nothing') ~ '.' : 'From .env (' ~ field.env ~ ').' %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: field.label, for: 'site-owner-' ~ key, full_width: key in ['address', 'memberships', 'accreditation'], required: key in ['trading_name', 'legal_name', 'legal_form'], help: help})} %}
 {% block control %}
-<input id="bank-name" name="bank_name" value="{{ bank_details.bank_name }}" maxlength="160" required {{ ui_field_attrs(props) }}>
+{% if key == 'legal_form' %}<select id="site-owner-{{ key }}" name="{{ key }}" required {{ ui_field_attrs(props) }}>{% for value, label in site_owner.legal_forms %}<option value="{{ value }}" {{ field.value == value ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% elseif key in ['address', 'memberships', 'accreditation'] %}<textarea id="site-owner-{{ key }}" name="{{ key }}" rows="3" {{ ui_field_attrs(props) }}>{{ field.value }}</textarea>{% else %}<input id="site-owner-{{ key }}" name="{{ key }}" value="{{ field.value }}" {{ key in ['trading_name', 'legal_name'] ? 'required' : '' }}{{ key == 'email' ? ' type=email' : '' }}{{ key == 'bank_account_number' ? ' inputmode=numeric pattern=[0-9]{1,34}' : '' }}{{ key == 'bank_branch_code' ? ' inputmode=numeric pattern=[0-9]{6}' : '' }} {{ ui_field_attrs(props) }}>{% endif %}
 {% endblock %}
 {% endembed %}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account name', full_width: false, for: 'bank-account-name', required: true})} %}
-{% block control %}
-<input id="bank-account-name" name="account_name" value="{{ bank_details.account_name }}" maxlength="160" required {{ ui_field_attrs(props) }}>
-{% endblock %}
-{% endembed %}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account number', full_width: false, for: 'bank-account-number', required: true})} %}
-{% block control %}
-<input id="bank-account-number" name="account_number" value="{{ bank_details.account_number }}" inputmode="numeric" pattern="[0-9]{1,34}" maxlength="34" required {{ ui_field_attrs(props) }}>
-{% endblock %}
-{% endembed %}
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Branch code', full_width: false, for: 'bank-branch-code', required: true})} %}
-{% block control %}
-<input id="bank-branch-code" name="branch_code" value="{{ bank_details.branch_code }}" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required {{ ui_field_attrs(props) }}>
-{% endblock %}
-{% endembed %}
-                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+				{% endfor %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Save bank details', variant: 'primary', size: 'normal', type: 'submit'}) }}
+{{ ui('action.button', {label: 'Save Site Owner details', variant: 'primary', size: 'normal', type: 'submit'}) }}
 {% endblock %}
 {% endembed %}
 
 {% endblock %}
 {% endembed %}</form>
+			{% if site_owner.overridden %}
+			<form action="/admin/settings/site-owner/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Reset Site Owner details to .env', variant: 'danger', size: 'small', confirm: 'Remove every saved Site Owner detail and follow .env?', icon: 'action-remove'}) }}
+			</form>
+			{% endif %}
 
 {% endblock %}
 {% endembed %}
+    {% endif %}
+    {% include '@platform/partials/admin/commerce-settings.html.twig' %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Configuration model', summary: 'How platform configuration is stored.', id: 'settings-configuration', open: settings_open_section|default('') == 'configuration'})} %}
 {% block body %}
 
@@ -228,9 +240,9 @@ Add bank details before accepting EFT payments.
 			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
 
-					<strong>Platform name and outgoing mail</strong>
+					<strong>Platform name, outgoing mail, site mode, the Site Owner and commerce</strong>
 					<p>
-						Platform name and outgoing mail may be changed here. Removing an override returns that setting to its <span class="mono">.env</span> default.
+						The platform name, outgoing mail, the site mode, the Site Owner's details and the commerce settings may be changed here. Removing an override returns that setting to its <span class="mono">.env</span> default.
 					</p>
 
 {% endblock %}
@@ -253,7 +265,7 @@ Add bank details before accepting EFT payments.
 {% endembed %}
 
 {% endblock %}
-{% endembed %}<p>Bank details are saved in the database and managed here. They have no environment-file fallback.</p>
+{% endembed %}
 
 {% endblock %}
 {% endembed %}

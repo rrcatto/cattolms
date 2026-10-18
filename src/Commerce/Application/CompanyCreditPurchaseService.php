@@ -11,18 +11,22 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Commerce\Settings\CommerceSettings;
+use CattoLearning\Commerce\Wallet\WalletOwner;
+use CattoLearning\Commerce\Wallet\WalletService;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Legal\LegalDocuments;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
 
-/** A company-scoped basket and checkout that creates paid credit lots through ordinary payment settlement. */
+/**
+ * A company-scoped basket and checkout that creates paid credit lots through ordinary payment settlement.
+ * The company's wallet can pay part or all of the order (owner, 2026-10-17), taken when it is placed.
+ */
 final class CompanyCreditPurchaseService
 {
     public function __construct(
@@ -30,13 +34,15 @@ final class CompanyCreditPurchaseService
         private readonly CompanyRepository $companies,
         private readonly AdministrationRepository $administration,
         private readonly TransactionManager $transactions,
-        private readonly CommercePolicy $policy,
+        private readonly CommerceSettings $settings,
         private readonly TransitionService $transitions,
         private readonly PaymentService $payments,
         private readonly ClockInterface $clock,
         private readonly AnalyticsEventRecorder $analytics,
         private readonly BillingProfileService $billing,
-        private readonly FinancialDocuments $documents
+        private readonly FinancialDocuments $documents,
+        private readonly WalletService $wallets,
+        private readonly OrderService $orders
     ) {}
 
     /**
@@ -188,17 +194,17 @@ final class CompanyCreditPurchaseService
      * change) and frozen into the order's snapshot. A replayed placement returns the existing order
      * without touching either.
      */
-    public function place(CurrentUser $actor, int $companyId, string $key, string $quote, BillingDetails $billing, string $method, string $token, bool $emailInvoice, bool $accepted): int
+    public function place(CurrentUser $actor, int $companyId, string $key, string $quote, BillingDetails $billing, string $method, string $token, bool $emailInvoice, bool $accepted, bool $useWallet = false): int
     {
         OrderService::requireCapability($actor, 'COMPANY.CREDIT.MANAGE');
         OrderService::requireCapability($actor, 'COMMERCE.CHECKOUT.START');
-        CheckoutService::validateMethod($method, $token);
+        if ($method !== 'wallet') $this->orders->requirePaymentMethod($method, $token);
         if (!$accepted) throw new RuntimeException('Accept the Terms and Conditions and the Refund Policy before placing the company order.');
         if (!Uuid::isValid($key)) throw new RuntimeException('Invalid purchase identifier.');
-        [$orderId,$created] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billing,$method,$emailInvoice): array {
+        [$orderId,$created,$method] = $this->transactions->run(function () use ($actor,$companyId,$key,$quote,$billing,$method,$emailInvoice,$useWallet): array {
             $this->records->lockPurchaser($actor->id);
             $existing = $this->records->companyOrderForKey($actor->id, $key);
-            if ($existing !== null) return [(int) $existing['id'],false];
+            if ($existing !== null) return [(int) $existing['id'],false,$this->records->paymentMethod((int) $existing['id'])];
             $review = $this->review($actor, $companyId);
             if (!hash_equals((string)$review['purchase_key'], $key) || !hash_equals((string)$review['quote'], $quote)) {
                 throw new RuntimeException('The selected credits or prices changed. Review the order again.');
@@ -213,24 +219,35 @@ final class CompanyCreditPurchaseService
             }
             $this->billing->saveForCompany($actor, $companyId, $billing);
             $now = $this->clock->now();
+            $total = (int) $review['total_minor'];
+            $owner = WalletOwner::company($companyId);
+            $walletApplied = $useWallet && $requestId === null ? min($this->wallets->spendable($owner, 'ZAR'), $total) : 0;
+            if ($method === 'wallet' && $walletApplied < $total) throw new RuntimeException('The company wallet does not cover this order. Choose how to pay the rest.');
+            if ($walletApplied === $total) $method = 'wallet';
+            $items = OrderService::shareWallet($review['items'], $walletApplied);
+            $legal = $this->orders->acceptedDocuments();
             $snapshot = ['purchaser_user_id'=>$actor->id,'purchaser_name'=>$actor->displayName,'purchaser_email'=>$actor->primaryEmail,
                 'company_id'=>$companyId,'company_name'=>$review['company']['name'],'billing'=>$billing->toSnapshot(),
-                'request_id'=>$requestId,'items'=>$review['items'],
-                'total_minor'=>$review['total_minor'],'currency'=>'ZAR','payment_method'=>$method,'invoice_email'=>$emailInvoice,
-                'tax_enabled'=>false,'terms_version'=>LegalDocuments::version(LegalDocuments::TERMS),
-                'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false,'refund_policy_version'=>LegalDocuments::version(LegalDocuments::REFUNDS)]];
-            $id = $this->records->placeCompany($actor->id,$companyId,$requestId,$key,(int)$review['total_minor'],'ZAR',$snapshot,
-                $now->format(DATE_ATOM),$now->modify('+'.$this->policy->paymentDueDays.' days')->format(DATE_ATOM));
-            foreach ($review['items'] as $line) $this->records->addCompanyOrderItem($id,$companyId,$line);
+                'request_id'=>$requestId,'items'=>$items,
+                'total_minor'=>$total,'wallet_applied_minor'=>$walletApplied,'payable_minor'=>$total-$walletApplied,'currency'=>'ZAR','payment_method'=>$method,'invoice_email'=>$emailInvoice,
+                'tax_enabled'=>false,
+                'consent'=>['accepted_at'=>$now->format(DATE_ATOM),'session_id'=>$actor->sessionPublicId,'immediate_service'=>false,'documents'=>$legal['documents']],
+                'site_owner'=>$legal['site_owner']]
+                + $this->orders->placementFacts($this->records->companyAccountReference($companyId));
+            $id = $this->records->placeCompany($actor->id,$companyId,$requestId,$key,$total,'ZAR',$snapshot,
+                $now->format(DATE_ATOM),$this->settings->paymentDue()->after($now)->format(DATE_ATOM));
+            foreach ($items as $line) $this->records->addCompanyOrderItem($id,$companyId,$line);
             $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $this->records->selectPaymentMethod($id,$method);
+            if ($walletApplied > 0) $this->orders->payFromWallet($this->records->order($id, true), $owner, $walletApplied, $snapshot);
             if ($emailInvoice) $this->records->enqueue('invoice:'.$id,'invoice.email_requested',['order_id'=>$id],$now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));
             $this->records->audit($id,$actor->id,'company_credit_order.placed',['company_id'=>$companyId,'request_id'=>$requestId,'total_minor'=>$review['total_minor']],$now->format(DATE_ATOM));
-            return [$id,true];
+            return [$id,true,$method];
         });
         $this->cancel($actor, $companyId);
-        if ($created && $method === 'dummy') $this->payments->purchase($actor,$orderId,$key,$token);
+        if ($created && $method === 'wallet') $this->payments->settlePaidByWallet($actor,$orderId);
+        elseif ($created && $method === 'dummy') $this->payments->purchase($actor,$orderId,$key,$token);
         return $orderId;
     }
 
@@ -238,7 +255,7 @@ final class CompanyCreditPurchaseService
     private function requireCompanyOffer(array $offer, int $companyId): void
     {
         if (!(bool)$offer['is_active'] || $offer['course_status'] !== 'published' || (int)$offer['price_minor_units'] <= 0
-            || (string)$offer['currency_code'] !== 'ZAR' || (int)($offer['owner_company_id'] ?? 0) === $companyId) {
+            || (string)$offer['currency_code'] !== 'ZAR' || \CattoLearning\Company\CompanyScope::same($offer['owner_company_id'] ?? null, $companyId)) {
             throw new RuntimeException('This paid credit offer is no longer available to this company.');
         }
     }

@@ -3,7 +3,8 @@
  * learner sees the public bundle page (its course cards, its price, the individual prices and the
  * saving), adds it to the cart with the keyboard, applies a bundle promotion at checkout, buys it, and
  * finds every course in their library, with the order and invoice showing the bundle as the item
- * bought. A learner who already has one of the courses is told so. The purchase and the ADMIN reorder
+ * bought. A learner who already has one of the courses is told so. A company account is told why it
+ * cannot buy and is offered no buttons (owner, 2026-10-18). The purchase and the ADMIN reorder
  * work without JavaScript, and the bundle pages, the cart and the ADMIN screens render in all five
  * themes at desktop and phone widths without sideways scrolling.
  *
@@ -136,6 +137,7 @@ async function checkoutToReview(page) {
             await Promise.all([page.waitForNavigation(), page.locator('#promo-code').press('Enter')]);
             assert.deepEqual(await totals(page), [['Subtotal', rand(120000)], [`Promo ${fixture.code} (10% off)`, `−${rand(12000)}`], ['Total', rand(108000)]]);
             await page.locator('input[name=accept_terms]').check();
+            await page.locator('input[name=accept_start]').check();
             await submit(page, page.getByRole('button', {name: 'Place my order'}));
             assert.match(page.url(), /\/account\/orders\/\d+/);
             const order = clean(await page.locator('main').innerText());
@@ -173,12 +175,23 @@ async function checkoutToReview(page) {
         await ctx.close();
     });
 
+    await scenario('a company account is told why it cannot buy the bundle and offered no buttons', 'chromium', async () => {
+        const {ctx, page} = await open(chromium, learner('company-learner').token);
+        await page.goto(`${base}${bundleUrl}`);
+        const box = clean(await page.locator('main aside').innerText());
+        assert.ok(box.includes('Company accounts cannot buy courses for themselves. Your company gives you your courses.'), 'the reason is shown');
+        assert.equal(await page.getByRole('button', {name: 'Add bundle to cart'}).count(), 0, 'no Add bundle to cart');
+        assert.equal(await page.locator('main aside').getByRole('button', {name: 'Buy now'}).count(), 0, 'no Buy now');
+        await ctx.close();
+    });
+
     await scenario('a bundle is bought, and an ADMIN reorders its courses, without JavaScript', 'chromium-nojs', async () => {
         const buyer = await open(chromium, learner().token, {js: false});
         await buyer.page.goto(`${base}${bundleUrl}`);
         await submit(buyer.page, buyer.page.getByRole('button', {name: 'Add bundle to cart'}));
         await checkoutToReview(buyer.page);
         await buyer.page.locator('input[name=accept_terms]').check();
+        await buyer.page.locator('input[name=accept_start]').check();
         await submit(buyer.page, buyer.page.getByRole('button', {name: 'Place my order'}));
         assert.match(clean(await buyer.page.locator('main').innerText()), /Status: Fulfilled/);
         await buyer.ctx.close();

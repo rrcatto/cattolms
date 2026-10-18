@@ -143,6 +143,7 @@ async function saveCompanyBilling(page, data) {
         await page.waitForURL(/\/checkout\/review/);
         assert.ok((await billedTo(page)).includes('14 Corrected Avenue'), 'the review shows the corrected billing');
         await page.locator('input[name=accept_terms]').check();
+        await page.locator('input[name=accept_start]').check();
         await page.getByRole('button', {name: 'Place my order'}).click();
         await page.waitForURL(/\/account\/orders\/\d+/);
         const orderUrl = page.url();

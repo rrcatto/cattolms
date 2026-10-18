@@ -1,0 +1,37 @@
+{% extends layout %}
+{% block page_body %}
+    {% set ph_kicker = 'Administration' %}{% set ph_title = 'Refund Requests' %}{% set ph_lead = 'Refunds learners and Company Administrators asked for, oldest first. The Refund Policy’s verdict is as it stood when they asked.' %}
+    {% include '@platform/partials/page-head.html.twig' %}
+    <section class="cl-page-section">
+    {% if requests %}
+        {% for request in requests %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: request.title, eyebrow: request.order_label ~ ' · asked ' ~ request.requested_at|date('j M Y H:i'), summary: (request.company_name ? request.company_name ~ ', by ' : '') ~ request.requester_name ~ ' (' ~ request.reference_label ~ ')' ~ (request.earlier_requests > 0 ? ' · ' ~ request.earlier_requests ~ ' earlier refund request(s)' : '')}) }}
+            <p><strong>Why:</strong> {{ request.customer_reason }}</p>
+            <p><strong>Asked for:</strong> {{ request.destination_label }}{% if request.company_id %} · {{ request.quantity }} unused credit(s){% endif %} · <strong>Paid for the line:</strong> {{ request.paid_label }} · <strong>Refund if approved in full:</strong> {{ request.net_label }}{% for line in request.deduction_lines %} · less {{ line }}{% endfor %}</p>
+            {% if request.rule_refusals %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Outside the Refund Policy when asked'})} %}{% block body %} {{ request.rule_refusals }} Approving it needs an override reason, kept with the refund and shown only to administrators.{% endblock %}{% endembed %}{% else %}<p class="help">Within the Refund Policy when asked.</p>{% endif %}
+            <p><a href="/admin/commerce/orders/{{ request.order_id }}">Open the order</a></p>
+            {% if can_decide %}
+            {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
+                <form action="/admin/commerce/refund-requests/{{ request.id }}/approve" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Refund basis', for: 'request-basis-' ~ request.id, required: true, full_width: true})} %}{% block control %}<select id="request-basis-{{ request.id }}" name="basis" required {{ ui_field_attrs(props) }}><option value="voluntary">Voluntary</option><option value="service_failure">Service failure (faulty course)</option><option value="statutory">Statutory right</option><option value="goodwill">Goodwill</option></select>{% endblock %}{% endembed %}
+                    {% if not request.company_id %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount (' ~ request.currency ~ '), before deductions', for: 'request-amount-' ~ request.id, full_width: true, help: 'Leave empty to refund everything left on the line.'})} %}{% block control %}<input id="request-amount-{{ request.id }}" name="amount" inputmode="decimal" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}{% endif %}
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Decision reason', for: 'request-reason-' ~ request.id, required: true, full_width: true})} %}{% block control %}<textarea id="request-reason-{{ request.id }}" name="reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                    {% if request.rule_refusals %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Override reason', for: 'request-override-' ~ request.id, required: true, full_width: true})} %}{% block control %}<textarea id="request-override-{{ request.id }}" name="override_reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}{% endif %}
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: request.rule_refusals ? 'Override and approve' : 'Approve refund', variant: 'danger', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+                </form>
+                <form action="/admin/commerce/refund-requests/{{ request.id }}/refuse" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+                    {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why it is refused (the requester sees this)', for: 'request-note-' ~ request.id, required: true, full_width: true})} %}{% block control %}<textarea id="request-note-{{ request.id }}" name="note" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Refuse', variant: 'secondary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+                </form>
+            {% endblock %}{% endembed %}
+            {% endif %}
+        {% endblock %}{% endembed %}
+        {% endfor %}
+    {% else %}
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+            {{ ui('layout.section-head', {heading: 'Nothing to decide', summary: 'No refund request is waiting.'}) }}
+        {% endblock %}{% endembed %}
+    {% endif %}
+    </section>
+{% endblock %}

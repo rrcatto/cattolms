@@ -19,7 +19,8 @@ either the System Company or nothing at all.
 Two modes:
 
   own        the actor's own active company. Every ordinary Company Administrator, always
-  selected   company X, chosen by a platform administrator, defaulting to the REAL System Company
+  selected   company X, chosen by a platform administrator; without a choice, their own company if
+             they belong to one, or else they are sent to choose one (NoCompanyChosen)
 
 The workspace always describes exactly one concrete company. The former "All companies" mode was
 removed: it was the default, so a platform administrator arrived at a context that no mutation could
@@ -48,6 +49,10 @@ owns that - and it performs no business writes at all. A read must not write bus
 resolving a context must never create, join or modify a company.
 
 Changelog:
+
+2026/10/18 SAST
+- No System Company default (owner, 2026-10-18): a platform administrator with no company chosen
+  administers their own company if they belong to one, or is sent to choose one (NoCompanyChosen).
 
 2026/08/29 21:05 SAST
 
@@ -139,7 +144,7 @@ final class SelectedCompanyContext
         return $company;
     }
 
-    /** Forgets the explicit selection, returning the context to the REAL System Company default. */
+    /** Forgets the explicit selection: the administrator's own company, or none until they choose one. */
     public function clear(): void
     {
         unset($_SESSION[self::SESSION_KEY]);
@@ -202,19 +207,14 @@ final class SelectedCompanyContext
             $this->clear();
         }
 
-        // No explicit selection: the REAL System Company. Resolved through the repository rather
-        // than hard-coded, because there is one System Company per universe (decision D1) and the
-        // genuine platform administrator is a REAL identity administering the REAL platform until
-        // they say otherwise.
-        $system = $this->companies->systemCompany();
-        if ($system === null) {
-            throw new RuntimeException(
-                'The REAL System Company is missing, so there is no default company to administer. '
-                . 'This database predates the v0.5.8 baseline.'
-            );
+        // No explicit selection: the administrator's own company, if they belong to one. There is no
+        // default company (owner, 2026-10-18: no System Company), so otherwise they choose one first.
+        $own = $this->companies->findForUser($user->id);
+        if ($own !== null) {
+            return $this->selectedContext($own);
         }
 
-        return $this->selectedContext($system);
+        throw new NoCompanyChosen();
     }
 
     /**
@@ -249,7 +249,13 @@ final class SelectedCompanyContext
      */
     public function contextCompanyId(CurrentUser $user): int
     {
-        return (int) $this->resolve($user)['company_id'];
+        // 0 when a platform administrator has chosen no company and belongs to none: the picker
+        // asks for this, and must not be sent to itself.
+        try {
+            return (int) $this->resolve($user)['company_id'];
+        } catch (NoCompanyChosen) {
+            return 0;
+        }
     }
 
 }

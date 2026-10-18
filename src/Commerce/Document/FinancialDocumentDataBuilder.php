@@ -43,8 +43,10 @@ namespace CattoLearning\Commerce\Document;
 
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Document\DocumentBusinessData;
 use CattoLearning\Document\DocumentType;
+use CattoLearning\Support\AccountReference;
 use CattoLearning\Support\Money;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -53,7 +55,7 @@ use InvalidArgumentException;
 final class FinancialDocumentDataBuilder
 {
     public const BASES = ['statutory' => 'Statutory right', 'service_failure' => 'Service failure', 'goodwill' => 'Goodwill', 'voluntary' => 'Voluntary'];
-    private const PAYMENT_METHODS = ['dummy' => 'Card (simulated)', 'manual_bank' => 'EFT / bank transfer'];
+    private const PAYMENT_METHODS = ['dummy' => 'Card (simulated)', 'manual_bank' => 'EFT / bank transfer', 'wallet' => 'Wallet credit'];
 
     public function __construct(
         private readonly DocumentBusinessData $business,
@@ -74,13 +76,14 @@ final class FinancialDocumentDataBuilder
     }
 
     /**
-     * The EFT details from Settings, when all of them have been entered.
+     * The EFT details customers pay into, when all of them have been entered: on a demo site the fake
+     * ones, labelled as fake (RuntimeSettings::payableBankDetails).
      *
      * @return array<string,string>
      */
     public function bank(): array
     {
-        $bank = $this->settings->bankDetails();
+        $bank = $this->settings->payableBankDetails();
         if (!$bank['configured']) {
             return [];
         }
@@ -103,6 +106,8 @@ final class FinancialDocumentDataBuilder
         $optionalMoney = static fn(int $minor): ?array => $minor > 0 ? $money($minor) : null;
         $promotion = is_array($snapshot['promotion'] ?? null) ? $snapshot['promotion'] : null;
         $data = $business + self::customer($snapshot) + [
+            // An order placed on a demo site says so on every document drawn from it, for good.
+            'document.simulation' => ($snapshot['simulation'] ?? false) === true ? SiteMode::SIMULATION : null,
             'order.number' => self::orderNumber((int) $order['id']),
             'order.date' => self::date((string) $order['placed_at']),
         ];
@@ -148,12 +153,34 @@ final class FinancialDocumentDataBuilder
                     'credit_note.basis' => self::BASES[(string) ($snapshot['refund_basis'] ?? '')] ?? (string) ($snapshot['refund_basis'] ?? ''),
                     'credit_note.reason' => self::text($snapshot['refund_reason'] ?? null),
                     'credit_note.invoice_number' => self::text($context['invoice_number'] ?? null),
+                    'credit_note.settlement' => self::settlement((array) ($snapshot['refund_settlement'] ?? []), $currency),
                 ];
                 $data['items'] = self::creditedLines($snapshot, $money);
                 return $data;
             default:
                 throw new InvalidArgumentException('A ' . strtolower($type->label()) . ' is not a financial document.');
         }
+    }
+
+    /**
+     * The refund's settlement as the credit note states it (owner, 2026-10-17): the part returned to
+     * the wallet it was paid from, each deduction, and the rest as wallet credit or money back.
+     *
+     * @param array<string,mixed> $settlement the order snapshot's refund_settlement
+     */
+    private static function settlement(array $settlement, string $currency): ?string
+    {
+        if ($settlement === []) return null;
+        $money = static fn(int $minor): string => \CattoLearning\Support\Money::ofMinorUnits($minor, $currency)->format();
+        $lines = [];
+        if ((int) ($settlement['wallet_part_minor'] ?? 0) > 0) $lines[] = $money((int) $settlement['wallet_part_minor']) . ' returned to the wallet it was paid from.';
+        foreach ((array) ($settlement['deductions'] ?? []) as $deduction) {
+            $lines[] = 'Less ' . lcfirst((string) ($deduction['label'] ?? 'a deduction')) . ': ' . $money((int) ($deduction['amount_minor'] ?? 0)) . '.';
+        }
+        $net = (int) ($settlement['net_minor'] ?? 0);
+        if ($net > 0) $lines[] = $money($net) . (($settlement['destination'] ?? '') === 'money_back' ? ' to be paid back to you.' : ' added to your wallet as wallet credit.');
+
+        return $lines === [] ? null : implode("\n", $lines);
     }
 
     public static function orderNumber(int $orderId): string
@@ -176,6 +203,7 @@ final class FinancialDocumentDataBuilder
             'customer.company_name' => self::text($snapshot['company_name'] ?? null),
             'customer.purchaser_name' => self::text($snapshot['purchaser_name'] ?? null),
             'customer.email' => self::text($snapshot['purchaser_email'] ?? null),
+            'customer.account_reference' => ($snapshot['account_reference'] ?? '') === '' ? null : AccountReference::format((string) $snapshot['account_reference']),
         ];
     }
 

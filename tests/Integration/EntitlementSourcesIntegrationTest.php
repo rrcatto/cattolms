@@ -10,7 +10,7 @@ use CattoLearning\Auth\{AuthService, CurrentUser, PermissionCatalog};
 use CattoLearning\Commerce\Application\{AccessService,BillingProfileService,CheckoutService,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentService,RefundAdministrationService};
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
@@ -55,11 +55,11 @@ final class EntitlementSourcesIntegrationTest extends TestCase
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
         $promotions = PromotionFixture::service($this->db, $this->clock);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock, $promotions,IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->orders = new OrderService($this->records, $tx, WalletFixture::settings($this->db), $transitions, $this->clock, $promotions,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock));
         $this->access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $this->access, $tx, $this->orders, $this->clock, $companyCredits, $this->analytics(), $promotions);
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'), $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $this->billing = BillingFixture::service($this->db, $this->clock);
         $this->owner = $this->fixture->createUser('Sources course owner');
         $this->provider = $this->fixture->createCompany($this->owner, 'Sources provider ' . $this->fixture->suffix(), $this->fixture->suffix() . '.sources.example.test');
@@ -143,24 +143,20 @@ final class EntitlementSourcesIntegrationTest extends TestCase
         $enrolment = $this->fixture->createEnrolment($buyer->id, $a, $this->owner, 60 * self::DAY);
         $bundle = BundleFixture::create($this->db, $this->owner, [$a, $b], 60000, [], 365 * self::DAY);
         $this->orders->changeBundle($buyer, $bundle['offer']);
+        $paidAt = $this->clock->now();
         $this->place($buyer);
-        self::assertSame([['origin', 'awaiting_activation'], ['bundle', 'awaiting_activation']], array_map(static fn(array $s): array => [$s['source'], $s['state']], $this->records->sources($enrolment)), 'Neither has started: the learner has not begun.');
-        self::assertTrue($this->access->assertAccess($enrolment));
-        self::assertNull($this->db->fetchOne('SELECT expires_at FROM course_enrolments WHERE id=:id', ['id' => $enrolment]));
-
-        $this->clock->modify('+5 days');
-        $startedAt = $this->clock->now();
-        self::assertTrue($this->access->start($enrolment));
+        // Buying starts the course (owner, 2026-10-17), and a learner's start begins every source the
+        // course has, each running its own period from that moment.
+        self::assertSame([['origin', 'active'], ['bundle', 'active']], array_map(static fn(array $s): array => [$s['source'], $s['state']], $this->records->sources($enrolment)), 'Both started on payment.');
         $ends = array_map(static fn(array $s): int => (new \DateTimeImmutable((string) $s['access_expires_at']))->getTimestamp(), $this->records->sources($enrolment));
-        self::assertSame([$startedAt->modify('+60 days')->getTimestamp(), $startedAt->modify('+365 days')->getTimestamp()], $ends, 'Starting the course starts both, each with its own period.');
-        $this->assertExpiry($startedAt->modify('+365 days'), $enrolment, 'The course stays open until the later end.');
+        self::assertSame([$paidAt->modify('+60 days')->getTimestamp(), $paidAt->modify('+365 days')->getTimestamp()], $ends, 'Each with its own period.');
+        $this->assertExpiry($paidAt->modify('+365 days'), $enrolment, 'The course stays open until the later end.');
+        self::assertTrue($this->access->assertAccess($enrolment));
 
         $courseB = $this->enrolment($buyer, $b);
-        $this->clock->modify('+86 days');
-        $this->runMaintenance();
-        $sourceB = $this->records->sources($courseB)[0];
-        self::assertSame('active', $sourceB['state'], 'Course B, never started, began automatically at its own activation deadline');
-        self::assertNull($this->db->fetchOne('SELECT started_at FROM course_enrolments WHERE id=:id', ['id' => $courseB]), 'which does not mark the learner as having started.');
+        self::assertSame('active', $this->records->sources($courseB)[0]['state'], 'Course B, new to the learner, started on payment too');
+        self::assertNotNull($this->db->fetchOne('SELECT started_at FROM course_enrolments WHERE id=:id', ['id' => $courseB]), 'and opens at once.');
+        self::assertTrue($this->access->start($courseB), 'Pressing Start course afterwards changes nothing.');
     }
 
     public function testFreeAccessAndTwoBundlesAreThreeSourcesOfOneCourse(): void
@@ -179,8 +175,8 @@ final class EntitlementSourcesIntegrationTest extends TestCase
         self::assertSame(1, $this->openCount($buyer, $free), 'Still one course.');
         [$lineX, $lineY] = $this->records->items($order);
         $refunds = $this->refunds();
-        $refunds->approve($this->admin(), $order, (int) $lineX['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 60000);
-        $refunds->approve($this->admin(), $order, (int) $lineY['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 50000);
+        $refunds->approve($this->admin(), $order, (int) $lineX['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 60000, 'The course started on payment; refund mechanics under test.');
+        $refunds->approve($this->admin(), $order, (int) $lineY['id'], Uuid::v4(), 'voluntary', 'Customer request', 1, 50000, 'The course started on payment; refund mechanics under test.');
         self::assertSame(['active', 'revoked', 'revoked'], array_column($this->records->sources($enrolment), 'state'), 'Both bundles refunded: their sources go; the free access, active since it was accepted, stays.');
         self::assertTrue($this->access->assertAccess($enrolment));
         self::assertSame('cancelled', $this->enrolmentStatus($this->enrolment($buyer, $a, true)));
@@ -214,7 +210,7 @@ final class EntitlementSourcesIntegrationTest extends TestCase
         $auth = clone IntegrationContainer::get()->get(AuthService::class);
         (new \ReflectionProperty(AuthService::class, 'currentUser'))->setValue($auth, $buyer);
         $checkout = new CheckoutService($auth, $this->orders, $this->records, $this->payments, $this->fulfilment, new TransactionManager($this->db), $this->analytics(), $this->billing);
-        $order = (int) $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $order = (int) $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         self::assertSame('fulfilled', $this->records->order($order)['state']);
         return $order;
     }
@@ -231,7 +227,7 @@ final class EntitlementSourcesIntegrationTest extends TestCase
 
     private function refunds(): RefundAdministrationService
     {
-        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(), $this->access,IntegrationContainer::get()->get(FinancialDocuments::class));
+        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(), $this->access,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
     }
 
     /** What the scheduled maintenance does for entitlements, at the mock clock's time. */

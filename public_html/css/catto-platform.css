@@ -4,6 +4,9 @@
    Repair the existing component rules in place. Do not add late override layers;
    rendered browser checks and ownership tests protect the shared geometry.
    Changelog:
+2026/10/17 SAST (tables on phones)
+- Nothing in a table or a toolbar stands out of its card at any width: a table with an action column gives that column at least its control's width (automatic layout, every other cell at max-width 0), row actions outside a table wrap, and the Activity search field keeps room to type.
+- Tables on a phone: only the essential columns (data-phone="hide" on the others), 7pt text, one Actions menu for several actions kept in a row (action.row narrow_menu), and a tooltip with the whole row.
 2026/10/17 SAST (Part C)
 - Bootstrap 6 underneath: 5.3.8's reboot values as plain rules, so lessons read as written; the safety-net colours; Core's field, display, lead, colour, container, box and monospace classes (cl-input, cl-select, cl-check, cl-label, cl-lead, cl-display-*, cl-text-*, cl-bg-subtle, cl-container, cl-box, cl-border-bottom, cl-mono); the content block accordion (a details element) and its scrolling table; every utility the markup uses, !important as 5.3.8's were; the 5.3.8 link underline. All unlayered, as 5.3.8's rules were, so themes meet them on specificity. The unused .cl-narrow and .cl-medium rules are gone: no markup has carried them since Part B.
 2026/10/17 SAST
@@ -397,12 +400,14 @@ summary{display:list-item;cursor:pointer}
 .cl-tag-chip.is-selected{border-color:currentColor;font-weight:800;box-shadow:inset 0 0 0 1px currentColor}
 .cl-tag-chip.is-selected .cl-category-count{opacity:.85}
 .cl-tag-cloud{display:flex;flex-wrap:wrap;align-items:baseline;gap:.6rem}
-.cl-tag-weight-0{font-size:.78rem;opacity:.45}
-.cl-tag-weight-1{font-size:.85rem}
-.cl-tag-weight-2{font-size:.95rem}
-.cl-tag-weight-3{font-size:1.1rem}
-.cl-tag-weight-4{font-size:1.3rem}
-.cl-tag-weight-5{font-size:1.55rem;font-weight:800}
+/* A tag cloud: the more courses a tag labels, the bigger it is (CourseTagController::weighted, five steps
+   on a log scale). Scoped to the cloud and stated with its chip class, so a theme's chip size cannot
+   flatten it: every tag at one size is not a cloud (owner, 2026-10-18). */
+.cl-tag-cloud .cl-tag-chip.cl-tag-weight-1{font-size:.8rem}
+.cl-tag-cloud .cl-tag-chip.cl-tag-weight-2{font-size:.95rem}
+.cl-tag-cloud .cl-tag-chip.cl-tag-weight-3{font-size:1.15rem;font-weight:600}
+.cl-tag-cloud .cl-tag-chip.cl-tag-weight-4{font-size:1.4rem;font-weight:700}
+.cl-tag-cloud .cl-tag-chip.cl-tag-weight-5{font-size:1.75rem;font-weight:800}
 .cl-course-tags{display:flex;flex-wrap:wrap;gap:.35rem;margin:.5rem 0 0}
 .cl-active-facet{display:flex;align-items:center;gap:.6rem}
 .cl-tag-row-wrap{display:flex;align-items:center;gap:.4rem;width:100%;flex-wrap:nowrap}
@@ -462,6 +467,9 @@ summary{display:list-item;cursor:pointer}
 .cl-ui-table td input,.cl-ui-table td select{padding:.2rem .4rem!important;font-size:var(--cl-table-btn-font)!important;min-height:0!important}/* Nothing inside a row stacks: not the actions, not a secondary line, not a hand-written flex box. */
 
 .cl-ui-row-actions,.cl-ui-table .cl-ui-row-actions,.cl-ui-table td .cl-ui-row-actions{display:inline-flex!important;flex-wrap:nowrap!important;align-items:center;gap:.3rem;white-space:nowrap}
+/* Outside a table, a row of actions wraps when it does not fit: a toolbar is not a table row, and
+   kept on one line the Themes toolbar stood 150px out of its card on a phone. */
+.cl-ui-row-actions:not(.cl-ui-table .cl-ui-row-actions){flex-wrap:wrap!important}
 .cl-ui-row-actions form,.cl-ui-table td form{display:inline-flex!important;margin:0!important}
 .cl-ui-table td .d-flex{flex-wrap:nowrap!important}
 .cl-ui-table td>div,.cl-ui-table td>p,.cl-ui-table td>span.muted,.cl-ui-table td>.small{display:inline!important;margin:0}
@@ -487,7 +495,19 @@ summary{display:list-item;cursor:pointer}
    The cell itself must not clip, or the panel is drawn outside the cell and simply is not shown -
    which is what made the first attempt at this look like a button that did nothing. */
 
-.cl-ui-table td.cell-actions,.cl-ui-table th.cell-actions{overflow:visible!important}/* The menu is core-owned and must not depend on a theme knowing what it is. Themes style `details`
+.cl-ui-table td.cell-actions,.cl-ui-table th.cell-actions{overflow:visible!important}
+/* An action column is never narrower than its control.
+
+   A declared share is a share of the table, and on a phone 13% of a table is about 40px: the
+   control did not fit, stood out past the table and pushed the page sideways (Enrolments, Themes),
+   or was squeezed until its label vanished (Activity's Details). A table with an action column
+   therefore uses the browser's automatic layout with every other cell at max-width 0, so only the
+   action cells are measured: the column takes the larger of its share and its control, and the
+   other columns keep their shares of what is left. Cells are border-box, so while the control fits
+   the columns are exactly what fixed layout gives them. A browser without :has() keeps fixed
+   layout. */
+.cl-ui-table:has(td.cell-actions) table{table-layout:auto!important}
+.cl-ui-table:has(td.cell-actions) th,.cl-ui-table:has(td.cell-actions) td:not(.cell-actions){max-width:0}/* The menu is core-owned and must not depend on a theme knowing what it is. Themes style `details`
    as a bordered accordion panel - Gilded Noir gives every one a border, a paper background, 18px of
    padding on its body and `overflow:hidden` - and all of that is wrong for a control that is one
    button and a floating panel. Restated here rather than fought selector by selector in five
@@ -586,9 +606,12 @@ summary{display:list-item;cursor:pointer}
 .cl-mt-2{margin-top:.625rem}
 .cl-mt-3{margin-top:1rem}
 .cl-row-between{display:flex;justify-content:space-between;gap:.75rem}
-.cl-row-inline{display:flex;align-items:center;gap:.5rem}
+.cl-row-inline{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
 .cl-row-wrap{display:flex;flex-wrap:wrap;gap:.5rem}
 .cl-flex-fill{flex:1}
+/* A field beside its buttons keeps room to type, like the shared dataset search: the buttons move
+   below it when the row is narrower than the field and the buttons together. */
+.cl-row-inline>.cl-flex-fill{flex:1 1 20rem;min-width:0}
 .cl-wrap-anywhere{white-space:pre-wrap;overflow-wrap:anywhere}
 
 .cl-course-cover-generated{display:block;line-height:0}
@@ -1076,7 +1099,7 @@ label.cl-ui-tree-select-option{position:relative}
 .cl-tag-cloud{min-width:0;max-height:36rem;overflow-y:auto;padding:.3rem}
 .cl-tag-cloud:focus-visible{outline:3px solid currentColor;outline-offset:3px}
 .cl-tag-cloud-shell .tagcloud{display:inline-block;font-weight:700;color:inherit}
-.cl-tag-cloud-shell .tagcloud--item{cursor:pointer;padding:.1rem .25rem;border-radius:6px;color:inherit}
+.cl-tag-cloud-shell .tagcloud--item{cursor:pointer;padding:.1rem .25rem;border-radius:6px;color:inherit;white-space:nowrap}
 .cl-tag-cloud-shell .tagcloud--item:hover{background:color-mix(in srgb,currentColor 14%,transparent)}
 @media(max-width:700px){
  .cl-tag-cloud-shell.is-animated{grid-template-columns:minmax(0,1fr)}
@@ -1264,6 +1287,8 @@ body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice
 .cl-ui-compact-action{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}.cl-ui-compact-action input,.cl-ui-compact-action select{width:auto;max-width:100%}
 .cl-ui-table{max-width:100%;overflow-x:auto}.cl-ui-table table{width:100%;border-collapse:collapse}.cl-ui-table[data-density="compact"] th,.cl-ui-table[data-density="compact"] td{padding:.4rem}
 .cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}.cl-ui-stat-grid[data-columns="1"]{grid-template-columns:1fr}.cl-ui-stat-grid[data-columns="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.cl-ui-stat-grid[data-columns="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}.cl-ui-stat-card{padding:1.2rem;min-width:0;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}.cl-ui-stat-value{font-size:1.8rem;font-weight:700}.cl-ui-stat-label{font-weight:600}.cl-ui-stat-note{font-size:.85rem}
+/* A stat card that opens what it counts (the dashboard's money figures): the card is the link, in the card's own colours. */
+a.cl-ui-stat-link{display:block;color:inherit;text-decoration:none}a.cl-ui-stat-link:hover{border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))}a.cl-ui-stat-link:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}a.cl-ui-stat-link .cl-ui-stat-label{text-decoration:underline;text-underline-offset:.2em}
 .cl-ui-list{display:grid;gap:.75rem}.cl-ui-list-item{display:flex;align-items:start;justify-content:space-between;gap:1rem;min-width:0}.cl-ui-list-item>div{min-width:0}
 .cl-ui-key-value-list{display:grid;grid-template-columns:minmax(6rem,1fr) minmax(0,2fr);gap:.5rem 1rem}.cl-ui-key-value-list dt{font-weight:600}.cl-ui-key-value-list dd{margin:0;overflow-wrap:anywhere}
 .cl-ui-badge{display:inline-flex;align-items:center;max-width:100%;border-radius:99px;padding:.25em .65em;font-size:.8rem;line-height:1.4;font-weight:600;white-space:normal;background:#edf0f4;color:#273343}.cl-ui-badge--small{font-size:.7rem}
@@ -1305,6 +1330,36 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-ui-table[data-density="compact"]{--cl-table-pad-y:4px;--cl-table-pad-x:7px}
 
 @media(max-width:700px){.cl-ui-table .cl-ui-row-label{display:none}.cl-ui-table .cl-ui-row-trigger{gap:0}}
+/* Tables on a phone (owner, 2026-10-17; UX rule 2.9). Squeezing every column into a phone's width at
+   the desktop size left nothing readable. At 700px and narrower a table:
+   - keeps only the columns that say what a row is and what can be done with it. The shared header
+     marks the others data-phone="hide", and the cells of a hidden column go with it;
+   - sets its text, headings, badges and buttons in 7pt;
+   - turns several actions kept in a row into one Actions menu. action.row with narrow_menu renders
+     the row of buttons and the menu, and only one of them shows.
+   The row's tooltip (.cl-ui-table-tip, filled by platform-overrides.js) shows the whole row. */
+.cl-ui-row-menu.cl-ui-row-menu--narrow,.cl-ui-table .cl-ui-row-menu.cl-ui-row-menu--narrow{display:none!important}
+@media(max-width:700px){
+.cl-ui-table{--cl-table-font:7pt;--cl-table-head-font:7pt;--cl-table-btn-font:7pt;--cl-table-pad-x:6px}
+.cl-ui-table td .cl-ui-badge,.cl-ui-table td .small,.cl-ui-table td .muted,.cl-ui-table td small{font-size:7pt!important}
+.cl-ui-row-actions.cl-ui-row-actions--wide,.cl-ui-table td .cl-ui-row-actions.cl-ui-row-actions--wide{display:none!important}
+.cl-ui-row-menu.cl-ui-row-menu--narrow,.cl-ui-table .cl-ui-row-menu.cl-ui-row-menu--narrow{display:inline-block!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(1)[data-phone=hide])>table>*>tr>:nth-child(1){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(2)[data-phone=hide])>table>*>tr>:nth-child(2){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(3)[data-phone=hide])>table>*>tr>:nth-child(3){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(4)[data-phone=hide])>table>*>tr>:nth-child(4){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(5)[data-phone=hide])>table>*>tr>:nth-child(5){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(6)[data-phone=hide])>table>*>tr>:nth-child(6){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(7)[data-phone=hide])>table>*>tr>:nth-child(7){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(8)[data-phone=hide])>table>*>tr>:nth-child(8){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(9)[data-phone=hide])>table>*>tr>:nth-child(9){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(10)[data-phone=hide])>table>*>tr>:nth-child(10){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(11)[data-phone=hide])>table>*>tr>:nth-child(11){display:none!important}
+.cl-ui-table:has(>table>thead>tr>th:nth-child(12)[data-phone=hide])>table>*>tr>:nth-child(12){display:none!important}
+}
+/* The row's tooltip: the whole row as "Label: value" lines, when a cell is hidden or cut short. */
+.cl-ui-table-tip{position:fixed;z-index:1040;max-width:min(92vw,26rem);padding:8px 10px;border:1px solid var(--cl-border,#dfe4ea);border-radius:8px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,#18212b);box-shadow:0 10px 30px rgba(23,33,43,.18);font-size:.8rem;line-height:1.45;text-align:left;white-space:pre-line;overflow-wrap:anywhere;pointer-events:none}
+.cl-ui-table-tip[hidden]{display:none!important}
 
 /* Notice headings are structural; emphasis inside notice prose stays inline. */
 .cl-ui-notice-heading{display:block;margin-bottom:.3rem}
@@ -1337,16 +1392,14 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-page-head-actions{display:flex;flex-wrap:wrap;gap:.5rem;flex:0 1 auto;min-width:0;margin-left:auto}
 .cl-page-head-compact .cl-page-head-content{display:flex;align-items:center;flex-wrap:wrap;gap:.75rem}
 .cl-page-section{min-width:0}
-/* Page width and row spacing. A page chooses its width once - ThemeRenderer puts cl-width-wide (the
-   default), cl-width-medium, cl-width-narrow or cl-width-full on the body - and every row in main
-   (the page head, the identity band, each page section) takes its width and spacing from these
-   variables, not from Bootstrap container and spacing classes. The defaults draw what those classes
-   drew: Bootstrap's 1320px container with its .75rem gutter, 3rem above and below, and the 54rem and
-   38rem medium and narrow columns. Full is drawn as wide unless a theme draws it otherwise. A theme
-   changes a width, the gutter or the rhythm by setting the variables, never per page. */
+/* Page width and row spacing. Every page is the one standard width - ThemeRenderer puts cl-width-wide
+   on the body - except Home and course landing pages (cl-width-full); there are no narrow pages (owner,
+   2026-10-18). Every row in main (the page head, the identity band, each page section) takes its width
+   and spacing from these variables, not from Bootstrap container and spacing classes. The defaults
+   draw what those classes drew: Bootstrap's 1320px container with its .75rem gutter, 3rem above and
+   below. Full is drawn as wide unless a theme draws it otherwise. A theme changes the width, the
+   gutter or the rhythm by setting the variables, never per page. */
 .cl-body{--cl-content-width:1320px;--cl-gutter:.75rem;--cl-section-space:3rem}
-.cl-body.cl-width-medium{--cl-content-width:54rem}
-.cl-body.cl-width-narrow{--cl-content-width:38rem}
 /* A theme's page-family wrapper (div.cl-page-family) is transparent here: its sections are rows too. */
 .cl-page-head-inner,.cl-identity-head>.cl-identity-meta,:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section{width:100%;max-width:var(--cl-content-width);margin-inline:auto;padding-inline:var(--cl-gutter)}
 .cl-page-head-inner{padding-block:var(--cl-section-space)}

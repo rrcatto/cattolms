@@ -17,9 +17,13 @@
             <h3 class="h5">Company billing details</h3>
             <p>The invoice is made out to {{ basket.company.name }}, not to you. {{ billing.saved ? 'The company’s saved billing details are filled in; a correction here also updates them.' : 'These become the company’s saved billing details.' }}</p>
             {% include '@platform/partials/billing-fields.html.twig' with {billing_prefix: 'company-checkout-billing'} %}
+            {% if wallet_balance_minor > 0 %}
+            {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Use the company wallet (' ~ wallet_balance_label ~ ' available)'})} %}{% block control %}<input type="checkbox" name="use_wallet" value="yes" checked>{% endblock %}{% endembed %}
+            <p>The company wallet pays as much of the order as it holds, oldest credit first. The payment method below pays anything left.</p>
+            {% endif %}
             {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: 'dummy', allow_eft: not basket.request_id} %}
             {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email the invoice to ' ~ user_email})} %}{% block control %}<input type="checkbox" name="invoice_email" value="yes">{% endblock %}{% endembed %}
-            <p>Credits are specific to the course and access period shown. They are issued only after confirmed full payment. An unpaid order is cancelled after 7 days. No VAT is charged. Credits are refunded only within 7 days of purchase and only while no learner has started them.</p>
+            <p>Credits are specific to the course and access period shown. They are issued only after confirmed full payment. An order not paid in full within {{ payment_due }} is cancelled, and anything paid towards it goes to the company wallet. No VAT is charged. Credits are refunded only within {{ refund_window }} of purchase, only while no learner has started them, and only as wallet credit.</p>
             {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
             {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Place company order', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Edit credits', variant: 'secondary', size: 'normal', href: '/company/credits/buy'}) }}{% endblock %}{% endembed %}
         </form>

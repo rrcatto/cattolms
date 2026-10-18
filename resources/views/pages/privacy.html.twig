@@ -1,8 +1,8 @@
 {% extends layout %}
 {#
   Privacy Policy under the Protection of Personal Information Act 4 of 2013. The text is version
-  controlled here; its version and date are in CattoLearning\Legal\LegalDocuments and must be raised
-  there whenever this text changes. What it says is stored must match the schema, and the cookie
+  controlled here, and its last-updated date is in CattoLearning\Legal\LegalDocuments: change the date
+  whenever this text changes (no version numbers, owner 2026-10-17). What it says is stored must match the schema, and the cookie
   names and lifetimes must match the instance defaults (LegalDocumentsTest checks .env.example).
 #}
 {% block page_body %}
@@ -29,7 +29,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'responsible-party'})} %}
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: '1. Who is responsible'}) }}
-			<p>The responsible party under POPIA is {{ supplier.legal_name }}, a sole proprietor trading as {{ supplier.trading_name }}. He is also the Information Officer.</p>
+			<p>The responsible party under POPIA is {{ supplier.legal_name }}, {{ supplier.legal_form_phrase }} trading as {{ supplier.trading_name }}. The Information Officer is {{ supplier.information_officer }}.</p>
 			{{ ui('data.key-value-list', {items: [
 				{label: 'Responsible party', value: supplier.legal_name ~ ', trading as ' ~ supplier.trading_name},
 				{label: 'Information Officer', value: supplier.information_officer},
@@ -38,6 +38,7 @@
 				{label: 'Email address', value: supplier.email},
 				{label: 'Website', value: supplier.website},
 			]}) }}
+			<p>We may change this policy from time to time. The date at the top of this page shows when it last changed. If a change affects how we use information we already hold about you, we will email you before it takes effect.</p>
 {% endblock %}
 {% endembed %}
 
@@ -45,9 +46,11 @@
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: '2. What we collect'}) }}
 			<ul>
-				<li><strong>Your account.</strong> Your names, your display name, the name for your certificate and your email addresses. If you give them: your date of birth, gender, cell number, identification number, profile picture and links to your social media. Your role on the site and the company you belong to, if any. Checkout asks for your first name, last name and cell number.</li>
+				<li><strong>Your account.</strong> Your names, your display name, the name for your certificate and your email addresses. If you give them: your date of birth, gender, cell number, identification number, profile picture and links to your social media. Your role on the site and the company you belong to, if any. Your account reference, which the site gives your account when it is made. Checkout asks for your first name, last name and cell number.</li>
 				<li><strong>Billing details.</strong> Your billing name, organisation, tax number and address. They are copied into each order you place.</li>
-				<li><strong>Orders and payments.</strong> Your orders, what you bought and the prices, your invoices, receipts and credit notes, and each payment's method, amount and reference. For a direct EFT, the bank reference and date we confirmed it with. Any refund and the reason for it. We do not receive or store card numbers or banking login details.</li>
+				<li><strong>Orders and payments.</strong> Your orders, what you bought and the prices, your invoices, receipts and credit notes, and each payment's method, amount and reference. For a direct EFT, the bank reference and date we confirmed it with. Any refund request, what you wrote in it and our decision, and any refund and the reason for it. For money back by EFT, the bank details you give us are used only to make that payment and are not stored on this site. We do not receive or store card numbers or banking login details.</li>
+				<li><strong>Your wallet.</strong> Each amount of wallet credit added to your wallet, spent or expired, with its date and expiry date, and the reminders we email you before credit expires.</li>
+				<li><strong>Emails about your payments.</strong> An email we send you about a payment, a refund or your wallet is recorded with the transaction it is about.</li>
 				<li><strong>Learning records.</strong> The courses you are enrolled on, your progress, every answer you give in an assessment and how long you took to answer, your marks and results, course requests and their notes, and your certificates.</li>
 				<li><strong>Reviews.</strong> Your rating and what you write. Once a review is approved it is shown publicly with your first name and the first letter of your surname.</li>
 				<li><strong>Activity log.</strong> A record of actions on your account, such as signing in or changing your details. The activity log stores the IP address of each recorded action. You can see your own activity in your account.</li>

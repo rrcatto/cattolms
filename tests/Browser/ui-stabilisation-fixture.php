@@ -20,9 +20,13 @@ if (($argv[1] ?? '') === 'create') {
     $email = 'ui-stabilisation-' . $fixture->suffix() . '@example.test';
     $user = $fixture->createUser('UI stabilisation browser check', $email);
     $boot['container']->get(RoleRepository::class)->assign($user, 'ADMIN');
+    // The Company workspace (/company) needs a company to administer; there is no default company (no
+    // System Company), so this ADMIN administers a test company of its own.
+    $company = $fixture->createCompany($user, 'UI stabilisation browser company', 'ui-stabilisation-' . $fixture->suffix() . '.example.test');
+    $fixture->addCompanyMember($company, $user, 'administrator');
     $token = Token::generate();
     $boot['container']->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'UI stabilisation browser', $email);
-    file_put_contents($statePath, json_encode(['user' => $user, 'email' => $email, 'token' => $token], JSON_THROW_ON_ERROR));
+    file_put_contents($statePath, json_encode(['user' => $user, 'email' => $email, 'token' => $token, 'company' => $company], JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created isolated browser identity.\n";
 } elseif (($argv[1] ?? '') === 'cleanup') {
@@ -30,6 +34,7 @@ if (($argv[1] ?? '') === 'create') {
     if (!str_starts_with($state['email'], 'ui-stabilisation-')) throw new RuntimeException('Unexpected fixture identity.');
     $db->executeStatement('DELETE FROM audit_log WHERE user_id = :id', ['id' => $state['user']]);
     $db->executeStatement('DELETE FROM users WHERE id = :id AND EXISTS (SELECT 1 FROM user_emails WHERE user_id = users.id AND email = :email)', ['id' => $state['user'], 'email' => $state['email']]);
+    if ((int) ($state['company'] ?? 0) > 0) $db->executeStatement("DELETE FROM companies WHERE id = :id AND domain LIKE 'ui-stabilisation-%'", ['id' => (int) $state['company']]);
     unlink($statePath);
     echo "Removed browser identity and its activity.\n";
 } else {

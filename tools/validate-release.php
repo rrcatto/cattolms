@@ -9,6 +9,8 @@ Validates the Catto Learning v0.5.8 Seed Database release contract: PHP 8.5.9, r
 Changelog:
 2026/10/08 SAST
 - 92 permissions with PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE (the financial document design).
+2026/10/17 SAST
+- 97 permissions with the wallet and refund request keys.
 2026/10/07 SAST
 - composer.json must require ext-gd.
 2026/10/07 SAST
@@ -59,7 +61,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.9.3', 'composer.json version must be 0.9.3.');
+$need(($composer['version'] ?? '') === '0.9.4', 'composer.json version must be 0.9.4.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 // ext-gd: profile images and certificate pictures are processed with GD, and an installation without
 // it answered an upload with HTTP 500, so `composer install` refuses a server that lacks it.
@@ -103,13 +105,14 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // COMPANY.BILLING.MANAGE: a company's billing details are company-owned data with their own authority.
 // 86 with PLATFORM.PROMOTION.VIEW and PLATFORM.PROMOTION.MANAGE: promo codes and their usage. 88 with
 // BUNDLE.MANAGEMENT.VIEW and BUNDLE.MANAGE: course bundles are a catalogue offer of their own. 90 with
-// CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE: certificate designs. 92 with PLATFORM.DOCUMENT.VIEW
+// CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE: certificate designs. 97 with the wallet and refund request keys
+// (COMMERCE.WALLET.VIEW, COMMERCE.REFUND.REQUEST, COMPANY.WALLET.VIEW, PLATFORM.WALLET.VIEW/MANAGE). 92 with PLATFORM.DOCUMENT.VIEW
 // and PLATFORM.DOCUMENT.MANAGE: the design of invoices, receipts and credit notes.
-$need(count($permissionKeys) === 92, 'PermissionCatalog must define exactly 92 reserved/current secure actions for this release.');
+$need(count($permissionKeys) === 97, 'PermissionCatalog must define exactly 97 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 82, 'ACL catalogue must contain 10 SYSTEM and 82 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 87, 'ACL catalogue must contain 10 SYSTEM and 87 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -181,7 +184,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.9.3'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.9.4'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 

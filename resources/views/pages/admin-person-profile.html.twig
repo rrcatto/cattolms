@@ -28,6 +28,7 @@
 						· {{ company.name }}
 					{% endif %}
 				</p>
+				{% if account_reference_label|default('') %}<p>Account reference: <strong>{{ account_reference_label }}</strong></p>{% endif %}
 				<div class="chip-row cl-mt-2">
 					{% for role in roles %}
 						{{ ui('feedback.badge', {label: (role), tone: 'info'}) }}
@@ -126,7 +127,7 @@
 
 {% endblock %}
 {% endembed %}
-				{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: selected_company, lk_required: 1, lk_empty: 'Search for the company'} %}
+				{# No company is a private account (owner, 2026-10-18); a Company Administrator needs one. #}{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'company_id', lk_type: 'companies', lk_label: 'Company', lk_selected: selected_company, lk_required: 0, lk_empty: 'No company: a private account'} %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Roles', full_width: true, for: 'profile-role-0', help: 'The platform must always retain at least one Platform Administrator. The last administrator cannot remove or disable their own administrator role.'})} %}
 {% block control %}
 

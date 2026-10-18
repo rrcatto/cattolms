@@ -86,14 +86,15 @@
 			{% endif %}
 
 			{% if active_tab == 'people' %}
-				{{ ui('layout.section-head', {heading: 'Owner & editors', heading_level: 2, summary: 'Every course has both an owning company and an owning person. Course Editors may work only on courses assigned to them.'}) }}
+				{{ ui('layout.section-head', {heading: 'Owner & editors', heading_level: 2, summary: 'Every course has an owning person, and an owning company or none: a course no company owns belongs to the Site Owner. Course Editors may work only on courses assigned to them.'}) }}
 				<form action="/admin/courses/{{ course.id }}/people" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 'wide'})} %}
 {% block body %}
-						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', for: 'owner-company', required: true, help: 'Newly imported courses default to the System Company.'})} %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Owning company', for: 'owner-company', help: 'Courses ADMIN creates or imports belong to the Site Owner, which is no company.'})} %}
 {% block control %}
-							<select class="cl-select" name="owner_company_id" required id="owner-company" {{ ui_field_attrs(props) }}>
+							<select class="cl-select" name="owner_company_id" id="owner-company" {{ ui_field_attrs(props) }}>
+							<option value="0" {{ course.owner_company_id is null ? 'selected' : '' }}>No company: the Site Owner</option>
 							{% for ownerCompany in owner_companies %}<option value="{{ ownerCompany.id }}" {{ ownerCompany.id==course.owner_company_id ? 'selected' : '' }}>{{ ownerCompany.name }}</option>{% endfor %}
 							</select>
 {% endblock %}
@@ -143,8 +144,8 @@
 						{% for price_index, price in course.price_variants %}
 							{% set price_form = 'price-edit-' ~ price.id %}
 							<tr id="price-{{ price.id }}">
-								<td>
-									{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+								<td class="cell-actions">
+									{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, label: 'Move'})} %}
 {% block body %}
 										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: price_index==0}) }}</form>
 										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: price_index+1==course.price_variants|length}) }}</form>
@@ -162,7 +163,7 @@
 									</td>
 									<td><input class="cl-input" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label"></td>
 									<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active'})} %}{% block control %}<input type="checkbox" form="{{ price_form }}" name="is_active" value="1" {{ price.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}</td>
-									<td>
+									<td class="cell-actions">
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 											<form id="{{ price_form }}" action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit'}) }}</form>
@@ -178,8 +179,8 @@
 										{% if price.is_default %}{{ ui('feedback.badge', {label: 'Default', tone: 'info', size: 'small'}) }}{% endif %}
 										{{ ui('feedback.badge', {label: (price.is_active ? 'Active' : 'Inactive'), tone: price.is_active ? 'success' : 'neutral', size: 'small'}) }}
 									</td>
-									<td>
-										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
+									<td class="cell-actions">
+										{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true})} %}
 {% block body %}
 											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: tab_url ~ '&edit_price=' ~ price.id ~ '#price-' ~ price.id}) }}
 											{% if not price.is_default %}
@@ -236,10 +237,10 @@
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '')})} %}
 {% block header %}
 						<tr>
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Position'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Position', wide: true}} %}
 							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 52, label: 'Title'}} %}
 							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Type'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Placement'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Placement', wide: true}} %}
 						</tr>
 {% endblock %}
 {% block body %}
@@ -393,7 +394,7 @@
 						<tr>
 							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'When'}} %}
 							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 53, label: 'Change'}} %}
-							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'By'}} %}
+							{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'By', wide: true}} %}
 						</tr>
 {% endblock %}
 {% block body %}

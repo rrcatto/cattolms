@@ -1,9 +1,10 @@
 {% extends layout %}
 {#
-  Terms and Conditions. The text is version controlled here; its version and date are in
-  CattoLearning\Legal\LegalDocuments and must be raised there whenever this text changes, because an
-  order records the version its purchaser accepted. The day counts come from the code that enforces
-  them (RefundRule, CommercePolicy) so the text cannot drift from it.
+  Terms and Conditions. The text is version controlled here, and its last-updated date is in
+  CattoLearning\Legal\LegalDocuments: change the date whenever this text changes. There are no version
+  numbers (owner, 2026-10-17): an order records when its purchaser accepted, and the wording in force
+  then applies to it. The periods and fees come from the commerce settings in force (LegalController),
+  so the text cannot drift from the code that enforces them.
 #}
 {% block page_body %}
 	{% set ph_kicker = 'Legal' %}
@@ -18,10 +19,11 @@
 		{id: 'prices', label: 'Prices and payment'},
 		{id: 'access', label: 'Access to a course'},
 		{id: 'account', label: 'Your account'},
+		{id: 'wallet', label: 'Wallet credit'},
 		{id: 'acceptable-use', label: 'Acceptable use'},
 		{id: 'certificates', label: 'Certificates and transcripts'},
 		{id: 'intellectual-property', label: 'Intellectual property'},
-		{id: 'refunds', label: 'Cooling-off and refunds'},
+		{id: 'refunds', label: 'Cancellation and refunds'},
 		{id: 'liability', label: 'Limitation of liability'},
 		{id: 'privacy', label: 'Privacy'},
 		{id: 'complaints', label: 'Complaints and disputes'},
@@ -36,23 +38,28 @@
 			{{ ui('data.key-value-list', {items: [
 				{label: 'Full name', value: supplier.legal_name},
 				{label: 'Legal status', value: supplier.legal_status},
+				{label: 'Registration number', value: supplier.registration_number},
 				{label: 'Trading name', value: supplier.trading_name},
 				{label: 'Physical address', value: supplier.physical_address},
+				{label: 'Address for legal service', value: supplier.physical_address},
 				{label: 'Telephone', value: supplier.phone},
 				{label: 'Email address', value: supplier.email},
 				{label: 'Website', value: supplier.website},
 				{label: 'Information Officer', value: supplier.information_officer},
+				{label: 'Self-regulatory bodies and codes of conduct', value: supplier.memberships},
+				{label: 'Accreditation', value: supplier.accreditation},
 			]}) }}
-			<p>{{ supplier.trading_name }} is the seller. When you buy on this site you buy from {{ supplier.legal_name }}, not from a payment provider or any other party. The seller is a person and not a company, so there is no company registration number.</p>
+			<p>{{ supplier.trading_name }} is the seller. When you buy on this site you buy from {{ supplier.legal_name }}, {{ supplier.legal_form_phrase }}, not from a payment provider or any other party.{% if not supplier.is_company %} The seller is not a company, so there is no company registration number.{% endif %}</p>
+			<p>Legal documents may be served on the seller at the address for legal service above. The seller also accepts service by email at <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>.</p>
 			<p>The rest of the information ECTA requires is in these sections:</p>
 			<ul>
 				<li>what is sold - <a href="#what-we-sell">section 3</a></li>
 				<li>the full price and how to pay - <a href="#prices">section 4</a></li>
-				<li>when you get access and how long it lasts - <a href="#access">section 5</a></li>
+				<li>when a course starts and how long access lasts - <a href="#access">section 5</a></li>
 				<li>the record of your purchase - <a href="#prices">section 4</a></li>
-				<li>your cooling-off right and refunds - <a href="#refunds">section 10</a> and the <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a></li>
+				<li>cancellation and refunds - <a href="#refunds">section 11</a> and the <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a></li>
 				<li>payment security and privacy - <a href="#prices">section 4</a> and the <a href="{{ legal_documents.privacy.path }}">{{ legal_documents.privacy.title }}</a></li>
-				<li>complaints - <a href="#complaints">section 13</a></li>
+				<li>complaints and disputes - <a href="#complaints">section 14</a></li>
 			</ul>
 {% endblock %}
 {% endembed %}
@@ -61,8 +68,9 @@
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: '2. About these terms'}) }}
 			<p>In these terms 'we', 'us' and 'the seller' mean {{ supplier.legal_name }} trading as {{ supplier.trading_name }}. 'You' means the person using the site or placing an order. 'The site' means {{ supplier.website }}.</p>
-			<p>You accept these terms and the <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a> by ticking the acceptance box at checkout. An order cannot be placed without it. Before you place an order, checkout shows you the whole order so that you can review it, correct it or leave without buying.</p>
-			<p>Each version of these terms has a number and a date, shown at the top of this page. Your order records the version you accepted, when you accepted it and the session you were signed in with. That version applies to that order.</p>
+			<p>You accept these terms and the <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a> by ticking the acceptance box at checkout. You also tick a box to agree that your courses start as soon as your payment is confirmed. An order cannot be placed without both. Before you place an order, checkout shows you the whole order so that you can review it, correct it or leave without buying.</p>
+			<p>Your order records when you accepted these terms. The date at the top of this page shows when they last changed. You can print this page or save it from your browser.</p>
+			<p>We may change these terms from time to time. The terms that apply to a purchase are the ones in force when you made it, and changes apply only to later purchases unless the law requires otherwise or the change gives you more rights. If a change affects your account or wallet credit, we will email you at least 30 days before it takes effect.</p>
 {% endblock %}
 {% endembed %}
 
@@ -75,6 +83,7 @@
 				<li><strong>A bundle.</strong> A bundle is two or more courses sold together for one price and one access period.</li>
 				<li><strong>Company credits.</strong> A company can buy credits. One credit gives one staff member access to one named course for the access period shown. Only the Company Administrator buys credits for a company. Bundles are not sold to companies.</li>
 				<li><strong>A free course.</strong> A free course is added to your library when you complete checkout. Its access period starts at once. It has no order, invoice or payment.</li>
+				<li><strong>Wallet credit is not sold.</strong> <a href="#wallet">Section 7</a> explains where wallet credit comes from.</li>
 			</ul>
 			<p>You get a course as it is published. We may correct or update a course while you have access to it.</p>
 {% endblock %}
@@ -87,8 +96,9 @@
 			<p>The seller is not registered for VAT. No VAT is charged. The price shown is the full price.</p>
 			<p>A promo code is entered at checkout. One code can be used on an order. The discount is shown before you place the order. Promo codes cannot be used on company credit orders.</p>
 			<p>Payments are processed by Stitch. You enter your card details on Stitch's secure payment page. Card details never reach this site and are never stored by it.</p>
-			<p>Direct EFT is also accepted. You pay into our bank account and use your order number as the payment reference. A direct EFT is confirmed when we see the payment in our bank account.</p>
-			<p>An order that is not paid within {{ payment_due_days }} days is cancelled automatically.</p>
+			<p>Direct EFT is also accepted. You pay into our bank account and use your account reference as the payment reference (<a href="#account">section 6</a>). A direct EFT is confirmed when we see the payment in our bank account. If you pay more than the amount due, the difference is added to your wallet. If you pay less, the order waits until the rest is paid.</p>
+			<p>You can pay all or part of an order with wallet credit. The rest is paid by card or EFT.</p>
+			<p>An order that is not paid in full within {{ payment_due }} is cancelled automatically. Anything you paid towards it is added to your wallet.</p>
 			<p>We issue an invoice when you place an order and a receipt when your payment is confirmed. Both are PDF documents that stay available under My Orders in your account. We keep order and transaction records for at least 5 years.</p>
 {% endblock %}
 {% endembed %}
@@ -96,12 +106,10 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'access'})} %}
 {% block surface_body %}
 			{{ ui('layout.section-head', {heading: '5. Access to a course'}) }}
-			<p>A course you have paid for is added to your library when your payment is confirmed.</p>
-			<p>Your access period starts when you press Start course. If you have not pressed Start course {{ activation_deadline_days }} days after your payment was confirmed, the access period starts automatically on that day.</p>
-			<p>The access period is fixed. It runs from its start to its end. Unused time is not refunded.</p>
+			<p><strong>Every course you buy starts as soon as your payment is confirmed.</strong> At checkout you tick a box to agree to this. The course is added to your library and your access period begins at that moment. Every course in a bundle starts in the same way.</p>
+			<p>The access period is fixed. It runs from its start to its end. Unused time is not refunded. Your dashboard shows when each course started, when its access ends and how many days are left.</p>
 			<p>When the access period ends, the course leaves your library and you can no longer open it. The records of your work on the course are kept.</p>
-			<p>In a bundle, each course has its own start. A course starts when you press Start course for that course, or automatically {{ activation_deadline_days }} days after your payment was confirmed.</p>
-			<p>For a company credit, the staff member's access period starts when they press Start course. Starting uses the credit. If the Company Administrator removes a staff member from a course before they start, the credit returns to the company.</p>
+			<p>For a company credit, the staff member's access period starts when they press Start course and confirm it. Starting uses the credit. If the Company Administrator removes a staff member from a course before they start, the credit returns to the company.</p>
 {% endblock %}
 {% endembed %}
 
@@ -111,14 +119,31 @@
 			<p>You need an account to buy or take a course. You sign in with a one-time link sent to your email address. There are no passwords. A sign-in link works once and expires after 30 minutes.</p>
 			<p>Anyone who can read your email can sign in as you. Keep your email account secure. You are responsible for what is done through your account. You can see your active sessions in your account and end any of them.</p>
 			<p>You must be 18 or older to use this site. If you are under 18 you need the consent of your parent or guardian.</p>
-			<p>You may take a course under any name you choose. <a href="#certificates">Section 8</a> explains the name that appears on a certificate and a transcript.</p>
+			<p>You may take a course under any name you choose. <a href="#certificates">Section 9</a> explains the name that appears on a certificate and a transcript.</p>
+			<p>Your account has an account reference, such as CL-20261017-0001-U. It never changes. It is shown on your dashboard, on your profile and on your orders. Quote it when you pay by EFT or write to us. A company has an account reference of its own.</p>
 			<p>Your invoice is made out to the billing details you give at checkout. Give details that are correct.</p>
+{% endblock %}
+{% endembed %}
+
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'wallet'})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: '7. Wallet credit'}) }}
+			<p>Your account has a wallet. Wallet credit can be spent on courses on this site. A company's wallet can also buy company credits.</p>
+			<p>Wallet credit comes from:</p>
+			<ul>
+				<li>a refund you chose to take as wallet credit</li>
+				<li>an EFT payment that was more than the amount due</li>
+				<li>an order that was cancelled after you had paid towards it</li>
+			</ul>
+			<p>Each amount of wallet credit expires {{ wallet_expiry }} after it was added, if it has not been spent. When you spend wallet credit, the credit that expires first is used first. We email you {{ wallet_reminder }} before credit expires.</p>
+			<p>Wallet credit earns no interest. It is not paid out as cash and cannot be passed to another person or company.</p>
+			<p>My Wallet in your account shows your balance and a statement of every amount added, spent and expired, with its expiry date.</p>
 {% endblock %}
 {% endembed %}
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'acceptable-use'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '7. Acceptable use'}) }}
+			{{ ui('layout.section-head', {heading: '8. Acceptable use'}) }}
 			<p>You may not:</p>
 			<ul>
 				<li>share your account or a sign-in link with another person</li>
@@ -133,7 +158,7 @@
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'certificates'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '8. Certificates and transcripts'}) }}
+			{{ ui('layout.section-head', {heading: '9. Certificates and transcripts'}) }}
 			<p>A certificate is issued to every learner who completes every assessment in a course, whether or not they pass.</p>
 			<p>A certificate and a transcript are issued only after your identity has been verified. Both state your name exactly as it appears on your official identity document.</p>
 			<p>To be verified:</p>
@@ -143,7 +168,7 @@
 			</ul>
 			<p>We review the document, download it for secure offline storage and then delete it from the website. The website keeps only your ID or passport number, your verified name, and who verified it and when. Offline copies are kept for 5 years.</p>
 			<p>The purpose of verification is to protect the credibility of certificates and transcripts.</p>
-			<p>A certificate states only that you took the course. It shows your verified name, the course, the date, the certificate number, the accreditation and the provider. It shows no grade.</p>
+			<p>A certificate states only that you took the course. It shows your verified name, the course, the date, the certificate number, any accreditation stated for the course and the provider. It shows no grade.</p>
 			<p>A transcript records each module assessment mark, the final assessment mark and the overall grade. The overall grade is 50% module assessments and 50% final assessment.</p>
 			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Certificates and transcripts are public'})} %}
 {% block body %}
@@ -155,7 +180,7 @@
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'intellectual-property'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '9. Intellectual property'}) }}
+			{{ ui('layout.section-head', {heading: '10. Intellectual property'}) }}
 			<p>Course content and the other material on this site belong to the seller or to the course's provider. They are protected by copyright.</p>
 			<p>Buying access gives you a personal right to use a course for your own study during your access period. You cannot transfer that right to another person. Buying access does not make you the owner of any content.</p>
 			<p>A company that buys credits may give access only to its own staff members.</p>
@@ -164,21 +189,19 @@
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'refunds'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '10. Cooling-off and refunds'}) }}
-			<p>Section 44 of ECTA gives a consumer the right to cancel an electronic transaction for a service, without reason and without penalty, within 7 days after the agreement is concluded. Under section 42(2)(d) of ECTA that right does not apply to a service that began with the consumer's consent before the 7 days ended. Pressing Start course begins the service at your request.</p>
-			<p>You can therefore cancel a purchase and receive a refund only if both of these are true:</p>
-			<ol>
-				<li>you have not started the course, which means you have not pressed Start course</li>
-				<li>fewer than {{ refund_window_days }} days have passed since your purchase</li>
-			</ol>
-			<p>Once you start the course, or {{ refund_window_days }} days pass, whichever comes first, no refund is given.</p>
-			<p>The <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a> sets out the full rule, the rules for bundles and company credits, how a refund is paid and how to ask for one. It is part of these terms.</p>
+			{{ ui('layout.section-head', {heading: '11. Cancellation and refunds'}) }}
+			<p>Section 44 of ECTA gives a consumer the right to cancel an electronic transaction for a service, without reason and without penalty, within 7 days after the agreement is concluded. Under section 42(2)(d) of ECTA that right does not apply to a service that began with the consumer's consent before the 7 days ended.</p>
+			<p>Every course you buy starts as soon as your payment is confirmed, and at checkout you agree to this. <strong>Once a course has started, its content has been supplied to you and cannot be returned. No refund of any kind is given for it: no money back and no wallet credit.</strong></p>
+			<p>Company credits that no learner has started can be refunded as wallet credit within {{ refund_window }} of buying them.</p>
+			<p>When a refund is given, a refund of a card payment is what we received: the amount you paid less the Stitch transaction fee and, for money back, the Stitch refund fee. Money back for an EFT payment is less our EFT refund fee. Anything you paid from your wallet goes back to your wallet.</p>
+			<p>None of this affects your rights if a course is faulty, is not as described or cannot be provided. Tell us and we will put it right or refund you as the law requires.</p>
+			<p>The <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a> sets out the full rule, every deduction, how a refund is paid and how to ask for one. It is part of these terms.</p>
 {% endblock %}
 {% endembed %}
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'liability'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '11. Limitation of liability'}) }}
+			{{ ui('layout.section-head', {heading: '12. Limitation of liability'}) }}
 			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Please read this section carefully'})} %}
 {% block body %}
 				It limits what the seller is responsible for.
@@ -194,14 +217,14 @@
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'privacy'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '12. Privacy'}) }}
+			{{ ui('layout.section-head', {heading: '13. Privacy'}) }}
 			<p>We collect and use personal information as the <a href="{{ legal_documents.privacy.path }}">{{ legal_documents.privacy.title }}</a> describes. It explains what is collected, who receives it, how long it is kept and your rights under the Protection of Personal Information Act 4 of 2013.</p>
 {% endblock %}
 {% endembed %}
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'complaints'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '13. Complaints and disputes'}) }}
+			{{ ui('layout.section-head', {heading: '14. Complaints and disputes'}) }}
 			<p>If you have a complaint, contact us first:</p>
 			<ul>
 				<li>email <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a></li>
@@ -209,14 +232,14 @@
 				<li>the <a href="/contact">contact form</a></li>
 				<li>post to {{ supplier.legal_name }}, {{ supplier.physical_address }}</li>
 			</ul>
-			<p>If your complaint is about a purchase, give your order number. It starts with CL-. We respond to every complaint promptly.</p>
-			<p>If we cannot settle a complaint with you, you may refer it to the National Consumer Commission or to a court that has jurisdiction.</p>
+			<p>If your complaint is about a purchase, give your account reference and your order number. We respond to every complaint promptly.</p>
+			<p>If we cannot settle a complaint with you, you may refer it free of charge to the Consumer Goods and Services Ombud (<a href="https://www.cgso.org.za" target="_blank" rel="noopener">www.cgso.org.za</a>). You may also refer it to the National Consumer Commission or to a court that has jurisdiction.</p>
 {% endblock %}
 {% endembed %}
 
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'law'})} %}
 {% block surface_body %}
-			{{ ui('layout.section-head', {heading: '14. Governing law'}) }}
+			{{ ui('layout.section-head', {heading: '15. Governing law'}) }}
 			<p>These terms and every purchase made on this site are governed by the law of South Africa.</p>
 			<p>If a court finds that part of these terms cannot be enforced, the rest of these terms still applies.</p>
 {% endblock %}

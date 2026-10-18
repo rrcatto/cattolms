@@ -76,12 +76,12 @@ final class IdentityDisplayNameContractTest extends TestCase
      */
     public function testGildedNoirNavigationChipUsesTheDisplayName(): void
     {
-        foreach (['JaneD', ''] as $displayName) {
+        foreach (['ThandiN', ''] as $displayName) {
             $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/account/identity-compact', [
-                'identity_display_name' => $displayName, 'identity_name' => 'Jane Doe',
+                'identity_display_name' => $displayName, 'identity_name' => 'Thandi Nkosi',
                 'identity_email' => 'reader@example.test', 'user' => ['name' => 'Fallback'],
             ]);
-            self::assertStringContainsString('<strong class="cl-identity-name">' . ($displayName ?: 'Jane Doe') . '</strong>', $html);
+            self::assertStringContainsString('<strong class="cl-identity-name">' . ($displayName ?: 'Thandi Nkosi') . '</strong>', $html);
         }
     }
 

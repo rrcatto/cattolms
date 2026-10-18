@@ -15,7 +15,7 @@ use CattoLearning\Commerce\Http\CommerceController;
 use CattoLearning\Commerce\Http\PaymentAdministrationController;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
-use CattoLearning\Commerce\Policy\CommercePolicy;
+use CattoLearning\Tests\Support\WalletFixture;
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,CompanyRepository,Database,TransactionManager};
@@ -61,11 +61,11 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $this->records = new CommerceRepository($this->db);
         $tx = new TransactionManager($this->db);
         $transitions = $container->get(TransitionService::class);
-        $this->orders = new OrderService($this->records, $tx, new CommercePolicy(dirname(__DIR__, 2)), $transitions, $this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->orders = new OrderService($this->records, $tx, WalletFixture::settings($this->db), $transitions, $this->clock,PromotionFixture::service($this->db,$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock));
         $access = new AccessService($this->records, $tx, $transitions, $this->clock);
         $companyCredits = new CompanyCreditFulfilment($this->records, $container->get(AdministrationRepository::class), $container->get(CourseRepository::class), $this->clock);
         $this->fulfilment = new FulfilmentService($this->records, $transitions, $access, $tx, $this->orders, $this->clock, $companyCredits, $this->analytics(),PromotionFixture::service($this->db,$this->clock));
-        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter('test', $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class));
+        $this->payments = new PaymentService($this->records, $tx, $this->orders, new OmnipayPaymentGatewayAdapter(\CattoLearning\Configuration\SiteMode::fixed('demo'), $this->clock), $this->fulfilment, $transitions, $this->clock,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
         $this->billing = BillingFixture::service($this->db, $this->clock);
         $this->pdfs = IntegrationContainer::get()->get(FinancialDocuments::class);
         $this->ownerId = $this->fixture->createUser('Snapshot course owner');
@@ -93,10 +93,10 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $variant = $this->paidCourse('Snapshot course one');
         $this->orders->changeCart($buyer, $variant);
         $cart = $this->orders->cart($buyer);
-        $orderId = $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $orderId = $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         self::assertNotNull($orderId);
         self::assertSame('failed', $this->records->payments($orderId)[0]['state']);
-        self::assertSame($orderId, $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true), 'A replayed placement is the same order.');
+        self::assertSame($orderId, $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true), 'A replayed placement is the same order.');
         $this->assertBilling($a, $this->orderBilling($orderId));
         $invoice = $this->onlyDocument($orderId, 'invoice');
         $this->assertBilling($a, $this->documentBilling($invoice));
@@ -119,7 +119,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
 
         // A refund after the change: its credit note carries the order's billing, not the profile's.
         $item = $this->records->items($orderId)[0];
-        $this->refunds()->approve($this->finance($buyerId), $orderId, (int) $item['id'], Uuid::v4(), 'goodwill', 'Goodwill after a billing change.', 1, 1000);
+        $this->refunds()->approve($this->finance($buyerId), $orderId, (int) $item['id'], Uuid::v4(), 'goodwill', 'Goodwill after a billing change.', 1, 1000, 'The course started on payment; refund mechanics under test.');
         $creditNote = $this->onlyDocument($orderId, 'credit_note');
         $this->assertBilling($a, $this->documentBilling($creditNote));
         $this->assertShowsAButNotB($this->pdfs->render($creditNote)->html, $a, $b, 'credit note HTML');
@@ -137,7 +137,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $checkout->selectMethod($buyer, 'eft', '', false);
         $this->orders->changeCart($buyer, $this->paidCourse('Snapshot course two'));
         $cart = $this->orders->cart($buyer);
-        $second = $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true);
+        $second = $checkout->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
         self::assertNotNull($second);
         $this->assertBilling($b, $this->orderBilling($second));
         $this->assertBilling($b, $this->documentBilling($this->onlyDocument($second, 'invoice')));
@@ -293,12 +293,12 @@ final class BillingSnapshotIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         return new CompanyCreditPurchaseService($this->records, $container->get(CompanyRepository::class), $container->get(AdministrationRepository::class),
-            new TransactionManager($this->db), new CommercePolicy(dirname(__DIR__, 2)), $container->get(TransitionService::class), $this->payments, $this->clock, $this->analytics(), $this->billing,IntegrationContainer::get()->get(FinancialDocuments::class));
+            new TransactionManager($this->db), WalletFixture::settings($this->db), $container->get(TransitionService::class), $this->payments, $this->clock, $this->analytics(), $this->billing,IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), $this->orders);
     }
 
     private function refunds(): RefundAdministrationService
     {
-        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class));
+        return new RefundAdministrationService($this->records, new TransactionManager($this->db), IntegrationContainer::get()->get(TransitionService::class), $this->clock, $this->analytics(),new \CattoLearning\Commerce\Application\AccessService($this->records,new TransactionManager($this->db),IntegrationContainer::get()->get(TransitionService::class),$this->clock),IntegrationContainer::get()->get(FinancialDocuments::class), WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db));
     }
 
     private function analytics(): AnalyticsEventRecorder

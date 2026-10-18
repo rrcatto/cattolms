@@ -36,7 +36,6 @@ final class CategoryStatisticsPageTest extends TestCase
         $suffix = $this->fixture->suffix();
         $admin = $this->fixture->createUser('Category admin ' . $suffix, 'category-admin-' . $suffix . '@seed.test');
         $this->fixture->grantRole($admin, 'ADMIN');
-        $this->fixture->attachToSystemCompany($admin);
         // One branch of each depth, so the page is never counting an empty taxonomy.
         $root = $this->fixture->createCategory('Stats Root ' . $suffix, 'stats-root-' . $suffix);
         $branch = $this->fixture->createCategory('Stats Branch ' . $suffix, 'stats-branch-' . $suffix, $root);

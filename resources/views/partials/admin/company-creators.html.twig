@@ -32,9 +32,6 @@
 								<tr>
 									<td title="{{ company.name }} · {{ company.domain }}">
 										<strong>{{ company.name }}</strong>
-										{% if company.is_system %}
-											{{ ui('feedback.badge', {label: 'System', tone: 'permanent'}) }}
-										{% endif %}
 									</td>
 									<td>
 										{{ company.owned_course_count }}

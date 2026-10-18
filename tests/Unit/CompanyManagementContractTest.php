@@ -224,7 +224,7 @@ final class CompanyManagementContractTest extends TestCase
         $html = RenderHarness::render('partials/company-picker-results.html.twig', RenderHarness::baseHive() + [
             'picker_companies' => [[
                 'id' => 7, 'name' => 'Table Bay Logistics', 'domain' => 'tablebay.test',
-                'status' => 'active', 'status_label' => 'Active', 'is_system' => false,
+                'status' => 'active', 'status_label' => 'Active',
                 'universe' => 'seed', 'universe_label' => 'SEED', 'is_seed' => true,
             ]],
             'picker_pagination' => null,
@@ -243,7 +243,7 @@ final class CompanyManagementContractTest extends TestCase
         $html = RenderHarness::render('partials/company-picker-results.html.twig', RenderHarness::baseHive() + [
             'picker_companies' => [[
                 'id' => 9, 'name' => 'Dormant Co', 'domain' => 'dormant.test',
-                'status' => 'disabled', 'status_label' => 'Disabled', 'is_system' => false,
+                'status' => 'disabled', 'status_label' => 'Disabled',
                 'universe' => 'real', 'universe_label' => 'REAL', 'is_seed' => false,
             ]],
             'picker_pagination' => null,
@@ -261,7 +261,7 @@ final class CompanyManagementContractTest extends TestCase
         $html = RenderHarness::render('partials/company-picker-results.html.twig', RenderHarness::baseHive() + [
             'picker_companies' => [[
                 'id' => 5, 'name' => 'Current Co', 'domain' => 'current.test',
-                'status' => 'active', 'status_label' => 'Active', 'is_system' => false,
+                'status' => 'active', 'status_label' => 'Active',
                 'universe' => 'real', 'universe_label' => 'REAL', 'is_seed' => false,
             ]],
             'picker_pagination' => null,

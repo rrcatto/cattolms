@@ -81,6 +81,8 @@ final class CartService
         $discount = $promotion['discount'];
         $discountMinor = $discount->discountMinor ?? 0;
         $cart['count'] = count($cart['items']) + count($cart['bundles']);
+        // A company account never buys (OrderService::COMPANY_ACCOUNT), so it is shown no cart.
+        $cart['buyer'] = $this->orders->mayBuy($actor);
         $cart['subtotal_minor'] = $total->minorUnits;
         $cart['discount_minor'] = $discountMinor;
         $cart['total_minor'] = $total->minorUnits - $discountMinor;

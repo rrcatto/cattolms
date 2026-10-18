@@ -51,6 +51,16 @@ final class FakeMailer implements MailerInterface
         $this->record('course_request_notice', compact('email', 'staffLabel', 'courseTitle'));
     }
 
+    public function sendWalletExpiryReminder(string $email, string $name, array $lines, string $walletUrl): void
+    {
+        $this->record('wallet_expiry_reminder', compact('email', 'name', 'lines', 'walletUrl'));
+    }
+
+    public function sendAdministratorMessage(string $email, string $subject, string $body): void
+    {
+        $this->record('administrator_message', compact('email', 'subject', 'body'));
+    }
+
     public function sendCourseRequestDecision(string $email, string $courseTitle, bool $approved): void
     {
         $this->record('course_request_decision', compact('email', 'courseTitle', 'approved'));

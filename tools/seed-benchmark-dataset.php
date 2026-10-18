@@ -66,9 +66,9 @@ $db = $container->get(Database::class);
 $seeds = $container->get(SeedRepository::class);
 
 // This writes six-figure row counts and is a development instrument, not an operational one.
-// A production database has no business holding a hundred thousand benchmark people.
-if (Env::string('APP_ENV', 'production') !== 'development') {
-    fwrite(STDERR, "Refusing to run: APP_ENV is not development.\n");
+// A live site's database has no business holding a hundred thousand benchmark people.
+if (!$container->get(\CattoLearning\Configuration\SiteMode::class)->isDemo()) {
+    fwrite(STDERR, "Refusing to run: this is a live site (APP_SITE_MODE).\n");
     exit(1);
 }
 
@@ -186,12 +186,12 @@ printf("Writing benchmark batch %s\n", $token);
 
 $companyBase = $reserve('companies_id_seq', $companies);
 $run('companies', "
-    INSERT INTO companies (id, public_id, name, domain, status, is_system, company_type, seed_token)
+    INSERT INTO companies (id, public_id, name, domain, status, company_type, seed_token)
     SELECT :base + g - 1,
            gen_random_uuid(),
            'Benchmark Company ' || lpad(g::text, 7, '0'),
            'bench-' || :short || '-' || g || '.seed.test',
-           'active', FALSE, 'client', :token::uuid
+           'active', 'client', :token::uuid
     FROM generate_series(1, :count) g
 ", ['base' => $companyBase, 'short' => $short, 'token' => $token, 'count' => $companies], $companies);
 

@@ -17,9 +17,9 @@
 
 					<tr>
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 29, label: 'Role'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Role family'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 35, label: 'Description'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Permissions'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Role family', wide: true}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 35, label: 'Description', wide: true}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'Permissions', wide: true}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 6, label: 'Users'}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: 'Actions'}} %}
 					</tr>
@@ -47,7 +47,7 @@
 							<td>
 								{{ role.user_count }}
 							</td>
-							<td>
+							<td class="cell-actions">
 								{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 

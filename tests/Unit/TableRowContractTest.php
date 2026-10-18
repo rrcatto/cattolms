@@ -17,6 +17,9 @@ markup in callers; broad theme element rules still require some cascade protecti
 Changelog:
 2026/09/08 10:00 SAST
 - Created after the one-row rule shipped broken on every screen.
+2026/10/17 SAST
+- An action column is never narrower than its control.
+- Tables on a phone: essential columns only, 7pt, one Actions menu for several actions, and the row's tooltip.
 */
 
 declare(strict_types=1);
@@ -81,6 +84,80 @@ final class TableRowContractTest extends TestCase
         // Truncation is what makes "no wrapping and no scrolling" possible at all: content wider
         // than its column has to be shortened, because the other two options are the ones banned.
         self::assertStringContainsString('text-overflow:ellipsis', $css);
+    }
+
+    /**
+     * An action column is never narrower than its control.
+     *
+     * A declared share is a share of the table: on a phone 13% is about 40px, so a Remove button
+     * stood out past the table and pushed the page sideways, and Activity's Details button was
+     * squeezed until its label vanished. A table with an action column takes the browser's
+     * automatic layout with every other cell at max-width 0, so the action cells alone are
+     * measured.
+     */
+    public function testAnActionColumnIsNeverNarrowerThanItsControl(): void
+    {
+        $css = self::css();
+
+        foreach ([
+            '.cl-ui-table:has(td.cell-actions) table{table-layout:auto!important}',
+            '.cl-ui-table:has(td.cell-actions) th,.cl-ui-table:has(td.cell-actions) td:not(.cell-actions){max-width:0}',
+            '.cl-ui-row-actions:not(.cl-ui-table .cl-ui-row-actions){flex-wrap:wrap!important}',
+        ] as $rule) {
+            self::assertStringContainsString($rule, $css, 'Core lost a rule that keeps an action inside its table or card: ' . $rule);
+        }
+
+        // Every cell that opens with a row's actions is the cell the rules measure.
+        $offenders = [];
+        $actionCells = 0;
+        $opensWithActions = '\s*(?:\{%\s*embed ui_template\(\'action\.row\'\)|\{\{\s*ui\(\'action\.)';
+        foreach (self::views() as $path) {
+            foreach (self::rowsOf((string) file_get_contents($path)) as $row) {
+                $actionCells += preg_match_all('/<td class="cell-actions"[^>]*>' . $opensWithActions . '/', $row);
+                if (preg_match('/<td\b(?![^>]*\bcell-actions\b)[^>]*>' . $opensWithActions . '/', $row) === 1) {
+                    $offenders[] = basename($path);
+                }
+            }
+        }
+        self::assertGreaterThan(10, $actionCells, 'The scanner found too few action cells to prove anything.');
+        self::assertSame([], array_values(array_unique($offenders)), "A cell holding a row's actions must be td.cell-actions:\n  " . implode("\n  ", array_unique($offenders)));
+    }
+
+    /**
+     * A table on a phone shows only its essential columns, in 7pt, with one Actions menu for several
+     * actions and the whole row in a tooltip (owner, 2026-10-17; UX rule 2.9).
+     */
+    public function testAPhoneTableShowsItsEssentialColumns(): void
+    {
+        $css = self::css();
+        foreach ([
+            '.cl-ui-table{--cl-table-font:7pt;--cl-table-head-font:7pt;--cl-table-btn-font:7pt;--cl-table-pad-x:6px}',
+            '.cl-ui-table:has(>table>thead>tr>th:nth-child(1)[data-phone=hide])>table>*>tr>:nth-child(1){display:none!important}',
+            '.cl-ui-table:has(>table>thead>tr>th:nth-child(12)[data-phone=hide])>table>*>tr>:nth-child(12){display:none!important}',
+            '.cl-ui-row-actions.cl-ui-row-actions--wide,.cl-ui-table td .cl-ui-row-actions.cl-ui-row-actions--wide{display:none!important}',
+            '.cl-ui-row-menu.cl-ui-row-menu--narrow,.cl-ui-table .cl-ui-row-menu.cl-ui-row-menu--narrow{display:inline-block!important}',
+            '.cl-ui-table-tip[hidden]{display:none!important}',
+        ] as $rule) {
+            self::assertStringContainsString($rule, $css, 'Core lost a phone table rule: ' . $rule);
+        }
+
+        $header = (string) file_get_contents(self::root() . '/resources/views/partials/sortable-header.html.twig');
+        self::assertSame(2, substr_count($header, '{% if sh.wide|default(false) %}data-phone="hide"{% endif %}'), 'Both header forms mark a column a phone hides.');
+
+        $table = (string) file_get_contents(self::root() . '/resources/views/ui/data/data-table.html.twig');
+        self::assertStringContainsString('<div class="cl-ui-table-tip" role="tooltip" hidden></div>', $table);
+
+        $row = (string) file_get_contents(self::root() . '/resources/views/ui/actions/row-actions.html.twig');
+        self::assertStringContainsString('<div class="cl-ui-row-actions cl-ui-row-actions--wide">{{ block(\'body\') }}</div><details class="cl-ui-row-menu cl-ui-row-menu--narrow"', $row);
+
+        $script = (string) file_get_contents(self::root() . '/public_html/js/platform-overrides.js');
+        self::assertStringContainsString("element.textContent = text;", $script, 'The tooltip is filled with text, never built as markup.');
+
+        // Several actions kept in a row become one menu on a phone: Themes and the course price list.
+        $themes = (string) file_get_contents(self::root() . '/resources/views/partials/admin/themes.html.twig');
+        self::assertStringContainsString("ui_props('action.row', {narrow_menu: true})", $themes);
+        $course = (string) file_get_contents(self::root() . '/resources/views/pages/admin-course-edit.html.twig');
+        self::assertSame(2, substr_count($course, "narrow_menu: true"));
     }
 
     /** No table row lays its actions out with a container core does not control. */

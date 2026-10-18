@@ -95,8 +95,8 @@ final class IntegrationDataFixture
     public function createCompany(int $actorUserId, string $name, string $domain): int
     {
         $id = (int) $this->db->fetchAllAssociative(
-            "INSERT INTO companies (public_id,name,domain,status,is_system,created_by_user_id)
-             VALUES (:public_id,:name,:domain,'active',FALSE,:actor) RETURNING id",
+            "INSERT INTO companies (public_id,name,domain,status,created_by_user_id)
+             VALUES (:public_id,:name,:domain,'active',:actor) RETURNING id",
             ['public_id' => Uuid::v4(), 'name' => $name, 'domain' => $domain, 'actor' => $actorUserId]
         )[0]['id'];
         $this->companies[] = $id;
@@ -112,19 +112,6 @@ final class IntegrationDataFixture
              ON CONFLICT (company_id,user_id) DO NOTHING",
             ['company_id' => $companyId, 'user_id' => $userId, 'company_role' => $role]
         );
-    }
-
-    /** Attaches a user to the System Company, the way a genuine platform identity actually sits. */
-    public function attachToSystemCompany(int $userId, string $role = 'administrator'): int
-    {
-        $rows = $this->db->fetchAllAssociative('SELECT id FROM companies WHERE is_system = TRUE LIMIT 1');
-        $companyId = (int) ($rows[0]['id'] ?? 0);
-        if ($companyId < 1) {
-            throw new RuntimeException('No System Company exists. The database has not been installed.');
-        }
-        $this->addCompanyMember($companyId, $userId, $role);
-
-        return $companyId;
     }
 
     public function createCategory(string $name, string $slug, int $parentId = 0): int

@@ -1,7 +1,7 @@
 /**
  * Catto Learning CKEditor 5 configuration.
  *
- * Based on a working CKEditor Builder configuration.
+ * Based on the owner's working ctnlist CKEditor Builder configuration.
  * The locally installed ckeditor5.umd.js and ckeditor5.css must come from the
  * same CKEditor build so that every listed plugin is available.
  */

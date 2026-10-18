@@ -9,6 +9,7 @@
 {% block surface_body %}
 
 		{{ ui('layout.section-head', {heading: 'Personal particulars', eyebrow: 'Personal Particulars', summary: 'Information used across your account and certificates.'}) }}
+		<p>Your account reference: <strong>{{ account_reference_label|default('') }}</strong>. It never changes. Quote it when you pay by EFT or write to us.</p>
 		<form action="/account/profile" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 

@@ -96,7 +96,8 @@ final class CourseRepository
     public function __construct(
         private readonly Database $db,
         private readonly RuntimeSettings $settings,
-        private readonly ArtworkGenerator $artwork
+        private readonly ArtworkGenerator $artwork,
+        private readonly ?\CattoLearning\Configuration\SiteOwner $owner = null
     ) {
     }
 
@@ -1306,8 +1307,9 @@ final class CourseRepository
      */
     public function tagIndex(): array
     {
-        // Discovery exposes the complete vocabulary, including labels with no published courses.
-        // Counts and result queries still share the published-only membership rule.
+        // Only tags that label at least one published course (owner, 2026-10-18): a tag cloud shows
+        // what the catalogue holds, and a tag with no course has nothing to show. Counts and result
+        // queries share the published-only membership rule.
         return $this->normaliseRows($this->db->fetchAllAssociative(
             "SELECT t.id, t.name, t.slug, t.icon_svg, x.course_count
              FROM tags t
@@ -1317,6 +1319,7 @@ final class CourseRepository
                    JOIN courses c ON c.id = ct.course_id
                   WHERE ct.tag_id = t.id AND c.status = 'published'
              ) x ON TRUE
+             WHERE x.course_count > 0
              ORDER BY t.name, t.id"
         ));
     }
@@ -1758,10 +1761,11 @@ final class CourseRepository
         // The universe is the owning company's, supplied by the caller. Deriving it from $userId
         // would be wrong for a genuine ADMIN creating a course inside a SEED company: ADMIN is a
         // REAL identity, and the row must follow the resource rather than the actor.
+        // No owning company means the Site Owner's course (owner, 2026-10-18).
         $ownerCompanyId = (int) ($data['owner_company_id'] ?? 0);
         $ownerUserId = (int) ($data['owner_user_id'] ?? $userId);
-        if ($ownerCompanyId < 1 || $ownerUserId < 1) {
-            throw new RuntimeException('Every course requires both an owning company and an owning person.');
+        if ($ownerUserId < 1) {
+            throw new RuntimeException('Every course requires an owning person.');
         }
 
         $now = gmdate('Y-m-d H:i:sP');
@@ -1800,7 +1804,7 @@ final class CourseRepository
                 'course_style_key' => $data['course_style_key'] ?: 'standard',
                 'presentation_css' => (string) ($data['presentation_css'] ?? ''),
                 'source_filename' => ($data['source_filename'] ?? '') ?: null,
-                'owner_company_id' => $ownerCompanyId,
+                'owner_company_id' => $ownerCompanyId > 0 ? $ownerCompanyId : null,
                 'owner_user_id' => $ownerUserId,
                 'publication_approval_status' => (string) ($data['publication_approval_status'] ?? 'pending'),
                 'interchange_schema_version' => (string) ($data['interchange_schema_version'] ?? '1.0'),
@@ -2043,7 +2047,8 @@ final class CourseRepository
                     assessment_progress.assessment_count,
                     assessment_progress.submitted_assessment_count,
                     cr.overall_percentage, cr.grade_code AS overall_grade_code,
-                    cert.public_id AS certificate_public_id
+                    cert.public_id AS certificate_public_id,
+                    (SELECT MIN(e.access_started_at) FROM commerce_entitlements e WHERE e.enrolment_id = ce.id AND e.access_started_at IS NOT NULL) AS access_started_at
              FROM %s
              LEFT JOIN course_categories cc ON cc.id = c.category_id
              " . CourseItemRepository::assessmentProgressJoin() . "
@@ -2258,20 +2263,20 @@ final class CourseRepository
         );
     }
 
+    /** The course's provider: its owning company's name, or the Site Owner's trading name for a course no company owns. */
     public function certificateProviderName(int $courseId): string
     {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT COALESCE(NULLIF(trim(oc.name), ''), NULLIF(trim(sc.name), ''), :fallback) AS provider_name
-             FROM courses c
-             LEFT JOIN companies oc ON oc.id = c.owner_company_id
-             LEFT JOIN LATERAL (
-                 SELECT name FROM companies WHERE is_system = TRUE ORDER BY id LIMIT 1
-             ) sc ON TRUE
-             WHERE c.id = :course_id
-             LIMIT 1",
-            ['course_id' => $courseId, 'fallback' => $this->settings->platformName()]
-        );
-        return trim((string) ($rows[0]['provider_name'] ?? '')) ?: $this->settings->platformName();
+        $name = trim((string) $this->db->fetchOne(
+            'SELECT oc.name FROM courses c LEFT JOIN companies oc ON oc.id = c.owner_company_id WHERE c.id = :course_id',
+            ['course_id' => $courseId]
+        ));
+        return $name !== '' ? $name : $this->siteOwnerName();
+    }
+
+    /** The Site Owner's trading name, the provider of every course no company owns (owner, 2026-10-18). */
+    public function siteOwnerName(): string
+    {
+        return $this->owner?->value('trading_name') ?? $this->settings->platformName();
     }
 
     public function markEnrolmentExpired(int $enrolmentId): void
@@ -2493,10 +2498,11 @@ final class CourseRepository
         }
     }
 
+    /** $ownerCompanyId 0 gives the course to the Site Owner: no owning company (owner, 2026-10-18). */
     public function setCourseOwnership(int $courseId, int $ownerCompanyId, int $ownerUserId, int $actorUserId): void
     {
-        if ($ownerCompanyId < 1 || $ownerUserId < 1) {
-            throw new RuntimeException('Every course requires both an owning company and an owning person.');
+        if ($ownerUserId < 1) {
+            throw new RuntimeException('Every course requires an owning person.');
         }
         $updated = $this->db->executeStatement(
             'UPDATE courses
@@ -2504,7 +2510,7 @@ final class CourseRepository
                     updated_by_user_id=:updated_by,updated_at=:updated_at
               WHERE id=:id',
             [
-                'owner_company_id' => $ownerCompanyId,
+                'owner_company_id' => $ownerCompanyId > 0 ? $ownerCompanyId : null,
                 'owner_user_id' => $ownerUserId,
                 'updated_by' => $actorUserId,
                 'updated_at' => gmdate('Y-m-d H:i:sP'),

@@ -8,7 +8,7 @@
 
 					<tr>
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 36, label: 'Company'}} %}
-						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Domain'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 34, label: 'Domain', wide: true}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
 						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Actions'}} %}
 					</tr>
@@ -20,9 +20,6 @@
 						<tr>
 							<td>
 								<strong>{{ company.name }}</strong>
-								{% if company.is_system %}
-									{{ ui('feedback.badge', {label: 'System', tone: 'permanent'}) }}
-								{% endif %}
 							</td>
 							<td class="mono small">
 								{{ company.domain }}
