@@ -15,6 +15,8 @@ compiler (slots, notes kept as plain text, the logo fitted, typefaces and colour
 document drawn through the engine's validator and renderer, and the old hard-coded renderer gone.
 
 Changelog:
+2026/10/19 SAST
+- Every document starts with the account reference.
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K).
 */
@@ -163,6 +165,21 @@ final class FinancialDocumentsTest extends TestCase
                 if ($sample === 'learner') {
                     self::assertStringStartsWith('%PDF-', $pdf->render($document));
                 }
+            }
+        }
+    }
+
+    /** The account reference is the first thing on every document (owner, 2026-10-18: "the first thing you see"). */
+    public function testEveryDocumentStartsWithTheAccountReference(): void
+    {
+        $design = FinancialDocumentDesign::standard();
+        foreach (array_keys(FinancialDocumentSamples::SAMPLES) as $sample) {
+            foreach (FinancialDocumentSamples::documents($sample) as $type) {
+                $compiled = $this->compiler->compile($design, $type);
+                $reference = (string) $this->data($sample, $type)['customer.account_reference'];
+                self::assertMatchesRegularExpression('/^[A-Z]{1,3}-\d{8}-\d{4,}-[0-9A-Z]$/', $reference, $sample . ' ' . $type->value);
+                $body = trim($this->renderer->renderSource($type, $compiled['html'], $compiled['css'], $compiled['settings'], $this->data($sample, $type))->body);
+                self::assertStringStartsWith('<p class="account-ref">Account reference <strong>' . $reference . '</strong></p>', $body, $sample . ' ' . $type->value . ' opens with the account reference.');
             }
         }
     }

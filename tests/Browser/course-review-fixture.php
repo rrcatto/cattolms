@@ -7,6 +7,8 @@ declare(strict_types=1);
 // first learner's review so each run starts from no review; `cleanup` removes everything it created.
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseReviewRepository;
+use CattoLearning\Course\CourseService;
+use CattoLearning\Course\LearningService;
 use CattoLearning\Course\CourseReviewService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -42,7 +44,9 @@ if ($action === 'create') {
         $user = $fixture->createUser($first . ' ' . $last, $email);
         $db->executeStatement('UPDATE users SET first_name=:f, last_name=:l WHERE id=:id', ['f' => $first, 'l' => $last, 'id' => $user]);
         $container->get(RoleRepository::class)->assign($user, 'STUDENT');
-        $fixture->createEnrolment($user, $course, $admin, 31536000, false, 'active');
+        // ADMIN assigns the course and the learner starts it, as in the app (owner, 2026-10-19).
+        $container->get(CourseService::class)->grantToPerson($course, $user, 365, $admin);
+        $container->get(LearningService::class)->start($user, $slug);
         $learners[$key] = ['user' => $user, 'email' => $email];
     }
     $reviews = $container->get(CourseReviewService::class);

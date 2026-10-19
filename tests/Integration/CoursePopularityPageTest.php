@@ -34,6 +34,9 @@ final class CoursePopularityPageTest extends TestCase
     private int $learner;
     private int $leader;
     private int $free;
+    private int $company;
+    /** @var list<int> courses made only so the report has a second page */
+    private array $extra = [];
     /** @var array<string,mixed> */
     private array $cookies = [];
 
@@ -46,7 +49,7 @@ final class CoursePopularityPageTest extends TestCase
         $this->fixture->grantRole($this->admin, 'ADMIN');
         $this->learner = $this->fixture->createUser('Popularity learner ' . $this->suffix, 'popularity-learner-' . $this->suffix . '@seed.test');
         $this->fixture->grantRole($this->learner, 'STUDENT');
-        $company = $this->fixture->createCompany($this->admin, 'Popularity page ' . $this->suffix, 'popularity-' . $this->suffix . '.seed.test');
+        $company = $this->company = $this->fixture->createCompany($this->admin, 'Popularity page ' . $this->suffix, 'popularity-' . $this->suffix . '.seed.test');
         $this->leader = $this->fixture->createCourse($this->admin, $company, 'popularity-leader-' . $this->suffix, 'Popular leader ' . $this->suffix);
         $this->free = $this->fixture->createCourse($this->admin, $company, 'popularity-free-' . $this->suffix, 'Popular free ' . $this->suffix);
         $this->db->executeStatement(
@@ -66,7 +69,7 @@ final class CoursePopularityPageTest extends TestCase
     protected function tearDown(): void
     {
         $_COOKIE = $this->cookies;
-        $this->db->executeStatement('DELETE FROM analytics_events WHERE course_id IN (:a, :b)', ['a' => $this->leader, 'b' => $this->free]);
+        $this->db->executeStatement('DELETE FROM analytics_events WHERE course_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => '{' . implode(',', [$this->leader, $this->free, ...$this->extra]) . '}']);
         $this->fixture->cleanup();
     }
 
@@ -97,6 +100,14 @@ final class CoursePopularityPageTest extends TestCase
         self::assertStringContainsString('aria-sort="ascending"', $ascending);
         self::assertStringContainsString('popularity_sort=views&amp;popularity_dir=desc', $ascending, 'The header offers the other direction, keeping the search.');
 
+        // Its own courses fill more than one page of 25: the test does not lean on whatever else the
+        // development database holds (owner, 2026-10-19: a clean database).
+        $events = IntegrationContainer::get()->get(AnalyticsEventRepository::class);
+        for ($i = 0; $i < 25; $i++) {
+            $this->extra[] = $id = $this->fixture->createCourse($this->admin, $this->company, 'popularity-extra-' . $i . '-' . $this->suffix, 'Popular extra ' . $i . ' ' . $this->suffix);
+            $events->append('course_view', 'course_detail', (new DateTimeImmutable())->modify('-2 days'), ['course_id' => $id, 'visitor_id' => Uuid::v4()], [], null);
+        }
+        IntegrationContainer::get()->get(CoursePopularityCalculator::class)->recalculate();
         $all = $this->html('/admin/reports/popularity');
         self::assertStringContainsString('popularity_page=2', $all, 'Every published course is ranked, so the report pages.');
         self::assertStringContainsString('href="/admin/reports"', $all);

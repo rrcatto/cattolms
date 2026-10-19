@@ -511,6 +511,24 @@ final class CommerceRepository
             AND delivered_at IS NULL AND (last_error IS NULL OR created_at + attempts * INTERVAL '5 minutes' < NOW())
             ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED") ?: null;
     }
+    /** @return array<string,mixed>|null the next buyer email to send: how to pay by EFT, a part payment, an unpaid order cancelled, an order's confirmation or the courses it started */
+    public function nextBuyerEmail(): ?array
+    {
+        return $this->db->fetchAssociative("SELECT * FROM commerce_outbox WHERE event IN ('order.payment_instructions','order.part_paid','order.cancelled_unpaid','order.confirmed','order.courses_started')
+            AND delivered_at IS NULL AND (last_error IS NULL OR created_at + attempts * INTERVAL '5 minutes' < NOW())
+            ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED") ?: null;
+    }
+    /**
+     * The courses an order's lines opened for the learner, still held: title, address and when access ends.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function coursesStartedByOrder(int $orderId): array
+    {
+        return $this->db->fetchAllAssociative("SELECT DISTINCT ON (ce.id) c.title, c.slug, ce.expires_at FROM commerce_entitlements e
+            JOIN commerce_order_items i ON i.id = e.order_item_id JOIN course_enrolments ce ON ce.id = e.enrolment_id JOIN courses c ON c.id = ce.course_id
+            WHERE i.order_id = :order AND e.state <> 'revoked' AND ce.started_at IS NOT NULL ORDER BY ce.id", ['order'=>$orderId]);
+    }
     public function emailDelivered(int $id, ?string $error): void
     {
         $this->db->executeStatement('UPDATE commerce_outbox SET attempts=attempts+1,last_error=:error,delivered_at=CASE WHEN :ok THEN NOW() ELSE NULL END WHERE id=:id', ['id'=>$id,'error'=>$error,'ok'=>$error===null]);
@@ -519,6 +537,16 @@ final class CommerceRepository
     public function selectPaymentMethod(int $orderId, string $method): void
     {
         $this->db->executeStatement('INSERT INTO commerce_order_preferences(order_id,payment_method) VALUES (:id,:method) ON CONFLICT(order_id) DO UPDATE SET payment_method=EXCLUDED.payment_method', ['id'=>$orderId,'method'=>$method]);
+    }
+    /**
+     * Whether a deposit with this bank reference is already recorded, against an order or as unmatched
+     * money. An unmatched deposit whose own id is $requestKey is the deposit being matched, not another.
+     */
+    public function bankReferenceRecorded(string $bankReference, ?string $requestKey = null): bool
+    {
+        return (bool) $this->db->fetchOne('SELECT EXISTS (SELECT 1 FROM commerce_manual_payment_evidence WHERE bank_reference = :r)
+            OR EXISTS (SELECT 1 FROM commerce_unmatched_payments WHERE bank_reference = :r AND (CAST(:key AS UUID) IS NULL OR public_id <> CAST(:key AS UUID)))',
+            ['r' => $bankReference, 'key' => $requestKey]);
     }
     public function paymentMethod(int $orderId): string
     {

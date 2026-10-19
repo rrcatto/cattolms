@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.2 · **Updated:** 2026-10-17
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.5 · **Updated:** 2026-10-19
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -148,7 +148,8 @@ Sessions, Activity), Company (All sections, Dashboard, a People group holding Pe
 Course Requests, Enrolments and Performance, a Courses group holding Courses Created, Favourites, Courses
 Bought and Credits, then Billing details), and Administration in five groups: Courses (courses, the Course Item and Resource
 Libraries, categories, tags, Course Reviews, Bundles, Certificate Designs, requests, enrolments), People & Companies,
-Credits & Orders (credits, Orders & Payments, Promotions), Insights (activity and reports) and
+Credits & Orders (credits, Orders & Payments, Record EFT Payment, Unmatched Money, Money Ledger, Refund Requests, Wallets,
+Promotions, Financial Documents), Insights (activity and reports) and
 System (Themes, Roles & ACL, Seed Database, Settings, UI Components). Third-level entries
 are why navigation groups nest. Registries supply the exact labels, order and permission filtering;
 these examples do not authorise hard-coded destinations in themes.
@@ -158,9 +159,13 @@ to the site-footer partial. Factory Reset Sidebar retains its richer themed foot
 standard destinations and platform action component. Do not replace its footer with another theme's.
 
 Since v0.9.1 `footer_navigation` also carries the public legal documents - Terms (`/terms`), Refunds
-(`/refunds`) and Privacy (`/privacy`) - after Contact, for every visitor. A footer draws every entry of the
-array in the order core gives it; a theme never picks entries out of it and never writes a legal link of its
-own (`NavigationContractTest`). The legal pages themselves are ordinary platform pages on surfaces
+(`/refunds`) and Privacy (`/privacy`) - after Contact, for every visitor. Each link is in one place (owner,
+2026-10-18): the menu has Home and Catalogue but not Help and Contact, and the footer has Home, Catalogue,
+Help, Contact, Terms, Refunds and Privacy, the same for everyone, but not Account, Company and
+Administration. A footer draws every entry of the array in the order core gives it and never writes a legal
+link of its own. The one exception: a footer with its own contact form button (Saharan Sunset, Gilded Noir)
+leaves the Contact entry out, `footer_navigation|filter(link => link.key != 'contact')`, so the contact form
+is offered once; a footer without the button keeps it (`NavigationContractTest`). The legal pages themselves are ordinary platform pages on surfaces
 (`layout.surface`, `layout.section-head`, `data.key-value-list`): a theme styles them as it styles any page.
 
 Since v0.9.2 the footer's social marks come only from `footer_social`: Facebook, WhatsApp, X, LinkedIn,

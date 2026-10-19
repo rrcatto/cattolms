@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/19 SAST
+- Unmatched money (owner, 2026-10-19): commerce_unmatched_payments, money that reached the bank with no order to pay, kept until ADMIN matches it to an order or records that it was paid back (one decision, commerce_unmatched_payment_guard).
 2026/10/18 SAST (the Site Owner)
 - No System Company (owner, 2026-10-18): companies loses is_system, its unique index and the seeded row, and app_options its system_company_name. The business hosting the site is the Site Owner, defined in .env and Settings (Configuration\SiteOwner), and belongs to no table. courses.owner_company_id may be NULL: a course with no owning company belongs to the Site Owner. Companies are ordered by name (companies_name_idx).
 2026/10/17 SAST (commerce for launch)
@@ -2588,6 +2590,49 @@ CREATE TABLE commerce_attention_emails (
 );
 CREATE INDEX commerce_attention_emails_item ON commerce_attention_emails(kind, reference, sent_at);
 
+-- Money that reached the bank with no order to pay (owner, 2026-10-19: it "goes on an unmatched money
+-- list for me to sort out"). What the payer wrote and the bank's own reference for the deposit, which
+-- no other unmatched deposit may share. It is not in the money ledger until ADMIN matches it to an order,
+-- when it becomes that order's EFT payment on the day it arrived (order_id, payment_id); money paid back
+-- to the sender never enters the ledger. One decision, matched or returned, and nothing else changes
+-- (commerce_unmatched_payment_guard).
+CREATE TABLE commerce_unmatched_payments (
+    id BIGSERIAL PRIMARY KEY,
+    public_id UUID NOT NULL UNIQUE,
+    amount_minor BIGINT NOT NULL CHECK (amount_minor > 0),
+    currency CHAR(3) NOT NULL CHECK (currency ~ '^[A-Z]{3}$'),
+    received_at TIMESTAMPTZ NOT NULL,
+    payer_reference TEXT NOT NULL CHECK (length(trim(payer_reference)) BETWEEN 1 AND 200),
+    bank_reference TEXT NOT NULL UNIQUE CHECK (length(trim(bank_reference)) BETWEEN 3 AND 200),
+    seen_where TEXT NOT NULL CHECK (length(trim(seen_where)) BETWEEN 5 AND 2000),
+    recorded_by_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','matched','returned')),
+    order_id BIGINT NULL REFERENCES commerce_orders(id) ON DELETE RESTRICT,
+    payment_id UUID NULL REFERENCES commerce_payments(id) ON DELETE RESTRICT,
+    returned_at TIMESTAMPTZ NULL,
+    return_reference TEXT NULL CHECK (return_reference IS NULL OR length(trim(return_reference)) BETWEEN 3 AND 200),
+    resolved_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    resolved_at TIMESTAMPTZ NULL,
+    resolution_note TEXT NOT NULL DEFAULT '',
+    CHECK ((state = 'open') = (resolved_at IS NULL)),
+    CHECK (state <> 'matched' OR (order_id IS NOT NULL AND payment_id IS NOT NULL)),
+    CHECK (state <> 'returned' OR (returned_at IS NOT NULL AND return_reference IS NOT NULL))
+);
+CREATE INDEX commerce_unmatched_payments_open ON commerce_unmatched_payments(received_at) WHERE state = 'open';
+CREATE FUNCTION commerce_unmatched_payment_guard() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+    IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Unmatched payments cannot be deleted'; END IF;
+    IF OLD.state <> 'open' THEN RAISE EXCEPTION 'A matched or returned payment cannot change'; END IF;
+    IF (to_jsonb(NEW) - 'state' - 'order_id' - 'payment_id' - 'returned_at' - 'return_reference' - 'resolved_by_user_id' - 'resolved_at' - 'resolution_note')
+        IS DISTINCT FROM (to_jsonb(OLD) - 'state' - 'order_id' - 'payment_id' - 'returned_at' - 'return_reference' - 'resolved_by_user_id' - 'resolved_at' - 'resolution_note') THEN
+        RAISE EXCEPTION 'An unmatched payment records only how it was sorted out';
+    END IF;
+    RETURN NEW;
+END;
+$fn$;
+CREATE TRIGGER commerce_unmatched_payment_once BEFORE UPDATE OR DELETE ON commerce_unmatched_payments FOR EACH ROW EXECUTE FUNCTION commerce_unmatched_payment_guard();
+
 -- One redemption per paid order, however often its payment is confirmed or replayed.
 CREATE TABLE promotion_redemptions (
     id BIGSERIAL PRIMARY KEY,
@@ -3264,7 +3309,7 @@ DROP TABLE IF EXISTS
     commerce_cart_items, commerce_carts, commerce_document_files, commerce_document_numbers,
     commerce_documents, commerce_entitlements, commerce_ledger_entries, commerce_wallets, commerce_wallet_lots,
     commerce_wallet_allocations, commerce_wallet_reminders, commerce_refund_requests, commerce_refund_payouts,
-    commerce_attention_dismissals, commerce_attention_emails,
+    commerce_attention_dismissals, commerce_attention_emails, commerce_unmatched_payments,
     commerce_manual_payment_evidence, commerce_order_items, commerce_order_preferences,
     commerce_orders, commerce_outbox, commerce_payment_events, commerce_payments, commerce_refunds,
     companies, company_billing_profiles, company_favourites, company_users, course_categories,
@@ -3287,6 +3332,7 @@ DROP FUNCTION IF EXISTS commerce_protect_order_snapshot() CASCADE;
 DROP FUNCTION IF EXISTS commerce_protect_purchased_credit_lot() CASCADE;
 DROP FUNCTION IF EXISTS commerce_reject_history_mutation() CASCADE;
 DROP FUNCTION IF EXISTS commerce_refund_request_guard() CASCADE;
+DROP FUNCTION IF EXISTS commerce_unmatched_payment_guard() CASCADE;
 DROP FUNCTION IF EXISTS commerce_wallet_allocation_guard() CASCADE;
 DROP FUNCTION IF EXISTS next_account_reference(TEXT) CASCADE;
 DROP FUNCTION IF EXISTS account_reference_check(TEXT) CASCADE;

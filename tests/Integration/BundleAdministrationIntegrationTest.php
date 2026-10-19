@@ -114,7 +114,7 @@ final class BundleAdministrationIntegrationTest extends TestCase
 
         $audit = $this->audit($id);
         self::assertSame(['bundle.created', 'bundle.course_added', 'bundle.course_added', 'bundle.course_added', 'bundle.courses_reordered', 'bundle.offer_updated', 'bundle.status_changed', 'bundle.course_removed', 'bundle.offer_updated', 'bundle.retired'], array_column($audit, 'event_key'));
-        self::assertEquals(['bundle_id' => $id, 'from' => ['price_minor' => 120000, 'access_period_seconds' => 31536000, 'on_sale' => true], 'to' => ['price_minor' => 99950, 'access_period_seconds' => 15552000, 'on_sale' => true], 'currency' => 'ZAR'], $audit[8]['metadata'], 'A price change records the old and new price, not the whole bundle.');
+        self::assertEquals(['bundle_id' => $id, 'from' => ['price_minor' => 120000, 'access_period_seconds' => 31536000, 'on_sale' => true], 'to' => ['price_minor' => 99950, 'access_period_seconds' => 15811200, 'on_sale' => true], 'currency' => 'ZAR'], $audit[8]['metadata'], 'A price change records the old and new price, not the whole bundle.');
         self::assertEquals(['bundle_id' => $id, 'from' => 'published', 'to' => 'retired'], $audit[9]['metadata']);
     }
 

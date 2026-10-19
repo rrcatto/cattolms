@@ -1,10 +1,12 @@
 /* Wallets, EFT amounts, refunds, the transactions that need attention and the commerce settings in a
  * real browser (2026-10-17 launch work).
  *
- * In Chromium and Firefox, for a fresh learner with R200.00 of wallet credit: the wallet pays part of
- * a R300.00 course and the rest is chosen as EFT; checkout asks for both boxes; the order page quotes
- * the account reference and the R100.00 still to pay; ADMIN confirms an EFT of R150.00, the course
- * starts and R50.00 goes to the wallet; My Wallet shows it; the ADMIN dashboard lists the overpayment,
+ * In Chromium and Firefox, for a fresh learner whose R200.00 of wallet credit came from an EFT that paid
+ * R200.00 more than a course cost (the fixture makes it only as a learner and ADMIN would): the wallet
+ * pays part of a R300.00 course and the rest is chosen as EFT; checkout asks for both boxes; the order
+ * page quotes the account reference and the R100.00 still to pay; ADMIN records an EFT of R150.00 (in
+ * Chromium from Record EFT Payment, found by the account reference on the bank statement, in Firefox
+ * on the order's page), the course starts and R50.00 goes to the wallet; My Wallet shows it; the ADMIN dashboard lists the overpayment,
  * ADMIN emails the learner (Mailpit receives it) and marks it dealt with; the learner asks for a refund
  * on the order page as money back; ADMIN approves it with an override and records the payout; and
  * Start course on an ADMIN-assigned course needs its confirmation box, in the browser and on the
@@ -12,7 +14,11 @@
  * only Request from my company, with the reason it cannot buy, has no cart in the header, and is sent
  * from checkout to the cart, which explains it (owner, 2026-10-18). Without JavaScript the refund request and Start course still work. ADMIN changes a fee
  * on Commerce Settings, the Refund Policy shows it, a wrong value is refused with its reason, and the
- * reset restores the default. In every bundled theme at 1440, 820 and 390px the new pages answer in
+ * reset restores the default. A deposit that pays no order goes on Unmatched Money and the dashboard,
+ * and leaves both when ADMIN records that it was paid back. An order's page shows its Money Ledger
+ * lines, Payment Events and Commerce Trail together, each opening its own page; Credits & Orders lists
+ * neither Payment Events nor the Commerce Trail (owner, 2026-10-19). The learner is emailed how to pay
+ * the EFT, with the invoice attached and the demo site's fake bank details labelled (owner, 2026-10-19). In every bundled theme at 1440, 820 and 390px the new pages answer in
  * that theme with one h1 and no sideways scrolling.
  *
  * Run against the development instance with commerce-wallets-fixture.php. Orders and the ledger are
@@ -41,7 +47,6 @@ const clean = (text) => text.replace(/\s+/g, ' ').trim();
 const rand = (minor) => `R ${Math.floor(minor / 100).toLocaleString('en-ZA').replace(/\s/g, ' ')},${String(minor % 100).padStart(2, '0')}`;
 const order = (id) => `CL-${String(id).padStart(8, '0')}`;
 /* Now, a minute ago, in South African time with its offset, as the bank confirmation form wants it. */
-const receivedNow = () => new Date(Date.now() + 2 * 3600 * 1000 - 60000).toISOString().slice(0, 16) + '+02:00';
 const today = () => new Date(Date.now() + 2 * 3600 * 1000).toISOString().slice(0, 10);
 
 async function check(name, run) {
@@ -64,6 +69,17 @@ async function open(browser, token, options = {}) {
 const submit = async (page, locator) => Promise.all([page.waitForNavigation(), locator.click()]);
 const flash = async (page) => clean(await page.locator('[data-flash-message] > div').first().innerText());
 const text = async (page) => clean(await page.locator('main').innerText());
+/* The commerce worker's run, once, as the env_commerce-worker_1 loop does each minute. */
+const maintain = () => execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', 'SHELL_VERBOSITY=-1 php bin/console commerce:maintain --no-debug 2>/dev/null'], {encoding: 'utf8'});
+/* The one message Mailpit holds for an address with this subject, waiting up to the seconds given. */
+async function mailTo(address, subject, seconds = 20) {
+    for (let i = 0; i < seconds; i++) {
+        const found = await (await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:${address} subject:"${subject}"`)}`)).json();
+        if ((found.messages || []).length > 0) return await (await fetch(`${mailpit}/api/v1/message/${found.messages[0].ID}`)).json();
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    throw new Error(`no email "${subject}" reached the learner`);
+}
 
 /* The learner's course B in the cart, paid partly from the wallet and the rest by EFT, placed. */
 async function buyWithWalletAndEft(page, fixture) {
@@ -112,14 +128,43 @@ async function buyWithWalletAndEft(page, fixture) {
             assert.match(shown, new RegExp(`Use your account reference as the payment reference: ${learner.reference}\\. Amount to pay: ${rand(10000)}\\.`), 'the EFT instructions quote the account reference and the rest');
             assert.equal(php('wallet', learner.id), '0', 'the wallet part was taken at placement');
         });
+        await check(`${name}: the learner is emailed how to pay, with the invoice and the bank account`, async () => {
+            maintain();
+            const mail = await mailTo(learner.email, `Order ${order(placed.id)} received: how to pay by EFT`);
+            const body = clean(mail.Text || '');
+            assert.match(body, new RegExp(`Account reference ${learner.reference} Order ${order(placed.id)}, placed`), 'it names the account and the order');
+            assert.match(body, new RegExp(`Total: ${rand(30000)} Paid so far: ${rand(20000)} Amount to pay: ${rand(10000)}`), 'what is paid and what is left to pay');
+            assert.match(body, new RegExp(`Payment reference: ${learner.reference}`), 'the account reference to pay with');
+            assert.match(body, /These bank details are fake: this is a demo site\. Do not pay\./, 'a demo site\'s fake bank details say so');
+            assert.match(body, /Please pay by \d{1,2} \w+ \d{4} at \d{2}:\d{2}\. An order that is not paid within .+ is cancelled automatically, and what you paid towards it goes to your wallet\./);
+            assert.match(body, /Your course starts as soon as your payment is confirmed\./);
+            const files = (mail.Attachments || []).map((a) => a.FileName);
+            assert.ok(files.length === 1 && /^INV-\d+\.pdf$/.test(files[0]), 'the invoice is attached: ' + files.join(', '));
+        });
         await check(`${name}: an EFT above what is due starts the course and credits the wallet`, async () => {
             await adminPage.goto(`${base}/admin/commerce/orders/${placed.id}`);
-            assert.match(await text(adminPage), new RegExp(`Account reference: ${learner.reference}`));
-            await adminPage.locator('#bank-amount').fill('150.00');
-            await adminPage.locator('#bank-received').fill(receivedNow());
-            await adminPage.locator('input[name=bank_reference]').fill(`FNB-${name}-${Date.now()}`);
-            await adminPage.locator('textarea[name=reason]').first().fill('Seen on the bank statement.');
-            await submit(adminPage, adminPage.getByRole('button', {name: 'Confirm received payment'}));
+            // The order page names the account first and says what to do next (owner, 2026-10-18).
+            assert.match(await adminPage.locator('.cl-page-head').innerText(), new RegExp(`Account ${learner.reference}`));
+            assert.match(await text(adminPage), /Waiting for the EFT payment/);
+            if (name === 'chromium') {
+                // Record EFT Payment starts from the bank statement: no hunting for the order (owner, 2026-10-18).
+                await adminPage.goto(`${base}/admin/commerce/eft`);
+                await adminPage.locator('#eft-reference').fill(`EFT ${learner.reference} THANDI`);
+                await adminPage.locator('#eft-amount').fill('150.00');
+                await adminPage.locator('#eft-received-on').fill(today());
+                await adminPage.locator('#eft-bank-reference').fill(`FNB-${name}-${Date.now()}`);
+                await adminPage.locator('#eft-reason').fill('Seen on the bank statement.');
+                await submit(adminPage, adminPage.getByRole('button', {name: 'Find the account'}));
+                assert.match(await adminPage.locator('[data-eft-account]').innerText(), new RegExp(learner.reference), 'the account is found from the statement');
+                await submit(adminPage, adminPage.locator(`tr[data-eft-order="${placed.id}"] button`));
+                assert.equal(new URL(adminPage.url()).pathname, `/admin/commerce/orders/${placed.id}`, 'and the payment is recorded against its order');
+            } else {
+                await adminPage.locator('#bank-amount').fill('150.00');
+                await adminPage.locator('#bank-received-on').fill(today());
+                await adminPage.locator('input[name=bank_reference]').fill(`FNB-${name}-${Date.now()}`);
+                await adminPage.locator('textarea[name=reason]').first().fill('Seen on the bank statement.');
+                await submit(adminPage, adminPage.getByRole('button', {name: 'Record the EFT payment'}));
+            }
             assert.equal(JSON.parse(php('order', learner.id)).state, 'fulfilled');
             assert.equal(php('wallet', learner.id), '5000');
             await page.goto(`${base}/account/wallet`);
@@ -276,17 +321,57 @@ async function buyWithWalletAndEft(page, fixture) {
         assert.equal(new URL(page.url()).searchParams.get('kind'), 'payment_received', 'filtered to what the figure adds up');
         assert.equal(await page.locator('#ledger-kind').inputValue(), 'payment_received');
         await page.goto(`${base}/admin/commerce/ledger?q=${encodeURIComponent(sample.learner.reference)}`);
-        const kinds = await page.locator('tr[data-ledger-id] td:nth-child(2)').allInnerTexts();
-        assert.ok(kinds.includes('Payment received') && kinds.includes('Overpayment credited to wallet'), 'the learner\'s payment and overpayment, found by account reference: ' + kinds.join(', '));
+        const kinds = await page.locator('tr[data-ledger-id]').evaluateAll(rows => rows.map(r => r.dataset.ledgerKind));
+        assert.ok(kinds.includes('payment_received') && kinds.includes('overpayment_to_wallet'), 'the learner\'s payment and overpayment, found by account reference: ' + kinds.join(', '));
+        assert.match(await text(page), /paid R\s?[\d\s]+,\d{2} more than was due/, 'each line says what happened in a sentence');
         await Promise.all([page.waitForNavigation(), page.locator('tr[data-ledger-id] a', {hasText: 'Open'}).first().click()]);
-        assert.match(await page.locator('h1').innerText(), /^Ledger entry \d+$/);
+        assert.match(await page.locator('h1').innerText(), /^Ledger line \d+$/);
         assert.ok((await text(page)).includes(sample.learner.reference), 'the entry names the account');
-        await page.goto(`${base}/admin/commerce/trail?order=${sample.order}`);
-        assert.ok(await page.locator('tr[data-trail-id]').count() > 0, 'the order has a trail');
-        await page.goto(`${base}/admin/commerce/payment-events?order=${sample.order}`);
-        assert.ok(await page.locator('tr[data-payment-event-id]').count() > 0, 'and payment events');
-        await Promise.all([page.waitForNavigation(), page.locator('tr[data-payment-event-id] a', {hasText: 'Open'}).first().click()]);
-        assert.match(await page.locator('h1').innerText(), /^Payment event \d+$/);
+        // The order's page shows its ledger lines, payment events and trail together, each opening its
+        // own page, whose way back is the order (owner, 2026-10-19).
+        await page.goto(`${base}/admin/commerce/orders/${sample.order}`);
+        for (const kind of ['ledger', 'payment', 'trail']) assert.ok(await page.locator(`tr[data-order-record="${kind}"]`).count() > 0, `the order page lists its ${kind} records`);
+        await Promise.all([page.waitForNavigation(), page.locator('tr[data-order-record="payment"] a').first().click()]);
+        assert.match(await page.locator('h1').innerText(), /^Payment step \d+$/);
+        assert.match(await page.locator('[data-payment-sentence]').innerText(), /payment of R\s?[\d\s]+,\d{2} for order CL-\d{8} /, 'the step says what became of the payment');
+        await Promise.all([page.waitForNavigation(), page.locator('a.cl-back-link').click()]);
+        assert.equal(new URL(page.url()).pathname, `/admin/commerce/orders/${sample.order}`, 'the way back is the order');
+        await Promise.all([page.waitForNavigation(), page.locator('tr[data-order-record="trail"] a').first().click()]);
+        assert.ok(await page.locator('[data-trail-sentence]').count() === 1, 'a trail entry opens its own page');
+        const menu = await page.locator('#cl-primary-navigation').evaluate((nav) => [...nav.querySelectorAll('a')].map((a) => a.textContent.trim()));
+        assert.ok(menu.includes('Record EFT Payment') && menu.includes('Unmatched Money'), 'Credits & Orders lists Record EFT Payment and Unmatched Money');
+        assert.ok(!menu.includes('Payment Events') && !menu.includes('Commerce Trail'), 'and not Payment Events or the Commerce Trail');
+        await admin.ctx.close();
+    });
+
+    await check('chromium: money that pays no order waits on Unmatched Money until it is paid back', async () => {
+        const admin = await open(chromium, fixture.admin_token);
+        const page = admin.page;
+        const payer = `NO SUCH PAYER ${Date.now()}`;
+        await page.goto(`${base}/admin/commerce/eft`);
+        await page.locator('#eft-reference').fill(payer);
+        await page.locator('#eft-amount').fill('99.00');
+        await page.locator('#eft-received-on').fill(today());
+        await page.locator('#eft-bank-reference').fill(`FNB-UNMATCHED-${Date.now()}`);
+        await page.locator('#eft-reason').fill('Seen on the bank statement.');
+        await submit(page, page.getByRole('button', {name: 'Find the account'}));
+        assert.match(await text(page), /There is no account reference or order number in/, 'the page says nothing matches');
+        await submit(page, page.getByRole('button', {name: 'Put it on the unmatched money list'}));
+        assert.match(clean(await page.locator("[data-unmatched-sentence]").innerText()), new RegExp(`${rand(9900)} arrived on .+ with the reference "${payer}"`));
+        const item = new URL(page.url()).pathname;
+        await page.goto(`${base}/admin/dashboard`);
+        assert.ok(await page.locator(`a[href="${item}"]`).count() > 0, 'the dashboard lists it');
+        await page.goto(`${base}/admin/commerce/unmatched`);
+        assert.match(await text(page), new RegExp(payer));
+        await page.goto(`${base}${item}`);
+        await page.locator('#unmatched-returned-on').fill(today());
+        await page.locator('#unmatched-return-reference').fill(`FNB-BACK-${Date.now()}`);
+        await submit(page, page.getByRole('button', {name: 'Record that it was paid back'}));
+        assert.match(await page.locator('[data-unmatched-outcome]').innerText(), /^Paid back to the sender on /);
+        await page.goto(`${base}/admin/commerce/unmatched`);
+        assert.doesNotMatch(await text(page), new RegExp(payer), 'it has left the list');
+        await page.goto(`${base}/admin/dashboard`);
+        assert.equal(await page.locator(`a[href="${item}"]`).count(), 0, 'and the dashboard');
         await admin.ctx.close();
     });
 
@@ -294,7 +379,7 @@ async function buyWithWalletAndEft(page, fixture) {
      * activated in turn and the active theme is restored afterwards. */
     const learnerPages = ['/account/wallet', '/account/dashboard', `/account/orders/${sample?.order}`, '/refunds', '/terms', '/privacy'];
     const adminPages = ['/admin/dashboard', '/admin/settings', '/admin/commerce/refund-requests', '/admin/wallets', `/admin/wallets/person/${sample?.learner.id}`, `/admin/commerce/orders/${sample?.order}`,
-        '/admin/commerce/orders', `/admin/commerce/ledger?order=${sample?.order}`, '/admin/commerce/trail', '/admin/commerce/payment-events'];
+        '/admin/commerce/orders', `/admin/commerce/ledger?order=${sample?.order}`, '/admin/commerce/trail', '/admin/commerce/payment-events', '/admin/commerce/eft', '/admin/commerce/unmatched'];
     try {
         for (const key of themes) {
             php('theme', key);

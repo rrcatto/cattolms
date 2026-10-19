@@ -1,47 +1,52 @@
 {#
-	One ledger row in full (MoneyRecords::ledgerEntry), with links to its order, account, payment and
-	trail, and the rows that belong with it: its corrections and the other rows of its order or refund.
+	One ledger line (MoneyRecords::ledgerEntry). The page head names the account first; the first card
+	says what happened as a sentence, then the facts in plain words and the links to the order, the wallet
+	and the payment's steps (owner, 2026-10-18). The ledger's own codes are folded under Technical details.
+	Last, the lines that belong with it: its corrections and the other lines of its order or refund.
 #}
 {% extends layout %}
 {% block page_body %}
 	{% set ph_back_href = '/admin/commerce/ledger' %}{% set ph_back_label = 'Money Ledger' %}
-	{% set ph_kicker = 'Money Ledger' %}{% set ph_title = 'Ledger entry ' ~ entry.id %}
-	{% set ph_lead = entry.kind_label ~ ' · ' ~ entry.amount_label ~ ' · ' ~ entry.when %}
+	{% set ph_title = 'Ledger line ' ~ entry.id %}
+	{% set ph_lead = entry.reference_label ? 'Account ' ~ entry.reference_label ~ ' · ' ~ (entry.account_name ?: '—') : (entry.account_name ?: 'No account') %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Entry', summary: 'As it was recorded. A ledger row is never changed.'}) }}
-		{{ ui('data.key-value-list', {items: [
-			{label: 'Entry', value: entry.kind_label},
-			{label: 'Amount', value: entry.amount_label},
-			{label: 'Money', value: entry.money_label},
-			{label: 'Wallet credit', value: entry.wallet_label},
-			{label: 'Method', value: entry.method_label},
-			{label: 'When it happened', value: entry.when},
-			{label: 'When it was recorded', value: entry.recorded},
-			{label: 'Account', value: (entry.account_name ?: '—') ~ (entry.reference_label ? ' · ' ~ entry.reference_label : '') ~ (entry.account_email ? ' · ' ~ entry.account_email : '')},
-			{label: 'Order', value: entry.order_label ?: '—'},
-			{label: 'Order state', value: entry.order_state ? entry.order_state|replace({'_': ' '})|capitalize : '—'},
-			{label: 'Payment', value: entry.payment_id ? entry.payment_id ~ (entry.payment_gateway ? ' · ' ~ entry.payment_gateway : '') ~ (entry.payment_state ? ' · ' ~ entry.payment_state|replace({'_': ' '}) : '') : '—'},
-			{label: 'Refund', value: entry.refund_id ? 'Refund ' ~ entry.refund_id ~ (entry.refund_basis ? ' · ' ~ entry.refund_basis|replace({'_': ' '}) : '') : '—'},
-			{label: 'Document', value: entry.document_number ?: '—'},
-			{label: 'Reference', value: entry.external_reference ?: '—'},
-			{label: 'Recorded by', value: entry.actor_name ?: 'The system'},
-			{label: 'Note', value: entry.memo ?: '—'},
-		]}) }}
+		{{ ui('layout.section-head', {heading: 'What happened', summary: 'A ledger line is never changed. A mistake is put right by a new line.'}) }}
+		<p class="cl-lead" data-ledger-sentence>{{ entry.sentence }}</p>
+		{% set facts = [{label: 'When', value: entry.when}] %}
+		{% if entry.money_in_label %}{% set facts = facts|merge([{label: 'Money in', value: entry.money_in_label}]) %}{% endif %}
+		{% if entry.money_out_label %}{% set facts = facts|merge([{label: 'Money out', value: entry.money_out_label}]) %}{% endif %}
+		{% if entry.wallet_change_label %}{% set facts = facts|merge([{label: 'Wallet credit', value: entry.wallet_change_label}]) %}{% endif %}
+		{% if not entry.money_in_label and not entry.money_out_label and not entry.wallet_change_label %}{% set facts = facts|merge([{label: 'Amount', value: entry.amount_label ~ ', recorded only: no money or wallet credit moved'}]) %}{% endif %}
+		{% set facts = facts|merge([{label: 'How', value: entry.method_label}, {label: 'Order', value: entry.order_label ?: '—'}]) %}
+		{% if entry.external_reference %}{% set facts = facts|merge([{label: 'Bank or Stitch reference', value: entry.external_reference}]) %}{% endif %}
+		{% if entry.document_number %}{% set facts = facts|merge([{label: 'Document', value: entry.document_number}]) %}{% endif %}
+		{% set facts = facts|merge([{label: 'Recorded by', value: entry.actor_name ?: 'The system'}]) %}
+		{% if entry.memo %}{% set facts = facts|merge([{label: 'Note', value: entry.memo}]) %}{% endif %}
+		{{ ui('data.key-value-list', {items: facts}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{% if entry.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: entry.order_href}) }}{{ ui('action.link', {label: 'Ledger rows of this order', variant: 'secondary', size: 'small', href: entry.order_ledger_href}) }}{{ ui('action.link', {label: 'Trail of this order', variant: 'secondary', size: 'small', href: entry.order_trail_href}) }}{% endif %}
+			{% if entry.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: entry.order_href}) }}{% endif %}
 			{% if entry.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: entry.account_href}) }}{% endif %}
-			{% if entry.payment_events_href %}{{ ui('action.link', {label: 'Payment events', variant: 'secondary', size: 'small', href: entry.payment_events_href}) }}{% endif %}
-			{% if entry.corrects_href %}{{ ui('action.link', {label: 'The entry this corrects', variant: 'secondary', size: 'small', href: entry.corrects_href}) }}{% endif %}
+			{% if entry.payment_events_href %}{{ ui('action.link', {label: 'The payment’s steps', variant: 'secondary', size: 'small', href: entry.payment_events_href}) }}{% endif %}
+			{% if entry.corrects_href %}{{ ui('action.link', {label: 'The line this corrects', variant: 'secondary', size: 'small', href: entry.corrects_href}) }}{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Technical details', summary: 'The codes the ledger stores'})} %}{% block body %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Ledger code', value: entry.kind},
+				{label: 'Recorded at', value: entry.recorded},
+				{label: 'Payment', value: entry.payment_id ? entry.payment_id ~ (entry.payment_gateway ? ' · ' ~ entry.payment_gateway : '') ~ (entry.payment_state ? ' · ' ~ entry.payment_state|replace({'_': ' '}) : '') : '—'},
+				{label: 'Refund', value: entry.refund_id ? 'Refund ' ~ entry.refund_id ~ (entry.refund_basis ? ' · ' ~ entry.refund_basis|replace({'_': ' '}) : '') : '—'},
+				{label: 'Order state now', value: entry.order_state ? entry.order_state|replace({'_': ' '})|capitalize : '—'},
+			]}) }}
 		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Rows that belong with it', summary: 'Its corrections, and the other rows of its order or refund, oldest first.'}) }}
+		{{ ui('layout.section-head', {heading: 'Lines that belong with it', summary: 'Its corrections, and the other lines of its order or refund, oldest first.'}) }}
 		{% if entry.related %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Entry'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Method', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Money'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Wallet', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: ''}} %}</tr>{% endblock %}
-		{% block body %}{% for row in entry.related %}<tr><td class="small">{{ row.when }}</td><td>{{ row.kind_label }}</td><td>{{ row.method_label }}</td><td>{{ row.money_label }}</td><td>{{ row.wallet_label }}</td><td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open ledger entry ' ~ row.id}) }}</td></tr>{% endfor %}{% endblock %}
+		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 44, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Money in'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Money out'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Wallet credit', wide: true}} %}</tr>{% endblock %}
+		{% block body %}{% for row in entry.related %}<tr><td class="small">{{ row.when }}</td><td class="cell-text"><a href="{{ row.href }}">{{ row.sentence }}</a></td><td>{{ row.money_in_label }}</td><td>{{ row.money_out_label }}</td><td>{{ row.wallet_change_label }}</td></tr>{% endfor %}{% endblock %}
 		{% endembed %}
-		{% else %}{{ ui('feedback.empty', {summary: 'No other row belongs with this one.'}) }}{% endif %}
+		{% else %}{{ ui('feedback.empty', {summary: 'No other line belongs with this one.'}) }}{% endif %}
 	{% endblock %}{% endembed %}</section>
 {% endblock %}

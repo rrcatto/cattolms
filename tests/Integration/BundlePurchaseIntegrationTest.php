@@ -56,6 +56,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
     {
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable());
         $container = IntegrationContainer::get();
@@ -166,7 +167,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
         $secondOrder = $this->buy($second, [$bundle['offer']]);
         $line = $this->records->items($secondOrder)[0];
         $snapshot = CommerceRepository::decode((string) $line['snapshot']);
-        self::assertSame([90000, 15552000, $this->ids(['A', 'B', 'D'])], [(int) $line['amount_minor'], (int) $line['access_period_seconds'], array_column($snapshot['courses'], 'course_id')]);
+        self::assertSame([90000, 15811200, $this->ids(['A', 'B', 'D'])], [(int) $line['amount_minor'], (int) $line['access_period_seconds'], array_column($snapshot['courses'], 'course_id')]);
         self::assertSame($this->ids(['A', 'B', 'D']), $this->openCourses($second), 'A later buyer receives the bundle as it is now.');
         self::assertStringContainsString('Includes: Course A, Course B, Course D', $this->documentsHtml($secondOrder)['invoice']);
     }

@@ -110,6 +110,7 @@ use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Infrastructure\Persistence\UserRepository;
+use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\GeoIpLocator;
@@ -716,11 +717,12 @@ final class PlatformAdministrationService
         'company_favourites' => ['provider', 'category', 'standing', 'added'],
         'companies' => ['people', 'enrolments'],
         'company_creators' => ['courses'],
-        // The money records (owner, 2026-10-18): a phone keeps when, what and how much.
-        'ledger' => ['account', 'order', 'method', 'wallet'],
-        'trail' => ['order', 'actor', 'details'],
-        'payments' => ['order', 'method', 'reference'],
-        'orders' => ['placed', 'purchaser', 'paid'],
+        // The money records (owner, 2026-10-18): a phone keeps whose account and the sentence, which
+        // already says who, what and how much.
+        'ledger' => ['occurred', 'money_in', 'money_out', 'wallet'],
+        'trail' => ['created'],
+        'payments' => ['created', 'amount'],
+        'orders' => ['placed', 'bought'],
     ];
 
     /**
@@ -2728,9 +2730,7 @@ final class PlatformAdministrationService
     {
         foreach ($rows as &$row) {
             $seconds = (int) ($row['access_period_seconds'] ?? 0);
-            $row['access_period_label'] = $seconds % 31536000 === 0
-                ? (int) ($seconds / 31536000) . ' year(s)'
-                : (int) round($seconds / 86400) . ' days';
+            $row['access_period_label'] = AccessPeriod::label($seconds);
         }
         unset($row);
         return self::trimTimestamps($rows);

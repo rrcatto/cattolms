@@ -23,7 +23,9 @@ use Symfony\Component\Clock\ClockInterface;
  * - overpaid: an EFT above its order, whose excess went to the payer's wallet;
  * - cancelled_paid: an order cancelled after part of it was paid, the payment now wallet credit;
  * - refund_request: a refund asked for in the LMS, waiting for a decision;
- * - refund_to_pay: a money-back refund approved and not yet recorded as paid.
+ * - refund_to_pay: a money-back refund approved and not yet recorded as paid;
+ * - unmatched: money that reached the bank and paid no order (owner, 2026-10-19), which opens on its own
+ *   page under Unmatched Money, where it is matched to an order or recorded as paid back.
  * An item leaves the list when it is resolved (paid, decided, paid out), or, for the two that need no
  * further action in the LMS, when ADMIN marks it dealt with. Each opens on its own page with an Email
  * this person form: ADMIN edits the starting text and sends it through the platform's mail, and the
@@ -63,6 +65,11 @@ final class TransactionAttention
                     ? $this->item($kind, (string) $row['id'], 'Order ' . self::order((int) $row['order_id']) . ' was overpaid', $amount . ' more than was due went to the payer’s wallet.', (string) $row['occurred_at'])
                     : $this->item($kind, (string) $row['id'], 'Order ' . self::order((int) $row['order_id']) . ' was cancelled after a payment', $amount . ' paid towards it went to the payer’s wallet.', (string) $row['occurred_at']);
             }
+        }
+        foreach ($this->attention->openUnmatchedPayments() as $row) {
+            $items[] = $this->item('unmatched', (string) $row['id'], Money::strictMinorUnits((int) $row['amount_minor'], (string) $row['currency'])->format() . ' arrived and paid no order',
+                'Reference "' . $row['payer_reference'] . '", received ' . self::date((string) $row['received_at']) . '. Match it to an order or record that you paid it back.', (string) $row['received_at'],
+                '/admin/commerce/unmatched/' . (string) $row['id']);
         }
         foreach ($this->attention->openRefundRequests() as $row) {
             $items[] = $this->item('refund_request', (string) $row['id'], (string) $row['display_name'] . ' asked for a refund', 'Order ' . self::order((int) $row['order_id']) . ', as ' . ($row['destination'] === 'money_back' ? 'money back' : 'wallet credit') . '.', (string) $row['requested_at']);
@@ -133,9 +140,9 @@ final class TransactionAttention
     }
 
     /** @return array{kind:string,reference:string,title:string,summary:string,at:string,href:string} */
-    private function item(string $kind, string $reference, string $title, string $summary, string $at): array
+    private function item(string $kind, string $reference, string $title, string $summary, string $at, ?string $href = null): array
     {
-        return ['kind' => $kind, 'reference' => $reference, 'title' => $title, 'summary' => $summary, 'at' => $at, 'href' => '/admin/commerce/attention/' . $kind . '/' . $reference];
+        return ['kind' => $kind, 'reference' => $reference, 'title' => $title, 'summary' => $summary, 'at' => $at, 'href' => $href ?? '/admin/commerce/attention/' . $kind . '/' . $reference];
     }
 
     private static function startingText(string $kind, string $name, string $order, string $summary, string $reference): string

@@ -6,12 +6,15 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseService;
+use CattoLearning\Analytics\AnalyticsEventRepository;
+use CattoLearning\Course\Popularity\CoursePopularityCalculator;
 use CattoLearning\Course\Popularity\CoursePopularityRepository;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Kernel;
 use CattoLearning\Support\Env;
 use CattoLearning\Support\Token;
+use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
 use PHPUnit\Framework\TestCase;
@@ -30,20 +33,29 @@ final class HomePopularCoursesPageTest extends TestCase
     private IntegrationDataFixture $fixture;
     /** @var array<string,mixed> */
     private array $cookies = [];
+    /** @var list<int> the published courses the test makes, a whole pool of them */
+    private array $courses = [];
 
     protected function setUp(): void
     {
         $this->db = IntegrationContainer::db();
         $this->fixture = new IntegrationDataFixture($this->db);
         $this->cookies = $_COOKIE;
-        if ((int) $this->db->fetchOne("SELECT COUNT(*) FROM courses WHERE status='published'") < CourseService::POPULAR_GROUP_SIZE + 1) {
-            self::markTestSkipped('The development database needs more published courses than one group holds.');
+        // A whole pool of published courses of its own, so the test does not depend on what the
+        // development database holds (owner, 2026-10-19: a clean database).
+        $suffix = $this->fixture->suffix();
+        $owner = $this->fixture->createUser('Home popular owner ' . $suffix, 'home-popular-owner-' . $suffix . '@seed.test');
+        $company = $this->fixture->createCompany($owner, 'Home popular ' . $suffix, 'home-popular-' . $suffix . '.seed.test');
+        for ($i = 0; $i < CourseService::POPULAR_POOL_SIZE; $i++) {
+            $this->courses[] = $id = $this->fixture->createCourse($owner, $company, 'home-popular-' . $i . '-' . $suffix, 'Home popular ' . $i . ' ' . $suffix);
+            $this->db->executeStatement("UPDATE courses SET published_at = NOW() + CAST(:age AS INTERVAL) WHERE id = :id", ['age' => $i . ' minutes', 'id' => $id]);
         }
     }
 
     protected function tearDown(): void
     {
         $_COOKIE = $this->cookies;
+        if ($this->courses !== []) $this->db->executeStatement('DELETE FROM analytics_events WHERE course_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => '{' . implode(',', $this->courses) . '}']);
         $this->fixture->cleanup();
     }
 
@@ -70,10 +82,16 @@ final class HomePopularCoursesPageTest extends TestCase
 
     public function testTheFirstGroupHoldsTheHighestRankedCourses(): void
     {
-        $top = IntegrationContainer::get()->get(CoursePopularityRepository::class)->popularCourses(CourseService::POPULAR_GROUP_SIZE);
-        if (count($top) < CourseService::POPULAR_GROUP_SIZE) {
-            self::markTestSkipped('Popularity has not been calculated for enough courses.');
+        // Views for four of its courses, then the popularity calculation, as the nightly run makes it.
+        $events = IntegrationContainer::get()->get(AnalyticsEventRepository::class);
+        foreach (array_slice($this->courses, 0, CourseService::POPULAR_GROUP_SIZE) as $rank => $course) {
+            for ($view = 0; $view < 20 - $rank * 4; $view++) {
+                $events->append('course_view', 'course_detail', new \DateTimeImmutable('-2 days'), ['course_id' => $course, 'visitor_id' => Uuid::v4()], [], null);
+            }
         }
+        IntegrationContainer::get()->get(CoursePopularityCalculator::class)->recalculate();
+        $top = IntegrationContainer::get()->get(CoursePopularityRepository::class)->popularCourses(CourseService::POPULAR_GROUP_SIZE);
+        self::assertCount(CourseService::POPULAR_GROUP_SIZE, $top);
         $html = $this->html('/');
         $first = substr($html, (int) strpos($html, 'aria-label="1 of '), (int) strpos($html, 'aria-label="2 of ') - (int) strpos($html, 'aria-label="1 of '));
         $positions = array_map(static fn(array $course): int|false => strpos($first, 'href="/courses/' . $course['slug'] . '"'), $top);

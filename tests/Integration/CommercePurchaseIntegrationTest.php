@@ -3,6 +3,7 @@
 declare(strict_types=1);
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
@@ -45,6 +46,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $container=IntegrationContainer::get();
         $this->db=IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $fixture=new DevelopmentFixture($this->db);
         $user=$fixture->createUser('Commerce fixture', 'commerce-'.bin2hex(random_bytes(6)).'@example.invalid');
         $company=$fixture->createCompany($user,'Commerce fixture','commerce-'.bin2hex(random_bytes(5)).'.invalid');
@@ -181,7 +183,9 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertSame('fulfilled',$this->records->order($order)['state']);
         self::assertCount(2,$this->records->documents($order));
         self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_entitlements e JOIN course_enrolments ce ON ce.id=e.enrolment_id WHERE ce.user_id=:user', ['user'=>$this->actor->id]));
-        self::assertSame(1,(int)$this->db->fetchOne("SELECT COUNT(*) FROM commerce_outbox WHERE payload->>'user_id'=:user", ['user'=>(string)$this->actor->id]));
+        // The buyer's order confirmation and course-started emails are queued once (owner, 2026-10-19).
+        $this->payments->confirm('dummy',new PaymentResult($payment,'paid',Money::strictMinorUnits(12345,'ZAR'),(string)$p['provider_reference']));
+        self::assertSame(['order.confirmed','order.courses_started'],$this->db->fetchFirstColumn("SELECT event FROM commerce_outbox WHERE payload->>'order_id'=:order ORDER BY id", ['order'=>(string)$order]));
     }
     public function testPlacedSnapshotSurvivesLiveEditsAndRepeatedCheckout(): void
     {
@@ -371,11 +375,44 @@ final class CommercePurchaseIntegrationTest extends TestCase
         self::assertStringStartsWith('%PDF-', $bytes);
         self::assertSame($bytes, $pdfs->pdf($invoice));
         $mailer = new FakeMailer();
-        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, $pdfs, $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock));
+        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, $pdfs, $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class));
         $maintenance->deliverInvoices(); $maintenance->deliverInvoices();
         $messages = array_values(array_filter($mailer->messages, fn (array $m): bool => ($m['number'] ?? '') === $invoice['number']));
         self::assertCount(1, $messages);
         self::assertSame($bytes, $messages[0]['pdf']);
+    }
+
+    /**
+     * Every buyer is told their order is paid, with its receipt attached, and which courses started
+     * (owner, 2026-10-19): one of each, however often the worker runs.
+     */
+    public function testEveryBuyerIsSentAnOrderConfirmationWithTheReceiptAndTheCoursesThatStarted(): void
+    {
+        $order = $this->place();
+        $payment = $this->payments->purchase($this->actor, $order, Uuid::v4(), 'demo_success');
+        $this->payments->confirm('dummy', new PaymentResult($payment, 'paid', Money::strictMinorUnits(12345, 'ZAR'), (string) $this->records->payment($payment)['provider_reference']));
+        self::assertSame('fulfilled', $this->records->order($order)['state']);
+        $receipt = array_values(array_filter($this->records->documents($order), static fn(array $d): bool => $d['kind'] === 'receipt'))[0];
+        $buyer = (string) CommerceRepository::decode((string) $this->records->order($order)['snapshot'])['purchaser_email'];
+
+        $mailer = new FakeMailer();
+        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, IntegrationContainer::get()->get(FinancialDocuments::class), $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class));
+        $maintenance->deliverBuyerEmails(); $maintenance->deliverBuyerEmails();
+        $number = sprintf('CL-%08d', $order);
+        $confirmations = array_values(array_filter($mailer->messages, static fn(array $m): bool => $m['type'] === 'order_confirmation' && $m['order']['number'] === $number));
+        self::assertCount(1, $confirmations, 'One order confirmation.');
+        self::assertSame($buyer, $confirmations[0]['email']);
+        self::assertSame([$receipt['number']], array_keys($confirmations[0]['receipts']), 'with the receipt attached');
+        self::assertStringStartsWith('%PDF-', $confirmations[0]['receipts'][$receipt['number']]);
+        self::assertSame([['title' => 'Frozen course title', 'detail' => '1 day of access', 'amount' => Money::ofMinorUnits(12345, 'ZAR')->format()]], $confirmations[0]['order']['lines']);
+        self::assertSame('Paid in full on 12 September 2026: ' . Money::ofMinorUnits(12345, 'ZAR')->format() . ' by card.', $confirmations[0]['order']['paid']);
+        self::assertStringEndsWith('/account/orders/' . $order, $confirmations[0]['order']['url']);
+
+        $started = array_values(array_filter($mailer->messages, static fn(array $m): bool => $m['type'] === 'courses_started' && $m['email'] === $buyer));
+        self::assertCount(1, $started, 'One email naming the courses that started.');
+        self::assertSame('Frozen course title', $started[0]['courses'][0]['title']);
+        self::assertStringEndsWith('/learn/' . $this->db->fetchOne('SELECT slug FROM courses WHERE id = :id', ['id' => $this->course]), $started[0]['courses'][0]['url']);
+        self::assertSame('13 September 2026', $started[0]['courses'][0]['until'], 'Access ends a day after it started.');
     }
 
     public function testFreeCartCheckoutHasNoInvoiceOrPayment(): void

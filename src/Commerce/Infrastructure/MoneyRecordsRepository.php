@@ -171,13 +171,30 @@ final class MoneyRecordsRepository
         if (($f['event'] ?? '') !== '') { $where[] = 'e.event = :event'; $params['event'] = $f['event']; }
         if ((int) ($f['order_id'] ?? 0) > 0) { $where[] = 'e.order_id = :order_id'; $params['order_id'] = (int) $f['order_id']; }
         if (($f['q'] ?? '') !== '') {
-            $where[] = "(e.event ILIKE :like OR CAST(e.payload AS TEXT) ILIKE :like OR COALESCE(a.display_name, '') ILIKE :like OR COALESCE(ae.email, '') ILIKE :like OR CAST(e.order_id AS TEXT) = :number)";
-            $params += array_intersect_key(self::searchParams((string) $f['q']), ['like' => 1, 'number' => 1]);
+            $where[] = "(e.event ILIKE :like OR CAST(e.payload AS TEXT) ILIKE :like OR COALESCE(a.display_name, '') ILIKE :like OR COALESCE(ae.email, '') ILIKE :like OR CAST(e.order_id AS TEXT) = :number
+                OR COALESCE(oc.name, ou.display_name, tu.display_name, '') ILIKE :like OR COALESCE(oc.account_reference, ou.account_reference, tu.account_reference, '') ILIKE :reference)";
+            $params += array_intersect_key(self::searchParams((string) $f['q']), ['like' => 1, 'number' => 1, 'reference' => 1]);
         }
         return [implode(' AND ', $where), $params];
     }
 
-    private const TRAIL_FROM = 'FROM commerce_audit_events e LEFT JOIN users a ON a.id = e.actor_user_id LEFT JOIN user_emails ae ON ae.user_id = e.actor_user_id AND ae.is_primary';
+    /** An event with whoever did it and whose order it belongs to. */
+    private const TRAIL_FROM = "FROM commerce_audit_events e LEFT JOIN users a ON a.id = e.actor_user_id LEFT JOIN user_emails ae ON ae.user_id = e.actor_user_id AND ae.is_primary
+        LEFT JOIN commerce_orders o ON o.id = e.order_id LEFT JOIN users ou ON ou.id = o.purchaser_user_id LEFT JOIN companies oc ON oc.id = o.company_id
+        LEFT JOIN course_enrolments te ON te.id = CAST(e.payload->>'enrolment_id' AS BIGINT) LEFT JOIN users tu ON tu.id = te.user_id";
+
+    /**
+     * What an event's sentence needs besides its payload: the customer, the payment it names and the
+     * course of the enrolment or order line it names.
+     */
+    private const TRAIL_COLUMNS = "e.id, e.order_id, e.actor_user_id, e.event, e.payload, e.created_at, a.display_name AS actor_name, ae.email AS actor_email,
+        o.total_minor AS order_total_minor, COALESCE(o.currency, 'ZAR') AS currency, o.company_id AS account_company_id,
+        CASE WHEN o.company_id IS NULL THEN COALESCE(o.purchaser_user_id, te.user_id) END AS account_user_id,
+        COALESCE(oc.name, ou.display_name, tu.display_name, '') AS account_name, COALESCE(oc.account_reference, ou.account_reference, tu.account_reference, '') AS account_reference,
+        (SELECT p.amount_minor FROM commerce_payments p WHERE CAST(p.id AS TEXT) = e.payload->>'payment_id') AS payment_amount_minor,
+        (SELECT p.gateway FROM commerce_payments p WHERE CAST(p.id AS TEXT) = e.payload->>'payment_id') AS payment_gateway,
+        COALESCE((SELECT c.title FROM courses c WHERE c.id = te.course_id),
+            (SELECT COALESCE(i.snapshot->>'course_title', i.snapshot->>'bundle_title') FROM commerce_order_items i WHERE i.id = CAST(e.payload->>'order_item_id' AS BIGINT)), '') AS course_title";
 
     /** @param array<string,mixed> $f */
     public function trailCount(array $f): int
@@ -194,14 +211,14 @@ final class MoneyRecordsRepository
     {
         [$where, $params] = $this->trailWhere($f);
         $order = (self::TRAIL_SORTS[$sort] ?? 'e.created_at') . ($direction === 'asc' ? ' ASC' : ' DESC') . ', e.id' . ($direction === 'asc' ? ' ASC' : ' DESC');
-        return $this->db->fetchAllAssociative('SELECT e.id, e.order_id, e.actor_user_id, e.event, e.payload, e.created_at, a.display_name AS actor_name, ae.email AS actor_email '
+        return $this->db->fetchAllAssociative('SELECT ' . self::TRAIL_COLUMNS . ' '
             . self::TRAIL_FROM . ' WHERE ' . $where . ' ORDER BY ' . $order . ' LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset), $params);
     }
 
     /** @return array<string,mixed>|null */
     public function trailEvent(int $id): ?array
     {
-        return $this->db->fetchAssociative('SELECT e.id, e.order_id, e.actor_user_id, e.event, e.payload, e.created_at, a.display_name AS actor_name, ae.email AS actor_email '
+        return $this->db->fetchAssociative('SELECT ' . self::TRAIL_COLUMNS . ' '
             . self::TRAIL_FROM . ' WHERE e.id = :id', ['id' => $id]) ?: null;
     }
 
@@ -226,19 +243,26 @@ final class MoneyRecordsRepository
         if (($f['payment_id'] ?? '') !== '') { $where[] = 'CAST(pe.payment_id AS TEXT) = :payment_id'; $params['payment_id'] = $f['payment_id']; }
         if ((int) ($f['order_id'] ?? 0) > 0) { $where[] = 'p.order_id = :order_id'; $params['order_id'] = (int) $f['order_id']; }
         if (($f['q'] ?? '') !== '') {
-            $where[] = "(pe.event_key ILIKE :like OR COALESCE(p.provider_reference, '') ILIKE :like OR CAST(pe.payment_id AS TEXT) ILIKE :like OR CAST(pe.payload AS TEXT) ILIKE :like OR CAST(p.order_id AS TEXT) = :number)";
-            $params += array_intersect_key(self::searchParams((string) $f['q']), ['like' => 1, 'number' => 1]);
+            $where[] = "(pe.event_key ILIKE :like OR COALESCE(p.provider_reference, '') ILIKE :like OR CAST(pe.payment_id AS TEXT) ILIKE :like OR CAST(pe.payload AS TEXT) ILIKE :like OR CAST(p.order_id AS TEXT) = :number
+                OR COALESCE(oc.name, ou.display_name, '') ILIKE :like OR COALESCE(oc.account_reference, ou.account_reference, '') ILIKE :reference)";
+            $params += array_intersect_key(self::searchParams((string) $f['q']), ['like' => 1, 'number' => 1, 'reference' => 1]);
         }
         return [implode(' AND ', $where), $params];
     }
 
-    private const PAYMENT_EVENT_COLUMNS = 'pe.id, pe.payment_id, pe.event_key, pe.state, pe.payload, pe.created_at, p.order_id, p.gateway, p.amount_minor, p.currency, p.provider_reference, p.state AS payment_state';
+    private const PAYMENT_EVENT_COLUMNS = "pe.id, pe.payment_id, pe.event_key, pe.state, pe.payload, pe.created_at, p.order_id, p.gateway, p.amount_minor, p.currency, p.provider_reference, p.state AS payment_state,
+        COALESCE(oc.name, ou.display_name, '') AS account_name, COALESCE(oc.account_reference, ou.account_reference, '') AS account_reference,
+        o.company_id AS account_company_id, CASE WHEN o.company_id IS NULL THEN o.purchaser_user_id END AS account_user_id";
+
+    /** A payment event with its payment and whose order it pays. */
+    private const PAYMENT_EVENT_FROM = 'FROM commerce_payment_events pe JOIN commerce_payments p ON p.id = pe.payment_id
+        LEFT JOIN commerce_orders o ON o.id = p.order_id LEFT JOIN users ou ON ou.id = o.purchaser_user_id LEFT JOIN companies oc ON oc.id = o.company_id';
 
     /** @param array<string,mixed> $f */
     public function paymentEventCount(array $f): int
     {
         [$where, $params] = $this->paymentEventWhere($f);
-        return (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_payment_events pe JOIN commerce_payments p ON p.id = pe.payment_id WHERE ' . $where, $params);
+        return (int) $this->db->fetchOne('SELECT COUNT(*) ' . self::PAYMENT_EVENT_FROM . ' WHERE ' . $where, $params);
     }
 
     /**
@@ -249,14 +273,14 @@ final class MoneyRecordsRepository
     {
         [$where, $params] = $this->paymentEventWhere($f);
         $order = (self::PAYMENT_EVENT_SORTS[$sort] ?? 'pe.created_at') . ($direction === 'asc' ? ' ASC' : ' DESC') . ', pe.id' . ($direction === 'asc' ? ' ASC' : ' DESC');
-        return $this->db->fetchAllAssociative('SELECT ' . self::PAYMENT_EVENT_COLUMNS . ' FROM commerce_payment_events pe JOIN commerce_payments p ON p.id = pe.payment_id WHERE '
+        return $this->db->fetchAllAssociative('SELECT ' . self::PAYMENT_EVENT_COLUMNS . ' ' . self::PAYMENT_EVENT_FROM . ' WHERE '
             . $where . ' ORDER BY ' . $order . ' LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset), $params);
     }
 
     /** @return array<string,mixed>|null */
     public function paymentEvent(int $id): ?array
     {
-        return $this->db->fetchAssociative('SELECT ' . self::PAYMENT_EVENT_COLUMNS . ' FROM commerce_payment_events pe JOIN commerce_payments p ON p.id = pe.payment_id WHERE pe.id = :id', ['id' => $id]) ?: null;
+        return $this->db->fetchAssociative('SELECT ' . self::PAYMENT_EVENT_COLUMNS . ' ' . self::PAYMENT_EVENT_FROM . ' WHERE pe.id = :id', ['id' => $id]) ?: null;
     }
 
     /** @return list<string> */
@@ -306,8 +330,65 @@ final class MoneyRecordsRepository
         return $this->db->fetchAllAssociative("SELECT o.id, o.state, o.total_minor, o.currency, o.placed_at, o.company_id, o.request_id,
                 u.display_name AS purchaser_name, ue.email AS purchaser_email, c.name AS company_name,
                 COALESCE(c.account_reference, u.account_reference) AS account_reference,
-                (SELECT COALESCE(SUM(p.amount_minor), 0) FROM commerce_payments p WHERE p.order_id = o.id AND p.state IN ('paid','partially_refunded','refunded')) AS paid_minor "
+                (SELECT COALESCE(SUM(p.amount_minor), 0) FROM commerce_payments p WHERE p.order_id = o.id AND p.state IN ('paid','partially_refunded','refunded')) AS paid_minor,
+                (SELECT COALESCE(SUM(r.amount_minor), 0) FROM commerce_refunds r WHERE r.order_id = o.id) AS refunded_minor,
+                (SELECT op.payment_method FROM commerce_order_preferences op WHERE op.order_id = o.id) AS payment_method,
+                (SELECT string_agg(CASE i.product_type WHEN 'bundle' THEN 'Bundle: ' || COALESCE(i.snapshot->>'bundle_title', '')
+                    WHEN 'company_credit' THEN i.quantity || ' credits for ' || COALESCE(i.snapshot->>'course_title', '')
+                    ELSE COALESCE(i.snapshot->>'course_title', '') END, ', ' ORDER BY i.id) FROM commerce_order_items i WHERE i.order_id = o.id) AS bought "
             . self::ORDER_FROM . ' WHERE ' . $where . ' ORDER BY ' . $order . ' LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset), $params);
+    }
+
+    /**
+     * The trail of one order, oldest first: what its page tells as the story of the order.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function orderTrail(int $orderId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT ' . self::TRAIL_COLUMNS . ' '
+            . self::TRAIL_FROM . " WHERE e.order_id = :order
+                OR (e.order_id IS NULL AND te.id IN (SELECT ce.enrolment_id FROM commerce_entitlements ce JOIN commerce_order_items i ON i.id = ce.order_item_id WHERE i.order_id = :order)
+                    AND (e.payload->>'entitlement_id' IS NULL OR CAST(e.payload->>'entitlement_id' AS BIGINT) IN
+                        (SELECT ce.id FROM commerce_entitlements ce JOIN commerce_order_items i ON i.id = ce.order_item_id WHERE i.order_id = :order)))
+                ORDER BY e.created_at, e.id", ['order' => $orderId]);
+    }
+
+    /**
+     * The ledger rows of one order, oldest first.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function orderLedger(int $orderId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT ' . self::LEDGER_COLUMNS . ' ' . self::LEDGER_FROM . ' WHERE l.order_id = :order ORDER BY l.occurred_at, l.id', ['order' => $orderId]);
+    }
+
+    /**
+     * The payment events of an order's payments, oldest first.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function orderPaymentEvents(int $orderId): array
+    {
+        return $this->db->fetchAllAssociative('SELECT ' . self::PAYMENT_EVENT_COLUMNS . ' ' . self::PAYMENT_EVENT_FROM . ' WHERE p.order_id = :order ORDER BY pe.created_at, pe.id', ['order' => $orderId]);
+    }
+
+    /**
+     * The course of each enrolment, for the trail's access events.
+     *
+     * @param list<int> $enrolmentIds
+     * @return array<int,string> enrolment id => course title
+     */
+    public function enrolmentCourses(array $enrolmentIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $enrolmentIds), static fn(int $id): bool => $id > 0)));
+        if ($ids === []) return [];
+        $titles = [];
+        foreach ($this->db->fetchAllAssociative('SELECT e.id, c.title FROM course_enrolments e JOIN courses c ON c.id = e.course_id WHERE e.id IN (' . implode(',', $ids) . ')') as $row) {
+            $titles[(int) $row['id']] = (string) $row['title'];
+        }
+        return $titles;
     }
 
     /**

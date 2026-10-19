@@ -5,6 +5,11 @@ Date time: 2026/09/06 17:00 SAST
 Version: 0.5.7.5.1
 Description:
 Protects the core-owned standard primary and footer navigation hierarchies. Themes style these arrays but may not invent or omit authorised platform destinations.
+Changelog:
+2026/10/19 SAST
+- Credits & Orders lists the Money Ledger but not Payment Events or the Commerce Trail.
+2026/10/18 SAST
+- Help and Contact are not in the menu, the footer does not list Account, Company and Administration, and a footer with the contact form button does not list Contact.
 */
 declare(strict_types=1);
 namespace CattoLearning\Tests\Unit;
@@ -45,8 +50,20 @@ final class NavigationContractTest extends TestCase
         foreach ($items as $item) $byKey[(string) $item['key']] = $item;
         self::assertSame('/', $byKey['home']['href'] ?? null);
         self::assertSame('/courses', $byKey['catalogue']['href'] ?? null);
-        self::assertSame('/help', $byKey['help']['href'] ?? null);
-        self::assertSame('/contact', $byKey['contact']['href'] ?? null);
+        // Help and Contact are in every footer, so the menu leaves them out (owner, 2026-10-18).
+        self::assertArrayNotHasKey('help', $byKey);
+        self::assertArrayNotHasKey('contact', $byKey);
+        // Credits & Orders has the Money Ledger, but Payment Events and the Commerce Trail are reached from
+        // each order's page (owner, 2026-10-19).
+        $commerce = [];
+        foreach ((array) ($byKey['administration']['children'] ?? []) as $group) {
+            if (($group['key'] ?? '') === 'admin-group-commerce') $commerce = array_column((array) $group['children'], 'href', 'label');
+        }
+        self::assertSame('/admin/commerce/ledger', $commerce['Money Ledger'] ?? null);
+        self::assertSame('/admin/commerce/eft', $commerce['Record EFT Payment'] ?? null);
+        self::assertSame('/admin/commerce/unmatched', $commerce['Unmatched Money'] ?? null);
+        self::assertArrayNotHasKey('Payment Events', $commerce);
+        self::assertArrayNotHasKey('Commerce Trail', $commerce);
         self::assertSame('/company', $byKey['company']['href'] ?? null);
         self::assertSame('/admin', $byKey['administration']['href'] ?? null);
         self::assertSame('/account', $byKey['account']['href'] ?? null);
@@ -214,17 +231,40 @@ final class NavigationContractTest extends TestCase
     public function testFooterNavigationIsCoreOwnedAndStable(): void
     {
         $method = new ReflectionMethod(ThemeRenderer::class, 'footerNavigation');
-        $items = $method->invoke($this->renderer(), [
-            'is_authenticated' => true,
-            'is_platform_admin' => true,
-            'permissions' => (new PermissionCatalog())->keys(),
-        ]);
+        $items = $method->invoke($this->renderer());
         $keys = array_column($items, 'key');
-        self::assertSame(['home','catalogue','help','contact','terms','refunds','privacy','account','company','admin'], $keys);
+        // The same for everyone. Account, Company and Administration are in the menu, so the footer
+        // does not repeat them (owner, 2026-10-18).
+        self::assertSame(['home','catalogue','help','contact','terms','refunds','privacy'], $keys);
         // The three public legal documents, for everyone: also a signed-out visitor.
-        $public = array_column($method->invoke($this->renderer(), []), 'href', 'key');
+        $public = array_column($items, 'href', 'key');
         self::assertSame(['/terms', '/refunds', '/privacy'], [$public['terms'] ?? null, $public['refunds'] ?? null, $public['privacy'] ?? null]);
         self::assertSame(['Terms', 'Refunds', 'Privacy'], array_slice(array_column($items, 'label'), 4, 3));
+    }
+
+    /**
+     * A footer with the contact form button leaves the Contact link out of its list, so the contact
+     * form is offered once (owner, 2026-10-18). A footer without the button keeps the link: it is the
+     * only way to Contact, now that the menu does not have it.
+     */
+    public function testAFooterWithTheContactFormButtonDoesNotListContactAgain(): void
+    {
+        $root = dirname(__DIR__, 2) . '/themes';
+        $buttons = 0;
+        foreach (glob($root . '/*/partials/footer.html.twig') ?: [] as $footer) {
+            $source = (string) file_get_contents($footer);
+            $theme = basename(dirname($footer, 2));
+            if (str_contains($source, "label: 'Open the contact form'")) {
+                $buttons++;
+                self::assertStringContainsString("footer_navigation|filter(link => link.key != 'contact')", $source, $theme . ' lists Contact beside its contact form button.');
+                self::assertStringNotContainsString('{% for footer_link in footer_navigation %}', $source, $theme);
+                self::assertStringNotContainsString('{% for footerItem in footer_navigation %}', $source, $theme);
+            } else {
+                self::assertStringNotContainsString('link.key != \'contact\'', $source, $theme . ' has no contact form button, so its footer keeps Contact.');
+            }
+        }
+        self::assertSame(2, $buttons, 'Saharan Sunset and Gilded Noir have the contact form button.');
+        self::assertStringNotContainsString('filter(', (string) file_get_contents(dirname(__DIR__, 2) . '/resources/views/partials/site-footer.html.twig'), 'The Core footer lists every footer link.');
     }
 
     /** A theme draws the Core footer list; none may write its own link to a legal page. */

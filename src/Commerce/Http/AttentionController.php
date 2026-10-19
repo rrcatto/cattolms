@@ -8,6 +8,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Commerce\Application\TransactionAttention;
 use CattoLearning\Http\Controller\BaseController;
 use CattoLearning\View\ThemeRenderer;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -28,7 +29,11 @@ final class AttentionController extends BaseController
     public function show(): Response
     {
         $actor = $this->requirePermission('PLATFORM.PAYMENT.VIEW');
-        $detail = $this->attention->detail((string) $this->param('kind'), (string) $this->param('reference'));
+        try {
+            $detail = $this->attention->detail((string) $this->param('kind'), (string) $this->param('reference'));
+        } catch (RuntimeException $missing) {
+            throw $this->notFound($missing->getMessage());
+        }
 
         return $this->render('admin-attention-item', ['title' => $detail['title'], 'active_nav' => 'admin', 'item' => $detail,
             'can_act' => $actor->hasPermission('PLATFORM.PAYMENT.MANAGE') || $actor->hasPermission('PLATFORM.REFUND.MANAGE')]);

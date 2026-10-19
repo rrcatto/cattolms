@@ -188,6 +188,121 @@ class SymfonyMailerAdapter implements MailerInterface
         $this->send($email, 'Invoice '.$number, '<p>Your invoice is attached and is available in My Orders.</p>', 'Your invoice is attached and is available in My Orders.', attachment: $pdf, attachmentName: $number.'.pdf');
     }
 
+    public function sendOrderConfirmation(string $email, array $order, array $receipts): void
+    {
+        $html = '';
+        $text = '';
+        foreach ($order['lines'] as $line) {
+            $html .= '<tr><td>' . $this->escape($line['title']) . ($line['detail'] !== '' ? '<br><small>' . $this->escape($line['detail']) . '</small>' : '') . '</td><td style="text-align:right;white-space:nowrap">' . $this->escape($line['amount']) . '</td></tr>';
+            $text .= '- ' . $line['title'] . ($line['detail'] !== '' ? ' (' . $line['detail'] . ')' : '') . ': ' . $line['amount'] . "\n";
+        }
+        $attached = $receipts === [] ? '' : (count($receipts) === 1 ? 'Your receipt ' . array_key_first($receipts) . ' is attached.' : 'Your receipts ' . implode(' and ', array_keys($receipts)) . ' are attached.');
+        $attachments = [];
+        foreach ($receipts as $number => $pdf) $attachments[$number . '.pdf'] = $pdf;
+        $this->send(
+            $email,
+            'Order ' . $order['number'] . ' confirmed',
+            '<p>Hello ' . $this->escape($order['name']) . ',</p><p>Thank you for your order. It is paid.</p>'
+            . '<p>Account reference <strong>' . $this->escape($order['account_reference']) . '</strong><br>Order ' . $this->escape($order['number']) . ', placed ' . $this->escape($order['placed']) . '</p>'
+            . '<table cellpadding="4" style="border-collapse:collapse">' . $html . '<tr><td><strong>Total</strong></td><td style="text-align:right;white-space:nowrap"><strong>' . $this->escape($order['total']) . '</strong></td></tr></table>'
+            . '<p>' . $this->escape($order['paid']) . '</p>' . ($attached !== '' ? '<p>' . $this->escape($attached) . '</p>' : '')
+            . '<p><a href="' . $this->escape($order['url']) . '">See your order in My Orders</a></p>',
+            "Hello {$order['name']},\n\nThank you for your order. It is paid.\n\nAccount reference {$order['account_reference']}\nOrder {$order['number']}, placed {$order['placed']}\n\n{$text}Total: {$order['total']}\n\n{$order['paid']}\n"
+            . ($attached !== '' ? "{$attached}\n" : '') . "\nSee your order in My Orders: {$order['url']}",
+            attachments: $attachments
+        );
+    }
+
+    public function sendCoursesStarted(string $email, string $name, array $courses): void
+    {
+        $html = '';
+        $text = '';
+        foreach ($courses as $course) {
+            $html .= '<li><strong>' . $this->escape($course['title']) . '</strong>: your access runs until ' . $this->escape($course['until']) . '. <a href="' . $this->escape($course['url']) . '">Open the course</a></li>';
+            $text .= '- ' . $course['title'] . ': your access runs until ' . $course['until'] . '. Open it: ' . $course['url'] . "\n";
+        }
+        $subject = count($courses) === 1 ? 'Your course has started: ' . $courses[0]['title'] : 'Your ' . count($courses) . ' courses have started';
+        $this->send(
+            $email,
+            $subject,
+            '<p>Hello ' . $this->escape($name) . ',</p><p>' . (count($courses) === 1 ? 'Your course has started.' : 'Your courses have started.') . ' You can begin straight away.</p><ul>' . $html . '</ul>',
+            "Hello {$name},\n\n" . (count($courses) === 1 ? 'Your course has started.' : 'Your courses have started.') . " You can begin straight away.\n\n{$text}"
+        );
+    }
+
+    public function sendPaymentInstructions(string $email, array $order, array $bank, array $documents): void
+    {
+        $part = $order['received'] !== '';
+        $html = '';
+        $text = '';
+        foreach ($order['lines'] as $line) {
+            $html .= '<tr><td>' . $this->escape($line['title']) . ($line['detail'] !== '' ? '<br><small>' . $this->escape($line['detail']) . '</small>' : '') . '</td><td style="text-align:right;white-space:nowrap">' . $this->escape($line['amount']) . '</td></tr>';
+            $text .= '- ' . $line['title'] . ($line['detail'] !== '' ? ' (' . $line['detail'] . ')' : '') . ': ' . $line['amount'] . "\n";
+        }
+        $sums = [['Total', $order['total']]];
+        if ($order['paid'] !== '') $sums[] = ['Paid so far', $order['paid']];
+        $sums[] = [$part ? 'Still to pay' : 'Amount to pay', $order['due']];
+        $text .= "\n";
+        foreach ($sums as [$label, $value]) {
+            $html .= '<tr><td><strong>' . $label . '</strong></td><td style="text-align:right;white-space:nowrap"><strong>' . $this->escape($value) . '</strong></td></tr>';
+            $text .= $label . ': ' . $value . "\n";
+        }
+        if ($bank['configured']) {
+            $account = ['Bank' => $bank['bank_name'], 'Account name' => $bank['account_name'], 'Account number' => $bank['account_number'], 'Branch code' => $bank['branch_code'], 'Payment reference' => $order['account_reference']];
+            $bankHtml = '';
+            $bankText = '';
+            foreach ($account as $label => $value) {
+                $bankHtml .= '<tr><td>' . $label . '</td><td><strong>' . $this->escape($value) . '</strong></td></tr>';
+                $bankText .= $label . ': ' . $value . "\n";
+            }
+            $fake = $bank['fake'] ? 'These bank details are fake: this is a demo site. Do not pay.' : '';
+            $bankHtml = '<p>' . ($part ? 'Pay the rest into this account' : 'Pay into this account') . ', with your account reference as the payment reference:</p><table cellpadding="4" style="border-collapse:collapse">' . $bankHtml . '</table>'
+                . ($fake !== '' ? '<p><strong>' . $fake . '</strong></p>' : '');
+            $bankText = ($part ? 'Pay the rest into this account' : 'Pay into this account') . ", with your account reference as the payment reference:\n" . $bankText . ($fake !== '' ? "\n{$fake}\n" : '');
+        } else {
+            $bankText = 'Our bank details are not on the site yet. Check your order for them before you pay: ' . $order['url'] . "\n";
+            $bankHtml = '<p>Our bank details are not on the site yet. <a href="' . $this->escape($order['url']) . '">Check your order</a> for them before you pay.</p>';
+        }
+        $deadline = 'Please pay ' . ($part ? 'the rest ' : '') . 'by ' . $order['pay_by'] . '. An order that is not paid within ' . $order['deadline'] . ' is cancelled automatically'
+            . ($order['paid'] !== '' ? ', and what you paid towards it goes to your wallet.' : '.');
+        $attached = ($part ? 'Your receipt ' : 'Your invoice ') . implode(' and ', array_keys($documents)) . ' is attached.';
+        $warning = 'Our bank details never change. If a message gives you other bank details, do not pay, and contact us.';
+        $attachments = [];
+        foreach ($documents as $number => $pdf) $attachments[$number . '.pdf'] = $pdf;
+        $opening = $part ? 'We received ' . $order['received'] . ' for this order. Thank you.' : 'Thank you for your order. It is waiting for your EFT payment.';
+        $this->send(
+            $email,
+            'Order ' . $order['number'] . ($part ? ': payment received, ' . $order['due'] . ' still to pay' : ' received: how to pay by EFT'),
+            '<p>Hello ' . $this->escape($order['name']) . ',</p><p>' . $this->escape($opening) . '</p>'
+            . '<p>Account reference <strong>' . $this->escape($order['account_reference']) . '</strong><br>Order ' . $this->escape($order['number']) . ', placed ' . $this->escape($order['placed']) . '</p>'
+            . '<table cellpadding="4" style="border-collapse:collapse">' . $html . '</table>' . $bankHtml
+            . '<p>' . $this->escape($deadline) . '</p><p>' . $this->escape($order['next']) . '</p>' . ($documents !== [] ? '<p>' . $this->escape($attached) . '</p>' : '')
+            . '<p>' . $warning . '</p><p><a href="' . $this->escape($order['url']) . '">See your order in My Orders</a></p>',
+            "Hello {$order['name']},\n\n{$opening}\n\nAccount reference {$order['account_reference']}\nOrder {$order['number']}, placed {$order['placed']}\n\n{$text}\n{$bankText}\n{$deadline}\n{$order['next']}\n"
+            . ($documents !== [] ? "{$attached}\n" : '') . "\n{$warning}\n\nSee your order in My Orders: {$order['url']}",
+            attachments: $attachments
+        );
+    }
+
+    public function sendOrderCancelled(string $email, array $order): void
+    {
+        $what = 'Your order ' . $order['number'] . ', placed ' . $order['placed'] . ', was cancelled because it was not paid by ' . $order['pay_by'] . '.';
+        $returned = $order['returned'] !== '' ? 'The ' . $order['returned'] . ' you paid towards it is in your wallet, ready to spend on any course.' : '';
+        $invoice = $order['invoice'] !== '' ? 'Your invoice ' . $order['invoice'] . ' stays with the order in My Orders, for your records.' : '';
+        $this->send(
+            $email,
+            'Order ' . $order['number'] . ' cancelled: not paid in time',
+            '<p>Hello ' . $this->escape($order['name']) . ',</p><p>' . $this->escape($what) . '</p><p>Account reference <strong>' . $this->escape($order['account_reference']) . '</strong></p>'
+            . ($returned !== '' ? '<p>' . $this->escape($returned) . ' <a href="' . $this->escape($order['wallet_url']) . '">See your wallet</a></p>' : '')
+            . ($invoice !== '' ? '<p>' . $this->escape($invoice) . ' <a href="' . $this->escape($order['url']) . '">See the order</a></p>' : '')
+            . '<p>If you still want it, you are welcome to <a href="' . $this->escape($order['again_url']) . '">order again</a>.</p>',
+            "Hello {$order['name']},\n\n{$what}\n\nAccount reference {$order['account_reference']}\n\n"
+            . ($returned !== '' ? "{$returned} See your wallet: {$order['wallet_url']}\n\n" : '')
+            . ($invoice !== '' ? "{$invoice} See the order: {$order['url']}\n\n" : '')
+            . "If you still want it, you are welcome to order again: {$order['again_url']}"
+        );
+    }
+
     public function sendTestMessage(string $email): void
     {
         $appName = $this->settings->platformName();
@@ -199,6 +314,7 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
+    /** @param array<string,string> $attachments file name => PDF, beside the one $attachment */
     private function send(
         string $to,
         string $subject,
@@ -207,7 +323,8 @@ class SymfonyMailerAdapter implements MailerInterface
         ?string $replyToEmail = null,
         string $replyToName = '',
         ?string $attachment = null,
-        string $attachmentName = ''
+        string $attachmentName = '',
+        array $attachments = []
     ): void
     {
         if (filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
@@ -237,6 +354,7 @@ class SymfonyMailerAdapter implements MailerInterface
             $message->replyTo($configuration['reply_to']);
         }
         if ($attachment !== null) $message->attach($attachment, $attachmentName, 'application/pdf');
+        foreach ($attachments as $name => $bytes) $message->attach($bytes, (string) $name, 'application/pdf');
         $mailer->send($message);
     }
 

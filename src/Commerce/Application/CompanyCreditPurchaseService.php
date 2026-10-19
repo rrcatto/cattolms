@@ -240,7 +240,9 @@ final class CompanyCreditPurchaseService
             $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $this->records->selectPaymentMethod($id,$method);
             if ($walletApplied > 0) $this->orders->payFromWallet($this->records->order($id, true), $owner, $walletApplied, $snapshot);
-            if ($emailInvoice) $this->records->enqueue('invoice:'.$id,'invoice.email_requested',['order_id'=>$id],$now->format(DATE_ATOM));
+            // An EFT order's payment instructions carry its invoice, so it is not emailed twice.
+            if ($method === 'eft') $this->orders->queuePaymentInstructions($id);
+            elseif ($emailInvoice) $this->records->enqueue('invoice:'.$id,'invoice.email_requested',['order_id'=>$id],$now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));
             $this->records->audit($id,$actor->id,'company_credit_order.placed',['company_id'=>$companyId,'request_id'=>$requestId,'total_minor'=>$review['total_minor']],$now->format(DATE_ATOM));
             return [$id,true,$method];

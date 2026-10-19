@@ -165,6 +165,7 @@ final class CheckoutService
             }
             $this->records->selectPaymentMethod($orderId, $method);
             $this->records->audit($orderId, $actor->id, 'payment.method_selected', ['method'=>$method], gmdate(DATE_ATOM));
+            if ($method === 'eft') $this->orders->queuePaymentInstructions($orderId);
         });
         if ($method === 'dummy') $this->payments->purchase($actor, $orderId, $key, $token);
     }

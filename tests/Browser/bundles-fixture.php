@@ -70,7 +70,8 @@ if ($action === 'create') {
     $learner = $person('learner' . (count($state['learners']) + 1), 'Sipho', 'Ndlovu', ['STUDENT'], $state['suffix']);
     $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
     (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Sipho Ndlovu', 'address_line_1' => '7 Bundle Road', 'city' => 'Durban', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
-    if ($action === 'learner-owning-a') $fixture->createEnrolment($learner['id'], (int) $state['courses']['a']['id'], (int) $state['users']['admin']);
+    // ADMIN assigns course A from the person's page, as in the app (owner, 2026-10-19).
+    if ($action === 'learner-owning-a') $container->get(\CattoLearning\Course\CourseService::class)->grantToPerson((int) $state['courses']['a']['id'], $learner['id'], 30, (int) $state['users']['admin']);
     if ($action === 'company-learner') $fixture->addCompanyMember((int) $state['company'], $learner['id']);
     $state['learners'][] = $learner['id'];
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));

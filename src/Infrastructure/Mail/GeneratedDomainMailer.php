@@ -95,6 +95,26 @@ final class GeneratedDomainMailer implements MailerInterface
         $this->mailer->sendContactMessage($name, $email, $subject, $message);
     }
 
+    public function sendOrderConfirmation(string $email, array $order, array $receipts): void
+    {
+        $this->mailer->sendOrderConfirmation($this->router->deliveryAddress($email), $order, $receipts);
+    }
+
+    public function sendCoursesStarted(string $email, string $name, array $courses): void
+    {
+        $this->mailer->sendCoursesStarted($this->router->deliveryAddress($email), $name, $courses);
+    }
+
+    public function sendPaymentInstructions(string $email, array $order, array $bank, array $documents): void
+    {
+        $this->mailer->sendPaymentInstructions($this->router->deliveryAddress($email), $order, $bank, $documents);
+    }
+
+    public function sendOrderCancelled(string $email, array $order): void
+    {
+        $this->mailer->sendOrderCancelled($this->router->deliveryAddress($email), $order);
+    }
+
     public function sendInvoice(string $email, string $number, string $pdf): void
     {
         $this->mailer->sendInvoice($this->router->deliveryAddress($email), $number, $pdf);

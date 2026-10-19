@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 // Development-only fixture for popular-courses.cjs: one signed-in learner, so the home page's course
-// cards carry favourite stars. The home page's Popular Courses are whatever the development
-// database's popularity snapshot holds. `reset` clears the learner's favourites so each scenario
-// starts with every star off; `cleanup` removes the learner and everything it recorded.
+// cards carry favourite stars, and twelve published courses of its own, three groups of four, so the
+// home page's Popular Courses rotate whatever else the database holds (owner, 2026-10-19: a clean
+// database). `reset` clears the learner's favourites so each scenario starts with every star off;
+// `cleanup` removes the learner, the courses and everything they recorded.
 
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
@@ -27,9 +28,18 @@ if ($action === 'create') {
     $email = 'popular-courses-' . $fixture->suffix() . '@example.test';
     $user = $fixture->createUser('Popular courses browser', $email);
     $container->get(RoleRepository::class)->assign($user, 'STUDENT');
+    $owner = $fixture->createUser('Popular courses provider', 'popular-courses-owner-' . $fixture->suffix() . '@example.test');
+    $company = $fixture->createCompany($owner, 'Popular courses provider ' . $fixture->suffix(), 'popular-courses-' . $fixture->suffix() . '.example.test');
+    $courses = [];
+    foreach (['Bookkeeping Basics', 'Payroll Essentials', 'Business Writing', 'Time Management', 'Customer Service', 'Excel for Beginners',
+        'Project Planning', 'First Aid at Work', 'Fire Safety', 'Leading a Team', 'Sales Conversations', 'Digital Marketing'] as $i => $title) {
+        $courses[] = $id = $fixture->createCourse($owner, $company, 'popular-courses-' . ($i + 1) . '-' . $fixture->suffix(), $title, 'published');
+        $db->executeStatement("UPDATE courses SET published_at = NOW() - CAST(:age AS INTERVAL) WHERE id = :id", ['age' => $i . ' hours', 'id' => $id]);
+        $fixture->createPriceVariant($id, $owner, 31536000, 45000 + 5000 * $i);
+    }
     $token = Token::generate();
     $container->get(AuthSessionRepository::class)->create($user, Token::hash($token), 7200, '', 'Popular courses browser', $email);
-    file_put_contents($statePath, json_encode(['user' => $user, 'email' => $email, 'token' => $token], JSON_THROW_ON_ERROR));
+    file_put_contents($statePath, json_encode(['user' => $user, 'email' => $email, 'token' => $token, 'owner' => $owner, 'company' => $company, 'courses' => $courses], JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created popular-courses fixture.\n";
 } elseif ($action === 'reset' || $action === 'cleanup') {
@@ -40,6 +50,13 @@ if ($action === 'create') {
         echo json_encode($state, JSON_THROW_ON_ERROR), "\n";
         exit;
     }
+    $courses = '{' . implode(',', array_map('intval', $state['courses'] ?? [])) . '}';
+    foreach (['course_favourites', 'analytics_events', 'course_price_variants'] as $table) {
+        $db->executeStatement("DELETE FROM {$table} WHERE course_id = ANY(CAST(:ids AS BIGINT[]))", ['ids' => $courses]);
+    }
+    $db->executeStatement("DELETE FROM courses WHERE id = ANY(CAST(:ids AS BIGINT[])) AND slug LIKE 'popular-courses-%'", ['ids' => $courses]);
+    if ((int) ($state['company'] ?? 0) > 0) $db->executeStatement("DELETE FROM companies WHERE id = :c AND domain LIKE 'popular-courses-%'", ['c' => (int) $state['company']]);
+    if ((int) ($state['owner'] ?? 0) > 0) $db->executeStatement("DELETE FROM users WHERE id = :u AND EXISTS (SELECT 1 FROM user_emails WHERE user_id = users.id AND email LIKE 'popular-courses-owner-%')", ['u' => (int) $state['owner']]);
     $db->executeStatement('DELETE FROM analytics_events WHERE user_id=:u', ['u' => $state['user']]);
     $db->executeStatement('DELETE FROM audit_log WHERE user_id=:u', ['u' => $state['user']]);
     $db->executeStatement("DELETE FROM users WHERE id=:u AND EXISTS (SELECT 1 FROM user_emails WHERE user_id=users.id AND email LIKE 'popular-courses-%@example.test')", ['u' => $state['user']]);

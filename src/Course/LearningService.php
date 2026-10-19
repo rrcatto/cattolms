@@ -34,6 +34,7 @@ namespace CattoLearning\Course;
 use CattoLearning\Course\Certificate\CertificateRepository;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
+use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Support\Slug;
@@ -312,17 +313,9 @@ final class LearningService
         return $expires !== '' && (strtotime($expires) ?: PHP_INT_MAX) < time();
     }
 
+    /** In the words every offer uses (a month is a twelfth of a year, owner 2026-10-19). */
     private function durationLabel(int $seconds): string
     {
-        $days = max(1, (int) round($seconds / 86400));
-        if ($days % 365 === 0) {
-            $years = (int) ($days / 365);
-            return $years . ' year' . ($years === 1 ? '' : 's');
-        }
-        if ($days % 30 === 0) {
-            $months = (int) ($days / 30);
-            return $months . ' month' . ($months === 1 ? '' : 's');
-        }
-        return $days . ' days';
+        return AccessPeriod::label($seconds);
     }
 }

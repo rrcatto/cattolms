@@ -1,31 +1,37 @@
 {#
 	The Money Ledger (owner, 2026-10-18): every movement of money and wallet credit, filtered by dates,
 	kind, method, direction and account, searched by name, email, account reference, order number or
-	reference, totalled for what matches, sorted and paged like every Administration table. A row opens
-	its own page (MoneyRecords::ledger).
+	reference, totalled for what matches, sorted and paged like every Administration table. Each row is
+	whose account first, then what happened as one sentence (MoneyRecords::ledgerSentence), with money in
+	and money out in their own columns (owner, 2026-10-18). A row opens its own page.
 #}
 {% extends layout %}
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Money Ledger' %}
-	{% set ph_lead = 'Every movement of money and wallet credit, newest first. A row is never changed: a mistake is put right by a correction.' %}
+	{% set ph_lead = 'The money book: every rand that came into or went out of the business, and every change to a customer’s wallet credit, one line each, newest first. A line is never changed: a mistake is put right by a new line.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Find entries', summary: 'Both dates are included. Search by name, email, account reference, order number or reference.'}) }}
+		{{ ui('layout.section-head', {heading: 'Find lines', summary: 'Search by account reference, name, email, order number or bank reference. Both dates are included.'}) }}
 		<form action="/admin/commerce/ledger" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 			{% if filters.order_id %}<input type="hidden" name="order" value="{{ filters.order_id }}">{% endif %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: true, for: 'ledger-q'})} %}{% block control %}<input id="ledger-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Account reference, name, email, order number or bank reference" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'ledger-from'})} %}{% block control %}<input type="date" id="ledger-from" name="from" value="{{ filters.from }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'ledger-to'})} %}{% block control %}<input type="date" id="ledger-to" name="to" value="{{ filters.to }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Entry', full_width: false, for: 'ledger-kind'})} %}{% block control %}<select id="ledger-kind" name="kind" {{ ui_field_attrs(props) }}><option value="">Every entry</option>{% for key, label in kinds %}<option value="{{ key }}" {{ filters.kind == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Method', full_width: false, for: 'ledger-method'})} %}{% block control %}<select id="ledger-method" name="method" {{ ui_field_attrs(props) }}><option value="">Every method</option>{% for key, label in methods %}<option value="{{ key }}" {{ filters.method == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Money', full_width: false, for: 'ledger-money'})} %}{% block control %}<select id="ledger-money" name="money" {{ ui_field_attrs(props) }}><option value="">In, out or neither</option><option value="in" {{ filters.money == 'in' ? 'selected' : '' }}>Money in</option><option value="out" {{ filters.money == 'out' ? 'selected' : '' }}>Money out</option><option value="none" {{ filters.money == 'none' ? 'selected' : '' }}>No money moved</option></select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Wallet credit', full_width: false, for: 'ledger-wallet'})} %}{% block control %}<select id="ledger-wallet" name="wallet" {{ ui_field_attrs(props) }}><option value="">Any</option><option value="in" {{ filters.wallet == 'in' ? 'selected' : '' }}>Added to a wallet</option><option value="out" {{ filters.wallet == 'out' ? 'selected' : '' }}>Taken from a wallet</option></select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account', full_width: false, for: 'ledger-account'})} %}{% block control %}<select id="ledger-account" name="account" {{ ui_field_attrs(props) }}><option value="">People and companies</option><option value="person" {{ filters.account == 'person' ? 'selected' : '' }}>People</option><option value="company" {{ filters.account == 'company' ? 'selected' : '' }}>Companies</option></select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: true, for: 'ledger-q'})} %}{% block control %}<input id="ledger-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Name, email, account reference, order number or reference" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/ledger'}) }}{% endblock %}{% endembed %}
-		{% endblock %}{% endembed %}</form>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What happened', full_width: false, for: 'ledger-kind'})} %}{% block control %}<select id="ledger-kind" name="kind" {{ ui_field_attrs(props) }}><option value="">Anything</option>{% for key, label in kinds %}<option value="{{ key }}" {{ filters.kind == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'More filters', summary: 'How it was paid, money in or out, wallet credit, people or companies', open: filters.method or filters.money or filters.wallet or filters.account})} %}{% block body %}
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How it was paid', full_width: false, for: 'ledger-method'})} %}{% block control %}<select id="ledger-method" name="method" {{ ui_field_attrs(props) }}><option value="">Any way</option>{% for key, label in methods %}<option value="{{ key }}" {{ filters.method == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Money in or out', full_width: false, for: 'ledger-money'})} %}{% block control %}<select id="ledger-money" name="money" {{ ui_field_attrs(props) }}><option value="">In, out or neither</option><option value="in" {{ filters.money == 'in' ? 'selected' : '' }}>Money in</option><option value="out" {{ filters.money == 'out' ? 'selected' : '' }}>Money out</option><option value="none" {{ filters.money == 'none' ? 'selected' : '' }}>No money moved</option></select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Wallet credit', full_width: false, for: 'ledger-wallet'})} %}{% block control %}<select id="ledger-wallet" name="wallet" {{ ui_field_attrs(props) }}><option value="">Any</option><option value="in" {{ filters.wallet == 'in' ? 'selected' : '' }}>Added to a wallet</option><option value="out" {{ filters.wallet == 'out' ? 'selected' : '' }}>Taken from a wallet</option></select>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account', full_width: false, for: 'ledger-account'})} %}{% block control %}<select id="ledger-account" name="account" {{ ui_field_attrs(props) }}><option value="">People and companies</option><option value="person" {{ filters.account == 'person' ? 'selected' : '' }}>People</option><option value="company" {{ filters.account == 'company' ? 'selected' : '' }}>Companies</option></select>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/ledger'}) }}{% endblock %}{% endembed %}
+		</form>
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Totals', summary: filtered ? 'For the ' ~ totals.entries ~ ' entries that match.' : 'For all ' ~ totals.entries ~ ' entries.'}) }}
+		{{ ui('layout.section-head', {heading: 'Totals', summary: filtered ? 'What the ' ~ totals.entries ~ ' lines that match add up to.' : 'What all ' ~ totals.entries ~ ' lines add up to.'}) }}
 		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}{% block body %}
 			{{ ui('data.stat-card', {value: totals.money_in_label, label: 'Money in', note: 'Payments received'}) }}
 			{{ ui('data.stat-card', {value: totals.money_out_label, label: 'Money out', note: 'Refunds and payment fees'}) }}
@@ -35,22 +41,21 @@
 		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Entries', summary: 'Money is what came into or left the business; Wallet is what was added to or taken from a wallet.'}) }}
+		{{ ui('layout.section-head', {heading: 'Lines', summary: 'Money in and money out are what came into or left the business’s bank. Wallet credit is what was added to (+) or taken from (−) a customer’s wallet, which is not money in the bank.'}) }}
 		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'ledger', pagination: ledger_pagination})} %}{% block results %}
 			{% if rows %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% for sh in ledger_sort_headers %}{% include '@platform/partials/sortable-header.html.twig' with {sh: sh, sort_region: ledger_region, sort_results: ledger_results} %}{% endfor %}</tr>{% endblock %}
 			{% block body %}
 				{% for row in rows %}
-					<tr data-ledger-id="{{ row.id }}">
+					<tr data-ledger-id="{{ row.id }}" data-ledger-kind="{{ row.kind }}">
+						<td class="cell-text">{% if row.reference_label %}<strong>{% if row.account_href %}<a href="{{ row.account_href }}">{{ row.reference_label }}</a>{% else %}{{ row.reference_label }}{% endif %}</strong><br>{% endif %}<span class="small">{{ row.account_name ?: '—' }}</span></td>
 						<td class="small">{{ row.when }}</td>
-						<td>{{ row.kind_label }}</td>
-						<td>{% if row.account_href %}<a href="{{ row.account_href }}">{{ row.account_name ?: row.reference_label }}</a>{% else %}{{ row.account_name ?: '—' }}{% endif %}</td>
-						<td>{% if row.order_href %}<a href="{{ row.order_href }}">{{ row.order_label }}</a>{% else %}—{% endif %}</td>
-						<td>{{ row.method_label }}</td>
-						<td>{{ row.money_label }}</td>
-						<td>{{ row.wallet_label }}</td>
-						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open ledger entry ' ~ row.id}) }}</td>
+						<td class="cell-text">{{ row.sentence }}</td>
+						<td>{{ row.money_in_label }}</td>
+						<td>{{ row.money_out_label }}</td>
+						<td>{{ row.wallet_change_label }}</td>
+						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open ledger line ' ~ row.id}) }}</td>
 					</tr>
 				{% endfor %}
 			{% endblock %}

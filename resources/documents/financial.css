@@ -19,5 +19,7 @@ table.totals th { font-weight: normal; text-align: left; padding: 5px 6px; white
 table.totals td { text-align: right; padding: 5px 6px; }
 table.totals tr.total th, table.totals tr.total td { font-weight: bold; font-size: 12pt; border-top: 2px solid [[accent]]; }
 .note { margin-top: 18px; font-size: 9pt; color: #555; }
+.account-ref { margin: 0 0 12px; padding: 8px 10px; border: 2px solid [[accent]]; font-size: 13pt; }
+.account-ref strong { letter-spacing: 0.5px; }
 .simulation { margin: 0 0 12px; padding: 8px 10px; border: 2px solid #b42318; color: #b42318; font-weight: bold; font-size: 11pt; text-align: center; }
 tr { page-break-inside: avoid; }

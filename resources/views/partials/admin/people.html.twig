@@ -123,7 +123,7 @@
 
 									<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 									{% for role in roles %}
-										<option value="{{ role.role_key }}">{{ role.role_name }}</option>
+										<option value="{{ role.role_key }}"{{ role.role_key == 'STUDENT' ? ' selected' : '' }}>{{ role.role_name }}</option>
 									{% endfor %}
 									</select>
 

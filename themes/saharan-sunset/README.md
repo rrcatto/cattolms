@@ -1,6 +1,6 @@
 # Saharan Sunset
 
-Theme version **1.0.2** for CattoLMS **v0.9.3** and later. Theme Package 4.0 / Twig Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue, Course detail and Sign in). Version 1.0.2 runs on Bootstrap 6 (CattoLMS v0.9.3): it declares its colour scheme (light), sets its checkbox and radio colour (`accent-color`) and focus outline colour, and styles Core's classes in place of Bootstrap 5's.
+Theme version **1.0.3** for CattoLMS **v0.9.3** and later. Theme Package 4.0 / Twig Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue, Course detail and Sign in). Version 1.0.2 runs on Bootstrap 6 (CattoLMS v0.9.3): it declares its colour scheme (light), sets its checkbox and radio colour (`accent-color`) and focus outline colour, and styles Core's classes in place of Bootstrap 5's. Version 1.0.3 leaves Contact out of the footer's list of links, because the footer's Get in touch has the contact form button (owner, 2026-10-18).
 
 ## Look
 

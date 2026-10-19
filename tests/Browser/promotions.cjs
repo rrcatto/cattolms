@@ -44,6 +44,12 @@ async function open(browser, token, options = {}) {
     // scrolling, so a click below the fold times out; the themes turn it off for reduced motion.
     const ctx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: options.width || 1280, height: 1400}, javaScriptEnabled: options.js !== false, reducedMotion: options.js === false ? 'reduce' : 'no-preference'});
     await ctx.addCookies([{name: 'catto_learning_session', value: token, url: base, secure: true}]);
+    // A success message fades out by itself after 4.5 seconds (platform-overrides.js). The check reads
+    // each one, and on a busy machine it could be gone first, so here the messages stay until read.
+    await ctx.addInitScript(() => {
+        const wait = window.setTimeout;
+        window.setTimeout = (handler, delay, ...rest) => wait(handler, delay === 4500 || delay === 6500 ? 600000 : delay, ...rest);
+    });
     const page = await ctx.newPage();
     page.on('pageerror', (error) => failures.push(`page error: ${error.message}`));
     page.on('dialog', (dialog) => dialog.accept());

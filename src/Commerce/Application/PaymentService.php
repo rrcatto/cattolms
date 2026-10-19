@@ -143,6 +143,8 @@ final class PaymentService
             if ($paid<(int)$order['total_minor']) {
                 // Part of what is due: the order waits for the rest (Transactions that need attention).
                 $this->records->audit((int)$order['id'],null,'payment.partial',['payment_id'=>$result->transactionId,'paid_minor'=>$paid,'total_minor'=>(int)$order['total_minor']],$this->clock->now()->format(DATE_ATOM));
+                // The buyer is told what arrived and what is still to pay, with its receipt (owner, 2026-10-19).
+                $this->records->enqueue('part-paid:'.$result->transactionId,'order.part_paid',['order_id'=>(int)$order['id'],'payment_id'=>$result->transactionId],$this->clock->now()->format(DATE_ATOM));
                 return;
             }
             if ($paid>(int)$order['total_minor']) {

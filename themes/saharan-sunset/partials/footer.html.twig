@@ -1,7 +1,8 @@
 {#
 	Saharan Sunset footer. The orb artwork, mirrored so the orb sits on the right, and its veil are
 	decoration behind three semantic footer sections. Destinations come from the core footer_navigation model and the social marks
-	from footer_social and the platform sprite; nothing here is a theme-maintained route list.
+	from footer_social and the platform sprite; nothing here is a theme-maintained route list. The list leaves out Contact,
+	because Get in touch has the contact form button (owner, 2026-10-18).
 #}
 <footer class="cl-footer">
 	<div class="ss-footer-art" aria-hidden="true"></div>
@@ -29,7 +30,7 @@
 				<h2 id="ss-footer-explore">Explore</h2>
 				<nav class="cl-footer-nav" aria-label="Footer navigation">
 					<ul>
-						{% for footer_link in footer_navigation %}
+						{% for footer_link in footer_navigation|filter(link => link.key != 'contact') %}
 							<li><a href="{{ footer_link.href }}">{{ footer_link.label }}</a></li>
 						{% endfor %}
 					</ul>

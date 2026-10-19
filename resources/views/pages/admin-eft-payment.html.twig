@@ -1,0 +1,39 @@
+{#
+	Record EFT Payment (owner, 2026-10-18: "I don't want to go hunting for orders"). ADMIN starts from the
+	bank statement: what the payer wrote, the amount, the day, the bank's own reference for the deposit and
+	where it was seen. Finding the account is a GET, so it works without JavaScript and keeps what was typed.
+	Then each of the account's orders that can take an EFT payment has its own Record button, and money
+	that pays none of them goes on the Unmatched Money list (BankPayments).
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Record EFT Payment' %}
+	{% set ph_lead = 'Start from your bank statement. Type what it shows, find the account from the reference the payer used, then record the money against their order. Money that pays no order goes on the Unmatched Money list.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: '1. What the bank statement shows', heading_level: 2, summary: 'Copy each detail as the statement shows it.'}) }}
+		<form action="/admin/commerce/eft" method="get">
+			{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reference the payer used', for: 'eft-reference', required: true, full_width: true, help: 'Their account reference, such as CL-20261018-13147-3, or an order number, such as CL-00000183.'})} %}{% block control %}<input id="eft-reference" name="reference" value="{{ statement.reference }}" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount that arrived (ZAR)', for: 'eft-amount', required: true})} %}{% block control %}<input id="eft-amount" name="amount" value="{{ statement.amount }}" inputmode="decimal" placeholder="500.00" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date it arrived', for: 'eft-received-on', required: true})} %}{% block control %}<input id="eft-received-on" type="date" name="received_on" value="{{ statement.received_on }}" max="{{ today }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Time it arrived', for: 'eft-received-time', help: 'Optional, such as 14:30.'})} %}{% block control %}<input id="eft-received-time" type="time" name="received_time" value="{{ statement.received_time }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The bank’s own reference for this deposit', for: 'eft-bank-reference', required: true, help: 'So the same deposit is never recorded twice.'})} %}{% block control %}<input id="eft-bank-reference" name="bank_reference" value="{{ statement.bank_reference }}" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where you saw it', for: 'eft-reason', required: true, full_width: true, help: 'Such as: FNB business account statement, 18 October.'})} %}{% block control %}<textarea id="eft-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}>{{ statement.reason }}</textarea>{% endblock %}{% endembed %}
+			{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Find the account', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+	{% if match %}
+	{% set eft_hidden = {request_key: request_key, reference: statement.reference, amount: statement.amount, received_on: statement.received_on, received_time: statement.received_time, bank_reference: statement.bank_reference, reason: statement.reason} %}
+	<section class="cl-page-section" id="eft-match">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: '2. Record it', heading_level: 2, summary: 'You are recording ' ~ (statement.amount ?: 'the amount') ~ ' that arrived on ' ~ statement.received_on|date('j M Y') ~ (statement.bank_reference ? ', bank reference ' ~ statement.bank_reference : '') ~ '. If more arrived than is due, the order is paid and the rest goes to the customer’s wallet. If less arrived, it is recorded and the order waits for the rest.'}) }}
+		{% include '@platform/partials/admin/eft-match.html.twig' with {eft_match: match, eft_action: '/admin/commerce/eft/order', eft_hidden: eft_hidden, eft_button: 'Record it against this order'} %}
+		<h3 class="h5">If it pays none of these orders</h3>
+		<p>Put it on the Unmatched Money list. It stays there, and on your dashboard, until you match it to an order or record that you paid it back. It is not in the Money Ledger until it is matched.</p>
+		<form action="/admin/commerce/eft/unmatched" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{% for name, value in eft_hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Put it on the unmatched money list', variant: 'secondary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+		</form>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

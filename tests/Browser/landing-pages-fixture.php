@@ -12,7 +12,11 @@ declare(strict_types=1);
 // development database is disposable; a reset removes anything left behind.
 
 use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Course\CourseService;
 use CattoLearning\Course\Landing\LandingPageService;
+use CattoLearning\Course\LearningService;
+use CattoLearning\Course\CourseReviewRepository;
+use CattoLearning\Course\CourseReviewService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
@@ -75,7 +79,7 @@ if ($action === 'create') {
     $a['id'] = $fixture->createCourse($owner['id'], $company, $a['slug'], $a['title'], 'published');
     $db->executeStatement("UPDATE courses SET published_at=NOW(), subtitle='Property transfers from offer to registration', summary='A practical course on transferring property in South Africa.', certificate_accreditation='LPC CPD: 4 points', level='Intermediate' WHERE id=:id", ['id' => $a['id']]);
     $price($a['id'], $owner['id'], 1, 31536000, 150000, true);
-    $price($a['id'], $owner['id'], 2, 15552000, 90000, false);
+    $price($a['id'], $owner['id'], 2, 15811200, 90000, false); // 6 months: 183 days (a month is a twelfth of a year)
     $deeds = $node($a['id'], null, 1, 'section');
     $db->executeStatement("INSERT INTO course_sections (node_id,title) VALUES (:n,'Deeds and transfers')", ['n' => $deeds]);
     $place($node($a['id'], $deeds, 1, 'item'), $a['id'], $item($owner['id'], 'landing-browser-lesson-' . $s, 'html_lesson', 'Drafting a deed of transfer', '<p>How a deed is drafted.</p>', '<p>SECRET BROWSER LESSON</p>'), true);
@@ -86,14 +90,17 @@ if ($action === 'create') {
     $bonds = $node($a['id'], null, 2, 'section');
     $db->executeStatement("INSERT INTO course_sections (node_id,title) VALUES (:n,'Bonds')", ['n' => $bonds]);
     $place($node($a['id'], $bonds, 1, 'item'), $a['id'], $item($owner['id'], 'landing-browser-bonds-' . $s, 'html_lesson', 'Registering a bond', '', '<p>SECRET BROWSER BONDS</p>'), false);
-    $db->executeStatement(
-        "INSERT INTO course_reviews (course_id,user_id,rating,comment,status,published_rating,published_comment,published_at,submitted_at,updated_at) VALUES (:c,:u,5,'Clear and practical.','approved',5,'Clear and practical.',NOW(),NOW(),NOW())",
-        ['c' => $a['id'], 'u' => $reviewer['id']]
-    );
-    $db->executeStatement(
-        "INSERT INTO course_enrolments (public_id,user_id,course_id,status,access_period_seconds,assigned_by_user_id,is_preview,started_at) VALUES (:p,:u,:c,'active',31536000,:a,FALSE,NOW())",
-        ['p' => Uuid::v4(), 'u' => $holder['id'], 'c' => $a['id'], 'a' => $admin['id']]
-    );
+    // The holder and the reviewer have course A as a person gets it (owner, 2026-10-19: "No check may ever
+    // write records a real person could not have produced"): ADMIN assigns it and they start it. Only a
+    // learner with the course may review it, and ADMIN approves the review.
+    foreach ([$holder, $reviewer] as $who) {
+        $container->get(CourseService::class)->grantToPerson($a['id'], $who['id'], 365, $admin['id']);
+        $container->get(LearningService::class)->start($who['id'], $a['slug']);
+    }
+    $reviews = $container->get(CourseReviewService::class);
+    $reviews->submit($reviewer['id'], $a['id'], 5, 'Clear and practical.');
+    $submitted = $container->get(CourseReviewRepository::class)->forLearner($a['id'], $reviewer['id']) ?? [];
+    $reviews->approve((int) $submitted['id'], $admin['id'], $submitted['revision'], null);
 
     // Course B: published, its landing page published, and no active price.
     $b = ['slug' => 'landing-browser-b-' . $s, 'title' => 'Landing browser closed course ' . $s];

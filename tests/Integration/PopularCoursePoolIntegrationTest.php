@@ -60,6 +60,7 @@ final class PopularCoursePoolIntegrationTest extends TestCase
         $ranked = $this->course('ranked', '-30 days');
         $newest = $this->course('newest', '+2 days');
         $newer = $this->course('newer', '+1 day');
+        $this->course('older', '-10 days');
         $this->rank([$ranked => 50.0, $newest => 20.0]);
         $pool = $this->courses->popularCoursePool(4);
         $ids = self::ids($pool);
@@ -84,6 +85,7 @@ final class PopularCoursePoolIntegrationTest extends TestCase
 
     public function testThePoolIsBoundedAndCarriesCardData(): void
     {
+        $this->course('card');
         $pool = $this->courses->popularCoursePool();
         self::assertLessThanOrEqual(CourseService::POPULAR_POOL_SIZE, count($pool));
         self::assertCount(min(CourseService::POPULAR_POOL_SIZE, (int) $this->db->fetchOne("SELECT COUNT(*) FROM courses WHERE status='published'")), $pool);

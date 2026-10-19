@@ -1,6 +1,6 @@
 # Catto Learning UX/UI Rules
 
-**LMS:** 0.9.2 (development) **Date time:** 2026/10/17 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
+**LMS:** 0.9.5 (development) **Date time:** 2026/10/19 SAST **Status:** current requirements. Superseded implementation instructions are replaced in place.
 
 This is the owner's interface rule book. Every rule below was stated by the owner, and it is written down here so that stating it once is enough — a rule is not re-litigated on the next surface, and a new page is checked against this list before it is handed over.
 
@@ -92,7 +92,7 @@ Page heads use `cl-page-head-inner`, `cl-page-head-content` and `cl-page-head-ac
 
 **2.3 No horizontal scrolling, at any width.** A table never scrolls sideways and never pushes the page sideways. The declared widths keep it inside its box, so `.cl-ui-table` does not scroll: it lets a row menu out instead, because the menu's panel must escape its cell. Long values truncate (rule 2.4); the action column is the one column measured (rule 2.8).
 
-**2.4 Rows do not wrap into unreadable stacks.** Cells that can hold long values truncate or wrap within their own column; a cell never forces the row to grow to several lines because a neighbouring column was starved.
+**2.4 Rows do not wrap into unreadable stacks.** Cells that can hold long values truncate or wrap within their own column; a cell never forces the row to grow to several lines because a neighbouring column was starved. A cell that holds a sentence or an account reference is `td.cell-text` and wraps within its column instead of being cut short: the money records say what happened in words (owner, 2026-10-18).
 
 **2.5 Column width is measured, not guessed.** The widths in force were set by measuring the rendered content of every table on every page: the 90th percentile of each column's content, floored at the header label's own length, normalised to 100. A row menu counts as its trigger, not as the items it opens. Re-measure when the data changes shape; do not nudge one column and leave the rest.
 
@@ -184,7 +184,7 @@ An element named here is a platform element. It is defined once in core CSS, ava
 
 **6.6 Identity band.** Who the reader is, directly under the page head, except Gilded Noir’s shared compact header identity. Included by `partials/page-head.html.twig` rather than by each page, so a page cannot forget it and cannot put it anywhere else. A signed-out reader gets the same band — same height, same shape — with an account mark and a way in; a header that appears for some readers and not others makes the page jump about depending on who is looking at it. Core classes: `.cl-identity.cl-identity-head`, `.cl-identity-meta`, `.cl-identity-details`. Gilded Noir uses the shared compact identity in its header instead; the full band is omitted at render time. Compact styles must not inherit the full band’s padding or avatar dimensions.
 
-**6.7 Site footer.** Every footer uses `cl-footer` and follows `main.cl-main` inside `div.cl-page-frame`. Factory Reset, Light Default and Radiant Learning delegate to `partials/site-footer.html.twig`. Gilded Noir and Factory Reset Sidebar keep their distinctive rich footers while using the same shared footer vocabulary and core `footer_navigation` destinations. Gilded Noir retains `gn-footer-art`, `gn-footer-veil` and `gn-footnote`. → Enforced by `CanonicalPageConstructionTest` and the browser matrices.
+**6.7 Site footer.** Every footer uses `cl-footer` and follows `main.cl-main` inside `div.cl-page-frame`. Factory Reset, Light Default and Radiant Learning delegate to `partials/site-footer.html.twig`. Gilded Noir and Factory Reset Sidebar keep their distinctive rich footers while using the same shared footer vocabulary and core `footer_navigation` destinations. Gilded Noir retains `gn-footer-art`, `gn-footer-veil` and `gn-footnote`. Each link is in one place (owner, 2026-10-18): Help and Contact are in the footer and not in the menu, and Account, Company and Administration are in the menu and not in the footer. A footer with its own contact form button (Saharan Sunset, Gilded Noir) does not list Contact as well. → Enforced by `NavigationContractTest`, `CanonicalPageConstructionTest` and the browser matrices.
 
 **6.8 Social marks.** Brand glyphs in the core sprite as `social-<key>`, keyed to `SocialPlatform` so a mark and a link cannot disagree about which service they name. These are the one exception to rule 5.3's stroked style: a brand mark is a solid shape, and outlining one leaves the letterforms inside Facebook and LinkedIn with no interior. The sprite carries `symbol[id^="social-"] { fill: currentColor; stroke: none }` for exactly that reason, and `.cl-footer-social-icon` says the same in the page's CSS, because Firefox does not apply an external sprite's own styles to `<use>` content and drew the marks black (owner, 2026-10-17). Each mark is a link: to its platform's home page until the settings give a profile address (owner, 2026-10-17).
 

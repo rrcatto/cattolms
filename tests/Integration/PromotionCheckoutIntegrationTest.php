@@ -62,6 +62,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
     {
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $this->fixture = new DevelopmentFixture($this->db);
         // Near real time: the customer order page cancels overdue orders by the real clock.
         $this->clock = new MockClock(new \DateTimeImmutable());

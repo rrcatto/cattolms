@@ -32,6 +32,7 @@ use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\PermissionCatalog;
+use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Commerce\Application\{AccessService,CommerceMaintenance,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentAdministrationService,PaymentService,PromotionService,RefundAdministrationService};
 use CattoLearning\Commerce\Document\FinancialDocumentDesignService;
 use CattoLearning\Commerce\Document\FinancialDocuments;
@@ -80,6 +81,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $_SESSION['csrf'] = str_repeat('d', 64);
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock('2026-10-08T10:00:00+02:00');
@@ -285,11 +287,11 @@ final class FinancialDocumentIntegrationTest extends TestCase
         } catch (NotFoundHttpException) {
         }
         $page = InProcessPage::run($this->staff(['PLATFORM.ORDER.VIEW', 'PLATFORM.PAYMENT.VIEW']), PaymentAdministrationController::class, 'order', ['id' => $orderId]);
-        self::assertStringContainsString('drawn in the invoice design, version ' . $invoice['template_version_number'], $page['body'], 'ADMIN sees which design version drew each document.');
-        self::assertStringContainsString('drawn in the receipt design, version ' . $receipt['template_version_number'], $page['body']);
+        self::assertStringContainsString('data-document-kind="invoice" data-design-version="' . $invoice['template_version_number'] . '"', $page['body'], 'The page records which design version drew each document, out of sight.');
+        self::assertStringContainsString('data-document-kind="receipt" data-design-version="' . $receipt['template_version_number'] . '"', $page['body']);
 
         $mailer = new FakeMailer();
-        (new CommerceMaintenance($this->records, $this->orders, $this->access, $this->documents, $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock)))->deliverInvoices();
+        (new CommerceMaintenance($this->records, $this->orders, $this->access, $this->documents, $mailer, new TransactionManager($this->db), $this->clock, WalletFixture::wallets($this->db, $this->clock), WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class)))->deliverInvoices();
         $sent = array_values(array_filter($mailer->messages, static fn(array $m): bool => ($m['number'] ?? '') === $invoice['number']));
         self::assertCount(1, $sent);
         self::assertSame($this->documents->pdf($invoice), $sent[0]['pdf'], 'The emailed invoice is the same document as the download.');

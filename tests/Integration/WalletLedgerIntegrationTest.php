@@ -17,6 +17,11 @@ below nothing; ADMIN emails the payer about an item and dismisses it; and accoun
 from the database with the check character PHP computes. Every write rolls back.
 
 Changelog:
+2026/10/19 SAST
+- An EFT buyer is emailed how to pay, what arrived after a part payment and that the unpaid order was cancelled.
+- Record EFT Payment finds the account from the statement's reference; unmatched money waits on its list until matched or paid back.
+2026/10/18 SAST
+- Wallet credit with no order is not listed as an overpayment, and its attention page is not found rather than an error.
 2026/10/17 SAST
 - Created for wallets, the money ledger, EFT amounts and account references.
 */
@@ -27,22 +32,25 @@ namespace CattoLearning\Tests\Integration;
 
 use CattoLearning\Analytics\{AnalyticsEventRecorder, AnalyticsEventRepository};
 use CattoLearning\Auth\{AuthService, CurrentUser, PermissionCatalog};
-use CattoLearning\Commerce\Application\{AccessService,BillingProfileService,CheckoutService,CommerceMaintenance,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentAdministrationService,PaymentService,RefundAdministrationService,TransactionAttention};
+use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Commerce\Application\{AccessService,BankPayments,BillingProfileService,CheckoutService,CommerceMaintenance,CompanyCreditFulfilment,FulfilmentService,OrderService,PaymentAdministrationService,PaymentService,RefundAdministrationService,TransactionAttention};
 use CattoLearning\Commerce\Document\FinancialDocuments;
-use CattoLearning\Commerce\Http\WalletController;
-use CattoLearning\Commerce\Infrastructure\CommerceRepository;
+use CattoLearning\Commerce\Http\{AttentionController, BankPaymentController, WalletController};
+use CattoLearning\Commerce\Infrastructure\{BankPaymentRepository, CommerceRepository};
 use CattoLearning\Commerce\Infrastructure\Payment\OmnipayPaymentGatewayAdapter;
 use CattoLearning\Commerce\Wallet\{WalletOwner, WalletRepository, WalletService};
 use CattoLearning\Commerce\Workflow\TransitionService;
 use CattoLearning\Course\CourseRepository;
 use CattoLearning\Infrastructure\Persistence\{AdministrationRepository,Database,TransactionManager};
 use CattoLearning\Support\AccountReference;
+use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\{BillingFixture,DevelopmentFixture,FakeMailer,InProcessPage,IntegrationContainer,PromotionFixture,WalletFixture};
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Group('commerce')]
 final class WalletLedgerIntegrationTest extends TestCase
@@ -68,6 +76,7 @@ final class WalletLedgerIntegrationTest extends TestCase
     {
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable('2026-10-17T10:00:00+02:00'));
         $container = IntegrationContainer::get();
@@ -104,6 +113,16 @@ final class WalletLedgerIntegrationTest extends TestCase
         $buyer = $this->buyer();
         $me = WalletOwner::person($buyer->id);
         $this->wallets->credit($me, 'overpayment_to_wallet', 30000, 'ZAR', 'eft');
+        // Credit with no order is not an order's overpayment: the dashboard does not list it, and its
+        // page is not found rather than an error (owner, 2026-10-18: "500 Request failed").
+        $orphan = (string) $this->db->fetchOne("SELECT MAX(id) FROM commerce_ledger_entries WHERE owner_user_id = :u AND kind = 'overpayment_to_wallet'", ['u' => $buyer->id]);
+        self::assertSame([], array_values(array_filter($this->attention()->items(500), static fn(array $item): bool => $item['reference'] === $orphan && $item['kind'] === 'overpaid')));
+        try {
+            InProcessPage::run($this->admin(), AttentionController::class, 'show', ['kind' => 'overpaid', 'reference' => $orphan]);
+            self::fail('A credit with no order opened as an attention item.');
+        } catch (NotFoundHttpException $missing) {
+            self::assertSame('That item does not exist.', $missing->getMessage());
+        }
         $this->clock->modify('+1 day');
         $this->wallets->credit($me, 'refund_to_wallet', 40000, 'ZAR', 'stitch');
         self::assertSame(70000, $this->wallets->balance($me));
@@ -175,6 +194,92 @@ final class WalletLedgerIntegrationTest extends TestCase
         self::assertSame([], $this->itemsFor($attention, $orderId));
     }
 
+    /**
+     * Record EFT Payment starts from the bank statement (owner, 2026-10-18: "I don't want to go hunting
+     * for orders"), and money that pays no order waits on the unmatched money list until it is matched to
+     * an order or paid back (owner, 2026-10-19).
+     */
+    public function testAnEftIsFoundFromTheStatementReferenceAndUnmatchedMoneyWaitsToBeSortedOut(): void
+    {
+        $buyer = $this->buyer();
+        $admin = $this->admin();
+        $this->orders->changeCart($buyer, $this->course['A']['variant']);
+        $orderId = $this->buy($buyer, 'eft');
+        $stored = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id=:id', ['id' => $buyer->id]);
+        $reference = AccountReference::format($stored);
+        $bank = $this->bankPayments();
+
+        foreach (['Payment ' . $reference . ' thanks', strtolower($stored), implode(' ', explode('-', $reference)), sprintf('CL-%08d', $orderId)] as $typed) {
+            $found = $bank->find($typed);
+            self::assertTrue($found['found'], $typed . ' names the account.');
+            self::assertSame([$orderId], array_column($found['orders'], 'id'), $typed);
+            self::assertSame(Money::ofMinorUnits(50000, 'ZAR')->format(), $found['orders'][0]['due_label']);
+        }
+        $mistyped = substr($stored, 0, -1) . (substr($stored, -1) === 'A' ? 'B' : 'A');
+        self::assertFalse($bank->find($mistyped)['found']);
+        self::assertStringContainsString('mistake', $bank->find($mistyped)['message'], 'A wrong check character is caught, not matched to someone else.');
+        self::assertSame('There is no account reference or order number in "Rent".', $bank->find('Rent')['message']);
+
+        $page = InProcessPage::run($admin, BankPaymentController::class, 'record', [], null, ['reference' => $reference, 'amount' => '500.00', 'bank_reference' => 'FNB-EFT-1', 'reason' => 'Seen on the statement.'])['body'];
+        self::assertStringContainsString('data-eft-order="' . $orderId . '"', $page, 'The account\'s waiting order is offered with its own button.');
+        self::assertStringContainsString('Put it on the unmatched money list', $page);
+
+        $bank->recordAgainstOrder($admin, $orderId, Uuid::v4(), 50000, $this->clock->now()->format(DATE_ATOM), $reference, 'FNB-EFT-1', 'Seen on the statement.');
+        self::assertSame('fulfilled', $this->records->order($orderId)['state'], 'The course starts when the EFT is recorded.');
+        self::assertStringContainsString('The payer’s reference: ' . $reference, (string) $this->db->fetchOne('SELECT reason FROM commerce_manual_payment_evidence WHERE order_id=:o', ['o' => $orderId]));
+        try {
+            $bank->recordUnmatched($admin, Uuid::v4(), 50000, $this->clock->now()->format(DATE_ATOM), 'X', 'FNB-EFT-1', 'Seen on the statement.');
+            self::fail('The same deposit was recorded twice.');
+        } catch (RuntimeException $twice) {
+            self::assertStringContainsString('already recorded', $twice->getMessage());
+        }
+
+        // Money that pays no order: on the list and the dashboard, not in the ledger.
+        $ledgerRows = (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_ledger_entries');
+        $unmatched = $bank->recordUnmatched($admin, Uuid::v4(), 12345, $this->clock->now()->modify('-1 day')->format(DATE_ATOM), 'MYSTERY PAYMENT', 'FNB-EFT-2', 'Seen on the statement.');
+        self::assertSame($ledgerRows, (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_ledger_entries'), 'Unmatched money is not in the Money Ledger.');
+        $listed = array_values(array_filter($this->attention()->items(500), static fn(array $i): bool => $i['kind'] === 'unmatched' && $i['reference'] === (string) $unmatched));
+        self::assertSame('/admin/commerce/unmatched/' . $unmatched, $listed[0]['href'] ?? null, 'The dashboard lists it, and it opens on its own page.');
+        self::assertStringContainsString('with the reference "MYSTERY PAYMENT", and no unpaid order could be matched to it.', (string) $bank->unmatched($unmatched)['sentence']);
+        self::assertStringContainsString('MYSTERY PAYMENT', InProcessPage::run($admin, BankPaymentController::class, 'unmatchedList')['body']);
+
+        // Matched later: it becomes the order's EFT payment on the day it arrived.
+        $this->orders->changeCart($buyer, $this->course['B']['variant']);
+        $second = $this->buy($buyer, 'eft');
+        $item = InProcessPage::run($admin, BankPaymentController::class, 'unmatched', ['id' => (string) $unmatched], null, ['reference' => $reference])['body'];
+        self::assertStringContainsString('data-eft-order="' . $second . '"', $item);
+        $bank->match($admin, $unmatched, $second);
+        self::assertSame('matched', $bank->unmatched($unmatched)['state']);
+        self::assertSame(17655, $this->records->dueAmount($second), 'R 123,45 of R 300,00 is paid; the rest is still due.');
+        self::assertSame('2026-10-16', substr((string) $this->db->fetchOne("SELECT received_at AT TIME ZONE 'Africa/Johannesburg' FROM commerce_manual_payment_evidence WHERE order_id=:o", ['o' => $second]), 0, 10), 'The payment keeps the day the money arrived.');
+        self::assertSame(12345, (int) $this->db->fetchOne("SELECT amount_minor FROM commerce_ledger_entries WHERE order_id=:o AND kind='payment_received'", ['o' => $second]), 'and it is in the Money Ledger now.');
+        self::assertSame([], array_values(array_filter($this->attention()->items(500), static fn(array $i): bool => $i['kind'] === 'unmatched' && $i['reference'] === (string) $unmatched)), 'Matched, it leaves the dashboard.');
+        $this->expectRefusal(fn() => $bank->match($admin, $unmatched, $second), 'already been sorted out');
+
+        // Paid back: it leaves the list and never enters the ledger.
+        $returned = $bank->recordUnmatched($admin, Uuid::v4(), 9900, $this->clock->now()->format(DATE_ATOM), 'WRONG ACCOUNT', 'FNB-EFT-3', 'Seen on the statement.');
+        $ledgerRows = (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_ledger_entries');
+        $bank->returned($admin, $returned, $this->clock->now()->format('Y-m-d'), 'FNB-BACK-1', 'Sent to us by mistake.');
+        self::assertSame('returned', $bank->unmatched($returned)['state']);
+        self::assertStringContainsString('Paid back to the sender on', (string) $bank->unmatched($returned)['outcome']);
+        self::assertSame($ledgerRows, (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_ledger_entries'));
+        $this->expectRefusal(fn() => $this->db->executeStatement("UPDATE commerce_unmatched_payments SET amount_minor = 1 WHERE id = :id", ['id' => $returned]), 'cannot change');
+        self::assertSame(['unmatched.recorded', 'unmatched.matched', 'unmatched.recorded', 'unmatched.returned'],
+            $this->db->fetchFirstColumn("SELECT event FROM commerce_audit_events WHERE event LIKE 'unmatched.%' AND (payload->>'unmatched_id')::bigint IN (:a, :b) ORDER BY id", ['a' => $unmatched, 'b' => $returned]));
+    }
+
+    private function expectRefusal(callable $action, string $message): void
+    {
+        $this->db->executeStatement('SAVEPOINT refusal');
+        try {
+            $action();
+            self::fail('Expected a refusal: ' . $message);
+        } catch (\Throwable $refused) {
+            $this->db->executeStatement('ROLLBACK TO SAVEPOINT refusal');
+            self::assertStringContainsString($message, $refused->getMessage());
+        }
+    }
+
     public function testACancelledOrderGivesWhatWasPaidToTheWalletAndSoDoesALatePayment(): void
     {
         $buyer = $this->buyer();
@@ -199,6 +304,83 @@ final class WalletLedgerIntegrationTest extends TestCase
         self::assertSame(50000, $this->wallets->balance($me), 'but becomes wallet credit.');
     }
 
+    /**
+     * An EFT buyer is told how to pay, with the invoice and the bank account; what arrived after a part
+     * payment, with its receipt; and that the order was cancelled when it was left unpaid, and where what
+     * they paid went (owner, 2026-10-19). An order changed to EFT later is told too, and one that is paid
+     * before the worker gets to it is not.
+     */
+    public function testAnEftBuyerIsToldHowToPayWhatArrivedAndThatTheUnpaidOrderWasCancelled(): void
+    {
+        $buyer = $this->buyer();
+        $email = $buyer->primaryEmail;
+        $me = WalletOwner::person($buyer->id);
+        $this->wallets->credit($me, 'refund_to_wallet', 10000, 'ZAR', 'stitch');
+        $this->orders->changeCart($buyer, $this->course['A']['variant']);
+        $this->billing->saveOwn($buyer, BillingFixture::personFields('Wallet Buyer'));
+        $_SESSION['checkout'][$buyer->id] = ['profile_confirmed' => true, 'payment_method' => 'eft', 'method_token' => '', 'invoice_email' => true, 'payment_key' => Uuid::v4(), 'use_wallet' => true];
+        $cart = $this->orders->cart($buyer);
+        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
+        self::assertSame(['order.payment_instructions'], $this->db->fetchFirstColumn("SELECT event FROM commerce_outbox WHERE payload->>'order_id'=:o ORDER BY id", ['o' => (string) $orderId]),
+            'The payment instructions carry the invoice, so it is not emailed on its own as well.');
+        $order = $this->records->order($orderId);
+        $invoice = array_values(array_filter($this->records->documents($orderId), static fn(array $d): bool => $d['kind'] === 'invoice'))[0];
+        $payBy = (new \DateTimeImmutable((string) $order['payment_due_at']))->setTimezone(new \DateTimeZone(date_default_timezone_get()))->format('j F Y \\a\\t H:i');
+        $reference = AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id=:id', ['id' => $buyer->id]));
+        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, IntegrationContainer::get()->get(FinancialDocuments::class), $this->mailer, new TransactionManager($this->db), $this->clock, $this->wallets, WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class));
+        $maintenance->deliverBuyerEmails(); $maintenance->deliverBuyerEmails();
+
+        $sent = $this->sentTo($email, 'payment_instructions');
+        self::assertCount(1, $sent, 'One email with how to pay.');
+        self::assertSame([$invoice['number']], array_keys($sent[0]['documents']), 'with the invoice attached');
+        self::assertStringStartsWith('%PDF-', $sent[0]['documents'][$invoice['number']]);
+        self::assertSame(IntegrationContainer::get()->get(RuntimeSettings::class)->payableBankDetails(), $sent[0]['bank'], 'The bank account customers pay into: fake, and labelled so, on a demo site.');
+        $r = static fn(int $minor): string => Money::ofMinorUnits($minor, 'ZAR')->format();
+        self::assertSame(['number' => sprintf('CL-%08d', $orderId), 'account_reference' => $reference, 'total' => $r(50000), 'paid' => $r(10000), 'due' => $r(40000), 'pay_by' => $payBy,
+            'deadline' => WalletFixture::settings($this->db)->paymentDue()->words(), 'next' => 'Your course starts as soon as your payment is confirmed.', 'received' => ''],
+            array_intersect_key($sent[0]['order'], array_flip(['number', 'account_reference', 'total', 'paid', 'due', 'pay_by', 'deadline', 'next', 'received'])));
+        self::assertSame([['title' => 'Course A', 'detail' => '1 month of access', 'amount' => $r(50000)]], $sent[0]['order']['lines']);
+
+        $part = $this->bank()->confirmBank($this->admin(), $orderId, Uuid::v4(), 15000, $this->clock->now()->format(DATE_ATOM), 'FNB-0005', 'Part of it.');
+        $maintenance->deliverBuyerEmails(); $maintenance->deliverBuyerEmails();
+        $sent = $this->sentTo($email, 'payment_instructions');
+        self::assertCount(2, $sent, 'A part payment is acknowledged, once.');
+        $receipt = $this->records->documentForSource('payment:' . $part) ?? self::fail('The EFT has a receipt.');
+        self::assertSame([$receipt['number']], array_keys($sent[1]['documents']), 'with its own receipt attached, not the wallet part\'s');
+        self::assertSame(['paid' => $r(25000), 'due' => $r(25000), 'next' => 'Your course starts as soon as the rest is paid.', 'received' => $r(15000) . ' by EFT on 17 October 2026'],
+            array_intersect_key($sent[1]['order'], array_flip(['paid', 'due', 'next', 'received'])));
+
+        $this->clock->modify('+8 days');
+        self::assertTrue($this->orders->cancelDue($orderId));
+        $maintenance->deliverBuyerEmails(); $maintenance->deliverBuyerEmails();
+        $cancelled = $this->sentTo($email, 'order_cancelled');
+        self::assertCount(1, $cancelled, 'The buyer is told the unpaid order was cancelled, once.');
+        self::assertSame(['pay_by' => $payBy, 'returned' => $r(25000), 'invoice' => $invoice['number']], array_intersect_key($cancelled[0]['order'], array_flip(['pay_by', 'returned', 'invoice'])),
+            'what they paid towards it is in their wallet');
+        self::assertStringEndsWith('/account/wallet', $cancelled[0]['order']['wallet_url']);
+        self::assertStringEndsWith('/courses', $cancelled[0]['order']['again_url']);
+
+        // A card order whose payment was declined, changed to EFT afterwards, is told how to pay too.
+        $this->orders->changeCart($buyer, $this->course['B']['variant']);
+        $_SESSION['checkout'][$buyer->id] = ['profile_confirmed' => true, 'payment_method' => 'dummy', 'method_token' => 'demo_failure', 'invoice_email' => false, 'payment_key' => Uuid::v4()];
+        $cart = $this->orders->cart($buyer);
+        $declined = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
+        self::assertSame('awaiting_payment', $this->records->order($declined)['state']);
+        $this->checkout($buyer)->retry($buyer, $declined, Uuid::v4(), 'eft', '');
+        // Paid in full before the worker sends it: the instructions are dropped and the confirmation goes.
+        $this->bank()->confirmBank($this->admin(), $declined, Uuid::v4(), 30000, $this->clock->now()->format(DATE_ATOM), 'FNB-0006', 'All of it.');
+        self::assertSame(['order.payment_instructions', 'order.confirmed', 'order.courses_started'], $this->db->fetchFirstColumn("SELECT event FROM commerce_outbox WHERE payload->>'order_id'=:o ORDER BY id", ['o' => (string) $declined]));
+        $maintenance->deliverBuyerEmails();
+        self::assertSame([sprintf('CL-%08d', $orderId)], array_values(array_unique(array_map(static fn(array $m): string => $m['order']['number'], $this->sentTo($email, 'payment_instructions')))));
+        self::assertCount(1, array_filter($this->sentTo($email, 'order_confirmation'), static fn(array $m): bool => $m['order']['number'] === sprintf('CL-%08d', $declined)));
+    }
+
+    /** @return list<array<string,mixed>> the messages of one type sent to one address so far */
+    private function sentTo(string $email, string $type): array
+    {
+        return array_values(array_filter($this->mailer->messages, static fn(array $m): bool => ($m['type'] ?? '') === $type && ($m['email'] ?? '') === $email));
+    }
+
     public function testCreditExpiresAfterTheSettingInForceAndIsRemindedAboutOnce(): void
     {
         $buyer = $this->buyer();
@@ -206,7 +388,7 @@ final class WalletLedgerIntegrationTest extends TestCase
         $this->wallets->credit($me, 'refund_to_wallet', 10000, 'ZAR', 'stitch');
         $this->wallets->correct($me, -4000, 'ZAR', 'Spent at the front desk by agreement.', $this->admin()->id);
         self::assertSame(6000, $this->wallets->balance($me));
-        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, IntegrationContainer::get()->get(FinancialDocuments::class), $this->mailer, new TransactionManager($this->db), $this->clock, $this->wallets);
+        $maintenance = new CommerceMaintenance($this->records, $this->orders, $this->access, IntegrationContainer::get()->get(FinancialDocuments::class), $this->mailer, new TransactionManager($this->db), $this->clock, $this->wallets, WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class));
 
         $this->clock->modify('+3 years -31 days');
         $maintenance->remindWallets();
@@ -356,6 +538,11 @@ final class WalletLedgerIntegrationTest extends TestCase
     {
         $container = IntegrationContainer::get();
         return new RefundAdministrationService($this->records, new TransactionManager($this->db), $container->get(TransitionService::class), $this->clock, $this->analytics(), $this->access, $container->get(FinancialDocuments::class), $this->wallets, WalletFixture::settings($this->db));
+    }
+
+    private function bankPayments(): BankPayments
+    {
+        return new BankPayments(new BankPaymentRepository($this->db), $this->records, $this->bank(), new TransactionManager($this->db), $this->clock);
     }
 
     private function attention(): TransactionAttention

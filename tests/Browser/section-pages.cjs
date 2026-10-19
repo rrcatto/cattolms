@@ -33,7 +33,7 @@ const pages = [
   '/admin/courses/tags', '/admin/course-reviews', '/admin/bundles', '/admin/certificates/designs', '/admin/course/requests',
   '/admin/course/enrolments', '/admin/people', '/admin/companies', '/admin/companies/creators', '/admin/course/credits',
   '/admin/commerce/orders', '/admin/commerce/refund-requests', '/admin/wallets', '/admin/promotions', '/admin/commerce/documents',
-  '/admin/commerce/ledger', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
+  '/admin/commerce/eft', '/admin/commerce/unmatched', '/admin/commerce/ledger', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
   '/admin/reports/companies', '/admin/themes', '/admin/roles', '/admin/seed', '/admin/settings', '/admin/system/ui-components',
 ];
 const inspect = () => {

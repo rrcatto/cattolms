@@ -42,6 +42,9 @@ final class MoneyRecords
     public const ORDER_STATES = ['placed' => 'Placed', 'awaiting_payment' => 'Awaiting payment', 'manual_review' => 'Manual review', 'paid' => 'Paid',
         'fulfilled' => 'Fulfilled', 'cancelled' => 'Cancelled', 'partially_refunded' => 'Partly refunded', 'refunded' => 'Refunded'];
     public const PAYMENT_STATES = ['created', 'pending', 'paid', 'failed', 'cancelled', 'disputed', 'reversed', 'partially_refunded', 'refunded'];
+    /** Each step a payment can reach, in words, for the Payment Events filter. */
+    public const PAYMENT_STATE_WORDS = ['created' => 'Started', 'pending' => 'Waiting', 'paid' => 'Went through', 'failed' => 'Failed', 'cancelled' => 'Cancelled',
+        'disputed' => 'Disputed', 'reversed' => 'Reversed', 'partially_refunded' => 'Partly refunded', 'refunded' => 'Refunded'];
     public const PERIODS = ['today' => 'Today', '7d' => 'Last 7 days', '30d' => 'Last 30 days', 'month' => 'This month', 'last_month' => 'Last month', 'year' => 'This year', 'custom' => 'Dates'];
 
     public function __construct(private readonly MoneyRecordsRepository $records, private readonly ClockInterface $clock) {}
@@ -105,9 +108,183 @@ final class MoneyRecords
         return (new DateTimeImmutable($value))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('j M Y H:i');
     }
 
-    private static function orderNumber(int $id): string
+    public static function orderNumber(int $id): string
     {
         return 'CL-' . str_pad((string) $id, 8, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * What a ledger row means, as one plain sentence (owner, 2026-10-18: "Nothing tells me in plain
+     * English what happened"): "Thandi Ndlovu paid R 500,00 by card for order CL-00000183."
+     *
+     * @param array<string,mixed> $row
+     */
+    public static function ledgerSentence(array $row): string
+    {
+        $name = trim((string) ($row['account_name'] ?? ''));
+        $who = $name !== '' ? $name : 'The customer';
+        $whose = $name !== '' ? $name . "'s" : "the customer's";
+        $amount = self::money((int) $row['amount_minor'], (string) $row['currency']);
+        $memo = rtrim(trim((string) ($row['memo'] ?? '')), '.');
+        $number = ($row['order_id'] ?? null) === null ? '' : self::orderNumber((int) $row['order_id']);
+        $order = $number === '' ? '' : ' for order ' . $number;
+        $by = match ((string) ($row['method'] ?? '')) { 'eft' => ' by EFT', 'stitch' => ' by card', default => '' };
+        // A bank or payout reference is worth reading; a card payment's reference is the gateway's own id.
+        $reference = trim((string) ($row['external_reference'] ?? ''));
+        $reference = $reference === '' || (string) ($row['method'] ?? '') === 'stitch' ? '' : ', reference ' . $reference;
+        $sentence = match ((string) $row['kind']) {
+            'payment_received' => $who . ' paid ' . $amount . $by . $order . $reference . '.',
+            'processor_fee' => 'Stitch charged ' . $amount . ' to process ' . $whose . ' card payment' . $order . '.',
+            'wallet_payment' => $who . ' paid ' . $amount . ' from their wallet' . $order . '.',
+            'wallet_payment_released' => $amount . ' went back to ' . $whose . ' wallet because ' . ($number === '' ? 'the order' : 'order ' . $number) . ' was not paid.',
+            'refund_to_wallet' => $who . ' was refunded ' . $amount . ' as wallet credit' . $order . '.',
+            'overpayment_to_wallet' => $who . ' paid ' . $amount . ' more than was due' . $order . ', so it went to their wallet.',
+            'unfulfilled_payment_to_wallet' => ucfirst($whose) . ' payment of ' . $amount . $order . ' went to their wallet because the order was cancelled.',
+            'refund_owed' => $who . ' is owed ' . $amount . ' as money back' . $order . '. Paying it is recorded on its own line.',
+            'refund_deduction' => $amount . ' was kept back from ' . $whose . ' refund' . $order . ' to cover ' . ($memo === '' ? 'fees' : (str_starts_with($memo, 'The ') ? $memo : 'the ' . $memo)) . '.',
+            'refund_paid' => $amount . ' was paid back to ' . ($name !== '' ? $name : 'the customer') . $by . $reference . '.',
+            'processor_refund_fee' => 'Stitch charged ' . $amount . ' to refund ' . $whose . ' card payment' . $order . '.',
+            'credit_expired' => $amount . ' of ' . $whose . ' wallet credit expired unused.',
+            'correction' => 'A correction of ' . $amount . ' on ' . $whose . ' account' . $order . '.',
+            default => LedgerKind::label((string) $row['kind']) . ': ' . $amount . $order . '.',
+        };
+        return $memo !== '' && (string) $row['kind'] === 'correction' ? $sentence . ' ' . ucfirst($memo) . '.' : $sentence;
+    }
+
+    /** How a payment was made, in words: "card payment", "EFT payment" or "wallet payment". */
+    private static function paymentWords(string $gateway): string
+    {
+        return match (LedgerKind::methodForGateway($gateway)) { 'eft' => 'EFT payment', 'wallet' => 'wallet payment', default => 'card payment' };
+    }
+
+    /**
+     * What a payment event means, as one sentence: "Thandi Ndlovu's card payment of R 500,00 for order
+     * CL-00000183 went through."
+     *
+     * @param array<string,mixed> $row
+     */
+    public static function paymentEventSentence(array $row): string
+    {
+        $name = trim((string) ($row['account_name'] ?? ''));
+        $payment = ($name !== '' ? $name . "'s " : 'The ') . self::paymentWords((string) $row['gateway']) . ' of '
+            . self::money((int) $row['amount_minor'], (string) $row['currency']) . ' for order ' . self::orderNumber((int) $row['order_id']);
+        $method = LedgerKind::methodForGateway((string) $row['gateway']);
+        return $payment . match ((string) $row['state']) {
+            'created' => ' was started.',
+            'pending' => $method === 'eft' ? ' is waiting for the money to reach the bank.' : ' is waiting to be completed.',
+            'paid' => match ($method) { 'eft' => ' was received and recorded.', 'wallet' => ' was taken from the wallet.', default => ' went through: the money was received.' },
+            'failed' => ' failed: no money was taken.',
+            'cancelled' => ' was cancelled.',
+            'disputed' => ' was disputed by the cardholder.',
+            'reversed' => ' was reversed.',
+            'partially_refunded' => ' was partly refunded.',
+            'refunded' => ' was refunded in full.',
+            default => ': ' . str_replace('_', ' ', (string) $row['state']) . '.',
+        };
+    }
+
+    /**
+     * What a trail event means, as one sentence: "Thandi Ndlovu placed order CL-00000183 for R 500,00."
+     *
+     * @param array<string,mixed> $row a trail row with its customer, payment and course (MoneyRecordsRepository)
+     */
+    public static function trailSentence(array $row): string
+    {
+        $p = json_decode((string) $row['payload'], true);
+        $p = is_array($p) ? $p : [];
+        $currency = (string) ($row['currency'] ?? 'ZAR');
+        $money = static fn(mixed $minor): string => self::money((int) $minor, $currency);
+        $actor = trim((string) ($row['actor_name'] ?? ''));
+        $by = $actor !== '' ? $actor : 'The system';
+        $name = trim((string) ($row['account_name'] ?? ''));
+        $customer = $name !== '' ? $name : 'the customer';
+        $customers = $name !== '' ? $name . "'s" : "the customer's";
+        $order = ($row['order_id'] ?? null) === null ? 'the order' : 'order ' . self::orderNumber((int) $row['order_id']);
+        $course = trim((string) ($row['course_title'] ?? '')) !== '' ? (string) $row['course_title'] : 'the course';
+        $paid = ($row['payment_amount_minor'] ?? null) === null ? '' : ' of ' . $money($row['payment_amount_minor']);
+        $kind = static fn(string $k): string => match ($k) { 'overpaid' => 'overpayment', 'underpaid' => 'part payment', 'refund_to_pay' => 'refund to pay', 'refund_request' => 'refund request', default => str_replace('_', ' ', $k) };
+        $destination = static fn(string $d): string => $d === 'money_back' ? 'money back' : 'wallet credit';
+        return match ((string) $row['event']) {
+            'order.placed' => ($actor !== '' ? $actor : ucfirst($customer)) . ' placed ' . $order . ' for ' . $money($p['total_minor'] ?? $row['order_total_minor'] ?? 0) . '.',
+            'company_credit_order.placed' => $by . ' ordered course credits for ' . $customer . ', ' . $order . ', for ' . $money($p['total_minor'] ?? $row['order_total_minor'] ?? 0) . '.',
+            'company_request.fulfilled' => 'The course request was met by ' . $order . '.',
+            'order.settled_without_payment' => 'Nothing was left to pay on ' . $order . ' after the promotion, so it was settled without a payment.',
+            'order.payment_deadline_elapsed' => ucfirst($order) . ' was not paid by its due date, so it was cancelled.',
+            'payment.method_selected' => $by . ' chose to pay ' . $order . ' by ' . (($p['method'] ?? '') === 'eft' ? 'EFT' : 'card') . '.',
+            'payment.wallet_applied' => $money($p['amount_minor'] ?? 0) . ' was paid from ' . $customers . ' wallet for ' . $order . '.',
+            'payment.confirmed' => 'The ' . self::paymentWords((string) ($row['payment_gateway'] ?? '')) . $paid . ' for ' . $order . ' was confirmed.',
+            'payment.bank_evidence_confirmed' => $by . ' recorded an EFT payment of ' . $money($p['amount_minor'] ?? 0) . ' for ' . $order
+                . (isset($p['received_at']) ? ', received on ' . self::when((string) $p['received_at']) : '') . (isset($p['bank_reference']) ? ', bank reference ' . $p['bank_reference'] : '') . '.',
+            'payment.overpaid' => $money($p['excess_minor'] ?? 0) . ' more than was due for ' . $order . ' went to ' . $customers . ' wallet.',
+            'payment.partial' => 'Part of ' . $order . ' was paid: ' . $money($p['paid_minor'] ?? 0) . ' of ' . $money($p['total_minor'] ?? 0) . '. The rest is still due.',
+            'payment.after_cancellation' => 'A payment' . $paid . ' arrived after ' . $order . ' was cancelled.',
+            'payment.review_released' => $by . ' checked the payment and released ' . $order . (isset($p['reason']) ? ': ' . $p['reason'] : '') . '.',
+            'document.issued' => match ((string) ($p['kind'] ?? '')) { 'invoice' => 'Invoice', 'receipt' => 'Receipt', 'credit_note' => 'Credit note', default => 'Document' }
+                . ' ' . ($p['number'] ?? '') . ' was issued for ' . $order . '.',
+            'entitlement.created' => 'Access to ' . $course . ' was set up for ' . $customer . '.',
+            'entitlement.activated' => 'Access to ' . $course . ' opened.',
+            'entitlement.learner_started' => $course . ' started.',
+            'entitlement.free_accepted' => $by . ' accepted ' . $course . ' free of charge.',
+            'entitlement.expired' => 'Access to ' . $course . ' expired.',
+            'entitlement.revoked' => 'Access to ' . $course . ' was withdrawn' . (str_starts_with((string) ($p['reason'] ?? ''), 'refund') ? ' because it was refunded' : '') . '.',
+            'company_credit.created' => (int) ($p['quantity'] ?? 0) . ' course credits for ' . $course . ' were added to ' . $customer . '.',
+            'refund_request.made' => $by . ' asked for a refund on ' . $course . ' as ' . $destination((string) ($p['destination'] ?? '')) . '.',
+            'refund_request.withdrawn' => $by . ' withdrew their refund request.',
+            'refund_request.refused' => $by . ' refused the refund request' . (isset($p['note']) && $p['note'] !== '' ? ': ' . $p['note'] : '') . '.',
+            'refund.approved' => $by . ' approved a refund of ' . $money($p['amount_minor'] ?? 0) . ' on ' . $course . ' as ' . $destination((string) ($p['destination'] ?? ''))
+                . (isset($p['policy_refusal']) ? ', overriding the Refund Policy' : '') . '.',
+            'refund.paid_out' => $by . ' recorded paying a refund back by ' . (($p['method'] ?? '') === 'eft' ? 'EFT' : 'card') . (isset($p['reference']) ? ', reference ' . $p['reference'] : '') . '.',
+            'attention.email_sent' => $by . ' emailed ' . $customer . ' about the ' . $kind((string) ($p['kind'] ?? '')) . '.',
+            'attention.dismissed' => $by . ' marked the ' . $kind((string) ($p['kind'] ?? '')) . ' as dealt with.',
+            'unmatched.recorded' => $by . ' put ' . $money($p['amount_minor'] ?? 0) . ' on the unmatched money list: it arrived' . (isset($p['received_at']) ? ' on ' . self::when((string) $p['received_at']) : '')
+                . ' with the reference "' . ($p['payer_reference'] ?? '') . '" and paid no order.',
+            'unmatched.matched' => $by . ' matched unmatched money of ' . $money($p['amount_minor'] ?? 0) . ' to ' . $order . ', as its EFT payment.',
+            'unmatched.returned' => $by . ' recorded paying unmatched money of ' . $money($p['amount_minor'] ?? 0) . ' back to the sender' . (isset($p['return_reference']) ? ', reference ' . $p['return_reference'] : '') . '.',
+            default => self::eventLabel((string) $row['event']) . ($row['order_id'] === null ? '' : ' (' . $order . ')') . '.',
+        };
+    }
+
+    /**
+     * The account a record belongs to, for the first column of every money list: its reference, its
+     * name and the wallet page that shows everything about it.
+     *
+     * @param array<string,mixed> $row with account_reference, account_name, account_user_id, account_company_id
+     * @return array{account_reference_label:string,account_label:string,account_href:string}
+     */
+    private static function account(array $row): array
+    {
+        $company = (int) ($row['account_company_id'] ?? 0);
+        $person = (int) ($row['account_user_id'] ?? 0);
+        return ['account_reference_label' => (string) ($row['account_reference'] ?? '') === '' ? '' : AccountReference::format((string) $row['account_reference']),
+            'account_label' => (string) ($row['account_name'] ?? ''),
+            'account_href' => $company > 0 ? '/admin/wallets/company/' . $company : ($person > 0 ? '/admin/wallets/person/' . $person : '')];
+    }
+
+    /**
+     * Where an order stands, in words: a status, a note and a tone.
+     *
+     * @param array<string,mixed> $row an order with paid_minor, refunded_minor, payment_method and bought
+     * @return array{label:string,note:string,tone:string}
+     */
+    public static function orderStatus(array $row): array
+    {
+        $currency = (string) $row['currency'];
+        $total = (int) $row['total_minor'];
+        $paid = (int) ($row['paid_minor'] ?? 0);
+        $refunded = (int) ($row['refunded_minor'] ?? 0);
+        $method = (string) ($row['payment_method'] ?? '') === 'eft' ? 'EFT' : 'card';
+        $company = ($row['company_id'] ?? null) !== null;
+        $bundle = str_contains((string) ($row['bought'] ?? ''), 'Bundle:');
+        return match ((string) $row['state']) {
+            'awaiting_payment' => ['label' => 'Waiting for payment', 'note' => self::money(max(0, $total - $paid), $currency) . ' due by ' . $method, 'tone' => 'warning'],
+            'manual_review' => ['label' => 'Needs your review', 'note' => 'Paid; release it to open access', 'tone' => 'warning'],
+            'paid' => ['label' => 'Paid', 'note' => 'By ' . $method, 'tone' => 'success'],
+            'fulfilled' => ['label' => 'Paid', 'note' => $company ? 'Credits added' : ($bundle ? 'Courses open' : 'Course open'), 'tone' => 'success'],
+            'partially_refunded' => ['label' => 'Part refunded', 'note' => self::money($refunded, $currency) . ' refunded', 'tone' => 'neutral'],
+            'refunded' => ['label' => 'Refunded', 'note' => self::money($refunded, $currency) . ' refunded', 'tone' => 'neutral'],
+            'cancelled' => ['label' => 'Cancelled', 'note' => $paid > 0 ? self::money($paid, $currency) . ' was paid' : 'Not paid', 'tone' => 'neutral'],
+            default => ['label' => self::ORDER_STATES[(string) $row['state']] ?? ucfirst(str_replace('_', ' ', (string) $row['state'])), 'note' => '', 'tone' => 'neutral'],
+        };
     }
 
     /** The words of an event name: order.payment_deadline_elapsed is "Order payment deadline elapsed". */
@@ -158,6 +335,10 @@ final class MoneyRecords
             'method_label' => self::METHODS[(string) $row['method']] ?? (string) $row['method'],
             'money_label' => self::signed((int) $row['cash_effect'], (int) $row['amount_minor'], $currency),
             'wallet_label' => self::signed((int) $row['wallet_effect'], (int) $row['amount_minor'], $currency),
+            'sentence' => self::ledgerSentence($row),
+            'money_in_label' => (int) $row['cash_effect'] === 1 ? self::money((int) $row['amount_minor'], $currency) : '',
+            'money_out_label' => (int) $row['cash_effect'] === -1 ? self::money((int) $row['amount_minor'], $currency) : '',
+            'wallet_change_label' => (int) $row['wallet_effect'] === 0 ? '' : self::signed((int) $row['wallet_effect'], (int) $row['amount_minor'], $currency),
             'amount_label' => self::money((int) $row['amount_minor'], $currency),
             'reference_label' => (string) $row['account_reference'] === '' ? '' : AccountReference::format((string) $row['account_reference']),
             'account_href' => $company > 0 ? '/admin/wallets/company/' . $company : ($person > 0 ? '/admin/wallets/person/' . $person : ''),
@@ -196,8 +377,8 @@ final class MoneyRecords
             'filtered' => $carried !== [],
             'ledger_pagination' => PlatformAdministrationService::paginationPayload('ledger', $pagination, '/admin/commerce/ledger', 'Ledger entries', $carried + $sort->toPrefixedArray('ledger')),
         ] + PlatformAdministrationService::sortViewFor('ledger', $sort, '/admin/commerce/ledger',
-            ['occurred' => 'When|13', 'kind' => 'Entry|20', 'account' => 'Account|20', 'order' => 'Order|11', 'method' => 'Method|7', 'amount' => 'Money|10', 'wallet' => 'Wallet|10', 'actions' => '|9'],
-            ['occurred', 'kind', 'account', 'amount'], $carried, ['occurred' => SortOrder::DESCENDING, 'amount' => SortOrder::DESCENDING]);
+            ['account' => 'Account|18', 'occurred' => 'When|12', 'kind' => 'What happened|35', 'money_in' => 'Money in|10', 'money_out' => 'Money out|10', 'wallet' => 'Wallet|9', 'actions' => '|6'],
+            ['account', 'occurred', 'kind'], $carried, ['occurred' => SortOrder::DESCENDING]);
     }
 
     /**
@@ -233,7 +414,8 @@ final class MoneyRecords
             'order_href' => $row['order_id'] === null ? '' : '/admin/commerce/orders/' . (int) $row['order_id'],
             'actor_label' => (string) ($row['actor_name'] ?? '') !== '' ? (string) $row['actor_name'] : 'The system',
             'summary' => self::summary((string) $row['payload']),
-        ];
+            'sentence' => self::trailSentence($row),
+        ] + self::account($row);
     }
 
     /**
@@ -255,8 +437,8 @@ final class MoneyRecords
             'filtered' => $carried !== [],
             'trail_pagination' => PlatformAdministrationService::paginationPayload('trail', $pagination, '/admin/commerce/trail', 'Trail events', $carried + $sort->toPrefixedArray('trail')),
         ] + PlatformAdministrationService::sortViewFor('trail', $sort, '/admin/commerce/trail',
-            ['created' => 'When|14', 'event' => 'Event|22', 'order' => 'Order|12', 'actor' => 'By|16', 'details' => 'Details|27', 'actions' => '|9'],
-            ['created', 'event', 'order'], $carried, ['created' => SortOrder::DESCENDING]);
+            ['account' => 'Account|20', 'created' => 'When|13', 'event' => 'What happened|59', 'actions' => '|8'],
+            ['created', 'event'], $carried, ['created' => SortOrder::DESCENDING]);
     }
 
     /** @return array<string,mixed>|null */
@@ -286,7 +468,8 @@ final class MoneyRecords
             'order_label' => self::orderNumber((int) $row['order_id']),
             'order_href' => '/admin/commerce/orders/' . (int) $row['order_id'],
             'payment_short' => substr((string) $row['payment_id'], 0, 8),
-        ];
+            'sentence' => self::paymentEventSentence($row),
+        ] + self::account($row);
     }
 
     /**
@@ -305,13 +488,13 @@ final class MoneyRecords
         $sort = SortOrder::create($query['payments_sort'] ?? null, $query['payments_dir'] ?? null, array_keys(MoneyRecordsRepository::PAYMENT_EVENT_SORTS), 'created', SortOrder::DESCENDING);
         $pagination = Pagination::create($query['payments_page'] ?? null, $query['payments_page_size'] ?? null, $this->records->paymentEventCount($f), 50);
         return [
-            'filters' => $f, 'states' => array_combine(self::PAYMENT_STATES, array_map(static fn(string $s): string => ucfirst(str_replace('_', ' ', $s)), self::PAYMENT_STATES)),
-            'gateways' => $gateways,
+            'filters' => $f, 'states' => self::PAYMENT_STATE_WORDS,
+            'gateways' => array_combine($gateways, array_map(static fn(string $g): string => match ($g) { 'manual_bank' => 'EFT', 'wallet' => 'Wallet', 'dummy' => 'Card (simulated)', default => 'Card (' . $g . ')' }, $gateways)) ?: [],
             'rows' => array_map(fn(array $r): array => $this->paymentEventRow($r), $this->records->paymentEventPage($f, $sort->key, $sort->direction, $pagination->pageSize, $pagination->offset)),
             'filtered' => $carried !== [],
             'payments_pagination' => PlatformAdministrationService::paginationPayload('payments', $pagination, '/admin/commerce/payment-events', 'Payment events', $carried + $sort->toPrefixedArray('payments')),
         ] + PlatformAdministrationService::sortViewFor('payments', $sort, '/admin/commerce/payment-events',
-            ['created' => 'When|14', 'state' => 'State|13', 'order' => 'Order|13', 'method' => 'Method|9', 'amount' => 'Amount|12', 'reference' => 'Reference|21', 'actions' => '|9'],
+            ['account' => 'Account|20', 'created' => 'When|13', 'state' => 'What happened|47', 'amount' => 'Amount|12', 'actions' => '|8'],
             ['created', 'state', 'amount'], $carried, ['created' => SortOrder::DESCENDING, 'amount' => SortOrder::DESCENDING]);
     }
 
@@ -344,7 +527,9 @@ final class MoneyRecords
         $pagination = Pagination::create($query['orders_page'] ?? null, $query['orders_page_size'] ?? null, $this->records->orderCount($f), 50);
         $rows = [];
         foreach ($this->records->orderPage($f, $sort->key, $sort->direction, $pagination->pageSize, $pagination->offset) as $row) {
-            $rows[] = $row + ['href' => '/admin/commerce/orders/' . (int) $row['id'], 'number' => self::orderNumber((int) $row['id']), 'when' => self::when((string) $row['placed_at']),
+            $status = self::orderStatus($row);
+            $rows[] = $row + ['status_label' => $status['label'], 'status_note' => $status['note'], 'status_tone' => $status['tone'],
+                'href' => '/admin/commerce/orders/' . (int) $row['id'], 'number' => self::orderNumber((int) $row['id']), 'when' => self::when((string) $row['placed_at']),
                 'state_label' => self::ORDER_STATES[(string) $row['state']] ?? (string) $row['state'], 'total_label' => self::money((int) $row['total_minor'], (string) $row['currency']),
                 'paid_label' => self::money((int) $row['paid_minor'], (string) $row['currency']), 'reference_label' => AccountReference::format((string) $row['account_reference'])];
         }
@@ -352,8 +537,8 @@ final class MoneyRecords
             'filters' => $f, 'states' => self::ORDER_STATES, 'rows' => $rows, 'filtered' => $carried !== [],
             'orders_pagination' => PlatformAdministrationService::paginationPayload('orders', $pagination, '/admin/commerce/orders', 'Orders', $carried + $sort->toPrefixedArray('orders')),
         ] + PlatformAdministrationService::sortViewFor('orders', $sort, '/admin/commerce/orders',
-            ['placed' => 'Placed|13', 'order' => 'Order|12', 'purchaser' => 'Purchaser|25', 'state' => 'State|13', 'total' => 'Total|11', 'paid' => 'Received|11', 'actions' => '|9'],
-            ['placed', 'purchaser', 'state', 'total'], $carried, ['placed' => SortOrder::DESCENDING, 'total' => SortOrder::DESCENDING]);
+            ['purchaser' => 'Account|22', 'placed' => 'Order|16', 'bought' => 'What was bought|27', 'total' => 'Amount|11', 'state' => 'Status|17', 'actions' => '|7'],
+            ['purchaser', 'placed', 'total', 'state'], $carried, ['placed' => SortOrder::DESCENDING, 'total' => SortOrder::DESCENDING]);
     }
 
     /**

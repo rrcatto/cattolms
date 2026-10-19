@@ -31,14 +31,15 @@ final class PaymentAdministrationController extends BaseController
         private readonly CommerceRepository $records, private readonly PaymentAdministrationService $payments,
         private readonly RefundAdministrationService $refunds, private readonly FinancialDocuments $financialDocuments,
         private readonly WalletService $wallets, private readonly CommerceSettings $settings,
-        private readonly \CattoLearning\Commerce\Application\MoneyRecords $money)
+        private readonly \CattoLearning\Commerce\Application\MoneyRecords $money,
+        private readonly \CattoLearning\Commerce\Application\OrderStory $story)
     { parent::__construct($auth,$view,$requests); }
 
     #[Route('/admin/commerce/orders',name:'admin_commerce_orders',methods:['GET'])]
     public function orders(): Response
     {
         $this->requirePermission('PLATFORM.ORDER.VIEW');
-        return $this->render('admin-commerce-orders',['title'=>'Payment administration','active_nav'=>'admin']+$this->money->orders($this->request()->query->all()));
+        return $this->render('admin-commerce-orders',['title'=>'Orders & Payments','active_nav'=>'admin']+$this->money->orders($this->request()->query->all()));
     }
 
     #[Route('/admin/commerce/orders/{id}',name:'admin_commerce_order',requirements:['id'=>'[0-9]+'],methods:['GET'])]
@@ -109,6 +110,9 @@ final class PaymentAdministrationController extends BaseController
             default=>true,
         }));
         return $this->render('admin-commerce-order',['title'=>'Order CL-'.str_pad((string)$id,8,'0',STR_PAD_LEFT),'active_nav'=>'admin',
+            // The page opens with what happened, in plain English (owner, 2026-10-18).
+            'story'=>$this->story->tell($id,AccountReference::format($reference)),
+            'today'=>(new \DateTimeImmutable('now',new \DateTimeZone(date_default_timezone_get())))->format('Y-m-d'),
             'order'=>$order,'snapshot'=>$snapshot,'totals'=>OrderTotals::forSnapshot($snapshot),'promotion_eligible_label'=>is_array($snapshot['promotion'] ?? null) ? Money::strictMinorUnits((int)$snapshot['promotion']['eligible_minor'],(string)$order['currency'])->format() : null,'billing_lines'=>BillingDetails::fromSnapshot((array)($snapshot['billing'] ?? []))->documentLines(),'items'=>$items,'payments'=>$payments,'refunds'=>$refunds,'documents'=>$documents,
             'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'wallet_balance_label'=>$actor->hasPermission('PLATFORM.WALLET.VIEW') ? Money::ofMinorUnits($this->wallets->balance($owner,(string)$order['currency']),(string)$order['currency'])->format() : null,
@@ -126,9 +130,9 @@ final class PaymentAdministrationController extends BaseController
     {
         $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.PAYMENT.MANAGE'); $id=(int)$this->param('id');
         return $this->handle(function () use ($actor,$id): void {
-            $amount=$this->parseAmount($this->posted('amount'));
-            $this->payments->confirmBank($actor,$id,$this->posted('request_key'),$amount,$this->posted('received_at'),$this->posted('bank_reference'),$this->posted('reason'));
-            $this->flash('success','Bank payment recorded and the order settlement checked.');
+            $amount=EftForm::amount($this->posted('amount'));
+            $this->payments->confirmBank($actor,$id,$this->posted('request_key'),$amount,EftForm::receivedAt($this->posted('received_on'),$this->posted('received_time')),$this->posted('bank_reference'),$this->posted('reason'));
+            $this->flash('success','The EFT payment is recorded.');
             $this->redirect('/admin/commerce/orders/'.$id);
         },'/admin/commerce/orders/'.$id);
     }
@@ -149,7 +153,7 @@ final class PaymentAdministrationController extends BaseController
     {
         $this->requireCsrf(); $actor=$this->requirePermission('PLATFORM.REFUND.MANAGE'); $id=(int)$this->param('id');
         return $this->handle(function () use ($actor,$id): void {
-            $amount=$this->posted('amount')==='' ? 0 : $this->parseAmount($this->posted('amount'));
+            $amount=$this->posted('amount')==='' ? 0 : EftForm::amount($this->posted('amount'));
             $destination=$this->posted('destination')==='money_back' ? 'money_back' : 'wallet';
             $this->refunds->approve($actor,$id,(int)$this->posted('item_id'),$this->posted('request_key'),$this->posted('basis'),$this->posted('reason'),(int)$this->posted('quantity'),$amount,$this->posted('override_reason'),$destination);
             $this->flash('success',$destination==='money_back' ? 'Refund approved and documented with a credit note. Pay it as shown under Approved refunds, then record its reference.' : 'Refund approved, credited to the wallet and documented with a credit note.');
@@ -199,12 +203,5 @@ final class PaymentAdministrationController extends BaseController
             return new Response($this->financialDocuments->pdf($document),200,['Content-Type'=>'application/pdf','Content-Disposition'=>$disposition.'; filename="'.$document['number'].'.pdf"','Cache-Control'=>'private, no-store','X-Content-Type-Options'=>'nosniff']);
         }
         throw $this->notFound('Document not found.');
-    }
-
-    private function parseAmount(string $value): int
-    {
-        if (!preg_match('/^\d+(?:\.\d{1,2})?$/',$value) || strlen($value)>16) throw new RuntimeException('Enter an amount in rands and cents, such as 123.45.');
-        [$whole,$fraction]=array_pad(explode('.',$value,2),2,'');
-        return ((int)$whole)*100+(int)str_pad($fraction,2,'0');
     }
 }

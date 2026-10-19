@@ -55,6 +55,7 @@ final class BillingSnapshotIntegrationTest extends TestCase
         $container = IntegrationContainer::get();
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $this->fixture = new DevelopmentFixture($this->db);
         // Near real time: the customer order page cancels orders whose payment is overdue by the real clock.
         $this->clock = new MockClock(new \DateTimeImmutable());

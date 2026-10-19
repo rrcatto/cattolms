@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Integration;
 
+use CattoLearning\Configuration\RuntimeSettings;
 use CattoLearning\Commerce\Document\FinancialDocuments;
 use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsEventRepository;
@@ -46,6 +47,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $container=IntegrationContainer::get();
         $this->db=IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $this->fixture=new DevelopmentFixture($this->db);
         $suffix=$this->fixture->suffix();
         $buyerId=$this->fixture->createUser('Credit buyer '.$suffix,'credit-buyer-'.$suffix.'@example.test');
@@ -211,7 +213,7 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         self::assertGreaterThan(0,(int)$row['enrolment_id']);
         self::assertNotNull($row['commerce_order_item_id']);
         $mailer=new FakeMailer();
-        $maintenance=new CommerceMaintenance($this->records,$this->orders,$this->access,IntegrationContainer::get()->get(FinancialDocuments::class),$mailer,new TransactionManager($this->db),$this->clock,WalletFixture::wallets($this->db,$this->clock));
+        $maintenance=new CommerceMaintenance($this->records,$this->orders,$this->access,IntegrationContainer::get()->get(FinancialDocuments::class),$mailer,new TransactionManager($this->db),$this->clock,WalletFixture::wallets($this->db,$this->clock), WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class));
         $maintenance->deliverCompanyCourseNotices(2);
         self::assertSame(['course_request_decision','course_enrolment_notice'],array_column($mailer->messages,'type'));
     }
@@ -255,6 +257,15 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $review=$this->purchases->review($this->buyer,$this->companyId);
         $id=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'eft','',false,true);
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_credits WHERE commerce_order_item_id IN (SELECT id FROM commerce_order_items WHERE order_id=:id)',['id'=>$id]));
+        // The Company Administrator who placed it is told how to pay, with the invoice (owner, 2026-10-19).
+        $mailer=new FakeMailer();
+        $maintenance=new CommerceMaintenance($this->records,$this->orders,$this->access,IntegrationContainer::get()->get(FinancialDocuments::class),$mailer,new TransactionManager($this->db),$this->clock,WalletFixture::wallets($this->db,$this->clock), WalletFixture::settings($this->db), IntegrationContainer::get()->get(RuntimeSettings::class));
+        $maintenance->deliverBuyerEmails();
+        $sent=array_values(array_filter($mailer->messages,fn(array $m): bool => $m['type']==='payment_instructions' && $m['email']===$this->buyer->primaryEmail));
+        self::assertCount(1,$sent);
+        self::assertSame('Your course credits are added as soon as your payment is confirmed.',$sent[0]['order']['next']);
+        self::assertStringStartsWith('2 course credits: ',$sent[0]['order']['lines'][0]['title']);
+        self::assertStringStartsWith('INV-',(string)array_key_first($sent[0]['documents']));
         $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,
             new FulfilmentService($this->records,IntegrationContainer::get()->get(TransitionService::class),$this->access,new TransactionManager($this->db),$this->orders,$this->clock,
                 new CompanyCreditFulfilment($this->records,IntegrationContainer::get()->get(AdministrationRepository::class),IntegrationContainer::get()->get(CourseRepository::class),$this->clock),$this->analytics(),PromotionFixture::service($this->db,$this->clock)),

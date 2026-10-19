@@ -1,4 +1,49 @@
-# Catto Learning 0.9.4 — Development Handoff
+# Catto Learning 0.9.5 — Development Handoff
+
+## v0.9.5 handoff — 2026/10/19 (Record EFT Payment, unmatched money, the buyer's emails, 365-day years)
+
+Released at the owner's instruction ("commit and push to git -v0.9.5 - update stale docs"). v0.9.4 and v0.9.3 stay tagged and released; v0.9.4 still waits for the owner's review. It carries the sections below, from 2026/10/18 and 2026/10/19: the money pages in plain English with the account reference first; each menu and footer link in one place (Saharan Sunset 1.0.3, Gilded Noir 2.0.6); every item under Transactions that need attention opens; the account reference at the top of every invoice, receipt and credit note; Record EFT Payment from the bank statement and Unmatched Money; each order's ledger lines, payment events and commerce trail on its page (Payment Events and the Commerce Trail left the menu); the buyer's emails at every step; a month as a twelfth of a year (12 months = 365 days); browser-check data made only through the real workflows; Add person preselects Student.
+
+- **Version.** 0.9.5 in `composer.json` (lock hash refreshed, no package changed), the API and MCP status, `PLATFORM_ASSET_VERSION` and the validators; the headers of files new in this release.
+- **Schema.** The baseline gained `commerce_unmatched_payments` (rebuild the database; `OPERATIONS.md`, "Release notes").
+- **Database.** Rebuilt clean on 2026/10/19 without the random dataset; its data is what `tests/Browser/one-learner-scenario.cjs` made through the pages (Thandi Nkosi, CL-20261019-0002-6, order CL-00000001 by the simulated card). Saharan Sunset 1.0.3 is active and Modern the default certificate design.
+- **Tests.** `AuthWorkflowRegressionTest` no longer leaves three accounts per run. Still open: each `composer qa` run leaves about 310 Activity log rows whose person is already deleted (tests that clean up their records but not the activity they caused); rebuild the database to clear them.
+- **Gate.** After the version change: `composer qa` from a cold cache (1,205 tests), PHPStan, Twig lint (265), AssetMapper, Composer validation, `git diff --check`, UI matrix (86), canonical (36), safety net (42), legal pages (77). Before it, on the same code: commerce and wallets 342, promotions 9, bundles 9, billing 10, demo 78, legal 77, documents 9; every other suite earlier the same day.
+- **Open.** Some browser-check fixtures still insert courses, users, price variants and course structure directly (records a person could make through the pages, so allowed, but not yet made through them); the random Seed Database tool still exists, unused.
+
+
+## An EFT buyer is told how to pay — 2026/10/19 (released in v0.9.5)
+
+Asked whether placing an EFT order should send an email, the owner answered "Yes, of course! This should be obvious!". An order placed for EFT, or changed to EFT, sends the buyer "Order CL-… received: how to pay by EFT" with the bank account (fake and labelled so on a demo site), the account reference to pay with, the amount, the day to pay by and the invoice attached; that invoice is not emailed again on its own. An EFT that leaves something to pay sends "payment received, R … still to pay" with its receipt; an unpaid order cancelled at its deadline sends "cancelled: not paid in time", saying where anything paid went (`OrderService::queuePaymentInstructions`/`cancelDue`, `PaymentService::confirm`, `CommerceMaintenance::deliverBuyerEmails`, `MailerInterface::sendPaymentInstructions`/`sendOrderCancelled`). An email whose moment has passed when the worker reaches it is dropped. There is no reminder before the deadline. `composer qa` (1,205 tests), the checkout and payment browser checks (commerce-wallets 342 with the new Mailpit check) passed; the database was then rebuilt clean and the one-learner scenario run again (12/12).
+
+## Buyer emails and periods of a twelfth of a year — 2026/10/19 (released in v0.9.5)
+
+At the owner's instruction every buyer is sent an order confirmation with the order's receipts attached when the order is paid, and a learner an email naming the courses that started, with when each ends and a link (`FulfilmentService::queueBuyerEmails`, `CommerceMaintenance::deliverBuyerEmails`, `MailerInterface::sendOrderConfirmation`/`sendCoursesStarted`). The unsent per-course `entitlement.created` outbox rows are gone. A month is a twelfth of a year in whole days (`AccessPeriod`): 12 months is 365 days and reads "1 year"; the learner pages, the company credits list and the credit form's 6-month option use the same rule. Restart `env_commerce-worker_1` after changing commerce code: its `--watch` loop keeps the code it started with.
+
+## The account reference first, Record EFT Payment, Unmatched Money and real test data — 2026/10/19 (released in v0.9.5)
+
+The owner answered the open questions: the account reference first on every document; Record EFT Payment from the bank statement, with an unmatched money list (B); test data made by following the real steps, with a walkthrough; the commerce-wallets check's credit from a real payment and its made-up lines deleted ("No check may ever write records a real person could not have produced"); and Payment Events and Commerce Trail out of the menu, each order's page showing its own records together.
+
+- **Documents.** Invoice, receipt and credit note open with `Account reference CL-…` (`resources/documents/*.html`, `financial.css`); the design preview's sample orders carry one.
+- **Record EFT Payment** (`/admin/commerce/eft`) and **Unmatched Money** (`/admin/commerce/unmatched`): `BankPayments`, `BankPaymentRepository`, `BankPaymentController`, `EftForm`, templates `admin-eft-payment`, `admin-unmatched-money`, `admin-unmatched-item`, `partials/admin/eft-match`; `commerce_unmatched_payments` in the baseline. An unmatched deposit is not in the Money Ledger until matched to an order; one paid back never enters it. Open deposits are under Transactions that need attention. A bank reference already recorded is refused with a message (it was an error page on the order form).
+- **Menu and order page.** Credits & Orders: Record EFT Payment and Unmatched Money added, Payment Events and Commerce Trail removed (their list pages keep their addresses). The order page's Everything recorded for this order lists its ledger lines, payment events and trail, each opening its own page, whose back link is the order.
+- **Fixtures.** No browser-check fixture inserts ledger, payment, order, enrolment or review rows: commerce-wallets makes its credit from an overpaid EFT order, and courses are assigned with `CourseService::grantToPerson` and started with `LearningService::start`; the landing pages review goes through `CourseReviewService`; the UI matrix's fixture adds 110 people through Add person for its paging step. Two integration tests make their own courses instead of relying on the random dataset.
+- **Database.** Rebuilt clean from the baseline on 2026/10/19 without the random dataset; the six made-up overpayment lines and their test learners are gone with the old database. ADMIN was made by its first sign-in; Saharan Sunset 1.0.3 is active and Modern the default certificate design. `tests/Browser/one-learner-scenario.cjs` then built the owner's example through the pages: the 3% Stitch fee, four imported courses (R450, R550, R500, R750), Thandi Nkosi (account CL-20261019-0002-6) and her order CL-00000001 for R450 by the simulated card, with Stitch's R13,50 fee, invoice INV-00000001 and receipt REC-00000001. Walkthrough: workspace `REPORTS/one-learner-walkthrough-2026-10-19.md`. Do not run the browser checks against this database without need: they leave their orders behind.
+- **Tests independent of the database.** The UI matrix, safety net and popular courses fixtures and `HomePopularCoursesPageTest` make the people and courses they need; the commerce integration tests clear saved commerce settings in their own transaction (`WalletFixture::defaults`); the commerce-wallets and demo-site fixtures put back the owner's saved settings. Add person preselects Student.
+- **Found, for the owner:** after a purchase the learner gets no email unless they tick "Email my invoice"; the queued `entitlement.created` message has no sender; a 12-month price gives 360 days. All three were fixed the same day (Buyer emails and periods, above).
+- **Gate.** Before the clean rebuild: `composer qa` (1,200 tests, none skipped), Twig lint (265), `git diff --check` and every browser check with 0 failures (counts in `CHANGELOG.md`). On the clean database: the scenario, 11 of 11 steps.
+
+## Transactions that need attention: every item opens — 2026/10/18 (released in v0.9.5)
+
+The owner reported a 500 error on every item under the dashboard's Transactions that need attention. The `commerce-wallets.cjs` fixture had written R200.00 wallet credits as `overpayment_to_wallet` rows with no order, which the list showed as overpaid orders that could not open. The list now takes only an order's rows and a missing item is a not-found page (`AttentionRepository`, `AttentionController`, `WalletLedgerIntegrationTest`). Not done then: making the fixture's credit through a real workflow. Done on 2026/10/19 (above): the credit comes from an overpaid EFT order.
+
+## Each menu and footer link in one place — 2026/10/18 (released in v0.9.5)
+
+At the owner's instruction each link appears once. The menu has Home and Catalogue but no longer Help and Contact, in every theme, side menus included (owner's choice); the footer lists Home, Catalogue, Help, Contact, Terms, Refunds and Privacy for everyone and no longer Account, Company and Administration (`ThemeRenderer`). Saharan Sunset 1.0.3 and Gilded Noir 2.0.6 leave Contact out of the footer list because their footers have the contact form button; Gilded Noir keeps its envelope mark (owner's choice). Both packages were rebuilt and the superseded ones removed from `extras/themes`. Development instance: both installed, Saharan Sunset 1.0.3 active. `composer qa` (1,198 tests), Twig lint, `git diff --check`, canonical pages (36), UI matrix and legal pages (77) passed.
+
+## The money pages say what happened — 2026/10/18 (released in v0.9.5)
+
+At the owner's instruction, Orders & Payments, the order page, the Money Ledger, Payment Events and the Commerce Trail were rebuilt to say what happened in plain English, account reference first (`OrderStory`, `MoneyRecords` sentences, `td.cell-text`). `CHANGELOG.md` has the detail.
 
 ## v0.9.4 handoff — 2026/10/18 (commerce for the launch, the Site Owner, money records, the demo site)
 
@@ -8,6 +53,8 @@ Next, as the owner asked on 2026/10/18:
 - The account reference is the first thing shown on every invoice, receipt and credit note and on every order and ledger record.
 - A Record EFT payment page that starts from the reference on the bank statement, so that nobody has to find the order first.
 - Data made only by following the workflows, not by random generation: a clean database and a step-by-step walkthrough from one person buying one course to the documents and emails it produces.
+
+All three were built on 2026/10/19 and released in v0.9.5.
 
 ## The Site Owner, money records, page widths and the tag cloud — 2026/10/18 (released in v0.9.4)
 

@@ -26,15 +26,18 @@ final class PaymentAdministrationTemplateTest extends TestCase
 
     public function testAdminOrderPagesRenderNativeProtectedFinancialForms(): void
     {
-        $base=['layout'=>'test-layout','platform'=>['icon_sprite'=>'/icons.svg'],'app'=>['name'=>'Test LMS'],'csrf'=>'test-csrf'];
+        $base=['layout'=>'test-layout','platform'=>['icon_sprite'=>'/icons.svg'],'app'=>['name'=>'Test LMS'],'csrf'=>'test-csrf','today'=>'2026-10-18','story'=>self::story()];
         $sort=\CattoLearning\Support\SortOrder::create(null,null,['placed'],'placed',\CattoLearning\Support\SortOrder::DESCENDING);
         $list=$this->twig()->render('@platform/pages/admin-commerce-orders.html.twig',$base+[
-            'rows'=>[['id'=>12,'number'=>'CL-00000012','href'=>'/admin/commerce/orders/12','when'=>'23 Sep 2026 10:00','state'=>'awaiting_payment','state_label'=>'Awaiting payment','company_id'=>null,'company_name'=>null,'purchaser_name'=>'Buyer','purchaser_email'=>'buyer@example.test','total_label'=>'R 123.45','paid_label'=>'R 0.00']],
+            'rows'=>[['id'=>12,'number'=>'CL-00000012','href'=>'/admin/commerce/orders/12','when'=>'23 Sep 2026 10:00','state'=>'awaiting_payment','state_label'=>'Awaiting payment','company_id'=>null,'company_name'=>null,'purchaser_name'=>'Buyer','purchaser_email'=>'buyer@example.test','total_label'=>'R 123.45','paid_label'=>'R 0.00',
+                'reference_label'=>'CL-20261017-0001-U','bought'=>'Course','status_label'=>'Waiting for payment','status_note'=>'R 123.45 due by EFT','status_tone'=>'warning']],
             'filters'=>['from'=>'','to'=>'','state'=>'','account'=>'','q'=>'buyer@example.test'],'states'=>\CattoLearning\Commerce\Application\MoneyRecords::ORDER_STATES,'filtered'=>true,
             'orders_pagination'=>\CattoLearning\Application\PlatformAdministrationService::paginationPayload('orders',\CattoLearning\Support\Pagination::create(1,50,1,50),'/admin/commerce/orders','Orders',['q'=>'buyer@example.test'])]
             +\CattoLearning\Application\PlatformAdministrationService::sortViewFor('orders',$sort,'/admin/commerce/orders',['placed'=>'Placed','order'=>'Order','actions'=>''],['placed'],['q'=>'buyer@example.test']));
         self::assertStringContainsString('/admin/commerce/orders/12',$list);
         self::assertStringContainsString('method="get"',$list);
+        self::assertLessThan(strpos($list,'CL-00000012'),strpos($list,'CL-20261017-0001-U'),'A row names the account first.');
+        self::assertStringContainsString('R 123.45 due by EFT',$list,'and where the order stands, in words.');
 
         $item=['quotes'=>[],'refundable_quantity'=>1,'id'=>8,'title'=>'Course','access_period_seconds'=>86400,'quantity'=>1,'product_type'=>'individual_access','amount_label'=>'R 123.45','amount_minor'=>12345,'paid_minor'=>12345,'paid_label'=>'R 123.45','discount_label'=>null,'refunded_minor'=>0,'refunded_label'=>'R 0.00','remaining_label'=>'R 123.45','is_bundle'=>false,'includes'=>'','grants'=>[],'latest_refundable'=>null,'unissued'=>false,'refund_key'=>'00000000-0000-4000-8000-000000000002','rule_refusals'=>[]];
         $detail=$this->twig()->render('@platform/pages/admin-commerce-order.html.twig',$base+[
@@ -44,15 +47,36 @@ final class PaymentAdministrationTemplateTest extends TestCase
             'total_label'=>'R 123.45','totals'=>[['label'=>'Total','value'=>'R 123.45']],'promotion_eligible_label'=>null,'fund_balance_label'=>'R 0.00','payment_method'=>'eft','can_confirm'=>true,'can_reconcile'=>true,'can_refund'=>true,'can_view_payments'=>true,'wallet_balance_label'=>'R 0.00','wallet_href'=>'/admin/wallets/person/5','account_reference'=>'CL-20261017-0001-U','due_minor'=>12345,'due_label'=>'R 123.45','paid_label'=>'R 0.00','refund_window'=>'7 days',
             'confirmation_key'=>'00000000-0000-4000-8000-000000000001']);
         self::assertStringContainsString('/admin/commerce/orders/12/confirm-bank',$detail);
+        // What happened comes first, in sentences, with what to do next (owner, 2026-10-18).
+        self::assertLessThan(strpos($detail,'Record the EFT payment'),strpos($detail,'Buyer ordered Course for R 123.45'),'The story comes before the form.');
+        self::assertStringContainsString('Waiting for the EFT payment',$detail);
+        self::assertStringContainsString('Account CL-20261017-0001-U',$detail,'The page head names the account first.');
+        self::assertStringContainsString('type="date" name="received_on"',$detail,'The day the money arrived is picked from a calendar.');
+        self::assertStringNotContainsString('received_at',$detail,'No timestamp with a time zone is typed.');
         self::assertStringContainsString('name="bank_reference"',$detail);
         self::assertStringContainsString('name="csrf"',$detail);
         self::assertStringContainsString('Buyer Billing<br>Nkosi Consulting<br>14 Jacaranda Avenue',$detail,'The order shows its snapshot billing lines.');
         self::assertStringContainsString('buyer@example.test',$detail,'The purchaser is shown apart from the billed party.');
+        // The order's records together, each linking to its own page (owner, 2026-10-19).
+        self::assertStringContainsString('<a href="/admin/commerce/payment-events/9">',$detail);
+        self::assertStringContainsString('<a href="/admin/commerce/trail/7">',$detail);
+        self::assertLessThan(strpos($detail,'<h3 class="h5">Commerce Trail</h3>'),strpos($detail,'<h3 class="h5">Payment Events</h3>'));
+        self::assertLessThan(strpos($detail,'<h3 class="h5">Payment Events</h3>'),strpos($detail,'<h3 class="h5">Money Ledger</h3>'));
+    }
+
+    /** @return array<string,mixed> what OrderStory hands the order page */
+    private static function story(): array
+    {
+        return ['summary'=>['Buyer ordered Course for R 123.45 on 23 Sep 2026 at 10:00.','Nothing has been paid yet.'],'status'=>['label'=>'Waiting for payment','note'=>'R 123.45 due by EFT','tone'=>'warning'],
+            'next'=>['tone'=>'warning','heading'=>'Waiting for the EFT payment','text'=>'When R 123.45 shows on your bank statement, record it below.'],
+            'timeline'=>[['when'=>'23 Sep 2026 at 10:00','text'=>'Buyer placed order CL-00000012 for R 123.45.','by'=>'Buyer','href'=>'/admin/commerce/trail/7']],'ledger'=>[],
+            'payment_events'=>[['when'=>'23 Sep 2026 at 10:05','sentence'=>'Buyer\'s card payment of R 123.45 for order CL-00000012 went through: the money was received.','amount'=>'R 123.45','href'=>'/admin/commerce/payment-events/9']],
+            'fees_label'=>'','refunded_label'=>''];
     }
 
     public function testTheRefundFormAsksForAnOverrideReasonOnlyOutsideTheRefundPolicy(): void
     {
-        $base=['layout'=>'test-layout','platform'=>['icon_sprite'=>'/icons.svg'],'app'=>['name'=>'Test LMS'],'csrf'=>'test-csrf'];
+        $base=['layout'=>'test-layout','platform'=>['icon_sprite'=>'/icons.svg'],'app'=>['name'=>'Test LMS'],'csrf'=>'test-csrf','today'=>'2026-10-18','story'=>self::story()];
         $item=['quotes'=>[],'refundable_quantity'=>1,'id'=>8,'title'=>'Course','access_period_seconds'=>86400,'quantity'=>1,'product_type'=>'individual_access','amount_label'=>'R 123.45','amount_minor'=>12345,'paid_minor'=>12345,'paid_label'=>'R 123.45','discount_label'=>null,'refunded_minor'=>0,'refunded_label'=>'R 0.00','remaining_label'=>'R 123.45','is_bundle'=>false,'includes'=>'','grants'=>[],'latest_refundable'=>null,'unissued'=>false,'refund_key'=>'00000000-0000-4000-8000-000000000002'];
         $refund=['id'=>3,'amount_label'=>'R 100.00','quantity'=>1,'basis'=>'goodwill','actor_name'=>'Finance ADMIN','approved_at'=>'2026-10-01T10:00:00+02:00','reason'=>'Customer request','destination'=>'wallet','net_label'=>'R 100.00','wallet_part_minor'=>0,'wallet_part_label'=>'R 0.00','deduction_lines'=>[],'to_pay'=>false,'payout_due_at'=>null,'payout_paid_at'=>null,'payout_reference'=>null,'payout_instruction'=>''];
         $render=fn(array $refusals,array $refunds): string => $this->twig()->render('@platform/pages/admin-commerce-order.html.twig',$base+[
@@ -65,10 +89,10 @@ final class PaymentAdministrationTemplateTest extends TestCase
         $inside=$render([],[$refund+['policy_refusal'=>null,'override_reason'=>null]]);
         self::assertStringContainsString('Within the Refund Policy',$inside);
         self::assertStringNotContainsString('name="override_reason"',$inside);
-        self::assertStringNotContainsString('Refund Policy override',$inside);
+        self::assertStringNotContainsString('Override reason:',$inside);
         self::assertStringContainsString('Approve refund and issue credit note',$inside);
-        self::assertStringContainsString('gives no refund once a course has started',$inside,'The rule is stated where refunds are approved');
-        self::assertStringContainsString('refundable within 7 days of the purchase',$inside,'with the refund window in force.');
+        self::assertStringContainsString('refunds a course only before it has started',$inside,'The rule is stated where refunds are approved');
+        self::assertStringContainsString('within 7 days of the purchase',$inside,'with the refund window in force.');
         self::assertStringContainsString('name="destination"',$inside,'ADMIN chooses wallet credit or money back.');
 
         $outside=$render(['The course started on 1 October 2026. A started course is not refunded.'],[$refund+['policy_refusal'=>'7 days have passed since the purchase on 23 September 2026.','override_reason'=>'The request reached us in time.']]);
@@ -76,7 +100,6 @@ final class PaymentAdministrationTemplateTest extends TestCase
         self::assertStringContainsString('The course started on 1 October 2026. A started course is not refunded.',$outside);
         self::assertMatchesRegularExpression('/<textarea id="refund-override-8" name="override_reason" minlength="5" maxlength="2000" required/',$outside);
         self::assertStringContainsString('Override the Refund Policy and approve refund',$outside);
-        self::assertStringContainsString('Refund Policy override',$outside,'An approved refund says an override was used');
-        self::assertStringContainsString('The Refund Policy refused this refund: 7 days have passed since the purchase on 23 September 2026. Override reason: The request reached us in time.',$outside,'and why.');
+        self::assertStringContainsString('Outside the Refund Policy (7 days have passed since the purchase on 23 September 2026.) · Override reason: The request reached us in time.',$outside,'An approved refund says an override was used, and why.');
     }
 }

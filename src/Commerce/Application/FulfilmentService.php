@@ -13,7 +13,11 @@ use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use Symfony\Component\Clock\ClockInterface;
 use RuntimeException;
 
-/** The only commerce writer of paid learning entitlements; payment service holds purchaser/order locks. */
+/**
+ * The only commerce writer of paid learning entitlements; payment service holds purchaser/order locks.
+ * A fulfilled order queues, once, the buyer's order confirmation with its receipts and, for a learner,
+ * the email naming the courses it started (owner, 2026-10-19), which CommerceMaintenance sends.
+ */
 final class FulfilmentService
 {
     public function __construct(private readonly CommerceRepository $records, private readonly TransitionService $transitions, private readonly AccessService $access, private readonly TransactionManager $transactions, private readonly OrderService $orders, private readonly ClockInterface $clock, private readonly CompanyCreditFulfilment $companyCredits, private readonly AnalyticsEventRecorder $analytics, private readonly PromotionService $promotions) {}
@@ -30,6 +34,7 @@ final class FulfilmentService
             if (!$this->companyCredits->ready($order,$items)) return false;
             $this->companyCredits->fulfil($order,$items);
             $this->records->setOrderState((int)$order['id'],$this->transitions->apply('order','paid','fulfil'));
+            $this->queueBuyerEmails($order,false);
             return true;
         }
         foreach($items as $item) {
@@ -51,10 +56,24 @@ final class FulfilmentService
             // now too, so the course opens straight away and its timing counts from the payment.
             $this->access->start($enrolment);
             $this->records->audit((int)$order['id'],null,'entitlement.created',['enrolment_id'=>$enrolment,'order_item_id'=>$item['id']],$now->format(DATE_ATOM));
-            $this->records->enqueue('entitlement:'.$enrolment,'entitlement.created',['enrolment_id'=>$enrolment,'user_id'=>$item['beneficiary_user_id'],'course_title'=>$snapshot['course_title']],$now->format(DATE_ATOM));
         }
         $this->records->setOrderState((int)$order['id'],$this->transitions->apply('order','paid','fulfil'));
+        $this->queueBuyerEmails($order,true);
         return true;
+    }
+
+    /**
+     * The buyer's emails for a fulfilled order, queued in the fulfilment transaction and sent by
+     * CommerceMaintenance: the order confirmation with its receipts and, when courses started, the
+     * email naming them. Keyed by order, so a replayed fulfilment queues nothing twice.
+     *
+     * @param array<string,mixed> $order
+     */
+    private function queueBuyerEmails(array $order, bool $coursesStarted): void
+    {
+        $now=$this->clock->now()->format(DATE_ATOM);
+        $this->records->enqueue('order-confirmed:'.(int)$order['id'],'order.confirmed',['order_id'=>(int)$order['id']],$now);
+        if ($coursesStarted) $this->records->enqueue('courses-started:'.(int)$order['id'],'order.courses_started',['order_id'=>(int)$order['id']],$now);
     }
 
     /**
@@ -93,7 +112,6 @@ final class FulfilmentService
                 $now->format(DATE_ATOM),$deadline);
             $this->records->recordBundleGrant((int)$item['id'],$courseId,$enrolment,$source,$held,$now->format(DATE_ATOM));
             $this->records->audit((int)$order['id'],null,'entitlement.created',['enrolment_id'=>$enrolment,'entitlement_id'=>$source,'order_item_id'=>(int)$item['id'],'course_id'=>$courseId,'bundle_id'=>(int)$snapshot['bundle_id'],'shared'=>$held],$now->format(DATE_ATOM));
-            $this->records->enqueue('entitlement:'.$source,'entitlement.created',['enrolment_id'=>$enrolment,'user_id'=>$user,'course_title'=>(string)$course['title']],$now->format(DATE_ATOM));
             // The source runs from now, whether or not the learner already had the course, and the
             // course counts as started on payment.
             $this->access->start($enrolment);

@@ -51,6 +51,8 @@ $person = static function (string $key, string $first, string $last, string $rol
 
 if ($action === 'create') {
     if (is_file($statePath)) throw new RuntimeException('Clean up the previous demo site fixture first.');
+    // The check starts from the .env site mode; a site mode the owner saved in Settings is put back by cleanup.
+    $savedMode = $db->fetchAssociative('SELECT option_key, option_value, updated_at, updated_by_user_id FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]) ?: null;
     $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]);
     $suffix = $fixture->suffix();
     $provider = $person('provider', 'Course', 'Provider', 'STUDENT', $suffix);
@@ -68,7 +70,7 @@ if ($action === 'create') {
     $db->executeStatement("UPDATE users SET mobile_number='0821234567' WHERE id=:id", ['id' => $learner['id']]);
     (new BillingProfileRepository($db))->saveForUser($learner['id'], BillingDetails::forPerson(['billing_name' => 'Thandi Nkosi', 'address_line_1' => '7 Demo Street', 'city' => 'Cape Town', 'country_code' => 'ZA']), (new DateTimeImmutable())->format(DATE_ATOM));
     $reference = (string) $db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $learner['id']]);
-    $writeState(['suffix' => $suffix, 'courses' => $courses, 'users' => ['provider' => $provider['id'], 'admin' => $admin['id'], 'learner' => $learner['id']],
+    $writeState(['suffix' => $suffix, 'saved_mode' => $savedMode, 'courses' => $courses, 'users' => ['provider' => $provider['id'], 'admin' => $admin['id'], 'learner' => $learner['id']],
         'admin_token' => $session($admin['id'], $admin['email']),
         'learner' => ['id' => $learner['id'], 'email' => $learner['email'], 'token' => $session($learner['id'], $learner['email']), 'reference' => AccountReference::format($reference)]]);
     echo "Created the demo site fixture.\n";
@@ -101,9 +103,13 @@ if ($action === 'create') {
     }
     echo "Restored.\n";
 } elseif ($action === 'cleanup') {
-    $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]);
     if (!is_file($statePath)) exit(0);
     $state = $readState();
+    $db->executeStatement('DELETE FROM app_options WHERE option_key = :k', ['k' => SiteMode::OPTION]);
+    if (is_array($state['saved_mode'] ?? null)) {
+        $db->executeStatement('INSERT INTO app_options (option_key, option_value, updated_at, updated_by_user_id) VALUES (:k, :v, :at, :by)',
+            ['k' => $state['saved_mode']['option_key'], 'v' => $state['saved_mode']['option_value'], 'at' => $state['saved_mode']['updated_at'], 'by' => $state['saved_mode']['updated_by_user_id']]);
+    }
     if (isset($state['active_theme'])) $container->get(ThemeManager::class)->activate($state['active_theme'], (int) $state['users']['admin']);
     $ids = '{' . implode(',', array_map('intval', array_values($state['users']))) . '}';
     $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);

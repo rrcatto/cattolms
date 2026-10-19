@@ -51,6 +51,8 @@ final class PaymentAdministrationService
                 return [(string)$existing['id'],(string)$order['currency']];
             }
             if (!in_array($order['state'],['awaiting_payment','cancelled'],true) || $this->records->paymentMethod($orderId)!=='eft') throw new RuntimeException('This order cannot accept an EFT confirmation.');
+            // The same deposit is never recorded twice, against an order or as unmatched money.
+            if ($this->records->bankReferenceRecorded($bankReference,$requestKey)) throw new RuntimeException('A deposit with the bank reference '.$bankReference.' is already recorded. Check the bank statement: if it is a different deposit, use the bank’s own reference for it.');
             if ($order['state']==='awaiting_payment' && $this->records->dueAmount($orderId)<=0) throw new RuntimeException('Nothing is left to pay on this order.');
             foreach ($this->records->payments($orderId) as $payment) {
                 if (in_array($payment['state'],['created','pending'],true)) throw new RuntimeException('A payment is already being processed for this order.');

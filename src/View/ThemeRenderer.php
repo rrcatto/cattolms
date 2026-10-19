@@ -10,6 +10,11 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/19 SAST (v0.9.5)
+- Credits & Orders no longer lists Payment Events and Commerce Trail: each order's page shows its own. It lists Record EFT Payment and Unmatched Money.
+- Advanced PLATFORM_ASSET_VERSION to 0.9.5.
+2026/10/18 SAST
+- Help and Contact are no longer in the menu, and the footer no longer lists Account, Company and Administration: each link is in one place.
 2026/10/18 SAST (v0.9.4)
 - One page width: every page is wide except Home and course landing pages (full); medium and narrow are gone.
 - Demo site: site_demo, site_demo_notice and site_simulation reach every page, and a demo site is noindex, nofollow.
@@ -107,7 +112,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.4';
+    private const PLATFORM_ASSET_VERSION = '0.9.5';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -391,7 +396,7 @@ final class ThemeRenderer
             'roles' => $this->roles($data),
         ];
         $model['navigation'] = $navigation;
-        $model['footer_navigation'] = $this->footerNavigation($data);
+        $model['footer_navigation'] = $this->footerNavigation();
         $model['footer_social'] = $this->footerSocial($data);
         $model['breadcrumbs'] = $this->breadcrumbs($data);
         $model['flash'] = array_values((array) ($data['flash_messages'] ?? []));
@@ -485,11 +490,10 @@ final class ThemeRenderer
             'method'=>'GET','active'=>$marksHere($href, $children),'children'=>$children,
         ];
 
+        // Help and Contact are in every footer, so the menu leaves them out (owner, 2026-10-18).
         $items = [
             $item('home','Home','/','home',$active==='home'),
             $item('catalogue','Catalogue','/courses','catalogue',$active==='catalogue'),
-            $item('help','Help','/help','help',$active==='help'),
-            $item('contact','Contact','/contact','contact',$active==='contact'),
         ];
 
         if ($this->can($data, 'COMPANY.DASHBOARD.VIEW')) {
@@ -652,13 +656,17 @@ final class ThemeRenderer
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
                 $grandchildren[] = $child('admin-commerce-orders', 'Orders & Payments', '/admin/commerce/orders', 'credits');
             }
-            // The money records (owner, 2026-10-18): every ledger row, every payment state and the commerce trail.
+            // Record an EFT payment from the bank statement, and the money that paid no order (owner, 2026-10-19).
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PAYMENT.MANAGE')) {
+                $grandchildren[] = $child('admin-record-eft', 'Record EFT Payment', '/admin/commerce/eft', 'credits');
+            }
+            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PAYMENT.VIEW')) {
+                $grandchildren[] = $child('admin-unmatched-money', 'Unmatched Money', '/admin/commerce/unmatched', 'credits');
+            }
+            // The money records (owner, 2026-10-18): every ledger row. Payment Events and the Commerce Trail
+            // are not in the menu (owner, 2026-10-19): an order's page shows its own, each linking to its page.
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.PAYMENT.VIEW')) {
                 $grandchildren[] = $child('admin-money-ledger', 'Money Ledger', '/admin/commerce/ledger', 'credits');
-                $grandchildren[] = $child('admin-payment-events', 'Payment Events', '/admin/commerce/payment-events', 'credits');
-            }
-            if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
-                $grandchildren[] = $child('admin-commerce-trail', 'Commerce Trail', '/admin/commerce/trail', 'credits');
             }
             // Refunds asked for in the LMS, every wallet, and the commerce settings (owner, 2026-10-17).
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.REFUND.VIEW')) {
@@ -789,12 +797,15 @@ final class ThemeRenderer
     }
 
     /**
-     * @param array<string,mixed> $data
+     * The footer's links, the same for everyone. Account, Company and Administration are in the menu,
+     * so the footer does not repeat them; Help and Contact are here and not in the menu (owner,
+     * 2026-10-18). A theme whose footer has its own contact form button leaves out the Contact link.
+     *
      * @return list<array{key:string,label:string,href:string}>
      */
-    private function footerNavigation(array $data): array
+    private function footerNavigation(): array
     {
-        $items = [
+        return [
             ['key'=>'home','label'=>'Home','href'=>'/'],
             ['key'=>'catalogue','label'=>'Catalogue','href'=>'/courses'],
             ['key'=>'help','label'=>'Help','href'=>'/help'],
@@ -802,10 +813,6 @@ final class ThemeRenderer
             // Terms, Refunds and Privacy: the public legal documents, from their one registry.
             ...LegalDocuments::footerItems(),
         ];
-        if ((bool) ($data['is_authenticated'] ?? false)) $items[] = ['key'=>'account','label'=>'Account','href'=>'/account'];
-        if ($this->can($data,'COMPANY.DASHBOARD.VIEW')) $items[] = ['key'=>'company','label'=>'Company','href'=>'/company'];
-        if ($this->hasAdministrationAccess($data)) $items[] = ['key'=>'admin','label'=>'Administration','href'=>'/admin'];
-        return $items;
     }
 
     /** @param array<string,mixed> $data */
@@ -813,21 +820,6 @@ final class ThemeRenderer
     {
         if (in_array('ADMIN', $this->roles($data), true)) return true;
         return in_array(strtoupper($permission), array_map('strtoupper', (array) ($data['permissions'] ?? [])), true);
-    }
-
-    /** @param array<string,mixed> $data */
-    private function hasAdministrationAccess(array $data): bool
-    {
-        foreach ([
-            'PLATFORM.DASHBOARD.VIEW','COURSE.MANAGEMENT.VIEW','PLATFORM.PERSON.VIEW','PLATFORM.COMPANY.VIEW',
-            'PLATFORM.ENROLMENT.VIEW','PLATFORM.REQUEST.VIEW','PLATFORM.CREDIT.VIEW','PLATFORM.ACTIVITY.VIEW','PLATFORM.REPORT.VIEW',
-        ] as $permission) {
-            if ($this->can($data, $permission)) return true;
-        }
-        foreach (['SYSTEM.THEME.VIEW','SYSTEM.ROLE.VIEW','SYSTEM.SETTING.VIEW'] as $permission) {
-            if ($this->can($data, $permission)) return true;
-        }
-        return false;
     }
 
     /**

@@ -26,6 +26,7 @@ Changelog:
 declare(strict_types=1);
 
 use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Course\CourseService;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
@@ -72,7 +73,8 @@ if ($action === 'create') {
     $final = $fixture->createAssessmentItem($course, $admin['id'], 'final', 3);
     $fixture->createQuestion($final['item_id']);
     foreach ([$first, $second] as $learner) {
-        $fixture->createEnrolment($learner['id'], $course, $admin['id'], 31536000);
+        // ADMIN assigns the course and the learner starts it, as in the app (owner, 2026-10-19).
+        $container->get(CourseService::class)->grantToPerson($course, $learner['id'], 365, $admin['id']);
         $container->get(LearningService::class)->start($learner['id'], $slug);
     }
     $state = ['suffix' => $suffix, 'slug' => $slug, 'course' => $course, 'course_title' => $title, 'company' => $company,

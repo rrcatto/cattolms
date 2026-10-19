@@ -496,6 +496,9 @@ summary{display:list-item;cursor:pointer}
    which is what made the first attempt at this look like a button that did nothing. */
 
 .cl-ui-table td.cell-actions,.cl-ui-table th.cell-actions{overflow:visible!important}
+/* A cell that holds a sentence wraps within its own column instead of being cut short (UX rule 2.4):
+   the money records say what happened in words (owner, 2026-10-18). */
+.cl-ui-table td.cell-text{white-space:normal!important;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
 /* An action column is never narrower than its control.
 
    A declared share is a share of the table, and on a phone 13% of a table is about 40px: the

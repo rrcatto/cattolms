@@ -25,8 +25,9 @@
 				<h4>
 					Explore
 				</h4>
+				{# Contact is left out: Get in touch has the contact form button (owner, 2026-10-18). #}
 				<nav class="cl-footer-nav" aria-label="Explore"><ul>
-					{% for footerItem in footer_navigation %}
+					{% for footerItem in footer_navigation|filter(link => link.key != 'contact') %}
 						<li>
 							<a href="{{ footerItem.href }}">{{ footerItem.label }}</a>
 						</li>

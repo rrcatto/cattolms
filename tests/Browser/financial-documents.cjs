@@ -190,13 +190,14 @@ const learnerTexts = {};
         }
         await page.goto(`${base}/admin/commerce/orders/${state.orders.paid}`);
         step = 'ADMIN order page';
-        const named = (await page.locator('main').innerText()).match(/drawn in the invoice design, version (\d+)\b/);
-        assert.ok(named, 'the order page names the version that drew the invoice');
+        // The design version is kept out of sight (owner, 2026-10-18: no clutter) and read from the row.
+        const named = [null, await page.locator('[data-document-kind=invoice]').first().getAttribute('data-design-version')];
+        assert.ok(/^\d+$/.test(named[1] ?? ''), 'the order page records the version that drew the invoice');
         issued = JSON.parse(execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `php tests/Browser/financial-documents-fixture.php order ${statePath} 2>/dev/null | tail -1`], {encoding: 'utf8'}).trim());
         const later = await fetchPdf(learner.page, `/account/orders/${issued.order}/documents/${issued.documents.invoice[0]}`, 'the later invoice');
         contains(later, [NOTE], 'an invoice issued after the save');
         await page.goto(`${base}/admin/commerce/orders/${issued.order}`);
-        assert.ok((await page.locator('main').innerText()).includes(`drawn in the invoice design, version ${Number(named[1]) + 1}`), 'and names the new version');
+        assert.equal(await page.locator('[data-document-kind=invoice]').first().getAttribute('data-design-version'), String(Number(named[1]) + 1), 'and the new version');
         await learner.ctx.close();
         await ctx.close();
     });

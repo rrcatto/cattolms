@@ -11,6 +11,8 @@ Description:
 Protects the passwordless authentication lifecycle, including mail-failure cleanup, account creation, student-role assignment and session creation.
 
 Changelog:
+2026/10/19 SAST
+- The failed-delivery, retry and registration tests remove the account they make: they remembered only its email, so every run left three accounts in the development database.
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
 2026/08/19 04:20 SAST
@@ -58,7 +60,7 @@ final class AuthWorkflowRegressionTest extends TestCase
 
         try {
             $auth = $this->authService($container, new FakeMailer(true));
-            $container->get(UserRepository::class)->createManagedUser($email);
+            $fixture->rememberUser((int) $container->get(UserRepository::class)->createManagedUser($email)['id']);
 
             try {
                 $auth->requestLogin($email, '/account/library');
@@ -201,7 +203,7 @@ final class AuthWorkflowRegressionTest extends TestCase
         $fixture->rememberEmail($email);
 
         try {
-            $container->get(UserRepository::class)->createManagedUser($email);
+            $fixture->rememberUser((int) $container->get(UserRepository::class)->createManagedUser($email)['id']);
             $failedAuth = $this->authService($container, new FakeMailer(true));
             try {
                 $failedAuth->requestLogin($email, '/account/library');
@@ -237,6 +239,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             self::assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email', ['email'=>$email]));
             parse_str((string)parse_url((string)$mailer->messages[0]['url'], PHP_URL_QUERY), $query);
             $auth->consumeRegistration((string)$query['token']);
+            $fixture->rememberUser((int)$db->fetchOne('SELECT user_id FROM user_emails WHERE email=:email', ['email'=>$email]));
             self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email AND is_primary=TRUE', ['email'=>$email]));
             $fixture->rememberEmail($email);
         } finally { unset($_COOKIE['catto_learning_session']); $fixture->cleanup(); }

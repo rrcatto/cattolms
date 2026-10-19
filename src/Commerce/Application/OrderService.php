@@ -325,7 +325,9 @@ final class OrderService
             $this->documents->issueInvoice($id,$snapshot,$now->format(DATE_ATOM),$actor->id);
             $this->records->selectPaymentMethod($id, $method);
             if ($walletApplied>0) $this->payFromWallet($this->records->order($id,true),$owner,$walletApplied,$snapshot);
-            if ($checkout['invoice_email'] ?? false) $this->records->enqueue('invoice:'.$id, 'invoice.email_requested', ['order_id'=>$id], $now->format(DATE_ATOM));
+            // An EFT order's payment instructions carry its invoice, so it is not emailed twice.
+            if ($method==='eft') $this->queuePaymentInstructions($id);
+            elseif ($checkout['invoice_email'] ?? false) $this->records->enqueue('invoice:'.$id, 'invoice.email_requested', ['order_id'=>$id], $now->format(DATE_ATOM));
             $this->records->setOrderState($id,$this->transitions->apply('order','placed','await_payment'));
             $this->records->audit($id,$actor->id,'order.placed',['total_minor'=>$total]+($discount===null?[]:['promotion_id'=>$discount->promotion->id,'discount_minor'=>$discountMinor]),$now->format(DATE_ATOM));
             return $id;
@@ -412,6 +414,16 @@ final class OrderService
         }
     }
 
+    /**
+     * The buyer's email with how to pay an order by EFT (owner, 2026-10-19): the bank account, the
+     * reference, the amount and the day it must be paid by, with the invoice attached. Queued once per
+     * order, when it is placed for EFT or changed to EFT, and sent by CommerceMaintenance.
+     */
+    public function queuePaymentInstructions(int $orderId): void
+    {
+        $this->records->enqueue('payment-instructions:'.$orderId,'order.payment_instructions',['order_id'=>$orderId],$this->clock->now()->format(DATE_ATOM));
+    }
+
     public function cancelDue(int $orderId): bool
     {
         return $this->transactions->run(function() use($orderId): bool {
@@ -422,6 +434,8 @@ final class OrderService
             $this->records->setOrderState($orderId,$this->transitions->apply('order',(string)$row['state'],'cancel'));
             $this->records->audit($orderId,null,'order.payment_deadline_elapsed',[],$this->clock->now()->format(DATE_ATOM));
             $this->creditUnfulfilledPayments($row);
+            // The buyer is told, once, and where anything they paid towards it went (owner, 2026-10-19).
+            $this->records->enqueue('order-cancelled:'.$orderId,'order.cancelled_unpaid',['order_id'=>$orderId],$this->clock->now()->format(DATE_ATOM));
             return true;
         });
     }

@@ -14,7 +14,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', full_width: false, for: 'field-credits-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<select name="access_period_seconds" id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="15552000">6 months</option><option value="31536000" selected>12 months</option></select>
+				<select name="access_period_seconds" id="field-credits-1-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}><option value="15811200">6 months</option><option value="31536000" selected>12 months</option></select>
 
 {% endblock %}
 {% endembed %}

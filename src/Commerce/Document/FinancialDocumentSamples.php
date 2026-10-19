@@ -21,6 +21,8 @@ preview.
   credit note, because nothing was received.
 
 Changelog:
+2026/10/19 SAST
+- Each sample has an account reference, which every document shows first (owner, 2026-10-18).
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K).
 */
@@ -30,6 +32,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Document;
 
 use CattoLearning\Document\DocumentType;
+use CattoLearning\Support\AccountReference;
 use InvalidArgumentException;
 
 final class FinancialDocumentSamples
@@ -95,7 +98,7 @@ final class FinancialDocumentSamples
             'access_period_seconds' => 365 * 86400, 'quantity' => 1, 'unit_price_minor' => 179000, 'line_total_minor' => 179000, 'currency' => 'ZAR',
             'discount_minor' => 17900, 'paid_minor' => 161100];
         $snapshot = self::person('Lerato Dlamini', 'Dlamini & Associates', '4000000001', ['line_1' => '12 Kéré Street', 'line_2' => 'Suite 4', 'locality' => 'Brooklyn',
-            'city' => 'Pretoria', 'region' => 'Gauteng', 'postal_code' => '0181', 'country_code' => 'ZA'], 'lerato@example.test') + [
+            'city' => 'Pretoria', 'region' => 'Gauteng', 'postal_code' => '0181', 'country_code' => 'ZA'], 'lerato@example.test', null, 'CL2026090300412') + [
             'items' => [$course('Fire Safety for Workplace Supervisors', 129000, 12900, 365), $bundle, $course('Hazard Identification & Risk Assessment', 179000, 17900, 180)],
             'subtotal_minor' => 487000, 'discount_minor' => 48700, 'total_minor' => 438300, 'currency' => 'ZAR',
             'promotion' => ['code' => 'SPRING10', 'label' => '10% off', 'discount_minor' => 48700],
@@ -123,7 +126,7 @@ final class FinancialDocumentSamples
         $credits = static fn(string $title, int $quantity, int $unit, int $days): array => ['course_title' => $title, 'access_period_seconds' => $days * 86400,
             'quantity' => $quantity, 'unit_price_minor' => $unit, 'line_total_minor' => $unit * $quantity, 'currency' => 'ZAR'];
         $snapshot = self::person('Mokoena Logistics (Pty) Ltd', null, '4870123456', ['line_1' => 'Unit 7, Prime Park', 'line_2' => '22 Electron Avenue', 'locality' => 'Isando',
-            'city' => 'Kempton Park', 'region' => 'Gauteng', 'postal_code' => '1600', 'country_code' => 'ZA'], 'sipho.mokoena@example.test', 'Sipho Mokoena') + [
+            'city' => 'Kempton Park', 'region' => 'Gauteng', 'postal_code' => '1600', 'country_code' => 'ZA'], 'sipho.mokoena@example.test', 'Sipho Mokoena', 'CL2026082100187') + [
             'company_id' => 1, 'company_name' => 'Mokoena Logistics',
             'items' => [$credits('Forklift Operator Safety', 10, 85000, 365), $credits('First Aid Level 1', 4, 120000, 365)],
             'total_minor' => 1330000, 'currency' => 'ZAR',
@@ -146,7 +149,7 @@ final class FinancialDocumentSamples
     private static function free(): array
     {
         $snapshot = self::person('Pieter van der Merwe', null, null, ['line_1' => '3 Kloof Nek Road', 'line_2' => null, 'locality' => 'Tamboerskloof',
-            'city' => 'Cape Town', 'region' => 'Western Cape', 'postal_code' => '8001', 'country_code' => 'ZA'], 'pieter@example.test') + [
+            'city' => 'Cape Town', 'region' => 'Western Cape', 'postal_code' => '8001', 'country_code' => 'ZA'], 'pieter@example.test', null, 'CL2026092800533') + [
             'items' => [['fulfilment_type' => 'individual_access', 'course_title' => 'Introduction to Conveyancing', 'access_period_seconds' => 90 * 86400, 'quantity' => 1,
                 'unit_price_minor' => 99000, 'line_total_minor' => 99000, 'currency' => 'ZAR', 'discount_minor' => 99000, 'paid_minor' => 0]],
             'subtotal_minor' => 99000, 'discount_minor' => 99000, 'total_minor' => 0, 'currency' => 'ZAR',
@@ -159,9 +162,10 @@ final class FinancialDocumentSamples
      * @param array<string,?string> $address
      * @return array<string,mixed>
      */
-    private static function person(string $name, ?string $organisation, ?string $tax, array $address, string $email, ?string $purchaser = null): array
+    private static function person(string $name, ?string $organisation, ?string $tax, array $address, string $email, ?string $purchaser, string $account): array
     {
         return [
+            'account_reference' => $account . AccountReference::checkCharacter($account),
             'purchaser_name' => $purchaser ?? $name,
             'purchaser_email' => $email,
             'billing' => ['name' => $name, 'organisation_name' => $organisation, 'tax_registration_number' => $tax, 'address' => $address],

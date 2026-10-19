@@ -10,7 +10,7 @@ development pod (`docs/OPERATIONS.md`, "Local development environment") Playwrig
 installed on the host, so `CATTO_PLAYWRIGHT_MODULE` is `$HOME/tools/playwright/node_modules/playwright`;
 the runners accept the local mkcert certificate (`ignoreHTTPSErrors`), which Playwright's Firefox does not trust:
 
-The fixture's identity is an ADMIN who administers a test company of its own, so `/company` opens (there is no System Company, owner 2026-10-18); cleanup removes both.
+The fixture's identity is an ADMIN who administers a test company of its own, so `/company` opens (there is no System Company, owner 2026-10-18); it also adds 110 people through Add person, for the paging step without JavaScript (three pages of 50), and publishes a course with one free preview lesson for the Bootstrap safety net's reader, so neither depends on what the database holds (owner, 2026-10-19). Cleanup removes all of it.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/ui-stabilisation-fixture.php create'
@@ -223,9 +223,9 @@ group; reduced motion starts paused and changes groups without the fade; a favou
 its state across a full cycle; a card link opens its course; one group is one row of four cards
 at 1440px and the page does not scroll sideways at 390px; and without JavaScript the first group
 is shown and nothing else. Time is Playwright's fake clock, so the 20-second interval is jumped
-rather than waited for. The cards are whatever the development database's popularity snapshot
-holds, so run `php bin/console popularity:recalculate` first on a fresh database.
-`popular-courses-fixture.php` creates the signed-in learner whose favourites it toggles.
+rather than waited for. `popular-courses-fixture.php` creates the signed-in learner whose favourites it toggles and twelve
+published courses of its own, three groups of four, so the check does not depend on what the
+database holds (owner, 2026-10-19); cleanup removes them.
 
 ```sh
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/popular-courses-fixture.php create'
@@ -392,17 +392,36 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/demo-site-fixture.php cleanup'   # only after a killed run
 ```
 
-`commerce-wallets.cjs` checks the launch commerce work of 2026-10-17 and the money records of 2026-10-18 (303 checks):
+`commerce-wallets.cjs` checks the launch commerce work of 2026-10-17, the money records of 2026-10-18 and Record EFT Payment, Unmatched Money and the EFT buyer's email of 2026-10-19:
 
-- **Chromium and Firefox, a fresh learner each (12).** A private learner is offered no Request from my company. A company learner (owner, 2026-10-18) is offered only Request from my company, with the reason it cannot buy; it has no cart in the header, checkout sends it to My Cart with that reason, and its request reaches its company. The learner's R200.00 of wallet credit pays part of a R300.00 course and the rest is chosen as EFT; checkout keeps the form until both boxes are ticked; the order page quotes the account reference and the R100.00 still to pay. ADMIN confirms an EFT of R150.00: the course starts and R50.00 goes to the wallet, which My Wallet and its statement show, and the dashboard says the course started on payment. The ADMIN dashboard lists the overpayment; ADMIN opens it, sends the prepared email (Mailpit receives it, `CATTO_MAILPIT_URL`) and marks it dealt with. The learner asks for money back on the order page; ADMIN approves it at Refund Requests with an override reason, the wallet part goes back to the wallet, and ADMIN records the payout on the order. Start course on an ADMIN-assigned course needs its confirmation box, and a form without it is refused by the server.
+- **Chromium and Firefox, a fresh learner each (14).** A private learner is offered no Request from my company. A company learner (owner, 2026-10-18) is offered only Request from my company, with the reason it cannot buy; it has no cart in the header, checkout sends it to My Cart with that reason, and its request reaches its company. The learner's R200.00 of wallet credit (the fixture makes it as a person would: the learner orders a R100.00 course by EFT, ADMIN records R300.00 from the bank and marks the overpayment dealt with) pays part of a R300.00 course and the rest is chosen as EFT; checkout keeps the form until both boxes are ticked; the order page quotes the account reference and the R100.00 still to pay. The check runs the commerce worker once (`commerce:maintain`) and reads the learner's "Order CL-… received: how to pay by EFT" in Mailpit: the account and order, R200.00 paid and R100.00 to pay, the account reference as the payment reference, the demo site's fake bank details labelled, the deadline, when the course starts and the invoice attached (owner, 2026-10-19). ADMIN records an EFT of R150.00 (Chromium: on Record EFT Payment, where the account is found from the reference on the statement and the order has its own button; Firefox: on the order's page): the course starts and R50.00 goes to the wallet, which My Wallet and its statement show, and the dashboard says the course started on payment. The ADMIN dashboard lists the overpayment; ADMIN opens it, sends the prepared email (Mailpit receives it, `CATTO_MAILPIT_URL`) and marks it dealt with. The learner asks for money back on the order page; ADMIN approves it at Refund Requests with an override reason, the wallet part goes back to the wallet, and ADMIN records the payout on the order. Start course on an ADMIN-assigned course needs its confirmation box, and a form without it is refused by the server.
 - **Without JavaScript (1).** A refund request is sent and withdrawn, and Start course works, as plain forms.
 - **Commerce settings (1).** A Stitch fee saved in its section of Administration → Settings is printed by the Refund Policy, a reminder longer than the credit expiry is refused with its reason, and Reset brings back the `.env` default.
-- **Money records (1).** The dashboard's Money received figure opens the Money Ledger filtered to payments; a search by account reference finds the learner's payment and overpayment; an entry opens on its own page; the order's Commerce Trail and Payment Events list its rows and an event opens on its own page.
-- **Every theme at 1440, 820 and 390px (288).** My Wallet, the learner dashboard, the learner's order, the three legal pages, the ADMIN dashboard, Settings, Refund Requests, Wallets, a learner's wallet, the ADMIN order page, Orders & Payments, the Money Ledger, Commerce Trail and Payment Events answer in that theme with one `h1` and no sideways scrolling. Learners cannot preview a theme, so each theme is activated in turn (`commerce-wallets-fixture.php theme <key>`) and the theme that was active is put back even when a check fails; do not run it beside another check that switches themes.
+- **Money records (1).** The dashboard's Money received figure opens the Money Ledger filtered to payments; a search by account reference finds the learner's payment and overpayment; an entry opens on its own page. The order's page lists its Money Ledger lines, Payment Events and Commerce Trail together; a payment event and a trail entry open on their own pages, whose way back is the order; Credits & Orders lists Record EFT Payment and Unmatched Money but not Payment Events or the Commerce Trail.
+- **Unmatched money (1).** A deposit whose reference names nobody is put on Unmatched Money from Record EFT Payment; its page says what arrived; the dashboard and the list show it until ADMIN records that it was paid back.
+- **Every theme at 1440, 820 and 390px (288).** My Wallet, the learner dashboard, the learner's order, the three legal pages, the ADMIN dashboard, Settings, Refund Requests, Wallets, a learner's wallet, the ADMIN order page, Orders & Payments, the Money Ledger, Commerce Trail, Payment Events, Record EFT Payment and Unmatched Money answer in that theme with one `h1` and no sideways scrolling. Learners cannot preview a theme, so each theme is activated in turn (`commerce-wallets-fixture.php theme <key>`) and the theme that was active is put back even when a check fails; do not run it beside another check that switches themes.
 
-The script creates and cleans up its own fixture (two paid courses, an ADMIN, a learner per scenario with wallet credit and an assigned course, and a member of a client company); cleanup removes sessions, carts and every commerce setting override, and retires the courses. Orders, the ledger and what they refer to are immutable and stay. Phone screenshots are written to `/tmp/catto-commerce-wallets` (`CATTO_BROWSER_OUTPUT`).
+The script creates and cleans up its own fixture (three paid courses, an ADMIN, a learner per scenario with wallet credit from a real overpaid EFT order and a course ADMIN assigned, and a member of a client company); no fixture writes a record a person could not have produced (owner, 2026-10-19); cleanup removes sessions, carts and every commerce setting override, and retires the courses. Orders, the ledger and what they refer to are immutable and stay. Phone screenshots are written to `/tmp/catto-commerce-wallets` (`CATTO_BROWSER_OUTPUT`).
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/commerce-wallets.cjs
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/commerce-wallets-fixture.php cleanup'   # only after a killed run
+```
+
+## One learner buys one course
+
+`one-learner-scenario.cjs` builds the owner's example (2026-10-18: "a system with 1 learner, 4 courses, places an order for 1 course and pays for it via stitch. transaction fee is 3%. course starts immediately") on a demo site with a clean database, only through the pages, and leaves it all for the owner to follow:
+
+1. ADMIN signs in with the link Mailpit receives for `APP_ADMIN_EMAIL` (read from the workspace `env/.env`, never printed); the first sign-in makes the ADMIN account.
+2. ADMIN sets the Stitch transaction fee to 3% (Settings → Commerce fees).
+3. ADMIN imports four courses from the workspace's `COURSES` folder (Bookkeeping, Basic Financial Statements, Accounts Payable, Advanced Financial Statements; `CATTO_COURSES_DIR`), gives each a 12-month price (365 days; R450, R550, R500 and R750) and publishes it.
+4. ADMIN adds the learner Thandi Nkosi under People, with the account notification email.
+5. Thandi signs in with her own link, puts Example Course 1 in her cart, gives her details at checkout and pays with the simulated card, which stands in for Stitch on a demo site; the course starts at once.
+6. ADMIN's order page is read for its ledger lines (the R450.00 payment and Stitch's R13.50 fee), payment events, trail and documents (invoice and receipt).
+7. Thandi's order confirmation, with her receipt attached and her account reference, and the email saying her course has started, with its link, arrive in Mailpit (the commerce worker sends them within a minute; the script waits up to two and a half minutes), and every email sent is listed.
+
+It refuses to run when one of the courses is already on the site. Screenshots, `results.json` and `summary.json` go to `/tmp/catto-one-learner-scenario` (`CATTO_BROWSER_OUTPUT`). Rebuild the database (`docs/OPERATIONS.md`) and make the owner's theme active first.
+
+```sh
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAILPIT_URL=http://127.0.0.1:8025 node tests/Browser/one-learner-scenario.cjs
 ```

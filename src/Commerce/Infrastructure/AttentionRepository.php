@@ -14,6 +14,10 @@ has not marked dealt with, the open refund requests and the money-back refunds n
 the emails and dismissals recorded against an item.
 
 Changelog:
+2026/10/19 SAST
+- Unmatched money not yet sorted out.
+2026/10/18 SAST
+- An overpayment or cancelled order's payment is listed only when it belongs to an order: one without an order could not be opened.
 2026/10/17 SAST
 - Created for the transactions that need attention.
 */
@@ -47,15 +51,22 @@ final class AttentionRepository
     }
 
     /**
-     * Ledger rows of one kind that ADMIN has not marked dealt with under $attentionKind.
+     * Ledger rows of one kind that ADMIN has not marked dealt with under $attentionKind. Only an order's
+     * rows: each item is about an order and opens on it, so a credit with no order is not one.
      *
      * @return list<array<string,mixed>>
      */
     public function undismissedEntries(string $ledgerKind, string $attentionKind, int $limit = 200): array
     {
         return $this->db->fetchAllAssociative('SELECT e.id, e.order_id, e.amount_minor, e.currency, e.occurred_at FROM commerce_ledger_entries e
-                WHERE e.kind = :kind AND NOT EXISTS (SELECT 1 FROM commerce_attention_dismissals d WHERE d.kind = :attention AND d.reference = e.id::text)
+                WHERE e.kind = :kind AND e.order_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM commerce_attention_dismissals d WHERE d.kind = :attention AND d.reference = e.id::text)
                 ORDER BY e.occurred_at LIMIT ' . max(1, $limit), ['kind' => $ledgerKind, 'attention' => $attentionKind]);
+    }
+
+    /** @return list<array<string,mixed>> money that reached the bank and paid no order, not yet sorted out */
+    public function openUnmatchedPayments(int $limit = 200): array
+    {
+        return $this->db->fetchAllAssociative("SELECT id, amount_minor, currency, received_at, payer_reference FROM commerce_unmatched_payments WHERE state = 'open' ORDER BY received_at LIMIT " . max(1, $limit));
     }
 
     /** @return list<array<string,mixed>> */

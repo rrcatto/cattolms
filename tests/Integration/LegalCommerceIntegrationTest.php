@@ -72,6 +72,7 @@ final class LegalCommerceIntegrationTest extends TestCase
     {
         $this->db = IntegrationContainer::db();
         $this->db->beginTransaction();
+        WalletFixture::defaults($this->db);
         $this->fixture = new DevelopmentFixture($this->db);
         $this->clock = new MockClock(new \DateTimeImmutable());
         $container = IntegrationContainer::get();
@@ -230,7 +231,8 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertSame('revoked', $this->db->fetchOne('SELECT state FROM commerce_entitlements WHERE order_item_id=:i', ['i' => $item['id']]));
 
         $page = InProcessPage::run($admin, PaymentAdministrationController::class, 'order', ['id' => (string) $orderId])['body'];
-        self::assertStringContainsString('Refund Policy override', $page, 'The order page says an override was used');
+        self::assertStringContainsString('Outside the Refund Policy (', $page, 'The order page says an override was used');
+        self::assertStringContainsString('Override reason: ', $page, 'and why.');
         self::assertStringContainsString('Override reason: The course video would not play for this learner.', $page, 'and why.');
         self::assertStringContainsString(htmlspecialchars($refusals[0], ENT_QUOTES), $page);
 
@@ -322,6 +324,18 @@ final class LegalCommerceIntegrationTest extends TestCase
         self::assertStringContainsString('The course started on ', $page);
         self::assertStringContainsString('name="override_reason"', $page);
         self::assertStringContainsString('name="destination"', $page, 'ADMIN chooses wallet credit or money back.');
+        // The page opens with what happened, in plain English (owner, 2026-10-18).
+        self::assertLessThan(strpos($page, 'Everything recorded for this order'), strpos($page, 'What happened'));
+        // The order's Money Ledger lines, Payment Events and Commerce Trail together, each linking to its own page (owner, 2026-10-19).
+        foreach (['Money Ledger' => '#<tr data-order-record="ledger">.*?href="/admin/commerce/ledger/\d+"#s', 'Payment Events' => '#<tr data-order-record="payment">.*?href="/admin/commerce/payment-events/\d+"#s',
+            'Commerce Trail' => '#<tr data-order-step data-order-record="trail">.*?href="/admin/commerce/trail/\d+"#s'] as $heading => $row) {
+            self::assertStringContainsString('<h3 class="h5">' . $heading . '</h3>', $page);
+            self::assertMatchesRegularExpression($row, $page, $heading . ' rows link to their own pages.');
+        }
+        self::assertMatchesRegularExpression('/ordered .+ on \d{1,2} \w{3} \d{4} at \d{2}:\d{2}\./', $page, 'who ordered what, for how much and when');
+        self::assertMatchesRegularExpression('/It was paid in full, .+ by card, on /', $page, 'how it was paid');
+        self::assertMatchesRegularExpression('/ started on \d{1,2} \w{3} \d{4}/', $page, 'and that the course started, from the access events of its enrolment');
+        self::assertStringContainsString('Nothing to do', $page);
 
         $form = ['csrf' => $_SESSION['csrf'], 'item_id' => (string) $item['id'], 'basis' => 'goodwill', 'reason' => 'Customer request', 'quantity' => '1', 'amount' => '500.00', 'destination' => 'wallet'];
         $refused = InProcessPage::run($admin, PaymentAdministrationController::class, 'refund', ['id' => (string) $orderId], $form + ['request_key' => Uuid::v4()]);

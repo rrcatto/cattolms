@@ -1,24 +1,29 @@
-{# One Commerce Trail event in full (MoneyRecords::trailEvent): what was recorded, by whom, about which order. #}
+{#
+	One Commerce Trail event (MoneyRecords::trailEvent). The page head names the account first; the first
+	card says what happened as a sentence, with when, who and which order (owner, 2026-10-18). The event's
+	code and everything recorded with it are folded under Technical details. An order's entries are opened
+	from its order's page (owner, 2026-10-19), so the way back is to the order.
+#}
 {% extends layout %}
 {% block page_body %}
-	{% set ph_back_href = '/admin/commerce/trail' %}{% set ph_back_label = 'Commerce Trail' %}
-	{% set ph_kicker = 'Commerce Trail' %}{% set ph_title = 'Trail event ' ~ event.id %}
-	{% set ph_lead = event.event_label ~ ' · ' ~ event.when %}
+	{% if event.order_href %}{% set ph_back_href = event.order_href ~ '#order-records' %}{% set ph_back_label = 'Order ' ~ event.order_label %}{% else %}{% set ph_back_href = '/admin/commerce/trail' %}{% set ph_back_label = 'Commerce Trail' %}{% endif %}
+	{% set ph_title = 'Trail event ' ~ event.id %}
+	{% set ph_lead = event.account_reference_label ? 'Account ' ~ event.account_reference_label ~ ' · ' ~ (event.account_label ?: '—') : (event.account_label ?: 'No account') %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Event', summary: 'As it was recorded. Nothing in the trail can be changed or deleted.'}) }}
+		{{ ui('layout.section-head', {heading: 'What happened', summary: 'Nothing in the trail can be changed or deleted.'}) }}
+		<p class="cl-lead" data-trail-sentence>{{ event.sentence }}</p>
 		{{ ui('data.key-value-list', {items: [
-			{label: 'Event', value: event.event_label ~ ' (' ~ event.event ~ ')'},
 			{label: 'When', value: event.when},
-			{label: 'Order', value: event.order_label ?: '—'},
 			{label: 'By', value: event.actor_label ~ (event.actor_email ? ' · ' ~ event.actor_email : '')},
+			{label: 'Order', value: event.order_label ?: '—'},
 		]}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{% if event.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href}) }}{{ ui('action.link', {label: 'Ledger rows of this order', variant: 'secondary', size: 'small', href: event.order_ledger_href}) }}{{ ui('action.link', {label: 'Trail of this order', variant: 'secondary', size: 'small', href: event.order_trail_href}) }}{% endif %}
+			{% if event.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href}) }}{{ ui('action.link', {label: 'The order’s money in the ledger', variant: 'secondary', size: 'small', href: event.order_ledger_href}) }}{% endif %}
+			{% if event.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: event.account_href}) }}{% endif %}
 		{% endblock %}{% endembed %}
-	{% endblock %}{% endembed %}</section>
-	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
-		{{ ui('layout.section-head', {heading: 'Details', summary: 'Everything recorded with the event.'}) }}
-		{% if event.lines %}{{ ui('data.key-value-list', {items: event.lines}) }}{% else %}{{ ui('feedback.empty', {summary: 'Nothing else was recorded.'}) }}{% endif %}
+		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Technical details', summary: 'The event’s code and everything recorded with it'})} %}{% block body %}
+			{{ ui('data.key-value-list', {items: [{label: 'Event code', value: event.event}]|merge(event.lines)}) }}
+		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}</section>
 {% endblock %}

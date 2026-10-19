@@ -12,6 +12,12 @@ Provides mail infrastructure for mailer interface, supporting Catto Learning ema
 
 Changelog:
 
+2026/10/19 SAST
+
+- sendPaymentInstructions() and sendOrderCancelled(): an EFT buyer is told how to pay, what arrived after
+  a part payment and when an unpaid order is cancelled (owner, 2026-10-19).
+- sendOrderConfirmation() and sendCoursesStarted(): every buyer is told their order is paid, with its
+  receipts attached, and which courses started (owner, 2026-10-19).
 2026/09/07 12:00 SAST
 
 - sendCourseEnrolmentNotice(): every enrolment tells the learner where to start.
@@ -70,4 +76,43 @@ interface MailerInterface
      * written, sent as text and as simple HTML paragraphs.
      */
     public function sendAdministratorMessage(string $email, string $subject, string $body): void;
+
+    /**
+     * An order is paid (owner, 2026-10-19): what was bought, what it cost and how it was paid, with the
+     * order's receipts attached and a link to it in My Orders.
+     *
+     * @param array{number:string,name:string,account_reference:string,placed:string,lines:list<array{title:string,detail:string,amount:string}>,total:string,paid:string,url:string} $order
+     * @param array<string,string> $receipts receipt number => its PDF
+     */
+    public function sendOrderConfirmation(string $email, array $order, array $receipts): void;
+
+    /**
+     * The courses a paid order started (owner, 2026-10-19), each with the day its access ends and the
+     * address that opens it.
+     *
+     * @param list<array{title:string,until:string,url:string}> $courses
+     */
+    public function sendCoursesStarted(string $email, string $name, array $courses): void;
+
+    /**
+     * How to pay an order by EFT (owner, 2026-10-19): the bank account, the account reference to pay
+     * with, the amount still to pay and the day it must be paid by, with the order's documents
+     * attached. Sent when the order is placed for EFT (its invoice attached) and after each part
+     * payment, when $order['received'] says what arrived (its receipt attached); it is '' otherwise.
+     * $order['paid'] is what is paid so far, '' when nothing is. On a demo site $bank holds fake details
+     * with fake true.
+     *
+     * @param array{number:string,name:string,account_reference:string,placed:string,lines:list<array{title:string,detail:string,amount:string}>,total:string,paid:string,due:string,pay_by:string,deadline:string,next:string,received:string,url:string} $order
+     * @param array{bank_name:string,account_name:string,account_number:string,branch_code:string,configured:bool,fake:bool} $bank
+     * @param array<string,string> $documents document number => its PDF
+     */
+    public function sendPaymentInstructions(string $email, array $order, array $bank, array $documents): void;
+
+    /**
+     * An unpaid order was cancelled when its payment deadline passed (owner, 2026-10-19). $order['returned']
+     * is what the buyer had paid towards it, now in their wallet, or '' when nothing was paid.
+     *
+     * @param array{number:string,name:string,account_reference:string,placed:string,pay_by:string,returned:string,wallet_url:string,invoice:string,url:string,again_url:string} $order
+     */
+    public function sendOrderCancelled(string $email, array $order): void;
 }
