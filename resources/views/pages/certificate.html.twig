@@ -1,13 +1,17 @@
 {% extends layout %}
 {% block page_body %}
+	{# Seen by its learner and, once the learner makes it public, by anyone with its address; nothing here
+	   tells a visitor where the transcript is (owner, 2026-10-19). #}
 	{% set ph_compact = 1 %}
-	{% set ph_back_href = '/account/courses' %}
-	{% set ph_back_label = 'My Courses' %}
+	{% if is_owner %}{% set ph_back_href = '/account/certificates' %}{% set ph_back_label = 'My Certificates' %}{% endif %}
 	{% set ph_title = 'Certificate' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-			{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2, summary: 'This public page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
+			{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2, summary: 'This page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
+			{% if is_owner %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: certificate.is_public ? 'Public: anyone who has this page\'s address can see it.' : 'Private: only you can see this page.'})} %}{% block body %}<p>{{ ui('action.link', {label: 'Change who can see it', variant: 'secondary', size: 'small', href: '/account/certificates#certificate-' ~ certificate.id}) }}</p>{% endblock %}{% endembed %}
+			{% endif %}
 			{% if certificate.revoked_at %}
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This certificate was revoked on ' ~ (certificate.revoked_at|date('j F Y')) ~ '.'})} %}{% block body %}{% if certificate.revocation_reason %}<p>{{ certificate.revocation_reason }}</p>{% endif %}{% endblock %}{% endembed %}
 			{% endif %}
@@ -16,9 +20,11 @@
 				{label: 'Awarded to', value: certificate.learner_name},
 				{label: 'Course', value: certificate.course_title},
 				{label: 'Issued', value: certificate_values.issue_date|date('j F Y')},
-			] | merge(certificate.overall_percentage is not null ? [{label: 'Result', value: (certificate.overall_percentage|number_format(2, '.', '')) ~ '%' ~ (certificate.grade_code ? ' (' ~ certificate.grade_code ~ ')' : '')}] : []) | merge(certificate_values.accreditation ? [{label: 'Accreditation', value: certificate_values.accreditation}] : []) | merge(certificate_values.provider ? [{label: 'Provider', value: certificate_values.provider}] : [])}) }}
+				{label: 'Completed', value: certificate.completed_at|date('j F Y')},
+			] | merge(certificate_values.accreditation ? [{label: 'Accreditation', value: certificate_values.accreditation}] : []) | merge(certificate_values.provider ? [{label: 'Provider', value: certificate_values.provider}] : [])}) }}
+			<p class="cl-ui-field-help">A certificate states that the learner took the course. It shows no mark or grade: those are on its transcript.</p>
 			{% if not certificate.revoked_at %}
-				<p>{{ ui('action.link', {label: 'Download PDF', variant: 'primary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf', icon: 'action-open'}) }}</p>
+				<p>{{ ui('action.link', {label: 'Download PDF', variant: 'primary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf', icon: 'action-open'}) }}{% if is_owner and certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', href: '/transcripts/' ~ certificate.transcript_public_id}) }}{% endif %}</p>
 			{% endif %}
 			{% if can_view_designs %}
 				<p class="cl-ui-field-help">Drawn in the design “{{ certificate.template_name }}” as it was when the certificate was issued. Only administrators see this line.</p>

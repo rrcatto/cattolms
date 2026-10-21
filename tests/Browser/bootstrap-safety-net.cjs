@@ -80,16 +80,20 @@ async function read(page) {
 /* The colours alone: without Bootstrap 6 nothing states the colour scheme, which is then the browser's own light. */
 const colours = ({scheme, ...rest}) => rest;
 
-/* Core's reader: the public preview of the first catalogue course that has one. */
+/* Core's reader: the public preview of the first catalogue course that has one. The catalogue lists courses with a
+ * position first (owner, 2026-10-20), so every course of the first pages is tried, not only the first few. */
 async function readerRoute(page) {
-    await page.goto(`${base}/courses`, {waitUntil: 'networkidle'});
-    const courses = [...new Set(await page.locator('main a[href^="/courses/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href'))))]
-        .filter((href) => /^\/courses\/[a-zA-Z0-9_-]+$/.test(href)).slice(0, 12);
-    for (const href of courses) {
-        await page.goto(`${base}${href}`, {waitUntil: 'networkidle'});
-        if (await page.locator(`a[href="${href}/preview"]`).count()) return `${href}/preview`;
+    for (let number = 1; number <= 5; number++) {
+        await page.goto(`${base}/courses?page=${number}`, {waitUntil: 'networkidle'});
+        const courses = [...new Set(await page.locator('main a[href^="/courses/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href'))))]
+            .filter((href) => /^\/courses\/[a-zA-Z0-9_-]+$/.test(href));
+        if (courses.length === 0) break;
+        for (const href of courses) {
+            await page.goto(`${base}${href}`, {waitUntil: 'networkidle'});
+            if (await page.locator(`a[href="${href}/preview"]`).count()) return `${href}/preview`;
+        }
     }
-    throw new Error('no catalogue course with a public preview among the first twelve');
+    throw new Error('no catalogue course with a public preview on the first five pages');
 }
 
 /* Two readings the same, or a failure naming each value that differs. */

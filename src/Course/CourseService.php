@@ -11,6 +11,11 @@ Description:
 Implements Catto Learning business and application logic for course operations.
 
 Changelog:
+2026/10/20 SAST
+- A price option may carry a was price, shown struck through beside its price (owner, 2026-10-20); catalogue cards carry the default price's (default_was_label).
+
+2026/10/19 SAST
+- categoryNavigation(): the catalogue's trail and the categories beneath the one browsed, each with its branch total (owner, 2026-10-19). categoryCoursePage(), categoryCourseTotal() and featuredCourses() are gone: the catalogue shows every course, and a category its whole branch.
 
 2026/10/07 SAST
 
@@ -76,6 +81,7 @@ use CattoLearning\Support\EmailAddress;
 use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Support\Money;
 use CattoLearning\Support\Slug;
+use CattoLearning\Support\WasPrice;
 use CattoLearning\Commerce\Application\AccessService;
 use InvalidArgumentException;
 use RuntimeException;
@@ -83,6 +89,9 @@ use RuntimeException;
 /** Coordinates course application operations and builds presentation data without rendering HTML. */
 final class CourseService
 {
+    /** The icon of a category that has none of its own, on the catalogue's category cards. */
+    public const CATEGORY_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h8.5A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/></svg>';
+
     /**
      * The taxonomy for the life of one request.
      *
@@ -104,7 +113,8 @@ final class CourseService
         private readonly CourseReviewRepository $reviews,
         private readonly CoursePopularityRepository $popularity,
         private readonly CertificateDesignRepository $certificateDesigns,
-        private readonly CategoryHierarchyService $categoryHierarchy
+        private readonly CategoryHierarchyService $categoryHierarchy,
+        private readonly \CattoLearning\View\Artwork\IconLibrary $icons = new \CattoLearning\View\Artwork\IconLibrary()
     ) {
     }
 
@@ -249,7 +259,7 @@ final class CourseService
      * @param array<string,mixed> $data
      * @return array<string,mixed>
      */
-    public function createTag(array $data, int $actorUserId): array
+    public function createTag(array $data, int $actorUserId, ?string $iconSvg = null): array
     {
         $name = trim((string) ($data['name'] ?? ''));
         if ($name === '') {
@@ -263,14 +273,34 @@ final class CourseService
 
         // A tag is a name. It had a description nobody wrote and an active flag nobody set, and
         // both were on screen taking space from the only column that says anything.
-        $id = $this->courses->createTag(['name' => $name, 'slug' => $slug]);
+        // An uploaded icon (owner, 2026-10-20), already checked by UploadedSvg; otherwise the library's icon that fits
+        // the name best, so no tag is without a picture.
+        $iconSvg ??= $this->icons->svg($this->icons->bestFor($name, 'tag'));
+        $id = $this->courses->createTag(['name' => $name, 'slug' => $slug] + ($iconSvg === null ? [] : ['icon_svg' => $iconSvg]));
         $this->audit->record($actorUserId, 'course.tag.created', ['tag_id' => $id, 'name' => $name]);
 
         return $this->tag($id);
     }
 
+    /** A tag's icon replaced: chosen from the icon library or uploaded (owner, 2026-10-20). */
+    public function replaceTagIcon(int $id, string $iconSvg, int $actorUserId): void
+    {
+        $this->tag($id);
+        $this->courses->setTagIcon($id, $iconSvg);
+        $this->audit->record($actorUserId, 'course.tag.updated', ['tag_id' => $id, 'icon_replaced' => true]);
+    }
+
+    /** A category's icon replaced: chosen from the icon library or uploaded (owner, 2026-10-20). */
+    public function replaceCategoryIcon(int $categoryId, string $iconSvg, int $userId): void
+    {
+        $this->category($categoryId);
+        $this->courses->setCategoryIcon($categoryId, $iconSvg);
+        $this->categoryIndex = [];
+        $this->audit->record($userId, 'course_category.updated', ['category_id' => $categoryId, 'icon_replaced' => true]);
+    }
+
     /** @param array<string,mixed> $data */
-    public function updateTag(int $id, array $data, int $actorUserId): void
+    public function updateTag(int $id, array $data, int $actorUserId, ?string $iconSvg = null): void
     {
         $tag = $this->tag($id);
         $name = trim((string) ($data['name'] ?? ''));
@@ -285,9 +315,10 @@ final class CourseService
         }
 
         $this->courses->updateTag($id, ['name' => $name, 'slug' => $slug]);
+        if ($iconSvg !== null) $this->courses->setTagIcon($id, $iconSvg);
         $this->audit->record($actorUserId, 'course.tag.updated', [
             'tag_id' => $id, 'from' => (string) $tag['name'], 'to' => $name,
-        ]);
+        ] + ($iconSvg === null ? [] : ['icon_replaced' => true]));
     }
 
     /**
@@ -311,6 +342,37 @@ final class CourseService
     public function browsableCategory(string $slug): ?array
     {
         return $slug === '' ? null : $this->courses->browsableCategory($slug);
+    }
+
+    /**
+     * Where the reader is in the category tree and where they can go next (owner, 2026-10-19): the trail
+     * from All courses down to the category being browsed, and the categories directly beneath it (the
+     * main categories when none is chosen), each with the number of courses in its whole branch. Going
+     * up shows more courses, going down fewer. The catalogue draws the categories beneath as feature cards
+     * (owner, 2026-10-20): each with its icon (a plain one when it has none), name and description.
+     *
+     * @param array<string,mixed>|null $category
+     * @return array{trail:list<array{label:string,href:string,current:bool}>,label:string,subcategories:list<array{id:int,label:string,href:string,count:int,icon:string,description:string}>}
+     */
+    public function categoryNavigation(?array $category): array
+    {
+        $trail = [];
+        if ($category !== null) {
+            $trail[] = ['label' => 'All courses', 'href' => '/courses', 'current' => false];
+            foreach ($this->courses->categoryAncestry((int) $category['id']) as $step) {
+                $current = (int) $step['id'] === (int) $category['id'];
+                $trail[] = ['label' => (string) $step['name'], 'href' => $current ? '' : '/courses/category/' . rawurlencode((string) $step['slug']), 'current' => $current];
+            }
+        }
+        $subcategories = array_map(static fn(array $row): array => [
+            'id' => (int) $row['id'],
+            'label' => (string) $row['name'],
+            'href' => '/courses/category/' . rawurlencode((string) $row['slug']),
+            'count' => (int) $row['descendant_course_count'],
+            'icon' => trim((string) ($row['icon_svg'] ?? '')) !== '' ? (string) $row['icon_svg'] : self::CATEGORY_ICON,
+            'description' => trim((string) ($row['description'] ?? '')),
+        ], $this->courses->browsableChildCategories($category === null ? null : (int) $category['id']));
+        return ['trail' => $trail, 'label' => $category === null ? 'Categories' : 'Subcategories', 'subcategories' => $subcategories];
     }
 
     /**
@@ -369,7 +431,8 @@ final class CourseService
 
     /**
      * The category tree as nested picker items, down to $maxDepth levels, in the order ADMIN
-     * arranged: {value, label, depth, path, children}. Paths come from the stored tree.
+     * arranged: {value, label, depth, path, icon, children}. Paths come from the stored tree; icon is the
+     * category's icon (owner, 2026-10-20: "for the category picker, I would like a custom svg icon").
      *
      * @return list<array<string,mixed>>
      */
@@ -385,7 +448,7 @@ final class CourseService
                 continue;
             }
             $path = ($parent !== null ? $nodes[$parent]['path'] . ' › ' : '') . (string) $category['name'];
-            $nodes[$id] = ['value' => (string) $id, 'label' => (string) $category['name'], 'depth' => $depth, 'path' => $path, 'children' => [], 'parent' => $parent];
+            $nodes[$id] = ['value' => (string) $id, 'label' => (string) $category['name'], 'depth' => $depth, 'path' => $path, 'icon' => (string) ($category['icon_svg'] ?? ''), 'children' => [], 'parent' => $parent];
             if ($parent === null) {
                 $roots[] = $id;
             } else {
@@ -492,19 +555,6 @@ final class CourseService
         return $slugs === [] ? [] : $this->courses->activeTagsBySlug($slugs);
     }
 
-    /**
-     * The small featured set on the home page.
-     *
-     * Previously the home page built the whole catalogue and then array_slice()d six rows out
-     * of it, so the cost grew with every published course while the output never changed size.
-     *
-     * @return list<array<string,mixed>>
-     */
-    public function featuredCourses(int $limit = 6): array
-    {
-        return $this->decorateCatalogue($this->courses->featuredPublishedCourses($limit));
-    }
-
     /** How many courses the home page's Popular Courses loads with the page and rotates through. */
     public const POPULAR_POOL_SIZE = 16;
 
@@ -533,7 +583,7 @@ final class CourseService
         if (count($pool) < $size) {
             $taken = array_flip(array_map(static fn(array $course): int => (int) $course['id'], $pool));
             // Enough newest courses that, after skipping the ones already taken, the pool can fill.
-            foreach ($this->courses->publishedCourses(CatalogueFilter::none(), $size + count($pool), 0) as $course) {
+            foreach ($this->courses->publishedCourses(CatalogueFilter::none(), $size + count($pool), 0, true) as $course) {
                 if (count($pool) >= $size) { break; }
                 if (isset($taken[(int) $course['id']])) { continue; }
                 $pool[] = $course;
@@ -565,6 +615,10 @@ final class CourseService
             $label = trim((string) ($course['category_name'] ?? 'Course'));
             $course['cover_initial'] = mb_strtoupper(mb_substr($label !== '' ? $label : 'Course', 0, 1));
             $course['default_price_label'] = $this->formatPrice((int) ($course['default_price_minor_units'] ?? 0), (string) ($course['default_currency_code'] ?? 'ZAR'));
+            // The card shows a marked-down price with its was price struck through (owner, 2026-10-20).
+            $marked = WasPrice::labels((int) ($course['default_price_minor_units'] ?? 0), $course['default_was_price_minor_units'] ?? null, (string) ($course['default_currency_code'] ?? 'ZAR'));
+            $course['default_was_label'] = $marked['was_label'];
+            $course['saving_percent'] = $marked['saving_percent'];
             $course['default_access_label'] = AccessPeriod::label((int) ($course['default_price_access_period_seconds'] ?? 0));
             $course['has_price'] = (int) ($course['default_price_variant_id'] ?? 0) > 0;
             $course['has_alternative_prices'] = (int) ($course['active_price_variant_count'] ?? 0) > 1;
@@ -599,12 +653,6 @@ final class CourseService
     public function enrolmentForUser(int $userId, int $courseId): ?array
     {
         return $this->courses->enrolment($userId, $courseId);
-    }
-
-    /** One category's published-course total. */
-    public function categoryCourseTotal(int $categoryId): int
-    {
-        return $this->courses->categoryCourseTotal($categoryId);
     }
 
     /** @return array<string,mixed>|null */
@@ -675,22 +723,6 @@ final class CourseService
         return $courses;
     }
 
-    /**
-     * @param array<string,mixed> $pagination
-     * @return list<array<string,mixed>>
-     */
-    public function categoryCoursePage(int $categoryId, array $pagination): array
-    {
-        // The payload carries page and page size; the offset is derived rather than stored, so it
-        // is derived the same way here as Pagination derives it.
-        $pageSize = (int) $pagination['page_size'];
-        $offset = max(0, ((int) $pagination['page'] - 1) * $pageSize);
-
-        return $this->decorateCards(
-            $this->decorateCatalogue($this->courses->categoryCourses($categoryId, $pageSize, $offset))
-        );
-    }
-
     /** @return list<array<string,mixed>> */
     public function categories(bool $activeOnly = false): array
     {
@@ -711,9 +743,13 @@ final class CourseService
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    public function createCategory(array $input, int $userId, ?int $parentId = null): array
+    public function createCategory(array $input, int $userId, ?int $parentId = null, ?string $iconSvg = null): array
     {
         $data = $this->validateCategoryInput($input);
+        // An uploaded icon (owner, 2026-10-20), already checked by UploadedSvg; otherwise the library's icon that fits
+        // the name best, so no category is without a picture.
+        $iconSvg ??= $this->icons->svg($this->icons->bestFor((string) $data['name'], 'folder'));
+        if ($iconSvg !== null) $data['icon_svg'] = $iconSvg;
         // The parent comes from the caller - the row whose Add subcategory was chosen - never from
         // the posted form, and it is checked under the taxonomy lock: it must still exist and have
         // room below it. The new category goes last among its siblings.
@@ -735,20 +771,21 @@ final class CourseService
     /**
      * @param array<string,mixed> $input
      */
-    public function updateCategory(int $categoryId, array $input, int $userId): void
+    public function updateCategory(int $categoryId, array $input, int $userId, ?string $iconSvg = null): void
     {
         $existing = $this->category($categoryId);
-        // Its name, slug and description. Where it sits is changed in the tree, through
-        // CategoryHierarchyService, never here.
+        // Its name, slug, description and, when one is uploaded, its icon. Where it sits is changed in
+        // the tree, through CategoryHierarchyService, never here.
         $data = $this->validateCategoryInput($input, $categoryId);
         $this->courses->updateCategory($categoryId, $data);
+        if ($iconSvg !== null) $this->courses->setCategoryIcon($categoryId, $iconSvg);
         $this->categoryIndex = [];
         $this->audit->record($userId, 'course_category.updated', [
             'category_id' => $categoryId,
             'name' => $data['name'],
             'slug' => $data['slug'],
             'previous_name' => (string) $existing['name'],
-        ]);
+        ] + ($iconSvg === null ? [] : ['icon_replaced' => true]));
     }
 
     /**
@@ -1039,16 +1076,233 @@ final class CourseService
     /**
      * @param array<string,mixed> $input
      */
-    public function updateCourse(int $courseId, array $input, int $userId): void
+    public function updateCourse(int $courseId, array $input, int $userId, ?string $coverSvg = null): void
     {
         $existing = $this->courses->findById($courseId);
         if ($existing === null) {
             throw new InvalidArgumentException('The course does not exist.');
         }
         $data = $this->validateCourseInput($input, $existing);
-        $this->courses->updateCourse($courseId, $data, $userId);
-        $this->courses->recordHistory($courseId, $userId, 'course.updated', 'course', $courseId, 'Course details updated.', $data);
-        $this->audit->record($userId, 'course.updated', ['course_id' => $courseId]);
+        // Its tags, when the form showed them, and a cover picture ADMIN uploaded (owner, 2026-10-20).
+        $tagIds = array_key_exists('tags_shown', $input) ? $this->validTagIds($input['tag_ids'] ?? []) : null;
+        // Its place in the catalogue, when the form showed it (owner, 2026-10-20).
+        $positioned = array_key_exists('catalogue_position', $input);
+        $position = $positioned ? self::cataloguePosition($input['catalogue_position']) : null;
+        // The courses related to it, when the form showed them (owner, 2026-10-20): each relation is the other course's too.
+        $relatedIds = array_key_exists('related_shown', $input) ? $this->validRelatedIds($courseId, $input['related_ids'] ?? []) : null;
+        $this->transactions->run(function () use ($courseId, $data, $userId, $tagIds, $coverSvg, $positioned, $position, $relatedIds): void {
+            $this->courses->updateCourse($courseId, $data, $userId);
+            if ($tagIds !== null) $this->courses->replaceCourseTags($courseId, $tagIds);
+            if ($coverSvg !== null) $this->courses->setCourseCover($courseId, $coverSvg);
+            if ($positioned) $this->courses->setCataloguePosition($courseId, $position);
+            if ($relatedIds !== null) $this->courses->replaceRelatedCourses($courseId, $relatedIds);
+        });
+        $extra = ($tagIds === null ? [] : ['tag_ids' => $tagIds]) + ($coverSvg === null ? [] : ['cover_replaced' => true]) + ($positioned ? ['catalogue_position' => $position] : [])
+            + ($relatedIds === null ? [] : ['related_course_ids' => $relatedIds]);
+        $this->courses->recordHistory($courseId, $userId, 'course.updated', 'course', $courseId, 'Course details updated.', $data + $extra);
+        $this->audit->record($userId, 'course.updated', ['course_id' => $courseId] + $extra);
+    }
+
+    /**
+     * Puts a course after another in the catalogue's order, or first when $afterId is null (owner, 2026-10-20: "drag the
+     * course into position - this will change its position number - ... the middle point between the two courses you
+     * position it between. Alternatively, you can re-number the list from the insertion point on").
+     *
+     * The course takes the number halfway between its new neighbours'; first, half the next one's; last of the numbered
+     * courses, the one before plus 100. When there is no whole number between them, or it goes among the courses without
+     * a number, every course from the top down to it is numbered again in hundreds. The courses below it keep theirs.
+     *
+     * @return array<int,int> each course whose number changed, with its new number
+     */
+    public function arrangeInCatalogue(int $courseId, ?int $afterId, int $userId): array
+    {
+        if ($afterId === $courseId) throw new InvalidArgumentException('A course cannot go after itself.');
+        $changed = $this->transactions->run(function () use ($courseId, $afterId): array {
+            $order = $this->courses->catalogueOrderForUpdate();
+            $ids = array_column($order, 'id');
+            $positions = array_column($order, 'position', 'id');
+            if (!in_array($courseId, $ids, true)) throw new InvalidArgumentException('The course does not exist.');
+            $ids = array_values(array_filter($ids, static fn(int $id): bool => $id !== $courseId));
+            $index = 0;
+            if ($afterId !== null) {
+                $found = array_search($afterId, $ids, true);
+                if ($found === false) throw new InvalidArgumentException('The course to put it after does not exist.');
+                $index = $found + 1;
+            }
+            array_splice($ids, $index, 0, [$courseId]);
+            $before = $index > 0 ? $positions[$ids[$index - 1]] : 0;
+            $next = $ids[$index + 1] ?? null;
+            $after = $next === null ? null : $positions[$next];
+            $number = match (true) {
+                $before === null => null,
+                $after === null => $before + 100,
+                $after - $before >= 2 => intdiv($before + $after, 2),
+                default => null,
+            };
+            $changes = [];
+            if ($number !== null) {
+                $changes[$courseId] = $number;
+            } else {
+                // Numbered again in hundreds from the top down to the course, and on through any numbered course that
+                // would otherwise come before it.
+                $last = $index;
+                for ($i = $index + 1, $count = count($ids); $i < $count; $i++) {
+                    if ($positions[$ids[$i]] !== null && $positions[$ids[$i]] <= ($last + 1) * 100) $last = $i; else break;
+                }
+                for ($i = 0; $i <= $last; $i++) $changes[$ids[$i]] = ($i + 1) * 100;
+            }
+            foreach ($changes as $id => $position) {
+                if (($positions[$id] ?? null) === $position) { unset($changes[$id]); continue; }
+                $this->courses->setCataloguePosition($id, $position);
+            }
+            return $changes;
+        });
+        $this->audit->record($userId, 'course.catalogue_arranged', ['course_id' => $courseId, 'after_course_id' => $afterId, 'positions' => $changed]);
+        return $changed;
+    }
+
+    /**
+     * The ⋯ menu's moves in the catalogue's order, without JavaScript: up, down, top or bottom (of the numbered courses).
+     *
+     * @return array<int,int> each course whose number changed, with its new number
+     */
+    public function moveInCatalogue(int $courseId, string $direction, int $userId): array
+    {
+        $order = $this->transactions->run(fn(): array => $this->courses->catalogueOrderForUpdate());
+        $ids = array_column($order, 'id');
+        $index = array_search($courseId, $ids, true);
+        if ($index === false) throw new InvalidArgumentException('The course does not exist.');
+        $numbered = array_values(array_filter($order, static fn(array $row): bool => $row['position'] !== null && $row['id'] !== $courseId));
+        $after = match ($direction) {
+            'up' => $index >= 2 ? $ids[$index - 2] : null,
+            'down' => $ids[$index + 1] ?? throw new InvalidArgumentException('That course is already last.'),
+            'top' => null,
+            'bottom' => $numbered === [] ? null : $numbered[count($numbered) - 1]['id'],
+            default => throw new InvalidArgumentException('Choose up, down, top or bottom.'),
+        };
+        if ($direction === 'up' && $index === 0) throw new InvalidArgumentException('That course is already first.');
+        return $this->arrangeInCatalogue($courseId, $after, $userId);
+    }
+
+    /**
+     * A course's position in the catalogue as typed (owner, 2026-10-20): empty for none, else a whole number from 1.
+     * Numbered courses come first, lowest first.
+     */
+    public static function cataloguePosition(mixed $value): ?int
+    {
+        $text = trim((string) (is_scalar($value) ? $value : ''));
+        if ($text === '') return null;
+        if (preg_match('/^[0-9]{1,10}$/', $text) !== 1 || (int) $text < 1 || (int) $text > 2000000000) {
+            throw new InvalidArgumentException('Enter the position in the catalogue as a whole number from 1, such as 100, or leave it empty.');
+        }
+        return (int) $text;
+    }
+
+    /**
+     * The courses ticked as related to a course: real courses, never the course itself.
+     *
+     * @return list<int>
+     */
+    private function validRelatedIds(int $courseId, mixed $ids): array
+    {
+        $ids = array_values(array_unique(array_map('intval', is_array($ids) ? $ids : [])));
+        $known = array_column($this->courses->relatedCourseOptions($courseId), 'id');
+        foreach ($ids as $id) {
+            if ($id === $courseId) throw new InvalidArgumentException('A course cannot be related to itself.');
+            if (!in_array($id, $known, true)) throw new InvalidArgumentException('Choose related courses from the list.');
+        }
+        return $ids;
+    }
+
+    /**
+     * The courses related to a course, for its Related courses choice (owner, 2026-10-20).
+     *
+     * @return list<array{id:int,title:string,status:string,checked:bool}>
+     */
+    public function relatedCourseOptions(int $courseId): array
+    {
+        return $this->courses->relatedCourseOptions($courseId);
+    }
+
+    /**
+     * The published courses related to a course, as catalogue cards in the catalogue's order, for its page.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function relatedCourseCards(int $courseId): array
+    {
+        return $this->cardsByIds($this->courses->relatedCourseIds($courseId));
+    }
+
+    /**
+     * The courses related to a course, set by slug (the catalogue file, owner 2026-10-20). A slug no course has is
+     * left out and named.
+     *
+     * @param list<string> $slugs
+     * @return list<string> the slugs no course has
+     */
+    public function setRelatedCoursesBySlug(int $courseId, array $slugs): array
+    {
+        $ids = [];
+        $missing = [];
+        foreach ($slugs as $slug) {
+            $other = $this->courses->findBySlug((string) $slug);
+            if ($other === null) { $missing[] = (string) $slug; continue; }
+            if ((int) $other['id'] !== $courseId) $ids[] = (int) $other['id'];
+        }
+        $this->courses->replaceRelatedCourses($courseId, $ids);
+        return $missing;
+    }
+
+    /**
+     * Every tag, each marked when the course carries it, for the course's Tags choice.
+     *
+     * @return list<array{id:int,name:string,slug:string,icon_svg:string,checked:bool}>
+     */
+    public function courseTagOptions(int $courseId): array
+    {
+        $carried = $this->courses->courseTagIds($courseId);
+        return array_map(static fn(array $tag): array => [
+            'id' => (int) $tag['id'], 'name' => (string) $tag['name'], 'slug' => (string) $tag['slug'],
+            'icon_svg' => (string) ($tag['icon_svg'] ?? ''), 'checked' => in_array((int) $tag['id'], $carried, true),
+        ], $this->courses->tagOptions());
+    }
+
+    /**
+     * The tags a course carries, set by name (the catalogue file, owner 2026-10-20): every name must be
+     * an existing tag.
+     *
+     * @param list<string> $names
+     */
+    public function setCourseTagsByName(int $courseId, array $names, int $userId): void
+    {
+        $ids = [];
+        foreach ($names as $name) {
+            $tag = $this->courses->tagBySlug(Slug::from((string) $name)) ?? throw new InvalidArgumentException('There is no tag called "' . $name . '".');
+            $ids[] = (int) $tag['id'];
+        }
+        $this->courses->replaceCourseTags($courseId, array_values(array_unique($ids)));
+        $this->audit->record($userId, 'course.updated', ['course_id' => $courseId, 'tag_ids' => array_values(array_unique($ids))]);
+    }
+
+    /** A course's cover picture, replaced with one ADMIN uploaded (owner, 2026-10-20). */
+    public function setCourseCover(int $courseId, string $coverSvg, int $userId): void
+    {
+        $this->courses->setCourseCover($courseId, $coverSvg);
+        $this->audit->record($userId, 'course.updated', ['course_id' => $courseId, 'cover_replaced' => true]);
+    }
+
+    /**
+     * @return list<int> tag ids that exist, from a submitted list
+     */
+    private function validTagIds(mixed $input): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', is_array($input) ? $input : [$input]), static fn(int $id): bool => $id > 0)));
+        $known = array_map(static fn(array $tag): int => (int) $tag['id'], $this->courses->tagOptions());
+        foreach ($ids as $id) {
+            if (!in_array($id, $known, true)) throw new InvalidArgumentException('One of the chosen tags no longer exists. Review the tags and save again.');
+        }
+        return $ids;
     }
 
     /** @param array<string,mixed> $input */
@@ -1477,6 +1731,8 @@ final class CourseService
         return [
             'access_period_seconds' => $accessPeriod,
             'price_minor_units' => $minorUnits,
+            // An optional higher price shown struck through beside it (owner, 2026-10-20). Never charged.
+            'was_price_minor_units' => WasPrice::fromInput($input['was_price'] ?? '', $minorUnits),
             'currency_code' => $currency,
             'label' => mb_substr(trim((string) ($input['label'] ?? '')), 0, 120),
             'is_active' => !empty($input['is_active']),
@@ -1531,6 +1787,8 @@ final class CourseService
             $seconds = (int) ($variant['access_period_seconds'] ?? 0);
             $variant['access_period_label'] = AccessPeriod::label($seconds);
             $variant['price_label'] = $this->formatPrice((int) ($variant['price_minor_units'] ?? 0), (string) ($variant['currency_code'] ?? 'ZAR'));
+            $variant += WasPrice::labels((int) ($variant['price_minor_units'] ?? 0), $variant['was_price_minor_units'] ?? null, (string) ($variant['currency_code'] ?? 'ZAR'));
+            $variant['was_price_input'] = WasPrice::input($variant['was_price_minor_units'] ?? null);
             [$value, $unit] = AccessPeriod::decompose($seconds);
             $variant['access_period_value'] = $value;
             $variant['access_period_unit'] = $unit;

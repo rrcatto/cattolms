@@ -41,7 +41,19 @@ final class PlatformExtension extends AbstractExtension
             new TwigFilter('ucfirst', self::ucfirst(...)),
             new TwigFilter('urlencode', self::urlencode(...)),
             new TwigFilter('account_reference', self::accountReference(...)),
+            new TwigFilter('role_label', self::roleLabel(...)),
         ];
+    }
+
+    /**
+     * A role as people read it (owner, 2026-10-20: a person's role choices printed "CompanyAdministratorCOMPANY_ADMIN"):
+     * its CamelCase name in words, "Company Administrator"; its key only when it has no name.
+     */
+    public static function roleLabel(?string $name, ?string $key = null): string
+    {
+        $name = trim((string) $name);
+        if ($name === '') return ucwords(strtolower(str_replace('_', ' ', (string) $key)));
+        return trim((string) preg_replace('/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/', ' ', $name));
     }
 
     /** Upper-cases the first character and leaves the rest of the string exactly as written. */

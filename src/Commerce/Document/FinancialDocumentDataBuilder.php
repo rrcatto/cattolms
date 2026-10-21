@@ -33,6 +33,8 @@ assemble() is the pure part, given the business and bank details; the samples on
 are built by it too, so a preview is drawn exactly as an issued document is.
 
 Changelog:
+2026/10/19 SAST
+- A receipt names the payment method and its provider (PaymentMethods::receiptLabel, owner 2026-10-19).
 2026/10/08 SAST
 - Created for financial documents on the document template engine (Phase K).
 */
@@ -43,6 +45,7 @@ namespace CattoLearning\Commerce\Document;
 
 use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Configuration\RuntimeSettings;
+use CattoLearning\Commerce\Settings\PaymentMethods;
 use CattoLearning\Configuration\SiteMode;
 use CattoLearning\Document\DocumentBusinessData;
 use CattoLearning\Document\DocumentType;
@@ -55,7 +58,6 @@ use InvalidArgumentException;
 final class FinancialDocumentDataBuilder
 {
     public const BASES = ['statutory' => 'Statutory right', 'service_failure' => 'Service failure', 'goodwill' => 'Goodwill', 'voluntary' => 'Voluntary'];
-    private const PAYMENT_METHODS = ['dummy' => 'Card (simulated)', 'manual_bank' => 'EFT / bank transfer', 'wallet' => 'Wallet credit'];
 
     public function __construct(
         private readonly DocumentBusinessData $business,
@@ -139,7 +141,7 @@ final class FinancialDocumentDataBuilder
                     'receipt.discount' => $optionalMoney($discount),
                     'receipt.amount' => ['minor' => (int) $payment['amount_minor'], 'currency' => (string) ($payment['currency'] ?? $currency)],
                     'receipt.currency' => (string) ($payment['currency'] ?? $currency),
-                    'receipt.payment_method' => self::PAYMENT_METHODS[(string) ($payment['gateway'] ?? '')] ?? null,
+                    'receipt.payment_method' => PaymentMethods::receiptLabel((string) ($payment['gateway'] ?? '')),
                     'receipt.payment_reference' => self::text($payment['reference'] ?? null),
                 ] + self::promotion($promotion);
                 $data['items'] = self::lines($snapshot, $money);
@@ -213,7 +215,10 @@ final class FinancialDocumentDataBuilder
      */
     private static function promotion(?array $promotion): array
     {
-        return $promotion === null ? [] : ['promotion.code' => self::text($promotion['code'] ?? null), 'promotion.label' => self::text($promotion['label'] ?? null)];
+        // A promotion the cart applied by itself says so on the document too (owner, 2026-10-20).
+        $label = self::text($promotion['label'] ?? null);
+        if ($promotion !== null && (bool) ($promotion['automatic'] ?? false)) $label = ($label === null ? '' : $label . ', ') . 'applied automatically';
+        return $promotion === null ? [] : ['promotion.code' => self::text($promotion['code'] ?? null), 'promotion.label' => $label];
     }
 
     /**

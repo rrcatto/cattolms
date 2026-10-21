@@ -21,7 +21,7 @@
 
 						{{ ui('action.link', {label: 'Browse courses', variant: 'primary', size: 'large', href: '/courses'}) }}
 						{% if is_authenticated %}
-							{{ ui('action.link', {label: 'Open my library', variant: 'secondary', size: 'large', href: '/account/library'}) }}
+							{{ ui('action.link', {label: 'Open my library', variant: 'secondary', size: 'large', href: '/account/courses'}) }}
 						{% else %}
 							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/register', icon: 'action-add'}) }}
 						{% endif %}

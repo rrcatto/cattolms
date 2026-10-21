@@ -8,12 +8,13 @@ use CattoLearning\Commerce\Domain\OrderTotals;
 use CattoLearning\Support\AccessPeriod;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Support\Money;
+use CattoLearning\Support\WasPrice;
 use RuntimeException;
 
 /** Keeps anonymous selections in the browser session and merges them into the signed-in cart. */
 final class CartService
 {
-    public function __construct(private readonly AuthService $auth, private readonly OrderService $orders, private readonly CommerceRepository $records) {}
+    public function __construct(private readonly AuthService $auth, private readonly OrderService $orders, private readonly CommerceRepository $records, private readonly PromotionService $promotions) {}
 
     /** @return array<string,mixed> */
     public function summary(): array
@@ -45,12 +46,15 @@ final class CartService
                 $bundle['courses'] = $this->records->bundleCourses((int) $bundle['bundle_id']);
                 $bundles[] = $bundle;
             }
-            $cart = ['id'=>0, 'quote'=>'', 'items'=>$items, 'bundles'=>$bundles, 'promotion'=>['code'=>null, 'discount'=>null, 'rejection'=>null]];
+            // A guest types no code before signing in, but sees an automatic promotion (owner, 2026-10-20).
+            $cart = ['id'=>0, 'quote'=>'', 'items'=>$items, 'bundles'=>$bundles, 'promotion'=>$this->promotions->forGuest($items, $bundles)];
         }
         $total = Money::strictMinorUnits(0, 'ZAR');
         foreach ($cart['items'] as &$item) {
             $money = Money::strictMinorUnits((int) $item['price_minor_units'], (string) $item['currency_code']);
             $item['price_label'] = $money->format();
+            // A marked-down price shows its was price struck through (owner, 2026-10-20); only the price counts.
+            $item += WasPrice::labels($money->minorUnits, $item['was_price_minor_units'] ?? null, $money->currency);
             $item['days'] = (int) $item['access_period_seconds'] / 86400;
             $total = $total->plus($money);
         }
@@ -62,6 +66,7 @@ final class CartService
         foreach ($cart['bundles'] as &$bundle) {
             $money = Money::strictMinorUnits((int) $bundle['price_minor_units'], (string) $bundle['currency_code']);
             $bundle['price_label'] = $money->format();
+            $bundle += WasPrice::labels($money->minorUnits, $bundle['was_price_minor_units'] ?? null, $money->currency);
             $bundle['access_label'] = AccessPeriod::label((int) $bundle['access_period_seconds']);
             $bundle['course_count'] = count($bundle['courses']);
             $bundle['course_titles'] = array_map(static fn(array $c): string => (string) $c['title'], $bundle['courses']);
@@ -87,9 +92,11 @@ final class CartService
         $cart['discount_minor'] = $discountMinor;
         $cart['total_minor'] = $total->minorUnits - $discountMinor;
         $cart['total_label'] = Money::strictMinorUnits($cart['total_minor'], $total->currency)->format();
-        $cart['totals'] = OrderTotals::rows($total->minorUnits, $discountMinor, $cart['total_minor'], $total->currency, $promotion['code'], $discount?->promotion->discountLabel());
+        $automatic = (bool) ($promotion['automatic'] ?? false);
+        $cart['totals'] = OrderTotals::rows($total->minorUnits, $discountMinor, $cart['total_minor'], $total->currency, $promotion['code'], $discount?->promotion->discountLabel(), $automatic);
         $cart['promo'] = ['code'=>$promotion['code'], 'applied'=>$discount !== null, 'rejection'=>$promotion['rejection'],
-            'label'=>$discount?->promotion->discountLabel(), 'discount_label'=>$discount === null ? null : OrderTotals::negative($discountMinor, $total->currency)];
+            'label'=>$discount?->promotion->discountLabel(), 'discount_label'=>$discount === null ? null : OrderTotals::negative($discountMinor, $total->currency),
+            'name'=>$discount?->promotion->name, 'automatic'=>$automatic, 'saving_label'=>$discount === null ? null : Money::strictMinorUnits($discountMinor, $total->currency)->format(), 'typed_code'=>$promotion['typed_code'] ?? null, 'note'=>$promotion['note'] ?? null];
         // Templates receive plain values only; the calculation object stays with the services.
         unset($cart['promotion']);
         return $cart;

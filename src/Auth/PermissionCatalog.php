@@ -11,6 +11,10 @@ Defines the canonical Catto Learning ACL permission catalogue. Business permissi
 
 Changelog:
 
+2026/10/19 SAST
+
+- CERTIFICATE.ISSUED.VIEW and CERTIFICATE.ISSUED.MANAGE (Courses): the list of issued certificates and revoking one; PLATFORM.IDENTITY.VIEW and PLATFORM.IDENTITY.MANAGE (Platform): each person's identity verification, revoking one and allowing another try. 101 permissions.
+
 2026/10/08 SAST
 
 - PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE (Commerce · Platform): the design of invoices, receipts and credit notes (Phase K). 92 permissions.
@@ -93,6 +97,8 @@ final class PermissionCatalog
             $this->p('PLATFORM.ENROLMENT.MANAGE', 'ManagePlatformEnrolments', 'Platform', 'Grant, remove, restore or reset enrolments platform-wide.'),
             $this->p('PLATFORM.CREDIT.VIEW', 'ViewPlatformCredits', 'Platform', 'View credits platform-wide.'),
             $this->p('PLATFORM.CREDIT.MANAGE', 'ManagePlatformCredits', 'Platform', 'Create, allocate and manage credits platform-wide.'),
+            $this->p('PLATFORM.IDENTITY.VIEW', 'ViewIdentityVerification', 'Platform', 'See each person\'s identity verification status and history.'),
+            $this->p('PLATFORM.IDENTITY.MANAGE', 'ManageIdentityVerification', 'Platform', 'Revoke an identity verification with a reason, and allow another try after three declined checks.'),
             $this->p('PLATFORM.ACTIVITY.VIEW', 'ViewPlatformActivity', 'Platform', 'View audit activity platform-wide.'),
             $this->p('PLATFORM.REPORT.VIEW', 'ViewPlatformReports', 'Platform', 'View operational and learning reports platform-wide.'),
             $this->p('COURSE.MANAGEMENT.VIEW', 'ViewCourseManagement', 'Courses', 'Open course-authoring surfaces for courses within resource scope.'),
@@ -111,6 +117,8 @@ final class PermissionCatalog
             $this->p('BUNDLE.MANAGE', 'ManageBundles', 'Bundles', 'Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
             $this->p('CERTIFICATE.DESIGN.VIEW', 'ViewCertificateDesigns', 'Courses', 'See the certificate designs and preview them.'),
             $this->p('CERTIFICATE.DESIGN.MANAGE', 'ManageCertificateDesigns', 'Courses', 'Create, edit, duplicate and delete certificate designs and choose the default for new courses.'),
+            $this->p('CERTIFICATE.ISSUED.VIEW', 'ViewIssuedCertificates', 'Courses', 'See the issued certificates and their transcripts, and search them.'),
+            $this->p('CERTIFICATE.ISSUED.MANAGE', 'ManageIssuedCertificates', 'Courses', 'Revoke an issued certificate and its transcript, with a written reason.'),
             $this->p('COURSE.OWNERSHIP.MANAGE', 'ManageCourseOwnership', 'Courses', 'Assign owner company/person and course editors within scope.'),
             $this->p('COURSE.MEDIA.MANAGE', 'ManageCourseMedia', 'Courses', 'Upload and maintain private course media.'),
             $this->p('COURSE.ASSESSMENT.MANAGE', 'ManageCourseAssessments', 'Courses', 'Create and edit diagnostics, module/final assessments and grade bands.'),

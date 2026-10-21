@@ -11,7 +11,7 @@ Description:
 Whether this site is a demo or live (owner, 2026-10-18): one setting, APP_SITE_MODE=demo|live in
 .env, which Administration > Settings can override (app_options site_mode). A missing or unknown value
 means demo, so a site never takes real orders by accident. demo, test and development all mean the
-same thing: a test demo site in development, such as demo.example.com, which never goes live.
+same thing: a site for testing, development or showing, which never takes real orders.
 
 On a demo site every page says so, search engines are asked not to list it, the checkout says the
 purchase is a simulation, an order placed there is marked as a simulation (so its order page,

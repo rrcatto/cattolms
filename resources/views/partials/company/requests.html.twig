@@ -22,7 +22,8 @@
 								{% for request in requests %}
 									<tr>
 										<td>
-											<strong>{{ request.learner_name }}</strong>
+											{# The name and account reference, linked to the person's page (owner, 2026-10-21). #}
+											<strong>{{ ui('data.person', {name: request.learner_name, reference: request.learner_reference, href: '/company/people/' ~ request.user_id}) }}</strong>
 										</td>
 										<td>
 											{{ request.course_title }}

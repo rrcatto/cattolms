@@ -8,11 +8,11 @@
 {% block page_body %}
 	{% set ph_back_href = '/admin/commerce/ledger' %}{% set ph_back_label = 'Money Ledger' %}
 	{% set ph_title = 'Ledger line ' ~ entry.id %}
-	{% set ph_lead = entry.reference_label ? 'Account ' ~ entry.reference_label ~ ' · ' ~ (entry.account_name ?: '—') : (entry.account_name ?: 'No account') %}
+	{% if entry.account_person %}{% set ph_lead %}{{ ui('data.person', entry.account_person|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead = entry.reference_label ? 'Account ' ~ entry.reference_label ~ ' · ' ~ (entry.account_name ?: '—') : (entry.account_name ?: 'No account') %}{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'What happened', summary: 'A ledger line is never changed. A mistake is put right by a new line.'}) }}
-		<p class="cl-lead" data-ledger-sentence>{{ entry.sentence }}</p>
+		<p class="cl-lead" data-ledger-sentence>{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: entry.sentence_parts} only %}</p>
 		{% set facts = [{label: 'When', value: entry.when}] %}
 		{% if entry.money_in_label %}{% set facts = facts|merge([{label: 'Money in', value: entry.money_in_label}]) %}{% endif %}
 		{% if entry.money_out_label %}{% set facts = facts|merge([{label: 'Money out', value: entry.money_out_label}]) %}{% endif %}
@@ -21,9 +21,10 @@
 		{% set facts = facts|merge([{label: 'How', value: entry.method_label}, {label: 'Order', value: entry.order_label ?: '—'}]) %}
 		{% if entry.external_reference %}{% set facts = facts|merge([{label: 'Bank or Stitch reference', value: entry.external_reference}]) %}{% endif %}
 		{% if entry.document_number %}{% set facts = facts|merge([{label: 'Document', value: entry.document_number}]) %}{% endif %}
-		{% set facts = facts|merge([{label: 'Recorded by', value: entry.actor_name ?: 'The system'}]) %}
+		{% if not entry.actor_person %}{% set facts = facts|merge([{label: 'Recorded by', value: 'The system'}]) %}{% endif %}
 		{% if entry.memo %}{% set facts = facts|merge([{label: 'Note', value: entry.memo}]) %}{% endif %}
 		{{ ui('data.key-value-list', {items: facts}) }}
+		{% if entry.actor_person %}<p data-ledger-recorder><strong>Recorded by:</strong> {{ ui('data.person', entry.actor_person) }}</p>{% endif %}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
 			{% if entry.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: entry.order_href}) }}{% endif %}
 			{% if entry.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: entry.account_href}) }}{% endif %}
@@ -45,7 +46,7 @@
 		{% if entry.related %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 44, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Money in'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Money out'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Wallet credit', wide: true}} %}</tr>{% endblock %}
-		{% block body %}{% for row in entry.related %}<tr><td class="small">{{ row.when }}</td><td class="cell-text"><a href="{{ row.href }}">{{ row.sentence }}</a></td><td>{{ row.money_in_label }}</td><td>{{ row.money_out_label }}</td><td>{{ row.wallet_change_label }}</td></tr>{% endfor %}{% endblock %}
+		{% block body %}{% for row in entry.related %}<tr><td class="small"><a href="{{ row.href }}" aria-label="Ledger line {{ row.id }}, {{ row.when }}">{{ row.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: row.sentence_parts} only %}</td><td>{{ row.money_in_label }}</td><td>{{ row.money_out_label }}</td><td>{{ row.wallet_change_label }}</td></tr>{% endfor %}{% endblock %}
 		{% endembed %}
 		{% else %}{{ ui('feedback.empty', {summary: 'No other line belongs with this one.'}) }}{% endif %}
 	{% endblock %}{% endembed %}</section>

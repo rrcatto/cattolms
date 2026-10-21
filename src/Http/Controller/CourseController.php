@@ -69,16 +69,14 @@ final class CourseController extends BaseController
         }
         $category = $this->courses->browsableCategory(trim((string) $this->param('slug')));
         $search = trim((string) ($this->request()->query->get(PlatformAdministrationService::searchParam(self::DATASET), '')));
+        // Every published course, a page at a time; a category shows every course in it and in all its
+        // subcategories, and a keyword searches the same scope (owner, 2026-10-19).
         $filter = new CatalogueFilter($category === null ? null : (int) $category['id'], [], $search);
         $base = $category === null ? '/courses' : '/courses/category/' . (string) $category['slug'];
-        $showcase = $category === null && $search === '';
-        // Browsing uses exact membership; a keyword deliberately widens scope to descendants.
-        $total = $search !== '' ? $this->courses->catalogueCount($filter)
-            : ($category === null ? 0 : $this->courses->categoryCourseTotal((int) $category['id']));
-        $pagination = Pagination::catalogue($this->request()->query->get('page'), $total);
-        $courses = $showcase ? $this->courses->decorateCards($this->courses->featuredCourses(12))
-            : ($search !== '' ? $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset)
-                : $this->courses->categoryCoursePage((int) $category['id'], $pagination->toArray()));
+        $pagination = Pagination::catalogue($this->request()->query->get('page'), $this->courses->catalogueCount($filter));
+        $courses = $this->courses->catalogue($filter, $pagination->pageSize, $pagination->offset);
+        $navigation = $this->courses->categoryNavigation($category);
+        $scope = $category === null ? '' : (string) $category['name'] . ($navigation['subcategories'] === [] ? '' : ' and all its subcategories');
 
         return $this->render('courses', [
             'title' => $category === null ? 'Course catalogue' : (string) $category['name'] . ' courses',
@@ -89,13 +87,14 @@ final class CourseController extends BaseController
             'can_favourite' => $this->currentUser() !== null,
             'favourite_return' => $this->requests->getCurrentRequest()?->getRequestUri() ?? $base,
             'workspace' => [
-                'heading' => $search !== '' ? 'Search results' : ($category['name'] ?? 'Featured courses'),
+                'heading' => $search !== '' ? 'Search results' : ($category['name'] ?? 'All courses'),
                 'summary' => $search !== ''
-                    ? ($category === null ? 'Searching all published courses.' : 'Searching ' . $category['name'] . ' and all its subcategories.')
-                    : ($showcase ? 'A selection to get you started. Choose a category above to explore further.' : 'Courses filed directly in this category. Choose a subcategory above to explore further.'),
-                'paginated' => !$showcase,
+                    ? ($category === null ? 'Searching every course.' : 'Searching ' . $scope . '.')
+                    : ($category === null ? 'Every course in the catalogue. Choose a category to narrow the list.' : 'Every course in ' . $scope . '.'),
+                'navigation' => $navigation,
+                'paginated' => true,
                 'empty_heading' => $search !== '' ? 'No courses match your search' : 'No courses to show here yet',
-                'empty_summary' => $search !== '' ? 'Try another term or clear the search.' : 'Choose a category or subcategory to find a course.',
+                'empty_summary' => $search !== '' ? 'Try another term or clear the search.' : 'Choose another category to find a course.',
             ],
             'catalogue_pagination' => PlatformAdministrationService::paginationPayload(
                 self::DATASET, $pagination, $base, 'Courses',
@@ -203,7 +202,7 @@ final class CourseController extends BaseController
         return $this->handle(function () use ($user, $courseId, $period): void {
             $this->platformAdministration->requestCourse($user->id, $courseId, $period, (string) ($_POST['note'] ?? ''));
             $this->flash('success', 'Your course request was sent to your company administrator.');
-            $this->redirect('/account/library?tab=requests');
+            $this->redirect('/account/courses?list=requests');
         }, '/courses');
     }
 
@@ -261,6 +260,8 @@ final class CourseController extends BaseController
             'reviews_pagination' => PlatformAdministrationService::paginationPayload('reviews', $reviewsPagination, '/courses/' . (string) $course['slug'], 'Reviews'),
             'can_review' => $canReview,
             'own_review' => $canReview ? $this->reviews->learnerReview($courseId, $user->id) : null,
+            // The published courses related to this one (owner, 2026-10-20), as catalogue cards.
+            'related_courses' => $this->withFavourites($this->courses->relatedCourseCards($courseId)),
         ]);
     }
 

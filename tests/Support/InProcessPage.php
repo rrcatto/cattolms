@@ -28,7 +28,7 @@ final class InProcessPage
      * @param array<string,mixed> $attributes route attributes such as an id
      * @param array<string,mixed>|null $post a POST body, or null for GET
      * @param array<string,mixed> $query
-     * @return array{status:int,body:string,location:?string}
+     * @return array{status:int,body:string,location:?string,headers:array<string,string>}
      */
     public static function run(?CurrentUser $user, string $controller, string $method, array $attributes = [], ?array $post = null, array $query = []): array
     {
@@ -52,9 +52,11 @@ final class InProcessPage
                 $arguments[] = $type === RequestStack::class ? $stack : $container->get($type);
             }
             $response = $class->newInstanceArgs($arguments)->{$method}();
-            return ['status' => $response->getStatusCode(), 'body' => (string) $response->getContent(), 'location' => $response->headers->get('Location')];
+            $headers = [];
+            foreach ($response->headers->all() as $name => $values) $headers[(string) $name] = implode(', ', array_map('strval', $values));
+            return ['status' => $response->getStatusCode(), 'body' => (string) $response->getContent(), 'location' => $response->headers->get('Location'), 'headers' => $headers];
         } catch (HttpRedirect $redirect) {
-            return ['status' => $redirect->status, 'body' => '', 'location' => $redirect->path];
+            return ['status' => $redirect->status, 'body' => '', 'location' => $redirect->path, 'headers' => []];
         } finally {
             [$_POST, $_GET] = [$savedPost, $savedGet];
             $identity->setValue($auth, $previous);

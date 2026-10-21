@@ -39,7 +39,7 @@ final class AuthController extends BaseController
         }
         return $this->render('login', [
             'title' => 'Sign in',
-            'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/library')),
+            'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses')),
             'email' => (string) ($_GET['email'] ?? ''),
         ]);
     }
@@ -48,7 +48,7 @@ final class AuthController extends BaseController
     public function registerForm(): Response
     {
         if ($this->currentUser() !== null) $this->redirect('/account');
-        return $this->render('register', ['title' => 'Register', 'email' => (string) ($_GET['email'] ?? ''), 'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/library'))]);
+        return $this->render('register', ['title' => 'Register', 'email' => (string) ($_GET['email'] ?? ''), 'return_path' => $this->safeReturnPath((string) ($_GET['return'] ?? '/account/courses'))]);
     }
 
     #[Route('/register', name: 'auth_register', methods: ['POST'])]
@@ -56,7 +56,7 @@ final class AuthController extends BaseController
     {
         $this->requireCsrf();
         try {
-            $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/library')));
+            $this->auth->requestRegistration($_POST, $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses')));
         } catch (\Throwable $e) {
             $this->flash('danger', $e->getMessage());
             $this->redirect('/register?email=' . rawurlencode((string) ($_POST['email'] ?? '')));
@@ -73,7 +73,7 @@ final class AuthController extends BaseController
     {
         $this->requireCsrf();
         $email = (string) ($_POST['email'] ?? '');
-        $returnPath = $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/library'));
+        $returnPath = $this->safeReturnPath((string) ($_POST['return_path'] ?? '/account/courses'));
         try {
             $this->auth->requestLogin($email, $returnPath);
         } catch (UnknownLoginEmailException $e) {
@@ -96,6 +96,13 @@ final class AuthController extends BaseController
 
 
 
+    /** A demo site's new account, waiting for ADMIN's approval (owner, 2026-10-21). */
+    #[Route('/register/awaiting-approval', name: 'auth_awaiting_approval', methods: ['GET'])]
+    public function awaitingApproval(): Response
+    {
+        return $this->render('register-awaiting', ['title' => 'Waiting for approval']);
+    }
+
     #[Route('/login/sent', name: 'auth_sent', methods: ['GET'])]
     public function sent(): Response
     {
@@ -117,6 +124,8 @@ final class AuthController extends BaseController
         return $this->handle(function () use ($token): void {
             try { $returnPath = $this->auth->consumeLogin($token); }
             catch (\RuntimeException $loginError) { $returnPath = $this->auth->consumeRegistration($token); }
+            // A demo site's new account waits for approval and is not signed in (owner, 2026-10-21).
+            if ($returnPath === \CattoLearning\Auth\AuthService::AWAITING_APPROVAL_PATH) $this->redirect($returnPath);
             session_regenerate_id(true);
             $this->flash('success', 'You are signed in.');
             $this->redirect($returnPath);
@@ -136,6 +145,6 @@ final class AuthController extends BaseController
 
     private function safeReturnPath(string $path): string
     {
-        return str_starts_with($path, '/') && !str_starts_with($path, '//') ? $path : '/account/library';
+        return str_starts_with($path, '/') && !str_starts_with($path, '//') ? $path : '/account/courses';
     }
 }

@@ -10,17 +10,18 @@
 {% block page_body %}
 	{% set ph_back_href = '/admin/commerce/orders' %}{% set ph_back_label = 'Orders & Payments' %}
 	{% set ph_title = 'Order CL-' ~ '%08d'|format(order.id) %}
-	{% set ph_lead = 'Account ' ~ account_reference ~ ' · ' ~ (snapshot.company_name|default('') ?: snapshot.purchaser_name) %}
+	{# The order's account under its number, once, each detail on its own line (owner, 2026-10-21); elsewhere on the page the buyer is their name alone. #}
+	{% if snapshot.company_name|default('') %}{% set ph_lead %}Account {{ account_reference }} · {{ snapshot.company_name }}<br>Placed by {{ ui('data.person', purchaser|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead %}{{ ui('data.person', purchaser|merge({full: true})) }}{% endset %}{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'What happened', heading_level: 2}) }}
 			{% if snapshot.simulation|default(false) %}{{ ui('feedback.notice', {tone: 'warning', heading: site_simulation}) }}{% endif %}
 			<p data-order-status>{{ ui('feedback.badge', {label: story.status.label, tone: story.status.tone}) }}{% if story.status.note %} {{ story.status.note }}{% endif %}</p>
-			{% for sentence in story.summary %}
-				<p>{{ sentence }}</p>
+			{% for sentence in story.summary_parts %}
+				<p>{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: sentence} only %}</p>
 			{% endfor %}
-			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: story.next.tone, heading: story.next.heading})} %}{% block body %} {{ story.next.text }}{% endblock %}{% endembed %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: story.next.tone, heading: story.next.heading})} %}{% block body %} {% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: story.next.parts} only %}{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}
 	</section>
 	{% if can_confirm and payment_method == 'eft' and order.state in ['awaiting_payment','cancelled'] %}
@@ -60,7 +61,7 @@
 			{% block body %}{% for item in items %}<tr><td class="cell-text">{{ item.product_type == 'company_credit' ? item.quantity ~ ' course credits: ' : '' }}{{ item.title }}{% if item.is_bundle %}{% if item.grants %}{% for grant in item.grants %}<br><span class="small">{{ grant.title }}: {{ grant.outcome }}{{ grant.state == 'revoked' ? ' (withdrawn)' : '' }}</span>{% endfor %}{% else %}<br><span class="small">Includes {{ item.includes }}</span>{% endif %}{% endif %}</td><td>{{ item.access_period_seconds // 86400 }} days</td><td>{{ item.amount_label }}</td><td>{{ item.discount_label ?: '—' }}</td><td>{{ item.refunded_minor > 0 ? item.refunded_label : '—' }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{{ ui('data.key-value-list', {items: totals}) }}
-			{% if snapshot.promotion|default(null) %}<p class="help">Promotion {{ snapshot.promotion.code }} ({{ snapshot.promotion.name }}) took {{ snapshot.promotion.label }} off {{ promotion_eligible_label }} of courses. Each course can be refunded up to what was paid for it.</p>{% endif %}
+			{% if snapshot.promotion|default(null) %}<p class="help">Promotion {{ snapshot.promotion.code }} ({{ snapshot.promotion.name }}){{ snapshot.promotion.automatic|default(false) ? ', applied automatically by the cart,' : '' }} took {{ snapshot.promotion.label }} off {{ promotion_eligible_label }} of courses. Each course can be refunded up to what was paid for it.</p>{% endif %}
 		{% endblock %}{% endembed %}
 	</section>
 	<section class="cl-page-section">
@@ -87,14 +88,14 @@
 			{% if story.ledger %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'When', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 42, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Money in'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 13, label: 'Money out'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Wallet credit', wide: true}} %}</tr>{% endblock %}
-			{% block body %}{% for line in story.ledger %}<tr data-order-record="ledger"><td class="small">{{ line.when }}</td><td class="cell-text"><a href="{{ line.href }}">{{ line.sentence }}</a></td><td>{{ line.money_in }}</td><td>{{ line.money_out }}</td><td>{{ line.wallet }}</td></tr>{% endfor %}{% endblock %}
+			{% block body %}{% for line in story.ledger %}<tr data-order-record="ledger"><td class="small"><a href="{{ line.href }}">{{ line.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: line.sentence_parts} only %}</td><td>{{ line.money_in }}</td><td>{{ line.money_out }}</td><td>{{ line.wallet }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p>No money has moved for this order yet.</p>{% endif %}
 			<h3 class="h5">Payment Events</h3>
 			{% if story.payment_events %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'When', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 64, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Amount'}} %}</tr>{% endblock %}
-			{% block body %}{% for event in story.payment_events %}<tr data-order-record="payment"><td class="small">{{ event.when }}</td><td class="cell-text"><a href="{{ event.href }}">{{ event.sentence }}</a></td><td>{{ event.amount }}</td></tr>{% endfor %}{% endblock %}
+			{% block body %}{% for event in story.payment_events %}<tr data-order-record="payment"><td class="small"><a href="{{ event.href }}">{{ event.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: event.sentence_parts} only %}</td><td>{{ event.amount }}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p>No payment has been started for this order yet.</p>{% endif %}
 			{% endif %}
@@ -102,7 +103,7 @@
 			{% if story.timeline %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'When'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 62, label: 'What happened'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 20, label: 'By', wide: true}} %}</tr>{% endblock %}
-			{% block body %}{% for step in story.timeline %}<tr data-order-step data-order-record="trail"><td class="small">{{ step.when }}</td><td class="cell-text"><a href="{{ step.href }}">{{ step.text }}</a></td><td class="small">{{ step.by }}</td></tr>{% endfor %}{% endblock %}
+			{% block body %}{% for step in story.timeline %}<tr data-order-step data-order-record="trail"><td class="small"><a href="{{ step.href }}">{{ step.when }}</a></td><td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: step.text_parts} only %}</td><td class="small">{% if step.by_person %}{{ ui('data.person', step.by_person) }}{% else %}{{ step.by }}{% endif %}</td></tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			{% else %}<p>Nothing has been recorded for this order yet.</p>{% endif %}
 		{% endblock %}{% endembed %}
@@ -121,7 +122,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Customer', heading_level: 2, summary: 'As they were when the order was placed.'}) }}
 			{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
-				<div>{{ ui('data.key-value-list', {items: [{label: 'Account reference', value: account_reference}, {label: 'Name', value: snapshot.purchaser_name}, {label: 'Email', value: snapshot.purchaser_email}]|merge(snapshot.company_name|default('') ? [{label: 'Bought for', value: snapshot.company_name}] : [])}) }}</div>
+				<div><p data-order-purchaser><strong>{{ snapshot.company_name|default('') ? 'Placed by' : 'Customer' }}:</strong> {{ ui('data.person', purchaser) }}</p>{% if snapshot.company_name|default('') %}{{ ui('data.key-value-list', {items: [{label: 'Bought for', value: snapshot.company_name}, {label: 'Company account reference', value: account_reference}]}) }}{% endif %}</div>
 				<div><h3 class="h5">Billed to</h3>{% include '@platform/partials/billing-address.html.twig' %}</div>
 			{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}
@@ -131,7 +132,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Refunds', heading_level: 2, summary: 'The Refund Policy refunds a course only before it has started, within ' ~ refund_window ~ ' of the purchase. Every course starts when it is paid, so a refund outside the policy needs a written reason.'}) }}
 			{% for refund in refunds %}
-				<p data-refund-id="{{ refund.id }}"><strong>{{ refund.approved_at|date('j M Y') }}:</strong> {{ refund.actor_name }} refunded {{ refund.amount_label }} as {{ refund.destination == 'money_back' ? 'money back' : 'wallet credit' }}{% if refund.wallet_part_minor > 0 %}, {{ refund.wallet_part_label }} of it back to the wallet it was paid from{% endif %}{% for line in refund.deduction_lines %}, less {{ line }}{% endfor %}. {% if refund.payout_paid_at %}Paid back on {{ refund.payout_paid_at|date('j M Y') }}, reference {{ refund.payout_reference }}.{% elseif refund.to_pay %}{{ ui('feedback.badge', {label: 'To pay by ' ~ refund.payout_due_at|date('j M Y'), tone: 'warning', size: 'small'}) }}{% endif %}<br><span class="small">Reason: {{ refund.reason }}{% if refund.override_reason %} · Outside the Refund Policy ({{ refund.policy_refusal }}) · Override reason: {{ refund.override_reason }}{% endif %}</span></p>
+				<p data-refund-id="{{ refund.id }}"><strong>{{ refund.approved_at|date('j M Y') }}:</strong> {{ ui('data.person', refund.actor_person) }} refunded {{ refund.amount_label }} as {{ refund.destination == 'money_back' ? 'money back' : 'wallet credit' }}{% if refund.wallet_part_minor > 0 %}, {{ refund.wallet_part_label }} of it back to the wallet it was paid from{% endif %}{% for line in refund.deduction_lines %}, less {{ line }}{% endfor %}. {% if refund.payout_paid_at %}Paid back on {{ refund.payout_paid_at|date('j M Y') }}, reference {{ refund.payout_reference }}.{% elseif refund.to_pay %}{{ ui('feedback.badge', {label: 'To pay by ' ~ refund.payout_due_at|date('j M Y'), tone: 'warning', size: 'small'}) }}{% endif %}<br><span class="small">Reason: {{ refund.reason }}{% if refund.override_reason %} · Outside the Refund Policy ({{ refund.policy_refusal }}) · Override reason: {{ refund.override_reason }}{% endif %}</span></p>
 				{% if refund.to_pay and can_refund %}
 				<form action="/admin/commerce/refunds/{{ refund.id }}/payout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 					<p>{{ refund.payout_instruction }}</p>

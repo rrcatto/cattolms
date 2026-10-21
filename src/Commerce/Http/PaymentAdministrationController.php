@@ -97,6 +97,7 @@ final class PaymentAdministrationController extends BaseController
             $refund['deduction_lines']=array_map(static fn(array $d): string => $d['label'].': '.Money::strictMinorUnits((int)$d['amount_minor'],(string)$refund['currency'])->format(),CommerceRepository::decode((string)$refund['deductions']));
             $refund['to_pay']=$refund['destination']==='money_back' && (int)$refund['net_minor']>0 && $refund['payout_paid_at']===null;
             $refund['payout_instruction']=$refund['to_pay'] ? RefundAdministrationService::payoutInstruction($refund) : '';
+            $refund['actor_person']=\CattoLearning\Commerce\Application\MoneyRecords::person((int)$refund['actor_user_id'],(string)$refund['actor_name'],(string)($refund['actor_reference'] ?? ''),(string)($refund['actor_email'] ?? ''));
         }
         unset($refund);
         $owner=WalletOwner::forOrder($order);
@@ -117,7 +118,10 @@ final class PaymentAdministrationController extends BaseController
             'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
             'wallet_balance_label'=>$actor->hasPermission('PLATFORM.WALLET.VIEW') ? Money::ofMinorUnits($this->wallets->balance($owner,(string)$order['currency']),(string)$order['currency'])->format() : null,
             'wallet_href'=>'/admin/wallets/'.($owner->isCompany() ? 'company/'.$owner->companyId : 'person/'.$owner->userId),
-            'account_reference'=>AccountReference::format($reference),'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),
+            'account_reference'=>AccountReference::format($reference),
+            // The buyer as a person: the name and email the order was placed under, their account reference and their account (owner, 2026-10-21).
+            'purchaser'=>\CattoLearning\Commerce\Application\MoneyRecords::person((int)$order['purchaser_user_id'],(string)($snapshot['purchaser_name'] ?? ''),$this->records->userAccountReference((int)$order['purchaser_user_id']),(string)($snapshot['purchaser_email'] ?? '')),
+            'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),
             'paid_label'=>Money::ofMinorUnits($this->records->paidTotal($id),(string)$order['currency'])->format(),
             'payment_method'=>$this->records->paymentMethod($id),'can_confirm'=>$actor->hasPermission('PLATFORM.PAYMENT.MANAGE') && $actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),
             'can_reconcile'=>$actor->hasPermission('PLATFORM.PAYMENT.RECONCILE'),'can_refund'=>$actor->hasPermission('PLATFORM.REFUND.MANAGE'),'refund_window'=>$this->settings->refundWindow()->words(),

@@ -13,7 +13,7 @@ use CattoLearning\Support\Uuid;
  */
 final class BundleRepository
 {
-    private const WITH_OFFER = 'SELECT b.*, o.id AS offer_id, o.price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active
+    private const WITH_OFFER = 'SELECT b.*, o.id AS offer_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active
         FROM bundles b LEFT JOIN bundle_offers o ON o.bundle_id = b.id';
 
     public function __construct(private readonly Database $db) {}
@@ -133,14 +133,14 @@ final class BundleRepository
     }
 
     /** Saves the bundle's one offer in place; orders keep the price they were placed at in their snapshot. */
-    public function saveOffer(int $bundleId, int $priceMinor, string $currency, int $periodSeconds, bool $active, int $actorId, string $now): void
+    public function saveOffer(int $bundleId, int $priceMinor, string $currency, int $periodSeconds, bool $active, int $actorId, string $now, ?int $wasMinor = null): void
     {
         $this->db->executeStatement(
-            'INSERT INTO bundle_offers(public_id,bundle_id,price_minor_units,currency_code,access_period_seconds,is_active,created_at,updated_at,created_by_user_id,updated_by_user_id)
-             VALUES (:public,:bundle,:price,:currency,:period,:active,:now,:now,:actor,:actor)
-             ON CONFLICT (bundle_id) DO UPDATE SET price_minor_units=EXCLUDED.price_minor_units, currency_code=EXCLUDED.currency_code,
+            'INSERT INTO bundle_offers(public_id,bundle_id,price_minor_units,was_price_minor_units,currency_code,access_period_seconds,is_active,created_at,updated_at,created_by_user_id,updated_by_user_id)
+             VALUES (:public,:bundle,:price,:was,:currency,:period,:active,:now,:now,:actor,:actor)
+             ON CONFLICT (bundle_id) DO UPDATE SET price_minor_units=EXCLUDED.price_minor_units, was_price_minor_units=EXCLUDED.was_price_minor_units, currency_code=EXCLUDED.currency_code,
                 access_period_seconds=EXCLUDED.access_period_seconds, is_active=EXCLUDED.is_active, updated_at=EXCLUDED.updated_at, updated_by_user_id=EXCLUDED.updated_by_user_id',
-            ['public' => Uuid::v4(), 'bundle' => $bundleId, 'price' => $priceMinor, 'currency' => $currency, 'period' => $periodSeconds, 'active' => $active ? 't' : 'f', 'now' => $now, 'actor' => $actorId]
+            ['public' => Uuid::v4(), 'bundle' => $bundleId, 'price' => $priceMinor, 'was' => $wasMinor, 'currency' => $currency, 'period' => $periodSeconds, 'active' => $active ? 't' : 'f', 'now' => $now, 'actor' => $actorId]
         );
     }
 
@@ -164,8 +164,9 @@ final class BundleRepository
     public function sales(int $bundleId, int $limit, int $offset): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT o.id AS order_id, o.state, o.placed_at, o.currency, i.id AS item_id, i.amount_minor, i.discount_minor, u.display_name AS purchaser_name
-               FROM commerce_order_items i JOIN commerce_orders o ON o.id=i.order_id JOIN users u ON u.id=o.purchaser_user_id
+            'SELECT o.id AS order_id, o.state, o.placed_at, o.currency, i.id AS item_id, i.amount_minor, i.discount_minor, u.display_name AS purchaser_name,
+                    o.purchaser_user_id, u.account_reference AS purchaser_reference, ue.email AS purchaser_email
+               FROM commerce_order_items i JOIN commerce_orders o ON o.id=i.order_id JOIN users u ON u.id=o.purchaser_user_id LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary
               WHERE i.bundle_id=:id ORDER BY o.id DESC LIMIT :limit OFFSET :offset',
             ['id' => $bundleId, 'limit' => $limit, 'offset' => $offset]
         );
@@ -190,7 +191,7 @@ final class BundleRepository
     {
         [$where, $params] = self::where($filters);
         return $this->db->fetchAllAssociative(
-            'SELECT b.*, o.price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
+            'SELECT b.*, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
                     (SELECT COUNT(*) FROM bundle_courses bc WHERE bc.bundle_id=b.id) AS course_count,
                     (SELECT COUNT(*) FROM commerce_order_items i WHERE i.bundle_id=b.id) AS sales
                FROM bundles b LEFT JOIN bundle_offers o ON o.bundle_id=b.id' . $where . ' ORDER BY b.updated_at DESC, b.id DESC LIMIT :limit OFFSET :offset',
@@ -211,7 +212,7 @@ final class BundleRepository
     public function published(int $limit, int $offset): array
     {
         return $this->db->fetchAllAssociative(
-            "SELECT b.*, o.id AS offer_id, o.price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
+            "SELECT b.*, o.id AS offer_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
                     (SELECT COUNT(*) FROM bundle_courses bc WHERE bc.bundle_id=b.id) AS course_count
                FROM bundles b LEFT JOIN bundle_offers o ON o.bundle_id=b.id
               WHERE b.status='published' ORDER BY b.published_at DESC NULLS LAST, b.title, b.id LIMIT :limit OFFSET :offset",

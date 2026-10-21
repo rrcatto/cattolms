@@ -1,6 +1,7 @@
 {% extends layout %}
 {% block page_body %}
-{% if admin_section.key == 'ui_components' %}{{ importmap() }}{% endif %}
+{# Courses drag into the catalogue's order with a Stimulus controller (course_order, owner 2026-10-20). #}
+{% if admin_section.key in ['ui_components', 'courses'] %}{{ importmap() }}{% endif %}
 	{% set ph_kicker = 'Administration' %}
 	{% set ph_title = admin_section.label %}
 	{% set ph_lead = admin_section.description %}

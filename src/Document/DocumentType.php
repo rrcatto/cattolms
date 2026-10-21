@@ -13,6 +13,8 @@ type; a type only decides its placeholders, its sample data, its default templat
 page settings. A new document type is a new case here, not a new template system.
 
 Changelog:
+2026/10/19 SAST
+- Transcript (owner, 2026-10-19): a certificate's public transcript of marks, an A4 portrait page.
 2026/10/07 SAST
 - A certificate is an A4 landscape sheet with no page margins; its design places the background across the sheet.
 2026/10/06 SAST
@@ -26,6 +28,7 @@ namespace CattoLearning\Document;
 enum DocumentType: string
 {
     case Certificate = 'certificate';
+    case Transcript = 'transcript';
     case Invoice = 'invoice';
     case Receipt = 'receipt';
     case CreditNote = 'credit_note';
@@ -34,6 +37,7 @@ enum DocumentType: string
     {
         return match ($this) {
             self::Certificate => 'Certificate',
+            self::Transcript => 'Transcript',
             self::Invoice => 'Invoice',
             self::Receipt => 'Receipt',
             self::CreditNote => 'Credit note',
@@ -42,7 +46,8 @@ enum DocumentType: string
 
     /**
      * A certificate is an A4 landscape sheet with no page margins: its design places its background
-     * picture across the whole sheet and keeps the words inside it. Financial documents are A4 portrait.
+     * picture across the whole sheet and keeps the words inside it. Transcripts and financial documents
+     * are A4 portrait.
      */
     public function defaultSettings(): PageSettings
     {

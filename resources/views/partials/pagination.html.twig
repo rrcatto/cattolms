@@ -1,17 +1,22 @@
+{#
+	The shared pagination row, kept short so it fits one line (owner, 2026-10-21: "be ECONOMICAL with how many chars you
+	splash on the page"): icons for first, previous, next and last (their words for screen readers), "Pg", "Show Pg", the
+	page count said once, and the rows drop-down before its words.
+#}
 {% set pg_id = pg.prefix ~ '-' ~ pg_position|default('single') %}
 <nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}">
 	<div class="pagination-summary" aria-live="polite">
-		{% if pg.total_pages > 1 %}<span>Showing {{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
-		<span class="pagination-pages">Page {{ pg.page }} of {{ pg.total_pages }}</span>
+		{% if pg.total_pages > 1 %}<span>{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
+		<span class="pagination-pages">Pg {{ pg.page }} of {{ pg.total_pages }}</span>
 	</div>
 	{% if pg.has_pages %}
 		<div class="pagination-controls">
 			{% if pg.has_previous %}
-				{{ ui('action.link', {label: '« First', variant: 'secondary', size: 'small', href: (pg.first_href), aria_label: 'First page', get: (pg.first_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', push_url: true}) }}
-				{{ ui('action.link', {label: 'Previous', variant: 'secondary', size: 'small', href: (pg.previous_href), aria_label: 'Previous page', get: (pg.previous_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', rel: 'prev', push_url: true}) }}
+				{{ ui('action.link', {label: 'First page', icon: 'page-first', icon_only: true, variant: 'secondary', size: 'small', href: (pg.first_href), aria_label: 'First page', get: (pg.first_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', push_url: true}) }}
+				{{ ui('action.link', {label: 'Previous page', icon: 'page-previous', icon_only: true, variant: 'secondary', size: 'small', href: (pg.previous_href), aria_label: 'Previous page', get: (pg.previous_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', rel: 'prev', push_url: true}) }}
 			{% else %}
-				<span class="pagination-state" aria-disabled="true">&laquo; First</span>
-				<span class="pagination-state" aria-disabled="true">Previous</span>
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-first', decorative: true}) }}<span class="visually-hidden">First page</span></span>
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-previous', decorative: true}) }}<span class="visually-hidden">Previous page</span></span>
 			{% endif %}
 			<ol class="pagination-pages-list">
 				{% for pg_item in pg.pages %}
@@ -29,11 +34,11 @@
 				{% endfor %}
 			</ol>
 			{% if pg.has_next %}
-				{{ ui('action.link', {label: 'Next', variant: 'secondary', size: 'small', href: (pg.next_href), aria_label: 'Next page', get: (pg.next_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', rel: 'next', push_url: true}) }}
-				{{ ui('action.link', {label: 'Last »', variant: 'secondary', size: 'small', href: (pg.last_href), aria_label: 'Last page', get: (pg.last_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', push_url: true}) }}
+				{{ ui('action.link', {label: 'Next page', icon: 'page-next', icon_only: true, variant: 'secondary', size: 'small', href: (pg.next_href), aria_label: 'Next page', get: (pg.next_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', rel: 'next', push_url: true}) }}
+				{{ ui('action.link', {label: 'Last page', icon: 'page-last', icon_only: true, variant: 'secondary', size: 'small', href: (pg.last_href), aria_label: 'Last page', get: (pg.last_href), target: '#' ~ (pg.region), select: '#' ~ (pg.results), indicator: 'closest .pagination-row', push_url: true}) }}
 			{% else %}
-				<span class="pagination-state" aria-disabled="true">Next</span>
-				<span class="pagination-state" aria-disabled="true">Last &raquo;</span>
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-next', decorative: true}) }}<span class="visually-hidden">Next page</span></span>
+				<span class="pagination-state" aria-disabled="true">{{ ui('icon', {name: 'page-last', decorative: true}) }}<span class="visually-hidden">Last page</span></span>
 			{% endif %}
 		</div>
 		<form class="pagination-jump" method="get" action="{{ pg.base }}"
@@ -43,12 +48,10 @@
 				<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
 			{% endfor %}
 			<input type="hidden" name="{{ pg.size_param }}" value="{{ pg.page_size }}">
-			<label for="{{ pg_id }}-jump-page">Jump to page</label>
+			<label for="{{ pg_id }}-jump-page">Show Pg</label>
 			<input id="{{ pg_id }}-jump-page" name="{{ pg.page_param }}" type="number" inputmode="numeric"
-		       min="1" max="{{ pg.total_pages }}" step="1" value="{{ pg.page }}"
-		       aria-describedby="{{ pg_id }}-jump-help">
+		       min="1" max="{{ pg.total_pages }}" step="1" value="{{ pg.page }}" data-digits="{{ (pg.total_pages ~ '')|length }}">
 			{{ ui('action.button', {label: 'Go', variant: 'secondary', size: 'small', type: 'submit'}) }}
-			<span class="help" id="{{ pg_id }}-jump-help">of {{ pg.total_pages }}</span>
 		</form>
 		<form class="pagination-page-size" method="get" action="{{ pg.base }}"
 	      hx-get="{{ pg.base }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
@@ -57,12 +60,13 @@
 			{% for filter_key, filter_value in pg.filters %}
 				<input type="hidden" name="{{ filter_key }}" value="{{ filter_value }}">
 			{% endfor %}
-			<label for="{{ pg_id }}-page-size">Rows per page</label>
+			{# The drop-down first, its words after (owner, 2026-10-21): if the row scrolls, the control is not the part lost. #}
 			<select id="{{ pg_id }}-page-size" name="{{ pg.size_param }}" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
 			{% for size in pg.page_sizes %}
 				<option value="{{ size }}" {{ pg.page_size == size ? 'selected' : '' }}>{{ size }}</option>
 			{% endfor %}
 			</select>
+			<label for="{{ pg_id }}-page-size">Rows per pg</label>
 			<noscript>
 				{{ ui('action.button', {label: 'Apply', variant: 'secondary', size: 'small', type: 'submit'}) }}
 			</noscript>

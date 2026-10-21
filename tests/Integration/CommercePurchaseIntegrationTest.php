@@ -294,12 +294,12 @@ final class CommercePurchaseIntegrationTest extends TestCase
     public function testGuestCartMergesOnceAfterSignIn(): void
     {
         $_SESSION['guest_cart'] = [];
-        $cart = new CartService($this->auth(null), $this->orders, $this->records);
+        $cart = new CartService($this->auth(null), $this->orders, $this->records, PromotionFixture::service($this->db, $this->clock));
         $cart->change($this->variant);
         $cart->change($this->variant);
         self::assertSame(1, $cart->summary()['count']);
         self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_carts WHERE user_id=:user', ['user'=>$this->actor->id]));
-        $signedIn = new CartService($this->auth($this->actor), $this->orders, $this->records);
+        $signedIn = new CartService($this->auth($this->actor), $this->orders, $this->records, PromotionFixture::service($this->db, $this->clock));
         self::assertSame(1, $signedIn->summary()['count']);
         self::assertSame(1, $signedIn->summary()['count']);
         self::assertArrayNotHasKey('guest_cart', $_SESSION);
@@ -527,7 +527,7 @@ final class CommercePurchaseIntegrationTest extends TestCase
         catch (\RuntimeException $e) { self::assertSame(OrderService::COMPANY_ACCOUNT,$e->getMessage()); }
         self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM commerce_orders WHERE purchaser_user_id=:u',['u'=>$this->actor->id]));
         self::assertFalse($this->records->hasOpenEnrolment($this->actor->id,$this->course));
-        self::assertFalse((new CartService($this->auth($this->actor),$this->orders,$this->records))->summary()['buyer'],'It is shown no cart.');
+        self::assertFalse((new CartService($this->auth($this->actor),$this->orders,$this->records,PromotionFixture::service($this->db,$this->clock)))->summary()['buyer'],'It is shown no cart.');
     }
 
     public function testTheCoursePageOffersACompanyAccountOnlyARequestAndAPrivateAccountOnlyBuying(): void

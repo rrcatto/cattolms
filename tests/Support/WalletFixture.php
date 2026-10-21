@@ -17,12 +17,14 @@ final class WalletFixture
     /**
      * The commerce settings at their defaults for this test, whatever ADMIN has saved on the site (the
      * owner's database keeps a 3% Stitch fee, for example): the saved overrides are removed inside the
-     * test's own transaction, which is rolled back afterwards.
+     * test's own transaction, which is rolled back afterwards. The site's automatic promotions (owner,
+     * 2026-10-20) are switched off the same way, so one ADMIN made cannot change a test's totals.
      */
     public static function defaults(Database $db): void
     {
         if (!$db->isTransactionActive()) throw new \LogicException('Clear the commerce settings only inside the test\'s own transaction.');
         $db->executeStatement("DELETE FROM app_options WHERE option_key LIKE 'commerce.%'");
+        $db->executeStatement('UPDATE promotions SET active = FALSE WHERE applies_automatically AND active');
     }
 
     public static function settings(Database $db): CommerceSettings

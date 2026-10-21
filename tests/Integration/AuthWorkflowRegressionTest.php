@@ -12,6 +12,7 @@ Protects the passwordless authentication lifecycle, including mail-failure clean
 
 Changelog:
 2026/10/19 SAST
+- Registration needs the age tick and records when it was ticked (owner, 2026-10-19).
 - The failed-delivery, retry and registration tests remove the account they make: they remembered only its email, so every run left three accounts in the development database.
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
@@ -63,7 +64,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             $fixture->rememberUser((int) $container->get(UserRepository::class)->createManagedUser($email)['id']);
 
             try {
-                $auth->requestLogin($email, '/account/library');
+                $auth->requestLogin($email, '/account/courses');
                 self::fail('Expected mail delivery failure.');
             } catch (RuntimeException $e) {
                 self::assertSame('The sign-in email could not be sent.', $e->getMessage());
@@ -160,7 +161,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             self::assertNotSame('', $token);
 
             $returnPath = $auth->consumeLogin($token);
-            self::assertSame('/account/library', $returnPath);
+            self::assertSame('/account/courses', $returnPath);
 
             $rows = $db->fetchAllAssociative(
                 'SELECT u.id,u.created_at,u.last_login_at,ue.verified_at FROM users u JOIN user_emails ue ON ue.user_id=u.id WHERE ue.email=:email AND ue.is_primary=TRUE',
@@ -206,7 +207,7 @@ final class AuthWorkflowRegressionTest extends TestCase
             $fixture->rememberUser((int) $container->get(UserRepository::class)->createManagedUser($email)['id']);
             $failedAuth = $this->authService($container, new FakeMailer(true));
             try {
-                $failedAuth->requestLogin($email, '/account/library');
+                $failedAuth->requestLogin($email, '/account/courses');
                 self::fail('Expected first mail delivery attempt to fail.');
             } catch (RuntimeException $e) {
                 self::assertSame('The sign-in email could not be sent.', $e->getMessage());
@@ -216,7 +217,7 @@ final class AuthWorkflowRegressionTest extends TestCase
 
             $mailer = new FakeMailer();
             $retryAuth = $this->authService($container, $mailer);
-            $retryAuth->requestLogin($email, '/account/library');
+            $retryAuth->requestLogin($email, '/account/courses');
             self::assertCount(1, $mailer->messages);
             self::assertSame('magic_link', $mailer->messages[0]['type']);
             $afterRetry = $db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM auth_login_tokens WHERE email=:email AND used_at IS NULL', ['email'=>$email]);
@@ -235,12 +236,29 @@ final class AuthWorkflowRegressionTest extends TestCase
         $mailer = new FakeMailer();
         try {
             $auth = $this->authService($container, $mailer);
-            $auth->requestRegistration(['account_type'=>'individual','first_name'=>'Reg','middle_names'=>'','last_name'=>'Tester','email'=>$email]);
+            // Adults only (owner, 2026-10-20): a date of birth is required, and someone under 18 is refused.
+            $person = ['account_type'=>'individual','first_name'=>'Reg','middle_names'=>'','last_name'=>'Tester','email'=>$email];
+            $seventeen = (new \DateTimeImmutable('-17 years'))->format('Y-m-d');
+            $eighteenToday = (new \DateTimeImmutable('-18 years'))->format('Y-m-d');
+            $tomorrow = (new \DateTimeImmutable('+1 day'))->format('Y-m-d');
+            foreach (['' => 'Enter your date of birth.', '14/03/1990' => 'Enter your date of birth as a real date, for example 1990-03-14.', '1990-02-30' => 'Enter your date of birth as a real date, for example 1990-03-14.',
+                $tomorrow => 'A date of birth cannot be in the future.', '1890-01-01' => 'Check the year of your date of birth.', $seventeen => \CattoLearning\Auth\AdultAge::REFUSED] as $born => $message) {
+                try {
+                    $auth->requestRegistration($person + ['date_of_birth' => (string) $born]);
+                    self::fail('Refused: ' . $born);
+                } catch (\InvalidArgumentException $refused) {
+                    self::assertSame($message, $refused->getMessage());
+                }
+            }
+            self::assertCount(0, $mailer->messages, 'Nothing is sent, and nothing is kept, for someone refused.');
+            $auth->requestRegistration($person + ['date_of_birth' => $eighteenToday]);
             self::assertSame(0, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email', ['email'=>$email]));
             parse_str((string)parse_url((string)$mailer->messages[0]['url'], PHP_URL_QUERY), $query);
             $auth->consumeRegistration((string)$query['token']);
             $fixture->rememberUser((int)$db->fetchOne('SELECT user_id FROM user_emails WHERE email=:email', ['email'=>$email]));
             self::assertSame(1, (int)$db->fetchOne('SELECT COUNT(*) FROM user_emails WHERE email=:email AND is_primary=TRUE', ['email'=>$email]));
+            self::assertSame($eighteenToday, $db->fetchOne('SELECT u.birthdate::text FROM users u JOIN user_emails ue ON ue.user_id = u.id WHERE ue.email=:email', ['email'=>$email]), 'Eighteen today registers, and the account keeps the date of birth.');
+            self::assertSame(1, (int)$db->fetchOne("SELECT COUNT(*) FROM audit_log a JOIN user_emails ue ON ue.user_id = a.user_id WHERE ue.email=:email AND a.event_key='user.date_of_birth_given' AND a.metadata->>'when' = 'registration'", ['email'=>$email]));
             $fixture->rememberEmail($email);
         } finally { unset($_COOKIE['catto_learning_session']); $fixture->cleanup(); }
     }
@@ -280,7 +298,7 @@ final class AuthWorkflowRegressionTest extends TestCase
                 );
                 $_SESSION = [];
                 $_POST = ['csrf' => \CattoLearning\Support\Csrf::token(), 'email' => $email,
-                    'first_name' => 'Redirect', 'last_name' => 'Test', 'account_type' => 'individual'];
+                    'first_name' => 'Redirect', 'last_name' => 'Test', 'account_type' => 'individual', 'date_of_birth' => '1990-05-12'];
                 try {
                     $controller->$action();
                     self::fail('Expected a success redirect.');

@@ -8,13 +8,20 @@ Date time: 2026/10/07 SAST
 Version: 0.8.8.10
 
 Description:
-An issued certificate's public verification page and its PDF, addressed by the certificate's public
-id, which is what a learner shares and what a printed certificate's verification address carries.
+An issued certificate's verification page and its PDF, and its transcript's, each addressed by its own
+random code: what a learner shares and what the printed document's verification address carries. Each
+is seen by its learner and, once the learner makes it public, by anyone who has the address.
 The page shows the certificate's details and the certificate itself as its PDF, drawn from what it
 was issued with - its stored data and the design version named on it - through the shared document
 renderer and PDF engine. A revoked certificate's page says so and it has no PDF.
 
 Changelog:
+2026/10/19 SAST
+- Private until the learner makes it public (owner, 2026-10-19): a private certificate or transcript is
+  not found for anyone but its learner; the addresses are 32-digit hex codes; neither page is indexed,
+  cached or sent as a referrer, and only the learner sees the link from the certificate to the transcript.
+- /transcripts/{public_id} and its PDF: a certificate's public transcript, revoked with it. The
+  certificate page shows no result or grade (owner, 2026-10-19).
 2026/10/07 SAST
 - The page shows the certificate as its PDF, the one drawing there is, instead of an HTML copy.
 - Created for certificates on the document template engine (Phase J): the page shows the
@@ -26,8 +33,10 @@ declare(strict_types=1);
 namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Course\Certificate\CertificateAddress;
 use CattoLearning\Course\Certificate\CertificateDocuments;
 use CattoLearning\Course\Certificate\CertificateRepository;
+use CattoLearning\Course\Certificate\CertificateSharing;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,13 +55,13 @@ final class CertificateController extends BaseController
         parent::__construct($auth, $view, $requests);
     }
 
-    #[Route('/certificates/{public_id}', name: 'course_certificate', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]
+    #[Route('/certificates/{public_id}', name: 'course_certificate', requirements: ['public_id' => CertificateAddress::PATTERN], methods: ['GET'])]
     public function show(): Response
     {
         $certificate = $this->certificate();
         $user = $this->currentUser();
         $data = (array) $certificate['document_data'];
-        return $this->render('certificate', [
+        return self::unlisted($this->render('certificate', [
             'title' => 'Certificate verification',
             'certificate' => $certificate,
             'certificate_values' => [
@@ -60,29 +69,98 @@ final class CertificateController extends BaseController
                 'provider' => $data['course.provider'] ?? null,
                 'accreditation' => $data['course.accreditation'] ?? null,
             ],
+            // Only the learner is shown the way to the transcript, and told who can see the page.
+            'is_owner' => CertificateSharing::isOwner($certificate, $user?->id),
             'can_view_designs' => $user !== null && $user->hasPermission('CERTIFICATE.DESIGN.VIEW'),
-        ]);
+            'page_meta' => ['robots' => 'noindex, nofollow'],
+        ]));
     }
 
-    #[Route('/certificates/{public_id}/certificate.pdf', name: 'course_certificate_pdf', requirements: ['public_id' => '[a-zA-Z0-9-]+'], methods: ['GET'])]
+    #[Route('/certificates/{public_id}/certificate.pdf', name: 'course_certificate_pdf', requirements: ['public_id' => CertificateAddress::PATTERN], methods: ['GET'])]
     public function pdf(): Response
     {
         $certificate = $this->certificate();
         if ($certificate['revoked_at'] !== null) {
             throw new NotFoundHttpException('This certificate was revoked.');
         }
-        return new Response($this->documents->pdf($certificate), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="certificate-' . preg_replace('/[^A-Za-z0-9-]/', '', (string) $certificate['certificate_number']) . '.pdf"',
-            'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'private, no-store',
-        ]);
+        return self::pdfResponse($this->documents->pdf($certificate), 'certificate-' . $certificate['certificate_number']);
     }
 
-    /** @return array<string,mixed> */
+    /**
+     * A certificate's transcript (owner, 2026-10-19): every assessment mark and the overall grade.
+     * Revoked with its certificate, when it says so and has no PDF.
+     */
+    #[Route('/transcripts/{public_id}', name: 'course_transcript', requirements: ['public_id' => CertificateAddress::PATTERN], methods: ['GET'])]
+    public function transcript(): Response
+    {
+        $transcript = $this->transcriptRow();
+        return self::unlisted($this->render('transcript', [
+            'title' => 'Transcript verification',
+            'transcript' => $transcript,
+            'values' => (array) $transcript['document_data'],
+            'is_owner' => CertificateSharing::isOwner($transcript, $this->currentUser()?->id),
+            'page_meta' => ['robots' => 'noindex, nofollow'],
+        ]));
+    }
+
+    #[Route('/transcripts/{public_id}/transcript.pdf', name: 'course_transcript_pdf', requirements: ['public_id' => CertificateAddress::PATTERN], methods: ['GET'])]
+    public function transcriptPdf(): Response
+    {
+        $transcript = $this->transcriptRow();
+        if ($transcript['revoked_at'] !== null) {
+            throw new NotFoundHttpException('This transcript was revoked with its certificate.');
+        }
+        return self::pdfResponse($this->documents->pdf($transcript), 'transcript-' . $transcript['transcript_number']);
+    }
+
+    /**
+     * A transcript the viewer may see. A private one is not found for anyone but its learner, exactly as
+     * an address that does not exist, so the answer says nothing about it.
+     *
+     * @return array<string,mixed>
+     */
+    private function transcriptRow(): array
+    {
+        $transcript = $this->certificates->transcriptByPublicId((string) $this->param('public_id'));
+        if ($transcript === null || !CertificateSharing::canSee($transcript, $this->currentUser()?->id)) {
+            throw new NotFoundHttpException('The transcript could not be found.');
+        }
+        return $transcript;
+    }
+
+    /**
+     * A certificate the viewer may see; a private one is not found for anyone but its learner.
+     *
+     * @return array<string,mixed>
+     */
     private function certificate(): array
     {
-        return $this->certificates->byPublicId((string) $this->param('public_id'))
-            ?? throw new NotFoundHttpException('The certificate could not be found.');
+        $certificate = $this->certificates->byPublicId((string) $this->param('public_id'));
+        if ($certificate === null || !CertificateSharing::canSee($certificate, $this->currentUser()?->id)) {
+            throw new NotFoundHttpException('The certificate could not be found.');
+        }
+        return $certificate;
+    }
+
+    /**
+     * Neither page is listed or kept anywhere: search engines are asked not to index it, no browser or
+     * proxy keeps a copy (the learner may make it private at any moment) and no link from it tells another
+     * site its address.
+     */
+    private static function unlisted(Response $response): Response
+    {
+        $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+        $response->headers->set('Cache-Control', 'private, no-store');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        return $response;
+    }
+
+    private static function pdfResponse(string $pdf, string $name): Response
+    {
+        return self::unlisted(new Response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . preg_replace('/[^A-Za-z0-9-]/', '', $name) . '.pdf"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]));
     }
 }

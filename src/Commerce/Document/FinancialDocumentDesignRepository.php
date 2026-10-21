@@ -41,7 +41,7 @@ final class FinancialDocumentDesignRepository
     {
         $rows = $this->db->fetchAllAssociative(
             "SELECT t.id, t.document_type, t.name, t.updated_at, t.published_version_id, v.version_number, v.html, v.css, v.design,
-                    COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS updated_by_name
+                    COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS updated_by_name, t.updated_by_user_id, u.account_reference AS updated_by_reference
                FROM document_templates t
                JOIN document_template_versions v ON v.id = t.published_version_id
                LEFT JOIN users u ON u.id = t.updated_by_user_id

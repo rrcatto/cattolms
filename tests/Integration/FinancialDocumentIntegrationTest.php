@@ -206,7 +206,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $paymentId = $this->payments->purchase($buyer, $card, Uuid::v4(), 'demo_success');
         $payment = $this->records->payment($paymentId);
         $receipt = $this->data($this->only($card, 'receipt'));
-        self::assertSame([(int) $payment['amount_minor'], 'Card (simulated)', $payment['provider_reference'], '2026-10-08'],
+        self::assertSame([(int) $payment['amount_minor'], 'Simulated card (demo site, no money was charged)', $payment['provider_reference'], '2026-10-08'],
             [$receipt['receipt.amount']['minor'], $receipt['receipt.payment_method'], $receipt['receipt.payment_reference'], $receipt['receipt.date']]);
         self::assertArrayNotHasKey('bank.account_number', $receipt);
 
@@ -216,7 +216,7 @@ final class FinancialDocumentIntegrationTest extends TestCase
         $reference = 'FNB-' . strtoupper(bin2hex(random_bytes(4)));
         $bank->confirmBank($admin, $eft, Uuid::v4(), 80000, '2026-10-06T15:30:00+02:00', $reference, 'Matched the bank statement.');
         $receipt = $this->data($this->only($eft, 'receipt'));
-        self::assertSame([80000, 'EFT / bank transfer', $reference, '2026-10-06'],
+        self::assertSame([80000, 'EFT (direct bank transfer)', $reference, '2026-10-06'],
             [$receipt['receipt.amount']['minor'], $receipt['receipt.payment_method'], $receipt['receipt.payment_reference'], $receipt['receipt.date']], 'An EFT was received on its bank date.');
     }
 

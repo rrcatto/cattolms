@@ -97,8 +97,11 @@ const noSideScroll = (page) => page.evaluate(() => document.documentElement.scro
             const entry = page.locator('.cl-review', {hasText: 'Typed in the browser.'});
             await entry.waitFor();
             await entry.getByRole('button', {name: 'Approve'}).click();
-            // The flash message is transient; the emptied queue is the lasting evidence.
-            await page.getByText('No reviews are waiting for moderation.').waitFor();
+            await page.waitForLoadState('networkidle');
+            // The flash message is transient; the review leaving the pending queue is the lasting evidence. Other people's
+            // reviews may be waiting too (the queue is the site's, not the check's), so the queue need not be empty.
+            await page.goto(`${base}/admin/course-reviews`);
+            assert.equal(await page.locator('.cl-review', {hasText: 'Typed in the browser.'}).count(), 0, 'the approved review has left the pending queue');
             await page.goto(`${base}/courses/${state.slug}`);
             await page.getByText('Typed in the browser.').waitFor();
             assert.ok((await page.locator('.cl-rating-summary').first().textContent()).includes('Rated 4.0 out of 5 from 2 reviews'));

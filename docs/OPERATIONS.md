@@ -1,47 +1,29 @@
-# Catto Learning Development Operations
+# Operations
 
-**LMS:** 0.9.5 **Date time:** 2026/10/19 SAST **Runtime:** PHP >=8.5.9 <9.0 (supported floor) · verified on PHP 8.5.10 / PostgreSQL 16.15 **Environment:** disposable TEST/DEV until explicitly declared production
+**LMS:** 0.9.6 **Runtime:** PHP >=8.5.9 <9.0, PostgreSQL 13 or later.
 
-## Current v0.9.5 operational position
+How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
-- **Code.** The active local code is `code/current` (resolving to `code/cattolms-v0.9`) on `dev-v0.9`. Until 2026/10/16 the same code line was `code/cattolms-v0.8` on `dev-v0.8`, which v0.9.0 and v0.9.1 were released from and which is kept for reference. Repointing `code/current` needs the Symfony caches in `runtime/storage/cache/symfony/` deleted and `env_php_1` and `env_commerce-worker_1` restarted: the compiled container holds absolute code paths, and `cache:clear` cannot start with the old one. Annotated tag `v0.9.5` is on GitHub `main` and published as a GitHub release with the source zip (earlier versions have their own releases). Git publication does not deploy the VPS; 0.5.8.3 remains the accepted VPS version.
-- **Data.** All data is disposable test data: drop, reset or re-seed it whenever needed without preserving it first. The development database was last rebuilt on 2026/10/19 from the one canonical baseline (bundled themes, seed names and a popularity recalculation) without the random dataset, at the owner's wish for a clean database: its data is what `tests/Browser/one-learner-scenario.cjs` makes through the pages.
-- **Schema.** One migration, the canonical baseline `database/migrations/20261006120000_create_v088_baseline.php`, creates the whole schema and its reference data (owner instruction, 2026/10/06). While the system is not live a schema change is made in the baseline and the database is rebuilt; there are no incremental migrations, and `tools/validate-release.php` fails with a second migration file. Incremental migrations begin only once the owner declares production. The ACL has 92 permissions (10 `SYSTEM.*`, 82 business) across the five roles.
-- **Financial documents (Phase K, v0.8.9).** The baseline installs the invoice, receipt and credit note templates compiled from the standard financial document design (`FinancialDocumentDesignCompiler`, whose structure is `resources/documents/invoice.html`, `receipt.html`, `credit_note.html` and the shared `financial.css`). After that ADMIN changes the design at Commerce → Financial Documents; each save publishes a new version, and every issued document stores its values and names the version that drew it, so it is drawn the same way however the design, the business details or the customer's details change. Editing a source file changes only new installations, until the database is rebuilt.
-- **Course landing pages (Phase L, v0.9.0).** A course's marketing page is at `/landing/{slug}` and is public only while it and its course are published; its price, rating, reviews and outline are read live, so nothing needs refreshing when a course changes. Its hero picture is served by `/landing/{slug}/picture/{public_id}`, publicly only once the page is published. Every bundled theme's head includes `partials/head-meta.html.twig`, so a theme installed from an older package keeps the fixed site description until it is reinstalled. The ACL is unchanged (92 permissions).
-- **Legal documents and the Site Owner.** `/terms`, `/refunds` and `/privacy` are public pages listed in the footer of every theme. Every seller detail they print comes from the Site Owner (`Configuration\SiteOwner`, owner 2026-10-18): `SITE_OWNER_*` in `.env` (placeholders in `.env.example`), `APP_ADMIN_EMAIL` for the email address and `APP_DOMAIN` for the website, each overridable at Administration → Settings → Site Owner. Set them before the pages are shown to the public; the code holds no real business's details. Each page shows only a last-updated date: the later of the date its text last changed (`src/Legal/LegalDocuments.php`) and the date a Site Owner detail it prints last changed. A change to a document's text changes its date in the same change, and applies to later purchases only. An order keeps the dates its buyer accepted and the Site Owner's details at that moment. The periods and fees the pages state are the commerce settings in force.
-- **Page construction and themes (v0.9.2).** Every page chooses one width (`ThemeRenderer::PAGE_WIDTHS`), and its rows take their width, gutter and spacing from `--cl-content-width`, `--cl-gutter` and `--cl-section-space` in `catto-platform.css`, which a theme may set. Six themes are bundled (Saharan Sunset 1.0.3, Gilded Noir 2.0.6, Light Default 2.0.3, Radiant Learning 4.0.3, Factory Reset 2.0.3 and Factory Reset Sidebar 2.0.3), each with its package in `extras/themes`. Installed older versions stay beside the new ones; an older Factory Reset Sidebar needs the Factory Reset of its own version, which is no longer bundled, so activate 2.0.3.
-- **Certificate designs (v0.8.8.10).** The baseline stores the six look backgrounds (`resources/certificates/looks/*.png`) as pictures in `document_assets` and installs six designs compiled from the looks (Classic, Modern, Minimal, Legal Seal, Gold Frame and Professional CPD), with Classic the default for new courses; every course starts on it. After that, designs are made at Courses → Certificate Designs and live in the database, uploaded backgrounds, logos and signatures included (`document_assets` rows are immutable, stored once by SHA-256, and never written to `storage/`). Each issued certificate stores its values and references the design version it was drawn with, and is drawn again from them, so editing or deleting a design never changes an issued certificate. Generated seed certificates are recorded the same way, against each course's design.
-- **Category order.** Category positions are explicit and compact: 1..n within each parent, refused as a duplicate by the database. A script that inserts categories directly must place each one after its siblings (`COALESCE(MAX(position),0)+1` for its parent) or run inside a transaction that defers `course_categories_sibling_position` and renumbers before it ends.
-- **PDF fonts.** Certificates print in the bundled OFL fonts in `resources/documents/fonts/` (Cormorant Garamond, Playfair Display, IBM Plex Sans and IBM Plex Serif). Dompdf keeps their metrics in the instance's `storage/cache/dompdf-fonts`, which it creates on first use; it must be writable by PHP-FPM (`cattotest` in development), and deleting it only makes the next PDF rebuild it.
-- **PHP extensions.** `composer.json` lists every required extension, GD included (profile images and certificate pictures); run `composer check-platform-reqs --no-dev` after installing PHP on a server. Without GD those uploads are refused with a message saying so. On Debian or Ubuntu with the `php8.5` packages, install it with `apt install php8.5-gd` and restart `php8.5-fpm`.
-- **Instance folders.** PHP-FPM must be able to write `storage/` and its subfolders, including `storage/tmp/theme-imports` (theme uploads) and `storage/logs/application.log`. A folder or log created by another user stops theme imports or silences the log; the theme page says which folder.
-- **Scheduled work.** `commerce:maintain` (every minute, or `--watch` under a supervisor) and `popularity:recalculate` (hourly); see below. `commerce:maintain` also sends the buyer's emails, so without it nobody is told how to pay or that an order is confirmed. A `--watch` worker keeps the code it started with: restart it (`podman restart env_commerce-worker_1` locally) after changing commerce code or the release.
-- **Served files.** nginx serves workspace `runtime/public_html`, not the repository's `public_html/`. After changing `public_html/css`, `js`, `img` or the compiled `assets/`, copy them there (from the host or inside `env_php_1` as `cattotest`, which are the same user), then run `php bin/console cache:clear` as `cattotest`.
-- **Bootstrap 6 (v0.9.3).** Only Bootstrap 6.0.0-alpha.1's reboot, grid and utilities files are served, from `public_html/css/` ("Bootstrap", below). The development web root still holds the 5.3.8 files that v0.9.2 and earlier load; delete them once no older tree is served from it.
-- **Local environment.** Linux with rootless Podman since 2026/10/08 (below).
+## Local development environment
 
-### Local development environment
-
-The workspace is `/path/to/workspace` on Linux with rootless Podman 4.9.3 (development moved from WSL with Podman Desktop on 2026/10/08). The services run in one pod, `pod_env`, created once by the workspace script `env/scripts/create-pod.sh`:
+A development setup can run the services in one rootless Podman pod (any equivalent arrangement works):
 
 | Container | Image | Job |
 |---|---|---|
-| `env_postgres_1` | `postgres:16` | the database, kept in workspace `postgres-data/` (published on 127.0.0.1:5433) |
-| `env_mailpit_1` | `axllent/mailpit` | catches every email (http://127.0.0.1:8025) |
-| `env_php_1` | `localhost/env_php` (built from `env/containers/php`) | PHP-FPM 8.5 and the command line, in `/home/cattotest/code/current` |
-| `env_commerce-worker_1` | `localhost/env_php` | `php bin/console commerce:maintain --watch --no-debug` |
-| `env_nginx_1` | `nginx:1.24-alpine` | `https://catto.test/` on 127.0.0.1:80 and 443, serving `runtime/public_html` |
+| PostgreSQL | `postgres:16` | the database |
+| Mailpit | `axllent/mailpit` | catches every email (http://127.0.0.1:8025) |
+| PHP | a PHP 8.5 image with the extensions `composer.json` requires | PHP-FPM and the command line, in the code directory |
+| Scheduler | the same PHP image | `php bin/console schedule:run --watch --no-debug` |
+| nginx | `nginx` | the local site over HTTPS (for example `https://catto.test/`), serving the instance's `public_html` |
 
-- **Start and stop.** `podman pod start pod_env` and `podman pod stop pod_env`; stopping keeps the pod and its containers. `env/scripts/create-pod.sh --recreate` replaces the containers (the database and runtime files on the host mounts are kept), and `--recreate --build` also rebuilds the PHP image. The containers reach each other on 127.0.0.1, and `--add-host` keeps the hostnames `php`, `postgres` and `mailpit` that the instance `.env` and the nginx configuration use. The PHP containers get the instance `.env` as environment variables from `env/.env.podman`, a copy the script writes with surrounding quotes removed, because `podman --env-file` keeps them (`APP_NAME="CattoLMS"` would otherwise print with its quotes); after editing `env/.env`, run the script with `--recreate`. `env/compose.yaml` describes the same services but is not used.
-- **Restarting one PHP container.** `env_php_1` and `env_commerce-worker_1` both mount `env/.env` at `/home/cattotest/code/.env`, inside the shared `code/` mount. Stopping or restarting one of them can leave the other with an empty `code/.env` it cannot read (2026-10-18). The site keeps working (it reads `/home/cattotest/.env`), but `phinx` and `tools/reset-development-database.php` fail with "Unable to read any of the environment file(s) at [/home/cattotest/code/.env]". Restart `env_php_1` last (`podman restart env_php_1`); to stop the worker during a database rebuild, `podman pause` it instead.
-- **One owner.** The pod runs with `--userns=keep-id`: the host user (UID 1000) is `cattotest` in the containers, so the code, `runtime/` and everything PHP-FPM writes have one owner, and files can be copied or deleted from either side. Do not `chown` the database directory (Podman maps it to the PostgreSQL user with `:U`).
-- **Host setup, once.** Ports below 1024 for the rootless pod (`net.ipv4.ip_unprivileged_port_start=80` in `/etc/sysctl.d/`), `127.0.0.1 catto.test` in `/etc/hosts`, and a certificate made with `mkcert` (whose CA the host trusts) in `env/config/certs/catto.test.pem` and `catto.test-key.pem`. No other web server may listen on ports 80 and 443.
-- **Host tools.** Node 24 and Playwright (Chromium and Firefox) for the browser checks, with `CATTO_PLAYWRIGHT_MODULE` naming its `node_modules/playwright`; `gs` and `pdftoppm` for the certificate PDF checks; `psql` 16 for the database on port 5433.
+- **One owner.** Run the pod with `--userns=keep-id`, so the host user is the PHP user in the containers and the code, the instance files and everything PHP-FPM writes have one owner. Run PHP commands as that user, so generated cache and asset files stay writable by PHP-FPM.
+- **Environment.** The PHP containers read the instance `.env`. Podman's `--env-file` keeps surrounding quotes, so give it a copy with them removed (`APP_NAME="CattoLMS"` would otherwise print with its quotes).
+- **Host setup.** A local hostname in `/etc/hosts`, a certificate the browser trusts (for example from `mkcert`), and, for a rootless pod, ports below 1024 opened with `net.ipv4.ip_unprivileged_port_start=80`.
+- **Host tools.** Node and Playwright (Chromium and Firefox) for the browser checks, with `CATTO_PLAYWRIGHT_MODULE` naming its `node_modules/playwright`; `gs` and `pdftoppm` for the certificate PDF checks.
 
-### Rebuilding the development database
+## Rebuilding the development database
 
-The database is disposable, so it is rebuilt rather than upgraded. Run, as `cattotest` in `env_php_1` (each step of `composer smoke:install`, whose `@migrate` step cannot run the Phinx launcher as `cattotest`):
+The database is disposable, so it is rebuilt rather than upgraded. Run, as the PHP user in the code directory (each step of `composer smoke:install`, whose `@migrate` step cannot run the Phinx launcher as an unprivileged user):
 
 ```sh
 php tools/reset-development-database.php --force        # drops and recreates the public schema
@@ -53,57 +35,17 @@ php bin/console popularity:recalculate --no-debug
 php bin/console cache:clear
 ```
 
-Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to the runtime web root. On a clean database the ADMIN account is made by the first sign-in with `APP_ADMIN_EMAIL` (the link arrives in Mailpit); make the owner's theme active and the owner's certificate design the default again, and build test data through the pages (`tests/Browser/one-learner-scenario.cjs`, owner 2026-10-19), not with the random dataset. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources` when needed.
+Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to the instance web root. On a clean database the ADMIN account is made by the first sign-in with `APP_ADMIN_EMAIL` (the link arrives in Mailpit). Make your theme active and your certificate design the default again, and build test data through the pages (`tests/Browser/one-learner-scenario.cjs`): test data is made through the application's own workflows, never inserted.
 
-To change the schema, edit the baseline and rebuild. Before replacing a large part of it, the equivalence check used on 2026/10/06 is cheap. Create two scratch databases, apply the old and new baselines to them through a copy of `phinx.php` that names the scratch database, and compare `pg_dump --schema-only --no-owner -T phinxlog` and a `--data-only --inserts` dump with timestamps masked.
+The baseline ships no categories. `resources/catalogue/catalogue.json` holds the starter categories and tags, each with its icon. After ADMIN's first sign-in, load it with `php bin/console catalogue:import` (or Administration → System → Setup). A site's own catalogue file can also hold its courses' categories, tags, covers and prices: write it with `php bin/console catalogue:export - > <private file>`, keep it privately, and load it after a rebuild with `catalogue:import <private file>`. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources` when needed.
 
-### Release notes for earlier v0.8 versions (historical)
+To change the schema, edit the baseline and rebuild. Before replacing a large part of it, an equivalence check is cheap. Create two scratch databases, apply the old and new baselines to them through a copy of `phinx.php` that names the scratch database, and compare `pg_dump --schema-only --no-owner -T phinxlog` and a `--data-only --inserts` dump with timestamps masked.
 
-These versions shipped as incremental migrations. Those migrations were consolidated into the canonical baseline on 2026/10/06 and no longer exist; the schema they describe is part of the baseline. The served-file and command notes still describe what each release changed.
-
-- **v0.8.6.1:** initial ADMIN test access and corrected documentation.
-- **v0.8.7:** tester administration, company credit purchasing, and ADMIN payment administration and refunds.
-  - The company purchase migrations are `20260923190000_add_company_credit_purchases.php`, `20260923191000_guard_company_credit_settlement.php` and `20260923192000_repair_company_credit_delete_trigger.php`.
-  - The payment migrations are `20260923200000_add_payment_administration_and_refunds.php` and `20260923201000_guard_refunded_credit_allocations.php`.
-- **v0.8.7.1:** explicit Save/Cancel for Course Content movement (later replaced by immediate moves), module assessments imported beneath their modules, and repaired availability fields.
-- **v0.8.7.2:** the tabbed course editor and the working grading scale. Publish `catto-platform.css`.
-- **v0.8.7.3:** publish `catto-platform.css`, `platform-overrides.js`, `nav-icons.svg` and compiled `assets/` (the `category-tree` controller), and run `composer themes:install -- --force` (Gilded Noir).
-- **v0.8.7.4:** Downloadable Files, with `20261002100000_add_downloadable_file_items.php` and `20261002110000_fold_document_items_into_downloadable_file.php`. Files stay in `storage/course-resources`, outside the web root, and are served only by the learner download route.
-- **v0.8.7.5–v0.8.7.8:** the Course Content tree.
-  - v0.8.7.5 publishes `catto-platform.css`, `nav-icons.svg` (`action-drag`, `action-more`) and compiled `assets/` (the `course-content` controller).
-  - v0.8.7.6 publishes `question-editor.js` and updates the controller.
-  - v0.8.7.7 publishes CSS only.
-  - v0.8.7.8 publishes CSS and an updated controller.
-  - None of these releases has a migration.
-- **v0.8.7.9:** public section previews, with `20261003100000_add_public_preview_to_course_sections.php`.
-- **v0.8.8:** analytics events, with `20261004100000_create_analytics_events.php`. Events hold no IP addresses, session tokens or payment details; `AnalyticsEventRepository::anonymiseBefore()` and `deleteBefore()` are the retention hooks for a later policy.
-- **v0.8.8.1:** moderated course reviews, with `20261004110000_create_course_reviews.php` (`LEARNING.REVIEW.CREATE`, `COURSE.REVIEW.MANAGE`). Rejection never deletes a review, and there is no hard-delete action.
-- **v0.8.8.2:** course popularity, with `20261004120000_create_course_popularity.php`. Run `popularity:recalculate` afterwards.
-- **v0.8.8.3:** home page Popular Courses. Publish `catto-platform.css`, `nav-icons.svg` (`action-pause`, `action-play`) and compiled `assets/` (the `popular-courses` controller). Without a popularity snapshot it shows the newest published courses.
-- **v0.8.8.4:** billing profiles, promo codes, course bundles and independent entitlement sources, as migrations `20261005100000_create_billing_profiles`, `20261006100000_create_promotions`, `20261007100000_create_bundles` and `20261007110000_create_entitlement_sources`. Publish `catto-platform.css`.
-- **v0.8.8.5:** the 25 migrations above consolidated into the one canonical baseline; rebuild the database (see above).
-- **v0.8.8.6:** copy the new `public_html/index.php` to the served web root. The front controller reads `APP_CODEBASE_PATH` as a `.env` file, so comments in the instance `.env` no longer stop the site loading; before it, a `#` comment containing brackets made every page answer "Application dependencies are missing."
-- **v0.8.8.7:** code only (Account → Profile → Billing Address at `/account/billing`); no CSS, JavaScript or schema change.
-- **v0.8.8.8:** the baseline gained the document template tables and permissions: rebuild the database (see above). Copy `public_html/index.php` to the served web root (it reads `.env` comments correctly and reports each start-up failure separately; the detail is in the PHP error log), and publish `catto-platform.css` and the compiled `assets/` (the `template_placeholders` controller).
-- **v0.8.8.9:** certificates on the document template engine (Phase J). The baseline's `certificates` table and the course certificate columns changed, and the certificate designs are installed. Rebuild the database (see above), publish `catto-platform.css`, and run `composer themes:install -- --force`, because four theme stylesheets lost their unused certificate rules.
-- **v0.8.8.10:** certificate designs. The baseline gained `document_assets`, `document_template_versions.design`, `courses.certificate_design_id` and `courses.certificate_accreditation`, lost the course certificate title, body, footer and signatory columns, and renamed `DOCUMENT.TEMPLATE.*` to `CERTIFICATE.DESIGN.*`. Rebuild the database (see above). Publish `catto-platform.css`, `js/ck-certificate.js`, `img/certificates/` (the placement pictures and the look thumbnails) and the compiled `assets/` (the `certificate-preview` controller; delete the served `template_placeholders_controller-*.js`, which is gone).
-- **v0.8.8.11:** the draggable category tree. `course_categories.position` is 1..n within each parent with the unique, deferrable `course_categories_sibling_position` constraint, and the shipped taxonomy is renumbered when it is installed. Rebuild the database (see above). Publish `catto-platform.css` and the compiled `assets/` (the shared `lib/sortable_tree_controller.js` and the rewritten `category-tree` and `course-content` controllers), and delete the served copies of the controllers they replace.
-- **v0.8.8.12:** one category picker for the catalogue, the course forms, course import and category deletion. No schema change. Publish `catto-platform.css` and `js/platform-overrides.js` (the picker's disclosure behaviour and + New).
-- **v0.8.8.13:** install GD first (`apt install php8.5-gd`, restart `php8.5-fpm`; `php -m` then lists `gd`), because `composer install` refuses a server without it; a v0.8.8.4 VPS without GD answered a profile image upload with HTTP 500. Publish `catto-platform.css` (the certificate preview above its form). No schema change.
-- **v0.8.8.14:** signature pictures fitted to the certificate automatically. No schema change and nothing to publish to the web root.
-- **v0.8.9:** financial documents on the document template engine (Phase K). The baseline changed (`commerce_documents` stores `document_data` and the template version; `PLATFORM.DOCUMENT.VIEW`/`MANAGE`): rebuild the database. Publish `catto-platform.css`.
-- **v0.9.0:** course landing pages (Phase L). The baseline gained `course_landing_pages` and `course_landing_sections`: rebuild the database. Publish `catto-platform.css`, `js/platform-overrides.js` and the compiled `assets/` (the `landing-sections` controller and the new Stimulus controller map; delete the served `@symfony/stimulus-bundle/controllers-i3Y_kUZ.js`), then run `composer themes:install -- --force`, because every theme's head now includes the core head metadata.
-- **v0.9.1:** the legal pages, terms acceptance and the Refund Policy rule. The baseline changed (`commerce_refunds.policy_refusal` and `override_reason`): rebuild the database. No stylesheet, script, compiled asset or theme changed, so nothing is published to the web root. Set `APP_ADMIN_EMAIL` and `APP_DOMAIN` to the email address and domain the pages should print.
-- **v0.9.3:** Bootstrap 6 underneath. Publish `css/bootstrap-reboot.min.css`, `bootstrap-grid.min.css`, `bootstrap-utilities.min.css` and `catto-platform.css`, and run `composer themes:install`; no schema change ("Bootstrap", below).
-- **v0.9.4:** the commerce launch work, the Site Owner and the demo site. The baseline changed (ledger, wallets, refunds, account references, the Site Owner in place of the System Company): rebuild the database. Set `SITE_OWNER_*`, `APP_SITE_MODE` and, where they differ from the defaults, `COMMERCE_*` in `.env` (`.env.example` lists them). Publish `catto-platform.css`, run `composer themes:install` (Gilded Noir 2.0.5), and keep `commerce:maintain` running.
-- **v0.9.5:** Record EFT Payment, Unmatched Money and the buyer's emails. The baseline gained `commerce_unmatched_payments`: rebuild the database. Publish `catto-platform.css` (sentences in money tables wrap), run `composer themes:install` (Saharan Sunset 1.0.3 and Gilded Noir 2.0.6, whose footers no longer repeat menu links) and restart the commerce worker, which sends the new emails.
-- **v0.9.2:** one construction for every page, Saharan Sunset 1.0.1 and new versions of every bundled theme. No schema change. Run `composer install` (Symfony 8.1.9), publish `catto-platform.css` and run `composer themes:install`, which installs the new versions beside the old ones; if Factory Reset Sidebar 2.0.1 was active, activate 2.0.2. A Factory Reset 2.0.1 setting falls back to 2.0.2 by itself, and a fresh database starts on it.
-
-### Commerce operations
+## Commerce operations
 
 - **Who buys.** Only a private account buys a course or bundle for itself. A private account belongs to no company. A company account (an active member of a company) never does: the shop shows it no buttons and no cart and refuses it at every step, and its courses come from its company. A Company Administrator buys company credits and may assign one to their own account. A company person who wants a course for themselves registers a separate private account with their own email address.
-- **Payment methods.** Individual checkout takes card (the Dummy gateway, on a demo site only) and EFT. Company checkout buys exact course/access-period credit variants in quantities, as immutable paid credit lots.
-- **Company credit requests.** A linked request stays pending until simulated card payment succeeds. One credit is then allocated and the learner enrolled.
+- **Payment methods.** Administration → Settings → Payment methods has one tick box per method: EFT and card (Stitch) for now, and on a demo site the simulated card. Checkout offers only the ticked methods that work, each named with its provider, and receipts name the method and provider used. Card can be ticked only once `STITCH_CLIENT_ID` and `STITCH_CLIENT_SECRET` are in `.env` and Stitch is connected (not built yet). The simulated card exists only on a demo site and is never offered on a live site, whatever is saved. The wallet is not a payment method: it can always be spent. At least one method stays ticked. No method collects card details on this site. Every change is in the Activity log. Company checkout buys exact course/access-period credit variants in quantities, as immutable paid credit lots.
+- **Company credit requests.** A company pays for a learner's request like any other purchase: by any ticked method or from the company wallet. The request stays pending until the payment is confirmed (for an EFT, when ADMIN records it); one credit is then allocated and the learner enrolled.
 - **EFT.** A direct EFT company order issues no credit before confirmed full settlement. Do not treat a pending EFT instruction as proof of payment, or create its credits manually.
 - **Recording bank payments.** Start at Credits & Orders → Record EFT Payment (`/admin/commerce/eft`) with what the bank statement shows: the reference the payer used, the amount, the day, the bank's own reference for the deposit and where it was seen. The payer's reference is read as an account reference (with or without hyphens, among other words) or an order number, and the account's orders that can take an EFT are listed, each with its own button. A deposit that pays no order goes on Unmatched Money (`/admin/commerce/unmatched`, not in the ledger) until it is matched to an order (it becomes that order's EFT payment on the day it arrived) or recorded as paid back. An order's own page records an EFT the same way. A bank reference is recorded only once.
   - Record a confirmation only against an independently verified bank statement, never a customer's screenshot or an invoice.
@@ -113,7 +55,7 @@ These versions shipped as incremental migrations. Those migrations were consolid
   - If fulfilment is impossible, ADMIN may refund the paid but unissued order from manual review.
 - **Refunds.** Refund approval creates a credit note and ledger rows. Learners ask on their order page and Company Administrators on the credit order's page; open requests wait at Commerce → Refund Requests.
   - Approval enforces the Refund Policy (`/refunds`, `Commerce\Domain\RefundRule`): a started course is never refunded, and every bought course starts on payment; anything not started is refundable only within the refund window of the confirmed payment (company credits that no learner has started). The order page shows each line as within or outside the policy, with the reasons and what each choice of refund would pay.
-  - A refund goes to the wallet or as money back. What was paid from the wallet always goes back to the wallet with its original expiry. Card refunds are less the Stitch transaction fee and, for money back, the Stitch refund fee; EFT money back is less the EFT refund fee (Administration → Settings (its commerce sections)).
+  - A refund goes to the wallet or as money back. What was paid from the wallet always goes back to the wallet with its original expiry. Card refunds are less the Stitch transaction fee and, for money back, the Stitch refund fee; EFT money back is less the EFT refund fee (Administration → Settings (its commerce sections)). The Refund Policy says this without naming the provider or printing its fees.
   - Money back is paid outside the LMS, within 7 days of the request: through the Stitch dashboard for a card, or by EFT to a bank account in the customer's name that they give you (it is not stored in the LMS). Then record the date and the Stitch or bank reference on the order page. Until then it is listed under Transactions that need attention.
   - ADMIN may approve a refused refund by recording an override reason (5 to 2,000 characters). The reason and what the rule refused are kept with the refund and shown on the order page. An override does not make a company credit a learner has started refundable.
   - A full refund of an individual course or bundle line revokes exactly the entitlement sources that line created. Each course's access is then worked out again from its remaining sources.
@@ -121,12 +63,28 @@ These versions shipped as incremental migrations. Those migrations were consolid
   - Company credit refunds apply only to unused purchased units, at historical LIFO prices.
   - The LMS never pays money out itself; wallet credit is never paid out as cash.
 - **Wallets.** Administration → Wallets lists every wallet with its balance and statement; a correction (more or less credit) needs a written reason and is a new ledger row. Wallet credit expires after the wallet expiry setting (3 years by default), and the holder is emailed once before each credit expires (30 days by default).
-- **Commerce settings.** Administration → Settings has a section for each group of commerce settings (one settings area, owner 2026-10-18), showing each setting with its `.env` default (`COMMERCE_*`, `.env.example`) and any override saved there; Reset removes the override. The legal pages print the values in force, and a change applies to later purchases only. Set the real Stitch fees before launch: both default to nothing.
+- **Commerce settings.** Administration → Settings has a section for each group of commerce settings (one settings area), showing each setting with its `.env` default (`COMMERCE_*`, `.env.example`) and any override saved there; Reset removes the override. The legal pages print the values in force, and a change applies to later purchases only. Set the real Stitch fees before launch: both default to nothing.
 - **Account references.** Every person and company has one from the moment the account is made (prefix setting, creation date, a number from a database sequence, a check character). The dashboard, profile and orders show it, and EFT instructions ask the payer to quote it.
 - **Promotions.** A promotion's use is held from order placement until cancellation, and redeemed once when the order is paid. An order that a promotion makes free settles without a payment.
 - **Historical records.** Original invoices, payment events, course results and certificates remain historical records. A certificate is drawn only from the values and design version stored with it. Financial documents render only from the order's immutable snapshot, including its billing details and promotion.
 
-Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It does these things:
+## Scheduled work
+
+One scheduler runs everything on an installation: `php bin/console schedule:run --no-debug` from cron once a minute, as the application user, or `php bin/console schedule:run --watch --no-debug` kept running under a process supervisor (systemd, or a development pod's scheduler container). `install/install.sh` writes the cron file. Each time it runs the jobs that are due and records each run in `scheduled_jobs` (when it started, finished, last succeeded or failed, and why). One job failing never stops the others. `--job commerce|popularity|cleanup` runs one job now. An example crontab line:
+
+```
+* * * * * cd /path/to/current && php bin/console schedule:run --no-debug >> /path/to/instance/storage/logs/schedule.log 2>&1
+```
+
+| Job | How often | What it does |
+|---|---|---|
+| Orders and emails (`commerce`) | every minute | the commerce job, below |
+| Course popularity (`popularity`) | every hour | recalculates the popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read; pages never calculate it |
+| Clean-up (`cleanup`) | every day | deletes activity log entries and analytics events older than 5 years, as the Privacy Policy states, and expired sign-in links and sessions (what Settings → Maintenance → Clean expired records also does) |
+
+Settings → Maintenance shows each job's last run and success, and "Not running" when it is overdue (commerce after 5 minutes, popularity after 3 hours, clean-up after 2 days). The ADMIN dashboard warns when the commerce job has stopped, for example "Order emails have not been sent since 10:42". `commerce:maintain` and `popularity:recalculate` still run one job by hand, and their runs are recorded the same way.
+
+The commerce job does these things:
 
 - cancels orders not paid in full by their due date (the payment due setting, 7 days by default), giving what was paid to the payer's wallet;
 - activates entitlement sources at their deadlines;
@@ -135,138 +93,54 @@ Run `php bin/console commerce:maintain --no-debug` once per minute from the inst
 - retries requested invoice emails and queued learner notices;
 - sends the buyer's emails, each once: how to pay by EFT with the invoice (when an order is placed for EFT or changed to it), a part payment with its receipt, an unpaid order cancelled, the order confirmation with every receipt, and the courses that started. An email whose moment has passed (the order was paid or cancelled first) is dropped.
 
-The local pod runs it in its own container, `env_commerce-worker_1`; `deployment/commerce-worker.compose.yaml` holds the same configuration in Compose form for other setups.
+`deployment/commerce-worker.compose.yaml` holds a Compose configuration for container setups.
 
-Run `php bin/console popularity:recalculate --no-debug` once an hour from the same scheduler, as the application user. It recalculates the course popularity snapshot that `/admin/reports/popularity` and the home page's Popular Courses read. Pages never calculate it, so without the schedule the ranking stays as it was last calculated. It exits non-zero on failure. An example crontab line: `5 * * * * cd /path/to/current && php bin/console popularity:recalculate --no-debug`.
+## Identity verification
 
-### Demo site or live site (`APP_SITE_MODE`)
+Learners verify on Didit's hosted page: they photograph their ID or passport and take a live selfie, and Didit matches them. The site keeps only the status, the verified name, the document type, number and issuing country, the date of birth, Didit's session id and when (`identity_verifications`), never an image.
 
-One setting says whether a site is real (owner, 2026-10-18): `APP_SITE_MODE=demo` or `live` in `.env`, which Administration → Settings → Site mode overrides (`app_options` `site_mode`; Reset returns to `.env`). Anything but `live`, or no value, is a demo site, so a site never takes real orders by accident. demo, test and development mean the same thing: demo.example.com is the demo site and stays one; the public site will be live on its own domain. `APP_ENV` keeps its technical job (how the program runs) and says nothing about this (`Configuration\SiteMode`).
+1. In the Didit console (https://business.didit.me) make a KYC workflow with ID verification and liveness, and an API key.
+2. Add a webhook destination (version v3, subscribed to `status.updated`) with the address Administration → Settings → Identity verification shows: `https://<the site's domain>/webhooks/didit` (from `APP_URL`), for example `https://learning.example.com/webhooks/didit`. Didit cannot reach a local development site: there the result is read when the learner returns.
+3. Put `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID` and the destination's secret as `DIDIT_WEBHOOK_SECRET` in `.env` (`.env.example` has placeholders that count as not set). Restart PHP-FPM and the scheduler.
 
-- **A demo site** shows "This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation." at the top of every page (`partials/flash-messages.html.twig`, in every theme and the course reader); asks search engines not to list it (`<meta name="robots" content="noindex, nofollow">` on every page and `X-Robots-Tag: noindex, nofollow` on every response from PHP); says at both checkouts that the purchase is a simulation and nothing is being bought or sold; marks every order placed on it as a simulation in its snapshot, so its order pages, invoice, receipt and credit note say so for good, even if the site later goes live; starts every email's subject with `[DEMO]` and its text with a line saying it comes from a demo site; shows fake bank details labelled as fake in EFT instructions and documents (`SiteMode::FAKE_BANK_DETAILS`); offers the simulated card; and lets the seed tools run.
-- **A live site** does none of that: no simulated card (EFT only until Stitch is built), the Site Owner's bank details, and the seed tools refuse to run.
-- With `APP_DEBUG` on, Symfony adds `X-Robots-Tag: noindex` to every response by itself, so catto.test sends it even when set to live.
+Without all three, verification is not available and certificates wait. Verification is never skipped. A learner verifies once, when their first certificate is due: nothing is asked before a purchase. A declined check says why; after three, ADMIN allows another try on the person's page, where ADMIN also sees the status and history, opens Didit's console (search for the session id under Verifications) and revokes a verification with a reason. Checks Didit is reviewing are listed on the dashboard. The site is for adults only: a verified learner whose document shows them under 18 is stopped at the adults-only page and issued nothing. Every event is in the Activity log, without the document number or date of birth.
+
+## Who can sign in
+
+Administration → Settings → Who can sign in: everyone (the default), or administrators and the email addresses listed only (`app_options` `signin.restricted` and `signin.allowed_emails`). While it is limited, anyone else is refused when they sign in or register, and a session they already hold stops working at once; an administrator (the `APP_ADMIN_EMAIL` address or an account with the ADMIN role) always signs in. A listed address needs no approval on a demo site. Each change is in the Activity log.
+
+## Sitemap and robots.txt
+
+`/sitemap.xml` lists every published course and every published landing page of a published course, with absolute addresses from `APP_URL` and each one's last change, cached for an hour; beyond 50,000 addresses it becomes an index of `/sitemap-1.xml` and onward. `/robots.txt` is generated by the site, so its `Sitemap:` line carries the site's own full address. The static `public_html/robots.txt` is gone: remove it from a server's web root when deploying, or the web server keeps serving the old file. A demo site's sitemap addresses answer "not found" and its robots.txt names no sitemap; its pages keep their noindex. It is not told to keep search engines away entirely, because a search engine kept away never reads the noindex.
+
+## Demo site or live site (`APP_SITE_MODE`)
+
+One setting says whether a site is real: `APP_SITE_MODE=demo` or `live` in `.env`, which Administration → Settings → Site mode overrides (`app_options` `site_mode`; Reset returns to `.env`). Anything but `live`, or no value, is a demo site, so a site never takes real orders by accident. demo, test and development mean the same thing: a site for trying the platform stays a demo site, and a public site takes real orders only when set to live. `APP_ENV` keeps its technical job (how the program runs) and says nothing about this (`Configuration\SiteMode`).
+
+- **A demo site** makes every account registered through the site wait for an administrator's approval before it can sign in (Administration → People → the person → Approve account; the administrator is emailed when one registers, the dashboard lists them, and the person is emailed when approved), so nobody can buy courses with the simulated card and read them without your say. Accounts an administrator adds under People are approved already. It also shows "This is a demo site for testing and development. Nothing on it represents an offer: it is not real, it is a simulation." at the top of every page (`partials/flash-messages.html.twig`, in every theme and the course reader); asks search engines not to list it (`<meta name="robots" content="noindex, nofollow">` on every page and `X-Robots-Tag: noindex, nofollow` on every response from PHP); says at both checkouts that the purchase is a simulation and nothing is being bought or sold; marks every order placed on it as a simulation in its snapshot, so its order pages, invoice, receipt and credit note say so for good, even if the site later goes live; starts every email's subject with `[DEMO]` and its text with a line saying it comes from a demo site; shows fake bank details labelled as fake in EFT instructions and documents (`SiteMode::FAKE_BANK_DETAILS`); offers the simulated card; and lets the seed tools run.
+- **A live site** does none of that: never the simulated card (only the ticked payment methods, Settings → Payment methods), the Site Owner's bank details, a sitemap named in robots.txt, and the seed tools refuse to run.
+- With `APP_DEBUG` on, Symfony adds `X-Robots-Tag: noindex` to every response by itself, so a development site sends it even when set to live.
 
 Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Settings → Site Owner) before providing EFT instructions to customers on a live site; a demo site shows fake details instead (below). The Dummy gateway simulates card outcomes only on a demo site. EFT instructions do not confirm a bank payment; ADMIN must record independently verified bank evidence before settlement. No live payment-processor credentials are included in the current code.
 
-### Publishing a release (owner instruction, 2026/10/06)
+## Publishing a release
 
-Only on the owner's explicit instruction to commit and push a version:
+Releases are made by the maintainer of the repository:
 
-1. Update the version, `README.md` (its current release line and release history), `CHANGELOG.md`, the docs and the workspace `CLAUDE.md`/`AGENTS.md` checkpoint, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the relevant browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme, and an installed theme whose head lacks `partials/head-meta.html.twig` fails two landing page tests. Make the installed theme active again afterwards. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit on `dev-v0.9` and create the annotated tag: the version with a leading `v` (`v0.9.2`, `v0.8.8.14`).
-3. Push both to GitHub `main` without checking out branches in the served directory (`git push origin dev-v0.9:main` and `git push origin` with the tag).
+1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
+2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.6`).
+3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.2   # the tag being released
+   V=v0.9.6   # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```
 
    Build the zip outside the code tree and attach it to the release.
 
-Every pushed version has a release with its zip; v0.8.8.4 is the first. Git publication and the release do not deploy the VPS.
-
-The version-specific installation and reset instructions below describe their named historical versions. They are not an upgrade procedure for the current code or for a production system. Follow the current release procedure and `PROJECT-INSTRUCTIONS.md` for any later authorized deployment, and do not apply a historical reset command to a populated instance.
-
-## Historical v0.8 commerce upgrade from v0.7
-
-Use the existing database and run `composer install` followed by `composer migrate`. The three commerce migrations are additive. Do not use `smoke:install` to upgrade a populated v0.7 development instance. Publish core CSS/JS and the modified bundled themes using the development publication procedure below.
-
-Run `php bin/console commerce:maintain --no-debug` once per minute from the installation scheduler, or keep `php bin/console commerce:maintain --watch --no-debug` running under a process supervisor. It cancels overdue unpaid orders, advances access deadlines and retries requested invoice emails. The local Podman setup uses a dedicated worker; `deployment/commerce-worker.compose.yaml` exports its configuration for use with the workspace’s `env/compose.yaml`.
-
-Configure Administration → Settings → Bank details before providing EFT instructions to customers. The Dummy gateway simulates card outcomes only in development/test environments. No live payment-processor credentials are included in this update.
-
-**Historical note:** The following install, reset, benchmark and seed sections describe v0.5–v0.8 transition states. Their old paths, version numbers, REAL/SEED details and reset commands are retained for provenance and must not be used as current instructions. `PROJECT-INSTRUCTIONS.md` and the current position above take precedence.
-
-**v0.7 is a reset for the same reason v0.6 was.** It inherits v0.6's single baseline, so there is no upgrade path into it either: installing v0.7 is `composer smoke:install` and a discarded database. The section below is v0.6's account of that, and every word of it applies unchanged.
-
-## v0.6 is a reset, not an upgrade
-
-**There is no migration path from 0.5.8.3 to v0.6.** v0.6 collapses the 0.5.8 baseline and the five migrations that followed it into one canonical baseline, which is a schema rebase — the same situation 0.5.7.5.1 was in, and the reason `validate-release.php` forbids rebasing by default. Installing v0.6 means the full install/reset path below, and the database is discarded.
-
-That is acceptable only while the database is disposable TEST/DEV state. Once production is declared it stops being an option, and any change of this shape needs a real migration instead.
-
-Two v0.6 install steps that did not exist before:
-
-- `composer seeds:publish` copies the bundled name lists into `storage/seeds/`, where the Seed Database reads them and the operator edits them. It never overwrites a file the instance already has, so an upgrade that adds two hundred surnames leaves an edited list alone. It runs as part of `composer smoke:install`.
-- Course categories and tags are no longer generated per seed set. They are universe-free labels installed by the baseline and managed in Administration, so a seed set files its generated courses under the same taxonomy a genuine course uses.
-
-## Upgrading 0.5.7.6 to 0.5.8
-
-0.5.8 **rebases the baseline migration**, so unlike 0.5.7.6 it requires a destructive development database reset. There is no incremental upgrade path.
-
-Set these before migrating:
-
-```text
-SEED_SYSTEM_COMPANY_NAME="SEED System Company"
-SEED_SYSTEM_COMPANY_DOMAIN=seed.your-domain.example
-```
-
-`SEED_SYSTEM_COMPANY_DOMAIN` must differ from `APP_DOMAIN` — `companies.domain` is unique across the whole platform and the migration stops with an explanatory error otherwise — and it must be a domain you genuinely receive mail for, because every message addressed to a generated identity is delivered there. Leave it blank to disable the rewrite; seed mail then simply bounces, which is safe for an installation that never signs in as a generated identity.
-
-Then deploy alongside the existing version, repoint the `current` symlink and reset:
-
-```bash
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer install
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer smoke:install
-```
-
-`smoke:install` is destructive by design and is acceptable only while the database is disposable TEST/DEV state.
-
-```bash
-sudo ln -sfn /usr/local/lib/php/catto-learning/0.5.8 /usr/local/lib/php/catto-learning/current.tmp
-sudo mv -Tf /usr/local/lib/php/catto-learning/current.tmp /usr/local/lib/php/catto-learning/current
-```
-
-`mv -T` replaces the link with a single rename, so no in-flight request ever sees a missing `current`. The common `ln -sfn <target> current` one-liner unlinks and re-creates, leaving a brief window in which the path does not exist.
-
-Then clear the two caches that key on the unchanged `current/...` paths and would otherwise keep serving the previous version:
-
-```bash
-sudo -u www-data /usr/local/lib/php/catto-learning/current/bin/console cache:clear
-sudo systemctl reload php8.5-fpm
-```
-
-The first is Symfony's compiled container and Twig's compiled templates, both under `storage/cache/`. `public_html/index.php` sets the code root to the literal `current` path and never resolves it, so those cache paths are identical across versions and nothing in them looks stale after the symlink moves. `cache:clear` must run as the web server's user, or it writes a cache directory PHP-FPM afterwards cannot overwrite. The second is opcache, which has the same exposure on the same paths.
-
-After deploying, run the QA gate below, then the browser acceptance pass.
-
-## Full install/reset
-
-A full reset is only required for a version that rebases the schema, such as 0.5.7.5.1. Supported artifact pair:
-
-```text
-catto-learning-v0.5.7.5.1.zip
-deploy-catto-learning-v0.5.7.5.1.sh
-```
-
-Version 0.5.7.5.1 rebased the ACL baseline schema. Its installer therefore requires the explicit `reset` argument, resets the disposable database before migration, installs the versioned release under `/usr/local/lib/php/catto-learning/0.5.7.5.1`, publishes platform/default-theme assets, re-synchronises persistent themes and updates the `current` symlink. **0.5.7.6 does not need any of this** — see the upgrade section above.
-
-It preserves instance-owned:
-
-```text
-/home/<site-user>/.env
-/home/<site-user>/themes/
-```
-
-Keep downloaded release artifacts in an instance subdirectory rather than directly in the site home. Example after becoming root with `sudo -i`:
-
-```bash
-mkdir -p /home/siteuser/releases
-chmod 755 /home/siteuser/releases/deploy-catto-learning-v0.5.7.5.1.sh
-/home/siteuser/releases/deploy-catto-learning-v0.5.7.5.1.sh \
-  /home/siteuser/releases/catto-learning-v0.5.7.5.1.zip \
-  siteuser \
-  reset
-```
-
-Required PHP extensions: DOM, fileinfo, GD, JSON, mbstring, OpenSSL, PDO/PostgreSQL and ZIP.
-
-GD is required from v0.7 for the profile image (an upload is validated, cropped to a square and resized to 256x256 before it is stored) and from v0.8.8.10 for certificate pictures and design thumbnails. Since v0.8.8.13 `composer.json` requires it, so `composer install` refuses a server without it; a server already running without it refuses those uploads with a message saying so and logs what to install, rather than answering HTTP 500.
-
-`composer migrate` is the canonical migration command on an installation. In the local Podman environment it cannot run the Phinx launcher as `cattotest`; run `php vendor/bin/phinx migrate -c phinx.php -e development` directly. There is no separate `migrate-test` convention.
+Publishing a release deploys no site. `install/install.sh` installs a release on a server. The installation and reset notes in older sections below describe their named historical versions: they are not an upgrade procedure, and a historical reset command must never be applied to a populated site.
 
 ## Bundled themes
 
@@ -295,37 +169,10 @@ CattoLMS serves Bootstrap 6.0.0-alpha.1, and only three of its files, from `publ
 | `bootstrap-utilities.min.css` | `88aeb98978ecf1f202fd24a01b9612ff8422756f653c4368a4f0b347ace9e5b2` |
 | `bootstrap-LICENSE.txt`, Bootstrap's MIT `LICENSE` | `bc0cd18d94c028f1c0b62ec9fdaddcb9921c1e07c29cf52dc7df8cca9daf2488` |
 
-- **Source.** The workspace root's `composer.json` requires `twbs/bootstrap` 6.0.0-alpha.1 (`composer.lock`: commit `780627306eb517ca210310a24e10f8186003c127`). The files are copied unchanged from its `vendor/twbs/bootstrap/dist/css/` and `LICENSE`. That Composer project is only the source of these files: the application's `composer.json` does not require Bootstrap.
+- **Source.** A separate Composer project outside the code tree requires `twbs/bootstrap` 6.0.0-alpha.1 (commit `780627306eb517ca210310a24e10f8186003c127`). The files are copied unchanged from its `vendor/twbs/bootstrap/dist/css/` and `LICENSE`. The application's `composer.json` does not require Bootstrap.
 - **Loading.** `ThemeRenderer` loads the reboot first, because it declares the cascade layer order, then the grid, the utilities and `catto-platform.css`, on every page. No other Bootstrap file and no Bootstrap JavaScript is loaded (`BootstrapSixContractTest`). Each file names its MIT licence in a banner. Each also names a source map, which is not shipped; a browser asks for one only with its developer tools open.
-- **Updating.** Change the version in the workspace root's `composer.json` and run `composer update twbs/bootstrap` there. Read Bootstrap's release notes for changes to the reboot, the grid, the utilities and their tokens. Copy the three files and `LICENSE` (as `bootstrap-LICENSE.txt`) into `public_html/css/`, and record the version and checksums here. Then compare every page in every theme before and after, as Part C did, and run `composer qa` and the browser suites in Chromium and Firefox, `bootstrap-safety-net.cjs` included. Publish the files to the instance web root with the release that brings them, then clear the cache.
+- **Updating.** Change the version in that project's `composer.json` and run `composer update twbs/bootstrap` there. Read Bootstrap's release notes for changes to the reboot, the grid, the utilities and their tokens. Copy the three files and `LICENSE` (as `bootstrap-LICENSE.txt`) into `public_html/css/`, and record the version and checksums here. Then compare every page in every theme before and after, as Part C did, and run `composer qa` and the browser suites in Chromium and Firefox, `bootstrap-safety-net.cjs` included. Publish the files to the instance web root with the release that brings them, then clear the cache.
 - **The 5.3.8 files.** A web root that served 5.3.8 still holds `css/bootstrap.min.css` and `js/bootstrap.bundle.min.js`. Nothing loads them under 6.0. Keep them while a 5.3.8 tree may still be served from that web root, and delete them once a release with 6.0 is deployed there.
-
-## VPS QA gate
-
-Run from `/usr/local/lib/php/catto-learning/current`:
-
-```bash
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer check-platform-reqs --no-dev
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer migrations:status
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer themes:install
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer themes:sync
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer test:unit
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer test:architecture
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer test:integration
-runuser -u siteuser -- env HOME=/home/siteuser COMPOSER_HOME=/home/siteuser/.composer composer qa
-```
-
-`composer qa` is the authoritative pre-handoff/pre-release gate and includes the full PHPUnit suite, PHPStan and project validators.
-
-**Check the suites can start before running them.** `composer qa` begins with `tools/check-test-suite.php` for a reason: a test class that cannot be declared kills PHPUnit during suite construction, before any test — including any guard written as a test — can run. The companion command is:
-
-```bash
-php vendor/bin/phpunit --list-tests --testsuite Integration
-```
-
-Test files present and zero tests discovered is a failure, not an empty directory.
-
-The integration suite uses the configured development database. Test fixtures must clean up records they create, including audit events; tests must not masquerade as later seed data. The Seed integration tests create both REAL and SEED fixtures and remove their seed sets through the catalogue's own cleanup order, so a failed run leaves nothing that a later generation could collide with.
 
 ## Static validators
 
@@ -345,7 +192,7 @@ tools/seed-benchmark-dataset.php
 tools/benchmark-pagination.php
 ```
 
-Artifact-generation environments without the VPS PHP/Composer/PostgreSQL may run syntax/static validators but must not claim the VPS QA gate passed.
+An environment without PHP 8.5, Composer and PostgreSQL may run the syntax and static validators, but that is not the gate.
 
 ## Pagination benchmark (v0.6)
 
@@ -403,7 +250,7 @@ COURSE_OWNER
 
 Business permissions use one shared resource-first/action-last catalogue such as `ACCOUNT.PROFILE.VIEW`, `COMPANY.PERSON.MANAGE` and `COURSE.PUBLICATION.REQUEST`. There are no mirrored `REAL.*` / `SEED.*` business permission namespaces. `SYSTEM.*` is reserved for ADMIN-only platform infrastructure. `API.*` ACL permissions are obsolete; API/MCP requires transport scope plus the same ordinary business permission used by Web.
 
-Since v0.8 the commerce permissions are in use (orders, payments, refunds, promotions, bundles and company billing), and the catalogue has 92 permissions: 10 `SYSTEM.*` and 82 business. `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
+Since v0.8 the commerce permissions are in use (orders, payments, refunds, promotions, bundles and company billing), and the catalogue has 101 permissions: 10 `SYSTEM.*` and 91 business (`CERTIFICATE.ISSUED.*` and `PLATFORM.IDENTITY.*` since 2026/10/19). `SYSTEM.SEED.MANAGE` still guards the Seed Database screen, which generates ordinary rows: there is no `seed_token`, no cleanup-by-token and no query isolation, because there is only one kind of data.
 
 ## Browser acceptance after clean QA
 
@@ -477,7 +324,7 @@ Core and theme browser assets are emitted with content fingerprints. A repaired 
 
 ## Working tree traps
 
-**Never check out a branch in the served directory.** `code/current` is what the web server serves, so `git checkout main` replaces the running application. Checking out v0.6 while `vendor/` holds Symfony gives every request `Class "Base" not found`, because the old code wants Fat-Free and it is no longer installed. To move a branch pointer, use `git branch -f main dev-0.7`, or push a ref directly with `git push origin dev-0.7:main`. Neither touches a single file.
+**Never check out a branch in a served directory.** When the web server serves the working tree, `git checkout main` replaces the running application. Checking out v0.6 while `vendor/` holds Symfony gives every request `Class "Base" not found`, because the old code wants Fat-Free and it is no longer installed. To move a branch pointer, use `git branch -f main dev-0.7`, or push a ref directly with `git push origin dev-0.7:main`. Neither touches a single file.
 
 **A path checkout does not delete.** `git checkout <branch> -- .` writes the files the branch has and leaves behind every file the branch dropped. After restoring this way, remove what does not belong: ask the commit what should exist (`git ls-tree -r --name-only <branch>`) rather than asking the diff what was deleted, because `--diff-filter=D` misses a file that was *renamed* away. A single leftover Fat-Free class is enough to stop Symfony building its container.
 
@@ -488,18 +335,18 @@ chmod +x bin/console
 git update-index --chmod=+x bin/console
 ```
 
-**Build output under `public_html/assets/` is written by `cattotest`**, because `asset-map:compile` runs in the container. In the pod `cattotest` is the host user, so the host can delete it; on a host where the container user maps to another UID (the former WSL setup), remove it from inside the container. The same applies to anything else PHP-FPM writes.
+**Build output under `public_html/assets/` is written by the PHP user**, because `asset-map:compile` runs as it. When that user is the host user (`--userns=keep-id`) the host can delete it; when the container user maps to another UID, remove it from inside the container. The same applies to anything else PHP-FPM writes.
 
 ## Development database cleanup
 
 The database is currently disposable. To clear accumulated Activity during development:
 
 ```bash
-runuser -u siteuser -- psql -d siteuser \
+runuser -u <site-user> -- psql -d <database> \
   -c "TRUNCATE TABLE audit_log RESTART IDENTITY;"
 ```
 
-Do not use this instruction once the project owner declares a production database.
+Never use this on a live site.
 
 ## GeoIP
 
@@ -516,7 +363,7 @@ No special PHP GeoIP extension is required.
 Expected database path can be configured in `.env`, for example:
 
 ```dotenv
-GEOIP_DATABASE=/home/siteuser/storage/geoip/GeoLite2-City.mmdb
+GEOIP_DATABASE=/home/<site-user>/storage/geoip/GeoLite2-City.mmdb
 ```
 
 The LMS must continue to work when the MMDB file is absent; location simply remains unavailable. Private/local IPs should be presented as local/private rather than treated as geolocation errors.
@@ -547,24 +394,8 @@ Never fabricated: sessions, login and API tokens, Resources, and everything comm
 
 What replaces all three is the single sentence above: reset the database. `composer smoke:install` is the whole cleanup story now, and it is the only one, which is why generating is safe to do freely and impossible to undo selectively.
 
-### The Site Owner and its bank details
+## The Site Owner and its bank details
 
-The business hosting the site is the Site Owner (owner, 2026-10-18), not a company: there is no System Company. Its trading name, legal name, legal form (company or sole proprietor), registration number, tax number, address, telephone, email address, website, Information Officer, memberships, accreditation and EFT bank details come from `SITE_OWNER_*` in `.env` (with `APP_ADMIN_EMAIL` and `APP_DOMAIN`), and Administration → Settings → Site Owner overrides each (`app_options` `site_owner.<field>`; a value equal to `.env` removes the override; Reset removes all). Every change is in the Activity log (`site_owner.updated`) with each changed field's old and new value. The legal pages, invoices, receipts, credit notes and certificates name it; a document keeps the details it was issued with. Nobody belongs to the Site Owner, not even ADMIN; a course no company owns is the Site Owner's, and its provider name is the Site Owner's trading name.
+The business hosting the site is the Site Owner, not a company: there is no System Company. Its trading name, legal name, legal form (company or sole proprietor), registration number, tax number, address, telephone, email address, website, Information Officer, memberships, accreditation and EFT bank details come from `SITE_OWNER_*` in `.env` (with `APP_ADMIN_EMAIL` and `APP_DOMAIN`), and Administration → Settings → Site Owner overrides each (`app_options` `site_owner.<field>`; a value equal to `.env` removes the override; Reset removes all). Every change is in the Activity log (`site_owner.updated`) with each changed field's old and new value. The legal pages, invoices, receipts, credit notes and certificates name it; a document keeps the details it was issued with. Nobody belongs to the Site Owner, not even ADMIN; a course no company owns is the Site Owner's, and its provider name is the Site Owner's trading name.
 
 Settings is one area: site mode, the Site Owner, platform identity, outgoing mail, each group of commerce settings and maintenance, each in its own accordion with its own save. Saving one section does not submit another's fields, and saving settings never changes anyone's company membership.
-
-## v0.8.6 release and browser verification
-
-Install changed theme sources through ThemeManager, using `themes:install -- --force` only in development. Compile AssetMapper assets and publish the compiled output and changed core assets as the application user; never mirror the whole runtime tree or recursively change its ownership from the host. Clear the application cache after publication.
-
-Run the canonical shell and component matrices serially using the [browser instructions](../tests/Browser/README.md), then Twig lint and full `composer qa`. The canonical matrix temporarily activates themes for anonymous requests; restore its saved active theme before removing its isolated identity, including after an interrupted run. Component checks alone do not verify shell construction.
-
-For an authorized release, increment changed theme versions and the child’s exact parent requirement, rebuild `extras/themes` from final source, and validate packages. Do not overwrite accepted installed versions with development `--force`. v0.9.2 ships Factory Reset and Factory Reset Sidebar 2.0.2, Gilded Noir 2.0.3, Light Default 2.0.2, Radiant Learning 4.0.2 and Saharan Sunset 1.0.1. Git publication does not deploy or certify the VPS. Push the reviewed development commit to `main` directly without checking out branches in the served directory.
-
-### v0.8.6 installation order
-
-Run `composer themes:install` before `composer migrate`. The additive canonical-theme migration advances only the immediately preceding bundled active-theme keys to their new installed versions; it preserves custom or other selections. Then publish compiled/core assets and clear caches. Historical reports are kept outside the code repository in workspace `cattolms/REPORTS/`.
-
-## Course Components development baseline — completed
-
-The released Course Components implementation replaced the disposable module-centric baseline with `20260906110000_create_v085_course_components_baseline.php`. The owner-authorized reset and 100,000-record generation have already run; do not rerun destructive operations merely to resume a session. Resources live in the instance storage root under `course-resources`; files may be transferred there externally and then registered by exact filename in `/admin/resources`. Do not overwrite registered files or automatically rename duplicates. All reports belong in workspace `cattolms/REPORTS`, outside the code repository. The former code-tree REPORTS content is intentionally removed. The v0.8.6 release validation is recorded in `HANDOFF.md`; workspace `AGENTS.md` records the current release checkpoint.

@@ -2,9 +2,12 @@
  * designs as pictures, Classic the default, and nothing of the template engine. ADMIN makes a design
  * in the one-form editor - a look picked by picture, the wording in CKEditor with Insert field, a
  * signatory - while the preview above it, at the full width, redraws as the form changes; the course then picks that design by
- * picture with its own accreditation line and previews what issuing will draw. A learner passes the
- * final and gets the certificate page and PDF. Editing the design changes the next learner's
- * certificate and never the issued one. An uploaded Canva-sized background becomes a design's look.
+ * picture with its own accreditation line and previews what issuing will draw. A verified learner
+ * completes the final and gets the certificate page and PDF and the transcript. A certificate proves that
+ * the learner took the course, never that they passed (owner, 2026-10-19): the second learner fails the
+ * final, is told to verify to receive the certificate and transcript, and once verified receives both,
+ * the transcript recording the failed mark. Editing the design changes the next learner's certificate
+ * and never the issued one. An uploaded Canva-sized background becomes a design's look.
  * Duplicate, the default for new courses and delete (which moves the courses using a design) work.
  * The editor and the course page work without JavaScript, typed [Learner name] fields included; a
  * learner cannot open either; the pages fit every theme at desktop and phone widths; Firefox
@@ -145,17 +148,24 @@ async function fetchPdf(page, href, label) {
     assert.equal((body.toString('latin1').match(/\/Type\s*\/Page(?![a-zA-Z])/g) || []).length, 1, `${label} is one page`);
     return pdfText(body);
 }
-/* A learner passes the one-question final in the reader and opens the certificate from the course. */
-async function passFinal(page) {
+/* A learner answers the one-question final in the reader and goes back to the course. */
+async function completeFinal(page, answer) {
     await page.goto(base + state.assessment);
     await submit(page, 'Start graded assessment');
     step = 'answer';
-    await page.getByLabel('Correct').check();
+    await page.getByLabel(answer).check();
     await submit(page, 'Submit answer');
     await page.goto(`${base}/learn/${state.slug}`);
+}
+/* A verified learner completes the final (with the right answer, as the other learner gives the wrong one) and opens the certificate from the course. */
+async function passFinal(page) {
+    await completeFinal(page, 'Correct');
+    return openCertificate(page);
+}
+async function openCertificate(page) {
     step = 'View certificate';
     await Promise.all([page.waitForNavigation(), page.getByRole('link', {name: 'View certificate'}).click()]);
-    assert.match(page.url(), /\/certificates\/[0-9a-f-]{36}$/);
+    assert.match(page.url(), /\/certificates\/[0-9a-f]{32}$/);
     return page.url();
 }
 
@@ -235,7 +245,7 @@ async function passFinal(page) {
         assert.equal(await page.locator('textarea, .ck-editor').count(), 0, 'the course holds no wording');
         assert.ok(await pictureChoice(page, 'Classic').isChecked(), 'the course starts with the default design');
         let text = await nextPreview(previews, () => pictureChoice(page, DESIGN).check(), 'pick the design');
-        assert.ok(text.includes('Browser edition one') && text.includes(state.course_title) && text.includes('Certificates Administrator'), `the preview is this course in the design (${text.slice(0, 160)})`);
+        assert.ok(text.includes('Browser edition one') && text.includes(state.course_title) && text.includes('Sample Learner'), `the preview is this course in the design, for a sample learner (an issued certificate carries the verified name) (${text.slice(0, 160)})`);
         text = await nextPreview(previews, () => page.locator('#certificate-accreditation').fill(ACCREDITATION), 'accreditation');
         assert.ok(text.includes(ACCREDITATION), 'the accreditation line is previewed');
         await submit(page, 'Save');
@@ -247,7 +257,7 @@ async function passFinal(page) {
         await ctx.close();
     });
 
-    await scenario('a learner passes the final, sees the certificate and downloads its PDF', 'chromium', async () => {
+    await scenario('a verified learner completes the final, sees the certificate and transcript and downloads their PDFs', 'chromium', async () => {
         const {ctx, page} = await open(chromium, state.first_tokens[0]);
         firstCertificate = await passFinal(page);
         step = 'certificate page';
@@ -261,9 +271,73 @@ async function passFinal(page) {
         for (const expected of ['Lerato Browser Mokoena', state.course_title, 'Browser edition one', ACCREDITATION, 'Dr. Browser Signatory']) {
             assert.ok(firstText.includes(expected), `the certificate prints ${expected}`);
         }
+        assert.equal(await page.getByText('Result').count(), 0, 'the certificate page shows no result');
         await page.goto(`${base}/learn/${state.slug}`);
         await fetchPdf(page, await page.getByRole('link', {name: 'Download certificate PDF'}).getAttribute('href'), 'the course page PDF link');
+        step = 'transcript';
+        await Promise.all([page.waitForNavigation(), page.getByRole('link', {name: 'View transcript'}).click()]);
+        assert.match(page.url(), /\/transcripts\/[0-9a-f]{32}$/);
+        const transcript = await page.locator('main').textContent();
+        for (const expected of ['Lerato Browser Mokoena', 'Final assessment', '100.00%', 'Overall grade']) {
+            assert.ok(transcript.includes(expected), `the transcript shows ${expected}`);
+        }
+        const transcriptText = await fetchPdf(page, await page.getByRole('link', {name: 'Download PDF'}).getAttribute('href'), 'the transcript PDF');
+        assert.ok(transcriptText.includes('Transcript') && transcriptText.includes('Lerato Browser Mokoena'), 'the transcript PDF names the learner');
         await page.screenshot({path: `${output}/learner-certificate.png`, fullPage: true});
+        await ctx.close();
+    });
+
+    // Each certificate and transcript is private until the learner makes it public, each decided
+    // separately, and the learner can give either a new address (owner, 2026-10-19).
+    await scenario('the learner decides who sees the certificate and the transcript, and gives the transcript a new address', 'chromium', async () => {
+        const {ctx, page} = await open(chromium, state.first_tokens[0]);
+        const visitor = await open(chromium, null);
+        const status = async (url) => (await visitor.page.request.get(url, {maxRedirects: 0})).status();
+        step = 'private';
+        assert.equal(await status(firstCertificate), 404, 'a private certificate is not found by a visitor');
+        await page.goto(`${base}/account/certificates`);
+        const card = page.locator('section.cl-ui-surface[id^="certificate-"]', {hasText: state.course_title});
+        const row = (label) => card.locator('.cl-ui-list-item').filter({has: page.locator('strong', {hasText: new RegExp(`^${label}$`)})});
+        const address = async (label) => row(label).locator('input[readonly]').inputValue();
+        assert.equal(await address('Certificate'), firstCertificate, 'My Certificates shows the certificate\'s address');
+        const oldTranscript = await address('Transcript');
+        assert.match(oldTranscript, /\/transcripts\/[0-9a-f]{32}$/);
+        assert.equal(await status(oldTranscript), 404, 'a private transcript is not found by a visitor');
+        for (const label of ['Certificate', 'Transcript']) assert.ok((await row(label).textContent()).includes('Private'), `the ${label} starts private`);
+
+        step = 'make the certificate public';
+        await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), row('Certificate').getByRole('button', {name: /public/}).click()]);
+        await flash(page, 'Your certificate is now public.');
+        assert.equal(await status(firstCertificate), 200, 'anyone with its address sees a public certificate');
+        await visitor.page.goto(firstCertificate);
+        assert.equal(await visitor.page.locator('object.cl-certificate-pdf').count(), 1, 'the visitor sees the certificate');
+        assert.equal(await visitor.page.locator('a[href*="/transcripts/"]').count(), 0, 'nothing tells the visitor where the transcript is');
+        assert.equal(await visitor.page.getByText('only you can see', {exact: false}).count(), 0, 'and nothing meant for the learner');
+        assert.equal(await status(oldTranscript), 404, 'the transcript is still private: each is decided separately');
+
+        step = 'transcript public, then a new address';
+        await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), row('Transcript').getByRole('button', {name: /public/}).click()]);
+        await flash(page, 'Your transcript is now public.');
+        assert.equal(await status(oldTranscript), 200);
+        await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), row('Transcript').getByRole('button', {name: /new address/}).click()]);
+        await flash(page, 'Your transcript has a new address. The old address no longer works.');
+        const newTranscript = await address('Transcript');
+        assert.notEqual(newTranscript, oldTranscript, 'the address changed');
+        assert.match(newTranscript, /\/transcripts\/[0-9a-f]{32}$/);
+        assert.equal(await status(oldTranscript), 404, 'the old address no longer works');
+        assert.equal(await status(newTranscript), 200, 'the new one does, still public');
+        assert.equal(await address('Certificate'), firstCertificate, 'the certificate kept its address');
+        const pdf = await fetchPdf(visitor.page, `${newTranscript}/transcript.pdf`, 'the transcript PDF at its new address');
+        const code = (url) => url.slice(-32);
+        assert.ok(!pdf.replace(/\s/g, '').includes(code(oldTranscript)), 'the PDF no longer prints the old address');
+        assert.ok(pdf.replace(/\s/g, '').includes(code(newTranscript)) || !pdf.includes('/transcripts/'), 'the PDF prints the address that works');
+
+        step = 'private again';
+        await Promise.all([page.waitForNavigation({waitUntil: 'domcontentloaded'}), row('Transcript').getByRole('button', {name: /private/}).click()]);
+        await flash(page, 'Your transcript is now private. Only you can see it.');
+        assert.equal(await status(newTranscript), 404, 'private again, the visitor finds nothing');
+        await page.screenshot({path: `${output}/my-certificates.png`, fullPage: true});
+        await visitor.ctx.close();
         await ctx.close();
     });
 
@@ -288,10 +362,22 @@ async function passFinal(page) {
         assert.ok(await page.getByText(`Drawn in the design “${DESIGN}”`).isVisible(), 'ADMIN sees the design it was drawn in');
         await ctx.close();
 
+        // The second learner fails the final: completing every assessment still earns the certificate,
+        // which waits until they are verified.
         const learner = await open(chromium, state.second_token);
-        await passFinal(learner.page);
+        await completeFinal(learner.page, 'Wrong');
+        step = 'waiting';
+        assert.ok(await learner.page.getByText('You have completed every assessment. Verify your identity to receive your certificate and transcript.').isVisible(), 'an unverified learner is told to verify');
+        assert.equal(await learner.page.getByRole('link', {name: 'Verify my identity'}).count(), 1, 'with a Verify button');
+        assert.equal(await learner.page.getByRole('link', {name: 'View certificate'}).count(), 0, 'and no certificate yet');
+        execFileSync('podman', ['exec', '-u', 'cattotest', container, 'sh', '-lc', `SHELL_VERBOSITY=-1 php tests/Browser/certificates-fixture.php verify ${statePath} 2>/dev/null`], {encoding: 'utf8'});
+        await learner.page.goto(`${base}/learn/${state.slug}`);
+        await openCertificate(learner.page);
         const text = await fetchPdf(learner.page, await learner.page.getByRole('link', {name: 'Download PDF'}).getAttribute('href'), 'the next certificate');
         assert.ok(text.includes('Pieter Browser van Wyk') && text.includes('Edition two: Browser edition one'), `the next certificate uses the edited design (${text.slice(0, 200)})`);
+        step = 'failed transcript';
+        await Promise.all([learner.page.waitForNavigation(), learner.page.getByRole('link', {name: 'View transcript'}).click()]);
+        assert.ok((await learner.page.locator('main').textContent()).includes('0.00%'), 'the transcript records the failed final');
         await learner.ctx.close();
     });
 

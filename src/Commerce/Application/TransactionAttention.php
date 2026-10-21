@@ -47,7 +47,7 @@ final class TransactionAttention
     /**
      * Every open item, oldest first.
      *
-     * @return list<array{kind:string,reference:string,title:string,summary:string,at:string,href:string}>
+     * @return list<array{kind:string,reference:string,title:string,summary:string,at:string,href:string,person:?array{name:string,reference:string,href:string}}>
      */
     public function items(int $limit = 50): array
     {
@@ -56,26 +56,26 @@ final class TransactionAttention
             $due = (int) $row['total_minor'] - (int) $row['paid_minor'];
             if ($due <= 0) continue;
             $items[] = $this->item('underpaid', (string) $row['id'], 'Order ' . self::order((int) $row['id']) . ' is underpaid',
-                Money::strictMinorUnits((int) $row['external_minor'], (string) $row['currency'])->format() . ' received; ' . Money::strictMinorUnits($due, (string) $row['currency'])->format() . ' still due by ' . self::date((string) $row['payment_due_at']) . '.', (string) $row['placed_at']);
+                Money::strictMinorUnits((int) $row['external_minor'], (string) $row['currency'])->format() . ' received; ' . Money::strictMinorUnits($due, (string) $row['currency'])->format() . ' still due by ' . self::date((string) $row['payment_due_at']) . '.', (string) $row['placed_at'], row: $row);
         }
         foreach (['overpaid' => 'overpayment_to_wallet', 'cancelled_paid' => 'unfulfilled_payment_to_wallet'] as $kind => $ledgerKind) {
             foreach ($this->attention->undismissedEntries($ledgerKind, $kind) as $row) {
                 $amount = Money::strictMinorUnits((int) $row['amount_minor'], (string) $row['currency'])->format();
                 $items[] = $kind === 'overpaid'
-                    ? $this->item($kind, (string) $row['id'], 'Order ' . self::order((int) $row['order_id']) . ' was overpaid', $amount . ' more than was due went to the payer’s wallet.', (string) $row['occurred_at'])
-                    : $this->item($kind, (string) $row['id'], 'Order ' . self::order((int) $row['order_id']) . ' was cancelled after a payment', $amount . ' paid towards it went to the payer’s wallet.', (string) $row['occurred_at']);
+                    ? $this->item($kind, (string) $row['id'], 'Order ' . self::order((int) $row['order_id']) . ' was overpaid', $amount . ' more than was due went to the payer’s wallet.', (string) $row['occurred_at'], row: $row)
+                    : $this->item($kind, (string) $row['id'], 'Order ' . self::order((int) $row['order_id']) . ' was cancelled after a payment', $amount . ' paid towards it went to the payer’s wallet.', (string) $row['occurred_at'], row: $row);
             }
         }
         foreach ($this->attention->openUnmatchedPayments() as $row) {
             $items[] = $this->item('unmatched', (string) $row['id'], Money::strictMinorUnits((int) $row['amount_minor'], (string) $row['currency'])->format() . ' arrived and paid no order',
                 'Reference "' . $row['payer_reference'] . '", received ' . self::date((string) $row['received_at']) . '. Match it to an order or record that you paid it back.', (string) $row['received_at'],
-                '/admin/commerce/unmatched/' . (string) $row['id']);
+                '/admin/commerce/unmatched/' . (string) $row['id'], row: $row);
         }
         foreach ($this->attention->openRefundRequests() as $row) {
-            $items[] = $this->item('refund_request', (string) $row['id'], (string) $row['display_name'] . ' asked for a refund', 'Order ' . self::order((int) $row['order_id']) . ', as ' . ($row['destination'] === 'money_back' ? 'money back' : 'wallet credit') . '.', (string) $row['requested_at']);
+            $items[] = $this->item('refund_request', (string) $row['id'], (string) $row['display_name'] . ' asked for a refund', 'Order ' . self::order((int) $row['order_id']) . ', as ' . ($row['destination'] === 'money_back' ? 'money back' : 'wallet credit') . '.', (string) $row['requested_at'], row: $row);
         }
         foreach ($this->attention->unpaidMoneyBackRefunds() as $row) {
-            $items[] = $this->item('refund_to_pay', (string) $row['id'], 'Refund to pay for order ' . self::order((int) $row['order_id']), Money::strictMinorUnits((int) $row['net_minor'], (string) $row['currency'])->format() . ' by ' . ($row['method'] === 'stitch' ? 'the Stitch dashboard' : 'EFT') . ', due by ' . self::date((string) $row['payout_due_at']) . '.', (string) $row['payout_due_at']);
+            $items[] = $this->item('refund_to_pay', (string) $row['id'], 'Refund to pay for order ' . self::order((int) $row['order_id']), Money::strictMinorUnits((int) $row['net_minor'], (string) $row['currency'])->format() . ' by ' . ($row['method'] === 'stitch' ? 'the Stitch dashboard' : 'EFT') . ', due by ' . self::date((string) $row['payout_due_at']) . '.', (string) $row['payout_due_at'], row: $row);
         }
         usort($items, static fn(array $a, array $b): int => strcmp($a['at'], $b['at']));
 
@@ -104,7 +104,10 @@ final class TransactionAttention
             'kind' => $kind, 'reference' => $reference, 'open' => $item !== null, 'title' => $title, 'summary' => $item['summary'] ?? 'This item has been resolved.',
             'order_id' => $orderId, 'order_label' => self::order($orderId), 'company_name' => (string) ($snapshot['company_name'] ?? ''),
             'person' => $person, 'account_reference' => $accountReference, 'ledger' => $ledger,
-            'emails' => $this->attention->emails($kind, $reference),
+            // The purchaser and each email's sender as people (owner, 2026-10-21: names linked to their accounts, with their account reference).
+            'purchaser' => MoneyRecords::person((int) $order['purchaser_user_id'], $person['name'], $this->records->userAccountReference((int) $order['purchaser_user_id']), $person['email']),
+            'emails' => array_map(static fn(array $e): array => $e + ['sender_person' => MoneyRecords::person((int) $e['sent_by_user_id'], (string) $e['sender'], (string) ($e['sender_reference'] ?? ''), (string) ($e['sender_email'] ?? ''))],
+                $this->attention->emails($kind, $reference)),
             'subject' => 'About your order ' . self::order($orderId),
             'body' => self::startingText($kind, $person['name'], self::order($orderId), $item['summary'] ?? '', $accountReference),
             'can_dismiss' => in_array($kind, ['overpaid', 'cancelled_paid'], true) && $item !== null,
@@ -139,10 +142,14 @@ final class TransactionAttention
         });
     }
 
-    /** @return array{kind:string,reference:string,title:string,summary:string,at:string,href:string} */
-    private function item(string $kind, string $reference, string $title, string $summary, string $at, ?string $href = null): array
+    /**
+     * @param array<string,mixed> $row the item's record, whose person_* columns name who it concerns (owner, 2026-10-21)
+     * @return array{kind:string,reference:string,title:string,summary:string,at:string,href:string,person:?array{name:string,reference:string,href:string}}
+     */
+    private function item(string $kind, string $reference, string $title, string $summary, string $at, ?string $href = null, array $row = []): array
     {
-        return ['kind' => $kind, 'reference' => $reference, 'title' => $title, 'summary' => $summary, 'at' => $at, 'href' => $href ?? '/admin/commerce/attention/' . $kind . '/' . $reference];
+        $person = isset($row['person_id']) ? ['name' => trim((string) $row['person_name']) ?: 'Someone', 'reference' => (string) ($row['person_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['person_id']] : null;
+        return ['kind' => $kind, 'reference' => $reference, 'title' => $title, 'summary' => $summary, 'at' => $at, 'href' => $href ?? '/admin/commerce/attention/' . $kind . '/' . $reference, 'person' => $person];
     }
 
     private static function startingText(string $kind, string $name, string $order, string $summary, string $reference): string

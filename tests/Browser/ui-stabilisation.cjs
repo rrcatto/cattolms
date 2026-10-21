@@ -44,7 +44,7 @@ function assertUi(measured,theme,route,width) {
                         const centres=p.children.map(b=>b.y+b.height/2);
                         assert.ok(Math.max(...centres)-Math.min(...centres)<2,'All pagination groups share one horizontal centre line');
                         assert.ok(p.box.height<100,`One-row pager height ${p.box.height}`);
-                        assert.match(p.summary,/^(Showing \d+–\d+ of \d+ · )?Page \d+ of \d+$/);
+                        assert.match(p.summary,/^(\d+–\d+ of \d+ · )?Pg \d+ of \d+$/);
                     }
                     if(route==='/company') assert.ok(measured.banners.length,'Company context exercised');
                     for(const b of measured.banners) {assert.equal(b.background[3],255,'Opaque context surface');assert.ok(Math.max(...b.background.slice(0,3))-Math.min(...b.background.slice(0,3))>=10,`Visible context colour: ${b.background}`);assert.ok(b.contrast>=4.5,`Context contrast ${b.contrast}`);}
@@ -69,7 +69,7 @@ function assertUi(measured,theme,route,width) {
         page.on('pageerror', e => failures.push(`JavaScript: ${e.message}`));
         for (const theme of themes) for (const width of [1440, 390]) {
             await page.setViewportSize({width, height:1000});
-            for (const route of ['/admin/system/ui-components', '/admin/reports', '/admin/people', '/company', '/account', '/courses', '/help']) {
+            for (const route of ['/admin/system/ui-components', '/admin/reports', '/admin/people', '/company', '/account', '/courses', '/help', '/faq']) {
                 const label = `${theme.slug} ${width} ${route}`;
                 try {
                     const response = await page.goto(`${base}${route}?theme_preview=${theme.key}`);
@@ -123,12 +123,12 @@ function assertUi(measured,theme,route,width) {
         await p.goto(`${base}/admin/people`);
         await p.locator('.pagination-controls').first().getByRole('link',{name:'Next page',exact:true}).click();
         await p.waitForLoadState();
-        assert.match(await p.locator('.pagination-summary').first().innerText(),/Page 2 of/i);
+        assert.match(await p.locator('.pagination-summary').first().innerText(),/Pg 2 of/i);
         const jump=p.locator('.pagination-jump').first();
         await jump.locator('input[type=number]').fill('3');
         await jump.locator('input[type=number]').press('Enter');
         await p.waitForLoadState();
-        assert.match(await p.locator('.pagination-summary').first().innerText(),/Page 3 of/i);
+        assert.match(await p.locator('.pagination-summary').first().innerText(),/Pg 3 of/i);
         await p.goto(`${base}/courses`);
         assert.equal(new URL(p.url()).pathname,'/courses');
         console.log('PASS non-JavaScript GET controls');

@@ -69,4 +69,33 @@ final class CanonicalPageConstructionTest extends TestCase
             self::assertStringNotContainsString('href="/login"', $source, 'Authentication navigation belongs to the core model.');
         }
     }
+
+    /**
+     * Saharan Sunset's sign-in panel (owner, 2026-10-20: the serpent "will put off some people … make them
+     * different for the Login vs Register pages"): a doorway for signing in, a dawn for registering, each
+     * with its own line, chosen by page.name.
+     */
+    public function testSaharanSunsetShowsOnePictureForSigningInAndAnotherForRegistering(): void
+    {
+        $expect = [
+            'login' => ['ss-auth--sign-in', 'Sign in on any device'],
+            'login-sent' => ['ss-auth--sign-in', 'Sign in on any device'],
+            'register' => ['ss-auth--register', 'Create your account once.'],
+            'company-register' => ['ss-auth--register', 'Register your company once'],
+        ];
+        foreach ($expect as $page => [$class, $line]) {
+            $html = CanonicalPageFixture::render('saharan-sunset', $page === 'company-register', $page);
+            self::assertStringContainsString('class="cl-page-family ss-auth ' . $class . '"', $html, $page);
+            self::assertStringContainsString($line, $html, $page);
+        }
+        $theme = dirname(__DIR__, 2) . '/themes/saharan-sunset';
+        $css = (string) file_get_contents($theme . '/public/css/theme.css');
+        self::assertStringContainsString('url("../img/auth-sign-in.svg")', $css);
+        self::assertStringContainsString('.ss-auth--register .ss-auth-art { background-image: url("../img/auth-register.svg")', $css);
+        self::assertStringNotContainsString('serpent.jpg', $css);
+        self::assertFileExists($theme . '/public/img/auth-sign-in.svg');
+        self::assertFileExists($theme . '/public/img/auth-register.svg');
+        self::assertFileDoesNotExist($theme . '/public/img/footer-serpent.jpg');
+        self::assertStringContainsString("'name' => \$page,", (string) file_get_contents(dirname(__DIR__, 2) . '/src/View/ThemeRenderer.php'), 'Themes receive page.name.');
+    }
 }

@@ -31,9 +31,9 @@
 			{% block body %}
 				{% for row in rows %}
 					<tr data-payment-event-id="{{ row.id }}" data-payment-state="{{ row.state }}">
-						<td class="cell-text">{% if row.account_reference_label %}<strong>{% if row.account_href %}<a href="{{ row.account_href }}">{{ row.account_reference_label }}</a>{% else %}{{ row.account_reference_label }}{% endif %}</strong><br>{% endif %}<span class="small">{{ row.account_label ?: '—' }}</span></td>
+						<td class="cell-text">{% if row.account_reference_label %}<strong>{% if row.account_href %}<a href="{{ row.account_href }}">{{ row.account_reference_label }}</a>{% else %}{{ row.account_reference_label }}{% endif %}</strong><br>{% endif %}<span class="small">{% if row.account_person %}{{ ui('data.person', row.account_person) }}{% else %}{{ row.account_label ?: '—' }}{% endif %}</span></td>
 						<td class="small">{{ row.when }}</td>
-						<td class="cell-text">{{ row.sentence }}</td>
+						<td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: row.sentence_parts} only %}</td>
 						<td>{{ row.amount_label }}</td>
 						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open payment step ' ~ row.id}) }}</td>
 					</tr>

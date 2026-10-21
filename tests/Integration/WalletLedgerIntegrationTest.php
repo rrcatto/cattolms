@@ -150,6 +150,41 @@ final class WalletLedgerIntegrationTest extends TestCase
         foreach (['Paid from wallet', 'Refund to wallet', 'Overpayment credited to wallet'] as $row) self::assertStringContainsString($row, $page, 'My Wallet lists ' . $row . '.');
     }
 
+    /**
+     * Every money record names the buyer as a person (owner, 2026-10-21: "Every time you mention a person with an account
+     * in the system, I want their name linked to their account" with "their unique Account Reference number", and their
+     * email on commerce pages): the order, its ledger lines and the order page carry the buyer's id, account reference and
+     * email, and the order page links the buyer's name to their account.
+     */
+    public function testEveryMoneyRecordNamesTheBuyerLinkedToTheirAccountWithTheirReferenceAndEmail(): void
+    {
+        $buyer = $this->buyer();
+        $this->orders->changeCart($buyer, $this->course['A']['variant']);
+        $orderId = $this->buy($buyer);
+        $email = (string) $this->db->fetchOne('SELECT email FROM user_emails WHERE user_id = :id AND is_primary', ['id' => $buyer->id]);
+        $reference = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $buyer->id]);
+        $records = new \CattoLearning\Commerce\Application\MoneyRecords(new \CattoLearning\Commerce\Infrastructure\MoneyRecordsRepository($this->db), $this->clock);
+
+        $order = array_values(array_filter($records->orders(['q' => $email])['rows'], static fn(array $row): bool => (int) $row['id'] === $orderId))[0] ?? null;
+        self::assertNotNull($order, 'The order is found by the buyer\'s email.');
+        self::assertSame($buyer->id, (int) $order['purchaser_user_id']);
+        self::assertSame(['reference' => $reference, 'href' => '/admin/people/' . $buyer->id, 'email' => $email],
+            array_intersect_key($order['purchaser_person'], ['reference' => 1, 'href' => 1, 'email' => 1]), 'The orders list names the buyer as a person.');
+
+        $paid = array_values(array_filter($records->ledger(['order' => (string) $orderId])['rows'], static fn(array $row): bool => $row['kind'] === 'payment_received'))[0];
+        self::assertSame(['reference' => $reference, 'href' => '/admin/people/' . $buyer->id, 'email' => $email],
+            array_intersect_key((array) $paid['account_person'], ['reference' => 1, 'href' => 1, 'email' => 1]), 'A ledger line names its account as a person.');
+        self::assertSame('/admin/people/' . $buyer->id, $paid['sentence_parts'][0]['person']['href'] ?? null, 'Its sentence draws the buyer as a person.');
+        self::assertSame($paid['sentence'], implode('', array_map(static fn(array $part): string => $part['text'] ?? $part['person']['name'], $paid['sentence_parts'])), 'The parts read as the sentence.');
+
+        $page = InProcessPage::run($this->admin(), \CattoLearning\Commerce\Http\PaymentAdministrationController::class, 'order', ['id' => (string) $orderId])['body'];
+        self::assertStringContainsString('<a class="cl-ui-person-account" href="/admin/people/' . $buyer->id . '">', $page, 'The order page links the buyer to their account.');
+        self::assertStringContainsString('<span class="cl-ui-person-line cl-ui-person-reference">' . AccountReference::format($reference) . '</span>', $page, 'with their account reference, once, under the order number');
+        $placedWith = (string) (CommerceRepository::decode((string) $this->records->order($orderId)['snapshot'])['purchaser_email'] ?? '');
+        self::assertNotSame('', $placedWith);
+        self::assertStringContainsString('href="mailto:' . $placedWith . '"', $page, 'and the email the order was placed with.');
+    }
+
     public function testAnEftThatIsTooLittleWaitsAndOneThatIsTooMuchCreditsTheWallet(): void
     {
         $buyer = $this->buyer();

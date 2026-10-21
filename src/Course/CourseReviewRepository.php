@@ -174,8 +174,8 @@ final class CourseReviewRepository
         [$where, $bindings] = self::moderationFilter($filters);
         return $this->db->fetchAllAssociative(
             "SELECT r.*, c.title AS course_title, c.slug AS course_slug,
-                    COALESCE(NULLIF(u.sort_name,''), 'User ' || u.id) AS learner_name, " . self::PUBLIC_NAME . " AS reviewer,
-                    m.sort_name AS moderator_name
+                    COALESCE(NULLIF(u.sort_name,''), 'User ' || u.id) AS learner_name, u.account_reference AS learner_reference, " . self::PUBLIC_NAME . " AS reviewer,
+                    m.sort_name AS moderator_name, m.account_reference AS moderator_reference
                FROM course_reviews r
                JOIN courses c ON c.id = r.course_id
                JOIN users u ON u.id = r.user_id

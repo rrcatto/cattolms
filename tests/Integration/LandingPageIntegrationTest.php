@@ -270,10 +270,8 @@ final class LandingPageIntegrationTest extends TestCase
         self::assertSame('The course summary for search results.', $this->db->fetchOne('SELECT summary FROM courses WHERE id=:id', ['id' => $this->course]), 'The page’s copy never rewrites the course.');
 
         $this->db->executeStatement('DELETE FROM course_reviews WHERE course_id=:c', ['c' => $this->course]);
-        self::assertStringNotContainsString('What learners say', $this->html('/landing/' . $this->slug), 'With no approved reviews the reviews section is left out by default.');
-        $reviews = $this->sectionOfType('reviews');
-        $this->landing->updateSection($this->course, $reviews, ['heading' => '', 'limit' => '3', 'when_empty' => 'show'], $this->admin);
-        self::assertStringContainsString('No reviews yet', $this->html('/landing/' . $this->slug));
+        self::assertStringNotContainsString('What learners say', $this->html('/landing/' . $this->slug), 'With no approved reviews the reviews section is left out (owner, 2026-10-20).');
+        self::assertStringNotContainsString('No reviews yet', $this->html('/landing/' . $this->slug), 'Nothing says there are no reviews.');
     }
 
     public function testTheOutlineShowsTitlesAndNeverWhatIsInsideALessonAnAssessmentOrAFile(): void
@@ -284,9 +282,12 @@ final class LandingPageIntegrationTest extends TestCase
         $this->landing->updateSection($this->course, $contents, ['show_items' => '1', 'show_descriptions' => '1'], $this->owner);
         $this->landing->publish($this->course, $this->admin);
         $html = $this->html('/landing/' . $this->slug);
-        foreach (['Deeds and transfers', 'Drafting a deed', 'How a deed is drafted.', 'Module test', 'Precedent pack', 'HTML lesson', 'Assessment', 'Free preview'] as $shown) {
+        foreach (['Deeds and transfers', 'Drafting a deed', 'How a deed is drafted.', 'Precedent pack', 'HTML lesson', 'Free preview'] as $shown) {
             self::assertStringContainsString($shown, $html);
         }
+        // The outline lists the modules and other learning items, never the assessments (owner, 2026-10-20).
+        $outline = (string) substr($html, (int) strpos($html, 'cl-landing-outline'), 4000);
+        self::assertStringNotContainsString('Module test', $outline);
         foreach (['SECRET SECTION INTRO', 'SECRET LESSON BODY', 'SECRET QUESTION TEXT', 'SECRET OPTION', 'SECRET EXPLANATION', 'secret-precedents.zip', '/download/', 'SECRET PASS MESSAGE'] as $protected) {
             self::assertStringNotContainsString($protected, $html, 'The outline never shows ' . $protected . '.');
         }

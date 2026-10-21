@@ -8,9 +8,15 @@ Date time: 2026/08/16 14:24 SAST
 Version: 0.5.7.5.1
 
 Description:
-Provides the public Catto Learning contact page and securely forwards contact-form submissions to the configured platform mailbox.
+The public contact page (ContactService). One form whose fields follow the reason chosen: the address
+may choose the reason and fill in what a page knows (/contact?reason=order&order=CL-00000012,
+/contact?reason=course&course=a-slug). A sent message is kept, emailed to the site and acknowledged to
+its sender with its reference.
 
 Changelog:
+2026/10/20 SAST
+- A reason, the account reference, an order and a course, and each reason's own fields; every message
+  kept and acknowledged (owner, 2026-10-20). A drawn header picture.
 2026/08/16 14:24 SAST
 - Added public contact page rendering and CSRF-protected contact submissions.
 - Added a honeypot and short session rate limit to reduce automated form abuse.
@@ -20,17 +26,12 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Controller;
 
-use CattoLearning\Infrastructure\Mail\MailerInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\Routing\Attribute\Route;
-
-use CattoLearning\View\ThemeRenderer;
-
 use CattoLearning\Auth\AuthService;
-
-
-use RuntimeException;
+use CattoLearning\Contact\ContactService;
+use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class ContactController extends BaseController
 {
@@ -38,18 +39,21 @@ final class ContactController extends BaseController
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
-        private readonly MailerInterface $mailer
+        private readonly ContactService $contact
     ) {
         parent::__construct($auth, $view, $requests);
     }
 
-
     #[Route('/contact', name: 'contact_index', methods: ['GET'])]
     public function index(): Response
     {
+        // A message refused for a mistake comes back as it was typed, once.
+        $draft = is_array($_SESSION['contact_draft'] ?? null) ? $_SESSION['contact_draft'] : [];
+        unset($_SESSION['contact_draft']);
         return $this->render('contact', [
             'title' => 'Contact',
             'page_kicker' => 'Get in touch',
+            'contact' => $this->contact->form($this->currentUser(), $this->request()->query->all(), $draft),
         ]);
     }
 
@@ -71,34 +75,15 @@ final class ContactController extends BaseController
             $this->redirect('/contact');
         }
 
-        $name = trim((string) ($_POST['name'] ?? ''));
-        $email = trim((string) ($_POST['email'] ?? ''));
-        $subject = trim((string) ($_POST['subject'] ?? ''));
-        $message = trim((string) ($_POST['message'] ?? ''));
-
-        if ($name === '' || mb_strlen($name) > 120) {
-            throw new RuntimeException('Enter your name.');
-        }
-        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 254) {
-            throw new RuntimeException('Enter a valid email address.');
-        }
-        if ($subject === '' || mb_strlen($subject) > 160) {
-            throw new RuntimeException('Enter a subject of no more than 160 characters.');
-        }
-        if ($message === '' || mb_strlen($message) > 5000) {
-            throw new RuntimeException('Enter a message of no more than 5,000 characters.');
-        }
-
-        try {
-            $this->mailer->sendContactMessage($name, $email, $subject, $message);
-        } catch (\Throwable $e) {
-            error_log('Contact form mail delivery failed: ' . $e->getMessage());
-            $this->flash('danger', 'Your message could not be sent. Please try again.');
+        $reason = (string) ($_POST['reason'] ?? '');
+        $_SESSION['contact_draft'] = array_map(static fn(mixed $value): string => is_string($value) ? mb_substr($value, 0, 5000) : '',
+            array_intersect_key($_POST, array_flip(ContactService::FIELDS)));
+        return $this->handle(function (): void {
+            $reference = $this->contact->submit($this->currentUser(), $_POST);
+            unset($_SESSION['contact_draft']);
+            $_SESSION['contact_last_sent_at'] = time();
+            $this->flash('success', 'Thank you. Your message has arrived. Its reference is ' . $reference . '.');
             $this->redirect('/contact');
-        }
-
-        $_SESSION['contact_last_sent_at'] = time();
-        $this->flash('success', 'Thank you. Your message has been sent.');
-        $this->redirect('/contact');
+        }, '/contact' . ($reason !== '' ? '?reason=' . rawurlencode($reason) : ''));
     }
 }

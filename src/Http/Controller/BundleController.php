@@ -9,6 +9,7 @@ use CattoLearning\Auth\AuthService;
 use CattoLearning\Bundle\BundleRepository;
 use CattoLearning\Bundle\BundleService;
 use CattoLearning\Commerce\Application\OrderService;
+use CattoLearning\Commerce\Application\PromotionService;
 use CattoLearning\Support\Pagination;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -22,7 +23,8 @@ use Symfony\Component\Routing\Attribute\Route;
 final class BundleController extends BaseController
 {
     public function __construct(AuthService $auth, ThemeRenderer $view, RequestStack $requests,
-        private readonly BundleService $bundles, private readonly BundleRepository $records, private readonly OrderService $orders)
+        private readonly BundleService $bundles, private readonly BundleRepository $records, private readonly OrderService $orders,
+        private readonly PromotionService $promotions)
     {
         parent::__construct($auth, $view, $requests);
     }
@@ -43,7 +45,11 @@ final class BundleController extends BaseController
     {
         $bundle = $this->bundles->detail((string) $this->param('slug'), $this->currentUser()) ?? throw $this->notFound('This bundle does not exist.');
         // A company account never buys (OrderService::COMPANY_ACCOUNT): it reads why instead of the buttons.
+        $mayBuy = $this->orders->mayBuy($this->currentUser());
+        // The automatic promotions that cover the bundle are announced beside its price (owner, 2026-10-20).
+        $promotions = $mayBuy && $bundle['offer_id'] !== null && $bundle['unavailable'] === null
+            ? $this->promotions->announcements('bundle', (int) $bundle['id'], (int) $bundle['price_minor_units'], (string) $bundle['currency_code'], $this->currentUser()?->id) : [];
         return $this->render('bundle-detail', ['title' => (string) $bundle['title'], 'active_nav' => 'catalogue', 'bundle' => $bundle,
-            'company_note' => $this->orders->mayBuy($this->currentUser()) ? '' : OrderService::COMPANY_ACCOUNT]);
+            'company_note' => $mayBuy ? '' : OrderService::COMPANY_ACCOUNT, 'promotions' => $promotions]);
     }
 }

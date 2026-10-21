@@ -14,6 +14,8 @@ from LegalDocuments, the supplier's details, and the figures the code enforces (
 the automatic start and the payment deadline) so the text cannot drift from them.
 
 Changelog:
+2026/10/19 SAST
+- The Refund Policy names no payment provider and prints no provider's fees (owner, 2026-10-19).
 2026/10/13 SAST
 - Created for the public legal pages; /privacy moved here from HomeController.
 */
@@ -37,7 +39,8 @@ final class LegalController extends BaseController
         ThemeRenderer $view,
         RequestStack $requests,
         private readonly LegalDocuments $legal,
-        private readonly CommerceSettings $settings
+        private readonly CommerceSettings $settings,
+        private readonly \CattoLearning\Document\DocumentPdfRenderer $pdfs
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -60,11 +63,54 @@ final class LegalController extends BaseController
         return $this->document(LegalDocuments::PRIVACY);
     }
 
+    /**
+     * Each document as a PDF (owner, 2026-10-20: "a properly formatted PDF that features the name of the site, the
+     * Last Update date and all the information under neat headings, and at the bottom of each one, my name,
+     * address, contact details"), drawn from the same sections as its page. Shown in the browser, saved under a
+     * name that carries the document and its date.
+     */
+    #[Route('/terms.pdf', name: 'legal_terms_pdf', methods: ['GET'])]
+    public function termsPdf(): Response
+    {
+        return $this->pdf(LegalDocuments::TERMS);
+    }
+
+    #[Route('/refunds.pdf', name: 'legal_refunds_pdf', methods: ['GET'])]
+    public function refundsPdf(): Response
+    {
+        return $this->pdf(LegalDocuments::REFUNDS);
+    }
+
+    #[Route('/privacy.pdf', name: 'legal_privacy_pdf', methods: ['GET'])]
+    public function privacyPdf(): Response
+    {
+        return $this->pdf(LegalDocuments::PRIVACY);
+    }
+
+    private function pdf(string $key): Response
+    {
+        $data = $this->data($key);
+        $pdf = $this->pdfs->renderPage($this->view->renderFragment('partials/legal/document-pdf', $data));
+        // Saved as, for example, Terms-and-Conditions-2026-10-20.pdf.
+        $name = trim((string) preg_replace('/[^A-Za-z0-9]+/', '-', $data['legal']['title'] . ' ' . $data['legal']['updated']), '-');
+        return new Response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $name . '.pdf"',
+            'Cache-Control' => 'public, max-age=300',
+        ]);
+    }
+
     private function document(string $key): Response
+    {
+        return $this->render($key, $this->data($key));
+    }
+
+    /** @return array<string,mixed> what a legal page and its PDF print */
+    private function data(string $key): array
     {
         $document = $this->legal->document($key);
 
-        return $this->render($key, [
+        return [
             'title' => $document['title'],
             'legal' => $document,
             'legal_documents' => $this->legal->all(),
@@ -74,9 +120,7 @@ final class LegalController extends BaseController
             'payment_due' => $this->settings->paymentDue()->words(),
             'wallet_expiry' => $this->settings->walletExpiry()->words(),
             'wallet_reminder' => $this->settings->walletReminder()->words(),
-            'stitch_fee' => $this->settings->stitchFee()->words(),
-            'stitch_refund_fee' => $this->settings->stitchRefundFee()->words(),
             'eft_refund_fee' => $this->settings->eftRefundFee()->words(),
-        ]);
+        ];
     }
 }

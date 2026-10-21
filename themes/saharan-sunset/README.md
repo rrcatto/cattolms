@@ -1,6 +1,6 @@
 # Saharan Sunset
 
-Theme version **1.0.3** for CattoLMS **v0.9.3** and later. Theme Package 4.0 / Twig Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue, Course detail and Sign in). Version 1.0.2 runs on Bootstrap 6 (CattoLMS v0.9.3): it declares its colour scheme (light), sets its checkbox and radio colour (`accent-color`) and focus outline colour, and styles Core's classes in place of Bootstrap 5's. Version 1.0.3 leaves Contact out of the footer's list of links, because the footer's Get in touch has the contact form button (owner, 2026-10-18).
+Theme version **1.0.4** for CattoLMS **v0.9.3** and later. Theme Package 4.0 / Twig Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue, Course detail and Sign in). Version 1.0.2 runs on Bootstrap 6 (CattoLMS v0.9.3): it declares its colour scheme (light), sets its checkbox and radio colour (`accent-color`) and focus outline colour, and styles Core's classes in place of Bootstrap 5's. Version 1.0.3 leaves Contact out of the footer's list of links, because the footer's Get in touch has the contact form button (owner, 2026-10-18). Version 1.0.4 replaces the serpent beside the sign-in pages with two drawn pictures, one for signing in and one for registering (owner, 2026-10-20: the serpent "will put off some people"), and gives a form field's date boxes and drop-downs the height of its text boxes.
 
 ## Look
 
@@ -10,7 +10,8 @@ Warm ivory ground (#f7f1e8, striped with #efe5d6) with paper surfaces (#fbf6ee),
 
 - `public/img/hero-abacus.jpg` is the home page hero behind a dark gradient.
 - `public/img/decor-orb.jpg` lies behind the footer under a veil, mirrored so the orb sits on the right, and is the artwork of course cards that have no cover image.
-- `public/img/footer-serpent.jpg` is the side panel on the sign-in pages.
+- `public/img/auth-sign-in.svg` is the side panel when signing in (sign in, link sent): an arched doorway at night, its door open on a lit room, with lanterns and the moon.
+- `public/img/auth-register.svg` is the side panel when registering (register, company registration): dawn over the dunes, a new account card in the sky and fresh footprints towards the sun. Each panel has its own line of text.
 
 No picture appears twice on one page.
 
@@ -22,6 +23,6 @@ Every page except Home and course landing pages is one box on the slanted textur
 
 `partials/footer.html.twig` is a rich footer with three `cl-footer-section` sections, the core `footer_navigation` destinations, the core `footer_social` marks from the platform sprite and a contact action. The orb art and veil are `ss-footer-art` and `ss-footer-veil`.
 
-`pages/auth.html.twig` wraps the sign-in family (sign in, link sent, register and company registration) in `div.cl-page-family.ss-auth`, placing the serpent panel beside the unchanged page body inside the box.
+`pages/auth.html.twig` wraps the sign-in family (sign in, link sent, register and company registration) in `div.cl-page-family.ss-auth`, placing the picture panel beside the unchanged page body inside the box. It reads `page.name` to choose the picture and the line of text (`ss-auth--sign-in` or `ss-auth--register`).
 
 There is no theme JavaScript. Theme CSS sets colours, type, borders, shadows and decoration on canonical classes. Layout is set only on the shell, the box and its rows, and theme-owned `ss-*` elements.

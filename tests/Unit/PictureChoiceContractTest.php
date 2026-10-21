@@ -58,6 +58,55 @@ final class PictureChoiceContractTest extends TestCase
         }
     }
 
+    /**
+     * Feature cards (owner, 2026-10-20: the Register page's account type as "a Feature Card Radio Selector (Grid
+     * Layout). Each card should have an SVG icon, a Bold Title, and a description"): an option may carry an SVG
+     * icon instead of a picture, drawn inline, never anything that runs or links out.
+     */
+    public function testAnOptionMayBeAFeatureCardWithAnSvgIcon(): void
+    {
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="7" r="3.5"/></svg>';
+        $html = ComponentHarness::render('form.picture-choice', ['name' => 'account_type', 'legend' => 'Account type', 'selected' => 'individual', 'items' => [
+            ['value' => 'individual', 'label' => 'Individual learner', 'icon' => $icon, 'note' => 'For yourself.'],
+            ['value' => 'company', 'label' => 'Company account', 'icon' => $icon, 'note' => 'For a business.'],
+        ]]);
+        $xpath = self::xpath($html);
+        self::assertSame(1, $xpath->query('//fieldset[contains(@class,"cl-ui-picture-choice--cards")]')->length, 'All cards: the card grid.');
+        self::assertSame(2, $xpath->query('//label[contains(@class,"cl-ui-picture-choice-item--icon")]/input[@type="radio" and @name="account_type"]')->length);
+        self::assertSame(2, $xpath->query('//label/span[@class="cl-ui-picture-choice-icon" and @aria-hidden="true"]/*[local-name()="svg"]')->length, 'The icon is decoration: the title names the option.');
+        self::assertSame(0, $xpath->query('//img')->length);
+        self::assertSame(['Individual learner', 'For yourself.'], [trim((string) $xpath->query('//*[@class="cl-ui-picture-choice-label"]')->item(0)?->textContent), trim((string) $xpath->query('//*[@class="cl-ui-picture-choice-note"]')->item(0)?->textContent)]);
+
+        $ui = new PlatformUi();
+        foreach (['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', '<svg xmlns="http://www.w3.org/2000/svg" onload="x()"/>',
+            '<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.com/a.png"/></svg>', '<p>not a picture</p>'] as $bad) {
+            try {
+                $ui->properties('form.picture-choice', ['name' => 'type', 'legend' => 'Type', 'items' => [['value' => 'a', 'label' => 'A', 'icon' => $bad]]]);
+                self::fail('Accepted ' . $bad);
+            } catch (\InvalidArgumentException $refused) {
+                self::assertMatchesRegularExpression('/picture choice/', $refused->getMessage());
+            }
+        }
+        try {
+            $ui->properties('form.picture-choice', ['name' => 'type', 'legend' => 'Type', 'items' => [['value' => 'a', 'label' => 'A', 'image' => '/a.png', 'icon' => $icon]]]);
+            self::fail('A picture and an icon at once.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertMatchesRegularExpression('/picture choice/', $refused->getMessage());
+        }
+    }
+
+    /** columns 4 (owner, 2026-10-20, the catalogue's categories): at most four cards to a row. */
+    public function testFourColumnsIsAVariantAndNothingElseIs(): void
+    {
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>';
+        $items = [['value' => 1, 'label' => 'Finance', 'icon' => $icon, 'note' => 'Keeping the books.']];
+        $xpath = self::xpath(ComponentHarness::render('form.picture-choice', ['name' => 'category', 'legend' => 'Categories', 'items' => $items, 'size' => 'small', 'columns' => 4]));
+        self::assertSame(1, $xpath->query('//fieldset[contains(@class,"cl-ui-picture-choice--four") and contains(@class,"cl-ui-picture-choice--small")]')->length);
+        self::assertSame(0, self::xpath(ComponentHarness::render('form.picture-choice', ['name' => 'category', 'legend' => 'Categories', 'items' => $items]))->query('//fieldset[contains(@class,"cl-ui-picture-choice--four")]')->length);
+        $this->expectException(\InvalidArgumentException::class);
+        (new PlatformUi())->properties('form.picture-choice', ['name' => 'category', 'legend' => 'Categories', 'items' => $items, 'columns' => 3]);
+    }
+
     private static function xpath(string $html): \DOMXPath
     {
         $document = new \DOMDocument();

@@ -9,7 +9,7 @@
         </summary>
         <div class="cl-cart-panel">
             <a class="cl-cart-heading" href="/cart">My Cart</a>
-            {% for item in cart_summary.items %}<div class="cl-cart-line"><a href="/courses/{{ item.slug }}">{{ item.title }}</a><span>{{ item.price_label }}</span></div>{% else %}<p>Your cart is empty.</p>{% endfor %}
+            {% for item in cart_summary.items %}<div class="cl-cart-line"><a href="/courses/{{ item.slug }}">{{ item.title }}</a><span>{% include '@platform/partials/price.html.twig' with {price: item} %}</span></div>{% else %}<p>Your cart is empty.</p>{% endfor %}
             <p class="cl-cart-total"><strong>Total</strong><strong>{{ cart_summary.total_label }}</strong></p>
             <div class="cl-cart-links"><a href="/cart">View My Cart</a>{% if cart_summary.count > 0 %}{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'small', href: '/checkout'}) }}{% endif %}</div>
         </div>

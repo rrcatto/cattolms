@@ -6,6 +6,7 @@ namespace CattoLearning\Commerce\Http;
 
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Commerce\Application\MoneyRecords;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Settings\CommerceSettings;
 use CattoLearning\Commerce\Wallet\WalletOwner;
@@ -76,6 +77,8 @@ final class WalletController extends BaseController
             $row['balance_label'] = Money::ofMinorUnits(max(0, (int) $row['balance_minor']), (string) $row['currency'])->format();
             $row['reference_label'] = AccountReference::format((string) $row['account_reference']);
             $row['href'] = '/admin/wallets/' . ($row['owner_company_id'] !== null ? 'company/' . (int) $row['owner_company_id'] : 'person/' . (int) $row['owner_user_id']);
+            // A person's wallet names its owner as a person (owner, 2026-10-21); a company's stays its name.
+            $row['owner_person'] = $row['owner_user_id'] !== null ? MoneyRecords::person((int) $row['owner_user_id'], (string) $row['owner_name'], (string) $row['account_reference'], (string) ($row['owner_email'] ?? '')) : null;
         }
         unset($row);
 
@@ -94,6 +97,7 @@ final class WalletController extends BaseController
             'title' => 'Wallet', 'active_nav' => 'admin',
             'owner_name' => $owner->isCompany() ? $this->records->companyName((int) $owner->companyId) : $this->records->userName((int) $owner->userId),
             'reference' => $owner->isCompany() ? $this->records->companyAccountReference((int) $owner->companyId) : $this->records->userAccountReference((int) $owner->userId),
+            'owner_person' => $owner->isCompany() ? null : MoneyRecords::person((int) $owner->userId, $this->records->userName((int) $owner->userId), $this->records->userAccountReference((int) $owner->userId), $this->records->userEmail((int) $owner->userId)),
             'can_correct' => $actor->hasPermission('PLATFORM.WALLET.MANAGE'), 'correct_href' => $base . '/correct',
         ]);
     }

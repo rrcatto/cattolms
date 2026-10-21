@@ -1,0 +1,27 @@
+{% extends layout %}
+{% block page_body %}
+	{# What a signed-in person must do before anything else (adults only, owner, 2026-10-20): their date of birth
+	   at the first sign-in of an account someone else created, or, when their verified identity document shows
+	   them under 18, the adults-only page, which goes no further. #}
+	{% set ph_kicker = 'Your account' %}
+	{% set ph_title = step == 'age' ? 'Before you continue' : 'This site is for adults' %}
+	{% set ph_lead = step == 'age' ? 'Please give your date of birth once. This site is for adults: you must be 18 or older.' : 'Your identity document shows that you are under 18.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+			{% if step == 'age' %}
+			{{ ui('layout.section-head', {heading: 'Your date of birth', heading_level: 2, summary: 'Learners must be 18 or older. Your date of birth is kept with your account.'}) }}
+			<form action="/account/confirm-age" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', for: 'date-of-birth', required: true, help: 'For example 14 March 1990.'})} %}{% block control %}<input type="date" id="date-of-birth" name="date_of_birth" max="{{ 'now'|date_modify('-18 years')|date('Y-m-d') }}" autocomplete="bday" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Continue', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+			</form>
+			{% else %}
+			{{ ui('layout.section-head', {heading: 'Your account cannot be used', heading_level: 2, summary: 'Learners must be 18 or older.'}) }}
+			<p>The identity document you verified shows that you are under 18. This site is for adults, so your account goes no further. If this is wrong, <a href="/contact">contact us</a>.</p>
+			{% endif %}
+			<p>Read the <a href="/terms">Terms and Conditions</a> and the <a href="/privacy">Privacy Policy</a>.</p>
+			<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: step == 'age' ? 'Sign out instead' : 'Sign out', variant: 'quiet', size: 'small', type: 'submit'}) }}</form>
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

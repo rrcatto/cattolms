@@ -18,6 +18,8 @@ whether a fixed-size box overflowed - an absolutely positioned box that is too f
 sheet on the same page rather than starting a second one, so the page count alone cannot show it.
 
 Changelog:
+2026/10/20 SAST
+- renderPage(): a page of the site printed whole (the Terms, the Refund Policy and the Privacy Policy as PDFs).
 2026/10/07 SAST
 - Bundled fonts registered into an instance font cache; renderWithLayout() reports element boxes.
 2026/10/06 SAST
@@ -48,6 +50,19 @@ final class DocumentPdfRenderer
     public function render(RenderedDocument $document): string
     {
         return $this->renderWithLayout($document, [])['pdf'];
+    }
+
+    /**
+     * A page of the site set out for print as a whole HTML document, its margins in its own @page rule: the legal
+     * documents as PDFs (owner, 2026-10-20). Not a template document: its text is the page's own.
+     */
+    public function renderPage(string $html, string $size = 'A4', string $orientation = 'portrait'): string
+    {
+        $pdf = $this->dompdf();
+        $pdf->loadHtml($html, 'UTF-8');
+        $pdf->setPaper($size, $orientation);
+        $pdf->render();
+        return (string) $pdf->output();
     }
 
     /**

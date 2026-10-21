@@ -5,7 +5,8 @@
 	it reads why (company_note) and may ask its company for the course instead (can_request).
 
 	purchase is the options. purchase_style is full (every price to choose from) or compact (the default
-	price, named above the buttons). landing_page_id, on a landing page, goes with the form so the press
+	price, named above the buttons). A marked-down price shows its was price struck through, and each
+	automatic promotion that covers the course is announced above the buttons (owner, 2026-10-20). landing_page_id, on a landing page, goes with the form so the press
 	is recorded for the page. purchase_inert draws the buttons disabled, for ADMIN's preview.
 #}
 {% set purchase_style = purchase_style|default('full') %}
@@ -32,13 +33,16 @@
 {% block control %}
 <input class="cl-check mt-1" type="radio" name="variant_id" value="{{ price.id }}" {{ price.id == purchase.default_variant.id ? 'checked' : '' }} required>
 {% endblock %}
+{% block label_content %}{% include '@platform/partials/price.html.twig' with {price: price, price_saving: true} %} · {{ price.access_period_label }} access{{ price.label ? ' · ' ~ price.label : '' }}{% endblock %}
 {% endembed %}
 					{% endfor %}
 				</div>
 			{% else %}
 				<input type="hidden" name="variant_id" value="{{ purchase.default_variant.id }}">
-				<p class="cl-course-purchase-price"><strong>{{ purchase.default_variant.price_label }}</strong> · {{ purchase.default_variant.access_period_label }} access{% if purchase.variants|length > 1 %} · other periods available{% endif %}</p>
+				<p class="cl-course-purchase-price"><strong>{% include '@platform/partials/price.html.twig' with {price: purchase.default_variant} %}</strong> · {{ purchase.default_variant.access_period_label }} access{% if purchase.variants|length > 1 %} · other periods available{% endif %}</p>
+				{% if purchase.default_variant.saving_label|default(null) %}<p class="cl-course-purchase-saving">You save {{ purchase.default_variant.saving_label }}</p>{% endif %}
 			{% endif %}
+			{% include '@platform/partials/promotion-announcements.html.twig' with {announcements: purchase.promotions, announcement_price: purchase.default_variant.price_label} %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 				{% if purchase.can_buy %}

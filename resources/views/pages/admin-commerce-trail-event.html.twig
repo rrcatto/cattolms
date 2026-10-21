@@ -8,16 +8,13 @@
 {% block page_body %}
 	{% if event.order_href %}{% set ph_back_href = event.order_href ~ '#order-records' %}{% set ph_back_label = 'Order ' ~ event.order_label %}{% else %}{% set ph_back_href = '/admin/commerce/trail' %}{% set ph_back_label = 'Commerce Trail' %}{% endif %}
 	{% set ph_title = 'Trail event ' ~ event.id %}
-	{% set ph_lead = event.account_reference_label ? 'Account ' ~ event.account_reference_label ~ ' · ' ~ (event.account_label ?: '—') : (event.account_label ?: 'No account') %}
+	{% if event.account_person %}{% set ph_lead %}{{ ui('data.person', event.account_person|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead = event.account_reference_label ? 'Account ' ~ event.account_reference_label ~ ' · ' ~ (event.account_label ?: '—') : (event.account_label ?: 'No account') %}{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'What happened', summary: 'Nothing in the trail can be changed or deleted.'}) }}
-		<p class="cl-lead" data-trail-sentence>{{ event.sentence }}</p>
-		{{ ui('data.key-value-list', {items: [
-			{label: 'When', value: event.when},
-			{label: 'By', value: event.actor_label ~ (event.actor_email ? ' · ' ~ event.actor_email : '')},
-			{label: 'Order', value: event.order_label ?: '—'},
-		]}) }}
+		<p class="cl-lead" data-trail-sentence>{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: event.sentence_parts} only %}</p>
+		{% if event.actor_person %}<p data-trail-actor><strong>By:</strong> {{ ui('data.person', event.actor_person) }}</p>{% endif %}
+		{{ ui('data.key-value-list', {items: [{label: 'When', value: event.when}]|merge(event.actor_person ? [] : [{label: 'By', value: event.actor_label}])|merge([{label: 'Order', value: event.order_label ?: '—'}])}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
 			{% if event.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href}) }}{{ ui('action.link', {label: 'The order’s money in the ledger', variant: 'secondary', size: 'small', href: event.order_ledger_href}) }}{% endif %}
 			{% if event.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: event.account_href}) }}{% endif %}

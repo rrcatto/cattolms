@@ -147,6 +147,8 @@ fieldset{min-width:0;padding:0;margin:0;border:0}
 legend{float:left;width:100%;padding:0;margin-bottom:.5rem;line-height:inherit;font-size:calc(1.275rem + .3vw)}
 @media (min-width:1200px){legend{font-size:1.5rem}}
 legend+*{clear:left}
+/* A hidden field straight after a legend draws nothing, so the first field it shows must clear the floated legend instead (2026-10-20: the course's first tag rode up beside Tags). */
+legend+input[type="hidden"]+*{clear:left}
 summary{display:list-item;cursor:pointer}
 /* Core's classes for the 5.3.8 classes 6.0 no longer loads, with 5.3.8's values. */
 .cl-container{width:100%;padding-right:.75rem;padding-left:.75rem;margin-right:auto;margin-left:auto}
@@ -222,7 +224,7 @@ summary{display:list-item;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.cl-content-accordion-summary::after{transition:none}}
 .cl-options{margin-left:0!important;display:grid;gap:.65rem}.cl-option{display:grid!important;grid-template-columns:1.25rem minmax(0,1fr);align-items:start!important;justify-content:start!important;gap:.7rem;width:100%;text-align:left!important}.cl-option input[type="radio"]{width:1rem!important;height:1rem!important;min-width:1rem;max-width:1rem;margin:.28rem 0 0!important;padding:0!important;justify-self:start}.cl-option>span{display:block;min-width:0;text-align:left!important}
 
-.cl-admin-workspace{display:grid;gap:1rem}.cl-ui-accordion-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:12px;background:var(--cl-page-surface,#fff);overflow:clip}.cl-ui-accordion-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:800}.cl-ui-accordion-description{font-size:.875rem;opacity:.72}.cl-ui-accordion-toggle{justify-self:end}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-ui-accordion-link{white-space:nowrap}.cl-ui-accordion-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-ui-accordion-summary{grid-template-columns:1fr;gap:.35rem}.cl-ui-accordion-link{justify-self:start}}.cl-ui-modal[hidden],.cl-ui-modal[aria-hidden="true"]{display:none!important}.cl-ui-modal.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.cl-ui-modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
+.cl-admin-workspace{display:grid;gap:1rem}.cl-ui-accordion-section{display:block;border:1px solid var(--cl-border,#dfe4ea);border-radius:var(--cl-radius,12px);background:var(--cl-page-surface,#fff);overflow:clip}.cl-ui-accordion-summary{display:grid;grid-template-columns:minmax(10rem,.8fr) minmax(12rem,1.4fr) auto;align-items:center;gap:1rem;padding:1rem 1.1rem;cursor:pointer;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:800}.cl-ui-accordion-description{font-size:.875rem;opacity:.72}.cl-ui-accordion-toggle{justify-self:end}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}.cl-ui-accordion-link{white-space:nowrap}.cl-ui-accordion-content{padding:1rem 1.1rem 1.25rem;border-top:1px solid var(--cl-border,#dfe4ea)}@media(max-width:760px){.cl-ui-accordion-summary{grid-template-columns:1fr;gap:.35rem}.cl-ui-accordion-link{justify-self:start}}.cl-ui-modal[hidden],.cl-ui-modal[aria-hidden="true"]{display:none!important}.cl-ui-modal.open:not([hidden]){display:flex!important;overflow:auto;overscroll-behavior:contain}.cl-ui-modal-card{max-height:calc(100dvh - 2rem);overflow:auto;overscroll-behavior:contain}body.modal-open{overflow:hidden}
 .cl-password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.cl-password-control input{min-width:0}.cl-password-toggle{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;min-height:42px}.cl-password-toggle svg{width:18px;height:18px;fill:currentColor;display:block}.cl-password-toggle:disabled{opacity:.55;cursor:wait}
 .cl-palette-switcher{position:fixed;right:18px;bottom:18px;z-index:1100;width:min(310px,calc(100vw - 36px));padding:12px;border:1px solid var(--cl-border,#dfe4ea);border-radius:14px;background:#fff;color:#18212b;box-shadow:0 18px 48px rgba(15,23,42,.20)}.cl-palette-switcher[hidden]{display:none!important}.cl-palette-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}.cl-palette-head strong{font-size:.84rem}.cl-palette-hide,.cl-palette-show{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:6px 9px;font:inherit;font-weight:700}.cl-palette-show{position:fixed;right:18px;bottom:18px;z-index:1100;box-shadow:0 8px 24px rgba(15,23,42,.14)}.cl-palette-show[hidden]{display:none!important}.cl-palette-options{display:grid;gap:6px;max-height:min(52vh,430px);overflow:auto;padding-right:2px}.cl-palette-option{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;border:1px solid #dbe2ea;border-radius:9px;padding:8px 9px;background:#fff;color:#18212b;text-align:left;font:inherit}.cl-palette-option.active{border-color:var(--cl-accent,#64748b);box-shadow:inset 3px 0 var(--cl-accent,#64748b)}.cl-palette-name{font-size:.78rem;font-weight:800}.cl-palette-swatches{display:flex}.cl-palette-swatch{width:17px;height:17px;border:1px solid rgba(0,0,0,.13)}.cl-palette-swatch:first-child{border-radius:5px 0 0 5px}.cl-palette-swatch:last-child{border-radius:0 5px 5px 0}/* v0.5.7.5.1 scalable administration/account workspace layout primitives. */
 
@@ -269,7 +271,8 @@ summary{display:list-item;cursor:pointer}
 .dataset-search .cl-ui-field{flex:1 1 20rem;min-width:0;margin:0}
 .dataset-search input[type=search]{width:100%}
 .dataset-search-actions{display:flex;gap:.5rem;align-items:center}
-.dataset-search .help{flex:1 1 100%;margin:.25rem 0 0}
+/* Its own line under the field, never a second column: the form stacks downwards, and a basis of 100% there is a height, which in a card with a set height pushed the help beside the form, off a phone's screen (2026-10-21). */
+.dataset-search .help{flex:0 0 auto;width:100%;margin:.25rem 0 0}
 @media (max-width:640px){.dataset-search,.company-picker-search{flex-direction:column;align-items:stretch}.company-context-actions{margin-left:0}}/* Live dataset search: the status text is the loading indicator. htmx toggles the request class
    on the form, so the message is hidden except while a search is actually in flight. Its geometry stays in this core stylesheet. */
 
@@ -305,7 +308,22 @@ summary{display:list-item;cursor:pointer}
 .pagination-jump{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;gap:.5rem;margin:0}
 .pagination-jump label{margin:0;font-size:.9rem;white-space:nowrap}
 .pagination-jump input[type="number"]{width:5.5rem;min-width:0;text-align:center;font-variant-numeric:tabular-nums}
-.pagination-jump .help{margin:0;font-size:.85rem;white-space:nowrap;opacity:.75}/* htmx busy state. The control stays in place and dims rather than being replaced by a spinner,
+.pagination-jump .help{margin:0;font-size:.85rem;white-space:nowrap;opacity:.75}
+/* Short enough for one line (owner, 2026-10-21): tighter gaps, icon-only first/previous/next/last, a page box for four digits. */
+/* position: the words hidden for screen readers inside the icon links are positioned; the bar contains them, so they scroll with it instead of widening the page. */
+.pagination-row{gap:.4rem;position:relative}.pagination-controls,.pagination-pages-list{gap:.15rem}.pagination-jump,.pagination-page-size{gap:.35rem}
+/* The page box as wide as the last page number needs (owner, 2026-10-21: "expand the input field's size if the number of
+   pages need a larger sized input"): one character more than its digits, without the up and down arrows. */
+.pagination-row .pagination-jump input[type="number"][data-digits]{width:calc((var(--pg-digits, 1) + 1) * 1ch + 1rem + 2px);min-width:0;padding-left:.5rem;padding-right:.5rem;text-align:center;font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+.pagination-row .pagination-jump input[type="number"]::-webkit-inner-spin-button,.pagination-row .pagination-jump input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
+/* [data-digits] outranks a theme's padding for every input. */
+.pagination-row .pagination-jump input[data-digits="2"]{--pg-digits:2}.pagination-row .pagination-jump input[data-digits="3"]{--pg-digits:3}.pagination-row .pagination-jump input[data-digits="4"]{--pg-digits:4}.pagination-row .pagination-jump input[data-digits="5"]{--pg-digits:5}.pagination-row .pagination-jump input[data-digits="6"]{--pg-digits:6}.pagination-row .pagination-jump input[data-digits="7"]{--pg-digits:7}
+/* The bar's geometry is Core's (UX rule 8.7): every theme's buttons there are kept narrow, so the bar fits a desktop line in each. */
+.pagination-row .cl-ui-action{padding-left:.5rem!important;padding-right:.5rem!important;min-width:2rem}
+/* The rows drop-down as wide as its numbers: a theme that stretches selects to their box must not push "Rows per pg" out of the bar. */
+.pagination-row .pagination-page-size select{width:auto!important;min-width:4.5rem;max-width:none;flex:0 0 auto}
+.pagination-row .cl-ui-action:has(>.visually-hidden){padding-left:.45rem!important;padding-right:.45rem!important}
+.pagination-row .cl-ui-action:has(>.visually-hidden) .cl-ui-icon,.pagination-state .cl-ui-icon{width:1rem;height:1rem}/* htmx busy state. The control stays in place and dims rather than being replaced by a spinner,
    because the rows underneath it are still the previous page and removing the control would move
    the page under the pointer mid-request. */
 
@@ -391,7 +409,59 @@ summary{display:list-item;cursor:pointer}
 .cl-breadcrumb a:hover{text-decoration:underline;opacity:1}
 .cl-breadcrumb a[aria-current="page"]{font-weight:800;opacity:1;text-decoration:none;cursor:default}
 .cl-breadcrumb-sep{opacity:.4}
-.cl-category-count{font-size:.75rem;font-weight:700;opacity:.55}/* v0.6 tags. A tag is a link into the catalogue wherever it appears, so it looks and behaves the
+.cl-category-count{font-size:.75rem;font-weight:700;opacity:.55}
+/* The catalogue's place in the category tree (owner, 2026-10-19): the trail up to All courses and the
+   categories beneath, each with its branch total, as one light line each rather than tiles. */
+.cl-catalogue-nav{display:grid;gap:.4rem;margin:0 0 1rem;font-size:.85rem}
+.cl-catalogue-nav .cl-ui-breadcrumb a{color:inherit}
+.cl-catalogue-nav .cl-ui-breadcrumb [aria-current="page"]{font-weight:700}
+/* A category's or tag's icon: the current one, a search of the icon library, its icons as cards, one's own upload (owner, 2026-10-20). */
+.cl-icon-choice{display:grid;gap:.9rem;margin:.5rem 0 1rem}
+.cl-icon-choice-current{display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem}
+.cl-icon-choice-current>span[aria-hidden]{margin:0}
+.cl-icon-choice .cl-ui-picture-choice--cards{margin-bottom:0}
+/* A person's picture on their page in Administration, or a plain placeholder (owner, 2026-10-20: never initials). */
+.cl-main .profile-head{display:flex;flex-wrap:wrap;align-items:center;gap:1rem 1.25rem}
+.cl-main .profile-head .profile-meta{min-width:0;flex:1 1 16rem}
+.cl-main .profile-head .profile-meta p{margin:0 0 .35rem}
+.cl-person-photo{flex:0 0 auto;width:96px;height:96px;object-fit:cover;border-radius:var(--cl-radius,12px);border:1px solid var(--cl-border,#dfe4ea)}
+.cl-person-photo--placeholder{display:inline-flex;align-items:center;justify-content:center;padding:1.1rem;color:var(--cl-muted,#6b7280);background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-person-photo--placeholder svg{width:100%;height:100%}
+/* Administration → Courses in the catalogue's order: each course's position, dragged by its handle (owner, 2026-10-20). */
+.cl-course-order{display:block}
+.cl-course-order-status{min-height:1.25rem;margin:0 0 .4rem;font-size:.85rem}
+.cl-course-order-status.is-error{color:var(--cl-danger,#b42318);font-weight:600}
+.cl-course-order[aria-busy="true"] .cl-row-handle{cursor:progress}
+.cl-course-position{white-space:nowrap}
+.cl-course-position [data-position]{font-variant-numeric:tabular-nums;font-weight:600}
+.cl-row-handle{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 .4rem 0 0;padding:0;vertical-align:middle;border:1px solid var(--cl-border,#dfe4ea);border-radius:.4rem;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;cursor:grab;touch-action:none}
+.cl-row-handle[hidden]{display:none}
+.cl-row-handle:focus-visible{outline:2px solid var(--cl-primary,#1f5fbf);outline-offset:2px}
+.cl-course-order tr.is-dragging{opacity:.55;background:color-mix(in srgb,var(--cl-primary,#1f5fbf) 8%,transparent)}
+/* The categories beneath the one browsed, as short feature cards (owner, 2026-10-20). */
+.cl-catalogue-categories{margin:.35rem 0 0;font-size:1rem}
+.cl-catalogue-categories .cl-ui-picture-choice--cards{margin-bottom:.25rem}
+/* A person with an account (data.person, owner 2026-10-21): the name, then the account reference in the figures' face, one
+   link to the account; the email after it. Wraps between its parts, never inside the reference. */
+.cl-ui-person{display:inline}
+.cl-ui-person-account{text-decoration:underline;text-underline-offset:.15em}
+.cl-ui-person-name{font-weight:inherit}
+.cl-ui-person-reference{font-family:var(--cl-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);font-size:.85em;white-space:nowrap;opacity:.85}
+/* The page's own person, once: name, account reference and email each on its own line (owner, 2026-10-21). */
+.cl-ui-person--full{display:inline-flex;flex-direction:column;align-items:flex-start;gap:.1rem;vertical-align:top}
+.cl-ui-person-line{display:block}
+.cl-ui-person-email{font-size:.9em;overflow-wrap:anywhere}
+/* The one thing a link opened (the dashboard's Needs your attention, owner 2026-10-21): a review or a table row marked by
+   the theme's accent, clear of the sticky header. */
+.cl-review:target,.cl-ui-table tr:target{outline:3px solid var(--cl-accent,var(--cl-primary,currentColor));outline-offset:2px;scroll-margin-top:7rem}
+/* My Courses' four lists (owner, 2026-10-21): the cards above the one table. */
+.cl-library-lists{margin:.35rem 0 .75rem;font-size:1rem}
+.cl-library-lists .cl-ui-picture-choice--cards{margin-bottom:0}
+/* My Certificates (owner, 2026-10-19): each document's row takes the room its address needs, and the
+   address is shown whole so the learner can copy it. */
+.cl-ui-list-item>div:has(>.cl-certificate-share){flex:1 1 26rem}
+.cl-certificate-share input[readonly]{width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
+/* v0.6 tags. A tag is a link into the catalogue wherever it appears, so it looks and behaves the
    same on a card, on a rail and beside a course. The administration row is a form per tag: an edit
    surface with one field is not worth a second screen. */
 
@@ -499,6 +569,13 @@ summary{display:list-item;cursor:pointer}
 /* A cell that holds a sentence wraps within its own column instead of being cut short (UX rule 2.4):
    the money records say what happened in words (owner, 2026-10-18). */
 .cl-ui-table td.cell-text{white-space:normal!important;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+/* Column fitting (platform-overrides.js, owner 2026-10-21): laid out once at its natural width to measure what each column
+   holds on one line (data-column-fit="measuring"), then fixed at the widths shared out from that (data-column-fit="fitted"). */
+.cl-ui-table[data-column-fit="measuring"] table{table-layout:auto!important;width:max-content!important;max-width:none!important}
+.cl-ui-table[data-column-fit="measuring"] th,.cl-ui-table[data-column-fit="measuring"] td{width:auto!important;max-width:none!important;white-space:nowrap!important}
+.cl-ui-table[data-column-fit="measuring"] td *{max-width:none!important}
+.cl-ui-table[data-column-fit="fitted"] table{table-layout:fixed!important}
+.cl-ui-table[data-column-fit="fitted"] th,.cl-ui-table[data-column-fit="fitted"] td{max-width:none}
 /* An action column is never narrower than its control.
 
    A declared share is a share of the table, and on a phone 13% of a table is about 40px: the
@@ -788,6 +865,11 @@ summary{display:list-item;cursor:pointer}
 .cl-identity-head-anonymous{display:grid;place-items:center;color:var(--cl-ink,var(--ink,#18212b));opacity:.55}
 .cl-identity-head-anonymous svg{fill:none;stroke:currentColor;stroke-width:1.9}
 .cl-identity-details{min-width:0}
+/* The reader's account reference (owner, 2026-10-21): at the band's right edge, opening their profile; in the compact chip, after the name. */
+.cl-identity-reference{font-family:var(--cl-mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);font-size:.9rem;white-space:nowrap;text-decoration:underline;text-underline-offset:.15em}
+/* Top-aligned with the name and 9pt (owner, 2026-10-21: "top aligned", "it should be 8-10pt"). */
+.cl-identity-head .cl-identity-reference{margin-inline-start:auto;align-self:flex-start;font-size:12px!important;line-height:1.4}
+.cl-identity-compact .cl-identity-reference{font-size:.75rem}
 .cl-identity-details h2{margin:0;font-size:1.15rem;line-height:1.25}
 .cl-identity-details p{margin:.15rem 0 0;font-size:.85rem;opacity:.75}
 .cl-filter-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
@@ -824,7 +906,10 @@ summary{display:list-item;cursor:pointer}
    flex-direction:column continues to apply. If that theme drops gap:0 when it is next versioned,
    the !important here can go with it. */
 
-.cl-ui-field{display:grid;gap:.4rem!important;min-width:0}/* Air between one field and the next, and before whatever ends the form. Light Default is the only
+/* A field's one column never grows past the field, so a drop-down with a long option (a course title) shortens to
+   fit a phone instead of pushing the page sideways (owner, 2026-10-20). */
+.cl-ui-field{display:grid;grid-template-columns:minmax(0,1fr);gap:.4rem!important;min-width:0}
+.cl-ui-field select{max-width:100%}/* Air between one field and the next, and before whatever ends the form. Light Default is the only
    theme that spaced consecutive fields, and it did it with a margin on every field including the
    last one inside a grid cell.
 
@@ -1194,7 +1279,8 @@ body.cl-page-texture{background:repeating-linear-gradient(var(--cl-texture-angle
    headline in the stacking order, and neither takes pointer events, so the title stays a link and
    the star stays a button. */
 
-.cl-course-card-header{position:relative;isolation:isolate;display:flex;align-items:flex-end;min-height:8.5rem;overflow:hidden}
+/* One size for every card's picture (owner, 2026-10-20: "the same size across all courses. the bigger size is preferable"): 16:10, growing only for a title that needs more room. */
+.cl-course-card-header{position:relative;isolation:isolate;display:flex;align-items:flex-end;aspect-ratio:16/10;min-height:8.5rem;overflow:hidden}
 .cl-course-card-art{position:absolute;inset:0;z-index:0;line-height:0;pointer-events:none}
 .cl-course-card-art svg,.cl-course-card-art img{display:block;width:100%;height:100%;object-fit:cover}
 .cl-course-card-art .cl-course-cover-placeholder{display:grid;place-items:center;width:100%;height:100%;font-size:2.4rem;font-weight:800;color:#fff;background:linear-gradient(135deg,#243b53,#486581)}
@@ -1290,9 +1376,16 @@ body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice
 .cl-ui-compact-action{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}.cl-ui-compact-action input,.cl-ui-compact-action select{width:auto;max-width:100%}
 .cl-ui-table{max-width:100%;overflow-x:auto}.cl-ui-table table{width:100%;border-collapse:collapse}.cl-ui-table[data-density="compact"] th,.cl-ui-table[data-density="compact"] td{padding:.4rem}
 .cl-ui-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr));gap:1rem}.cl-ui-stat-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}.cl-ui-stat-grid[data-columns="1"]{grid-template-columns:1fr}.cl-ui-stat-grid[data-columns="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.cl-ui-stat-grid[data-columns="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}.cl-ui-stat-card{padding:1.2rem;min-width:0;background:var(--cl-surface,#fff);border:1px solid var(--cl-line,#ddd);border-radius:.75rem}.cl-ui-stat-value{font-size:1.8rem;font-weight:700}.cl-ui-stat-label{font-weight:600}.cl-ui-stat-note{font-size:.85rem}
+/* A large stat card (owner, 2026-10-21, a wallet's balance): the figure the page is opened for, big and bold in a border
+   of the theme's accent, as wide as it needs. Its size and weight outrank a theme's stat style. */
+.cl-ui-stat-card.cl-ui-stat-card--large{width:fit-content;max-width:100%;min-width:min(100%,18rem);padding:1.25rem 1.75rem!important;border:3px solid var(--cl-accent,var(--cl-primary,currentColor))!important}
+.cl-ui-stat-card--large .cl-ui-stat-value{font-size:clamp(2.6rem,7vw,3.75rem)!important;font-weight:800!important;line-height:1.05!important;letter-spacing:-.02em;overflow-wrap:anywhere}
+.cl-ui-stat-card--large .cl-ui-stat-label{font-size:1rem;font-weight:700;margin-top:.35rem}
 /* A stat card that opens what it counts (the dashboard's money figures): the card is the link, in the card's own colours. */
 a.cl-ui-stat-link{display:block;color:inherit;text-decoration:none}a.cl-ui-stat-link:hover{border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))}a.cl-ui-stat-link:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}a.cl-ui-stat-link .cl-ui-stat-label{text-decoration:underline;text-underline-offset:.2em}
-.cl-ui-list{display:grid;gap:.75rem}.cl-ui-list-item{display:flex;align-items:start;justify-content:space-between;gap:1rem;min-width:0}.cl-ui-list-item>div{min-width:0}
+.cl-ui-list{display:grid;gap:.75rem}.cl-ui-list-item{display:flex;flex-wrap:wrap;align-items:start;justify-content:space-between;gap:.5rem 1rem;min-width:0}.cl-ui-list-item>div{min-width:0}
+/* In a narrow card the actions go below the text rather than past the row's edge (2026-10-20: Manage stood out of a person's course row). */
+.cl-ui-list-item>div:first-child{flex:1 1 12rem}.cl-ui-list-item>.cl-ui-list-actions{flex:0 0 auto;max-width:100%}
 .cl-ui-key-value-list{display:grid;grid-template-columns:minmax(6rem,1fr) minmax(0,2fr);gap:.5rem 1rem}.cl-ui-key-value-list dt{font-weight:600}.cl-ui-key-value-list dd{margin:0;overflow-wrap:anywhere}
 .cl-ui-badge{display:inline-flex;align-items:center;max-width:100%;border-radius:99px;padding:.25em .65em;font-size:.8rem;line-height:1.4;font-weight:600;white-space:normal;background:#edf0f4;color:#273343}.cl-ui-badge--small{font-size:.7rem}
 .cl-ui-badge--success{background:#e0f4e8;color:#18582c}.cl-ui-badge--warning{background:#fff0cb;color:#684b09}.cl-ui-badge--danger{background:#ffe3e6;color:#832030}.cl-ui-badge--info{background:#e0eefb;color:#214c70}.cl-ui-badge--permanent{background:#ede2fc;color:#503073}
@@ -1304,7 +1397,7 @@ a.cl-ui-stat-link{display:block;color:inherit;text-decoration:none}a.cl-ui-stat-
 .cl-ui-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}.cl-ui-breadcrumb-separator{opacity:.6}
 .cl-ui-close{border:0;background:transparent;color:inherit;font-size:1.5rem;cursor:pointer;min-width:2.5rem;min-height:2.5rem}
 .cl-ui-modal[hidden]{display:none}.cl-ui-modal{position:fixed;inset:0;z-index:10000;background:#0009;overflow:auto;padding:2rem 1rem}.cl-ui-modal-card{max-width:42rem;margin:auto;background:var(--cl-surface,#fff);color:var(--cl-ink,#222);border-radius:.75rem}.cl-ui-modal-card--wide{max-width:60rem}.cl-ui-modal-head,.cl-ui-modal-foot{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:1rem}.cl-ui-modal-body{padding:1rem}.cl-ui-modal-foot{border-top:1px solid color-mix(in srgb,currentColor 15%,transparent);flex-wrap:wrap}
-.cl-ui-accordion-section{border:1px solid var(--cl-line,#ddd);border-radius:.6rem;margin-block:.75rem;background:var(--cl-surface,#fff)}.cl-ui-accordion-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;cursor:pointer;padding:1rem;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:700}.cl-ui-accordion-description{flex:1 1 16rem;font-size:.9rem}.cl-ui-accordion-toggle{margin-left:auto}.cl-ui-accordion-section[open]>.cl-ui-accordion-summary .cl-ui-accordion-toggle{transform:rotate(180deg)}.cl-ui-accordion-content{padding:1rem}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}
+.cl-ui-accordion-section{border:1px solid var(--cl-line,#ddd);border-radius:var(--cl-radius,.6rem);margin-block:.75rem;background:var(--cl-surface,#fff)}.cl-ui-accordion-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;cursor:pointer;padding:1rem;list-style:none}.cl-ui-accordion-summary::-webkit-details-marker{display:none}.cl-ui-accordion-title{font-weight:700}.cl-ui-accordion-description{flex:1 1 16rem;font-size:.9rem}.cl-ui-accordion-toggle{margin-left:auto}.cl-ui-accordion-section[open]>.cl-ui-accordion-summary .cl-ui-accordion-toggle{transform:rotate(180deg)}.cl-ui-accordion-content{padding:1rem}.cl-ui-accordion-actions{display:flex;justify-content:flex-end;margin-bottom:.75rem}
 .cl-ui-action:focus-visible,.cl-ui-close:focus-visible,.cl-ui-accordion-summary:focus-visible,.cl-ui-breadcrumb a:focus-visible{outline:3px solid currentColor;outline-offset:3px}
 @media(max-width:700px){.cl-ui-section-grid[data-columns],.cl-ui-form-grid{grid-template-columns:minmax(0,1fr)}.cl-ui-sticky{position:static}.cl-ui-list-item{flex-wrap:wrap}.cl-ui-modal{padding:.5rem}}/* Without script a modal is an ordinary, accessible section containing the same working forms. */
 
@@ -1360,8 +1453,9 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
 .cl-ui-table:has(>table>thead>tr>th:nth-child(11)[data-phone=hide])>table>*>tr>:nth-child(11){display:none!important}
 .cl-ui-table:has(>table>thead>tr>th:nth-child(12)[data-phone=hide])>table>*>tr>:nth-child(12){display:none!important}
 }
-/* The row's tooltip: the whole row as "Label: value" lines, when a cell is hidden or cut short. */
-.cl-ui-table-tip{position:fixed;z-index:1040;max-width:min(92vw,26rem);padding:8px 10px;border:1px solid var(--cl-border,#dfe4ea);border-radius:8px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,#18212b);box-shadow:0 10px 30px rgba(23,33,43,.18);font-size:.8rem;line-height:1.45;text-align:left;white-space:pre-line;overflow-wrap:anywhere;pointer-events:none}
+/* The row's tooltip: the whole row on one straight line along it, "Label: value · Label: value" (owner,
+   2026-10-20), when a cell is hidden or cut short. The script sets its width to the row's. */
+.cl-ui-table-tip{position:fixed;z-index:1040;box-sizing:border-box;max-width:calc(100vw - 16px);padding:5px 10px;border:1px solid var(--cl-border,#dfe4ea);border-radius:4px;background:var(--cl-page-surface,#fff);color:var(--cl-ink,#18212b);box-shadow:0 4px 12px rgba(23,33,43,.14);font-size:.8rem;line-height:1.45;text-align:left;white-space:normal;overflow-wrap:anywhere;pointer-events:none}
 .cl-ui-table-tip[hidden]{display:none!important}
 
 /* Notice headings are structural; emphasis inside notice prose stays inline. */
@@ -1404,7 +1498,24 @@ section.cl-ui-surface[data-tone="permanent"]{border-color:var(--cl-accent,#67528
    gutter or the rhythm by setting the variables, never per page. */
 .cl-body{--cl-content-width:1320px;--cl-gutter:.75rem;--cl-section-space:3rem}
 /* A theme's page-family wrapper (div.cl-page-family) is transparent here: its sections are rows too. */
-.cl-page-head-inner,.cl-identity-head>.cl-identity-meta,:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section{width:100%;max-width:var(--cl-content-width);margin-inline:auto;padding-inline:var(--cl-gutter)}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section{width:100%;max-width:var(--cl-content-width);margin-inline:auto;padding-inline:var(--cl-gutter)}
+/* The page's own boxes line up with its cards (owner, 2026-10-21: "the Page header is wider than the Page section. They
+   should align with each other"). The notices, the page head and the identity band are each exactly as wide as the cards
+   beneath them, whatever a theme paints on them (a box, a band, a picture): the cards sit a gutter inside the content
+   width, and so do these. Their words sit inside their box by the gutter; a theme whose head is not a box sets
+   --cl-head-inset to 0 so its title stands on the cards' edge. */
+/* A theme whose content width is none leaves the cap invalid, so it falls back to none: the row less two gutters. */
+:is(.cl-main,.cl-main>.cl-page-family)>:is(.cl-flash-stack,.cl-page-head,.cl-identity-head){box-sizing:border-box!important;width:calc(100% - 2 * var(--cl-gutter))!important;max-width:calc(var(--cl-content-width) - 2 * var(--cl-gutter))!important;margin-inline:auto!important}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-flash-stack{padding-inline:0!important}
+.cl-page-head-inner,.cl-identity-head>.cl-identity-meta{width:100%;max-width:none;margin-inline:0}
+.cl-page-head-inner{padding-inline:var(--cl-head-inset,var(--cl-gutter))}
+.cl-identity-head>.cl-identity-meta{padding-inline:var(--cl-gutter)}
+.cl-page-head.cl-page-head--picture .cl-page-head-inner{padding-inline:0}
+/* A course, bundle or landing head holds its words in a container: the head is already the cards' width, so the container fills
+   it and insets its words like any head (--cl-head-inset), and a picture in it fills it. */
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-head>.cl-container{max-width:none!important;width:100%!important;padding-inline:var(--cl-head-inset,var(--cl-gutter))!important}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-head>.cl-container:has(>.cl-picture-head){padding-inline:0!important;max-width:none!important;width:100%!important}
+:is(.cl-main,.cl-main>.cl-page-family)>.cl-page-head:has(.cl-picture-head){padding-inline:0!important}
 .cl-page-head-inner{padding-block:var(--cl-section-space)}
 .cl-page-head-compact>.cl-page-head-inner{padding-block:1rem}
 :is(.cl-main,.cl-main>.cl-page-family)>.cl-page-section{padding-block:var(--cl-section-space)}
@@ -1519,6 +1630,36 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-ui-picture-choice-text{display:flex;flex-direction:column;line-height:1.3}
 .cl-ui-picture-choice-label{font-weight:600}
 .cl-ui-picture-choice-note{font-size:.85rem;font-weight:400;opacity:.75}
+/* Feature cards (owner, 2026-10-20, Register's account type): an icon in the theme's accent, a bold title and a
+   description, in a grid. The chosen card's icon fills with the accent. Corners follow the theme. */
+.cl-ui-picture-choice--cards{margin-bottom:1.5rem}
+.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:1rem}
+.cl-ui-picture-choice-item--icon{gap:.65rem;padding:1.1rem 1.15rem 1.25rem}
+.cl-ui-picture-choice-item--icon:has(input:checked){padding:calc(1.1rem - 1px) calc(1.15rem - 1px) calc(1.25rem - 1px)}
+.cl-ui-picture-choice-item--icon input{top:1rem;right:1rem;left:auto}
+.cl-ui-picture-choice-icon{display:inline-flex;flex:0 0 auto;width:2.9rem;height:2.9rem;padding:.6rem;border-radius:calc(var(--cl-radius,12px) * 100);color:var(--cl-accent,var(--cl-primary,#c4562f));background:color-mix(in srgb,var(--cl-accent,var(--cl-primary,#c4562f)) 14%,transparent);transition:background .15s,color .15s}
+.cl-ui-picture-choice-icon svg{display:block;width:100%;height:100%}
+.cl-ui-picture-choice-item--icon:has(input:checked) .cl-ui-picture-choice-icon{color:var(--cl-on-color-1,#fff);background:var(--cl-accent,var(--cl-primary,#c4562f))}
+.cl-ui-picture-choice-item--icon .cl-ui-picture-choice-text{gap:.3rem}
+.cl-ui-picture-choice-item--icon .cl-ui-picture-choice-label{font-size:1.05rem;font-weight:700;padding-right:1.75rem}
+.cl-ui-picture-choice-item--icon .cl-ui-picture-choice-note{font-size:.9rem;line-height:1.45;opacity:.8}
+/* Small cards (owner, 2026-10-20: the contact form's topics "must look subordinate to the main choices above"): the
+   icon beside a smaller title, less padding, a smaller line. */
+.cl-ui-picture-choice--small.cl-ui-picture-choice--cards{margin-bottom:1rem}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-legend{font-size:.95rem}
+.cl-ui-picture-choice--small.cl-ui-picture-choice--cards .cl-ui-picture-choice-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr));gap:.6rem}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-item--icon{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:.15rem .6rem;padding:.6rem 2rem .65rem .7rem}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-item--icon:has(input:checked){padding:calc(.6rem - 1px) calc(2rem - 1px) calc(.65rem - 1px) calc(.7rem - 1px)}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-item--icon input{top:.65rem;right:.65rem;width:1rem;height:1rem}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-icon{width:1.9rem;height:1.9rem;padding:.38rem}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-item--icon .cl-ui-picture-choice-text{gap:.15rem}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-item--icon .cl-ui-picture-choice-label{font-size:.9rem;font-weight:700;padding-right:0}
+.cl-ui-picture-choice--small .cl-ui-picture-choice-item--icon .cl-ui-picture-choice-note{font-size:.78rem;line-height:1.35}
+/* columns 4 (the catalogue's categories): at most four cards to a row, further rows beneath, left-aligned; two
+   on a tablet, one on a phone. */
+.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--four .cl-ui-picture-choice-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:991.98px){.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--four .cl-ui-picture-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:575.98px){.cl-ui-picture-choice.cl-ui-picture-choice--cards.cl-ui-picture-choice--four .cl-ui-picture-choice-grid{grid-template-columns:minmax(0,1fr)}}
 
 /* Certificates: the design editor's preview above its form, and the preview itself - the PDF the
  * renderer draws, shown by the browser's own PDF viewer. A design's text styles and fields look in
@@ -1608,6 +1749,100 @@ body[data-cl-course-reader="1"] .cl-palette-switcher,body[data-cl-course-reader=
 .cl-course-purchase{min-width:0}
 .cl-course-purchase-note{margin:0 0 .6rem}
 .cl-course-purchase-price{margin:0 0 .75rem;overflow-wrap:anywhere}
+/* A marked-down price (owner, 2026-10-20): the was price struck through before the price, and what is saved. */
+.cl-price{display:inline}
+.cl-price-now,.cl-price-was,.cl-ui-key-value-was{white-space:nowrap}
+.cl-price--marked-down .cl-price-now{font-weight:700}
+.cl-price-was,.cl-ui-key-value-was{font-weight:400;opacity:.72;text-decoration:line-through}
+.cl-price-saving{display:inline-block;margin-left:.2em;padding:0 .4em;border:1px solid currentColor;border-radius:var(--cl-radius,.3em);font-size:.85em;font-weight:700;white-space:nowrap}
+.cl-course-purchase-saving{margin:-.4rem 0 .75rem;font-weight:700}
+.cl-course-card-special{margin:0 0 .5rem}
+.cl-course-tags-choice{min-width:0;margin-inline:0;padding:0;border:0}
+/* A course's related courses (owner, 2026-10-20): a column per 22rem, so a long list stays short. */
+.cl-course-related-choice{min-width:0;margin-inline:0;padding:0;border:0}
+.cl-course-related-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));gap:.15rem 1.5rem}
+/* A picture with the page's title over it (owner, 2026-10-20): a course's cover on its page, and a page
+   head given ph_hero (Help, FAQ, catalogue, tags). Every one is the same size ("I do not want to see a lot
+   of different sized header graphics"): the page's full width at one shape, taller on a phone; it grows only
+   if its words could not fit. The picture fills it, a dark fade rises from the foot, the text and the page's
+   actions sit on it. Its name is its own (the Home page has cl-hero). Corners follow the theme (--cl-radius: Saharan Sunset's are square). */
+.cl-picture-head{position:relative;isolation:isolate;display:flex;flex-wrap:wrap;align-items:flex-end;align-content:flex-end;width:100%;aspect-ratio:32/15;border-radius:var(--cl-radius,.6rem);box-shadow:0 10px 30px rgba(18,14,11,.18)}
+.cl-picture-head-art{position:absolute;inset:0;z-index:0;overflow:hidden;border-radius:inherit;line-height:0;pointer-events:none}
+.cl-picture-head-art svg{display:block;width:100%;height:100%}
+.cl-picture-head::after{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit;pointer-events:none;background:linear-gradient(to top,rgba(12,10,8,.88) 0%,rgba(12,10,8,.6) 40%,rgba(12,10,8,.08) 85%)}
+.cl-picture-head-text{position:relative;z-index:2;flex:1 1 20rem;min-width:0;padding:clamp(1rem,3vw,2.25rem);color:#fff}
+.cl-picture-head>.cl-page-head-actions{position:relative;z-index:2;flex:0 0 auto;margin:0;padding:0 clamp(1rem,3vw,2.25rem) clamp(1rem,3vw,2.25rem)}
+.cl-picture-head>.cl-page-head-actions a{background:rgba(251,246,238,.95)!important;color:#2b2523!important;border-color:transparent!important}
+.cl-picture-head-text .cl-course-detail-headline{display:flex;align-items:flex-start;gap:.75rem}
+.cl-picture-head .cl-picture-head-text h1{margin:0;color:#fff!important;text-shadow:0 2px 6px rgba(0,0,0,.55);max-width:52rem}
+.cl-picture-head .cl-picture-head-text .cl-kicker,.cl-picture-head .cl-picture-head-text .cl-lead,.cl-picture-head .cl-picture-head-text .cl-back-link{color:#fff!important;opacity:.92;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.cl-picture-head .cl-picture-head-text .cl-lead{max-width:44rem;margin-top:.6rem}
+.cl-picture-head .cl-picture-head-text .cl-ui-badge{background:rgba(12,10,8,.55)!important;color:#fff!important;border-color:rgba(255,255,255,.6)!important}
+.cl-picture-head-text .cl-favourite{color:#fff;background:rgba(12,10,8,.45)}
+.cl-page-head.cl-page-head--picture .cl-page-head-inner{display:block}
+@media (max-width:700px){.cl-picture-head{aspect-ratio:1/1}.cl-picture-head .cl-picture-head-text h1.cl-display-4,.cl-picture-head .cl-picture-head-text h1.cl-display-5{font-size:1.75rem;line-height:1.12}}
+/* Help (owner, 2026-10-20): the way to the FAQ, one big word in a small square-bordered block. */
+.cl-help-intro{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1.25rem 2rem}
+.cl-help-intro>div{flex:1 1 22rem;min-width:0}
+.cl-help-faq{display:inline-flex;align-items:center;justify-content:center;min-width:9rem;padding:.9rem 2.2rem;border:2px solid currentColor;border-radius:0;color:inherit;font-size:clamp(2.2rem,5vw,3.2rem);font-weight:700;letter-spacing:.08em;line-height:1;text-decoration:none}
+.cl-help-faq:hover,.cl-help-faq:focus-visible{background:color-mix(in srgb,currentColor 8%,transparent)}
+.cl-help-faq abbr{text-decoration:none;cursor:inherit}
+.cl-course-grading-link{margin-bottom:0}
+.cl-course-contact-link{margin:.25rem 0 0}
+/* The contact form (owner, 2026-10-20): each reason's own fields in a framed group under the reason chosen.
+   Without JavaScript every group shows, its legend saying which reason it is for. */
+.cl-contact-faq{margin:0 0 1.25rem}
+/* A legal page's PDF (owner, 2026-10-20): its download button and what the PDF holds, on one line where they fit. */
+.cl-legal-pdf{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem}
+/* The setup wizard (owner, 2026-10-20): its steps under the progress bar, each step's buttons on one row. */
+.cl-setup-steps{margin-top:1rem}
+.cl-setup-action{display:inline-flex;margin:0}
+/* In an accordion with an icon and a category, a short description (Done, To do) sits at the right, by the arrow. */
+.cl-ui-accordion-summary--labelled .cl-ui-accordion-description{flex:0 0 auto;margin-left:auto;text-align:right;font-weight:600}
+/* The contact form's parts: the reason cards in one row, then About you (name, email and account reference side by
+   side), the chosen reason's own fields, then the message. */
+.cl-contact-part{margin:0 0 1.5rem;padding:0}
+.cl-contact-part>legend{float:none;width:auto;margin:0 0 .5rem;padding:0;font-size:1rem;font-weight:600}
+.cl-contact-about{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));align-items:start;gap:1rem 1.25rem}
+.cl-contact-about>.cl-ui-field+.cl-ui-field{margin-top:0}
+.cl-contact-reason .cl-ui-picture-choice--cards{margin-top:.5rem}
+.cl-contact-reason{margin:1.25rem 0;padding:1rem 1.25rem 1.25rem;border:1px solid var(--cl-border,#dfe4ea);border-left:4px solid var(--cl-accent,var(--cl-primary,#c4562f));border-radius:var(--cl-radius,.6rem)}
+.cl-contact-reason legend{float:none;width:auto;margin:0;padding:0 .4rem;font-size:1rem;font-weight:600}
+.cl-contact-reason[hidden]{display:none}
+.cl-contact-reason-only{font-weight:400;font-size:.875em;opacity:.75}
+.cl-contact-eft-note{margin:.25rem 0 .5rem}
+.cl-contact-subpart{margin:0 0 1rem;padding:0}
+.cl-contact-subpart>legend{float:none;width:auto;margin:0 0 .5rem;padding:0;font-size:.95rem;font-weight:600}
+.cl-contact-company{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));align-items:start;gap:1rem 1.25rem;margin:0 0 1.25rem}
+.cl-contact-company[hidden]{display:none}
+.cl-contact-company>.cl-ui-field+.cl-ui-field{margin-top:0}
+.cl-contact-message-text{white-space:normal;overflow-wrap:anywhere;max-width:60rem}
+/* An accordion with an icon and a category line above its heading (owner, 2026-10-20, the FAQ). */
+.cl-ui-accordion-summary.cl-ui-accordion-summary--labelled{display:flex;flex-wrap:nowrap;align-items:center;gap:.85rem}
+.cl-ui-accordion-icon{display:inline-flex;flex:0 0 auto;width:2.4rem;height:2.4rem;padding:.45rem;border-radius:calc(var(--cl-radius,12px) * 100);background:color-mix(in srgb,currentColor 9%,transparent)}
+.cl-ui-accordion-icon svg{display:block;width:100%;height:100%}
+/* Open looks different from closed (owner, 2026-10-20): an open accordion's title bar darkens, and an icon is
+   in colour, filled when its accordion is open. The colours are the theme's (--cl-accent, --cl-ink). */
+.cl-ui-accordion-summary--labelled .cl-ui-accordion-icon{color:var(--cl-accent,var(--cl-primary,#c4562f));background:color-mix(in srgb,var(--cl-accent,var(--cl-primary,#c4562f)) 14%,transparent);transition:background .15s,color .15s}
+.cl-ui-accordion-section[open]>.cl-ui-accordion-summary{background:color-mix(in srgb,var(--cl-ink,#18212b) 13%,transparent);box-shadow:inset 4px 0 0 var(--cl-accent,var(--cl-primary,#c4562f))}
+.cl-ui-accordion-section[open]>.cl-ui-accordion-summary .cl-ui-accordion-icon{color:var(--cl-on-color-1,#fff);background:var(--cl-accent,var(--cl-primary,#c4562f))}
+.cl-ui-accordion-section:not([open])>.cl-ui-accordion-summary:hover{background:color-mix(in srgb,var(--cl-ink,#18212b) 5%,transparent)}
+.cl-ui-accordion-label{display:flex;flex:1 1 auto;flex-direction:column;gap:.15rem;min-width:0}
+.cl-ui-accordion-eyebrow{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
+.cl-ui-accordion-summary--labelled .cl-ui-accordion-toggle{flex:0 0 auto;margin-left:auto;transition:transform .15s}
+.cl-faq{display:grid;gap:.6rem}
+.cl-faq .cl-ui-accordion-section{margin:0}
+.cl-faq .cl-ui-accordion-content>p:last-child{margin-bottom:0}
+/* Category icons (owner, 2026-10-20): beside a category in the picker, the catalogue's category line and
+   the ADMIN tree. Drawn in the text's colour. Uploaded icons and covers are previewed on their forms. */
+.cl-ui-tree-select-icon,.cl-category-icon{display:inline-flex;flex:0 0 auto;width:1.15em;height:1.15em;margin-right:.45em;vertical-align:-.2em}
+.cl-ui-tree-select-icon svg,.cl-category-icon svg{display:block;width:100%;height:100%}
+.cl-tag-chip-compact .cl-tag-icon svg{width:14px;height:14px;vertical-align:-2px;margin-right:.25rem}
+.cl-category-icon--preview,.cl-tag-icon--preview{display:inline-flex;width:2.5rem;height:2.5rem;margin:0 0 .5rem}
+.cl-category-icon--preview svg,.cl-tag-icon--preview svg{width:100%;height:100%;margin:0}
+.cl-course-cover-preview{display:block;width:min(100%,24rem);aspect-ratio:16/9;margin:0 0 .5rem;overflow:hidden;border-radius:var(--cl-radius,.4rem);line-height:0}
+.cl-course-cover-preview svg{display:block;width:100%;height:100%}
+.cl-promotion-announcement,.cl-cart-promo-automatic{margin:0 0 .75rem;overflow-wrap:anywhere}
 .cl-course-purchase-signin,.cl-course-purchase-inert{margin:.75rem 0 0;font-size:.88rem}
 /* The landing page editor: the hero row fixed above the sortable list, the address field with its
    prefix, and the rows of benefits or questions. */

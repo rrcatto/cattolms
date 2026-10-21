@@ -44,16 +44,17 @@ final class AccountWorkspaceContractTest extends TestCase
         return (string) file_get_contents($matches[0]);
     }
 
-    public function testAccountRegistryDefinesEightDistinctSectionsAndSemanticRoutes(): void
+    public function testAccountRegistryDefinesNineDistinctSectionsAndSemanticRoutes(): void
     {
         // Seven since 2026/09/10. Profile became three sections - Personal Particulars, Email
         // Addresses and Social Media - on the owner's instruction, each with its own page under a
         // Profile pop-out, because each is a separate decision with its own rules. Eight since
-        // 2026/10/06: Billing Address is its own page straight after Personal Particulars.
+        // 2026/10/06: Billing Address is its own page straight after Personal Particulars. Nine since
+        // 2026/10/19: My Certificates, where the learner decides who sees each certificate and transcript.
         $sections = (new AccountSectionRegistry())->all();
-        self::assertSame(['dashboard','profile','billing','emails','social','learning','sessions','activity'], array_column($sections, 'key'));
+        self::assertSame(['dashboard','profile','billing','emails','social','learning','certificates','sessions','activity'], array_column($sections, 'key'));
         self::assertSame(
-            ['/account/dashboard','/account/profile','/account/billing','/account/emails','/account/social','/account/courses','/account/sessions','/account/activity'],
+            ['/account/dashboard','/account/profile','/account/billing','/account/emails','/account/social','/account/courses','/account/certificates','/account/sessions','/account/activity'],
             array_column($sections, 'route')
         );
         foreach ($sections as $section) self::assertFileExists(dirname(__DIR__, 2) . '/resources/views/' . $section['template']);
@@ -64,7 +65,7 @@ final class AccountWorkspaceContractTest extends TestCase
         $root = dirname(__DIR__, 2);
         $app = RouteTable::signatures();
         $controller = (string) file_get_contents($root . '/src/Http/Controller/AccountController.php');
-        foreach (['GET /account','GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity'] as $route) self::assertStringContainsString($route, $app);
+        foreach (['GET /account','GET /account/dashboard','GET /account/profile','GET /account/courses','GET /account/sessions','GET /account/activity'] as $route) self::assertStringContainsString($route, $app);
         self::assertStringContainsString("render('account-control-centre'", $controller);
         $library = array_values(array_filter(
             RouteTable::all(),

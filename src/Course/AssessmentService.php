@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
-use CattoLearning\Course\Certificate\CertificateIssuer;
+use CattoLearning\Course\Certificate\CertificateAwards;
 use CattoLearning\Commerce\Application\AccessService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
@@ -12,10 +12,17 @@ use CattoLearning\Support\Slug;
 use InvalidArgumentException;
 use RuntimeException;
 
-/** Runs assessment and diagnostic Course Items in a placement context. */
+/**
+ * Runs assessment and diagnostic Course Items in a placement context.
+ *
+ * A certificate proves that the learner took the course, never that they passed (owner, 2026-10-19):
+ * after every graded attempt CertificateAwards issues it, with its transcript, once every graded
+ * assessment is completed, pass or fail, and only to a verified account. A later graded attempt on a
+ * completed course recalculates the result, so the transcript always adds up.
+ */
 final class AssessmentService
 {
-    public function __construct(private readonly TransactionManager $transactions, private readonly CourseRepository $courses, private readonly CourseItemRepository $itemRecords, private readonly CourseItemService $items, private readonly AssessmentRepository $assessments, private readonly AuditRepository $audit, private readonly CertificateIssuer $certificates, private readonly ?AccessService $commerceAccess = null)
+    public function __construct(private readonly TransactionManager $transactions, private readonly CourseRepository $courses, private readonly CourseItemRepository $itemRecords, private readonly CourseItemService $items, private readonly AssessmentRepository $assessments, private readonly AuditRepository $audit, private readonly CertificateAwards $certificates, private readonly ?AccessService $commerceAccess = null)
     {
     }
 
@@ -149,7 +156,10 @@ final class AssessmentService
     private function selectQuestions(array $assessment, string $mode): array
     {
         $all = $this->itemRecords->questions((int) $assessment['id'], true); $poolMode = (string) ($assessment['practice_pool_mode'] ?? 'both');
-        $eligible = array_values(array_filter($all, static function (array $question) use ($mode, $poolMode): bool { if ($mode === 'graded' || $mode === 'diagnostic') { return (bool) ($question['graded_eligible'] ?? true); } return match ($poolMode) { 'separate' => (bool) ($question['practice_eligible'] ?? true) && !(bool) ($question['graded_eligible'] ?? true), 'graded' => (bool) ($question['graded_eligible'] ?? true), default => (bool) ($question['practice_eligible'] ?? true) || (bool) ($question['graded_eligible'] ?? true) }; }));
+        // A diagnostic asks every question it holds: it never counts towards a grade, so it has no graded or practice pool,
+        // and the importers mark its questions not graded-eligible (owner, 2026-10-21: "No eligible questions are available
+        // for this assessment" on every imported diagnostic).
+        $eligible = array_values(array_filter($all, static function (array $question) use ($mode, $poolMode): bool { if ($mode === 'diagnostic') { return true; } if ($mode === 'graded') { return (bool) ($question['graded_eligible'] ?? true); } return match ($poolMode) { 'separate' => (bool) ($question['practice_eligible'] ?? true) && !(bool) ($question['graded_eligible'] ?? true), 'graded' => (bool) ($question['graded_eligible'] ?? true), default => (bool) ($question['practice_eligible'] ?? true) || (bool) ($question['graded_eligible'] ?? true) }; }));
         if ((bool) ($assessment['randomise_questions'] ?? true)) { shuffle($eligible); }
         $count = $mode === 'practice' ? (int) ($assessment['practice_question_count'] ?? 5) : (int) ($assessment['graded_question_count'] ?? count($eligible));
         return array_slice($eligible, 0, max(1, min($count, count($eligible))));
@@ -174,6 +184,8 @@ final class AssessmentService
             $responses = []; foreach ($this->assessments->sessionResponses((int) $session['id']) as $response) { if ($response['selected_option_id'] !== null && $response['selected_option_id'] !== '') { $responses[] = ['question_id' => (int) $response['question_id'], 'selected_option_id' => (int) $response['selected_option_id'], 'is_correct' => (bool) $response['is_correct'], 'points_awarded' => (float) $response['points_awarded']]; } }
             $attemptId = $this->assessments->saveAttempt($session, $result, $responses); $this->assessments->attachLegacyAttempt((int) $session['id'], $attemptId);
             if (($session['assessment_role'] ?? '') === 'final') { $this->completeCourse($session); }
+            else { $this->recalculateCompletedCourse((int) $session['enrolment_id'], (int) $session['course_id'], (int) $session['user_id']); }
+            if (!(bool) $session['is_preview']) { $this->certificates->afterGradedAttempt((int) $session['enrolment_id'], (int) $session['user_id']); }
         }
         $this->audit->record((int) $session['user_id'], 'assessment.completed', ['course_item_id' => (int) $session['course_item_id'], 'structure_node_id' => (int) $session['structure_node_id'], 'session_id' => (int) $session['id'], 'mode' => $session['attempt_mode'], 'percentage' => $result['percentage'], 'status' => $result['status'], 'preview' => (bool) $session['is_preview']]);
         return $this->result((int) $session['user_id'], (string) $session['public_id']);
@@ -202,10 +214,19 @@ final class AssessmentService
         $band = $this->band($overall, $this->courses->gradeBands((int) $session['course_id']));
         $before = $this->courses->enrolmentByIdForUser((int) $session['enrolment_id'], (int) $session['user_id']); $this->courses->saveCourseResult((int) $session['enrolment_id'], $module, $final, $overall, (string) $band['grade_code'], (bool) $band['is_passing']);
         if (($before['status'] ?? '') !== 'completed') { $this->audit->record((int) $session['user_id'], 'course.completed', ['course_id' => (int) $session['course_id'], 'enrolment_id' => (int) $session['enrolment_id'], 'completion_method' => 'final_assessment', 'percentage' => $overall, 'grade_code' => $band['grade_code'], 'passed' => $band['is_passing']]); }
-        $course = $this->courses->findById((int) $session['course_id']); if ($course === null || !(bool) $course['certificate_enabled'] || !(bool) $band['is_passing']) { return; }
-        // Issued through the document template engine with the current published certificate design;
-        // the certificate keeps the values and the template version it was issued with.
-        $this->certificates->issue((int) $session['enrolment_id'], (int) $session['user_id']);
+    }
+
+    /** A graded attempt on a course already completed recalculates its result from the final's placement. */
+    private function recalculateCompletedCourse(int $enrolmentId, int $courseId, int $userId): void
+    {
+        $enrolment = $this->courses->enrolmentByIdForUser($enrolmentId, $userId);
+        if (($enrolment['status'] ?? '') !== 'completed') { return; }
+        foreach ($this->itemRecords->assessmentContexts($courseId, $enrolmentId) as $context) {
+            if ($context['assessment_role'] === 'final') {
+                $this->completeCourse(['course_id' => $courseId, 'structure_node_id' => (int) $context['node_id'], 'enrolment_id' => $enrolmentId, 'user_id' => $userId]);
+                return;
+            }
+        }
     }
 
     /** @return array{0:array<string,mixed>,1:array<string,mixed>} */
@@ -248,7 +269,7 @@ final class AssessmentService
     }
 
     /** @param list<float> $values */
-    private function aggregate(array $values, string $policy): float { if ($values === []) { return 0; } return match ($policy) { 'average' => array_sum($values) / count($values), 'latest' => $values[array_key_last($values)], default => max($values) }; }
+    private function aggregate(array $values, string $policy): float { return ScorePolicy::aggregate($values, $policy); }
     /**
      * @param list<array<string,mixed>> $bands
      * @return array<string,mixed>

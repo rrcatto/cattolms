@@ -1,6 +1,13 @@
-<section class="cl-page-head {{ ph_compact|default(false) ? 'cl-page-head-compact' : '' }}">
+{#
+	ph_hero (owner, 2026-10-20): a picture (captured SVG markup) the kicker, title, lead and the page's actions
+	sit over, as on Help, the FAQ, the catalogue and the tag browser. Every such picture is the same size
+	(.cl-picture-head, shared with a course page's cover); without one the head is text alone.
+#}
+{% set ph_hero_art = ph_hero|default('')|trim %}
+<section class="cl-page-head {{ ph_compact|default(false) ? 'cl-page-head-compact' : '' }}{{ ph_hero_art ? ' cl-page-head--picture' : '' }}">
 	<div class="cl-page-head-inner">
-		<div class="cl-page-head-content">
+		{% if ph_hero_art %}<div class="cl-picture-head"><div class="cl-picture-head-art" aria-hidden="true">{{ ph_hero_art }}</div>{% endif %}
+		<div class="cl-page-head-content{{ ph_hero_art ? ' cl-picture-head-text' : '' }}">
 			{% if ph_back_href|default('') %}<a class="cl-back-link" href="{{ ph_back_href }}">← {{ ph_back_label|default('Back', true) }}</a>{% endif %}
 			{% if ph_kicker|default('') %}<span class="cl-kicker d-block">{{ ph_kicker }}</span>{% endif %}
 			<h1 class="{{ ph_compact|default(false) ? 'h5 mb-0' : 'cl-display-5 fw-bold' }}">{{ ph_title }}</h1>
@@ -16,6 +23,7 @@
 		{% elseif ph_action_href|default('') %}
 			<div class="cl-page-head-actions">{{ ui('action.link', {label: ph_action_label|default('Back', true), variant: 'secondary', href: ph_action_href}) }}</div>
 		{% endif %}
+		{% if ph_hero_art %}</div>{% endif %}
 	</div>
 </section>
 {% include '@platform/partials/account/identity-head.html.twig' %}

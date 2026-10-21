@@ -84,7 +84,7 @@
       }
     });
     initialiseModals();
-    document.addEventListener('htmx:afterSwap', initialiseModals);
+    document.addEventListener('htmx:after:swap', () => initialiseModals());
 
     /* Delegated from document rather than bound per element, so a trigger or a close button that
        arrives in an htmx swap works without rebinding. The Switch Company picker replaces its own
@@ -327,6 +327,52 @@
 
     window.CattoTreeSelect = { initialise: root => { initialiseTreeSelects(root); initialiseCategoryFields(root); } };
     initialiseTreeSelects(document);
+
+    /* Feature cards that open a page (a form with data-choose-submits: the catalogue's categories, owner
+       2026-10-20). A pointer choice, Space or Enter submits the form at once; arrow keys only move the choice.
+       Delegated from the document, so cards swapped into the page work too. Without JavaScript the form's own
+       button submits it. */
+    let arrowChoice = false;
+    const choosing = target => target instanceof HTMLInputElement && target.type === 'radio' && target.form && target.form.matches('[data-choose-submits]');
+    document.addEventListener('keydown', event => {
+      if (!choosing(event.target)) return;
+      arrowChoice = event.key.startsWith('Arrow');
+      if (event.key === 'Enter') { event.preventDefault(); event.target.checked = true; event.target.form.requestSubmit(); }
+    });
+    document.addEventListener('change', event => {
+      if (!choosing(event.target)) return;
+      if (arrowChoice) { arrowChoice = false; return; }
+      event.target.form.requestSubmit();
+    });
+
+    /* The catalogue keeps its place (owner, 2026-10-20: "whenever I click a category card, the screen jumps to
+       the top of the page"). Choosing a category card, or a step of the trail above the cards, loads the next
+       page; the place marked data-keep-scroll comes back where it was on the screen instead of the page opening
+       at the top. Saved for the next page only, and only from this tab (sessionStorage). */
+    const KEEP_SCROLL_KEY = 'catto-learning:keep-scroll';
+    const keepPlace = from => {
+      const anchor = from.closest('[data-keep-scroll]');
+      if (!anchor) return;
+      try { sessionStorage.setItem(KEEP_SCROLL_KEY, JSON.stringify({top: anchor.getBoundingClientRect().top, at: Date.now()})); } catch (_) {}
+    };
+    // The button that sent the form counts: a search field and its button can sit in one place and belong to a
+    // form drawn elsewhere (form="…").
+    document.addEventListener('submit', event => { const from = event.submitter || event.target; if (from instanceof Element) keepPlace(from); }, true);
+    document.addEventListener('click', event => {
+      const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (link && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey) keepPlace(link);
+    }, true);
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(KEEP_SCROLL_KEY) || 'null');
+      sessionStorage.removeItem(KEEP_SCROLL_KEY);
+      const anchor = document.querySelector('[data-keep-scroll]');
+      if (saved && anchor && Date.now() - saved.at < 15000) {
+        const place = () => window.scrollTo({top: Math.max(0, window.scrollY + anchor.getBoundingClientRect().top - saved.top), behavior: 'instant'});
+        place();
+        // Fonts and pictures can still move the page once loaded.
+        window.addEventListener('load', place, {once: true});
+      }
+    } catch (_) {}
     initialiseCategoryFields(document);
     const passwordInput=document.querySelector('form[action="/admin/settings/mail"] input[name="smtp_password"]');
     if(passwordInput instanceof HTMLInputElement){const form=passwordInput.closest('form'),csrfInput=form?.querySelector('input[name="csrf"]');if(csrfInput instanceof HTMLInputElement&&csrfInput.value){const toggle=document.getElementById('smtp-password-toggle');if(!(toggle instanceof HTMLButtonElement))return;toggle.hidden=false;toggle.addEventListener('click',()=>{const visible=passwordInput.type==='password';passwordInput.type=visible?'text':'password';toggle.querySelector('span').textContent=visible?'Hide':'Show';});fetch('/admin/settings/mail/password',{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:new URLSearchParams({csrf:csrfInput.value}).toString(),cache:'no-store'}).then(response=>response.ok?response.json():null).then(data=>{if(!data)return;passwordInput.value=typeof data.password==='string'?data.password:'';toggle.disabled=false;}).catch(()=>{});}}
@@ -392,13 +438,76 @@
         }
       });
     };
-    applyCellTooltips(document);
-    document.body.addEventListener('htmx:afterSwap', event => applyCellTooltips(event.target));
+    /* Columns sized to what they hold (owner, 2026-10-21: "dynamically resize all columns to optimally fit all the
+       data ... the company name is truncated, but you have spare space in all the other columns").
+
+       The server gives each column a share of the width as a percentage, which cannot know the rows of the page being
+       shown. Here each table is laid out once at its natural width (data-column-fit="measuring": every column as wide as its
+       widest entry on one line), and the space is then shared out: every column that needs no more than an equal share
+       of what is left gets all it needs, and the columns that need more share the rest equally, so a cell is cut short
+       only when the table truly cannot hold everything. When everything fits, the spare width goes to each column in
+       proportion to what it holds. The widths are kept as percentages of the table, and worked out again when the
+       window changes size, a page turns or a closed section opens. Without JavaScript the server's percentages stand. */
+    // The one-line columns share space as above; a column whose text wraps (cell-text, such as a course title) loses
+    // nothing by being narrower, so it gives way: it keeps a floor of 10rem and takes whatever the others leave.
+    const waterFill = (needs, indexes, available, widths) => {
+      let open = indexes.slice(), remaining = available;
+      while (open.length) {
+        const share = remaining / open.length;
+        const fitting = open.filter(index => needs[index] <= share);
+        if (!fitting.length) { open.forEach(index => { widths[index] = share; }); return 0; }
+        fitting.forEach(index => { widths[index] = needs[index]; remaining -= needs[index]; });
+        open = open.filter(index => needs[index] > share);
+      }
+      return remaining;
+    };
+    const shareWidth = (needs, wraps, available) => {
+      const total = needs.reduce((sum, need) => sum + need, 0);
+      if (total <= available) return needs.map(need => need + (available - total) * need / total);
+      const widths = needs.slice();
+      const floor = parseFloat(getComputedStyle(document.documentElement).fontSize) * 10;
+      const wrapping = needs.map((_, index) => index).filter(index => wraps[index]);
+      const lines = needs.map((_, index) => index).filter(index => !wraps[index]);
+      const floors = wrapping.map(index => Math.min(needs[index], floor));
+      const reserved = floors.reduce((sum, value) => sum + value, 0);
+      const left = waterFill(needs, lines, Math.max(0, available - reserved), widths);
+      const wanted = wrapping.reduce((sum, index, position) => sum + needs[index] - floors[position], 0);
+      wrapping.forEach((index, position) => { widths[index] = floors[position] + (wanted > 0 ? left * (needs[index] - floors[position]) / wanted : 0); });
+      return widths;
+    };
+    const fitTableColumns = root => {
+      const scope = root instanceof Element ? root : document;
+      within(scope, '.cl-ui-table').forEach(wrapper => {
+        const table = wrapper.querySelector(':scope > table');
+        const head = table && table.tHead && table.tHead.rows[0];
+        if (!head || !wrapper.clientWidth) return;
+        const columns = [...head.cells];
+        // A header or row cell spanning columns cannot be measured one column at a time.
+        if (columns.some(cell => cell.colSpan > 1) || [...table.tBodies].some(body => [...body.rows].some(row => [...row.cells].some(cell => cell.colSpan > 1)))) return;
+        wrapper.dataset.columnFit = 'measuring';
+        const needs = columns.map(cell => cell.getClientRects().length ? Math.ceil(cell.getBoundingClientRect().width) : 0);
+        delete wrapper.dataset.columnFit;
+        const shown = needs.map((need, index) => need > 0 ? index : -1).filter(index => index >= 0);
+        const available = table.clientWidth || wrapper.clientWidth;
+        if (!shown.length || !available) return;
+        const firstRow = table.tBodies[0] && table.tBodies[0].rows[0];
+        const wraps = shown.map(index => !!(firstRow && firstRow.cells[index] && firstRow.cells[index].classList.contains('cell-text')));
+        const widths = shareWidth(shown.map(index => needs[index]), wraps, available);
+        shown.forEach((index, position) => { columns[index].style.width = (widths[position] / available * 100).toFixed(3) + '%'; });
+        wrapper.dataset.columnFit = 'fitted';
+      });
+    };
+    const fitAndExplain = root => { fitTableColumns(root); applyCellTooltips(root); };
+    fitAndExplain(document);
+    // htmx 4's event name; the swapped element can be gone (an outerHTML swap), so the page is looked at again.
+    document.addEventListener('htmx:after:swap', () => fitAndExplain(document));
+    // A table inside a section that was closed had no width to share out until it opened.
+    document.addEventListener('toggle', event => { if (event.target instanceof HTMLDetailsElement && event.target.open) fitAndExplain(event.target); }, true);
     /* And when the viewport changes, because a column that fitted at one width may not at another. */
     let tooltipResize = 0;
     window.addEventListener('resize', () => {
       clearTimeout(tooltipResize);
-      tooltipResize = setTimeout(() => applyCellTooltips(document), 200);
+      tooltipResize = setTimeout(() => fitAndExplain(document), 200);
     });
 
     if(document.body.dataset.clCourseReader==='1')return;
@@ -486,7 +595,8 @@ document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
             var label = heads[index] ? clean(heads[index].textContent) : '';
             lines.push(label ? label + ': ' + text : text);
         });
-        return needed ? lines.join('\n') : '';
+        // One straight line along the row (owner, 2026-10-20), not a box of stacked lines.
+        return needed ? lines.join('  ·  ') : '';
     }
     function hide() {
         if (tip) tip.hidden = true;
@@ -499,8 +609,11 @@ document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
         element.textContent = text;
         element.hidden = false;
         current = row;
-        var rect = row.getBoundingClientRect(), box = element.getBoundingClientRect();
-        var left = Math.max(8, Math.min(rect.left + 8, window.innerWidth - box.width - 8));
+        var rect = row.getBoundingClientRect();
+        // As wide as the row, inside the window, so the line runs along it.
+        var left = Math.max(8, rect.left);
+        element.style.width = Math.max(120, Math.min(rect.right, window.innerWidth - 8) - left) + 'px';
+        var box = element.getBoundingClientRect();
         var top = rect.bottom + 6;
         if (top + box.height > window.innerHeight - 8) top = Math.max(8, rect.top - box.height - 6);
         element.style.left = left + 'px';
@@ -526,4 +639,22 @@ document.querySelectorAll('.cl-cart-menu').forEach(function (cart) {
     document.addEventListener('toggle', function (event) { if (event.target.matches && event.target.matches('.cl-ui-row-menu') && event.target.open) hide(); }, true);
     window.addEventListener('scroll', hide, {passive: true});
     window.addEventListener('resize', hide);
+})();
+
+/* A link to a closed disclosure opens it (owner, 2026-10-20: /faq#grading opens the grading answer). */
+(function () {
+    function openTarget() {
+        var id = decodeURIComponent((location.hash || '').slice(1));
+        var target = id ? document.getElementById(id) : null;
+        if (target && target.tagName === 'DETAILS' && !target.open) target.open = true;
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openTarget, {once: true}); else openTarget();
+    window.addEventListener('hashchange', openTarget);
+    /* A printed page shows every section (the legal pages say "You can print this page"): the accordions closed
+       for printing close again afterwards. */
+    var openedForPrint = [];
+    window.addEventListener('beforeprint', function () {
+        openedForPrint = Array.prototype.filter.call(document.querySelectorAll('details.cl-ui-accordion-section:not([open])'), function (section) { section.open = true; return true; });
+    });
+    window.addEventListener('afterprint', function () { openedForPrint.forEach(function (section) { section.open = false; }); openedForPrint = []; });
 })();

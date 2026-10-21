@@ -13,15 +13,16 @@
 		{{ ui('layout.section-head', {heading: 'What happened', heading_level: 2}) }}
 		<p data-unmatched-status>{{ ui('feedback.badge', {label: item.status_label, tone: item.status_tone}) }}</p>
 		<p class="cl-lead" data-unmatched-sentence>{{ item.sentence }}</p>
-		{% if item.outcome %}<p data-unmatched-outcome>{{ item.outcome }}</p>{% endif %}
+		{% if item.outcome %}<p data-unmatched-outcome>{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: item.outcome_parts} only %}</p>{% endif %}
 		{{ ui('data.key-value-list', {items: [
 			{label: 'Amount', value: item.amount_label},
 			{label: 'Arrived', value: item.received},
 			{label: 'Reference the payer used', value: item.payer_reference},
 			{label: 'The bank’s reference', value: item.bank_reference},
 			{label: 'Where it was seen', value: item.seen_where},
-			{label: 'Put on this list', value: item.recorded ~ ' by ' ~ item.recorded_by},
+			{label: 'Put on this list', value: item.recorded},
 		]}) }}
+		<p data-unmatched-recorder><strong>Put on this list by:</strong> {{ ui('data.person', item.recorded_by_person) }}</p>
 		{% if item.order_href %}{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.link', {label: 'Open order ' ~ item.order_label, variant: 'secondary', size: 'small', href: item.order_href}) }}{% endblock %}{% endembed %}{% endif %}
 	{% endblock %}{% endembed %}</section>
 	{% if item.state == 'open' and can_manage %}

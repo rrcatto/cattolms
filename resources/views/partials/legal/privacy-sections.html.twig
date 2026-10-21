@@ -1,0 +1,142 @@
+{#
+  The numbered sections of the Privacy Policy, each a closed accordion with its icon (owner, 2026-10-20). One source for the page and its PDF
+  (partials/legal/document-pdf.html.twig), which prints each section open under its heading. The text is the
+  legal text: change its date in CattoLearning\Legal\LegalDocuments whenever it changes.
+#}
+{% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+{% set icons = {
+	'responsible-party': '<svg ' ~ a ~ '><path d="M3 21h18"/><path d="M5 21V5l7-2v18"/><path d="M12 9h7v12"/><path d="M8 8h1M8 11h1M8 14h1M8 17h1M15 12h1M15 15h1M15 18h1"/></svg>',
+	'what-we-collect': '<svg ' ~ a ~ '><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>',
+	'why': '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14M12 17h.01"/></svg>',
+	'age': '<svg ' ~ a ~ '><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+	'identity': '<svg ' ~ a ~ '><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M5.5 16.5c.6-1.6 2-2.5 3.5-2.5s2.9.9 3.5 2.5M15 10h4M15 13h3"/></svg>',
+	'cookies': '<svg ' ~ a ~ '><path d="M21 12a9 9 0 1 1-9-9 3 3 0 0 0 3 3 3 3 0 0 0 3 3 3 3 0 0 0 3 3z"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="15.5" cy="12" r="1"/></svg>',
+	'who-receives': '<svg ' ~ a ~ '><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg>',
+	'retention': '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+	'security': '<svg ' ~ a ~ '><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+	'your-rights': '<svg ' ~ a ~ '><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
+} %}
+<div class="cl-faq">
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'responsible-party', eyebrow: 'Section 1', icon: icons['responsible-party'], heading: 'Who is responsible'})} %}{% block body %}
+<p>The responsible party under POPIA is {{ supplier.legal_name }}, {{ supplier.legal_form_phrase }} trading as {{ supplier.trading_name }}. The Information Officer is {{ supplier.information_officer }}.</p>
+{{ ui('data.key-value-list', {items: [
+	{label: 'Responsible party', value: supplier.legal_name ~ ', trading as ' ~ supplier.trading_name},
+	{label: 'Information Officer', value: supplier.information_officer},
+	{label: 'Physical address', value: supplier.physical_address},
+	{label: 'Telephone', value: supplier.phone},
+	{label: 'Email address', value: supplier.email},
+	{label: 'Website', value: supplier.website},
+]}) }}
+<p>We may change this policy from time to time. The date at the top of this page shows when it last changed. If a change affects how we use information we already hold about you, we will email you before it takes effect.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'what-we-collect', eyebrow: 'Section 2', icon: icons['what-we-collect'], heading: 'What we collect'})} %}{% block body %}
+<ul>
+	<li><strong>Your account.</strong> Your names, your display name, your email addresses and your date of birth. If you give them: your gender, cell number, identification number, profile picture and links to your social media. Your role on the site and the company you belong to, if any. Your account reference, which the site gives your account when it is made. Checkout asks for your first name, last name and cell number.</li>
+	<li><strong>Identity verification.</strong> The result of each identity check, your verified name, the type, number and issuing country of your identity document, your date of birth and when you were verified. No image of your document or of your face is kept on this site.</li>
+	<li><strong>Billing details.</strong> Your billing name, organisation, tax number and address. They are copied into each order you place.</li>
+	<li><strong>Orders and payments.</strong> Your orders, what you bought and the prices, your invoices, receipts and credit notes, and each payment's method, amount and reference. For an EFT, the bank reference and date we confirmed it with. Any refund request, what you wrote in it and our decision, and any refund and the reason for it. For money back by EFT, the bank details you give us are used only to make that payment and are not stored on this site. We do not receive or store card numbers or banking login details.</li>
+	<li><strong>Your wallet.</strong> Each amount of wallet credit added to your wallet, spent or expired, with its date and expiry date, and the reminders we email you before credit expires.</li>
+	<li><strong>Emails about your payments.</strong> An email we send you about a payment, a refund or your wallet is recorded with the transaction it is about.</li>
+	<li><strong>Learning records.</strong> The courses you are enrolled on, your progress, every answer you give in an assessment and how long you took to answer, your marks and results, course requests and their notes, and your certificates and transcripts, with whether you have made each one public.</li>
+	<li><strong>Reviews.</strong> Your rating and what you write. Once a review is approved it is shown publicly with your first name and the first letter of your surname.</li>
+	<li><strong>Activity log.</strong> A record of actions on your account, such as signing in or changing your details. The activity log stores the IP address of each recorded action. You can see your own activity in your account.</li>
+	<li><strong>Sessions.</strong> Each browser session and each sign-in session stores a hashed IP address and your browser's user agent. This applies to every visitor, signed in or not. A request for a sign-in link also stores a hashed IP address.</li>
+	<li><strong>Analytics events.</strong> Our own record of events such as a course page being viewed, a checkout being started or a course being bought. An event stores your user number if you are signed in, or a random visitor number kept only for your browser session, with the course or order concerned and any campaign tags in the address you arrived by. Analytics events store neither an IP address nor a user agent.</li>
+	<li><strong>Messages.</strong> A message you send through the contact form: what it is about, your name, email address and message, your account reference and an order number or course if you give them, and the answers the form asks for its reason, such as the day, amount and reference of an EFT payment. It is kept on this site and emailed to us, and we email you its reference.</li>
+</ul>
+<p>If you belong to a company, your Company Administrator can see your name, email address and role, the courses you are on and your status, progress and dates on them. The company also sees totals for each course with an average result.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'why', eyebrow: 'Section 3', icon: icons['why'], heading: 'Why we use it'})} %}{% block body %}
+<p>We use personal information only for these purposes:</p>
+<ul>
+	<li>to give you an account, sign you in and give you access to your courses</li>
+	<li>to take orders, confirm payments, make refunds and issue invoices, receipts and credit notes</li>
+	<li>to mark your assessments, record your results and issue certificates and transcripts</li>
+	<li>to verify your identity before a certificate or transcript is issued</li>
+	<li>to make sure that you are 18 or older</li>
+	<li>to let a company manage the courses of its staff members</li>
+	<li>to keep the site secure and to investigate misuse</li>
+	<li>to measure which courses are viewed and bought</li>
+	<li>to answer your questions and complaints</li>
+	<li>to keep the financial records the law requires</li>
+</ul>
+<p>We do not sell personal information.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'age', eyebrow: 'Section 4', icon: icons['age'], heading: 'Age'})} %}{% block body %}
+<p>This site is for adults. Learners must be 18 or older. You give your date of birth when you register, or the first time you sign in if someone else created your account. If you are under 18 we refuse the registration and keep nothing you typed. If your verified identity document shows that you are under 18, your account cannot be used.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'identity', eyebrow: 'Section 5', icon: icons['identity'], heading: 'Identity verification, certificates and transcripts'})} %}{% block body %}
+<p>You may take a course under any name you choose.</p>
+<p>A certificate proves that you took a course. It never states that you passed. You earn it when you have completed every assessment in the course, whether you pass or fail. A certificate and a transcript are issued only after your identity has been verified. Both state your name exactly as it appears on your identity document.</p>
+<p>Your identity is verified by an identity verification provider. On its secure page you photograph your identity document and take a live selfie, and the provider checks them. The provider tells this site the result. This site keeps no images. It keeps only the result, your verified name, the type, number and issuing country of your document, your date of birth and when you were verified.</p>
+<p>The purpose is to protect the credibility of certificates and transcripts.</p>
+<p>A certificate shows your verified name, the course, the date you completed it, the certificate number, the accreditation and the provider. It shows no mark or grade. A transcript records each module assessment mark, the final assessment mark and the overall grade, which is 50% module assessments and 50% final assessment.</p>
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'You decide who can see your certificates and transcripts'})} %}
+{% block body %}
+	Each certificate and each transcript is private until you make it public, and you decide for each one separately. A private one can be seen only by you. A public one can be seen without signing in by anyone who has its address. They will see your name and, on a transcript, your marks and your grade. We never link to it, list it or tell anyone where to find it. You can make it public or private, or give it a new address, at any time in your account. The old address then stops working.
+{% endblock %}
+{% endembed %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'cookies', eyebrow: 'Section 6', icon: icons['cookies'], heading: 'Cookies'})} %}{% block body %}
+		<p>The site sets three cookies. None is an advertising or third-party tracking cookie.</p>
+<ul>
+	<li><strong>catto_learning_web</strong> keeps your browser session: your cart, your checkout steps, form protection and the random analytics visitor number. It is set for every visitor. It ends when you close your browser, and its record on the server is removed after 24 hours without use.</li>
+	<li><strong>catto_learning_session</strong> keeps you signed in. It is set when you sign in. It lasts 24 hours and is renewed while you use the site.</li>
+	<li><strong>cl_palette</strong> remembers the colour palette the site is shown in. It is set when a theme that offers colour palettes is shown. It lasts 1 year.</li>
+</ul>
+<p>The site also keeps small display settings in your browser's local storage, such as the chosen palette and the position of the menu. They stay in your browser.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'who-receives', eyebrow: 'Section 7', icon: icons['who-receives'], heading: 'Who receives your information'})} %}{% block body %}
+<ul>
+	<li><strong>A payment provider.</strong> A card payment is made on our payment provider's secure page. Card details and banking logins are entered there and never reach this site. The payment provider tells this site whether the payment succeeded. It may process personal information outside South Africa.</li>
+	<li><strong>An identity verification provider.</strong> When you verify your identity, you photograph your identity document and take a live selfie on the provider's secure page. The provider checks them and tells this site the result, with your verified name, the type, number and issuing country of your document and your date of birth. It may process personal information outside South Africa.</li>
+	<li><strong>A hosting provider.</strong> The site and its database are hosted on a server in Canada. Your personal information is therefore stored outside South Africa.</li>
+	<li><strong>Email.</strong> Email is sent from the site's own mail server on the same host.</li>
+	<li><strong>A web font service.</strong> When the site is shown in the Gilded Noir or Light Default theme, your browser loads fonts from a web font service, which then receives your IP address.</li>
+	<li><strong>A video service.</strong> Some course videos are embedded from a video service in its privacy-enhanced mode. When you open a page with such a video, your browser connects to that service.</li>
+	<li><strong>Your company.</strong> Your Company Administrator sees the information set out in <a href="#what-we-collect">section 2</a>.</li>
+	<li><strong>The public.</strong> An approved review, as <a href="#what-we-collect">section 2</a> explains, and a certificate or transcript you have made public, as <a href="#identity">section 5</a> explains.</li>
+</ul>
+<p>We also disclose personal information when the law requires it.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'retention', eyebrow: 'Section 8', icon: icons['retention'], heading: 'How long we keep it'})} %}{% block body %}
+{{ ui('data.key-value-list', {items: [
+	{label: 'Orders and transaction records', value: 'At least 5 years'},
+	{label: 'Activity log', value: '5 years'},
+	{label: 'Analytics events', value: '5 years'},
+	{label: 'Contact messages', value: '5 years'},
+	{label: 'Sign-in links', value: '30 minutes'},
+	{label: 'Sessions', value: '24 hours'},
+]}) }}
+<p>Your account details, your date of birth, your identity verification results, learning records, certificates and reviews are kept for as long as you have an account. Activity log entries, analytics events and contact messages older than 5 years are deleted automatically every day.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'security', eyebrow: 'Section 9', icon: icons['security'], heading: 'How we protect it'})} %}{% block body %}
+<ul>
+	<li>The site has no passwords. You sign in with a one-time link that expires after 30 minutes.</li>
+	<li>Sign-in links and sign-in sessions are stored only in hashed form.</li>
+	<li>Card details and banking logins are entered on our payment provider's pages and never reach this site.</li>
+	<li>Identity documents and selfies are checked on the identity verification provider's page. This site never receives or keeps an image of them.</li>
+	<li>You can see your active sessions in your account and end any of them.</li>
+</ul>
+<p>If a security breach affects your personal information, we will tell you and the Information Regulator as POPIA requires.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'your-rights', eyebrow: 'Section 10', icon: icons['your-rights'], heading: 'Your rights'})} %}{% block body %}
+<p>Under POPIA you have the right to:</p>
+<ul>
+	<li>ask whether we hold personal information about you and ask for a copy of it</li>
+	<li>ask us to correct or delete personal information that is inaccurate, out of date, excessive or unlawfully obtained</li>
+	<li>ask us to delete personal information we no longer have a right to keep</li>
+	<li>object to the processing of your personal information on reasonable grounds</li>
+	<li>withdraw a consent you have given</li>
+	<li>complain to the Information Regulator</li>
+</ul>
+<p>You can correct most of your details yourself in your account profile. To exercise any other right, contact the Information Officer, {{ supplier.information_officer }}:</p>
+<ul>
+	<li>email <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a></li>
+	<li>telephone <a href="{{ supplier.phone_href }}">{{ supplier.phone }}</a></li>
+	<li>post to {{ supplier.physical_address }}</li>
+</ul>
+<p>We may ask you to prove who you are before we act on a request. Records that the law requires us to keep, such as order and transaction records, cannot be deleted while that duty lasts.</p>
+<p>You have the right to complain to the Information Regulator at <a href="https://inforegulator.org.za" rel="noopener noreferrer">https://inforegulator.org.za</a>.</p>
+	{% endblock %}{% endembed %}
+</div>

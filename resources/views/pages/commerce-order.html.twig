@@ -1,6 +1,8 @@
 {% extends layout %}
 {% block page_body %}
     {% set ph_kicker = 'My Orders' %}{% set ph_title = 'Order CL-' ~ '%08d'|format(order.id) %}
+    {# A question about this order opens the contact form with the order chosen (owner, 2026-10-20). #}
+    {% set ph_actions %}{{ ui('action.link', {label: 'Ask about this order', variant: 'secondary', href: '/contact?reason=order&order=CL-' ~ '%08d'|format(order.id)}) }}{% endset %}
     {% include '@platform/partials/page-head.html.twig' %}
     <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
@@ -69,7 +71,7 @@
             {% if change_method or payment_method != 'eft' %}
                 <form action="/account/orders/{{ order.id }}/pay" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="payment_key" value="{{ payment_key }}">
-                    {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method, allow_eft: not order.request_id|default(null)} %}
+                    {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: payment_method} %}
                     {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.button', {label: 'Use this payment method', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'I’ll sort it out later', variant: 'secondary', size: 'normal', href: '/account/orders'}) }}

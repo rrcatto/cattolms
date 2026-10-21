@@ -86,7 +86,6 @@ final class LandingPagesTest extends TestCase
         $this->refuses(static fn() => LandingSectionType::Audience->normalise(['items' => implode("\n", array_fill(0, 13, 'Someone'))]), 'at most 12');
         $this->refuses(static fn() => LandingSectionType::Hero->normalise(['headline' => str_repeat('x', 121)]), 'longer than 120');
         $this->refuses(static fn() => LandingSectionType::Reviews->normalise(['limit' => '13']), 'between 1 and 12');
-        $this->refuses(static fn() => LandingSectionType::Reviews->normalise(['limit' => '3', 'when_empty' => 'maybe']), 'no reviews');
         $this->refuses(static fn() => LandingSectionType::Hero->normalise(['secondary' => 'https://example.com/buy']), 'second button');
         $this->refuses(static fn() => LandingSectionType::Hero->normalise(['image' => 'https://example.com/a.png']), 'hero picture');
         $this->refuses(static fn() => LandingSectionType::fromName('custom_html'), 'kind of section');

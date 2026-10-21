@@ -18,6 +18,7 @@ declare(strict_types=1);
 // history and stay behind. The development database is disposable; a reset removes them.
 
 use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Auth\AclService;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Commerce\Application\CheckoutService;
@@ -163,9 +164,14 @@ if ($action === 'create') {
     $ids = '{' . implode(',', array_map('intval', $users)) . '}';
     $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);
     $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[])) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.cart_id = commerce_carts.id)', ['ids' => $ids]);
+    // A company learner's course request still waiting is declined, as an administrator would, so it does not wait on
+    // the ADMIN dashboard's Needs your attention after the check (owner, 2026-10-21).
+    foreach ($db->fetchFirstColumn("SELECT id FROM course_requests WHERE status = 'pending' AND user_id = ANY(CAST(:ids AS BIGINT[]))", ['ids' => $ids]) as $request) {
+        $container->get(PlatformAdministrationService::class)->decideRequest((int) $request, false, 'The browser check has finished.', (int) $state['users']['admin']);
+    }
     foreach ($state['courses'] as $course) $db->executeStatement("UPDATE courses SET status='retired' WHERE id = :c", ['c' => $course['id']]);
     unlink($statePath);
-    echo "Removed the sessions, carts and setting overrides; orders, the ledger and what they refer to remain.\n";
+    echo "Removed the sessions, carts and setting overrides and declined the course requests left waiting; orders, the ledger and what they refer to remain.\n";
 } else {
     throw new RuntimeException('Usage: php tests/Browser/commerce-wallets-fixture.php create|learner|company-learner|order|request|wallet|theme|restore|cleanup [state-path] [learner-id]');
 }

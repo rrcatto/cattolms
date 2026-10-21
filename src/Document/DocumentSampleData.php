@@ -14,6 +14,9 @@ from real learners, customers or settings. A financial document is the made-up l
 FinancialDocumentSamples, turned into values by the builder that issues real ones.
 
 Changelog:
+2026/10/19 SAST
+- The certificate sample has no grade (a certificate proves that the learner took the course); a
+  transcript sample with its marks.
 2026/10/08 SAST
 - Invoice, receipt and credit note samples are built by FinancialDocumentDataBuilder from the sample
   learner order, rather than written out here a second time.
@@ -39,14 +42,32 @@ final class DocumentSampleData
             DocumentType::Certificate => self::business() + [
                 'certificate.number' => 'CL-2026-9141C30F7167',
                 'certificate.issue_date' => '2026-09-30',
-                'certificate.verification_url' => 'https://learning.example.test/certificates/3f6c1e2a',
+                'certificate.verification_url' => 'https://learning.example.test/certificates/3f6c1e2a9b8d4c7e1f0a2b3c4d5e6f70',
                 'learner.name' => 'Thandiwe Mokoena',
                 'course.title' => 'Conveyancing 1',
                 'course.provider' => 'Example Training Academy',
                 'course.completion_date' => '2026-09-29',
                 'course.accreditation' => 'Legal Practice Council CPD: 2 points',
-                'result.percentage' => '86.50',
-                'result.grade' => 'Distinction',
+            ],
+            DocumentType::Transcript => self::business() + [
+                'transcript.number' => 'TR-2026-9141C30F7167',
+                'transcript.certificate_number' => 'CL-2026-9141C30F7167',
+                'transcript.issue_date' => '2026-09-30',
+                'transcript.verification_url' => 'https://learning.example.test/transcripts/7a2d4b10c3e5f6a7b8c9d0e1f2a3b4c5',
+                'learner.name' => 'Thandiwe Mokoena',
+                'course.title' => 'Conveyancing 1',
+                'course.provider' => 'Example Training Academy',
+                'course.completion_date' => '2026-09-29',
+                'course.accreditation' => 'Legal Practice Council CPD: 2 points',
+                'result.module_average' => '78.00',
+                'result.final' => '64.00',
+                'result.overall' => '71.00',
+                'result.grade' => 'Merit',
+                'assessments' => [
+                    ['title' => 'Module 1: Transfers', 'kind' => 'Module assessment', 'mark' => '82.00'],
+                    ['title' => 'Module 2: Bonds', 'kind' => 'Module assessment', 'mark' => '74.00'],
+                    ['title' => 'Final assessment', 'kind' => 'Final assessment', 'mark' => '64.00'],
+                ],
             ],
             DocumentType::Invoice, DocumentType::Receipt, DocumentType::CreditNote => self::financial($type),
         };

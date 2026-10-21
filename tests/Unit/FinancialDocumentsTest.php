@@ -116,12 +116,12 @@ final class FinancialDocumentsTest extends TestCase
         $example['context']['payment']['amount_minor'] = 400000;
         $data = FinancialDocumentDataBuilder::assemble(DocumentType::Receipt, $example['order'], $example['snapshot'], $example['number'], '2026-10-06T09:00:00+02:00', $example['context'], self::BUSINESS, self::BANK);
         self::assertSame(['minor' => 400000, 'currency' => 'ZAR'], $data['receipt.amount'], 'The amount received is the payment\'s, never copied from the invoice.');
-        self::assertSame(['2026-10-03', 'EFT / bank transfer', 'FNB-20261003-7741'], [$data['receipt.date'], $data['receipt.payment_method'], $data['receipt.payment_reference']],
+        self::assertSame(['2026-10-03', 'EFT (direct bank transfer)', 'FNB-20261003-7741'], [$data['receipt.date'], $data['receipt.payment_method'], $data['receipt.payment_reference']],
             'An EFT is received on the day the bank says, not when the receipt was issued.');
         self::assertArrayNotHasKey('bank.account_number', $data, 'A receipt has no payment instructions.');
         self::assertSame(['minor' => 48700, 'currency' => 'ZAR'], $data['receipt.discount']);
         $card = $this->data('company', DocumentType::Receipt);
-        self::assertSame(['Card (simulated)', 'PAY-7F3A91C2', null, null], [$card['receipt.payment_method'], $card['receipt.payment_reference'], $card['receipt.subtotal'], $card['receipt.discount']]);
+        self::assertSame(['Simulated card (demo site, no money was charged)', 'PAY-7F3A91C2', null, null], [$card['receipt.payment_method'], $card['receipt.payment_reference'], $card['receipt.subtotal'], $card['receipt.discount']]);
     }
 
     public function testACreditNotePrintsItsOwnRefundOfTheLineAsItWasPaid(): void

@@ -80,7 +80,7 @@ final class AdministrationSectionRegistry
         return match ($key) {
             'dashboard' => [$link('Manage courses', '/admin/courses'), $link('View activity', '/admin/activity')],
             'courses' => [$link('Import HTML course', '/admin/courses/import'), $link('Create course', '/admin/courses/new', 'primary', 'action-add')],
-            'people' => [$opens('Add person', 'quickAddPersonModal', 'can_manage_people')],
+            'people' => [$link('Find a person', '/admin/people/find'), $opens('Add person', 'quickAddPersonModal', 'can_manage_people')],
             'companies', 'company_creators' => [$opens('Add company', 'company-add', 'can_manage_companies')],
             'roles' => [$opens('Create role', 'createRoleModal', 'can_manage_roles')],
             default => [],

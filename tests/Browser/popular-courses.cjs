@@ -60,7 +60,9 @@ async function open(browser, {token = null, width = 1440, reducedMotion = 'no-pr
             const groups = await groupCount(page);
             assert.ok(groups >= 2, `the pool needs more than one group (found ${groups})`);
             const requests = [];
-            page.on('request', (request) => requests.push(request.url()));
+            // The site's own server: a web font's file, fetched from its host when a later group first shows one of
+            // its characters, is not the site being asked for anything.
+            page.on('request', (request) => { if (request.url().startsWith(base)) requests.push(request.url()); });
             assert.equal(await visibleGroup(page), 0);
             // The fake clock also runs in real time after install, so leave room for a slow page load.
             await tick(page, 15);
@@ -70,7 +72,7 @@ async function open(browser, {token = null, width = 1440, reducedMotion = 'no-pr
                 assert.equal(await visibleGroup(page), expected % groups, `group ${expected % groups + 1} after ${expected} intervals`);
                 assert.equal(await shownGroups(page), 1, 'exactly one group is shown');
             }
-            assert.deepEqual(requests, [], 'rotation made no requests');
+            assert.deepEqual(requests, [], 'rotation made no requests: ' + requests.join(', '));
             await page.screenshot({path: `${output}/${browserName}-desktop.png`});
             await ctx.close();
         });

@@ -49,6 +49,7 @@ use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\View\ThemeRenderer;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Routing\Attribute\Route;
@@ -313,6 +314,31 @@ final class CompanyController extends BaseController
     }
 
 
+    /**
+     * One company member's page (owner, 2026-10-21: every person named is linked to their account): who they are, their
+     * courses and their course requests, with the company's actions on them. A person outside the company in context is
+     * not found.
+     */
+    #[Route('/company/people/{id}', name: 'company_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function person(): Response
+    {
+        $user = $this->requirePermission('COMPANY.PERSON.VIEW');
+        $view = $this->platformAdministration->companyPersonView($this->contextCompanyId($user), max(1, (int) $this->param('id')));
+        if ($view === null) throw new NotFoundHttpException('That person is not in this company.');
+        return $this->render('company-person', $this->companySelectorView($user) + $view + [
+            'title' => (string) $view['person']['name'] . ' · Company', 'page_kicker' => 'Company', 'active_nav' => 'company',
+            'can_manage_person' => $user->hasPermission('COMPANY.PERSON.MANAGE'),
+            'can_decide_requests' => $user->hasPermission('COMPANY.REQUEST.MANAGE'),
+        ]);
+    }
+
+    /** Where an action on a person goes back to: their page when it was sent from there, else the list. */
+    private function personReturn(string $fallback): string
+    {
+        $return = (string) ($_POST['return'] ?? '');
+        return preg_match('#^/company/people/\d+$#', $return) === 1 ? $return : $fallback;
+    }
+
     #[Route('/company/people/{id}/remove', name: 'company_remove_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function removePerson(): Response
     {
@@ -349,8 +375,8 @@ final class CompanyController extends BaseController
                 $this->redirect('/company/credits/buy');
             }
             $this->flash('success', $approve ? 'The course request was approved.' : 'The course request was rejected.');
-            $this->redirect('/company/requests');
-        }, '/company/requests');
+            $this->redirect($this->personReturn('/company/requests'));
+        }, $this->personReturn('/company/requests'));
     }
 
 
@@ -368,8 +394,8 @@ final class CompanyController extends BaseController
                 (string) ($_POST['reason'] ?? 'Removed by company administrator')
             );
             $this->flash('success', 'Course access was removed.');
-            $this->redirect('/company/enrolments');
-        }, '/company/enrolments');
+            $this->redirect($this->personReturn('/company/enrolments'));
+        }, $this->personReturn('/company/enrolments'));
     }
 
 
@@ -382,8 +408,8 @@ final class CompanyController extends BaseController
         return $this->handle(function () use ($user, $id): void {
             $this->platformAdministration->restoreCompanyEnrolment($user->id, $this->contextCompanyId($user), $id);
             $this->flash('success', 'Course access was restored.');
-            $this->redirect('/company/enrolments');
-        }, '/company/enrolments');
+            $this->redirect($this->personReturn('/company/enrolments'));
+        }, $this->personReturn('/company/enrolments'));
     }
 
     /**
@@ -398,8 +424,8 @@ final class CompanyController extends BaseController
         return $this->handle(function () use ($user, $target): void {
             $this->platformAdministration->updateCompanyPerson($user->id, $this->contextCompanyId($user), $target, $_POST);
             $this->flash('success', 'The person was updated.');
-            $this->redirect('/company/people');
-        }, '/company/people');
+            $this->redirect($this->personReturn('/company/people'));
+        }, $this->personReturn('/company/people'));
     }
 
     /**
@@ -421,8 +447,8 @@ final class CompanyController extends BaseController
             $this->flash('success', $status === 'disabled'
                 ? 'The account was disabled and signed out. Their membership and learning history are unchanged.'
                 : 'The account was enabled and can sign in again.');
-            $this->redirect('/company/people');
-        }, '/company/people');
+            $this->redirect($this->personReturn('/company/people'));
+        }, $this->personReturn('/company/people'));
     }
 
     /**

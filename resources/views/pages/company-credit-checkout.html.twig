@@ -5,7 +5,7 @@
     {% include '@platform/partials/page-head.html.twig' %}
     <section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
         <h2 class="h4">{{ basket.company.name }}</h2>
-        {% if basket.request_id %}<p>After confirmed payment, one matching credit will be allocated to the pending learner request and the learner will be enrolled.</p>{% endif %}
+        {% if basket.request_id %}<p>When the payment is confirmed, one matching credit is allocated to the learner's request and the learner is enrolled. For an EFT, that is when we record your payment.</p>{% endif %}
         {% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
             {% for item in basket.items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
                 <strong>{{ item.course_title }}</strong><p>{{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} × {{ item.unit_label }} = {{ item.line_label }}</p>
@@ -21,7 +21,7 @@
             {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Use the company wallet (' ~ wallet_balance_label ~ ' available)'})} %}{% block control %}<input type="checkbox" name="use_wallet" value="yes" checked>{% endblock %}{% endembed %}
             <p>The company wallet pays as much of the order as it holds, oldest credit first. The payment method below pays anything left.</p>
             {% endif %}
-            {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: 'dummy', allow_eft: not basket.request_id} %}
+            {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: ''} %}
             {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email the invoice to ' ~ user_email})} %}{% block control %}<input type="checkbox" name="invoice_email" value="yes">{% endblock %}{% endembed %}
             <p>Credits are specific to the course and access period shown. They are issued only after confirmed full payment. An order not paid in full within {{ payment_due }} is cancelled, and anything paid towards it goes to the company wallet. No VAT is charged. Credits are refunded only within {{ refund_window }} of purchase, only while no learner has started them, and only as wallet credit.</p>
             {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}

@@ -14,6 +14,10 @@ lines, its Payment Events and its Commerce Trail entries, each a sentence linkin
 the order's records and its trail and changes nothing.
 
 Changelog:
+2026/10/21 SAST
+- Every person the story names is a person (owner, 2026-10-21: names linked to their accounts, with their account
+  reference): beside each sentence, its parts (summary_parts, next.parts, each record's sentence_parts and the trail's
+  by_person), drawn by partials/admin/money-sentence.html.twig. The plain sentences read as before.
 2026/10/19 SAST
 - The order's payment events, and a link from each trail entry to its own page.
 - Steps recorded in the same instant read in the order they happen (access set up, opened, started).
@@ -40,9 +44,11 @@ final class OrderStory
 
     /**
      * @param string $accountReference the buyer's account reference, formatted
-     * @return array{summary:list<string>,status:array{label:string,note:string,tone:string},next:array{tone:string,heading:string,text:string},
-     *     timeline:list<array{when:string,text:string,by:string,href:string}>,ledger:list<array{when:string,sentence:string,money_in:string,money_out:string,wallet:string,href:string}>,
-     *     payment_events:list<array{when:string,sentence:string,amount:string,href:string}>,
+     * @return array{summary:list<string>,summary_parts:list<list<array<string,mixed>>>,status:array{label:string,note:string,tone:string},
+     *     next:array{tone:string,heading:string,text:string,parts:list<array<string,mixed>>},
+     *     timeline:list<array{when:string,text:string,text_parts:list<array<string,mixed>>,by:string,by_person:array<string,string>|null,href:string}>,
+     *     ledger:list<array{when:string,sentence:string,sentence_parts:list<array<string,mixed>>,money_in:string,money_out:string,wallet:string,href:string}>,
+     *     payment_events:list<array{when:string,sentence:string,sentence_parts:list<array<string,mixed>>,amount:string,href:string}>,
      *     fees_label:string,refunded_label:string}
      */
     public function tell(int $orderId, string $accountReference): array
@@ -67,10 +73,15 @@ final class OrderStory
         $state = (string) $order['state'];
         $buyer = trim((string) ($snapshot['purchaser_name'] ?? '')) !== '' ? (string) $snapshot['purchaser_name'] : 'The customer';
         $company = trim((string) ($snapshot['company_name'] ?? ''));
+        // The buyer as a person: the name the order was placed under, their account reference and their account (owner, 2026-10-21).
+        $buyerPerson = MoneyRecords::person((int) $order['purchaser_user_id'], $buyer, $this->records->userAccountReference((int) $order['purchaser_user_id']));
 
-        $summary = [($company !== '' ? $buyer . ' ordered for ' . $company . ' ' : $buyer . ' ordered ') . self::bought($items) . ' for ' . self::money($total, $currency)
-            . ' on ' . self::when((string) $order['placed_at']) . '.'];
+        $ordered = ($company !== '' ? ' ordered for ' . $company . ' ' : ' ordered ') . self::bought($items) . ' for ' . self::money($total, $currency)
+            . ' on ' . self::when((string) $order['placed_at']) . '.';
+        $summary = [$buyer . $ordered];
+        $summaryParts = [[['person' => $buyerPerson], ['text' => $ordered]]];
         $parts = self::paidParts($payments, $currency);
+        $before = count($summary);
         if ($total === 0) {
             $summary[] = 'Nothing was left to pay after the promotion.';
         } elseif ($state === 'cancelled') {
@@ -81,16 +92,22 @@ final class OrderStory
         } elseif ($payments !== []) {
             $summary[] = 'It was paid in full, ' . $parts . ', on ' . self::when((string) end($payments)['created_at']) . '.';
         }
+        // The sentences about payment name nobody: each is one text part.
+        foreach (array_slice($summary, $before) as $sentence) $summaryParts[] = [['text' => $sentence]];
         $started = array_values(array_filter($trail, static fn(array $e): bool => in_array((string) $e['event'], ['entitlement.learner_started', 'company_credit.created'], true)));
         foreach ($started as $event) {
-            $summary[] = rtrim(MoneyRecords::trailSentence($event), '.') . ' on ' . self::when((string) $event['created_at']) . '.';
+            $on = ' on ' . self::when((string) $event['created_at']) . '.';
+            $summary[] = rtrim(MoneyRecords::trailSentence($event), '.') . $on;
+            $summaryParts[] = self::endWith(MoneyRecords::trailSentenceParts($event), $on);
         }
         foreach ($refunds as $refund) {
-            $summary[] = (string) $refund['actor_name'] . ' refunded ' . self::money((int) $refund['amount_minor'], $currency) . ' on ' . self::when((string) $refund['approved_at'])
+            $refunded = ' refunded ' . self::money((int) $refund['amount_minor'], $currency) . ' on ' . self::when((string) $refund['approved_at'])
                 . ' as ' . ($refund['destination'] === 'money_back' ? 'money back' : 'wallet credit') . '.'
                 . ($refund['destination'] === 'money_back' && (int) $refund['net_minor'] > 0
                     ? ($refund['payout_paid_at'] !== null ? ' It was paid back on ' . self::when((string) $refund['payout_paid_at']) . '.' : ' It still has to be paid back.')
                     : '');
+            $summary[] = (string) $refund['actor_name'] . $refunded;
+            $summaryParts[] = [['person' => MoneyRecords::person((int) $refund['actor_user_id'], (string) $refund['actor_name'], (string) ($refund['actor_reference'] ?? ''))], ['text' => $refunded]];
         }
 
         $fees = 0;
@@ -101,16 +118,19 @@ final class OrderStory
 
         return [
             'summary' => $summary,
+            'summary_parts' => $summaryParts,
             'status' => MoneyRecords::orderStatus($order + ['paid_minor' => $paid, 'refunded_minor' => $refunded, 'payment_method' => $this->records->paymentMethod($orderId),
                 'bought' => self::bought($items)]),
-            'next' => $this->next($order, $refunds, $method, $due, $currency, $accountReference, $buyer),
+            'next' => $this->next($order, $refunds, $method, $due, $currency, $accountReference, $buyer, $buyerPerson),
             'timeline' => array_map(static fn(array $e): array => ['when' => self::when((string) $e['created_at']), 'text' => MoneyRecords::trailSentence($e),
+                'text_parts' => MoneyRecords::trailSentenceParts($e), 'by_person' => MoneyRecords::actorPerson($e, false),
                 'by' => trim((string) ($e['actor_name'] ?? '')) !== '' ? (string) $e['actor_name'] : 'The system', 'href' => '/admin/commerce/trail/' . (int) $e['id']], $trail),
             'payment_events' => array_map(static fn(array $e): array => ['when' => self::when((string) $e['created_at']), 'sentence' => MoneyRecords::paymentEventSentence($e),
+                'sentence_parts' => MoneyRecords::paymentEventSentenceParts($e),
                 'amount' => self::money((int) $e['amount_minor'], (string) $e['currency']), 'href' => '/admin/commerce/payment-events/' . (int) $e['id']], $this->money->orderPaymentEvents($orderId)),
             'ledger' => array_map(static function (array $line): array {
                 $amount = self::money((int) $line['amount_minor'], (string) $line['currency']);
-                return ['when' => self::when((string) $line['occurred_at']), 'sentence' => MoneyRecords::ledgerSentence($line),
+                return ['when' => self::when((string) $line['occurred_at']), 'sentence' => MoneyRecords::ledgerSentence($line), 'sentence_parts' => MoneyRecords::ledgerSentenceParts($line),
                     'money_in' => (int) $line['cash_effect'] === 1 ? $amount : '', 'money_out' => (int) $line['cash_effect'] === -1 ? $amount : '',
                     'wallet' => match ((int) $line['wallet_effect']) { 1 => '+' . $amount, -1 => '−' . $amount, default => '' },
                     'href' => '/admin/commerce/ledger/' . (int) $line['id']];
@@ -125,18 +145,20 @@ final class OrderStory
      *
      * @param array<string,mixed> $order
      * @param list<array<string,mixed>> $refunds
-     * @return array{tone:string,heading:string,text:string}
+     * @param array<string,string> $buyerPerson
+     * @return array{tone:string,heading:string,text:string,parts:list<array<string,mixed>>}
      */
-    private function next(array $order, array $refunds, string $method, int $due, string $currency, string $reference, string $buyer): array
+    private function next(array $order, array $refunds, string $method, int $due, string $currency, string $reference, string $buyer, array $buyerPerson): array
     {
         foreach ($refunds as $refund) {
             if ($refund['destination'] === 'money_back' && (int) $refund['net_minor'] > 0 && $refund['payout_paid_at'] === null) {
-                return ['tone' => 'warning', 'heading' => 'You have a refund to pay',
-                    'text' => 'Pay ' . self::money((int) $refund['net_minor'], $currency) . ' back to ' . $buyer . ' by ' . self::when((string) $refund['payout_due_at'])
-                        . ', outside the LMS, then record it below under Refunds.'];
+                $pay = 'Pay ' . self::money((int) $refund['net_minor'], $currency) . ' back to ';
+                $rest = ' by ' . self::when((string) $refund['payout_due_at']) . ', outside the LMS, then record it below under Refunds.';
+                return ['tone' => 'warning', 'heading' => 'You have a refund to pay', 'text' => $pay . $buyer . $rest,
+                    'parts' => [['text' => $pay], ['person' => $buyerPerson], ['text' => $rest]]];
             }
         }
-        return match ((string) $order['state']) {
+        $next = match ((string) $order['state']) {
             'awaiting_payment' => $method === 'EFT'
                 ? ['tone' => 'warning', 'heading' => 'Waiting for the EFT payment',
                     'text' => 'When ' . self::money($due, $currency) . ' with the reference ' . $reference . ' shows on your bank statement, record it below under Record the EFT payment. The course starts when you do.']
@@ -147,6 +169,23 @@ final class OrderStory
             'cancelled' => ['tone' => 'info', 'heading' => 'Nothing to do', 'text' => 'This order was cancelled.'],
             default => ['tone' => 'success', 'heading' => 'Nothing to do', 'text' => 'This order is complete.'],
         };
+        return $next + ['parts' => [['text' => $next['text']]]];
+    }
+
+    /**
+     * A sentence's parts with its last full stop replaced by an ending: "… started" and " on 21 Oct 2026 at 10:00."
+     *
+     * @param list<array<string,mixed>> $parts
+     * @return list<array<string,mixed>>
+     */
+    private static function endWith(array $parts, string $ending): array
+    {
+        $last = count($parts) - 1;
+        if ($last >= 0 && isset($parts[$last]['text'])) {
+            $parts[$last]['text'] = rtrim((string) $parts[$last]['text'], '.');
+        }
+        $parts[] = ['text' => $ending];
+        return $parts;
     }
 
     /**

@@ -53,6 +53,7 @@ namespace CattoLearning\Http\Controller;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseService;
+use CattoLearning\View\Artwork\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 use InvalidArgumentException;
 use RuntimeException;
@@ -69,7 +70,8 @@ final class AdminCourseCategoryController extends BaseController
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
-        private readonly CourseService $courses
+        private readonly CourseService $courses,
+        private readonly \CattoLearning\View\Artwork\IconLibrary $icons
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -141,9 +143,12 @@ final class AdminCourseCategoryController extends BaseController
         $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $categoryId = $this->categoryId();
         $category = $this->courses->category($categoryId);
+        $iconQuery = trim((string) $this->request()->query->get('icon_q', ''));
         return $this->render('admin-course-category-edit', [
             'title' => 'Edit category · ' . (string) $category['name'],
             'category' => $category,
+            // The icon library (owner, 2026-10-20): the icons that fit the name, or those found by a search.
+            'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $category['name'], $iconQuery), 'action' => '/admin/courses/categories/' . $categoryId],
             'category_path' => $this->courses->categoryTrail($categoryId),
             'replacement_picker' => $this->courses->replacementCategoryPicker($categoryId),
             'tree_href' => self::revealing($categoryId),
@@ -157,10 +162,26 @@ final class AdminCourseCategoryController extends BaseController
         $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
         $categoryId = $this->categoryId();
         return $this->handle(function () use ($user, $categoryId): void {
-            $this->courses->updateCategory($categoryId, $_POST, $user->id);
+            $this->courses->updateCategory($categoryId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
             $this->flash('success', 'The course category was updated.');
             $this->redirect(self::revealing($categoryId));
         }, '/admin/courses/categories/' . $categoryId);
+    }
+
+    /** The category's icon, from its own card: one chosen from the icon library or an SVG uploaded (owner, 2026-10-20). */
+    #[Route('/admin/courses/categories/{id}/icon', name: 'admin_course_category_icon', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function icon(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.CATEGORY.MANAGE');
+        $id = $this->categoryId();
+        return $this->handle(function () use ($user, $id): void {
+            $icon = UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon') ?? $this->icons->chosen($_POST['library_icon'] ?? '');
+            if ($icon === null) throw new \InvalidArgumentException('Choose an icon from the library or upload an SVG file.');
+            $this->courses->replaceCategoryIcon($id, $icon, $user->id);
+            $this->flash('success', 'The icon was saved.');
+            $this->redirect('/admin/courses/categories/' . $id . '#icon');
+        }, '/admin/courses/categories/' . $id . '#icon');
     }
 
     /** The ⋯ menu: top, up, down, bottom or out. */
@@ -296,7 +317,7 @@ final class AdminCourseCategoryController extends BaseController
     private function created(?array $parent, int $userId): Response
     {
         try {
-            $category = $this->courses->createCategory($_POST, $userId, $parent === null ? null : (int) $parent['id']);
+            $category = $this->courses->createCategory($_POST, $userId, $parent === null ? null : (int) $parent['id'], UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
         } catch (InvalidArgumentException|RuntimeException $refused) {
             return $this->createForm($parent, $_POST, [$refused->getMessage()], 422);
         }

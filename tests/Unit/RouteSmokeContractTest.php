@@ -58,7 +58,7 @@ final class RouteSmokeContractTest extends TestCase
             'GET /courses/tags' => 'CourseTagController::index',
             'GET /courses/tag/{slug}' => 'CourseTagController::tag',
             'GET /login' => 'AuthController::loginForm',
-            'GET /account/library' => 'AccountController::learning',
+            'GET /account/courses' => 'AccountController::learning',
             'GET /account' => 'AccountController::index',
             'GET /account/profile' => 'AccountController::profile',
             'GET /company' => 'CompanyController::index',

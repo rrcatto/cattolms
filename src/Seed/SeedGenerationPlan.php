@@ -202,10 +202,9 @@ final class SeedGenerationPlan
             'assessment_responses' => $worked * self::ATTEMPTS_PER_ENROLMENT * self::QUESTIONS_PER_ASSESSMENT,
             'assessment_sessions' => $worked,
             'assessment_session_questions' => $worked * self::QUESTIONS_PER_ASSESSMENT,
+            // No certificates: a certificate is issued only to a verified account (owner, 2026-10-19),
+            // and generated learners are not verified.
             'course_results' => $completed,
-            // One per completed enrolment. This used to project half of them, against a generator
-            // that issued one each and carried a cap that never bound.
-            'certificates' => $completed,
             'course_favourites' => $this->favourites,
             'course_requests' => $this->requests,
             'course_credits' => $this->credits,

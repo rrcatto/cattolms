@@ -233,6 +233,7 @@ abstract class BaseController
             $data['identity_name'] = $card['name'] !== '' ? $card['name'] : $currentUser->displayName;
             $data['identity_email'] = $currentUser->authenticatedEmail !== '' ? $currentUser->authenticatedEmail : ($card['email'] !== '' ? $card['email'] : $currentUser->primaryEmail);
             $data['identity_status'] = $card['status'];
+            $data['identity_reference'] = $card['reference'];
             // No fingerprint in the address: this is rendered on every page, and computing one
             // would mean loading the stored bytes on every page to hash them. The route already
             // answers with a private, week-long cache, and a changed picture is a changed row that
@@ -251,6 +252,7 @@ abstract class BaseController
             $data['identity_name'] = '';
             $data['identity_email'] = '';
             $data['identity_status'] = '';
+            $data['identity_reference'] = '';
             $data['identity_image'] = '';
             $data['identity_roles'] = [];
             $data['identity_role'] = '';
@@ -408,7 +410,7 @@ abstract class BaseController
             str_starts_with($path, '/contact') => 'contact',
             str_starts_with($path, '/company') => 'company',
             str_starts_with($path, '/account') => 'account',
-            str_starts_with($path, '/account/library'), str_starts_with($path, '/learn') => 'learning',
+            str_starts_with($path, '/learn') => 'learning',
             str_starts_with($path, '/courses') => 'catalogue',
             default => 'home',
         };

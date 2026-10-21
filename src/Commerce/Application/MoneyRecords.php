@@ -17,6 +17,11 @@ period; a row opens its own page; that page links to the order, the account, the
 that belong with it.
 
 Changelog:
+2026/10/21 SAST
+- Every person a money record names is a person (owner, 2026-10-21: "Every time you mention a person with an account in
+  the system, I want their name linked to their account" and with "their unique Account Reference number"): rows carry
+  account_person and actor_person, and each sentence has a parts form (ledgerSentenceParts, paymentEventSentenceParts,
+  trailSentenceParts) in which every person is drawn with data.person; the plain sentences read as before.
 2026/10/18 SAST
 - Created.
 */
@@ -108,6 +113,79 @@ final class MoneyRecords
         return (new DateTimeImmutable($value))->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('j M Y H:i');
     }
 
+    /** Where the account's and the actor's names stand in a sentence, until it is read as text or drawn in parts. */
+    private const ACCOUNT = "\u{E000}account\u{E001}";
+    private const ACTOR = "\u{E000}actor\u{E001}";
+
+    /**
+     * A person with an account as data.person draws them: name, account reference, a link to their account in
+     * Administration and, on the pages that show it, their email (owner, 2026-10-21).
+     *
+     * @return array{name:string,reference:string,href:string,email:string}
+     */
+    public static function person(int $userId, string $name, string $reference = '', string $email = ''): array
+    {
+        $name = trim($name);
+        return ['name' => $name !== '' ? $name : 'Someone', 'reference' => $reference, 'href' => $userId > 0 ? '/admin/people/' . $userId : '', 'email' => $email];
+    }
+
+    /**
+     * The person a record's account is, or null for a company's account or none.
+     *
+     * @param array<string,mixed> $row with account_user_id, account_company_id, account_name, account_reference, account_email
+     * @return array{name:string,reference:string,href:string,email:string}|null
+     */
+    public static function accountPerson(array $row, bool $withEmail = true): ?array
+    {
+        $user = (int) ($row['account_user_id'] ?? 0);
+        if ($user <= 0 || (int) ($row['account_company_id'] ?? 0) > 0) return null;
+        return self::person($user, (string) ($row['account_name'] ?? ''), (string) ($row['account_reference'] ?? ''), $withEmail ? (string) ($row['account_email'] ?? '') : '');
+    }
+
+    /**
+     * The person who did what a record says, or null when the system did it.
+     *
+     * @param array<string,mixed> $row with actor_user_id, actor_name, actor_reference, actor_email
+     * @return array{name:string,reference:string,href:string,email:string}|null
+     */
+    public static function actorPerson(array $row, bool $withEmail = true): ?array
+    {
+        $user = (int) ($row['actor_user_id'] ?? 0);
+        return $user > 0 ? self::person($user, (string) ($row['actor_name'] ?? ''), (string) ($row['actor_reference'] ?? ''), $withEmail ? (string) ($row['actor_email'] ?? '') : '') : null;
+    }
+
+    /**
+     * A sentence's words with the account's and the actor's names read back in: what lists, emails and tests read.
+     *
+     * @param array<string,mixed> $row
+     */
+    private static function plain(string $words, array $row): string
+    {
+        return strtr($words, [self::ACCOUNT => trim((string) ($row['account_name'] ?? '')), self::ACTOR => trim((string) ($row['actor_name'] ?? ''))]);
+    }
+
+    /**
+     * A sentence in parts for a page: its text, and each person it names as a person, linked to their account with their
+     * account reference (a company stays its name). Drawn by partials/admin/money-sentence.html.twig.
+     *
+     * @param array<string,mixed> $row
+     * @return list<array{text:string}|array{person:array{name:string,reference:string,href:string,email:string}}>
+     */
+    private static function parts(string $words, array $row): array
+    {
+        $parts = [];
+        $pieces = preg_split('/\x{E000}(account|actor)\x{E001}/u', $words, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$words];
+        foreach ($pieces as $index => $piece) {
+            if ($index % 2 === 0) {
+                if ($piece !== '') $parts[] = ['text' => $piece];
+                continue;
+            }
+            $person = $piece === 'account' ? self::accountPerson($row, false) : self::actorPerson($row, false);
+            $parts[] = $person !== null ? ['person' => $person] : ['text' => trim((string) ($row[$piece . '_name'] ?? ''))];
+        }
+        return $parts;
+    }
+
     public static function orderNumber(int $id): string
     {
         return 'CL-' . str_pad((string) $id, 8, '0', STR_PAD_LEFT);
@@ -121,9 +199,26 @@ final class MoneyRecords
      */
     public static function ledgerSentence(array $row): string
     {
+        return self::plain(self::ledgerWords($row), $row);
+    }
+
+    /**
+     * The ledger sentence in parts, each person in it drawn as a person.
+     *
+     * @param array<string,mixed> $row
+     * @return list<array{text:string}|array{person:array{name:string,reference:string,href:string,email:string}}>
+     */
+    public static function ledgerSentenceParts(array $row): array
+    {
+        return self::parts(self::ledgerWords($row), $row);
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function ledgerWords(array $row): string
+    {
         $name = trim((string) ($row['account_name'] ?? ''));
-        $who = $name !== '' ? $name : 'The customer';
-        $whose = $name !== '' ? $name . "'s" : "the customer's";
+        $who = $name !== '' ? self::ACCOUNT : 'The customer';
+        $whose = $name !== '' ? self::ACCOUNT . "'s" : "the customer's";
         $amount = self::money((int) $row['amount_minor'], (string) $row['currency']);
         $memo = rtrim(trim((string) ($row['memo'] ?? '')), '.');
         $number = ($row['order_id'] ?? null) === null ? '' : self::orderNumber((int) $row['order_id']);
@@ -142,7 +237,7 @@ final class MoneyRecords
             'unfulfilled_payment_to_wallet' => ucfirst($whose) . ' payment of ' . $amount . $order . ' went to their wallet because the order was cancelled.',
             'refund_owed' => $who . ' is owed ' . $amount . ' as money back' . $order . '. Paying it is recorded on its own line.',
             'refund_deduction' => $amount . ' was kept back from ' . $whose . ' refund' . $order . ' to cover ' . ($memo === '' ? 'fees' : (str_starts_with($memo, 'The ') ? $memo : 'the ' . $memo)) . '.',
-            'refund_paid' => $amount . ' was paid back to ' . ($name !== '' ? $name : 'the customer') . $by . $reference . '.',
+            'refund_paid' => $amount . ' was paid back to ' . ($name !== '' ? self::ACCOUNT : 'the customer') . $by . $reference . '.',
             'processor_refund_fee' => 'Stitch charged ' . $amount . ' to refund ' . $whose . ' card payment' . $order . '.',
             'credit_expired' => $amount . ' of ' . $whose . ' wallet credit expired unused.',
             'correction' => 'A correction of ' . $amount . ' on ' . $whose . ' account' . $order . '.',
@@ -165,8 +260,25 @@ final class MoneyRecords
      */
     public static function paymentEventSentence(array $row): string
     {
+        return self::plain(self::paymentEventWords($row), $row);
+    }
+
+    /**
+     * The payment event sentence in parts, each person in it drawn as a person.
+     *
+     * @param array<string,mixed> $row
+     * @return list<array{text:string}|array{person:array{name:string,reference:string,href:string,email:string}}>
+     */
+    public static function paymentEventSentenceParts(array $row): array
+    {
+        return self::parts(self::paymentEventWords($row), $row);
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function paymentEventWords(array $row): string
+    {
         $name = trim((string) ($row['account_name'] ?? ''));
-        $payment = ($name !== '' ? $name . "'s " : 'The ') . self::paymentWords((string) $row['gateway']) . ' of '
+        $payment = ($name !== '' ? self::ACCOUNT . "'s " : 'The ') . self::paymentWords((string) $row['gateway']) . ' of '
             . self::money((int) $row['amount_minor'], (string) $row['currency']) . ' for order ' . self::orderNumber((int) $row['order_id']);
         $method = LedgerKind::methodForGateway((string) $row['gateway']);
         return $payment . match ((string) $row['state']) {
@@ -190,15 +302,32 @@ final class MoneyRecords
      */
     public static function trailSentence(array $row): string
     {
+        return self::plain(self::trailWords($row), $row);
+    }
+
+    /**
+     * The trail sentence in parts, each person in it drawn as a person.
+     *
+     * @param array<string,mixed> $row
+     * @return list<array{text:string}|array{person:array{name:string,reference:string,href:string,email:string}}>
+     */
+    public static function trailSentenceParts(array $row): array
+    {
+        return self::parts(self::trailWords($row), $row);
+    }
+
+    /** @param array<string,mixed> $row */
+    private static function trailWords(array $row): string
+    {
         $p = json_decode((string) $row['payload'], true);
         $p = is_array($p) ? $p : [];
         $currency = (string) ($row['currency'] ?? 'ZAR');
         $money = static fn(mixed $minor): string => self::money((int) $minor, $currency);
-        $actor = trim((string) ($row['actor_name'] ?? ''));
+        $actor = trim((string) ($row['actor_name'] ?? '')) !== '' ? self::ACTOR : '';
         $by = $actor !== '' ? $actor : 'The system';
         $name = trim((string) ($row['account_name'] ?? ''));
-        $customer = $name !== '' ? $name : 'the customer';
-        $customers = $name !== '' ? $name . "'s" : "the customer's";
+        $customer = $name !== '' ? self::ACCOUNT : 'the customer';
+        $customers = $name !== '' ? self::ACCOUNT . "'s" : "the customer's";
         $order = ($row['order_id'] ?? null) === null ? 'the order' : 'order ' . self::orderNumber((int) $row['order_id']);
         $course = trim((string) ($row['course_title'] ?? '')) !== '' ? (string) $row['course_title'] : 'the course';
         $paid = ($row['payment_amount_minor'] ?? null) === null ? '' : ' of ' . $money($row['payment_amount_minor']);
@@ -249,7 +378,7 @@ final class MoneyRecords
      * name and the wallet page that shows everything about it.
      *
      * @param array<string,mixed> $row with account_reference, account_name, account_user_id, account_company_id
-     * @return array{account_reference_label:string,account_label:string,account_href:string}
+     * @return array{account_reference_label:string,account_label:string,account_href:string,account_person:array{name:string,reference:string,href:string,email:string}|null}
      */
     private static function account(array $row): array
     {
@@ -257,6 +386,7 @@ final class MoneyRecords
         $person = (int) ($row['account_user_id'] ?? 0);
         return ['account_reference_label' => (string) ($row['account_reference'] ?? '') === '' ? '' : AccountReference::format((string) $row['account_reference']),
             'account_label' => (string) ($row['account_name'] ?? ''),
+            'account_person' => self::accountPerson($row),
             'account_href' => $company > 0 ? '/admin/wallets/company/' . $company : ($person > 0 ? '/admin/wallets/person/' . $person : '')];
     }
 
@@ -336,6 +466,9 @@ final class MoneyRecords
             'money_label' => self::signed((int) $row['cash_effect'], (int) $row['amount_minor'], $currency),
             'wallet_label' => self::signed((int) $row['wallet_effect'], (int) $row['amount_minor'], $currency),
             'sentence' => self::ledgerSentence($row),
+            'sentence_parts' => self::ledgerSentenceParts($row),
+            'account_person' => self::accountPerson($row),
+            'actor_person' => self::actorPerson($row),
             'money_in_label' => (int) $row['cash_effect'] === 1 ? self::money((int) $row['amount_minor'], $currency) : '',
             'money_out_label' => (int) $row['cash_effect'] === -1 ? self::money((int) $row['amount_minor'], $currency) : '',
             'wallet_change_label' => (int) $row['wallet_effect'] === 0 ? '' : self::signed((int) $row['wallet_effect'], (int) $row['amount_minor'], $currency),
@@ -415,6 +548,8 @@ final class MoneyRecords
             'actor_label' => (string) ($row['actor_name'] ?? '') !== '' ? (string) $row['actor_name'] : 'The system',
             'summary' => self::summary((string) $row['payload']),
             'sentence' => self::trailSentence($row),
+            'sentence_parts' => self::trailSentenceParts($row),
+            'actor_person' => self::actorPerson($row),
         ] + self::account($row);
     }
 
@@ -469,6 +604,7 @@ final class MoneyRecords
             'order_href' => '/admin/commerce/orders/' . (int) $row['order_id'],
             'payment_short' => substr((string) $row['payment_id'], 0, 8),
             'sentence' => self::paymentEventSentence($row),
+            'sentence_parts' => self::paymentEventSentenceParts($row),
         ] + self::account($row);
     }
 
@@ -531,7 +667,9 @@ final class MoneyRecords
             $rows[] = $row + ['status_label' => $status['label'], 'status_note' => $status['note'], 'status_tone' => $status['tone'],
                 'href' => '/admin/commerce/orders/' . (int) $row['id'], 'number' => self::orderNumber((int) $row['id']), 'when' => self::when((string) $row['placed_at']),
                 'state_label' => self::ORDER_STATES[(string) $row['state']] ?? (string) $row['state'], 'total_label' => self::money((int) $row['total_minor'], (string) $row['currency']),
-                'paid_label' => self::money((int) $row['paid_minor'], (string) $row['currency']), 'reference_label' => AccountReference::format((string) $row['account_reference'])];
+                'paid_label' => self::money((int) $row['paid_minor'], (string) $row['currency']), 'reference_label' => AccountReference::format((string) $row['account_reference']),
+                // Who placed it, always a person: a company's order is placed by its administrator (owner, 2026-10-21).
+                'purchaser_person' => self::person((int) $row['purchaser_user_id'], (string) $row['purchaser_name'], (string) ($row['purchaser_reference'] ?? ''), (string) ($row['purchaser_email'] ?? ''))];
         }
         return [
             'filters' => $f, 'states' => self::ORDER_STATES, 'rows' => $rows, 'filtered' => $carried !== [],

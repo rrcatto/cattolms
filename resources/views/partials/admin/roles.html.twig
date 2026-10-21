@@ -30,7 +30,7 @@
 					{% for role in roles_acl %}
 						<tr>
 							<td title="{{ role.role_name }} · {{ role.role_key }}">
-								<strong>{{ role.role_name }}</strong>
+								<strong>{{ role.role_name|role_label(role.role_key) }}</strong>
 								<div class="muted">
 									<code>{{ role.role_key }}</code>{{ role.is_builtin_role ? ' · built in' : '' }}
 								</div>

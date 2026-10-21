@@ -1,6 +1,6 @@
 # CattoLMS Theme SDK
 
-**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.5 · **Updated:** 2026-10-19
+**Package schema:** 4.0 · **Template API:** 2.0 · **LMS:** 0.9.6 · **Updated:** 2026-10-20
 
 Themes are presentation packages. Symfony owns routing, authentication/ACL and application
 composition; DBAL repositories own persistence; platform Twig owns functional page bodies and
@@ -132,7 +132,10 @@ Twig escapes text and attributes; keep explanatory comments in Twig comments.
 ## View objects and navigation
 
 `ThemeRenderer` supplies `app`, `platform`, `theme`, `page`, `user`, `navigation`, `footer_navigation`,
-`breadcrumbs`, flash data and the family objects. Arrays may be empty. Strict Twig variables are
+`breadcrumbs`, flash data and the family objects. `page.type` is the page family (`auth`, `account`,
+…) and `page.name` the page within it (`login`, `login-sent`, `register`, `company-register`, …), so a
+family wrapper can vary its decoration by page (Saharan Sunset draws one picture for signing in and
+another for registering). Arrays may be empty. Strict Twig variables are
 intentional: use the documented objects and conditional defaults for optional values.
 
 Render the permission-filtered navigation hierarchy, including active state at every level. Entries
@@ -379,6 +382,15 @@ course landing pages without its box. The bands that still hold a container (the
 band, and the course, bundle and landing page heads) hold Core's `cl-container`, which keeps 5.3.8's
 container steps (1140px from 1200px wide, 1320px from 1400px). Bootstrap 6's own containers step
 differently (960px from 1024px, 1200px from 1280px, 1440px from 1536px).
+
+The page's own boxes line up with its cards (owner, 2026-10-21; UX rule 1.7a). Core sizes the notices
+(`cl-flash-stack`), the page head (`cl-page-head`) and the identity band (`cl-identity-head`), each a row
+directly in main or a page family, to exactly the cards' width: the row less two gutters, capped at
+`--cl-content-width` less two gutters, centred. A theme paints them as it likes (a coloured box, a
+border, a picture) but never sets their width, side margins or the stack's side padding. Their words sit
+inside by the gutter; a theme whose page head is not a box sets `--cl-head-inset: 0` on `.cl-page-head` so
+the title stands on the cards' edge (Saharan Sunset). `tests/Browser/page-construction.cjs` fails any
+painted notice, head or band whose edges differ from the cards'.
 
 Theme-specific elements may use theme-owned classes such as `gn-ribbon`, `gn-footer-art`, or future third-party theme classes.
 

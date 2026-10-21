@@ -12,7 +12,7 @@
 <tr>
 	<td><span class="cl-certificate-design"><a href="/admin/certificates/designs/{{ row.id }}" tabindex="-1" aria-hidden="true"><img class="cl-certificate-design-thumb" src="{{ row.image }}" alt=""></a><span class="cl-certificate-design-name"><a href="/admin/certificates/designs/{{ row.id }}" class="cl-certificate-design-link">{{ row.name }}</a>{% if row.is_default %}{{ ui('feedback.badge', {label: 'Default for new courses', tone: 'info', size: 'small'}) }}{% endif %}</span></span></td>
 	<td>{{ row.course_count == 0 ? 'No courses' : (row.course_count == 1 ? '1 course' : row.course_count ~ ' courses') }}</td>
-	<td>{{ row.updated_at|date('j M Y, H:i') }}{% if row.updated_by %} · {{ row.updated_by }}{% endif %}</td>
+	<td>{{ row.updated_at|date('j M Y, H:i') }}{% if row.updated_by %} · {{ ui('data.person', row.updated_by) }}{% endif %}</td>
 	{% if can_manage %}<td class="cell-actions">
 		{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, aria_label: 'Actions for ' ~ row.name})} %}{% block body %}
 			{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/certificates/designs/' ~ row.id}) }}

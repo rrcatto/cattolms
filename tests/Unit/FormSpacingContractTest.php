@@ -193,6 +193,26 @@ final class FormSpacingContractTest extends TestCase
     }
 
     /** The core stylesheet with its comments removed, so a guard cannot match its own prose. */
+    /**
+     * The reboot floats a legend and clears only the element after it. A hidden field there draws nothing, so the
+     * first field shown rode up beside the legend, past the form's right edge (2026-10-20: a course's first tag):
+     * no template puts one there, and Core clears the field after it anyway.
+     */
+    public function testNoHiddenFieldSitsBetweenALegendAndWhatItHeads(): void
+    {
+        $offenders = [];
+        $directory = new \RecursiveDirectoryIterator(dirname(__DIR__, 2) . '/resources/views');
+        /** @var \SplFileInfo $file */
+        foreach (new \RecursiveIteratorIterator($directory) as $file) {
+            if ($file->isFile() && str_ends_with($file->getFilename(), '.twig')
+                && preg_match('#</legend>\s*<input\b[^>]*type="hidden"#', (string) file_get_contents($file->getPathname())) === 1) {
+                $offenders[] = $file->getFilename();
+            }
+        }
+        self::assertSame([], $offenders);
+        self::assertStringContainsString('legend+input[type="hidden"]+*{clear:left}', self::stylesheet());
+    }
+
     private static function stylesheet(): string
     {
         $css = (string) file_get_contents(__DIR__ . '/../../public_html/css/catto-platform.css');

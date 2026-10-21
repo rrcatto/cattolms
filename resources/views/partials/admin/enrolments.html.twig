@@ -21,7 +21,7 @@
 							{% for enrolment in enrolments %}
 								<tr>
 									<td title="{{ enrolment.learner_name }} · {{ enrolment.email }}">
-										{{ enrolment.learner_name }}
+										{{ ui('data.person', {name: enrolment.learner_name, reference: enrolment.learner_reference, href: '/admin/people/' ~ enrolment.user_id}) }}
 									</td>
 									<td title="{{ enrolment.course_title }}">
 										{{ enrolment.course_title }}
@@ -66,7 +66,7 @@
 					{% if enrolments_preview_has_more %}
 						<div class="pagination-row">
 							<span class="pagination-summary">Showing the first {{ preview_page_size }} enrolments.</span>
-							{{ ui('action.link', {label: 'View all enrolments', variant: 'secondary', size: 'small', href: '/admin/enrolments'}) }}
+							{{ ui('action.link', {label: 'View all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
 						</div>
 					{% endif %}
 

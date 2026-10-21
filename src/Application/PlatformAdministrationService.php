@@ -12,6 +12,9 @@ Implements Catto Learning business and application logic for platform administra
 
 Changelog:
 
+2026/10/20 SAST
+- The course list shows each course's price (its active default price, with the was price struck through; blank when none is set), sortable; Category and Ownership move to the end and the Started column is gone (owner, 2026-10-20).
+
 2026/10/18 SAST
 - The Site Owner replaces the System Company (owner, 2026-10-18): no sweep puts people into a company, the person form may choose no company (a private account) and ends a membership when it does, a Company Administrator needs a company, saving settings changes no membership, and siteOwnerView(), saveSiteOwner() and resetSiteOwner() edit the Site Owner, logging each changed field with its old and new value (site_owner.updated). Only a company account may ask its company for a course.
 
@@ -117,6 +120,8 @@ use CattoLearning\Support\GeoIpLocator;
 use CattoLearning\Support\Pagination;
 use CattoLearning\Support\PersonName;
 use CattoLearning\Support\SortOrder;
+use CattoLearning\Support\Money;
+use CattoLearning\Support\WasPrice;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -355,11 +360,9 @@ final class PlatformAdministrationService
         'activity' => 100,
         'course_report' => 50,
         'company_report' => 50,
-        // The learner's own Course Library. Smaller pages: these are read on a personal
-        // screen rather than scanned by an administrator, and four datasets share the page.
-        'current' => 25,
-        'completed' => 25,
-        'favourites' => 25,
+        // The learner's My Courses, one of its four lists at a time. Smaller pages: read on a personal
+        // screen rather than scanned by an administrator.
+        'library' => 25,
         'picker' => 25,
     ];
 
@@ -706,7 +709,7 @@ final class PlatformAdministrationService
      * tables share some dataset names; their column keys do not collide, so one list serves both.
      */
     private const PHONE_HIDDEN_COLUMNS = [
-        'courses' => ['category', 'ownership', 'learners', 'started', 'updated'],
+        'courses' => ['status', 'category', 'ownership', 'learners', 'updated'],
         'people' => ['company', 'courses', 'created', 'last_login', 'account'],
         'requests' => ['company', 'requested'],
         'enrolments' => ['progress'],
@@ -1062,8 +1065,30 @@ final class PlatformAdministrationService
             // Trimmed here because this list has no normaliser of its own: it returns repository
             // rows straight to the template, so it was the one table still printing a timestamp to
             // the microsecond - the widest column on the screen after the title.
-            ? self::trimTimestamps($this->courses->allCourses($limit, $offset, $search, $sort))
-            : self::trimTimestamps($this->courses->manageableCourses($actorUserId, $limit, $offset, $search, $sort));
+            ? self::withPrices(self::trimTimestamps($this->courses->allCourses($limit, $offset, $search, $sort)))
+            : self::withPrices(self::trimTimestamps($this->courses->manageableCourses($actorUserId, $limit, $offset, $search, $sort)));
+    }
+
+    /**
+     * Each course's price as it is sold now (owner, 2026-10-20: "I need to know what I'm charging"): its
+     * active default price, the was price it is marked down from and its access period; no price when
+     * none is set, so the cell stays blank.
+     *
+     * @param list<array<string,mixed>> $courses
+     * @return list<array<string,mixed>>
+     */
+    private static function withPrices(array $courses): array
+    {
+        foreach ($courses as &$course) {
+            $minor = $course['default_price_minor_units'] ?? null;
+            $currency = (string) ($course['default_currency_code'] ?? Money::platformCurrency());
+            $course['price'] = $minor === null ? null : [
+                'price_label' => (int) $minor === 0 ? 'Free' : Money::strictMinorUnits((int) $minor, $currency)->format(),
+                'period_label' => AccessPeriod::label((int) $course['default_price_access_period_seconds']),
+            ] + WasPrice::labels((int) $minor, $course['default_was_price_minor_units'] ?? null, $currency);
+        }
+        unset($course);
+        return $courses;
     }
 
     /** Total rows behind adminCoursePage() under the same scope, counted with the identical membership rule. */
@@ -1138,22 +1163,32 @@ final class PlatformAdministrationService
             'courses' => (function () use ($actorUserId, $activityFilters, $capabilities, $scope): array {
                 $viewAll = !empty($capabilities['view_all_courses']);
                 $search = self::searchTerm('courses', $activityFilters);
-                $sort = $this->sortFor('courses', $activityFilters, array_keys(CourseRepository::ADMIN_COURSE_SORTS), 'updated', SortOrder::DESCENDING);
+                // In the catalogue's order by default (owner, 2026-10-20).
+                $sort = $this->sortFor('courses', $activityFilters, array_keys(CourseRepository::ADMIN_COURSE_SORTS), 'position', SortOrder::ASCENDING);
                 $searchFilter = self::withSearch($scope, 'courses', $search);
                 $pagination = $this->paginationFor('courses', $activityFilters, $this->adminCoursesTotal($actorUserId, $viewAll, $search));
+                // Courses are dragged into place only in that order, unsearched, by someone who sees every course: the
+                // whole order is then on screen a page at a time, and the course before this page anchors its first row.
+                $arrange = $viewAll && $search === '' && $sort->key === 'position' && $sort->direction === SortOrder::ASCENDING;
                 return [
                     'courses' => $this->adminCoursePage($actorUserId, $viewAll, $pagination->pageSize, $pagination->offset, $search, $sort),
                     'courses_search' => $search,
+                    'courses_can_arrange' => $arrange,
+                    'courses_before_page' => $arrange && $pagination->offset > 0
+                        ? (int) ($this->adminCoursePage($actorUserId, $viewAll, 1, $pagination->offset - 1, '', $sort)[0]['id'] ?? 0) : 0,
                 ]
                     + $this->paginationView('courses', $pagination, '/admin/courses', 'Courses', $searchFilter + $sort->toPrefixedArray('courses'))
                     + $this->sortView('courses', $sort, '/admin/courses', [
-                        'title' => 'Course|30',
-                        'category' => 'Category|16',
-                        'status' => 'Status|6',
-                        'ownership' => 'Ownership|22',
-                        'learners' => 'Learners|6',
-                        'started' => 'Started|5',
+                        // What matters most first (owner, 2026-10-20): the course and its price; category and
+                        // ownership last. A bought course starts at once, so there is no Started column.
+                        'position' => 'Position|8',
+                        'title' => 'Course|22',
+                        'price' => 'Price|15',
+                        'status' => 'Status|8',
+                        'learners' => 'Learners|7',
                         'updated' => 'Updated|9',
+                        'category' => 'Category|12',
+                        'ownership' => 'Ownership|13',
                         'actions' => 'Actions|6',
                     ], array_keys(CourseRepository::ADMIN_COURSE_SORTS), $searchFilter, [
                         'editors' => SortOrder::DESCENDING,
@@ -1180,12 +1215,13 @@ final class PlatformAdministrationService
                     // header row is then one repeat over this model rather than markup that has to
                     // agree with it.
                     + $this->sortView('people', $sort, '/admin/people', [
-                        'name' => 'Person|34',
-                        'company' => 'Company|21',
+                        // The name only, so Last login shows its whole date and time (owner, 2026-10-21).
+                        'name' => 'Person|24',
+                        'company' => 'Company|20',
                         'roles' => 'Roles|12',
                         'courses' => 'Courses|7',
-                        'created' => 'Created|11',
-                        'last_login' => 'Last login|9',
+                        'created' => 'Created|14',
+                        'last_login' => 'Last login|17',
                         'actions' => 'Actions|6',
                     ], array_keys(AdministrationRepository::PEOPLE_SORTS), self::withSearch($scope, 'people', $search), [
                         'courses' => SortOrder::DESCENDING,
@@ -1846,6 +1882,8 @@ final class PlatformAdministrationService
         $company = $this->contextCompany($companyId);
         $this->assertCompanyMember((int) $company['id'], $targetUserId);
 
+        // Adults only (owner, 2026-10-20): a date of birth is checked as at registration.
+        if (array_key_exists('birthdate', $input)) $input['birthdate'] = \CattoLearning\Auth\AdultAge::optionalInput($input['birthdate'], new \DateTimeImmutable());
         $this->transactions->run(function () use ($actorUserId, $company, $targetUserId, $input): void {
             $this->users->updateProfile($targetUserId, $input);
             $this->audit->record($actorUserId, 'company.person_updated', [
@@ -2041,6 +2079,7 @@ final class PlatformAdministrationService
             throw new InvalidArgumentException('The platform must always have at least one Platform Administrator. Assign another administrator before removing this role.');
         }
 
+        if (array_key_exists('birthdate', $input)) $input['birthdate'] = \CattoLearning\Auth\AdultAge::optionalInput($input['birthdate'], new \DateTimeImmutable());
         $this->transactions->run(function () use ($userId, $input, $actorUserId, $primaryEmail, $secondaryEmail, $roles): void {
             $this->users->updateProfile($userId, $input);
             $this->users->replacePrimaryEmail($userId, $primaryEmail);
@@ -2618,7 +2657,6 @@ final class PlatformAdministrationService
             // Same reason: the Company People editor reads these, and the platform-wide people
             // query does not select them. Keep the row shape stable so the partial never reads a
             // missing array key.
-            $row['certificate_name'] = (string) ($row['certificate_name'] ?? '');
             $row['mobile_number'] = (string) ($row['mobile_number'] ?? '');
             $row['middle_names'] = (string) ($row['middle_names'] ?? '');
             $row['roles_label'] = implode(', ', $row['roles']);
@@ -2711,6 +2749,44 @@ final class PlatformAdministrationService
      * @param list<array<string,mixed>> $rows
      * @return list<array<string,mixed>>
      */
+    /**
+     * Find a person by name, email address or account reference (owner, 2026-10-21). The one person an exact email address or
+     * account reference names, or the only match, is opened at once; otherwise every match is listed.
+     *
+     * @return array{open:?int,matches:list<array<string,mixed>>}
+     */
+    public function findPerson(string $query): array
+    {
+        $query = mb_substr(trim($query), 0, 120);
+        if ($query === '') return ['open' => null, 'matches' => []];
+        $matches = $this->users->findPeople($query);
+        $exact = array_values(array_filter($matches, static fn(array $m): bool => $m['exact']));
+        $open = count($exact) === 1 ? $exact[0]['id'] : (count($matches) === 1 ? $matches[0]['id'] : null);
+        return ['open' => $open, 'matches' => $matches];
+    }
+
+    /**
+     * A company member's page in the Company workspace (owner, 2026-10-21: "build the company person page too"): the
+     * person, their courses and the course requests they sent to the company. Null when they are not an active member
+     * of that company, so nobody opens a person outside the company they administer.
+     *
+     * @return array{person:array<string,mixed>,enrolments:list<array<string,mixed>>,requests:list<array<string,mixed>>}|null
+     */
+    public function companyPersonView(int $companyId, int $userId): ?array
+    {
+        $person = $this->administration->companyPerson($companyId, $userId);
+        if ($person === null) return null;
+        return [
+            'person' => self::trimTimestamps($this->normalisePeople([$person], $this->roles->all()))[0],
+            'enrolments' => $this->normaliseEnrolments($this->administration->companyPersonEnrolments($companyId, $userId)),
+            'requests' => self::trimTimestamps($this->administration->companyPersonRequests($companyId, $userId)),
+        ];
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
     private function normaliseEnrolments(array $rows): array
     {
         foreach ($rows as &$row) {
@@ -2757,6 +2833,14 @@ final class PlatformAdministrationService
             $row['event_label'] = $this->activityLabel($key);
             $row['family_label'] = ucfirst(str_replace(['_','-'], ' ', (string) ($row['event_family'] ?? 'other')));
             $row['subject'] = (string) ($row['course_title'] ?? '') ?: ((string) ($row['subject_user_name'] ?? '') ?: ((string) ($row['company_name'] ?? '') ?: 'Platform'));
+            // Who did it and, when the entry is about a person, who it is about: each a person with an account for
+            // data.person (owner, 2026-10-21: every person named is linked to their account, with their account reference).
+            $row['actor_person'] = ($row['actor_user_id'] ?? null) !== null
+                ? ['name' => (string) $row['actor_name'], 'reference' => (string) ($row['actor_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['actor_user_id']]
+                : ['name' => (string) ($row['actor_name'] ?? 'System'), 'reference' => '', 'href' => ''];
+            $row['subject_person'] = (string) ($row['course_title'] ?? '') === '' && ($row['subject_user_id'] ?? null) !== null
+                ? ['name' => (string) $row['subject_user_name'], 'reference' => (string) ($row['subject_user_reference'] ?? ''), 'href' => '/admin/people/' . (int) $row['subject_user_id']]
+                : null;
             $row['result'] = $this->activityResult($metadata);
             $row['source_label'] = str_starts_with($key, 'mcp.') ? 'MCP' : (str_starts_with($key, 'api.') ? 'API' : 'Web');
             $ipAddress = trim((string) ($row['ip_address'] ?? ''));
@@ -2773,7 +2857,26 @@ final class PlatformAdministrationService
         return match ($key) {
             'course.started' => 'Course started',
             'course.completed' => 'Course completed',
-            'certificate.issued' => 'Certificate issued',
+            'certificate.issued' => 'Certificate and transcript issued',
+            'certificate.reissued' => 'Certificate and transcript issued again',
+            'certificate.revoked' => 'Certificate and transcript revoked',
+            'certificate.issue_failed' => 'Certificate could not be issued',
+            'certificate.made_public' => 'Certificate made public by the learner',
+            'certificate.made_private' => 'Certificate made private by the learner',
+            'certificate.address_changed' => 'Certificate given a new address by the learner',
+            'transcript.made_public' => 'Transcript made public by the learner',
+            'transcript.made_private' => 'Transcript made private by the learner',
+            'transcript.address_changed' => 'Transcript given a new address by the learner',
+            'identity.verification_started' => 'Identity check started',
+            'identity.verification_approved' => 'Identity verified',
+            'identity.verification_declined' => 'Identity check declined',
+            'identity.verification_in_review' => 'Identity check being reviewed',
+            'identity.verification_abandoned' => 'Identity check left unfinished',
+            'identity.verification_expired' => 'Identity check expired',
+            'identity.verification_revoked' => 'Identity verification revoked',
+            'identity.retry_allowed' => 'Another identity check allowed',
+            'user.date_of_birth_given' => 'Date of birth given',
+            'settings.payment_methods_changed' => 'Payment methods changed',
             'assessment.started' => 'Assessment started',
             'assessment.completed' => 'Assessment completed',
             'course_request.created' => 'Course requested',
@@ -2853,6 +2956,9 @@ final class PlatformAdministrationService
         }
         if ((int) ($metadata['promotion_id'] ?? 0) > 0) {
             $links[] = ['label' => 'Promotion', 'url' => '/admin/promotions/' . (int) $metadata['promotion_id']];
+        }
+        if ((int) ($metadata['certificate_id'] ?? 0) > 0) {
+            $links[] = ['label' => 'Certificate', 'url' => '/admin/certificates/' . (int) $metadata['certificate_id']];
         }
         return $links;
     }

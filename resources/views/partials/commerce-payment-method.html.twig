@@ -1,16 +1,20 @@
-{# The simulated card is offered only on a demo site (SiteMode); a live site has no card payment until Stitch is built. #}
+{# The payment methods the site offers (Settings > Payment methods, owner 2026-10-19), each named with its
+   provider. The simulated card is offered only on a demo site. No method collects card details on this site:
+   a card is paid on the provider's own page. payment_options comes from PaymentMethods::checkoutOptions(). #}
+{% set offered = payment_options|default([]) %}
+{% set offered_keys = offered|map(o => o.key) %}
+{% if offered %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Payment method', full_width: false, for: 'payment-method', required: true})} %}
 {% block control %}
 
     <select id="payment-method" name="payment_method" required {{ ui_field_attrs(props) }}>
-        {% if site_demo|default(false) %}<option value="dummy" {{ selected_method == 'dummy' ? 'selected' : '' }}>Card (simulated)</option>{% endif %}
-        {% if allow_eft|default(true) %}<option value="eft" {{ selected_method == 'eft' or not site_demo|default(false) ? 'selected' : '' }}>EFT / bank transfer</option>{% endif %}
+        {% for option in offered %}<option value="{{ option.key }}" {{ selected_method == option.key or (selected_method not in offered_keys and loop.first) ? 'selected' : '' }}>{{ option.label }}</option>{% endfor %}
     </select>
 
 {% endblock %}
 {% endembed %}
-{% if site_demo|default(false) %}
-{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For card testing only. No money is charged. This option does not apply to EFT.'})} %}
+{% if 'dummy' in offered_keys %}
+{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Simulated card outcome', full_width: false, for: 'method-token', help: 'For testing on this demo site only. No money is charged. This does not apply to EFT.'})} %}
 {% block control %}
 
     <select id="method-token" name="method_token" {{ ui_field_attrs(props) }}>
@@ -21,4 +25,7 @@
 {% endblock %}
 {% endembed %}
 {% endif %}
-{% if allow_eft|default(true) %}<p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>{% endif %}
+{% if 'eft' in offered_keys %}<p>For EFT, find the bank account details and your unique payment reference on your order after placing it.</p>{% endif %}
+{% else %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'No payment method is available at the moment.'})} %}{% block body %}<p>Only wallet credit can pay for an order now. Please try again later or contact us.</p>{% endblock %}{% endembed %}
+{% endif %}

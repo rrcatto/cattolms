@@ -28,7 +28,7 @@
 					<div class="md:col-4">
 						<strong>Actor</strong>
 						<div>
-							{{ event.actor_name }}
+							{{ ui('data.person', event.actor_person) }}
 						</div>
 					</div>
 					<div class="md:col-4">
@@ -40,7 +40,7 @@
 					<div class="md:col-4">
 						<strong>Subject</strong>
 						<div>
-							{{ event.subject }}
+							{% if event.subject_person %}{{ ui('data.person', event.subject_person) }}{% else %}{{ event.subject }}{% endif %}
 						</div>
 					</div>
 					<div class="md:col-4">

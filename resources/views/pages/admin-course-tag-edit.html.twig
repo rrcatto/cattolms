@@ -1,0 +1,29 @@
+{% extends layout %}
+{% block page_body %}
+	{# A tag's own page (owner, 2026-10-20): its name and its icon, which tags on course cards and pages show. #}
+	{% set ph_back_href = '/admin/courses/tags' %}
+	{% set ph_back_label = 'Course Tags' %}
+	{% set ph_kicker = 'Course metadata' %}
+	{% set ph_title = tag.name %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Tag details', heading_level: 2, summary: 'Renaming a tag changes it on every course that carries it.'}) }}
+			<form action="/admin/courses/tags/{{ tag.id }}" method="post" enctype="multipart/form-data">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
+{% block body %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', for: 'tag-name', required: true})} %}{% block control %}<input class="cl-input" id="tag-name" name="name" value="{{ tag.name }}" maxlength="80" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save tag', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'normal', href: '/admin/courses/tags'}) }}{% endblock %}
+{% endembed %}
+			</form>
+{% endblock %}
+{% endembed %}
+		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: tag.icon_svg|default(''), ic_kind: 'tag', ic_choice: icon_choice, ic_save: '/admin/courses/tags/' ~ tag.id ~ '/icon'} %}
+	</section>
+{% endblock %}

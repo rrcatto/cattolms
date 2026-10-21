@@ -1,0 +1,100 @@
+{#
+	The Terms and Conditions, the Refund Policy or the Privacy Policy as a PDF (owner, 2026-10-20: "a properly
+	formatted PDF that features the name of the site, the Last Update date and all the information under neat
+	headings, and at the bottom of each one, my name, address, contact details"). DocumentPdfRenderer::renderPage
+	draws it from the same sections the page shows (partials/legal/*-sections.html.twig): each accordion prints
+	open, its number and title as a heading, its icon and toggle left out. Every page's foot carries the seller's
+	name and how to reach them, and the document ends with the seller's full details. Fonts are the bundled ones.
+#}
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+<head>
+<meta charset="utf-8">
+<title>{{ legal.title }} - {{ app_name }}</title>
+<style>
+	@page { margin: 20mm 19mm 27mm 19mm; }
+	body { font-family: 'Plex Sans', sans-serif; font-size: 9.5pt; line-height: 1.3; color: #1f1915; }
+	p, li { margin: 0 0 2.2mm; }
+	ul, ol { margin: 0 0 2.5mm; padding-left: 5mm; }
+	a { color: #7d3a20; text-decoration: none; }
+	strong { font-weight: bold; }
+	s { color: #6b5d51; }
+	.visually-hidden, .cl-ui-accordion-icon, .cl-ui-accordion-toggle, svg { display: none; }
+
+	/* Two cells laid out as a table, not a float: Dompdf narrows the whole page's text beside a float in a fixed box. */
+	#pdf-foot { position: fixed; left: 0; right: 0; bottom: -19mm; height: 13mm; border-top: 0.6pt solid #9a4a2a; padding-top: 1.5mm; font-size: 7.3pt; line-height: 1.3; color: #5a4e44; }
+	.pdf-foot-row { display: table; width: 100%; }
+	.pdf-foot-seller, .pdf-foot-document { display: table-cell; vertical-align: top; }
+	.pdf-foot-document { text-align: right; }
+	#pdf-foot strong { color: #1f1915; }
+
+	.pdf-masthead { border-bottom: 1.6pt solid #9a4a2a; padding-bottom: 4.5mm; margin-bottom: 6mm; }
+	.pdf-site { font-family: Cormorant, serif; font-size: 12pt; font-weight: bold; letter-spacing: 2.5pt; text-transform: uppercase; color: #9a4a2a; }
+	.pdf-title { font-family: Cormorant, serif; font-size: 27pt; font-weight: bold; line-height: 1.1; margin: 1.5mm 0 2mm; }
+	.pdf-updated { font-size: 10pt; font-weight: bold; }
+	.pdf-demo { margin-top: 2.5mm; padding: 2mm 3mm; border-left: 2pt solid #b07d1e; background: #fbf3dd; font-size: 8.5pt; }
+	.pdf-intro { font-size: 10.5pt; margin-bottom: 1.5mm; }
+	.pdf-related { color: #5a4e44; margin-bottom: 6mm; }
+
+	details.cl-ui-accordion-section { display: block; margin: 0 0 5.5mm; }
+	/* A section's number, title and first lines stay together: none is left alone at the foot of a page. */
+	summary.cl-ui-accordion-summary { display: block; margin: 0 0 2.5mm; padding-bottom: 1.4mm; border-bottom: 0.6pt solid #e6d8c6; page-break-inside: avoid; page-break-after: avoid; }
+	.cl-ui-accordion-label { display: block; page-break-inside: avoid; }
+	.cl-ui-accordion-eyebrow { display: block; font-size: 7pt; font-weight: bold; letter-spacing: 1.4pt; text-transform: uppercase; color: #9a4a2a; }
+	.cl-ui-accordion-title { display: block; font-family: Cormorant, serif; font-size: 15pt; font-weight: bold; line-height: 1.2; }
+	.cl-ui-accordion-description { display: block; font-size: 8.5pt; color: #5a4e44; }
+
+	dl.cl-ui-key-value-list { margin: 1mm 0 3mm; border-top: 0.4pt solid #e6d8c6; }
+	dl.cl-ui-key-value-list dt { float: left; clear: left; width: 52mm; padding: 1mm 0; font-weight: bold; }
+	dl.cl-ui-key-value-list dd { margin: 0 0 0 54mm; padding: 1mm 0; border-bottom: 0.4pt solid #e6d8c6; }
+	.cl-ui-notice { margin: 2mm 0 3mm; padding: 2.2mm 3.2mm; border-left: 2pt solid #9a4a2a; background: #f7efe6; }
+	.cl-ui-notice-heading { display: block; margin-bottom: 0.8mm; }
+
+	.pdf-contact { margin-top: 8mm; padding-top: 4mm; border-top: 1.6pt solid #9a4a2a; page-break-inside: avoid; }
+	.pdf-contact h2 { font-family: Cormorant, serif; font-size: 15pt; font-weight: bold; margin: 0 0 2.5mm; }
+</style>
+</head>
+<body>
+	<div id="pdf-foot"><div class="pdf-foot-row">
+		<div class="pdf-foot-seller"><strong>{{ supplier.legal_name }}{% if supplier.trading_name and supplier.trading_name != supplier.legal_name %}, trading as {{ supplier.trading_name }}{% endif %}</strong><br>
+		{{ supplier.physical_address }}<br>
+		{{ supplier.phone }} · {{ supplier.email }}{% if supplier.website %} · {{ supplier.website }}{% endif %}</div>
+		<div class="pdf-foot-document">{{ legal.title }}<br>Last updated {{ legal.updated_label }}</div>
+	</div></div>
+
+	<div class="pdf-masthead">
+		<div class="pdf-site">{{ app_name }}</div>
+		<div class="pdf-title">{{ legal.title }}</div>
+		<div class="pdf-updated">Last updated {{ legal.updated_label }}</div>
+		{% if site_demo %}<div class="pdf-demo">{{ site_demo_notice }}</div>{% endif %}
+	</div>
+
+	<p class="pdf-intro">{{ legal.intro }}</p>
+	<p class="pdf-related">Read it with the
+		{%- for other in legal_documents|filter(other => other.key != legal.key) %} {{ other.title }} ({{ app_url }}{{ other.path }}){{ loop.last ? '.' : ' and the' }}{% endfor %}
+		This copy was made from {{ app_url }}{{ legal.path }}.</p>
+
+	{% if legal.key == 'terms' %}
+		{% include '@platform/partials/legal/terms-sections.html.twig' %}
+	{% elseif legal.key == 'refunds' %}
+		{% include '@platform/partials/legal/refunds-sections.html.twig' %}
+	{% else %}
+		{% include '@platform/partials/legal/privacy-sections.html.twig' %}
+	{% endif %}
+
+	<div class="pdf-contact">
+		<h2>Contact us</h2>
+		{{ ui('data.key-value-list', {items: [
+			{label: 'Name', value: supplier.legal_name},
+			{label: 'Trading as', value: supplier.trading_name},
+			{label: 'Legal status', value: supplier.legal_status},
+			{label: 'Registration number', value: supplier.registration_number},
+			{label: 'Address', value: supplier.physical_address},
+			{label: 'Telephone', value: supplier.phone},
+			{label: 'Email address', value: supplier.email},
+			{label: 'Website', value: supplier.website ?: app_url},
+			{label: 'Information Officer', value: supplier.information_officer},
+		]}) }}
+	</div>
+</body>
+</html>

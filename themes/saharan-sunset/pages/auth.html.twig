@@ -1,15 +1,25 @@
 {#
-	Sign-in family wrapper (sign in, link sent, register, company registration). The serpent panel
+	Sign-in family wrapper (sign in, link sent, register, company registration). The picture panel
 	is decoration beside the unchanged platform page body, after the sign-in mockup's split layout,
-	and the whole family sits inside the page box.
+	and the whole family sits inside the page box. Signing in and registering differ (owner,
+	2026-10-20: "make them different for the Login vs Register pages"): signing in is a lit doorway at
+	night, registering is dawn over the dunes with a new account card.
 #}
 {% extends '@theme/base.html.twig' %}
 {% block page_content %}
-	<div class="cl-page-family ss-auth">
+	{% set ss_auth_page = page.name|default('login') %}
+	{% set ss_auth_registering = ss_auth_page in ['register', 'company-register'] %}
+	<div class="cl-page-family ss-auth {{ ss_auth_registering ? 'ss-auth--register' : 'ss-auth--sign-in' }}">
 		<div class="ss-auth-art">
 			<div class="ss-auth-copy">
 				<p class="ss-auth-eyebrow">{{ app.name }}</p>
-				<p class="ss-auth-quote">Your progress is saved on the server. Sign in on any device to continue where you stopped.</p>
+				{% if ss_auth_page == 'company-register' %}
+					<p class="ss-auth-quote">Register your company once, then give your people the courses they need.</p>
+				{% elseif ss_auth_registering %}
+					<p class="ss-auth-quote">Create your account once. Your courses, your progress and your certificates stay with it.</p>
+				{% else %}
+					<p class="ss-auth-quote">Your progress is saved on the server. Sign in on any device to continue where you stopped.</p>
+				{% endif %}
 			</div>
 		</div>
 		<div class="ss-auth-body">

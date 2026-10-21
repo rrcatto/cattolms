@@ -1,12 +1,13 @@
-/* Saharan Sunset 1.0.2 - Catto Learning theme stylesheet.
+/* Saharan Sunset 1.0.4 - Catto Learning theme stylesheet.
    Theme Package 4.0 / Template API 2.0. Built from the Saharan Sunset mockups (Home, Catalogue,
    Course detail, Sign in): warm ivory ground, sand bands, near-black ink, terracotta accent,
    Cormorant Garamond headings and Jost text, square corners and tracked uppercase actions.
    Construction (1.0.1): a full-width sticky header with the menu centred on the page; below it the
    page context band and main form one paper box on the slanted texture, and every block core puts
    in main is a full-width row of that box. Home runs full width without the box.
-   Imagery: abacus = home hero, orb = footer art and course cards without a cover, serpent = the
-   sign-in panel. No picture appears twice on one page.
+   Imagery: abacus = home hero, orb = footer art and course cards without a cover; the sign-in panel
+   is a lit doorway at night for signing in and dawn over the dunes for registering (1.0.4, owner,
+   2026-10-20, in place of the serpent). No picture appears twice on one page.
    Ownership: core owns component geometry, responsive grids, navigation behaviour and page bodies.
    This sheet sets colours, type, borders, shadows and decorative art only on canonical classes,
    and layout only on theme-owned ss-* elements, the shell, the box and its rows. */
@@ -98,7 +99,7 @@ body.ss-body {
   --cl-texture-band: 14px;
 }
 /* The page chooses its width once (core's cl-width-* body class); the box follows it. Sign-in pages
-   stay wide because the serpent panel needs the room. */
+   stay wide because the picture panel needs the room. */
 body.ss-body.cl-width-medium { --ss-box: 58rem; }
 body.ss-body.cl-width-narrow { --ss-box: 42rem; }
 body.ss-body.ss-family-auth { --ss-box: var(--ss-frame); }
@@ -403,7 +404,8 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
    the sides; the course, bundle and landing heads hold a container instead (see 4b). */
 .ss-body .cl-page-head { background: transparent; border-bottom: 1px solid var(--ss-line); color: var(--ss-ink); }
 .ss-body .cl-page-head-inner { padding-block: 52px 40px; }
-.ss-body .cl-main > .cl-page-head > .cl-container { padding: 52px var(--ss-box-pad) 40px !important; }
+/* The words stand on the cards' edge, as every head's do here (--cl-head-inset is 0 for a head Core sizes to the cards). */
+.ss-body .cl-main > .cl-page-head > .cl-container { padding: 52px var(--cl-head-inset, var(--ss-box-pad)) 40px !important; }
 .ss-body .cl-page-head h1 {
   margin: 14px 0 0;
   font-family: var(--ss-display);
@@ -414,6 +416,9 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
 .ss-body .cl-page-head-compact h1 { margin: 0; font-size: 1.6rem; }
 .ss-body .cl-page-head-compact > .cl-page-head-inner { padding-block: 18px; }
 .ss-body .cl-page-head .cl-lead { max-width: 40rem; margin-top: 16px; }
+/* The page head is not a box here (it stands on the paper), so its title stands on the cards' edge (Core's --cl-head-inset).
+   Only a head Core sizes to the cards: the sign-in and register column keeps the gutter its cards have. */
+.ss-body .cl-main > .cl-page-head, .ss-body .cl-main > .cl-page-family > .cl-page-head { --cl-head-inset: 0; }
 
 .ss-body .cl-kicker,
 .ss-body .cl-ui-eyebrow {
@@ -597,6 +602,9 @@ body.cl-body.ss-body { --cl-content-width: none; --cl-gutter: var(--ss-box-pad);
   box-shadow: none;
 }
 .ss-body .cl-main :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"], input[type="tel"], input[type="url"], input:not([type]), .cl-input) { padding: 10px 14px; }
+/* A form field's date box and drop-down are as tall as its text boxes (1.0.4, owner, 2026-10-20: fields side by side
+   "should all be the shorter height and aligned"). */
+.ss-body .cl-main .cl-ui-field :is(input[type="date"], input[type="datetime-local"], input[type="time"], select) { padding: 10px 14px; }
 .ss-body :is(input, select, textarea, .cl-input, .cl-select):focus {
   border-color: var(--ss-terra);
   box-shadow: 0 0 0 3px rgba(154, 74, 42, .18);
@@ -998,7 +1006,7 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
    footer. */
 .ss-body .cl-landing-section--cta > .cl-ui-surface { background: var(--ss-sand); border-color: var(--ss-line-2); border-top-color: var(--ss-terra); }
 
-/* 16. Sign-in family: the serpent panel beside the page body, inside the box -------------- */
+/* 16. Sign-in family: the picture panel beside the page body, inside the box -------------- */
 
 .ss-auth {
   display: grid;
@@ -1012,9 +1020,10 @@ body.ss-body.cl-width-full { --cl-gutter: var(--ss-row-pad); }
   align-items: flex-end;
   min-height: 360px;
   padding: 48px;
-  background: var(--ss-night) url("../img/footer-serpent.jpg") 62% 55% / cover no-repeat;
+  background: var(--ss-night) url("../img/auth-sign-in.svg") 50% 42% / cover no-repeat;
   color: var(--ss-on-dark);
 }
+.ss-auth--register .ss-auth-art { background-image: url("../img/auth-register.svg"); background-position: 50% 36%; }
 .ss-auth-art::before {
   content: "";
   position: absolute;

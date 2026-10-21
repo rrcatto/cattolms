@@ -80,6 +80,22 @@ final class TreeSelectContractTest extends TestCase
         foreach (["select.dataset.treeSelect !== 'field'", 'hidePopover()', 'treeSelectPath'] as $contract) self::assertStringContainsString($contract, $script);
     }
 
+    public function testAnOptionMayCarryItsCategoryIcon(): void
+    {
+        // Owner, 2026-10-20: "for the category picker, I would like a custom svg icon created for each category".
+        $icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4h16"/></svg>';
+        $items = [['value' => '1', 'label' => 'Business', 'depth' => 1, 'path' => 'Business', 'icon' => $icon, 'children' => [
+            ['value' => '2', 'label' => 'Finance', 'depth' => 2, 'path' => 'Business › Finance', 'icon' => $icon],
+        ]], ['value' => '3', 'label' => 'Science', 'depth' => 1, 'path' => 'Science', 'icon' => '']];
+        foreach (['submit', 'field'] as $mode) {
+            $html = ComponentHarness::render('form.tree-select', ['id' => 'picker', 'name' => 'category', 'items' => $items, 'selected' => '2', 'placeholder' => 'Choose', 'list_label' => 'Course categories', 'mode' => $mode]);
+            self::assertSame(2, substr_count($html, '<span class="cl-ui-tree-select-icon" aria-hidden="true">' . $icon . '</span><span>'), $mode . ' mode draws each icon before its label, hidden from screen readers.');
+            self::assertStringContainsString('Business › Finance', $html);
+        }
+        $this->expectException(\InvalidArgumentException::class);
+        ComponentHarness::render('form.tree-select', ['id' => 'picker', 'name' => 'category', 'items' => [['value' => '1', 'label' => 'Business', 'depth' => 1, 'path' => 'Business', 'icon' => ['not', 'markup']]], 'selected' => '', 'placeholder' => 'Choose', 'list_label' => 'Course categories']);
+    }
+
     public function testNothingChosenShowsThePlaceholder(): void
     {
         $html = ComponentHarness::render('form.tree-select', ['id' => 'picker', 'name' => 'category', 'items' => array_slice(self::ITEMS, 1), 'selected' => '', 'placeholder' => 'All categories', 'list_label' => 'Course categories']);

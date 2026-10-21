@@ -103,7 +103,7 @@ async function toReview(page, fixture, course, method) {
         await check('chromium: checkout offers the simulated card, says it is a simulation, and the order and its invoice say so with fake bank details', async () => {
             const {ctx, page} = await open(chromium, fixture.learner.token);
             const options = await toReview(page, fixture, 'b', 'eft');
-            assert.deepEqual(options, ['dummy', 'eft'], 'the simulated card is offered on a demo site');
+            assert.deepEqual(options, ['eft', 'dummy'], 'the simulated card is offered on a demo site, after EFT (Settings > Payment methods order)');
             assert.ok((await text(page)).includes(SIMULATION), 'the review says the purchase is a simulation');
             await page.locator('input[name=accept_terms]').check();
             await page.locator('input[name=accept_start]').check();

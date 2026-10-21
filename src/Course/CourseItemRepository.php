@@ -382,7 +382,7 @@ final class CourseItemRepository
                 JOIN course_item_references r ON r.source_course_item_id=source.id
                 JOIN course_items target ON target.item_key=r.referenced_key WHERE source.item_type='html_lesson'
              )
-             SELECT x.node_id,x.item_id AS course_item_id,ci.item_key,a.score_policy,a.practice,
+             SELECT x.node_id,x.item_id AS course_item_id,ci.item_key,ci.title AS item_title,a.score_policy,a.practice,
                     CASE WHEN x.root_item_id=x.item_id AND x.role='final' THEN 'final' ELSE 'graded' END AS assessment_role,
                     EXISTS(SELECT 1 FROM assessment_attempts aa WHERE aa.enrolment_id=:enrolment AND aa.structure_node_id=x.node_id AND aa.course_item_id=x.item_id) AS submitted
              FROM contexts x JOIN course_items ci ON ci.id=x.item_id JOIN course_item_assessments a ON a.course_item_id=ci.id

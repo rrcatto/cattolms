@@ -78,6 +78,9 @@ final class IntegrationDataFixture
             ['user_id' => $id, 'email' => $email]
         );
         $this->emails[] = strtolower($email);
+        // The person gave their date of birth, as everyone does once (adults only, owner, 2026-10-20),
+        // as the registration form records it.
+        $this->db->executeStatement("UPDATE users SET birthdate = DATE '1990-05-12' WHERE id = :id", ['id' => $id]);
 
         return $id;
     }

@@ -26,7 +26,7 @@
 					{label: 'Status', value: course.status|capitalize},
 					{label: 'Approval', value: course.publication_approval_status|capitalize},
 					{label: 'Owning company', value: course.owner_company_name ?: 'Not assigned'},
-					{label: 'Owning person', value: course.owner_person_name ?: 'Not assigned'},
+					course.owner_user_id ? {label: 'Owning person', person: {name: course.owner_person_name, reference: course.owner_person_reference|default(''), href: '/admin/people/' ~ course.owner_user_id}} : {label: 'Owning person', value: 'Not assigned'},
 					{label: 'JSON schema', value: course.interchange_schema_version}
 				]}) }}
 				{{ ui('layout.section-head', {heading: 'What this course contains', heading_level: 2, summary: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '') ~ ' · ' ~ content_summary.question_count ~ ' questions across assessments and diagnostics.'}) }}
@@ -35,10 +35,52 @@
 					{% for type in content_summary.type_counts %}{{ ui('data.stat-card', {value: type.count, label: type.label}) }}{% endfor %}
 {% endblock %}
 {% endembed %}
-				<form action="/admin/courses/{{ course.id }}" method="post">
+				<form action="/admin/courses/{{ course.id }}" method="post" enctype="multipart/form-data">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{{ ui('layout.section-head', {heading: 'Course details', heading_level: 2, summary: 'These details appear in the catalogue and on the course introduction page.'}) }}
 					{% include '@platform/partials/admin-course-fields.html.twig' %}
+					{# Its tags and its cover picture (owner, 2026-10-20). #}
+					<fieldset class="cl-course-tags-choice mt-5">
+						<legend class="h6">Tags</legend>
+						{% for tag in tag_options %}
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: tag.name})} %}
+{% block control %}<input type="checkbox" name="tag_ids[]" value="{{ tag.id }}" {{ tag.checked ? 'checked' : '' }}>{% endblock %}
+{% block label_content %}{% if tag.icon_svg %}<span class="cl-tag-icon" aria-hidden="true">{{ tag.icon_svg|raw }}</span> {% endif %}{{ tag.name }}{% endblock %}
+{% endembed %}
+						{% else %}
+							<p class="help">No tags exist yet. Create them at <a href="/admin/courses/tags">Course Tags</a>.</p>
+						{% endfor %}
+						{% if tag_options %}<p class="help">One to three tags that say what the course is about help learners find it. Tags are managed at <a href="/admin/courses/tags">Course Tags</a>.</p>{% endif %}
+						{# Says the form showed the tags, so none ticked removes them all; after the choices, never between the legend and the first. #}
+						<input type="hidden" name="tags_shown" value="1">
+					</fieldset>
+					{# The courses related to it (owner, 2026-10-20): a relation is both courses', so ticking one here ticks this course on the other's form too. #}
+					<fieldset class="cl-course-related-choice mt-5">
+						<legend class="h6">Related courses</legend>
+						<div class="cl-course-related-list">
+						{% for other in related_options %}
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: other.title})} %}
+{% block control %}<input type="checkbox" name="related_ids[]" value="{{ other.id }}" {{ other.checked ? 'checked' : '' }}>{% endblock %}
+{% block label_content %}{{ other.title }}{% if other.status != 'published' %} <small class="cl-text-muted">({{ other.status }})</small>{% endif %}{% endblock %}
+{% endembed %}
+						{% else %}
+							<p class="help">There is no other course yet.</p>
+						{% endfor %}
+						</div>
+						{% if related_options %}<p class="help">Related courses are shown on this course's page, and this course on theirs: relating a course here relates it both ways.</p>{% endif %}
+						{# Says the form showed the related courses, so none ticked removes them all; after the choices, never between the legend and the first. #}
+						<input type="hidden" name="related_shown" value="1">
+					</fieldset>
+					{# Its place in the catalogue (owner, 2026-10-20). #}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Position in the catalogue (optional)', for: 'catalogue-position', help: 'Courses with a number come first in the catalogue, lowest first; the rest follow, newest first. Number in hundreds (100, 200, 300) to leave room for courses in between.'})} %}
+{% block control %}<input class="cl-input" type="number" id="catalogue-position" name="catalogue_position" min="1" max="2000000000" step="1" value="{{ course.catalogue_position|default('') }}" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Cover picture (an SVG file, optional)', for: 'course-cover', full_width: true, help: 'Shown at the top of the course\'s catalogue card and on its landing page. Leave it empty to keep the current picture.'})} %}
+{% block control %}
+						{% if course.cover_svg|default('') %}<span class="cl-course-cover-preview" aria-hidden="true">{{ course.cover_svg|raw }}</span>{% endif %}
+						<input class="cl-input" type="file" id="course-cover" name="cover" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>
+{% endblock %}
+{% endembed %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Save course details', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
 {% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
@@ -159,6 +201,7 @@
 									</td>
 									<td>
 										<input class="cl-input" form="{{ price_form }}" name="price" value="{{ price.price_input }}" inputmode="decimal" required aria-label="Price">
+										<input class="cl-input" form="{{ price_form }}" name="was_price" value="{{ price.was_price_input }}" inputmode="decimal" placeholder="Was price" aria-label="Was price (optional)">
 										<input class="cl-input text-uppercase" form="{{ price_form }}" name="currency_code" value="{{ price.currency_code }}" maxlength="3" required aria-label="Currency">
 									</td>
 									<td><input class="cl-input" form="{{ price_form }}" name="label" value="{{ price.label }}" maxlength="120" aria-label="Label"></td>
@@ -173,7 +216,7 @@
 									</td>
 								{% else %}
 									<td>{{ price.access_period_label }}</td>
-									<td>{{ price.price_label }}</td>
+									<td>{% include '@platform/partials/price.html.twig' with {price: price} %}</td>
 									<td>{{ price.label }}</td>
 									<td>
 										{% if price.is_default %}{{ ui('feedback.badge', {label: 'Default', tone: 'info', size: 'small'}) }}{% endif %}
@@ -211,6 +254,9 @@
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Price', for: 'new-price-amount', span: 'quarter', required: true})} %}
 {% block control %}<input class="cl-input" id="new-price-amount" name="price" placeholder="5000.00" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (optional)', for: 'new-price-was', span: 'quarter', help: 'A higher price shown struck through beside the price, so the course is seen to be marked down. Only the price is charged. Leave it empty when the course is not marked down.'})} %}
+{% block control %}<input class="cl-input" id="new-price-was" name="was_price" placeholder="7500.00" inputmode="decimal" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Currency', for: 'new-price-currency', span: 'quarter', required: true})} %}
 {% block control %}<input class="cl-input text-uppercase" id="new-price-currency" name="currency_code" value="ZAR" maxlength="3" required {{ ui_field_attrs(props) }}>{% endblock %}
@@ -298,7 +344,7 @@
 			{% if active_tab == 'grades' %}
 				{{ ui('layout.section-head', {heading: 'Grading scale', heading_level: 2, summary: 'These bands decide every grade in this course. Changes apply to every result recorded after you save.'}) }}
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'What the bands control', section_spacing: true})} %}
-{% block body %}<ul><li><strong>Assessment results:</strong> each graded module assessment and the final show the band its score falls in.</li><li><strong>Final course grade:</strong> 50% module assessments plus 50% final assessment, placed in a band.</li><li><strong>Pass or fail:</strong> the course is passed when the final grade lands in a band marked Passing.</li><li><strong>Certificate:</strong> issued only for a passing band.</li></ul>{% endblock %}
+{% block body %}<ul><li><strong>Assessment results:</strong> each graded module assessment and the final show the band its score falls in.</li><li><strong>Final course grade:</strong> 50% module assessments plus 50% final assessment, placed in a band.</li><li><strong>Pass or fail:</strong> the course is passed when the final grade lands in a band marked Passing.</li><li><strong>Certificate:</strong> never depends on the grade. A learner earns it by completing every assessment, pass or fail, and it shows no mark or grade. The marks and grade are on its transcript.</li></ul>{% endblock %}
 {% endembed %}
 				<form action="/admin/courses/{{ course.id }}/grade-bands" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -399,7 +445,7 @@
 {% endblock %}
 {% block body %}
 						{% for event in course.history %}
-							<tr><td>{{ event.created_at }}</td><td>{{ event.summary }}</td><td>{{ event.user_email ? event.user_email : 'System' }}</td></tr>
+							<tr><td>{{ event.created_at }}</td><td>{{ event.summary }}</td><td>{% if event.user_id %}{{ ui('data.person', {name: event.user_name ?: event.user_email, reference: event.user_reference, href: '/admin/people/' ~ event.user_id}) }}{% else %}System{% endif %}</td></tr>
 						{% endfor %}
 {% endblock %}
 {% endembed %}

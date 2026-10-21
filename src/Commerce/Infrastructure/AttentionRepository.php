@@ -30,6 +30,9 @@ use CattoLearning\Infrastructure\Persistence\Database;
 
 final class AttentionRepository
 {
+    /** Who an item concerns: the order's purchaser or the refund's requester, named with their account reference (owner, 2026-10-21). */
+    private const PERSON = "u.id AS person_id, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, '') AS person_name, u.account_reference AS person_reference";
+
     public function __construct(private readonly Database $db)
     {
     }
@@ -42,10 +45,10 @@ final class AttentionRepository
      */
     public function partlyPaidOrders(int $limit = 200): array
     {
-        return $this->db->fetchAllAssociative("SELECT o.id, o.total_minor, o.currency, o.placed_at, o.payment_due_at,
+        return $this->db->fetchAllAssociative("SELECT o.id, o.total_minor, o.currency, o.placed_at, o.payment_due_at, " . self::PERSON . ",
                 (SELECT COALESCE(SUM(p.amount_minor), 0) FROM commerce_payments p WHERE p.order_id = o.id AND p.state IN ('paid','partially_refunded','refunded') AND p.gateway <> 'wallet') AS external_minor,
                 (SELECT COALESCE(SUM(p.amount_minor), 0) FROM commerce_payments p WHERE p.order_id = o.id AND p.state IN ('paid','partially_refunded','refunded')) AS paid_minor
-            FROM commerce_orders o WHERE o.state = 'awaiting_payment'
+            FROM commerce_orders o JOIN users u ON u.id = o.purchaser_user_id WHERE o.state = 'awaiting_payment'
               AND EXISTS (SELECT 1 FROM commerce_payments p WHERE p.order_id = o.id AND p.state = 'paid' AND p.gateway <> 'wallet')
             ORDER BY o.placed_at LIMIT " . max(1, $limit));
     }
@@ -58,7 +61,8 @@ final class AttentionRepository
      */
     public function undismissedEntries(string $ledgerKind, string $attentionKind, int $limit = 200): array
     {
-        return $this->db->fetchAllAssociative('SELECT e.id, e.order_id, e.amount_minor, e.currency, e.occurred_at FROM commerce_ledger_entries e
+        return $this->db->fetchAllAssociative('SELECT e.id, e.order_id, e.amount_minor, e.currency, e.occurred_at, ' . self::PERSON . ' FROM commerce_ledger_entries e
+                JOIN commerce_orders o ON o.id = e.order_id JOIN users u ON u.id = o.purchaser_user_id
                 WHERE e.kind = :kind AND e.order_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM commerce_attention_dismissals d WHERE d.kind = :attention AND d.reference = e.id::text)
                 ORDER BY e.occurred_at LIMIT ' . max(1, $limit), ['kind' => $ledgerKind, 'attention' => $attentionKind]);
     }
@@ -72,13 +76,13 @@ final class AttentionRepository
     /** @return list<array<string,mixed>> */
     public function openRefundRequests(int $limit = 200): array
     {
-        return $this->db->fetchAllAssociative("SELECT r.id, r.order_id, r.destination, r.requested_at, u.display_name FROM commerce_refund_requests r JOIN users u ON u.id = r.requested_by_user_id WHERE r.status = 'requested' ORDER BY r.requested_at LIMIT " . max(1, $limit));
+        return $this->db->fetchAllAssociative("SELECT r.id, r.order_id, r.destination, r.requested_at, u.display_name, " . self::PERSON . " FROM commerce_refund_requests r JOIN users u ON u.id = r.requested_by_user_id WHERE r.status = 'requested' ORDER BY r.requested_at LIMIT " . max(1, $limit));
     }
 
     /** @return list<array<string,mixed>> */
     public function unpaidMoneyBackRefunds(int $limit = 200): array
     {
-        return $this->db->fetchAllAssociative("SELECT r.id, r.order_id, r.net_minor, r.currency, r.payout_due_at, r.method FROM commerce_refunds r WHERE r.destination = 'money_back' AND r.net_minor > 0 AND NOT EXISTS (SELECT 1 FROM commerce_refund_payouts p WHERE p.refund_id = r.id) ORDER BY r.payout_due_at LIMIT " . max(1, $limit));
+        return $this->db->fetchAllAssociative("SELECT r.id, r.order_id, r.net_minor, r.currency, r.payout_due_at, r.method, " . self::PERSON . " FROM commerce_refunds r JOIN commerce_orders o ON o.id = r.order_id JOIN users u ON u.id = o.purchaser_user_id WHERE r.destination = 'money_back' AND r.net_minor > 0 AND NOT EXISTS (SELECT 1 FROM commerce_refund_payouts p WHERE p.refund_id = r.id) ORDER BY r.payout_due_at LIMIT " . max(1, $limit));
     }
 
     /** The order an item is about, or null when the item does not exist. */
@@ -100,7 +104,7 @@ final class AttentionRepository
     /** @return list<array<string,mixed>> the emails sent about an item, oldest first, with the sender's name */
     public function emails(string $kind, string $reference): array
     {
-        return $this->db->fetchAllAssociative('SELECT e.*, u.display_name AS sender FROM commerce_attention_emails e JOIN users u ON u.id = e.sent_by_user_id WHERE e.kind = :kind AND e.reference = :reference ORDER BY e.sent_at', ['kind' => $kind, 'reference' => $reference]);
+        return $this->db->fetchAllAssociative('SELECT e.*, u.display_name AS sender, u.account_reference AS sender_reference, ue.email AS sender_email FROM commerce_attention_emails e JOIN users u ON u.id = e.sent_by_user_id LEFT JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary WHERE e.kind = :kind AND e.reference = :reference ORDER BY e.sent_at', ['kind' => $kind, 'reference' => $reference]);
     }
 
     public function recordEmail(string $kind, string $reference, string $recipient, string $subject, string $body, int $actorId, string $now): void

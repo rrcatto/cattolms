@@ -75,7 +75,7 @@ final class FrontControllerEnvTest extends TestCase
     /** @return iterable<string,array{string,string}> file => the value Dotenv resolves */
     public static function resolvable(): iterable
     {
-        yield '.env.example' => [dirname(__DIR__, 2) . '/.env.example', '/usr/local/lib/php/catto-learning/current'];
+        yield '.env.example' => [dirname(__DIR__, 2) . '/.env.example', '/usr/local/lib/php/cattolms/current'];
         $expected = [
             'special-comments.env' => '/srv/catto/releases/current',
             'export-and-spaces.env' => '/srv/catto/exported',

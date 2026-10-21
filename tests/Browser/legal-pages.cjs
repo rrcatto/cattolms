@@ -90,18 +90,24 @@ async function toCompanyCheckout(page) {
     assert.equal(new URL(page.url()).pathname, '/company/credits/checkout');
 }
 
-/* One legal page as drawn: its facts, measured in the page. */
+/* One legal page as drawn: its facts, measured in the page. Each numbered section is a closed accordion (owner,
+   2026-10-20): the count is taken closed, then every section is opened so its text can be measured. */
 const documentFacts = (page) => page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
     const stamp = document.querySelector('[data-legal-document]');
-    const contents = [...document.querySelectorAll('nav[aria-label="Contents"] a')].map((a) => a.getAttribute('href').slice(1));
+    const sections = [...document.querySelectorAll('main details.cl-ui-accordion-section[id]')];
+    const closed = sections.filter((section) => !section.open).length;
+    sections.forEach((section) => { section.open = true; });
+    const contents = sections.map((section) => section.id);
     const inside = (e) => { const b = e.getBoundingClientRect(); return b.left >= -1 && b.right <= vw + 1; };
     const footer = document.querySelector('footer.cl-footer');
     return {
         h1: document.querySelector('h1')?.textContent.trim(),
         key: stamp?.dataset.legalDocument, version: stamp?.dataset.legalVersion, stamp: stamp?.textContent.replace(/\s+/g, ' ').trim(),
         contents: contents.length,
-        missing: contents.filter((id) => !document.querySelector(`section.cl-ui-surface#${CSS.escape(id)} h2`)),
+        closed: closed === contents.length,
+        missing: contents.filter((id) => !document.querySelector(`.cl-ui-surface details#${CSS.escape(id)} > summary .cl-ui-accordion-eyebrow`)?.textContent.match(/^Section \d+$/) || !document.querySelector(`details#${CSS.escape(id)} > summary .cl-ui-accordion-title`)),
+        pdf: document.querySelector('main a[href$=".pdf"]')?.getAttribute('href') ?? null,
         // Nothing of the document is written straight onto the page canvas (UX rule 1.8).
         loose: [...document.querySelectorAll('main .cl-page-section :is(p, ul, ol, dl, h2)')].filter((e) => !e.closest('.cl-ui-surface')).length,
         outside: [...document.querySelectorAll('main .cl-page-section :is(.cl-ui-surface, .cl-ui-notice, dl, ul, ol, p)')].filter((e) => !inside(e)).length,
@@ -180,7 +186,9 @@ function assertAcceptance(facts, label) {
                             assert.equal(facts.key, key, `${url} names its document`);
                             assert.equal(facts.version, undefined, `${url} carries no version (owner, 2026-10-17)`);
                             assert.match(facts.stamp, /^Last updated \d{1,2} [A-Z][a-z]+ \d{4}\.$/, `${url} shows its date`);
-                            assert.ok(facts.contents >= 8 && facts.missing.length === 0, `${url}: every contents entry is a card with a heading (missing: ${facts.missing.join(', ')})`);
+                            assert.ok(facts.contents >= 8 && facts.missing.length === 0, `${url}: every numbered section is an accordion with its number and title (missing: ${facts.missing.join(', ')})`);
+                            assert.ok(facts.closed, `${url}: every section starts closed`);
+                            assert.equal(facts.pdf, `${url}.pdf`, `${url} links to its PDF`);
                             assert.equal(facts.loose, 0, `${url}: all prose is on a card`);
                             assert.equal(facts.outside, 0, `${url}: every card and its text is on screen`);
                             assert.deepEqual(facts.overlapping, [], `${url}: no label runs into its value`);
@@ -263,7 +271,7 @@ function assertAcceptance(facts, label) {
         }
 
         /* 3. Without JavaScript: the pages read and their links work as ordinary links. */
-        await check('chromium without JavaScript: the pages, the footer link and the contents list', async () => {
+        await check('chromium without JavaScript: the pages, the footer link and a section opened', async () => {
             const {ctx, page} = await open(chromium, null, {js: false, width: 390});
             for (const [url, , title] of DOCUMENTS) {
                 assert.equal((await page.goto(base + url)).status(), 200, url);
@@ -272,8 +280,10 @@ function assertAcceptance(facts, label) {
             }
             await page.goto(`${base}/help`);
             await Promise.all([page.waitForURL(/\/terms$/), page.locator('footer.cl-footer a[href="/terms"]').click()]);
-            await page.locator('nav[aria-label="Contents"] a[href="#refunds"]').click();
-            assert.equal(new URL(page.url()).hash, '#refunds', 'a contents entry jumps to its section');
+            // Each section is a closed accordion (owner, 2026-10-20) that opens without JavaScript too.
+            assert.equal(await page.locator('details.cl-ui-accordion-section[open]').count(), 0, 'every section starts closed');
+            await page.locator('details#refunds > summary').click();
+            assert.equal(await page.locator('details#refunds').evaluate((section) => section.open), true, 'a section opens when it is chosen');
             await Promise.all([page.waitForURL(/\/refunds$/), page.locator('#refunds a[href="/refunds"]').click()]);
             assert.equal(await page.locator('h1').innerText(), 'Refund Policy');
             await ctx.close();

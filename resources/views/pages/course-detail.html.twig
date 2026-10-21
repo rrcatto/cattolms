@@ -2,13 +2,15 @@
 {% block page_body %}
 	<section class="cl-page-head cl-course-head">
 		<div class="cl-container py-12">
-			<div class="row g-7 align-items-center">
-				<div class="lg:col-8">
+			{#
+				The badges, the title and the favourite star: over the course's cover picture when it has one (owner,
+				2026-10-20: "these course pages must look interesting … combine the image with the title overlaid on
+				it"), at the top of the left column otherwise.
+			#}
+			{% set course_headline %}
 					<div class="d-flex flex-wrap gap-3 mb-5">
 						{% if course.category_name %}
-							{% if course.category_name %}
-								{{ ui('feedback.badge', {label: (course.category_name), tone: 'neutral'}) }}
-							{% endif %}
+							{{ ui('feedback.badge', {label: (course.category_name), tone: 'neutral'}) }}
 						{% endif %}
 						{% if course.level %}
 							{{ ui('feedback.badge', {label: (course.level), tone: 'neutral'}) }}
@@ -28,12 +30,23 @@
 							{% include '@platform/partials/course-favourite.html.twig' with {course: course, favourite_return: favourite_return|default('/courses')} %}
 						{% endif %}
 					</div>
+			{% endset %}
+			{% set course_hero = course.cover_svg|default('') starts with '<svg' %}
+			{% if course_hero %}
+				<div class="cl-picture-head mb-7">
+					<div class="cl-picture-head-art" aria-hidden="true">{{ course.cover_svg|raw }}</div>
+					<div class="cl-picture-head-text">{{ course_headline }}</div>
+				</div>
+			{% endif %}
+			<div class="row g-7 align-items-center">
+				<div class="lg:col-8">
+					{% if not course_hero %}{{ course_headline }}{% endif %}
 					{% if course.subtitle %}
 						<p class="h4 cl-text-light-muted">
 							{{ course.subtitle }}
 						</p>
 					{% endif %}
-					{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
+					{% if rating.count > 0 %}{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}{% endif %}
 					<p class="cl-lead mt-5 mb-0">
 						{{ course.summary }}
 					</p>
@@ -41,7 +54,8 @@
 				<div class="lg:col-4">
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
 {% block surface_body %}
-{{ ui('data.key-value-list', {items: [{label: 'Course Items', value: (course.item_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'When you start'}]}) }}
+{# A bought course opens at once (owner, 2026-10-20: "put 'immediately'"). #}
+{{ ui('data.key-value-list', {items: [{label: 'Course Items', value: (course.item_count)}, {label: 'Questions', value: (course.question_count)}, {label: 'Access starts', value: 'Immediately'}]}) }}
 {% endblock %}
 {% endembed %}
 				</div>
@@ -52,54 +66,34 @@
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}
 {% block body %}
 
+			{# The course itself in a card, as every page's content is (UX rule 1.7; 2026-10-21: it stood on the page beside the
+			   Course access card). #}
 			<div>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+				<h2 class="h4">About this course</h2>
 				<div class="cl-prose mb-12">
 					{{ course.description_html|raw }}
 				</div>
-				<h2 class="h3 mb-5">Course Content</h2>
+				<h3 class="h4 mb-5">Course Content</h3>
+                {# The modules and other learning items only (owner, 2026-10-20): an assessment repeats its module's title, so assessments are left out. #}
                 <ol>
-                {% for node in course.structure %}
+                {% for node in course.structure|filter(node => node.node_type == 'section' or node.item_type|default('') not in ['assessment', 'diagnostic']) %}
                     <li>{{ node.node_type == 'section' ? node.section_title : (node.display_title_override ?: node.item_title) }}</li>
                 {% endfor %}
                 </ol>
                 {% if course.has_public_preview %}
                     {{ ui('action.link', {label: 'Preview this course', href: '/courses/' ~ course.slug ~ '/preview', variant: 'secondary'}) }}
                 {% endif %}
-				<h2 class="h3 mt-12 mb-5">
-					Grading
-				</h2>
+				{# How results are worked out is in the FAQ (owner, 2026-10-20: "the grading belongs elsewhere, in a FAQ"). #}
+				<p class="cl-course-grading-link mt-7">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading'}) }}</p>
+				{# A question opens the contact form with this course chosen: a problem with it once it is yours, a question before buying until then (owner, 2026-10-20). #}
+				<p class="cl-course-contact-link">{{ purchase.state == 'owned' ? ui('action.link', {label: 'Report a problem with this course', variant: 'quiet', size: 'small', href: '/contact?reason=course&course=' ~ course.slug}) : ui('action.link', {label: 'Ask a question about this course', variant: 'quiet', size: 'small', href: '/contact?reason=before_buying&course=' ~ course.slug}) }}</p>
 
-					{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
-{% block header %}
-
-							<tr>
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 40, label: 'Grade'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Range'}} %}
-								{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Result'}} %}
-							</tr>
-
-{% endblock %}
-{% block body %}
-
-							{% for band in course.grade_bands %}
-								<tr>
-									<td>
-										<strong>{{ band.grade_label }}</strong>
-									</td>
-									<td>
-										{{ band.range_label }}
-									</td>
-									<td>
-										{{ band.is_passing ? 'Pass' : 'Fail' }}
-									</td>
-								</tr>
-							{% endfor %}
-
-{% endblock %}
-{% endembed %}
-
+				{# Shown only when the course has a published review (owner, 2026-10-20: "just leave it out entirely if there are no reviews"). #}
+				{% if rating.count > 0 %}
 				<section id="reviews" aria-labelledby="course-reviews-heading">
-					<h2 class="h3 mt-12 mb-5" id="course-reviews-heading">Reviews</h2>
+					<h3 class="h4 mt-12 mb-5" id="course-reviews-heading">Reviews</h3>
 					{% if rating.count > 0 %}
 						<div class="cl-rating-overview">
 							{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
@@ -112,6 +106,9 @@
 					{% endif %}
 					{% include '@platform/partials/course-reviews.html.twig' %}
 				</section>
+				{% endif %}
+{% endblock %}
+{% endembed %}
 			</div>
 			<aside>
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
@@ -141,4 +138,15 @@
 {% endblock %}
 {% endembed %}
 	</section>
+	{# The courses related to this one (owner, 2026-10-20), published ones only, in the catalogue's order. #}
+	{% if related_courses|default([]) %}
+	<section class="cl-page-section" aria-labelledby="related-courses-heading">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% block surface_body %}
+			<h2 class="h3" id="related-courses-heading">Related courses</h2>
+			{{ ui('catalogue.course-grid', {courses: related_courses}) }}
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
 {% endblock %}

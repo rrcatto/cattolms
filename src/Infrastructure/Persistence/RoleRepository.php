@@ -125,6 +125,13 @@ final class RoleRepository
         );
     }
 
+    /** The earliest account holding the role, or null when none does. */
+    public function firstUserWithRole(string $role): ?int
+    {
+        $id = $this->db->fetchOne('SELECT ur.user_id FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.role_key = :role ORDER BY ur.user_id LIMIT 1', ['role' => $role]);
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
     public function countUsersWithRole(string $role): int
     {
         $rows = $this->db->fetchAllAssociative(

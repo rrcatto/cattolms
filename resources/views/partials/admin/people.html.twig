@@ -31,15 +31,11 @@
 							{% for person in people %}
 								<tr data-person-row>
 									<td>
+										{# The name and account reference, a link to the person (owner, 2026-10-20/21): no badge, picture or
+										   initials, and no email address, so Last login has room. The search still finds a person by email. #}
 										<div class="person">
-											<div class="avatar">
-												U
-											</div>
 											<div>
-												<strong title="{{ person.name }}">{{ person.name }}</strong>
-												<div class="muted small" title="{{ person.email }}">
-													{{ person.email }}
-												</div>
+												<strong title="{{ person.name }}">{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/admin/people/' ~ person.id}) }}</strong>
 											</div>
 										</div>
 									</td>
@@ -48,8 +44,10 @@
 									</td>
 									<td>
 										<div class="role-list">
+											{# Waiting for approval on a demo site (owner, 2026-10-21); person.roles holds each role's name, shown in words. #}
+											{% if person.status|default('') == 'awaiting_approval' %}{{ ui('feedback.badge', {label: 'Awaiting approval', tone: 'warning'}) }}{% endif %}
 											{% for role in person.roles %}
-												{{ ui('feedback.badge', {label: (role), tone: 'info'}) }}
+												{{ ui('feedback.badge', {label: role|role_label, tone: 'info'}) }}
 											{% endfor %}
 										</div>
 									</td>
@@ -123,7 +121,7 @@
 
 									<select name="role" id="field-people-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 									{% for role in roles %}
-										<option value="{{ role.role_key }}"{{ role.role_key == 'STUDENT' ? ' selected' : '' }}>{{ role.role_name }}</option>
+										<option value="{{ role.role_key }}"{{ role.role_key == 'STUDENT' ? ' selected' : '' }}>{{ role.role_name|role_label(role.role_key) }}</option>
 									{% endfor %}
 									</select>
 

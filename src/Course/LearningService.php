@@ -48,12 +48,22 @@ final class LearningService
      *
      * `statuses` narrows the enrolment query; null marks a dataset answered by its own read.
      */
+    /**
+     * The four lists of My Courses, one shown at a time in one table and chosen by a feature card (owner, 2026-10-21:
+     * "Could these be consolidated into one table and you provide 4 Feature Card Radio Selectors").
+     */
     public const LIBRARY_DATASETS = [
-        'current' => ['label' => 'Current courses', 'statuses' => CourseRepository::LIBRARY_CURRENT],
-        'completed' => ['label' => 'Completed courses', 'statuses' => CourseRepository::LIBRARY_COMPLETED],
-        'favourites' => ['label' => 'Favourites', 'statuses' => null],
-        'requests' => ['label' => 'Course requests', 'statuses' => null],
+        'current' => ['label' => 'Current courses', 'note' => 'under way or waiting to start', 'statuses' => CourseRepository::LIBRARY_CURRENT],
+        'completed' => ['label' => 'Completed courses', 'note' => 'finished, with results and certificates', 'statuses' => CourseRepository::LIBRARY_COMPLETED],
+        'favourites' => ['label' => 'Favourite courses', 'note' => 'marked to come back to', 'statuses' => null],
+        'requests' => ['label' => 'Course requests', 'note' => 'asked for, and where each stands', 'statuses' => null],
     ];
+
+    /** Lists only an account that belongs to a company has (owner, 2026-10-21: course requests are "a function of company accounts, not individuals"). */
+    public const COMPANY_LISTS = ['requests'];
+
+    /** The search field shows from this many entries in the chosen list (owner, 2026-10-21). */
+    public const LIBRARY_SEARCH_FROM = 5;
 
     public function __construct(
         private readonly CourseRepository $courses,
@@ -64,50 +74,75 @@ final class LearningService
         private readonly AdministrationRepository $administration,
         private readonly ResourceLibraryService $resources,
         private readonly CertificateRepository $certificates,
-        private readonly ?AccessService $commerceAccess = null
+        private readonly ?AccessService $commerceAccess = null,
+        private readonly ?\CattoLearning\Course\Certificate\CertificateAwards $awards = null
     ) {
     }
 
 
     /**
-     * The whole Course Library view model: four datasets, each paged and searched.
+     * My Courses: a feature card for each of the lists with how many it holds, and the chosen list (`list`, Current
+     * courses when none is named) paged and searched as the one `library` dataset. Course requests are a list only for
+     * an account that belongs to a company. A list the account does not have is refused, never replaced by another
+     * (owner, 2026-10-21: "make it a 404"). The search is offered only when the list holds LIBRARY_SEARCH_FROM entries
+     * or more, or a search is already narrowing it.
      *
      * Built here rather than in a controller because two screens show it - the standalone
-     * /account/library page and the Course Library section of the consolidated /account
-     * workspace. They previously each filtered an unbounded array in their own way, which is how
-     * the same list came to be described two different ways on two pages.
+     * /account/courses page and the My Courses section of the consolidated /account workspace.
      *
-     * @param array<string,mixed> $request  page, page size and search term per dataset
+     * @param array<string,mixed> $request  the chosen list, and the library's page, page size and search term
      * @return array<string,mixed>
      */
-    public function courseLibraryView(int $userId, array $request, callable $paginate, callable $paginationView): array
+    public function courseLibraryView(int $userId, bool $companyAccount, array $request, callable $paginate, callable $paginationView): array
     {
-        $view = [];
-
-        foreach (self::LIBRARY_DATASETS as $dataset => $definition) {
-            $search = PlatformAdministrationService::searchTerm($dataset, $request);
-            $statuses = $definition['statuses'];
-
-            $total = match ($dataset) {
-                'favourites' => $this->administration->favouritesCount($userId, $search),
-                'requests' => $this->administration->userRequestsCount($userId, $search),
-                default => $this->libraryCount($userId, (array) $statuses, $search),
-            };
-
-            /** @var Pagination $pagination */
-            $pagination = $paginate($dataset, $request, $total);
-
-            $rows = match ($dataset) {
-                'favourites' => $this->administration->favouritesPage($userId, $pagination->pageSize, $pagination->offset, $search),
-                'requests' => $this->administration->userRequestsPage($userId, $pagination->pageSize, $pagination->offset, $search),
-                default => $this->libraryPage($userId, (array) $statuses, $pagination->pageSize, $pagination->offset, $search),
-            };
-
-            $view += [$dataset => $rows, $dataset . '_search' => $search]
-                + $paginationView($dataset, $pagination, $definition['label'], $search);
+        $offered = array_intersect_key(self::LIBRARY_DATASETS, array_flip($this->libraryLists($companyAccount)));
+        $chosen = $request['list'] ?? 'current';
+        if (!is_string($chosen) || !isset($offered[$chosen])) throw new InvalidArgumentException('There is no such list of courses.');
+        $lists = [];
+        $all = 0;
+        foreach ($offered as $key => $definition) {
+            $count = $this->libraryListCount($userId, $key, '');
+            if ($key === $chosen) $all = $count;
+            $lists[] = ['value' => $key, 'label' => $definition['label'], 'note' => ($count === 0 ? 'None' : (string) $count) . ' ' . $definition['note']];
         }
+        $search = PlatformAdministrationService::searchTerm('library', $request);
+        $total = $search === '' ? $all : $this->libraryListCount($userId, $chosen, $search);
+        /** @var Pagination $pagination */
+        $pagination = $paginate('library', $request, $total);
+        $statuses = (array) self::LIBRARY_DATASETS[$chosen]['statuses'];
+        $rows = match ($chosen) {
+            'favourites' => $this->administration->favouritesPage($userId, $pagination->pageSize, $pagination->offset, $search),
+            'requests' => $this->administration->userRequestsPage($userId, $pagination->pageSize, $pagination->offset, $search),
+            default => $this->libraryPage($userId, $statuses, $pagination->pageSize, $pagination->offset, $search),
+        };
 
-        return $view;
+        return [
+            'library_list' => $chosen,
+            'library_lists' => $lists,
+            'library_rows' => $rows,
+            'library_search' => $search,
+            'library_searchable' => $all >= self::LIBRARY_SEARCH_FROM || $search !== '',
+        ] + $paginationView('library', $pagination, self::LIBRARY_DATASETS[$chosen]['label'], $search, $chosen);
+    }
+
+    /**
+     * The lists of My Courses an account has.
+     *
+     * @return list<string>
+     */
+    public function libraryLists(bool $companyAccount): array
+    {
+        return $companyAccount ? array_keys(self::LIBRARY_DATASETS) : array_values(array_diff(array_keys(self::LIBRARY_DATASETS), self::COMPANY_LISTS));
+    }
+
+    /** How many entries one of the four lists holds, narrowed by a search term. */
+    private function libraryListCount(int $userId, string $list, string $search): int
+    {
+        return match ($list) {
+            'favourites' => $this->administration->favouritesCount($userId, $search),
+            'requests' => $this->administration->userRequestsCount($userId, $search),
+            default => $this->libraryCount($userId, (array) self::LIBRARY_DATASETS[$list]['statuses'], $search),
+        };
     }
 
     /** @return list<array<string,mixed>> */
@@ -192,6 +227,10 @@ final class LearningService
         $course['remaining_access_label'] = empty($enrolment['expires_at']) ? '' : CourseItemService::duration((int) ceil(max(0, (strtotime((string) $enrolment['expires_at']) ?: time()) - time()) / 60));
         $certificate = $this->certificates->forEnrolment((int) $enrolment['id']);
         $course['certificate'] = $certificate !== null && $certificate['revoked_at'] === null ? $certificate : null;
+        // Earned but not verified (owner, 2026-10-19): the learner is told to verify to receive it.
+        $course['certificate_waiting'] = !$preview && $certificate === null && $this->awards !== null
+            && $this->awards->forLearner((int) $enrolment['id'], $userId)['state'] === 'waiting';
+        $course['certificate_waiting_message'] = \CattoLearning\Course\Certificate\CertificateAwards::VERIFY_TO_RECEIVE;
         return $course;
     }
 

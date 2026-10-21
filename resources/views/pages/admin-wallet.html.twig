@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-    {% set ph_kicker = 'Wallets' %}{% set ph_title = 'Wallet' %}{% set ph_lead = owner_name ~ ' · account reference ' ~ reference_label %}
+    {% set ph_kicker = 'Wallets' %}{% set ph_title = 'Wallet' %}{% if owner_person %}{% set ph_lead %}{{ ui('data.person', owner_person|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead = owner_name ~ ' · account reference ' ~ reference_label %}{% endif %}
     {% include '@platform/partials/page-head.html.twig' %}
     {% include '@platform/partials/commerce-wallet.html.twig' %}
 {% endblock %}

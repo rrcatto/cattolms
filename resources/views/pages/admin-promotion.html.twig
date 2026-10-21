@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_back_href = '/admin/promotions' %}{% set ph_back_label = 'Promotions' %}{% set ph_kicker = 'Credits & Orders' %}{% set ph_title = promotion ? promotion.code : 'New promotion' %}{% set ph_lead = promotion ? promotion.name ~ ' · ' ~ promotion.discount : 'A promo code purchasers can enter when they review their order at checkout.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_back_href = '/admin/promotions' %}{% set ph_back_label = 'Promotions' %}{% set ph_kicker = 'Credits & Orders' %}{% set ph_title = promotion ? promotion.code : 'New promotion' %}{% set ph_lead = promotion ? promotion.name ~ ' · ' ~ promotion.discount ~ (promotion.automatic ? ' · applies automatically' : '') : 'A promo code purchasers can enter when they review their order at checkout, or that the cart applies automatically.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section">
 {% if promotion %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
@@ -43,6 +43,7 @@
 		{% endfor %}
 	{% endblock %}{% endembed %}
 	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Active: the code can be used within its dates and limits'})} %}{% block control %}<input type="checkbox" name="active" value="1" {{ form.active ? 'checked' : '' }}>{% endblock %}{% endembed %}
+	{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Apply it automatically: purchasers need not type the code', help: 'The cart applies the promotion by itself to the courses and bundles it covers and says so, for example "' ~ (form.code ?: 'SPRING25') ~ ', applied automatically". Their pages announce it while it is active. One promotion applies to an order: when a typed code or another automatic promotion would save more, that one applies instead.'})} %}{% block control %}<input type="checkbox" name="applies_automatically" value="1" {{ form.applies_automatically ? 'checked' : '' }}>{% endblock %}{% endembed %}
 	<fieldset class="cl-promotion-courses mt-5">
 		<legend class="h6">Selected courses</legend>
 		<p class="help">Used when the promotion applies to selected courses: only those courses in a cart are discounted, and the others keep their full price. A bundle is never discounted because it contains a selected course.</p>
@@ -72,6 +73,7 @@
 {% else %}
 {{ ui('data.key-value-list', {items: [
 	{label: 'Code', value: promotion.code},
+	{label: 'How purchasers get it', value: promotion.automatic ? 'Applied automatically in the cart' : 'They type the code at checkout'},
 	{label: 'Name', value: promotion.name},
 	{label: 'Discount', value: promotion.discount},
 	{label: 'Minimum spend', value: promotion.minimum ?? 'None'},
@@ -94,7 +96,7 @@
 {% for order in usage.orders %}
 <tr>
 	<td><a href="/admin/commerce/orders/{{ order.id }}">{{ order.number }}</a></td>
-	<td>{{ order.purchaser_name }}</td>
+	<td>{{ ui('data.person', {name: order.purchaser_name, reference: order.purchaser_reference, href: '/admin/people/' ~ order.purchaser_user_id, email: order.purchaser_email|default('')}) }}</td>
 	<td>{{ order.placed_at|date('j M Y H:i') }}</td>
 	<td>{{ order.state|replace({'_': ' '})|capitalize }}</td>
 	<td>{{ order.discount_label }}</td>

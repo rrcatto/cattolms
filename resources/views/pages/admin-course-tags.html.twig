@@ -32,7 +32,7 @@
 								{% for tag in tags %}
 									<tr>
 										<td title="{{ tag.name }}">
-											{{ tag.name }}
+											{% if tag.icon_svg|default('') %}<span class="cl-tag-icon" aria-hidden="true">{{ tag.icon_svg|raw }}</span> {% endif %}{{ tag.name }}
 										</td>
 										<td>
 											{{ tag.course_count }}
@@ -41,6 +41,7 @@
 											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
 {% block body %}
 
+													{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: '/admin/courses/tags/' ~ (tag.id), aria_label: 'Edit ' ~ tag.name}) }}
 													{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/courses/tag/' ~ (tag.slug)}) }}
 													<form action="/admin/courses/tags/{{ tag.id }}/delete" method="post">
 														<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -61,7 +62,7 @@
 
 {% endblock %}
 {% endembed %}
-		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createTagModal', title: 'Create tag', action: '/admin/courses/tags', method: 'post'})} %}
+		{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'createTagModal', title: 'Create tag', action: '/admin/courses/tags', method: 'post', upload: true})} %}
 {% block modal_body %}
 
 					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
@@ -75,6 +76,7 @@
 
 {% endblock %}
 {% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Icon (an SVG file, optional)', for: 'tag-icon', help: 'Shown in the tag on course cards and pages. Without one, a lettered icon is made.'})} %}{% block control %}<input class="cl-input" type="file" id="tag-icon" name="icon" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 {% endblock %}
 {% endembed %}
 

@@ -8,15 +8,22 @@ Date time: 2026/10/07 SAST
 Version: 0.8.8.10
 
 Description:
-Development-only fixture for certificates.cjs: an ADMIN, two learners with the names they print on
-certificates, and a published course that gives certificates, drawn in the default design, with a
+Development-only fixture for certificates.cjs: an ADMIN, two learners, and a published course that gives certificates, drawn in the default design, with a
 one-question final assessment both learners have started. It records the default design and the
 highest template id. `cleanup` removes the course, its enrolments and certificates and the people,
 makes the recorded design the default again, and deletes the designs the run made the way the
 Certificate designs page does (archived and renamed). Published versions and stored pictures are
 immutable history and stay; the development database is disposable, and a reset removes them.
 
+A certificate is issued only to a verified account, in the verified name (owner, 2026-10-19). The first
+learner is verified when the fixture is made and the second when the check asks (`verify second`): there
+are no Didit keys on a development machine, so the fixture stands in for Didit's answer and gives it to
+IdentityVerificationService::apply, the service Didit's webhook and the learner's return use.
+
 Changelog:
+2026/10/19 SAST
+- Learners are verified (the first at once, the second on request) instead of having a certificate name;
+  cleanup removes transcripts before their certificates.
 2026/10/07 SAST
 - Rewritten for certificate designs: no signatory or wording on the course, the run's designs are
   deleted rather than template drafts discarded.
@@ -28,10 +35,13 @@ declare(strict_types=1);
 use CattoLearning\Application\CliBootstrap;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Course\LearningService;
+use CattoLearning\Identity\IdentityVerificationRepository;
+use CattoLearning\Identity\IdentityVerificationService;
 use CattoLearning\Infrastructure\Persistence\AuthSessionRepository;
 use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\RoleRepository;
 use CattoLearning\Support\Token;
+use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\DevelopmentFixture;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
@@ -48,14 +58,23 @@ $session = static function (int $id, string $email) use ($container): string {
     return $token;
 };
 // One sign-in per browser context, as a person using several browsers has.
-$person = static function (string $key, string $name, string $role, string $suffix, int $sessions = 1) use ($fixture, $container, $session, $db): array {
+$person = static function (string $key, string $name, string $role, string $suffix, int $sessions = 1) use ($fixture, $container, $session): array {
     $email = 'certificates-browser-' . $key . '-' . $suffix . '@example.test';
     $id = $fixture->createUser($name, $email);
-    $db->executeStatement('UPDATE users SET certificate_name = :name WHERE id = :id', ['name' => $name, 'id' => $id]);
     $container->get(RoleRepository::class)->assign($id, $role);
     $tokens = [];
     for ($i = 0; $i < $sessions; $i++) $tokens[] = $session($id, $email);
     return ['id' => $id, 'token' => $tokens[0], 'tokens' => $tokens];
+};
+
+// Didit's answer for a learner's check: approved, with the name on their identity document.
+$verify = static function (int $userId, string $first, string $last) use ($container): void {
+    $sessionId = Uuid::v4();
+    $container->get(IdentityVerificationRepository::class)->create($userId, $sessionId);
+    $container->get(IdentityVerificationService::class)->apply($sessionId, 'Approved', ['status' => 'Approved', 'id_verifications' => [[
+        'status' => 'Approved', 'document_type' => 'Identity Card', 'document_number' => '9001010000000', 'first_name' => $first, 'last_name' => $last,
+        'date_of_birth' => '1990-01-01', 'issuing_state' => 'ZAF', 'issuing_state_name' => 'South Africa', 'warnings' => [],
+    ]]]);
 };
 
 if ($action === 'create') {
@@ -77,6 +96,7 @@ if ($action === 'create') {
         $container->get(CourseService::class)->grantToPerson($course, $learner['id'], 365, $admin['id']);
         $container->get(LearningService::class)->start($learner['id'], $slug);
     }
+    $verify($first['id'], 'Lerato Browser', 'Mokoena');
     $state = ['suffix' => $suffix, 'slug' => $slug, 'course' => $course, 'course_title' => $title, 'company' => $company,
         'assessment' => '/learn/' . $slug . '/item/' . $final['node_id'] . '/assessment/' . $final['key'],
         'admin_id' => $admin['id'], 'admin_tokens' => $admin['tokens'],
@@ -86,11 +106,16 @@ if ($action === 'create') {
     file_put_contents($statePath, json_encode($state, JSON_THROW_ON_ERROR));
     chmod($statePath, 0600);
     echo "Created the certificates fixture.\n";
+} elseif ($action === 'verify') {
+    $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
+    $verify((int) $state['second_id'], 'Pieter Browser', 'van Wyk');
+    echo "Verified the second learner.\n";
 } elseif ($action === 'cleanup') {
     if (!is_file($statePath)) exit(0);
     $state = json_decode((string) file_get_contents($statePath), true, 512, JSON_THROW_ON_ERROR);
     if (!str_starts_with((string) $state['slug'], 'certificates-browser-')) throw new RuntimeException('Unexpected fixture course.');
     $db->beginTransaction();
+    $db->executeStatement('DELETE FROM transcripts WHERE certificate_id IN (SELECT cert.id FROM certificates cert JOIN course_enrolments ce ON ce.id = cert.enrolment_id WHERE ce.course_id = :c)', ['c' => $state['course']]);
     $db->executeStatement('DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id = :c)', ['c' => $state['course']]);
     $db->executeStatement('DELETE FROM analytics_events WHERE course_id = :c', ['c' => $state['course']]);
     $db->executeStatement('DELETE FROM course_enrolments WHERE course_id = :c', ['c' => $state['course']]);
@@ -109,12 +134,14 @@ if ($action === 'create') {
         foreach (['auth_sessions', 'audit_log', 'analytics_events', 'user_roles', 'user_emails'] as $table) {
             $db->executeStatement('DELETE FROM ' . $table . ' WHERE user_id = :id', ['id' => $state[$key]]);
         }
+        // The identity checks' Activity log entries name the learner in their details, not as the actor.
+        $db->executeStatement("DELETE FROM audit_log WHERE metadata->>'user_id' = :id", ['id' => (string) $state[$key]]);
         $db->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $state[$key]]);
     }
     $db->commit();
     unlink($statePath);
     echo "Removed the certificates fixture, restored the default design and deleted the run's designs.\n";
 } else {
-    fwrite(STDERR, "Usage: php tests/Browser/certificates-fixture.php create|cleanup [state.json]\n");
+    fwrite(STDERR, "Usage: php tests/Browser/certificates-fixture.php create|verify|cleanup [state.json]\n");
     exit(1);
 }

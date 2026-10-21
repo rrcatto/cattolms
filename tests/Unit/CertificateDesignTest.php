@@ -21,6 +21,10 @@ Architectural boundary: unit. Stored images are read through a stand-in database
 installed looks' backgrounds (Tests\Support\ImageFileDatabase).
 
 Changelog:
+2026/10/19 SAST
+- A certificate proves that the learner took the course, never that they passed (owner, 2026-10-19):
+  no Result or Grade field, no result line in the starter wording, no "successfully", and the learner's
+  name is the verified name the issuer passes in (learnerName() is gone with certificate_name).
 2026/10/08 SAST
 - A signature picture of any shape fits every look, centred on the line; uploads are trimmed and lose their paper.
 2026/10/07 SAST
@@ -35,6 +39,7 @@ use CattoLearning\Course\Certificate\CertificateDesign;
 use CattoLearning\Course\Certificate\CertificateDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
 use CattoLearning\Course\Certificate\CertificateImage;
+use CattoLearning\Course\Certificate\CertificateAddress;
 use CattoLearning\Course\Certificate\CertificateIssuer;
 use CattoLearning\Course\Certificate\CertificateLooks;
 use CattoLearning\Course\Certificate\CertificateWording;
@@ -115,11 +120,18 @@ final class CertificateDesignTest extends TestCase
     {
         $stored = '<p class="cert-caps">' . CertificateWording::chip('course.provider') . '</p><p class="cert-title">Certificate</p>'
             . '<p>{{ learner.password }} {% include x %} ' . CertificateWording::chip('learner.name') . '</p>'
-            . '<p>with ' . CertificateWording::chip('result.percentage') . ' (' . CertificateWording::chip('result.grade') . ')</p>';
+            . '<p>with ' . CertificateWording::chip('course.accreditation') . ' (' . CertificateWording::chip('certificate.verification_url') . ')</p>';
         [$head, $main] = CertificateWording::toTemplateParts($stored);
         self::assertSame('{{#if course.provider}}<p class="cert-caps">{{ course.provider }}</p>{{/if}}<p class="cert-title">Certificate</p>', $head);
         self::assertStringContainsString('<p>&#123;&#123; learner.password &#125;&#125; &#123;% include x %&#125; {{ learner.name }}</p>', $main, 'Typed braces are text, never template syntax.');
-        self::assertStringContainsString('{{#if result.percentage}}{{#if result.grade}}<p>with {{ result.percentage }} ({{ result.grade }})</p>{{/if}}{{/if}}', $main);
+        self::assertStringContainsString('{{#if course.accreditation}}{{#if certificate.verification_url}}<p>with {{ course.accreditation }} ({{ certificate.verification_url }})</p>{{/if}}{{/if}}', $main);
+        self::assertArrayNotHasKey('result.percentage', CertificateWording::FIELDS, 'A certificate never shows a mark.');
+        self::assertArrayNotHasKey('result.grade', CertificateWording::FIELDS, 'A certificate never shows a grade.');
+        foreach (\CattoLearning\Course\Certificate\CertificateLooks::installed() as $key => $look) {
+            $wording = \CattoLearning\Course\Certificate\CertificateLooks::defaultWording($key);
+            self::assertStringNotContainsString('result.', $wording, $key . ' prints no result.');
+            self::assertStringNotContainsStringIgnoringCase('successfully', $wording, $key . ' never says the learner passed.');
+        }
         (new TemplateValidator(new PlaceholderRegistry()))->validate(DocumentType::Certificate, $head . $main, '');
         self::assertSame(['', '<p>Only ' . '{{ learner.name }}</p>'], CertificateWording::toTemplateParts('<p>Only ' . CertificateWording::chip('learner.name') . '</p>'));
     }
@@ -207,7 +219,7 @@ final class CertificateDesignTest extends TestCase
     public function testLinesWithoutAValueAreLeftOut(): void
     {
         $data = DocumentSampleData::for(DocumentType::Certificate);
-        foreach (['result.percentage', 'result.grade', 'course.accreditation', 'course.provider', 'certificate.verification_url'] as $optional) {
+        foreach (['course.accreditation', 'course.provider', 'certificate.verification_url'] as $optional) {
             $data[$optional] = null;
         }
         [, , $body] = $this->draw($this->compiler->compile(CertificateDesign::starter('legal-seal')), $data);
@@ -285,17 +297,26 @@ final class CertificateDesignTest extends TestCase
     public function testTheDataBuilderAndCertificateNumberKeepTheirRules(): void
     {
         $data = CertificateDocumentDataBuilder::assemble(['business.name' => 'Catto Learning'],
-            ['title' => 'Fire Safety', 'certificate_accreditation' => ' ', 'overall_percentage' => '84.5', 'grade_code' => ''],
+            ['title' => 'Fire Safety', 'certificate_accreditation' => ' ', 'overall_percentage' => '84.5', 'grade_code' => 'A'],
             'Lerato Dlamini', '', 'CL-2026-ABC', null, '2026-10-07T10:00:00+02:00', '2026-10-06T09:00:00+02:00');
-        self::assertSame('84.50', $data['result.percentage']);
-        foreach (['course.accreditation', 'result.grade', 'course.provider', 'certificate.verification_url'] as $absent) {
+        self::assertSame('Lerato Dlamini', $data['learner.name'], 'The name the issuer passes in: the verified name.');
+        self::assertArrayNotHasKey('result.percentage', $data, 'A certificate carries no mark, whatever the result.');
+        self::assertArrayNotHasKey('result.grade', $data, 'A certificate carries no grade, whatever the result.');
+        foreach (['course.accreditation', 'course.provider', 'certificate.verification_url'] as $absent) {
             self::assertNull($data[$absent], $absent);
         }
         self::assertArrayNotHasKey('certificate.title', $data);
-        self::assertSame('Thandi', CertificateDocumentDataBuilder::learnerName(['certificate_name' => ' ', 'display_name' => 'Thandi']));
-        $publicId = '9141c30f-7167-4abc-8def-0123456789ab';
-        self::assertSame('CL-2026-9141C30F7167', CertificateIssuer::number($publicId, new \DateTimeImmutable('2026-10-07 10:00', new DateTimeZone('Africa/Johannesburg'))));
-        self::assertSame('CL-2025-9141C30F7167', CertificateIssuer::number($publicId, new \DateTimeImmutable('2026-01-01 00:30', new DateTimeZone('Africa/Johannesburg'))), 'The year is the UTC year.');
+        // The number's digits are its own random ones, never the address's (owner, 2026-10-19).
+        $serial = '9141c30f7167';
+        self::assertSame('CL-2026-9141C30F7167', CertificateIssuer::number($serial, new \DateTimeImmutable('2026-10-07 10:00', new DateTimeZone('Africa/Johannesburg'))));
+        self::assertSame('CL-2025-9141C30F7167', CertificateIssuer::number($serial, new \DateTimeImmutable('2026-01-01 00:30', new DateTimeZone('Africa/Johannesburg'))), 'The year is the UTC year.');
+        $code = CertificateAddress::generate();
+        self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $code);
+        self::assertNotSame($code, CertificateAddress::generate(), 'Every address is new.');
+        self::assertTrue(CertificateAddress::isValid($code));
+        foreach (['9141c30f-7167-4abc-8def-0123456789ab', strtoupper($code), substr($code, 1), $code . "\n", $code . 'a'] as $invalid) {
+            self::assertFalse(CertificateAddress::isValid($invalid), $invalid);
+        }
     }
 
     public function testTheOldCertificateRendererIsGone(): void

@@ -83,6 +83,10 @@ if ($action === 'create') {
     $ids = '{' . implode(',', array_map('intval', $users)) . '}';
     $db->executeStatement('DELETE FROM auth_sessions WHERE user_id = ANY(CAST(:ids AS BIGINT[]))', ['ids' => $ids]);
     $db->executeStatement('DELETE FROM commerce_carts WHERE user_id = ANY(CAST(:ids AS BIGINT[])) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.cart_id = commerce_carts.id)', ['ids' => $ids]);
+    // An automatic promotion the check made applies to every cart while it is active: whatever an order
+    // keeps of it, it is switched off (owner, 2026-10-20).
+    $db->executeStatement('UPDATE promotions p SET active = FALSE WHERE p.applies_automatically AND (p.code LIKE :suffix OR p.created_by = ANY(CAST(:ids AS BIGINT[])))',
+        ['suffix' => '%' . strtoupper($state['suffix']) . '%', 'ids' => $ids]);
     // The fixture's promotions and any the ADMIN pass created, unless an order used them.
     $db->executeStatement('DELETE FROM promotions p WHERE (p.code LIKE :suffix OR p.created_by = ANY(CAST(:ids AS BIGINT[]))) AND NOT EXISTS (SELECT 1 FROM commerce_orders o WHERE o.promotion_id = p.id)',
         ['suffix' => '%' . strtoupper($state['suffix']) . '%', 'ids' => $ids]);

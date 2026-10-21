@@ -52,9 +52,21 @@ final class SymfonyKernelRouteTest extends TestCase
 
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame('v1', $payload['data']['api_version'] ?? null);
-        self::assertSame('0.9.5', $payload['data']['application_version'] ?? null);
+        self::assertSame('0.9.6', $payload['data']['application_version'] ?? null);
         self::assertSame('Bearer token', $payload['data']['authentication'] ?? null);
         self::assertNotSame('', (string) ($payload['data']['name'] ?? ''));
+    }
+
+    /** Every page names the full release that made it (owner, 2026-10-20: "I want the FULL FUCKING VERSION NUMBER ON EACH PAGE"). */
+    public function testEveryPageNamesTheFullReleaseThatMadeIt(): void
+    {
+        $composer = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+        self::assertMatchesRegularExpression('/^[0-9]+\.[0-9]+\.[0-9]+/', (string) $composer['version']);
+        self::assertSame((string) $composer['version'], \CattoLearning\Support\AppVersion::current());
+        foreach (['/', '/courses', '/terms'] as $path) {
+            $html = (string) $this->kernelResponse(Request::create($path))->getContent();
+            self::assertStringContainsString('<meta name="generator" content="CattoLMS v' . $composer['version'] . '">', $html, $path);
+        }
     }
 
     public function testEveryKernelResponseCarriesThePlatformHeaders(): void

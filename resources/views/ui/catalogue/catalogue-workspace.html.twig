@@ -7,6 +7,26 @@
 			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
 				{% block surface_body %}
 					{{ ui('layout.section-head', {heading: workspace.heading, summary: workspace.summary}) }}
+					{# Where the reader is in the category tree (owner, 2026-10-19): a light trail up to All courses. The
+					   categories beneath are short feature cards, four to a row (owner, 2026-10-20): choosing one opens it at
+					   once with JavaScript (data-choose-submits), or with Show courses without it. The next page opens with
+					   the cards where they were on the screen (data-keep-scroll), not at the top. #}
+					{% set navigation = workspace.navigation|default({trail: [], label: '', subcategories: []}) %}
+					{% if navigation.trail or navigation.subcategories %}
+						<div class="cl-catalogue-nav" data-keep-scroll>
+							{{ ui('layout.breadcrumb', {items: navigation.trail, aria_label: 'Category path'}) }}
+							{% if navigation.subcategories %}
+								{% set category_cards = [] %}
+								{% for sub in navigation.subcategories %}
+									{% set category_cards = category_cards|merge([sub.description ? {value: sub.id, label: sub.label, icon: sub.icon, note: sub.description} : {value: sub.id, label: sub.label, icon: sub.icon}]) %}
+								{% endfor %}
+								<form class="cl-catalogue-categories" method="get" action="/courses" data-choose-submits>
+									{{ ui('form.picture-choice', {name: 'category', legend: navigation.label, id: 'catalogue-categories', size: 'small', columns: 4, items: category_cards}) }}
+									<noscript>{{ ui('action.button', {label: 'Show courses', variant: 'secondary', size: 'small', type: 'submit'}) }}</noscript>
+								</form>
+							{% endif %}
+						</div>
+					{% endif %}
 					{% if workspace.paginated %}{% include '@platform/partials/pagination.html.twig' with {pg: catalogue_pagination, pg_position: 'top'} %}{% endif %}
 					{% if courses %}
 						{{ ui('catalogue.course-grid', {courses: courses}) }}

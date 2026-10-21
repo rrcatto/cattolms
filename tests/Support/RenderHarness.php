@@ -322,25 +322,34 @@ final class RenderHarness
             'courses' => [[
                 'id' => 1, 'title' => 'T', 'slug' => 't', 'status' => 'draft', 'category_name' => 'Cat',
                 'module_count' => 1, 'question_count' => 0, 'owner_company_name' => 'C',
-                'owner_person_name' => 'A', 'editor_count' => 0, 'learner_count' => 0,
+                'owner_person_name' => 'A', 'owner_user_id' => 1, 'owner_person_reference' => 'CL202601010001K', 'editor_count' => 0, 'learner_count' => 0,
                 'started_count' => 0, 'revision_number' => 1, 'updated_at' => '2026-01-01',
                 'public_id' => 'c1', 'summary' => '', 'subtitle' => '', 'level' => '',
+                'price' => ['price_label' => 'R 1 200,00', 'was_label' => 'R 1 800,00', 'saving_label' => 'R 600,00 (33%)', 'saving_percent' => 33, 'period_label' => '1 year'],
+            ], [
+                'id' => 2, 'title' => 'U', 'slug' => 'u', 'status' => 'draft', 'category_name' => 'Cat',
+                'module_count' => 1, 'question_count' => 0, 'owner_company_name' => 'C',
+                'owner_person_name' => 'A', 'owner_user_id' => null, 'owner_person_reference' => null, 'editor_count' => 0, 'learner_count' => 0,
+                'started_count' => 0, 'revision_number' => 1, 'updated_at' => '2026-01-01',
+                'public_id' => 'c2', 'summary' => '', 'subtitle' => '', 'level' => '', 'price' => null,
             ]],
             'enrolments' => [[
                 'id' => 1, 'public_id' => 'e1', 'status' => 'active', 'learner_name' => 'A',
                 'email' => 'a@b.c', 'course_title' => 'T', 'progress_percentage' => 0,
+                // Who the learner is (owner, 2026-10-21: a person is named with their account reference, linked to their account).
+                'user_id' => 1, 'learner_reference' => 'CL202601010001K',
             ]],
             'requests' => [[
                 'id' => 1, 'public_id' => 'r1', 'learner_name' => 'A', 'course_title' => 'T',
                 'company_name' => 'C', 'status' => 'pending', 'requested_at' => '2026-01-01',
                 'slug' => 't', 'email' => 'a@b.c', 'note' => '', 'decided_at' => null,
                 'decision_note' => '', 'access_period_seconds' => 31536000, 'course_id' => 1,
-                'user_id' => 1, 'company_id' => 1,
+                'user_id' => 1, 'company_id' => 1, 'learner_reference' => 'CL202601010001K',
                 // The readable status, as PlatformAdministrationService::normaliseRequests() adds it.
                 'status_label' => 'Pending', 'status_tone' => 'warning', 'awaiting_payment' => false,
             ]],
             'credits' => [[
-                'id' => 1, 'public_id' => 'cr1', 'holder_name' => 'C', 'course_title' => 'T',
+                'id' => 1, 'public_id' => 'cr1', 'holder_name' => 'C', 'company_id' => 1, 'user_id' => null, 'holder_reference' => null, 'course_title' => 'T',
                 'quantity' => 1, 'assigned_count' => 0, 'consumed_count' => 0, 'available_count' => 1,
                 'access_period_seconds' => 31536000, 'access_period_label' => '12 months',
                 'source_type' => 'administrator', 'note' => '', 'created_at' => '2026-01-01',

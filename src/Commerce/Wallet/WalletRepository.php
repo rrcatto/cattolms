@@ -264,10 +264,11 @@ final class WalletRepository
     {
         return $this->db->fetchAllAssociative(
             "SELECT w.id, w.owner_user_id, w.owner_company_id, w.currency,
-                    COALESCE(u.display_name, c.name) AS owner_name, COALESCE(u.account_reference, c.account_reference) AS account_reference,
+                    COALESCE(u.display_name, c.name) AS owner_name, COALESCE(u.account_reference, c.account_reference) AS account_reference, ue.email AS owner_email,
                     (SELECT COALESCE(SUM(l.amount_minor), 0) FROM commerce_wallet_lots l WHERE l.wallet_id = w.id)
                       - (SELECT COALESCE(SUM(a.amount_minor), 0) FROM commerce_wallet_allocations a JOIN commerce_wallet_lots l ON l.id = a.lot_id WHERE l.wallet_id = w.id) AS balance_minor
                FROM commerce_wallets w LEFT JOIN users u ON u.id = w.owner_user_id LEFT JOIN companies c ON c.id = w.owner_company_id
+               LEFT JOIN user_emails ue ON ue.user_id = w.owner_user_id AND ue.is_primary
               WHERE (:search = '' OR COALESCE(u.display_name, c.name) ILIKE :like OR COALESCE(u.account_reference, c.account_reference) ILIKE :like)
               ORDER BY balance_minor DESC, w.id LIMIT " . max(1, $limit) . ' OFFSET ' . max(0, $offset),
             ['search' => $search, 'like' => '%' . $search . '%']

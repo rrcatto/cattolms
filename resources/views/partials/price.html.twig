@@ -1,0 +1,9 @@
+{#
+	A price, and the higher was price it is marked down from when it has one (owner, 2026-10-20): the was
+	price struck through before the price, and, with price_saving, what the purchaser saves. Only the price
+	is ever charged. price holds price_label and, from Support\WasPrice::labels(), was_label and
+	saving_label.
+#}
+{% set price_saving = price_saving|default(false) %}
+{% set price_was = price.was_label|default(null) %}
+<span class="cl-price{% if price_was %} cl-price--marked-down{% endif %}">{% if price_was %}<s class="cl-price-was"><span class="visually-hidden">Was </span>{{ price_was }}</s> <span class="visually-hidden">now </span>{% endif %}<span class="cl-price-now">{{ price.price_label }}</span>{% if price_was and price_saving and price.saving_label|default(null) %} <span class="cl-price-saving">Save {{ price.saving_label }}</span>{% endif %}</span>

@@ -345,6 +345,7 @@ SELECT
     u.status,
     u.created_at,
     u.last_login_at,
+    u.account_reference,
     ue.email,
     c.id AS company_id,
     c.name AS company_name,
@@ -686,7 +687,7 @@ SQL;
         $detail = 'SELECT ce.id, ce.public_id, ce.status, ce.assigned_at, ce.started_at, ce.expires_at, ce.completed_at,
                     ce.access_removed_at, ce.access_removed_reason,
                     c.id AS course_id, c.title AS course_title, c.slug,
-                    u.id AS user_id, COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
+                    u.id AS user_id, COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email,
                     assessment_progress.submitted_assessment_count,
                     assessment_progress.assessment_count
@@ -747,7 +748,7 @@ SQL;
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE' . $where;
 
         $detail = 'SELECT cr.*, c.title AS course_title, c.slug,
-                    COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
+                    COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email, co.name AS company_name
              FROM page
              JOIN course_requests cr ON cr.id=page.id
@@ -827,6 +828,7 @@ SQL;
                     cc.quantity, cc.refunded_quantity, cc.source_type, cc.note, cc.created_at,
                     c.title AS course_title,
                     COALESCE(co.name, NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS holder_name,
+                    u.account_reference AS holder_reference,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'assigned\')::int AS assigned_count,
                     COUNT(cca.id) FILTER (WHERE cca.status=\'consumed\')::int AS consumed_count,
                     GREATEST(cc.quantity - cc.refunded_quantity - COUNT(cca.id) FILTER (WHERE cca.status IN (\'assigned\',\'consumed\')),0)::int AS available_count
@@ -837,7 +839,7 @@ SQL;
              LEFT JOIN users u ON u.id=cc.user_id
              LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              LEFT JOIN course_credit_allocations cca ON cca.credit_id=cc.id
-             GROUP BY cc.id,c.title,co.name,u.first_name,u.last_name,u.display_name,ue.email';
+             GROUP BY cc.id,c.title,co.name,u.first_name,u.last_name,u.display_name,u.account_reference,ue.email';
 
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
@@ -885,11 +887,10 @@ SQL;
              JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
              WHERE cu.company_id=:company_id AND cu.status=\'active\'' . '' . $match;
 
-        // certificate_name and mobile_number are selected because the Company People editor
-        // offers them. A template that reads a column the query never selected is an
+        // mobile_number is selected because the Company People editor offers it. A template that reads a column the query never selected is an
         // undefined-variable 500, not a blank field.
-        $detail = 'SELECT u.id,u.public_id,u.first_name,u.middle_names,u.last_name,u.display_name,u.status,u.last_login_at,
-                    u.certificate_name,u.mobile_number,
+        $detail = 'SELECT u.id,u.public_id,u.first_name,u.middle_names,u.last_name,u.display_name,u.status,u.last_login_at,u.account_reference,
+                    u.mobile_number,
                     ue.email,cu.company_role,
                     COALESCE(string_agg(DISTINCT r.role_key,\',\' ORDER BY r.role_key),\'\') AS role_keys,
                     COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN (\'assigned\',\'active\',\'completed\'))::int AS course_count
@@ -905,6 +906,67 @@ SQL;
         return $this->db->fetchAllAssociative(
             PageQuery::deferred($keys, $detail, $order, $limit, $offset),
             ['company_id' => $companyId] + $bindings
+        );
+    }
+
+    /**
+     * One active member of a company, for the Company workspace's person page (owner, 2026-10-21): the same row the
+     * People list shows, or null when they are not a member of that company.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function companyPerson(int $companyId, int $userId): ?array
+    {
+        $row = $this->db->fetchAssociative(
+            'SELECT u.id,u.public_id,u.first_name,u.middle_names,u.last_name,u.display_name,u.status,u.last_login_at,u.account_reference,
+                    u.mobile_number,u.created_at,ue.email,cu.company_role,cu.created_at AS member_since,
+                    COALESCE(string_agg(DISTINCT r.role_key,\',\' ORDER BY r.role_key),\'\') AS role_keys,
+                    COUNT(DISTINCT ce.id) FILTER (WHERE ce.status IN (\'assigned\',\'active\',\'completed\'))::int AS course_count
+             FROM users u
+             JOIN company_users cu ON cu.user_id=u.id AND cu.company_id=:company_id AND cu.status=\'active\'
+             JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
+             LEFT JOIN user_roles ur ON ur.user_id=u.id
+             LEFT JOIN roles r ON r.id=ur.role_id
+             LEFT JOIN course_enrolments ce ON ce.user_id=u.id AND ce.is_preview=FALSE
+             WHERE u.id=:user_id
+             GROUP BY u.id,ue.email,cu.company_role,cu.created_at',
+            ['company_id' => $companyId, 'user_id' => $userId]
+        );
+        return $row === false ? null : $row;
+    }
+
+    /**
+     * A company member's courses, newest first, with their progress.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function companyPersonEnrolments(int $companyId, int $userId): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT ce.id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,ce.access_removed_at,
+                    c.id AS course_id,c.title AS course_title,c.slug,
+                    assessment_progress.submitted_assessment_count,assessment_progress.assessment_count
+             FROM course_enrolments ce
+             JOIN company_users cu ON cu.user_id=ce.user_id AND cu.company_id=:company_id AND cu.status=\'active\'
+             JOIN courses c ON c.id=ce.course_id'
+             . \CattoLearning\Course\CourseItemRepository::assessmentProgressJoin() .
+            ' WHERE ce.user_id=:user_id AND ce.is_preview=FALSE ORDER BY ce.assigned_at DESC, ce.id DESC',
+            ['company_id' => $companyId, 'user_id' => $userId]
+        );
+    }
+
+    /**
+     * The course requests a company member sent to that company, newest first.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function companyPersonRequests(int $companyId, int $userId): array
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT cr.id,cr.status,cr.requested_at,cr.decided_at,cr.learner_note,cr.decision_note,c.title AS course_title,c.slug
+             FROM course_requests cr JOIN courses c ON c.id=cr.course_id
+             WHERE cr.company_id=:company_id AND cr.user_id=:user_id ORDER BY cr.requested_at DESC, cr.id DESC',
+            ['company_id' => $companyId, 'user_id' => $userId]
         );
     }
 
@@ -944,7 +1006,7 @@ SQL;
              WHERE cr.company_id=:company_id' . '' . $match;
 
         $detail = 'SELECT cr.*,c.title AS course_title,c.slug,
-                    COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
+                    COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email
              FROM page
              JOIN course_requests cr ON cr.id=page.id
@@ -991,7 +1053,7 @@ SQL;
 
         $detail = 'SELECT ce.id,ce.public_id,ce.status,ce.assigned_at,ce.started_at,ce.expires_at,ce.completed_at,
                     ce.access_removed_at,ce.access_removed_reason,c.id AS course_id,c.title AS course_title,c.slug,
-                    u.id AS user_id,COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name,
+                    u.id AS user_id,COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS learner_name, u.account_reference AS learner_reference,
                     ue.email,
                     assessment_progress.submitted_assessment_count,
                     assessment_progress.assessment_count
@@ -1223,6 +1285,7 @@ SQL;
 SELECT al.id, al.event_key, al.metadata, al.created_at, al.user_id AS actor_user_id,
        COALESCE(host(al.ip_address), '') AS ip_address,
        COALESCE(NULLIF(trim(concat_ws(' ',u.first_name,u.last_name)),''),u.display_name,ue.email,'System') AS actor_name,
+       u.account_reference AS actor_reference,
        COALESCE(
            (SELECT c.title FROM courses c WHERE c.id::text=al.metadata->>'course_id' LIMIT 1),
            (SELECT c.title FROM course_enrolments ce JOIN courses c ON c.id=ce.course_id WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1),
@@ -1235,15 +1298,23 @@ SELECT al.id, al.event_key, al.metadata, al.created_at, al.user_id AS actor_user
            (SELECT co.name FROM course_enrolments ce JOIN company_users cu ON cu.user_id=ce.user_id AND cu.status='active' JOIN companies co ON co.id=cu.company_id WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1),
            (SELECT co.name FROM company_users cu JOIN companies co ON co.id=cu.company_id WHERE cu.user_id=al.user_id AND cu.status='active' LIMIT 1)
        ) AS company_name,
-       COALESCE(
-           (SELECT COALESCE(NULLIF(trim(concat_ws(' ',tu.first_name,tu.last_name)),''),tu.display_name,te.email) FROM users tu LEFT JOIN user_emails te ON te.user_id=tu.id AND te.is_primary=TRUE WHERE tu.id::text=al.metadata->>'user_id' LIMIT 1),
-           (SELECT COALESCE(NULLIF(trim(concat_ws(' ',eu.first_name,eu.last_name)),''),eu.display_name,ee.email) FROM course_enrolments ce JOIN users eu ON eu.id=ce.user_id LEFT JOIN user_emails ee ON ee.user_id=eu.id AND ee.is_primary=TRUE WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1)
-       ) AS subject_user_name,
+       subject.name AS subject_user_name, subject.id AS subject_user_id, subject.account_reference AS subject_user_reference,
        split_part(al.event_key,'.',1) AS event_family
 FROM page
 JOIN audit_log al ON al.id=page.id
 LEFT JOIN users u ON u.id=al.user_id
 LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary=TRUE
+-- The person an entry is about (owner, 2026-10-21: every person named is linked to their account, with their
+-- account reference): the user the metadata names, else the learner of the enrolment it names.
+LEFT JOIN LATERAL (
+    SELECT su.id, su.account_reference, COALESCE(NULLIF(trim(concat_ws(' ',su.first_name,su.last_name)),''),su.display_name,se.email) AS name
+    FROM users su LEFT JOIN user_emails se ON se.user_id=su.id AND se.is_primary=TRUE
+    WHERE su.id = COALESCE(
+        (SELECT tu.id FROM users tu WHERE tu.id::text=al.metadata->>'user_id' LIMIT 1),
+        (SELECT ce.user_id FROM course_enrolments ce WHERE ce.id::text=al.metadata->>'enrolment_id' LIMIT 1)
+    )
+    LIMIT 1
+) subject ON TRUE
 SQL;
 
         if ($where !== []) {

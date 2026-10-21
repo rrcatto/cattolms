@@ -7,10 +7,14 @@ namespace CattoLearning\Tests\Support;
 use CattoLearning\View\Twig\TwigFactory;
 use CattoLearning\View\Twig\ThemeTemplates;
 
-/** Renders bundled theme shells with isolated presentation data for structural contracts. */
+/**
+ * Renders bundled theme shells with isolated presentation data for structural contracts. Given a page of
+ * the sign-in family ($authPage: login, login-sent, register, company-register), it renders that family's
+ * wrapper when the theme has one, with page.name set as ThemeRenderer sets it.
+ */
 final class CanonicalPageFixture
 {
-    public static function render(string $slug, bool $authenticated): string
+    public static function render(string $slug, bool $authenticated, ?string $authPage = null): string
     {
         $root = dirname(__DIR__, 2);
         $loader = TwigFactory::loader($root);
@@ -30,9 +34,10 @@ final class CanonicalPageFixture
             $navigation[] = $item('signin', '/login');
         }
         $layout = is_file($paths[0] . '/pages/content.html.twig') ? '@theme/pages/content.html.twig' : '@theme/base.html.twig';
+        if ($authPage !== null && is_file($paths[0] . '/pages/auth.html.twig')) $layout = '@theme/pages/auth.html.twig';
         return $twig->createTemplate("{% extends layout %}{% block page_body %}{% include '@platform/partials/page-head.html.twig' %}<section class=\"cl-page-section\" aria-label=\"Learning guide\">{{ ui('feedback.empty', {heading: 'Learning', summary: 'Course content'}) }}</section>{% endblock %}")->render([
             'layout' => $layout, 'title' => 'Help', 'app_name' => 'Catto', 'body_class' => '',
-            'page' => ['title' => 'Help', 'subtitle' => 'Learning', 'type' => 'content', 'body_class' => ''],
+            'page' => ['title' => 'Help', 'subtitle' => 'Learning', 'type' => $authPage === null ? 'content' : 'auth', 'name' => $authPage ?? 'help', 'body_class' => ''],
             'app' => ['name' => 'Catto', 'base_url' => '/'],
             'platform' => ['styles' => [], 'scripts' => [], 'icon_sprite' => '/img/nav-icons.svg'],
             'theme' => ['name' => $slug, 'slug' => $slug, 'version' => '2.0.0', 'asset_url' => '/theme', 'styles' => [], 'scripts' => [], 'external_styles' => [], 'external_scripts' => []],

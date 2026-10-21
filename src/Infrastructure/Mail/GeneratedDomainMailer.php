@@ -90,9 +90,14 @@ final class GeneratedDomainMailer implements MailerInterface
      * The contact form's address identifies who wrote in, and the message goes to the platform.
      * Rewriting it would corrupt the reply-to of a genuine enquiry.
      */
-    public function sendContactMessage(string $name, string $email, string $subject, string $message): void
+    public function sendContactMessage(array $message): void
     {
-        $this->mailer->sendContactMessage($name, $email, $subject, $message);
+        $this->mailer->sendContactMessage($message);
+    }
+
+    public function sendContactAcknowledgement(string $email, string $reference, string $reason): void
+    {
+        $this->mailer->sendContactAcknowledgement($this->router->deliveryAddress($email), $reference, $reason);
     }
 
     public function sendOrderConfirmation(string $email, array $order, array $receipts): void

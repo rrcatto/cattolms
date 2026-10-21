@@ -115,9 +115,8 @@ final class CourseCertificateController extends BaseController
         if ($design === null) {
             throw $this->notFound('That certificate design does not exist.');
         }
-        $profile = $this->auth->profile($userId);
-        $learner = CertificateDocumentDataBuilder::learnerName((array) $profile + ['display_name' => 'Sample Learner']);
-        $data = $this->data->forPreview(['certificate_accreditation' => $accreditation] + $course, $learner);
+        // A preview names a sample learner: an issued certificate carries the learner's verified name.
+        $data = $this->data->forPreview(['certificate_accreditation' => $accreditation] + $course, 'Sample Learner');
         $document = $this->renderer->renderVersion((int) $design['published_version_id'], $data);
         return new Response($this->pdf->render($document), 200, [
             'Content-Type' => 'application/pdf',

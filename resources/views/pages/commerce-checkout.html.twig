@@ -58,7 +58,7 @@
 {% endembed %}
                 <p>Your wallet pays as much of the order as it holds, oldest credit first. Choose how to pay anything left.</p>
                 {% endif %}
-                {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: checkout.payment_method|default('dummy')} %}
+                {% include '@platform/partials/commerce-payment-method.html.twig' with {selected_method: checkout.payment_method|default('')} %}
                 {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email my invoice to ' ~ (user_email)})} %}
 {% block control %}
 <input type="checkbox" name="invoice_email" value="yes" {{ checkout.invoice_email|default(false) ? 'checked' : '' }}>
@@ -73,7 +73,7 @@
             </form>
         {% else %}
             <h2 class="h4">Review my order</h2>
-            {% for item in cart.items %}<p><strong>{{ item.title }}</strong> · {{ item.days }} days · {{ item.price_label }}</p>{% endfor %}
+            {% for item in cart.items %}<p><strong>{{ item.title }}</strong> · {{ item.days }} days · {% include '@platform/partials/price.html.twig' with {price: item, price_saving: true} %}</p>{% endfor %}
             {% for bundle in cart.bundles %}{% include '@platform/partials/commerce-bundle-line.html.twig' %}{% endfor %}
             {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
             {% include '@platform/partials/commerce-promo-code.html.twig' %}
@@ -87,7 +87,7 @@
             <h3 class="h5">Billed to</h3>
             {% include '@platform/partials/billing-address.html.twig' %}
             <p><a href="/checkout/profile">Change billing details</a></p>
-            {% if to_pay_minor > 0 %}<p>Payment{{ wallet_applied_minor > 0 ? ' of what is left' : '' }}: {{ checkout.payment_method == 'eft' ? 'EFT / bank transfer' : 'Card (simulated)' }}. <a href="/checkout/payment">Change</a></p>{% endif %}
+            {% if to_pay_minor > 0 %}<p>Payment{{ wallet_applied_minor > 0 ? ' of what is left' : '' }}: {{ payment_method_label }}. <a href="/checkout/payment">Change</a></p>{% endif %}
             <p>{{ checkout.invoice_email ? 'Email my invoice and make it available in My Orders.' : 'Make my invoice available in My Orders.' }}</p>
             <form action="/checkout/place" method="post">
                 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="cart_id" value="{{ cart.id }}"><input type="hidden" name="quote" value="{{ cart.quote }}">

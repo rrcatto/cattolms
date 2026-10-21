@@ -93,7 +93,8 @@
 					{% for credit in credits %}
 						<tr>
 							<td>
-								{{ credit.holder_name }}
+								{# A company holds it, or a person, named with their account reference and linked to their account (owner, 2026-10-21). #}
+								{% if credit.company_id %}{{ credit.holder_name }}{% else %}{{ ui('data.person', {name: credit.holder_name, reference: credit.holder_reference, href: '/admin/people/' ~ credit.user_id}) }}{% endif %}
 							</td>
 							<td>
 								{{ credit.course_title }}

@@ -55,6 +55,7 @@
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bundle price (' ~ currency ~ ')', for: 'bundle-price', required: true})} %}{% block control %}<input id="bundle-price" name="price" value="{{ form.price }}" inputmode="decimal" maxlength="16" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Was price (' ~ currency ~ ', optional)', for: 'bundle-was-price', help: 'A higher price shown struck through beside the bundle price, so the bundle is seen to be marked down. Only the bundle price is charged.'})} %}{% block control %}<input id="bundle-was-price" name="was_price" value="{{ form.was_price }}" inputmode="decimal" maxlength="16" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access period', for: 'bundle-period', required: true})} %}{% block control %}<input id="bundle-period" name="access_period_value" type="number" min="1" max="3650" value="{{ form.access_period_value }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'bundle-unit', required: true})} %}{% block control %}<select id="bundle-unit" name="access_period_unit" required {{ ui_field_attrs(props) }}>{% for unit in units %}<option value="{{ unit }}"{% if form.access_period_unit == unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}
@@ -62,7 +63,7 @@
 		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save price', variant: 'primary', type: 'submit'}) }}{% endblock %}{% endembed %}
 	</form>
 	{% else %}
-	{{ ui('data.key-value-list', {items: [{label: 'Price', value: bundle.price_label ?? 'No price yet'}, {label: 'Access', value: bundle.access_label ?? '—'}]}) }}
+	{{ ui('data.key-value-list', {items: [{label: 'Price', value: bundle.price_label ?? 'No price yet', was: bundle.was_label}, {label: 'Access', value: bundle.access_label ?? '—'}]}) }}
 	{% endif %}
 {% endblock %}{% endembed %}
 {% endif %}
@@ -97,7 +98,7 @@
 {% block header %}<tr><th scope="col">Order</th><th scope="col">Purchaser</th><th scope="col">Placed</th><th scope="col">State</th><th scope="col">Price</th><th scope="col">Paid</th></tr>{% endblock %}
 {% block body %}
 {% for sale in bundle.sales %}
-<tr><td><a href="/admin/commerce/orders/{{ sale.order_id }}">{{ sale.number }}</a></td><td>{{ sale.purchaser_name }}</td><td>{{ sale.placed_at|date('j M Y H:i') }}</td><td>{{ sale.state|replace({'_': ' '})|capitalize }}</td><td>{{ sale.price_label }}</td><td>{{ sale.paid_label }}</td></tr>
+<tr><td><a href="/admin/commerce/orders/{{ sale.order_id }}">{{ sale.number }}</a></td><td>{{ ui('data.person', {name: sale.purchaser_name, reference: sale.purchaser_reference, href: '/admin/people/' ~ sale.purchaser_user_id, email: sale.purchaser_email|default('')}) }}</td><td>{{ sale.placed_at|date('j M Y H:i') }}</td><td>{{ sale.state|replace({'_': ' '})|capitalize }}</td><td>{{ sale.price_label }}</td><td>{{ sale.paid_label }}</td></tr>
 {% endfor %}
 {% endblock %}
 {% endembed %}

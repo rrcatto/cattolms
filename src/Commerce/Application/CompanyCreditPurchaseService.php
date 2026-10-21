@@ -19,6 +19,7 @@ use CattoLearning\Infrastructure\Persistence\CompanyRepository;
 use CattoLearning\Infrastructure\Persistence\AdministrationRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\Money;
+use CattoLearning\Support\WasPrice;
 use CattoLearning\Support\Uuid;
 use RuntimeException;
 use Symfony\Component\Clock\ClockInterface;
@@ -26,6 +27,9 @@ use Symfony\Component\Clock\ClockInterface;
 /**
  * A company-scoped basket and checkout that creates paid credit lots through ordinary payment settlement.
  * The company's wallet can pay part or all of the order (owner, 2026-10-17), taken when it is placed.
+ * A purchase for a learner's course request is paid like any other (owner, 2026-10-19): by any payment
+ * method the site offers or from the company wallet. The learner is enrolled when the payment is
+ * confirmed (CompanyCreditFulfilment), for an EFT when ADMIN records it.
  */
 final class CompanyCreditPurchaseService
 {
@@ -67,6 +71,7 @@ final class CompanyCreditPurchaseService
         $rows = $this->records->companyOffers($companyId, mb_substr(trim($search), 0, 120));
         foreach ($rows as &$row) {
             $row['price_label'] = Money::strictMinorUnits((int) $row['price_minor_units'], (string) $row['currency_code'])->format();
+            $row += WasPrice::labels((int) $row['price_minor_units'], $row['was_price_minor_units'] ?? null, (string) $row['currency_code']);
             $row['days'] = (int) $row['access_period_seconds'] / 86400;
         }
         unset($row);
@@ -162,7 +167,9 @@ final class CompanyCreditPurchaseService
             $items[] = ['variant_id'=>(int)$offer['id'],'course_id'=>(int)$offer['course_id'],
                 'course_title'=>(string)$offer['title'],'access_period_seconds'=>(int)$offer['access_period_seconds'],
                 'quantity'=>$quantity,'unit_price_minor'=>$unit->minorUnits,'line_total_minor'=>$line->minorUnits,
-                'unit_label'=>$unit->format(),'line_label'=>$line->format(),'currency'=>'ZAR'];
+                'unit_label'=>$unit->format(),'line_label'=>$line->format(),'currency'=>'ZAR',
+                // The was price shown beside the unit price when the company chose it (owner, 2026-10-20); never charged.
+                'was_price_minor'=>isset($offer['was_price_minor_units']) ? (int)$offer['was_price_minor_units'] : null];
         }
         if ($basket['request_id'] !== null) {
             $needed = $this->records->companyOfferForRequest((int)$basket['request_id'], $companyId);
@@ -211,9 +218,6 @@ final class CompanyCreditPurchaseService
             }
             if ($review['items'] === [] || (int)$review['total_minor'] <= 0) throw new RuntimeException('Select at least one paid credit.');
             $requestId = $review['request_id'] === null ? null : (int)$review['request_id'];
-            if ($requestId !== null && $method !== 'dummy') {
-                throw new RuntimeException('A request purchase needs immediate confirmed payment to enrol the learner. Use the simulated card payment.');
-            }
             if ($requestId !== null && $this->records->activeCompanyOrderForRequest($requestId, $companyId) !== null) {
                 throw new RuntimeException('A purchase for this request is already in progress. Open its order instead.');
             }
@@ -221,7 +225,7 @@ final class CompanyCreditPurchaseService
             $now = $this->clock->now();
             $total = (int) $review['total_minor'];
             $owner = WalletOwner::company($companyId);
-            $walletApplied = $useWallet && $requestId === null ? min($this->wallets->spendable($owner, 'ZAR'), $total) : 0;
+            $walletApplied = $useWallet ? min($this->wallets->spendable($owner, 'ZAR'), $total) : 0;
             if ($method === 'wallet' && $walletApplied < $total) throw new RuntimeException('The company wallet does not cover this order. Choose how to pay the rest.');
             if ($walletApplied === $total) $method = 'wallet';
             $items = OrderService::shareWallet($review['items'], $walletApplied);

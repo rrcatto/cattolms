@@ -9,19 +9,29 @@
         {% block surface_body %}
             <form action="/register" method="post" novalidate>
                 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
-                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Account type', for: 'account-type', required: true})} %}{% block control %}
-                    <select id="account-type" name="account_type" required data-registration-type><option value="individual">Individual learner</option><option value="company">Company account</option></select>
-                {% endblock %}{% endembed %}
+                {# The account type as feature cards (owner, 2026-10-20): an icon, a bold title and what the choice means. #}
+                {% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+                {{ ui('form.picture-choice', {name: 'account_type', legend: 'Account type', id: 'account-type', selected: 'individual', items: [
+                    {value: 'individual', label: 'Individual learner',
+                        icon: '<svg ' ~ icon_attributes ~ '><circle cx="12" cy="7" r="3.5"/><path d="M5 20v-1.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V20"/><path d="M12 13l1.5 3-1.5 4-1.5-4z"/></svg>',
+                        note: 'For yourself. Buy courses, learn at your own pace and earn certificates in your own name.'},
+                    {value: 'company', label: 'Company account',
+                        icon: '<svg ' ~ icon_attributes ~ '><path d="M3 21h18"/><path d="M5 21V5l7-2v18"/><path d="M12 9h7v12"/><path d="M8 8h1M8 11h1M8 14h1M8 17h1M15 12h1M15 15h1M15 18h1"/></svg>',
+                        note: 'For a business. Buy course credits, give your staff the courses they need and follow their progress.'},
+                ]}) }}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'first-name', required: true})} %}{% block control %}<input id="first-name" name="first_name" required>{% endblock %}{% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'middle-names'})} %}{% block control %}<input id="middle-names" name="middle_names">{% endblock %}{% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'last-name', required: true})} %}{% block control %}<input id="last-name" name="last_name" required>{% endblock %}{% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Company name', for: 'company-name', help: 'Required for a company account.'})} %}{% block control %}<input id="company-name" name="company_name" data-registration-company>{% endblock %}{% endembed %}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'registration-email', required: true})} %}{% block control %}<input type="email" id="registration-email" name="email" value="{{ email|default('') }}" autocomplete="email" required>{% endblock %}{% endembed %}
+                {# Adults only (owner, 2026-10-20): someone under 18 is refused, and nothing they typed is kept. #}
+                {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', for: 'date-of-birth', required: true, help: 'You must be 18 or older. For example 14 March 1990.'})} %}{% block control %}<input type="date" id="date-of-birth" name="date_of_birth" value="{{ date_of_birth|default('') }}" max="{{ 'now'|date_modify('-18 years')|date('Y-m-d') }}" autocomplete="bday" required>{% endblock %}{% endembed %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send registration link', variant: 'primary', size: 'large', type: 'submit'}) }}{% endblock %}{% endembed %}
             </form>
             <p class="small cl-text-secondary mt-5 mb-0">Already have an account? <a href="/login">Sign in</a>.</p>
         {% endblock %}
         {% endembed %}
     </section>
-    <script>const rt=document.querySelector('[data-registration-type]');if(rt){const sync=()=>{const f=document.querySelector('[data-registration-company]');if(f){f.required=rt.value==='company';f.closest('.cl-ui-field')?.toggleAttribute('hidden',rt.value!=='company');}};rt.addEventListener('change',sync);sync();}</script>
+    {# The company name shows only for a company account; without JavaScript it always shows, saying when it is needed. #}
+    <script>(()=>{const types=document.querySelectorAll('input[name=account_type]');const company=document.querySelector('[data-registration-company]');if(!types.length||!company)return;const sync=()=>{const chosen=document.querySelector('input[name=account_type]:checked')?.value;company.required=chosen==='company';company.closest('.cl-ui-field')?.toggleAttribute('hidden',chosen!=='company');};types.forEach((type)=>type.addEventListener('change',sync));sync();})();</script>
 {% endblock %}

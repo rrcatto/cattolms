@@ -1,0 +1,20 @@
+body { font-family: "DejaVu Sans", sans-serif; font-size: 10pt; color: #222; }
+p { margin: 2px 0; }
+h1 { font-size: 22pt; margin: 0 0 6px; color: #1F3A5F; }
+h2 { font-size: 12pt; margin: 18px 0 6px; color: #1F3A5F; }
+table { width: 100%; border-collapse: collapse; }
+table.head td { vertical-align: top; }
+table.head td.title { text-align: right; }
+.business { font-size: 13pt; font-weight: bold; }
+table.facts th { width: 28%; text-align: left; font-weight: normal; color: #555; padding: 4px 6px; vertical-align: top; }
+table.facts td { padding: 4px 6px; }
+table.lines { margin-top: 6px; }
+table.lines th, table.lines td { padding: 7px 6px; text-align: left; border-bottom: 1px solid #ddd; }
+table.lines th { background: #f3f4f6; border-bottom: 2px solid #1F3A5F; }
+table.lines th.mark, table.lines td.mark { text-align: right; white-space: nowrap; }
+table.totals { width: 70%; margin: 12px 0 0 30%; }
+table.totals th { font-weight: normal; text-align: left; padding: 5px 6px; }
+table.totals td { text-align: right; padding: 5px 6px; white-space: nowrap; }
+table.totals tr.total th, table.totals tr.total td { font-weight: bold; font-size: 12pt; border-top: 2px solid #1F3A5F; }
+.note { margin-top: 18px; font-size: 9pt; color: #555; }
+tr { page-break-inside: avoid; }

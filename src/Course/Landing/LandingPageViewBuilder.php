@@ -204,6 +204,11 @@ final class LandingPageViewBuilder
         $items = 0;
         foreach ($outline as $row) {
             $isSection = $row['node_type'] === 'section';
+            // The modules and other learning items, never the assessments (owner, 2026-10-20: an assessment
+            // repeats its module's title).
+            if (!$isSection && in_array((string) $row['item_type'], ['assessment', 'diagnostic'], true)) {
+                continue;
+            }
             $isSection ? $sections++ : $items++;
             if (!$isSection && !(bool) $data['show_items']) {
                 continue;
@@ -232,7 +237,9 @@ final class LandingPageViewBuilder
      */
     private function reviewsSection(array $common, array $data, array $course, array $rating): array
     {
-        if ((int) $rating['count'] === 0 && $data['when_empty'] === 'hide') {
+        // A course with no approved review shows no reviews section at all (owner, 2026-10-20: "the reviews
+        // section should not advertise the fact that there are no reviews yet").
+        if ((int) $rating['count'] === 0) {
             return ['omit' => true];
         }
         return $common + [

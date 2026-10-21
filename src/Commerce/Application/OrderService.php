@@ -10,6 +10,7 @@ use CattoLearning\Commerce\Domain\BillingDetails;
 use CattoLearning\Commerce\Domain\PromotionRejected;
 use CattoLearning\Commerce\Infrastructure\CommerceRepository;
 use CattoLearning\Commerce\Settings\CommerceSettings;
+use CattoLearning\Commerce\Settings\PaymentMethods;
 use CattoLearning\Commerce\Wallet\LedgerKind;
 use CattoLearning\Commerce\Wallet\WalletOwner;
 use CattoLearning\Commerce\Wallet\WalletService;
@@ -53,8 +54,15 @@ final class OrderService
         private readonly FinancialDocuments $documents,
         private readonly WalletService $wallets,
         private readonly ?SiteMode $site = null,
-        private readonly ?\CattoLearning\Legal\LegalDocuments $legal = null
+        private readonly ?\CattoLearning\Legal\LegalDocuments $legal = null,
+        private readonly ?PaymentMethods $methods = null
     ) {}
+
+    /** The site's payment methods (owner, 2026-10-19); without the setting, EFT and a demo site's simulated card. */
+    public function paymentMethods(): PaymentMethods
+    {
+        return $this->methods ?? new PaymentMethods($this->site ?? SiteMode::fixed(SiteMode::DEMO));
+    }
 
     /**
      * What an order keeps of what its purchaser accepted (owner, 2026-10-18): the last-updated date of
@@ -86,13 +94,13 @@ final class OrderService
     }
 
     /**
-     * A payment method a purchaser may choose. The simulated card works only on a demo site
-     * (SiteMode); a live site takes EFT until Stitch is built.
+     * A payment method a purchaser may choose: one the site offers (Settings > Payment methods, owner
+     * 2026-10-19). The simulated card is offered only on a demo site, never on a live one.
      */
     public function requirePaymentMethod(string $method, string $token): void
     {
         CheckoutService::validateMethod($method, $token);
-        if ($method === 'dummy' && !($this->site?->isDemo() ?? true)) throw new RuntimeException('Card payments are not available yet. Pay by EFT.');
+        if (!$this->paymentMethods()->isOffered($method)) throw new RuntimeException('That payment method is not available. Choose one of the methods shown.');
     }
 
     /** Whether this visitor may buy: anyone signed out (checkout asks them to sign in) and every private account. */
@@ -293,7 +301,7 @@ final class OrderService
                 if ($amount->isFree()) throw new RuntimeException('Remove free courses from the cart and accept them directly.');
                 $subtotal=$subtotal->plus($amount);
                 $lineDiscount=$discount?->lineDiscount('course:'.(int)$offer['id']) ?? 0;
-                $lines[]=['variant_id'=>(int)$offer['id'],'course_id'=>(int)$offer['course_id'],'course_title'=>(string)$offer['title'],'revision_policy'=>'purchased_course_with_published_edits','access_period_seconds'=>(int)$offer['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>$lineDiscount,'paid_minor'=>$amount->minorUnits-$lineDiscount,'promotion_eligible'=>$discount!==null && array_key_exists('course:'.(int)$offer['id'],$discount->lineDiscounts),'fulfilment_type'=>'individual_access','start'=>'immediate'];
+                $lines[]=['variant_id'=>(int)$offer['id'],'course_id'=>(int)$offer['course_id'],'course_title'=>(string)$offer['title'],'revision_policy'=>'purchased_course_with_published_edits','access_period_seconds'=>(int)$offer['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>$lineDiscount,'paid_minor'=>$amount->minorUnits-$lineDiscount,'promotion_eligible'=>$discount!==null && array_key_exists('course:'.(int)$offer['id'],$discount->lineDiscounts),'fulfilment_type'=>'individual_access','start'=>'immediate','was_price_minor'=>self::wasPrice($offer)];
             }
             foreach($cart['bundles'] as $bundle) {
                 $this->validateBundle($bundle,$bundle['courses'],$actor->id);
@@ -307,7 +315,7 @@ final class OrderService
                     'courses'=>array_map(static fn(array $c): array => ['course_id'=>(int)$c['course_id'],'title'=>(string)$c['title'],'slug'=>(string)$c['slug']],$bundle['courses']),
                     'access_period_seconds'=>(int)$bundle['access_period_seconds'],'quantity'=>1,'unit_price_minor'=>$amount->minorUnits,'line_total_minor'=>$amount->minorUnits,'currency'=>$amount->currency,
                     'tax_minor'=>0,'tax_rate'=>'0','discount_minor'=>$lineDiscount,'paid_minor'=>$amount->minorUnits-$lineDiscount,'promotion_eligible'=>$discount!==null && array_key_exists($key,$discount->lineDiscounts),
-                    'revision_policy'=>'purchased_course_with_published_edits','start'=>'immediate'];
+                    'revision_policy'=>'purchased_course_with_published_edits','start'=>'immediate','was_price_minor'=>self::wasPrice($bundle)];
             }
             $discountMinor=$discount->discountMinor ?? 0;
             if ($discount!==null && $discount->currency!==$subtotal->currency) throw new RuntimeException('Your cart or prices changed. Review the updated checkout.');
@@ -332,6 +340,17 @@ final class OrderService
             $this->records->audit($id,$actor->id,'order.placed',['total_minor'=>$total]+($discount===null?[]:['promotion_id'=>$discount->promotion->id,'discount_minor'=>$discountMinor]),$now->format(DATE_ATOM));
             return $id;
         });
+    }
+
+    /**
+     * The was price the purchaser saw struck through beside a line's price (owner, 2026-10-20), kept in
+     * the order's snapshot as what was advertised. It is never charged and never reaches a total.
+     *
+     * @param array<string,mixed> $offer a price variant or bundle offer row
+     */
+    private static function wasPrice(array $offer): ?int
+    {
+        return isset($offer['was_price_minor_units']) && (int)$offer['was_price_minor_units']>(int)$offer['price_minor_units'] ? (int)$offer['was_price_minor_units'] : null;
     }
 
     /**

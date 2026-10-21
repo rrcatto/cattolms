@@ -42,7 +42,7 @@
 
 {% endblock %}
 {% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Birthdate', full_width: false, for: 'field-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', help: '18 or older.', full_width: false, for: 'field-profile-5-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
 				<input type="date" name="birthdate" value="{{ profile.birthdate }}" id="field-profile-5-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
@@ -70,13 +70,6 @@
 
 {% endblock %}
 {% endembed %}
-			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name to print on certificates', full_width: true, for: 'field-profile-9-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
-{% block control %}
-
-				<input name="certificate_name" maxlength="160" value="{{ profile.certificate_name }}" id="field-profile-9-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
@@ -90,6 +83,15 @@
 
 {% endblock %}
 {% endembed %}
+	{# Identity verification (owner, 2026-10-19): certificates carry the verified name, exactly as on the identity document. #}
+	{% if identity_verification|default(null) %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'identity-verification'})} %}
+{% block surface_body %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Identity verification', heading_level: 2, summary: 'Your certificates and transcripts carry your name exactly as it appears on your identity document.'})} %}{% block section_actions %}{{ ui('action.link', {label: identity_verification.verified ? 'View' : 'Verify my identity', variant: identity_verification.verified ? 'secondary' : 'primary', size: 'small', href: '/account/verification'}) }}{% endblock %}{% endembed %}
+		{{ ui('data.key-value-list', {items: [{label: 'Status', value: identity_verification.status_words}] | merge(identity_verification.verified ? [{label: 'Verified name', value: identity_verification.verification.verified_name}] : [])}) }}
+{% endblock %}
+{% endembed %}
+	{% endif %}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'profile-image'})} %}
 {% block surface_body %}
 

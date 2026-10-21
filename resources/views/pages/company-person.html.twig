@@ -1,0 +1,117 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		A company member's page (owner, 2026-10-21: "build the company person page too"): who they are, their courses and
+		the course requests they sent to the company, with what the company can do about each. Every action comes back here.
+	#}
+	{% set ph_kicker = 'Company' %}
+	{% set ph_title = person.name %}
+	{% set ph_lead = (person.account_reference|account_reference) ~ ' · ' ~ person.email %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set back = '/company/people/' ~ person.id %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Summary', eyebrow: 'Person'}) }}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Account reference', value: person.account_reference|account_reference},
+				{label: 'Email', value: person.email},
+				{label: 'Mobile number', value: person.mobile_number ?: 'Not given'},
+				{label: 'Role in the company', value: (person.company_role ?: 'student')|replace({'_': ' '})|capitalize},
+				{label: 'Status', value: person.status == 'active' ? 'Active: can sign in' : 'Disabled: cannot sign in'},
+				{label: 'Member since', value: person.member_since|date('j F Y')},
+				{label: 'Last sign-in', value: person.last_login_at ? person.last_login_at|date('j F Y \\a\\t H:i') : 'Never'},
+				{label: 'Courses', value: person.course_count},
+			]}) }}
+			{% if can_manage_person %}
+				{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}{% block body %}
+					<form action="/company/people/{{ person.id }}/status" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<input type="hidden" name="return" value="{{ back }}">
+						{% if person.status == 'active' %}
+							<input type="hidden" name="status" value="disabled">
+							{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.'}) }}
+						{% else %}
+							<input type="hidden" name="status" value="active">
+							{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small'}) }}
+						{% endif %}
+					</form>
+					<form action="/company/people/{{ person.id }}/remove" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{{ ui('action.button', {label: 'Remove from the company', variant: 'danger', size: 'small', confirm: 'Remove this person from the company? Course access this company granted them ends. Their account and learning history are kept, and this does not stop them signing in.', icon: 'action-remove'}) }}
+					</form>
+				{% endblock %}{% endembed %}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		{% if can_manage_person %}
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Details', summary: 'Their email address is part of how they sign in, so it is changed by them.'}) }}
+				<form action="/company/people/{{ person.id }}" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}">
+					<input type="hidden" name="return" value="{{ back }}">
+					{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'First name', for: 'person-first-name'})} %}{% block control %}<input id="person-first-name" name="first_name" value="{{ person.first_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Middle names', for: 'person-middle-names'})} %}{% block control %}<input id="person-middle-names" name="middle_names" maxlength="160" value="{{ person.middle_names }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'person-last-name'})} %}{% block control %}<input id="person-last-name" name="last_name" value="{{ person.last_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', for: 'person-mobile'})} %}{% block control %}<input id="person-mobile" name="mobile_number" value="{{ person.mobile_number }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+					{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save details', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				</form>
+			{% endblock %}{% endembed %}
+		{% endif %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Courses', summary: 'Every course they have, with how far they have got.'}) }}
+			{% if enrolments %}
+				{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+					{% block header %}<tr>
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 44, label: 'Course'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Status'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Progress'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Access ends', wide: true}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Actions'}} %}
+					</tr>{% endblock %}
+					{% block body %}{% for enrolment in enrolments %}<tr>
+						<td><strong>{{ enrolment.course_title }}</strong></td>
+						<td>{{ enrolment.status|ucfirst }}</td>
+						<td>{{ enrolment.progress_percentage }}%</td>
+						<td class="small">{{ enrolment.expires_at ?: 'No end date' }}</td>
+						<td class="cell-actions">{% if can_manage_person %}
+							<form action="/company/enrolments/{{ enrolment.id }}/{{ enrolment.status == 'cancelled' ? 'restore' : 'remove' }}" method="post">
+								<input type="hidden" name="csrf" value="{{ csrf }}">
+								<input type="hidden" name="return" value="{{ back }}">
+								{% if enrolment.status == 'cancelled' %}
+									{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small'}) }}
+								{% else %}
+									{{ ui('action.button', {label: 'Remove access', variant: 'danger', size: 'small', confirm: 'Remove their access to this course?', icon: 'action-remove'}) }}
+								{% endif %}
+							</form>
+						{% endif %}</td>
+					</tr>{% endfor %}{% endblock %}
+				{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {summary: 'They have no courses yet.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Course requests', summary: 'The courses they asked the company for, and what was decided.'}) }}
+			{% if requests %}
+				{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
+					{% for request in requests %}
+						{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+							{% block body %}{{ ui('feedback.badge', {label: request.status|ucfirst, tone: request.status == 'pending' ? 'warning' : 'info'}) }} <strong>{{ request.course_title }}</strong><p>Asked {{ request.requested_at }}{% if request.learner_note %}: "{{ request.learner_note }}"{% endif %}{% if request.decided_at %}. Decided {{ request.decided_at }}{% endif %}</p>{% endblock %}
+							{% block actions %}{% if request.status == 'pending' and can_decide_requests %}
+								<form action="/company/requests/{{ request.id }}/decision" method="post">
+									<input type="hidden" name="csrf" value="{{ csrf }}">
+									<input type="hidden" name="return" value="{{ back }}">
+									{{ ui('action.button', {label: 'Approve', variant: 'primary', size: 'small', name: 'decision', value: 'approve'}) }}
+									{{ ui('action.button', {label: 'Reject', variant: 'danger', size: 'small', name: 'decision', value: 'reject', confirm: 'Reject this course request? The learner is told it was declined.'}) }}
+								</form>
+							{% endif %}{% endblock %}
+						{% endembed %}
+					{% endfor %}
+				{% endblock %}{% endembed %}
+			{% else %}
+				{{ ui('feedback.empty', {summary: 'They have not asked for a course.'}) }}
+			{% endif %}
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

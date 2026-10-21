@@ -235,8 +235,10 @@ final class TableRowContractTest extends TestCase
         self::assertStringContainsString('const applyCellTooltips', $js);
         self::assertStringContainsString(".cl-ui-table td, .cl-ui-table th", $js);
         self::assertStringContainsString('cell.scrollWidth > cell.clientWidth', $js);
-        // A page turn replaces the rows, so the pass has to run again on what htmx swapped in.
-        self::assertStringContainsString("htmx:afterSwap", $js);
+        // A page turn replaces the rows, so the pass has to run again on what htmx swapped in: htmx 4's event name, never
+        // htmx 2's, which the bundled htmx does not send (it left searched and paged tables unfitted until 2026-10-21).
+        self::assertStringContainsString("htmx:after:swap", $js);
+        self::assertStringNotContainsString("htmx:afterSwap", $js);
         // A tooltip a template set deliberately - the email behind a person's name - outranks this.
         self::assertStringContainsString("cell.hasAttribute('title')", $js);
     }

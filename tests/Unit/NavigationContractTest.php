@@ -91,7 +91,8 @@ final class NavigationContractTest extends TestCase
         self::assertSame('/account/orders', $accountChildren['account-orders']['href'] ?? null);
         // Title case like every other menu group (owner's decision, 2026-10-17).
         self::assertSame('Courses', $accountChildren['account-courses-group']['label'] ?? null);
-        self::assertCount(3, $accountChildren['account-courses-group']['children'], 'My Courses, My Orders and My Wallet.');
+        self::assertCount(4, $accountChildren['account-courses-group']['children'], 'My Orders, My Wallet, My Courses and My Certificates.');
+        self::assertSame('/account/certificates', $accountChildren['account-certificates']['href'] ?? null);
         self::assertSame('/account/wallet', $accountChildren['account-wallet']['href'] ?? null);
         self::assertArrayNotHasKey('commerce', $byKey);
         self::assertSame('/account/sessions', $accountChildren['account-sessions']['href'] ?? null);
@@ -178,7 +179,7 @@ final class NavigationContractTest extends TestCase
             'Administration must be gathered into its five groups, in order.'
         );
         self::assertSame(
-            ['admin-courses', 'admin-course-items', 'admin-resources', 'admin-course-categories', 'admin-course-tags', 'admin-course-reviews', 'admin-bundles', 'admin-certificate-designs', 'admin-requests', 'admin-enrolments'],
+            ['admin-courses', 'admin-course-items', 'admin-resources', 'admin-course-categories', 'admin-course-tags', 'admin-course-reviews', 'admin-bundles', 'admin-certificate-designs', 'admin-issued-certificates', 'admin-requests', 'admin-enrolments'],
             $groups['admin-group-catalogue'],
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );

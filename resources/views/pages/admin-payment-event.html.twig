@@ -8,11 +8,11 @@
 {% block page_body %}
 	{% set ph_back_href = event.order_href ~ '#order-records' %}{% set ph_back_label = 'Order ' ~ event.order_label %}
 	{% set ph_title = 'Payment step ' ~ event.id %}
-	{% set ph_lead = event.account_reference_label ? 'Account ' ~ event.account_reference_label ~ ' · ' ~ (event.account_label ?: '—') : (event.account_label ?: 'No account') %}
+	{% if event.account_person %}{% set ph_lead %}{{ ui('data.person', event.account_person|merge({full: true})) }}{% endset %}{% else %}{% set ph_lead = event.account_reference_label ? 'Account ' ~ event.account_reference_label ~ ' · ' ~ (event.account_label ?: '—') : (event.account_label ?: 'No account') %}{% endif %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'What happened'}) }}
-		<p class="cl-lead" data-payment-sentence>{{ event.sentence }}</p>
+		<p class="cl-lead" data-payment-sentence>{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: event.sentence_parts} only %}</p>
 		{{ ui('data.key-value-list', {items: [
 			{label: 'When', value: event.when},
 			{label: 'Amount', value: event.amount_label},

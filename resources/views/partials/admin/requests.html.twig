@@ -28,9 +28,10 @@
 {% block body %}
 
 								{% for request in requests %}
-									<tr>
+									{# Each request has its own anchor, which the dashboard's Needs your attention opens (owner, 2026-10-21); the learner's name and account reference open their account. #}
+									<tr id="request-{{ request.id }}">
 										<td title="{{ request.learner_name }} · {{ request.email }}">
-											{{ request.learner_name }}
+											{{ ui('data.person', {name: request.learner_name, reference: request.learner_reference, href: '/admin/people/' ~ request.user_id}) }}
 										</td>
 										<td title="{{ request.course_title }}">
 											{{ request.course_title }}

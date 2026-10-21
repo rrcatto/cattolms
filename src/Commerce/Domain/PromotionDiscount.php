@@ -7,7 +7,8 @@ namespace CattoLearning\Commerce\Domain;
 /**
  * What one promotion gives one cart: the eligible amount it was calculated on, the discount, and
  * that discount spread over the eligible lines. Calculated by the server from the cart and the
- * promotion alone; nothing a browser submits other than the code reaches it.
+ * promotion alone; nothing a browser submits other than the code reaches it. automatic says the cart
+ * applied it by itself, without the purchaser typing the code (owner, 2026-10-20).
  */
 final readonly class PromotionDiscount
 {
@@ -26,7 +27,15 @@ final readonly class PromotionDiscount
         public array $lineDiscounts,
         public array $eligibleCourseIds,
         public array $eligibleBundleIds,
+        public bool $automatic = false,
     ) {}
+
+    /** The same discount, applied by the cart without the purchaser typing the code. */
+    public function appliedAutomatically(): self
+    {
+        return new self($this->promotion, $this->currency, $this->eligibleMinor, $this->discountMinor, $this->lineDiscounts,
+            $this->eligibleCourseIds, $this->eligibleBundleIds, true);
+    }
 
     public function lineDiscount(string $key): int
     {
@@ -60,6 +69,7 @@ final readonly class PromotionDiscount
             'eligible_minor' => $this->eligibleMinor,
             'discount_minor' => $this->discountMinor,
             'allocation' => self::ALLOCATION,
+            'automatic' => $this->automatic,
         ];
     }
 
@@ -71,6 +81,6 @@ final readonly class PromotionDiscount
      */
     public function quoteKey(): array
     {
-        return ['promotion' => $this->promotion->id, 'code' => $this->promotion->code, 'discount' => $this->discountMinor, 'lines' => $this->lineDiscounts];
+        return ['promotion' => $this->promotion->id, 'code' => $this->promotion->code, 'discount' => $this->discountMinor, 'lines' => $this->lineDiscounts, 'automatic' => $this->automatic];
     }
 }

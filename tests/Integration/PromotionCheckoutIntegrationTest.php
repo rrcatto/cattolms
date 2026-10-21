@@ -93,7 +93,8 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         $cart = $this->summary($buyer);
         self::assertSame([17345, 1735, 15610], [$cart['subtotal_minor'], $cart['discount_minor'], $cart['total_minor']]);
         self::assertSame([['label' => 'Subtotal', 'value' => $this->rand(17345)], ['label' => 'Promo ' . $code . ' (10% off)', 'value' => '−' . $this->rand(1735)], ['label' => 'Total', 'value' => $this->rand(15610)]], $cart['totals']);
-        self::assertSame(['code' => $code, 'applied' => true, 'rejection' => null, 'label' => '10% off', 'discount_label' => '−' . $this->rand(1735)], $cart['promo']);
+        self::assertSame(['code' => $code, 'applied' => true, 'rejection' => null, 'label' => '10% off', 'discount_label' => '−' . $this->rand(1735),
+            'name' => 'Test promotion', 'automatic' => false, 'saving_label' => $this->rand(1735), 'typed_code' => $code, 'note' => null], $cart['promo']);
 
         $events = $this->events('promo_code_applied', $buyer->id);
         self::assertCount(1, $events, 'The accepted code is recorded once.');
@@ -292,7 +293,7 @@ final class PromotionCheckoutIntegrationTest extends TestCase
         self::assertSame([17345, 1735, 15610], [$snapshot['subtotal_minor'], $snapshot['discount_minor'], $snapshot['total_minor']]);
         $expected = ['promotion_id' => $id, 'code' => $code, 'name' => 'Spring offer', 'discount_type' => 'percentage', 'discount_value' => 1000, 'label' => '10% off',
             'course_scope' => 'all', 'bundle_scope' => 'none', 'eligible_course_ids' => [$this->courseA, $this->courseB], 'eligible_bundle_ids' => [], 'minimum_order_minor' => null, 'starts_at' => null, 'ends_at' => null,
-            'currency' => 'ZAR', 'eligible_minor' => 17345, 'discount_minor' => 1735, 'allocation' => 'proportional_largest_remainder'];
+            'currency' => 'ZAR', 'eligible_minor' => 17345, 'discount_minor' => 1735, 'allocation' => 'proportional_largest_remainder', 'automatic' => false];
         self::assertEquals($expected, $snapshot['promotion']);
         $before = [$order, $this->documentsHtml($orderId), $this->db->fetchAllAssociative('SELECT * FROM commerce_order_items WHERE order_id=:id ORDER BY id', ['id' => $orderId])];
 
@@ -313,6 +314,88 @@ final class PromotionCheckoutIntegrationTest extends TestCase
             self::assertStringNotContainsString('50% off', $page);
         }
         self::assertStringContainsString('Spring offer', $administrator['body'], 'The ADMIN order page names the promotion as applied.');
+    }
+
+    public function testAnAutomaticPromotionAppliesItselfAndTheOrderAndInvoiceSaySo(): void
+    {
+        // Owner, 2026-10-20: "telling the customer that a promo code was automatically applied".
+        $buyer = $this->buyer();
+        $this->ready($buyer, 'dummy');
+        $this->fill($buyer, $this->variantA, $this->variantB);
+        $code = $this->code('AUTO');
+        $id = PromotionFixture::create($this->db, $this->owner, ['code' => $code, 'name' => 'Spring special', 'discount_value' => 2000, 'applies_automatically' => true]);
+        $cart = $this->summary($buyer);
+        self::assertSame([17345, 3469, 13876], [$cart['subtotal_minor'], $cart['discount_minor'], $cart['total_minor']], '20% of R173.45, with nothing typed.');
+        self::assertSame([$code, true, true, null, $this->rand(3469)], [$cart['promo']['code'], $cart['promo']['applied'], $cart['promo']['automatic'], $cart['promo']['typed_code'], $cart['promo']['saving_label']]);
+        self::assertSame(['label' => 'Promo ' . $code . ' (20% off, applied automatically)', 'value' => '−' . $this->rand(3469)], $cart['totals'][1]);
+        self::assertFalse($this->promotions->remove($buyer), 'There is no typed code to remove.');
+
+        $_SESSION['guest_cart'] = [$this->variantA];
+        try {
+            $guest = $this->summary(null);
+        } finally {
+            unset($_SESSION['guest_cart']);
+        }
+        self::assertSame([12345, 2469, true], [$guest['subtotal_minor'], $guest['discount_minor'], $guest['promo']['automatic']], 'A guest sees it in the cart before signing in.');
+
+        $cart = $this->orders->cart($buyer);
+        $orderId = (int) $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
+        $order = $this->records->order($orderId);
+        self::assertSame([$id, 3469], [(int) $order['promotion_id'], (int) $order['discount_minor']]);
+        $snapshot = CommerceRepository::decode((string) $order['snapshot']);
+        self::assertTrue($snapshot['promotion']['automatic']);
+        self::assertSame(['label' => 'Promo ' . $code . ' (20% off, applied automatically)', 'value' => '−' . $this->rand(3469)], \CattoLearning\Commerce\Domain\OrderTotals::forSnapshot($snapshot)[1]);
+        self::assertStringContainsString('20% off, applied automatically', $this->documentsHtml($orderId)['invoice']);
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM promotion_redemptions WHERE promotion_id=:id AND order_id=:order', ['id' => $id, 'order' => $orderId]), 'It is redeemed like a typed code.');
+    }
+
+    public function testOnePromotionAppliesTheOneThatSavesTheMost(): void
+    {
+        $buyer = $this->buyer();
+        $auto = $this->code('AUTO');
+        $autoId = PromotionFixture::create($this->db, $this->owner, ['code' => $auto, 'discount_value' => 1000, 'applies_automatically' => true]);
+        $small = $this->code('SMALL');
+        PromotionFixture::create($this->db, $this->owner, ['code' => $small, 'discount_value' => 500]);
+        $bOnly = $this->code('BONLY');
+        PromotionFixture::create($this->db, $this->owner, ['code' => $bOnly, 'discount_value' => 2000], [$this->courseB]);
+        $this->fill($buyer, $this->variantB);
+        self::assertSame([$auto, true, 500], [$this->summary($buyer)['promo']['code'], $this->summary($buyer)['promo']['automatic'], $this->summary($buyer)['discount_minor']]);
+        $this->expectRejected($auto . ', which is applied automatically, already saves you at least as much as ' . $small . ' would. One promotion applies to an order.',
+            fn() => $this->promotions->apply($buyer, $small), 'A typed code that saves less is refused.');
+
+        $this->promotions->apply($buyer, $bOnly);
+        $cart = $this->summary($buyer);
+        self::assertSame([$bOnly, false, 1000, $bOnly, null], [$cart['promo']['code'], $cart['promo']['automatic'], $cart['discount_minor'], $cart['promo']['typed_code'], $cart['promo']['note']], 'A typed code that saves more applies instead.');
+
+        $this->fill($buyer, $this->variantA);
+        $cart = $this->summary($buyer);
+        self::assertSame([$auto, true, 1735, $bOnly], [$cart['promo']['code'], $cart['promo']['automatic'], $cart['discount_minor'], $cart['promo']['typed_code']], 'Once the automatic promotion saves more, it applies.');
+        self::assertSame('Your code ' . $bOnly . ' saves less than ' . $auto . ', which is applied automatically, so your order uses ' . $auto . '.', $cart['promo']['note']);
+        self::assertSame($autoId, (int) $this->records->order($this->placeDirect($buyer))['promotion_id']);
+    }
+
+    public function testAnAutomaticPromotionsLastUseIsTakenUnderItsLock(): void
+    {
+        $code = $this->code('LAST');
+        $id = PromotionFixture::create($this->db, $this->owner, ['code' => $code, 'applies_automatically' => true, 'maximum_total_uses' => 1]);
+        $buyer = $this->buyer();
+        $this->ready($buyer);
+        $this->fill($buyer, $this->variantA);
+        $cart = $this->orders->cart($buyer);
+        self::assertSame($id, $cart['promotion']['discount']?->promotion->id);
+        $other = $this->buyer();
+        $this->fill($other, $this->variantB);
+        $this->placeDirect($other);
+        try {
+            $this->checkout($buyer)->place($buyer, (int) $cart['id'], (string) $cart['quote'], true, true);
+            self::fail('The review showed a discount the order can no longer have.');
+        } catch (\RuntimeException $changed) {
+            self::assertNotInstanceOf(PromotionRejected::class, $changed);
+            self::assertSame('Your cart or prices changed. Review your order again.', $changed->getMessage());
+        }
+        self::assertSame(0, $this->orderCount($buyer));
+        $cart = $this->summary($buyer);
+        self::assertSame([null, 12345], [$cart['promo']['code'], $cart['total_minor']], 'The used-up promotion no longer applies.');
     }
 
     public function testDiscountedLinesRefundOnlyWhatWasPaidForThem(): void
@@ -559,11 +642,11 @@ final class PromotionCheckoutIntegrationTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function summary(CurrentUser $buyer): array
+    private function summary(?CurrentUser $buyer): array
     {
         $auth = clone IntegrationContainer::get()->get(AuthService::class);
         (new \ReflectionProperty(AuthService::class, 'currentUser'))->setValue($auth, $buyer);
-        return (new CartService($auth, $this->orders, $this->records))->summary();
+        return (new CartService($auth, $this->orders, $this->records, $this->promotions))->summary();
     }
 
     private function checkout(CurrentUser $buyer): CheckoutService

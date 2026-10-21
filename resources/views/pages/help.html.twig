@@ -1,84 +1,76 @@
 {% extends layout %}
 {% block page_body %}
+    {#
+        The learner's guide (owner, 2026-10-20: "an svg graphic for the help page header, with title overlaid on
+        it … use <details> <summary> tags styled as accordions, in the same way the FAQ page is built … a big Link
+        to FAQ … in its own small block with a border round it"). Each topic is the canonical accordion with its
+        icon and category, closed until it is chosen; a link to a topic's id opens it.
+    #}
     {% set ph_kicker = 'Help' %}
     {% set ph_title = 'How CattoLMS works' %}
     {% set ph_lead = 'A practical guide to finding a course, getting access and learning at your own pace.' %}
+    {% set ph_hero %}{% include '@platform/partials/artwork/help-hero.html.twig' %}{% endset %}
     {% include '@platform/partials/page-head.html.twig' %}
+    {% set icon_attributes = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' %}
+    {% set icons = {
+        catalogue: '<svg ' ~ icon_attributes ~ '><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>',
+        buying: '<svg ' ~ icon_attributes ~ '><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h7.6a1.5 1.5 0 0 0 1.4-1l1.9-6.3H6.2"/><circle cx="9.5" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg>',
+        courses: '<svg ' ~ icon_attributes ~ '><path d="M12 3 2.5 8 12 13l9.5-5z"/><path d="m2.5 12.5 9.5 5 9.5-5"/><path d="m2.5 16.5 9.5 5 9.5-5"/></svg>',
+        learning: '<svg ' ~ icon_attributes ~ '><path d="M3 20h18"/><rect x="5" y="12" width="3" height="5"/><rect x="10.5" y="8" width="3" height="9"/><rect x="16" y="4" width="3" height="13"/></svg>',
+        account: '<svg ' ~ icon_attributes ~ '><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
+        contact: '<svg ' ~ icon_attributes ~ '><path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17H9l-5 4v-4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"/><path d="M8 10h8M8 13h5"/></svg>',
+    } %}
 
     <section class="cl-page-section">
         {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
             {% block surface_body %}
-                <p class="cl-lead">CattoLMS is a library of self-paced courses. You can browse the public catalogue without signing in, choose a course, and decide whether it is right for you before you buy access.</p>
-                <p>Use the links below to jump to a topic. The information is kept visible on the page so it is easy to scan, print, search with your browser, and read with JavaScript disabled.</p>
-                <nav aria-label="Help topics">
-                    <p>
-                        <a href="#find-a-course">Find a course</a> ·
-                        <a href="#buy-access">Buy access</a> ·
-                        <a href="#course-structure">Course structure</a> ·
-                        <a href="#learn">Learn and track progress</a> ·
-                        <a href="#sign-in">Sign in and your account</a>
-                    </p>
-                </nav>
+                {{ ui('layout.section-head', {heading: 'Welcome', summary: 'Choose a topic below to read about it, or go straight to the questions people ask most.'}) }}
+                <div class="cl-help-intro">
+                    <div>
+                        <p class="cl-lead">CattoLMS is a library of self-paced courses. You can browse the catalogue without signing in, choose a course, and decide whether it is right for you before you buy access.</p>
+                    </div>
+                    <a class="cl-help-faq" href="/faq"><abbr title="Frequently asked questions">FAQ</abbr></a>
+                </div>
             {% endblock %}
         {% endembed %}
+    </section>
 
-        {% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
-            {% block body %}
-                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'find-a-course'})} %}
-                    {% block surface_body %}
-                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '01', heading: 'Find a course', summary: 'Browse the catalogue and compare courses before you choose.'})} %}{% endembed %}
-                        <p>Open <a href="/courses">Courses</a> to see the public catalogue. The first row shows the top-level categories. Select a category to open its related areas and subjects, then choose a subject to see the courses in that branch.</p>
-                        <p>You can also search by keyword or browse <a href="/courses/tags">tags</a>. A course can appear under more than one tag, so tags are useful when you know the topic or outcome you want but not the category name.</p>
-                        <p>Select a course card to read its description, estimated time, level, included material and available prices. The course page is where you decide whether to continue.</p>
-                    {% endblock %}
-                {% endembed %}
-
-                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'buy-access'})} %}
-                    {% block surface_body %}
-                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '02', heading: 'Buy access', summary: 'Choose a price and complete checkout securely.'})} %}{% endembed %}
+    <section class="cl-page-section">
+        {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+            {% block surface_body %}
+                {{ ui('layout.section-head', {heading: 'Help topics', summary: 'Each topic opens when you choose it.'}) }}
+                <div class="cl-faq">
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'find-a-course', eyebrow: 'Catalogue', icon: icons.catalogue, heading: 'Find a course'})} %}{% block body %}
+                        <p>Open <a href="/courses">Courses</a> to see the catalogue: every course, 24 to a page. Choose a category to see every course in it and in its subcategories, search by keyword, or browse <a href="/courses/tags">tags</a>. A course can carry more than one tag, so tags help when you know the topic you want but not the category.</p>
+                        <p>Choose a course card to read its description, level, contents and prices. The course page is where you decide whether to buy.</p>
+                    {% endblock %}{% endembed %}
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'buy-access', eyebrow: 'Buying', icon: icons.buying, heading: 'Buy access'})} %}{% block body %}
                         <ol>
                             <li>On a course page, choose the price and access period that suit you.</li>
-                            <li>Select <strong>Buy now</strong> to go straight to checkout, or add the course to your cart if you want to continue browsing.</li>
-                            <li>Review your course, price, access period and email address before placing the order.</li>
-                            <li>Choose the payment method offered at checkout. Card payments in this environment show their result immediately; an EFT order displays payment instructions and an order reference.</li>
+                            <li>Select <strong>Buy now</strong> to go straight to checkout, or add the course to your cart to keep browsing.</li>
+                            <li>Review your order, then choose one of the payment methods offered at checkout.</li>
                         </ol>
-                        <p>After a successful payment, your course appears in <strong>My Course Library</strong>. EFT access starts after the payment has been confirmed. Keep the order email and reference if you need to ask about a payment.</p>
-                    {% endblock %}
-                {% endembed %}
-
-                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'course-structure'})} %}
-                    {% block surface_body %}
-                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '03', heading: 'What a course contains', summary: 'Courses are organised into a sequence of learning steps.'})} %}{% endembed %}
-                        <p>A course is made up of modules. Each module contains the material for one part of the subject, such as written explanations, images, video, downloads or other practical resources.</p>
-                        <p>Courses contain reusable Course Items and optional sections. Assessments and diagnostics may appear alongside lessons or inside them. Only submitted graded assessments count toward progress; reading, watching and downloading content do not mark it complete. The final assessment opens after preceding graded assessments have been submitted.</p>
-                        <p>When a course offers a certificate, passing the course issues it. Open it from the course page with View certificate, or from the course history on your Account dashboard, and download it as a PDF. Its page has a public address anyone can use to check it.</p>
-                    {% endblock %}
-                {% endembed %}
-
-                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'learn'})} %}
-                    {% block surface_body %}
-                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '04', heading: 'Learn and track progress', summary: 'Pause and return whenever you are ready.'})} %}{% endembed %}
-                        <p>Open a purchased course from <strong>My Course Library</strong> and select <strong>Start</strong> or <strong>Continue</strong>. Work through the modules in order unless the course says that another path is available.</p>
-                        <p>Your completed material and assessment results are saved as you go. You can leave and return later; the library shows your current progress and completed courses.</p>
-                        <p>Read each module's instructions before starting an assessment. Submit your answers when you are ready and follow the result page for the next available step.</p>
-                    {% endblock %}
-                {% endembed %}
-
-                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'sign-in'})} %}
-                    {% block surface_body %}
-                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '05', heading: 'Sign in and your account', summary: 'Access your courses without a password.'})} %}{% endembed %}
-                        <p>CattoLMS uses a one-time sign-in link. Enter your email address on the <a href="/login">sign-in page</a>; the latest email contains the link for that sign-in attempt. A link expires and can only be used once.</p>
-                        <p>Once signed in, your account area contains your course library, profile details, email addresses and active sessions. Keep your email address current so you can receive sign-in links and order messages.</p>
-                    {% endblock %}
-                {% endembed %}
-
-                {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'answers'})} %}
-                    {% block surface_body %}
-                        {% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {eyebrow: '06', heading: 'Still need an answer?', summary: 'We can help with questions about courses or access.'})} %}{% endembed %}
-                        <p>Read the course description and checkout review first; they contain the specific access period, included material and payment details for that course.</p>
-                        <p>If something is unclear or an order does not look right, <a href="/contact">contact the CattoLMS team</a> and include the email address on the account and your order reference where applicable.</p>
-                    {% endblock %}
-                {% endembed %}
+                        <p>Your course starts immediately: as soon as your payment is confirmed it is in <strong>My Courses</strong>. When you pay by EFT, use your account reference as the payment reference. The course starts when we confirm that the payment has arrived.</p>
+                    {% endblock %}{% endembed %}
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'course-structure', eyebrow: 'Courses', icon: icons.courses, heading: 'What a course contains'})} %}{% block body %}
+                        <p>A course is made up of modules. Each module covers one part of the subject with written explanations, images, video, downloads or other practical material, and most end with an assessment.</p>
+                        <p>Only submitted graded assessments count towards your progress. Reading, watching and downloading do not. The final assessment opens after the graded assessments before it have been submitted. The <a href="/faq#grading">FAQ</a> explains how your result is worked out.</p>
+                        <p>When a course offers a certificate, you earn it by completing every assessment in the course, whether you pass or fail. A certificate states that you took the course and shows no mark. Your marks and overall grade are on its transcript. Both are issued once your identity is verified, in your name exactly as it appears on your identity document: if you are not verified yet, the course page offers Verify my identity. Open them from the course page with View certificate and View transcript, and download each as a PDF. Each is private, seen only by you, until you make it public at Account → My Certificates: then anyone you give its address to can check it. You decide for the certificate and the transcript separately, and you can make either private again, or give it a new address, at any time.</p>
+                    {% endblock %}{% endembed %}
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'learn', eyebrow: 'Learning', icon: icons.learning, heading: 'Learn and track progress'})} %}{% block body %}
+                        <p>Open a course from <strong>My Courses</strong> and select <strong>Start course</strong> or <strong>Continue course</strong>. Work through the modules in order unless the course says that another path is available.</p>
+                        <p>Your assessment results are saved as you go. You can leave and come back later: My Courses shows your progress and your completed courses.</p>
+                        <p>Read each module's instructions before starting its assessment. Submit your answers when you are ready and follow the result page to the next step.</p>
+                    {% endblock %}{% endembed %}
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'sign-in', eyebrow: 'Account', icon: icons.account, heading: 'Sign in and your account'})} %}{% block body %}
+                        <p>CattoLMS is for adults: you must be 18 or older, and you give your date of birth when you register. CattoLMS uses a one-time sign-in link instead of a password. Enter your email address on the <a href="/login">sign-in page</a> and use the link in the latest email. A link expires and works only once.</p>
+                        <p>Once signed in, your account holds your courses, orders, certificates, profile details, email addresses and active sessions. Keep your email address current so you receive sign-in links and order emails.</p>
+                    {% endblock %}{% endembed %}
+                    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'answers', eyebrow: 'Contact', icon: icons.contact, heading: 'Still need an answer?'})} %}{% block body %}
+                        <p>The <a href="/faq">FAQ</a> answers the questions people ask most. A course's page and the checkout review show its access period, contents and payment details.</p>
+                        <p>If something is unclear or an order does not look right, <a href="/contact">contact the CattoLMS team</a> with the email address on your account and your order number.</p>
+                    {% endblock %}{% endembed %}
+                </div>
             {% endblock %}
         {% endembed %}
     </section>

@@ -1,20 +1,15 @@
 {#
   The opening card of a public legal document: its last-updated date from LegalDocuments (no version
-  number, owner 2026-10-17), the page's contents and the other two documents. legal_sections is the page's own list of {id, label}, one per numbered section below.
+  number, owner 2026-10-17), what the document covers, the other two documents and the document as a PDF, opened in
+  a new tab (owner, 2026-10-20). The sections below are accordions, so their titles
+  are the contents.
 #}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'document'})} %}
 {% block surface_body %}
 		<p data-legal-document="{{ legal.key }}"><strong>Last updated <time datetime="{{ legal.updated }}">{{ legal.updated_label }}</time>.</strong></p>
-		<p>{{ legal_intro }}</p>
-		<nav aria-label="Contents">
-			<ol>
-				{% for section in legal_sections %}
-					<li><a href="#{{ section.id }}">{{ section.label }}</a></li>
-				{% endfor %}
-			</ol>
-		</nav>
+		<p>{{ legal.intro }}</p>
 		<p>Read this with the
-			{%- for other in legal_documents|filter(other => other.key != legal.key) %} <a href="{{ other.path }}">{{ other.title }}</a>{{ loop.last ? '.' : ' and the' }}{% endfor %}
-			You can print this page or save it from your browser.</p>
+			{%- for other in legal_documents|filter(other => other.key != legal.key) %} <a href="{{ other.path }}">{{ other.title }}</a>{{ loop.last ? '.' : ' and the' }}{% endfor %}</p>
+		<p class="cl-legal-pdf">{{ ui('action.link', {label: 'Download the ' ~ legal.title ~ ' (PDF)', variant: 'secondary', size: 'small', href: legal.path ~ '.pdf', new_window: true}) }} Every section, with the date it was last updated and our details.</p>
 {% endblock %}
 {% endembed %}

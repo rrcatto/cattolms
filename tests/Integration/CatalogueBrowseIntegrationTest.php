@@ -12,7 +12,7 @@ use CattoLearning\Tests\Support\IntegrationContainer;
 use CattoLearning\Tests\Support\IntegrationDataFixture;
 use PHPUnit\Framework\TestCase;
 
-/** Exercises direct category navigation, descendant search and tag filtering against PostgreSQL. */
+/** Exercises category browsing (each category's whole branch), search and tag filtering against PostgreSQL. */
 final class CatalogueBrowseIntegrationTest extends TestCase
 {
     private Database $db;
@@ -405,14 +405,74 @@ final class CatalogueBrowseIntegrationTest extends TestCase
     }
 
 
-    public function testDirectCategoryPagesDoNotIncludeDescendants(): void
+    /** A category shows every course in it and in all its subcategories (owner, 2026-10-19). */
+    public function testACategoryListsEveryCourseInItsWholeBranch(): void
     {
-        foreach ([$this->rootId => 1, $this->branchId => 1, $this->leafId => 2] as $id => $expected) {
-            $pagination = \CattoLearning\Support\Pagination::catalogue(1, $this->service->categoryCourseTotal($id));
-            $rows = $this->service->categoryCoursePage($id, $pagination->toArray());
-            self::assertSame($expected, $pagination->total);
+        foreach ([$this->rootId => 4, $this->branchId => 3, $this->leafId => 2] as $id => $expected) {
+            $filter = new CatalogueFilter($id);
+            $rows = $this->service->catalogue($filter, 24, 0);
+            self::assertSame($expected, $this->service->catalogueCount($filter));
             self::assertCount($expected, $rows);
-            foreach ($rows as $row) self::assertSame($id, (int) $row['category_id']);
+        }
+        self::assertSame([$this->leafId, $this->leafId], array_map(static fn(array $row): int => (int) $row['category_id'], $this->service->catalogue(new CatalogueFilter($this->leafId), 24, 0)));
+    }
+
+    /** The trail from All courses down, and the categories beneath with each whole branch's total. */
+    public function testTheCategoryNavigationIsTheTrailAndTheBranchesBeneath(): void
+    {
+        $root = $this->service->category($this->rootId);
+        $branch = $this->service->category($this->branchId);
+        $leaf = $this->service->category($this->leafId);
+        $atRoot = $this->service->categoryNavigation($root);
+        self::assertSame([['label' => 'All courses', 'href' => '/courses', 'current' => false], ['label' => $root['name'], 'href' => '', 'current' => true]], $atRoot['trail']);
+        self::assertSame('Subcategories', $atRoot['label']);
+        self::assertSame([$this->card($branch, 3)], $atRoot['subcategories'], 'Each category beneath carries its id, icon and description for its card (owner, 2026-10-20).');
+        $atLeaf = $this->service->categoryNavigation($leaf);
+        self::assertSame(['All courses', $root['name'], $branch['name'], $leaf['name']], array_column($atLeaf['trail'], 'label'));
+        self::assertSame(['/courses', '/courses/category/' . $root['slug'], '/courses/category/' . $branch['slug'], ''], array_column($atLeaf['trail'], 'href'));
+        self::assertSame([], $atLeaf['subcategories']);
+        $top = $this->service->categoryNavigation(null);
+        self::assertSame([], $top['trail'], 'All courses needs no trail.');
+        self::assertSame('Categories', $top['label']);
+        self::assertContains($this->card($root, 4), $top['subcategories']);
+    }
+
+    /**
+     * A category's card, as categoryNavigation() gives it: a category without an icon gets the plain one.
+     *
+     * @param array<string,mixed> $category
+     * @return array{id:int,label:string,href:string,count:int,icon:string,description:string}
+     */
+    private function card(array $category, int $count): array
+    {
+        $icon = trim((string) ($category['icon_svg'] ?? ''));
+        return ['id' => (int) $category['id'], 'label' => (string) $category['name'], 'href' => '/courses/category/' . $category['slug'], 'count' => $count,
+            'icon' => $icon !== '' ? (string) $category['icon_svg'] : CourseService::CATEGORY_ICON, 'description' => trim((string) ($category['description'] ?? ''))];
+    }
+
+    /** Numbered courses first, lowest first, then the rest newest first (owner, 2026-10-20: a basic course before its advanced one). */
+    public function testTheCatalogueFollowsEachCoursesPosition(): void
+    {
+        $filter = new CatalogueFilter($this->rootId);
+        $ids = static fn(array $rows): array => array_map(static fn(array $row): int => (int) $row['id'], $rows);
+        [$first, $second, $third] = $this->seedCourseIds;
+        $this->courses->setCataloguePosition($third, 100);
+        $this->courses->setCataloguePosition($first, 200);
+        $shown = $ids($this->service->catalogue($filter, 24, 0));
+        self::assertSame([$third, $first], array_slice($shown, 0, 2), 'The numbered courses lead, lowest first.');
+        self::assertCount(4, $shown, 'The unnumbered courses follow.');
+        self::assertContains($second, array_slice($shown, 2));
+        $this->courses->setCataloguePosition($third, null);
+        self::assertSame($first, $ids($this->service->catalogue($filter, 24, 0))[0], 'Clearing a number puts the course back among the rest.');
+        self::assertNull(CourseService::cataloguePosition(''));
+        self::assertSame(150, CourseService::cataloguePosition(' 150 '));
+        foreach (['0', '-100', '1.5', 'abc', '3000000000'] as $refused) {
+            try {
+                CourseService::cataloguePosition($refused);
+                self::fail('Accepted ' . $refused);
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('whole number', $error->getMessage());
+            }
         }
     }
 
@@ -483,21 +543,35 @@ final class CatalogueBrowseIntegrationTest extends TestCase
         self::assertTrue(($form->compareDocumentPosition($search) & 4) === 4, 'The category picker comes before the search field.');
     }
 
-    public function testLiveCategoryRouteUsesDirectCoursesAndSearchUsesDescendants(): void
+    public function testLiveCategoryRouteShowsTheWholeBranchWithItsTrail(): void
     {
         $base = '/courses/category/' . $this->rootSlug;
         $normal = $this->page($base);
-        self::assertSame(1, $normal->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(4, $normal->query('//article[contains(@class,"cl-course-card")]')->length, 'The root shows its own course and every course beneath it.');
         self::assertSame(1, $normal->query('//button[@name="category" and @value="' . $this->rootId . '" and @aria-current="true"]')->length);
         self::assertSame(1, $normal->query('//form[@action="' . $base . '" and @data-server-search]')->length);
+        $trail = '//*[@id="catalogue-results"]//nav[@aria-label="Category path"]';
+        self::assertSame(1, $normal->query($trail . '//a[@href="/courses" and normalize-space()="All courses"]')->length);
+        self::assertSame(1, $normal->query($trail . '//span[@aria-current="page"]')->length);
+        $branch = $this->service->category($this->branchId);
+        // The categories beneath are feature cards, a native radio each, in a form that opens the chosen one (owner, 2026-10-20).
+        $cards = '//*[@id="catalogue-results"]//form[@method="get" and @action="/courses" and @data-choose-submits]//fieldset[@id="catalogue-categories" and contains(@class,"cl-ui-picture-choice--four")]';
+        self::assertSame('Subcategories', trim((string) $normal->query($cards . '/legend')->item(0)?->textContent));
+        self::assertSame(1, $normal->query($cards . '//label[.//*[@class="cl-ui-picture-choice-label" and normalize-space()="' . $branch['name'] . '"]]/input[@type="radio" and @name="category" and @value="' . $this->branchId . '"]')->length);
+        self::assertSame(1, $normal->query($cards . '//label//*[@class="cl-ui-picture-choice-icon"]/*[local-name()="svg"]')->length, 'Each card has its icon.');
+        self::assertSame(1, $normal->query('//form[@data-choose-submits]/noscript')->length, 'Show courses submits the choice without JavaScript.');
         $search = $this->page($base . '?catalogue_q=Browse%20Seed%20Course');
         self::assertSame(3, $search->query('//article[contains(@class,"cl-course-card")]')->length);
         self::assertSame(1, $search->query('//form[@data-server-search]//a[@href="' . $base . '"]')->length, 'Clearing search stays in the category.');
         $enhanced = $this->page($base, true);
         self::assertSame(1, $enhanced->query('//*[@id="catalogue-region"]/*[@id="catalogue-results"]')->length);
-        self::assertSame(1, $enhanced->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(4, $enhanced->query('//article[contains(@class,"cl-course-card")]')->length);
         $cleared = $this->page($base . '?catalogue_q=');
-        self::assertSame(1, $cleared->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(4, $cleared->query('//article[contains(@class,"cl-course-card")]')->length);
+        $leaf = $this->page('/courses/category/' . $this->service->category($this->leafId)['slug']);
+        self::assertSame(2, $leaf->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(3, $leaf->query($trail . '//a')->length, 'All courses, the root and the branch lead back up.');
+        self::assertSame(0, $leaf->query('//*[@id="catalogue-categories"]')->length, 'The deepest level has no cards beneath it.');
     }
 
     public function testLiveTagRouteKeepsVocabularyAndSearchScope(): void
@@ -547,9 +621,11 @@ final class CatalogueBrowseIntegrationTest extends TestCase
             self::assertGreaterThan(0, $second->query('//article[contains(@class,"cl-course-card")]')->length);
             self::assertLessThanOrEqual(24, $second->query('//article[contains(@class,"cl-course-card")]')->length);
         }
+        // The catalogue opens on every course, a page at a time, not a featured few (owner, 2026-10-19).
         $root = $this->page('/courses');
-        self::assertLessThanOrEqual(12, $root->query('//article[contains(@class,"cl-course-card")]')->length);
-        self::assertGreaterThan(0, $root->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(24, $root->query('//article[contains(@class,"cl-course-card")]')->length);
+        self::assertSame(2, $root->query('//nav[@data-pagination="catalogue"]')->length);
+        self::assertSame(1, $root->query('//fieldset[@id="catalogue-categories" and legend="Categories"]//input[@name="category" and @value="' . $this->rootId . '"]')->length);
     }
 
     public function testFavouriteStateAndCsrfSurviveFullAndHtmxWorkspaceRendering(): void

@@ -1,0 +1,82 @@
+{#
+  The numbered sections of the Refund Policy, each a closed accordion with its icon (owner, 2026-10-20). One source for the page and its PDF
+  (partials/legal/document-pdf.html.twig), which prints each section open under its heading. The text is the
+  legal text: change its date in CattoLearning\Legal\LegalDocuments whenever it changes.
+#}
+{% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+{% set icons = {
+	'rule': '<svg ' ~ a ~ '><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/><circle cx="12" cy="12" r="2.5"/></svg>',
+	'bundles': '<svg ' ~ a ~ '><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>',
+	'company-credits': '<svg ' ~ a ~ '><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.4.6 4 2.7 4 6"/></svg>',
+	'nothing-paid': '<svg ' ~ a ~ '><rect x="3" y="8" width="18" height="5"/><path d="M5 13v8h14v-8M12 8v13M12 8c-2-4-6-3-5 0M12 8c2-4 6-3 5 0"/></svg>',
+	'destination': '<svg ' ~ a ~ '><path d="M7 7h12l-3-3M17 17H5l3 3"/></svg>',
+	'deductions': '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>',
+	'access': '<svg ' ~ a ~ '><circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H21M18 12v3M15 12v2"/></svg>',
+	'payment': '<svg ' ~ a ~ '><path d="M3 10h18L12 4z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/></svg>',
+	'request': '<svg ' ~ a ~ '><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13l2 2 4-4"/></svg>',
+	'your-rights': '<svg ' ~ a ~ '><path d="M12 4v16M8 20h8M5 7h14"/><path d="M5 7l-3 6h6zM19 7l-3 6h6z"/></svg>',
+} %}
+<div class="cl-faq">
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'rule', eyebrow: 'Section 1', icon: icons['rule'], heading: 'The rule'})} %}{% block body %}
+<p>Every course you buy starts as soon as your payment is confirmed. You agree to this at checkout. For a card payment that is when you pay. For an EFT it is when we confirm that your payment has arrived in our bank account.</p>
+<p><strong>Once a course has started, its content has been supplied to you and cannot be returned. No refund of any kind is given for it: no money back and no wallet credit.</strong></p>
+<p>A course that has not started can be refunded only within {{ refund_window }} of your purchase.</p>
+<p>Unused access time is not refunded.</p>
+<p>This rule does not affect your rights if a course is faulty, is not as described or cannot be provided. <a href="#your-rights">Section 10</a> explains them.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'bundles', eyebrow: 'Section 2', icon: icons['bundles'], heading: 'Bundles'})} %}{% block body %}
+<p>A bundle is refunded as a whole. A single course in a bundle is not refunded on its own.</p>
+<p>Every course in a bundle starts when your payment is confirmed, and once any course in it has started, no refund is given for the bundle.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'company-credits', eyebrow: 'Section 3', icon: icons['company-credits'], heading: 'Company credits'})} %}{% block body %}
+<p>A refund for company credits is given only within {{ refund_window }} of buying the credits, and only for credits that no learner has started.</p>
+<p>A credit that is assigned to a staff member who has not started can be refunded once the Company Administrator removes that staff member from the course. That returns the credit to the company.</p>
+<p>Company credits are refunded only as wallet credit in the company's wallet, at the price the company paid for them, less any deduction in <a href="#deductions">section 6</a>. Staff members who have started keep their access. This does not affect a refund the law gives the company.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'nothing-paid', eyebrow: 'Section 4', icon: icons['nothing-paid'], heading: 'Orders with nothing to pay'})} %}{% block body %}
+<p>A free course has nothing to refund. An order that a promo code reduced to nothing has nothing to refund.</p>
+<p>An order that is not paid in full in time is cancelled, not refunded. Anything you paid towards it becomes wallet credit.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'destination', eyebrow: 'Section 5', icon: icons['destination'], heading: 'Wallet credit or money back'})} %}{% block body %}
+<p>When you ask for a refund you choose where it goes:</p>
+<ul>
+	<li><strong>Wallet credit.</strong> The refund is added to your wallet and can be spent on any course. This is the choice we suggest.</li>
+	<li><strong>Money back.</strong> The refund is paid back to you.</li>
+</ul>
+<p>Whatever you choose, the part of the order you paid from your wallet goes back to your wallet, with the expiry date it had before.</p>
+<p>Wallet credit expires {{ wallet_expiry }} after it was added if it has not been spent. It earns no interest and is not paid out as cash. The {{ legal_documents.terms.title }} explain wallet credit in full.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'deductions', eyebrow: 'Section 6', icon: icons['deductions'], heading: 'What is deducted'})} %}{% block body %}
+<p>A refund of a card payment is less any fee the payment provider charged us for that payment and, for money back, for the refund. Money back for an EFT payment is less our EFT refund fee.</p>
+<ul>
+	<li><strong>Paid by card, refunded as money back:</strong> any fee the payment provider charged us for your payment and any fee it charges us for the refund are deducted.</li>
+	<li><strong>Paid by card, refunded as wallet credit:</strong> any fee the payment provider charged us for your payment is deducted.</li>
+	<li><strong>Paid by EFT, refunded as money back:</strong> our EFT refund fee ({{ eft_refund_fee }}) is deducted.</li>
+	<li><strong>Paid by EFT, refunded as wallet credit:</strong> nothing is deducted.</li>
+	<li><strong>Paid from your wallet:</strong> nothing is deducted. It goes back to your wallet.</li>
+</ul>
+<p>The refund you are offered shows each deduction before it is made, and your credit note records them.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'access', eyebrow: 'Section 7', icon: icons['access'], heading: 'What happens to your access'})} %}{% block body %}
+<p>When a course or bundle is refunded in full, the access that purchase gave you ends at once. A course you have no other access to leaves your library.</p>
+<p>If you also have access to the same course from another purchase or from your company, that access continues.</p>
+<p>The records of your order, your payment and the refund are kept. Your invoice and receipt stay available under My Orders in your account, and a credit note is added for the refund.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'payment', eyebrow: 'Section 8', icon: icons['payment'], heading: 'How money back is paid'})} %}{% block body %}
+<ul>
+	<li><strong>You paid by card.</strong> The refund is made through our payment provider to the card you paid with, within 7 days of your refund request.</li>
+	<li><strong>You paid by EFT.</strong> We ask you for a bank account in your name and pay the refund into it by EFT within 7 days of your refund request. We use those bank details only to make that payment and do not keep them on this site.</li>
+</ul>
+<p>After we make a refund, your bank may take a few working days to show it in your account. Wallet credit is added to your wallet as soon as the refund is approved.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'request', eyebrow: 'Section 9', icon: icons['request'], heading: 'How to ask for a refund'})} %}{% block body %}
+<p>Ask on this site: open the order under My Orders in your account and choose Ask for a refund beside the course or bundle. Tell us why, and choose wallet credit or money back.</p>
+<p>If you cannot use the order page, email <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a> with your account reference, your order number and the course or bundle.</p>
+<p>For company credits, the Company Administrator asks for the company on the order page of the credit purchase.</p>
+<p>We check your request against this policy and the law, and you see our decision on the order. You can withdraw a request until it is decided.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'your-rights', eyebrow: 'Section 10', icon: icons['your-rights'], heading: 'Your rights under the law'})} %}{% block body %}
+<p>This policy does not take away a right you have under the Consumer Protection Act 68 of 2008 or the Electronic Communications and Transactions Act 25 of 2002. If a course is faulty, is not as described or cannot be provided, ask for a refund on this site and tell us what is wrong. We will put it right or refund you as the law requires.</p>
+<p>If you are unhappy with a decision about a refund, <a href="{{ legal_documents.terms.path }}#complaints">the complaints section of the {{ legal_documents.terms.title }}</a> explains how to complain.</p>
+	{% endblock %}{% endembed %}
+</div>

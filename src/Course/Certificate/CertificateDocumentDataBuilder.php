@@ -13,11 +13,14 @@ renders (PlaceholderRegistry, certificate type). One assembly step serves issuin
 certificate preview and the Seed Database, so a certificate's values come from one place:
 
 - certificate.* : the number and public verification address minted for it, and the issue time;
-- learner.name : the learner's certificate name, else their display name, else their email;
-- course.*     : the course title, the provider (the course's owner company, else the System
-  Company, else the platform name), the completion time and the course's accreditation line;
-- result.*     : the course result's overall percentage and grade, when the course has one;
+- learner.name : the learner's verified name, exactly as on their identity document (owner,
+  2026-10-19): a certificate is issued only to a verified account;
+- course.*     : the course title, the provider (the course's owner company, else the Site Owner),
+  the date the learner completed every assessment and the course's accreditation line;
 - business.*   : DocumentBusinessData.
+
+A certificate proves that the learner took the course, never that they passed: it carries no mark,
+grade or percentage. Those are on its transcript (TranscriptDataBuilder).
 
 The values are stored with the certificate exactly as built (CertificateIssuer), so a certificate
 keeps the names, titles and dates it was issued with.
@@ -25,6 +28,8 @@ keeps the names, titles and dates it was issued with.
 The wording, signatory and small print are not data: they belong to the course's certificate design.
 
 Changelog:
+2026/10/19 SAST
+- The verified name, and no result.percentage or result.grade (owner, 2026-10-19).
 2026/10/07 SAST
 - Certificate designs: course.accreditation added; the course's title, body, footer and signatory
   removed, as the design now holds its own wording and signatory.
@@ -54,7 +59,7 @@ final class CertificateDocumentDataBuilder
      *
      * @return array<string,mixed>
      */
-    public function forIssue(int $enrolmentId, string $certificateNumber, string $publicId, DateTimeImmutable $issuedAt): array
+    public function forIssue(int $enrolmentId, string $certificateNumber, string $publicId, DateTimeImmutable $issuedAt, string $verifiedName): array
     {
         $row = $this->certificates->issueContext($enrolmentId);
         if ($row === null) {
@@ -64,7 +69,7 @@ final class CertificateDocumentDataBuilder
         return self::assemble(
             $this->business->values(),
             $row,
-            self::learnerName($row),
+            $verifiedName,
             $this->courses->certificateProviderName((int) $row['course_id']),
             $certificateNumber,
             self::verificationUrl($publicId),
@@ -85,7 +90,7 @@ final class CertificateDocumentDataBuilder
         $now = (new DateTimeImmutable())->format(DATE_ATOM);
         return self::assemble(
             $this->business->values(),
-            $course + ['overall_percentage' => '85.00', 'grade_code' => 'Distinction'],
+            $course,
             $learnerName,
             $this->courses->certificateProviderName((int) $course['id']),
             'CL-PREVIEW-000001',
@@ -100,13 +105,12 @@ final class CertificateDocumentDataBuilder
      * template's {{#if}} leaves them out.
      *
      * @param array<string,mixed> $business business.* values
-     * @param array<string,mixed> $course the course's title and certificate_accreditation, and the result's overall_percentage and grade_code
+     * @param array<string,mixed> $course the course's title and certificate_accreditation
      * @return array<string,mixed>
      */
     public static function assemble(array $business, array $course, string $learnerName, string $provider, string $certificateNumber, ?string $verificationUrl, string $issuedAt, string $completedAt): array
     {
         $optional = static fn(mixed $value): ?string => ($value = trim((string) $value)) === '' ? null : $value;
-        $percentage = $course['overall_percentage'] ?? null;
         return $business + [
             'certificate.number' => $certificateNumber,
             'certificate.issue_date' => $issuedAt,
@@ -116,25 +120,7 @@ final class CertificateDocumentDataBuilder
             'course.provider' => $optional($provider),
             'course.completion_date' => $completedAt,
             'course.accreditation' => $optional($course['certificate_accreditation'] ?? null),
-            'result.percentage' => $percentage === null || $percentage === '' ? null : number_format((float) $percentage, 2, '.', ''),
-            'result.grade' => $optional($course['grade_code'] ?? null),
         ];
-    }
-
-    /**
-     * The name the learner chose for certificates, else their display name, else their email.
-     *
-     * @param array<string,mixed> $user
-     */
-    public static function learnerName(array $user): string
-    {
-        foreach (['certificate_name', 'display_name', 'email'] as $field) {
-            $name = trim((string) ($user[$field] ?? ''));
-            if ($name !== '') {
-                return $name;
-            }
-        }
-        return 'Learner';
     }
 
     /** The public page that verifies a certificate, when the installation knows its own address. */

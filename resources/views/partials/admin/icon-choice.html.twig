@@ -1,0 +1,35 @@
+{#
+	A category's or tag's icon, in its own card (owner, 2026-10-20: "an icon library is the best option here"): the
+	current icon; the shared search control, which searches the icon library as one types (or with Search, without
+	JavaScript); the library's icons that fit the name, or those the search finds, as short feature cards; an SVG of
+	one's own; and Save icon. Choosing nothing and uploading nothing changes nothing.
+	Expects: ic_current (the current icon's SVG), ic_kind ('category' or 'tag'), ic_choice ({query, items, action: the
+	page's own address, which the search reloads}), ic_save (where Save icon posts).
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'icon'})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Icon', heading_level: 2, summary: 'Shown beside the ' ~ ic_kind ~ ' wherever it appears. Choose one from the icon library, find another by a word, or upload your own.'}) }}
+	<div class="cl-icon-choice">
+		<div class="cl-icon-choice-current">
+			{% if ic_current %}<span class="{{ ic_kind == 'tag' ? 'cl-tag-icon cl-tag-icon--preview' : 'cl-category-icon cl-category-icon--preview' }}" aria-hidden="true">{{ ic_current|raw }}</span><span>The current icon</span>{% else %}<span>No icon yet</span>{% endif %}
+		</div>
+		{% include '@platform/partials/dataset-search.html.twig' with {ds_name: 'icon', ds_label: 'Find an icon in the library', ds_value: ic_choice.query, ds_action: ic_choice.action, ds_help: 'A word, such as lock, book or chart. Without one, the icons that fit the name are shown.'} %}
+		<form action="{{ ic_save }}" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			<div id="icon-region"><div id="icon-results">
+				{% if ic_choice.items %}
+					{{ ui('form.picture-choice', {name: 'library_icon', legend: ic_choice.query ? 'Icons for “' ~ ic_choice.query ~ '”' : 'Icons that fit the name', id: 'library-icon', size: 'small', columns: 4, items: ic_choice.items}) }}
+				{% else %}
+					<p class="help">No icon in the library matches “{{ ic_choice.query }}”. Try another word.</p>
+				{% endif %}
+			</div></div>
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Or upload your own (an SVG file)', for: ic_kind ~ '-icon', help: 'An icon drawn in one colour takes the theme\'s colour.'})} %}
+{% block control %}<input class="cl-input" type="file" id="{{ ic_kind }}-icon" name="icon" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save icon', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% endembed %}
+		</form>
+	</div>
+{% endblock %}
+{% endembed %}

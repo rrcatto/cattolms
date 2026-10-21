@@ -5,6 +5,10 @@
  * total and the order page and invoice keep it; ADMIN creates, edits, deactivates, reactivates and
  * deletes a promotion; and the checkout promo section and the ADMIN promotion pages render in all
  * five themes at desktop and phone widths without sideways scrolling.
+ * Last (owner, 2026-10-20): ADMIN gives a course a was price on its pricing tab and makes a promotion
+ * apply automatically; the course page and catalogue card strike the was price through, the course
+ * page announces the promotion, the cart applies it with nothing typed and refuses a smaller code, and
+ * the order keeps it; the announcement fits every theme at both widths.
  *
  * Run against the development instance with promotions-fixture.php. Placing orders leaves them
  * behind: orders are immutable. Uses the installed Playwright. */
@@ -228,6 +232,81 @@ async function applyCode(page, code, keyboard = true) {
             }
         }
         await buyer.ctx.close();
+        await admin.ctx.close();
+    });
+    /* Owner, 2026-10-20: a was price struck through beside the price, and a promotion that applies itself.
+     * Last, because while it is active the automatic promotion applies to every cart. */
+    await scenario('ADMIN marks a course down and makes a promotion apply automatically; the learner sees both, the cart applies it and the order keeps it', 'chromium', async () => {
+        const admin = await open(chromium, fixture.admin_token);
+        await admin.page.goto(`${base}/admin/courses/${fixture.courses.a.id}?tab=pricing`);
+        await admin.page.locator('a[href*="edit_price="]').first().click();
+        await admin.page.waitForURL(/edit_price=/);
+        await admin.page.locator('input[name=was_price][form^="price-edit-"]').fill('200');
+        await submit(admin.page, admin.page.locator('form[id^="price-edit-"] button[type=submit]'));
+        assert.equal(await flash(admin.page), 'The course price option was updated.');
+        assert.equal(clean(await admin.page.locator('tbody .cl-price').first().innerText()), `Was ${rand(20000)} now ${rand(12345)}`, 'the pricing tab shows the markdown');
+
+        const auto = `AUTO${fixture.suffix}`.toUpperCase();
+        await admin.page.goto(`${base}/admin/promotions/new`);
+        await admin.page.locator('#promotion-code').fill(auto);
+        await admin.page.locator('#promotion-name').fill('Browser automatic offer');
+        await admin.page.locator('#promotion-value').fill('20');
+        await admin.page.locator('input[name=applies_automatically]').check();
+        await submit(admin.page, admin.page.getByRole('button', {name: 'Create promotion'}));
+        assert.equal(await flash(admin.page), 'The promotion was created.');
+        const editor = admin.page.url();
+        await admin.page.goto(`${base}/admin/promotions?promotions_q=${auto}`);
+        assert.match(clean(await admin.page.locator('tbody tr').first().innerText()), /Applies automatically/i, 'the list marks it, whatever case the theme draws badges in');
+
+        const {ctx, page} = await open(chromium, learner().token);
+        await page.goto(`${base}/courses/${fixture.courses.a.slug}`);
+        const box = page.locator('.cl-course-purchase');
+        assert.equal(clean(await box.locator('.cl-price').first().innerText()), `Was ${rand(20000)} now ${rand(12345)} Save ${rand(7655)} (38%)`, 'the course page strikes the was price through and says what is saved');
+        assert.equal(await box.locator('s.cl-price-was').count(), 1);
+        assert.equal(clean(await box.locator('.cl-promotion-announcement').innerText()), `${auto} 20% off, applied automatically in your cart: you pay ${rand(9876)} instead of ${rand(12345)}.`);
+        await page.goto(`${base}/courses?catalogue_q=${encodeURIComponent('Promotions browser course A')}`);
+        assert.equal(clean(await page.locator('.cl-course-card s.cl-ui-key-value-was').first().innerText()), `Was ${rand(20000)}`, 'the catalogue card strikes it through too');
+
+        await toReview(page, fixture);
+        const automatic = [['Subtotal', rand(17345)], [`Promo ${auto} (20% off, applied automatically)`, `−${rand(3469)}`], ['Total', rand(13876)]];
+        assert.deepEqual(await totals(page), automatic, 'the cart applied it with nothing typed');
+        assert.equal(clean(await page.locator('.cl-checkout-promo-applied').innerText()), `${auto} · 20% off · −${rand(3469)} · applied automatically`);
+        assert.equal(await page.locator('form[action="/checkout/promo/remove"]').count(), 0, 'there is no typed code to remove');
+        assert.match(clean(await page.locator('main').innerText()), new RegExp(`Was ${rand(20000)} now ${rand(12345)}`), 'the review strikes the was price through');
+        await applyCode(page, code);
+        assert.equal(await flash(page), `${auto}, which is applied automatically, already saves you at least as much as ${code} would. One promotion applies to an order.`);
+        assert.deepEqual(await totals(page), automatic, 'the smaller code changed nothing');
+        await page.screenshot({path: `${output}/chromium-automatic-review.png`, fullPage: true});
+        await page.locator('input[name=accept_terms]').check();
+        await page.locator('input[name=accept_start]').check();
+        await submit(page, page.getByRole('button', {name: 'Place my order'}));
+        assert.deepEqual(await totals(page), automatic, 'the order keeps the promotion and that it applied itself');
+        await page.screenshot({path: `${output}/chromium-automatic-order.png`, fullPage: true});
+        const orderId = new URL(page.url()).pathname.split('/').pop();
+        await ctx.close();
+        await admin.page.goto(`${base}/admin/commerce/orders/${orderId}`);
+        assert.match(clean(await admin.page.locator('main').innerText()), new RegExp(`Promotion ${auto} \\(Browser automatic offer\\), applied automatically by the cart, took 20% off`), 'ADMIN\'s order page says the cart applied it');
+
+        // A learner who has not bought the course yet sees the announcement in every theme.
+        const viewer = await open(chromium, learner().token);
+        for (const theme of themes) {
+            for (const width of [1440, 390]) {
+                await viewer.page.setViewportSize({width, height: 1200});
+                await viewer.page.goto(`${base}/courses/${fixture.courses.a.slug}?theme_preview=${theme}`);
+                assert.ok(await viewer.page.locator('.cl-promotion-announcement').first().isVisible(), `${theme} ${width} announces the promotion`);
+                assert.ok(await viewer.page.locator('.cl-course-purchase s.cl-price-was').first().isVisible(), `${theme} ${width} strikes the was price through`);
+                assert.ok(await noSideScroll(viewer.page), `${theme} ${width} course page does not scroll sideways`);
+            }
+        }
+        await viewer.page.setViewportSize({width: 390, height: 1200});
+        await viewer.page.goto(`${base}/courses/${fixture.courses.a.slug}`);
+        await viewer.page.screenshot({path: `${output}/chromium-390-marked-down.png`, fullPage: true});
+        await viewer.ctx.close();
+
+        // The site is left as it was: the promotion an order used is kept, switched off.
+        await admin.page.goto(editor);
+        await submit(admin.page, admin.page.getByRole('button', {name: 'Deactivate'}));
+        assert.match(await flash(admin.page), /^The promotion is deactivated\./);
         await admin.ctx.close();
     });
     await chromium.close();

@@ -1,0 +1,44 @@
+{#
+	Contact Messages (owner, 2026-10-20; ContactService): every message sent through the contact form, newest
+	first, the ones not yet answered by default, filtered by reason and searched by reference, name, email,
+	account reference or order number. Each opens its own page.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Contact Messages' %}
+	{% set ph_lead = 'Every message sent through the contact form. Open one to read it, reply by email and mark it answered.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Find messages', summary: unanswered == 1 ? '1 message is not answered yet.' : unanswered ~ ' messages are not answered yet.'}) }}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+			{{ ui('action.link', {label: 'Not answered', variant: filters.status == 'new' ? 'primary' : 'secondary', size: 'small', href: '/admin/messages?status=new'}) }}
+			{{ ui('action.link', {label: 'Answered', variant: filters.status == 'answered' ? 'primary' : 'secondary', size: 'small', href: '/admin/messages?status=answered'}) }}
+			{{ ui('action.link', {label: 'All', variant: filters.status == 'all' ? 'primary' : 'secondary', size: 'small', href: '/admin/messages?status=all'}) }}
+		{% endblock %}{% endembed %}
+		<form action="/admin/messages" method="get"><input type="hidden" name="status" value="{{ filters.status }}">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: false, for: 'messages-q'})} %}{% block control %}<input id="messages-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Reference, name, email, account reference or order number" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason', full_width: false, for: 'messages-reason'})} %}{% block control %}<select id="messages-reason" name="reason" {{ ui_field_attrs(props) }}><option value="">Every reason</option>{% for key, label in reasons %}<option value="{{ key }}" {{ filters.reason == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/messages?status=' ~ filters.status}) }}{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</form>
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: filters.status == 'new' ? 'Not answered' : (filters.status == 'answered' ? 'Answered' : 'All messages'), summary: 'Newest first.'}) }}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'messages', pagination: messages_pagination})} %}{% block results %}
+			{% if rows %}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Received'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'From'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 18, label: 'Reason'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Message', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 9, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 7, label: ''}} %}</tr>{% endblock %}
+			{% block body %}{% for row in rows %}
+				<tr data-message-id="{{ row.id }}">
+					<td class="small">{{ row.received }}<br>{{ row.reference }}</td>
+					<td class="cell-text"><strong>{{ ui('data.person', row.sender) }}</strong><br><span class="small">{{ row.sender_email }}{% if not row.user_id and row.account_reference %}<br>{{ row.account_reference }}{% endif %}</span></td>
+					<td class="cell-text">{{ row.reason_label }}{% if row.order_number %}<br><span class="small">{{ row.order_number }}</span>{% endif %}{% if row.course_title %}<br><span class="small">{{ row.course_title }}</span>{% endif %}</td>
+					<td class="cell-text">{{ row.excerpt }}</td>
+					<td>{{ ui('feedback.badge', {label: row.status_label, tone: row.status_tone, size: 'small'}) }}</td>
+					<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open message ' ~ row.reference}) }}</td>
+				</tr>
+			{% endfor %}{% endblock %}
+			{% endembed %}
+			{% else %}{{ ui('feedback.empty', {summary: filtered ? 'No message matches these filters.' : (filters.status == 'new' ? 'Every message has been answered.' : 'No messages yet.')}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

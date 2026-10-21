@@ -27,6 +27,12 @@ token would rebuild the same graph - useful when reproducing a defect found at v
 
 Changelog:
 
+2026/10/19 SAST
+
+- No certificates: a certificate is issued only to a verified account, in its verified name (owner,
+  2026-10-19), and generated learners are not verified, so their completed courses wait for
+  verification like anyone else's. A generated identity check would be a made-up identity.
+
 2026/10/07 SAST
 
 - Certificate designs: generated certificates use the default design, which every generated course starts on.
@@ -53,7 +59,6 @@ declare(strict_types=1);
 
 namespace CattoLearning\Seed;
 
-use CattoLearning\Course\Certificate\CertificateDocumentDataBuilder;
 use CattoLearning\Infrastructure\Mail\GeneratedDomainRouter;
 use CattoLearning\Infrastructure\Persistence\SeedRepository;
 use CattoLearning\Auth\RoleCatalog;
@@ -215,8 +220,7 @@ final class SeedGenerator
      * keep generated slugs and domains readable to someone reading the database directly.
      *
      * Every globally unique value the generator writes is built from this key: `companies.domain`,
-     * `user_emails.email`, `course_categories.slug`, `courses.slug` and
-     * `certificates.certificate_number`. That list is the whole of it: every other unique
+     * `user_emails.email`, `course_categories.slug` and `courses.slug`. That list is the whole of it: every other unique
      * constraint on a table this class writes is either a random `public_id`, or composite and
      * scoped to a parent row the generator creates itself, so two sets cannot reach each other
      * through one. Anything globally unique added later must be built from this key.
@@ -810,8 +814,8 @@ final class SeedGenerator
     }
 
     /**
-     * Enrolments and everything that hangs off them: progress, attempts, responses, sessions,
-     * results and certificates.
+     * Enrolments and everything that hangs off them: progress, attempts, responses, sessions and
+     * results. Never a certificate: generated learners are not verified (owner, 2026-10-19).
      *
      * @param list<array{id:int,placements:array<int,int>,assessments:list<int>,questions:array<int,list<int>>,options:array<int,list<int>>,title:string}> $courses
      * @param array{all:list<int>,students:list<int>,owners:list<int>,editors:list<int>,admins:list<int>} $people
@@ -833,20 +837,14 @@ final class SeedGenerator
         $seenPairs = [];
         // How many enrolments have been given a full history so far. The plan caps it.
         $worked = 0;
-        // Certificate numbers run across the whole set, so the counter cannot live inside a chunk:
-        // reset per chunk it would issue SEED-<key>-000000 once per chunk instead of once.
-        $certificateSequence = 0;
-        // Generated certificates are drawn like issued ones: the certificate data and the version of
-        // the design they are drawn in - the default certificate design, which every generated course
-        // starts on.
-        $certificateTemplate = $this->repository->certificateTemplate();
         $learnerCount = count($learners);
         $courseCount = count($courses);
 
         // This phase writes eleven tables and used to build every row of all of them before
         // issuing a single statement, which is why it was the largest of the six. A chunk of
-        // enrolments now carries its own progress, attempts, responses, sessions, results and
-        // certificates through to the database and is then discarded.
+        // enrolments now carries its own progress, attempts, responses, sessions and results through
+        // to the database and is then discarded. It writes no certificate: a certificate is issued
+        // only to a verified account (owner, 2026-10-19).
         //
         // One consequence worth stating: the random sequence is consumed in a different order than
         // it was when every enrolment's attempts were built before any enrolment's responses. A
@@ -907,7 +905,6 @@ final class SeedGenerator
             $sessionRows = [];
             $sessionContext = [];
             $resultRows = [];
-            $certificateRows = [];
 
             foreach ($enrolmentIds as $index => $enrolmentId) {
                 [$course, $entryStatus] = $context[$index];
@@ -954,21 +951,6 @@ final class SeedGenerator
                 if ($complete) {
                     $overall = round(60 + $this->next(40), 2);
                     $resultRows[] = [$enrolmentId, $overall, $overall, $overall, $this->gradeFor($overall), $overall >= 50.0];
-
-                    $number = 'SEED-' . strtoupper($suffix) . '-' . str_pad((string) $certificateSequence, 6, '0', STR_PAD_LEFT);
-                    $issuedAt = (new \DateTimeImmutable($now))->format(DATE_ATOM);
-                    $data = CertificateDocumentDataBuilder::assemble(
-                        ['business.name' => $certificateTemplate['business_name']],
-                        ['title' => $course['title'], 'overall_percentage' => $overall, 'grade_code' => $this->gradeFor($overall)],
-                        'Seed Learner', '', $number, null, $issuedAt, $issuedAt
-                    );
-                    $certificateRows[] = [
-                        Uuid::v4(), $enrolmentId, $number,
-                        'Seed Learner', $course['title'], $this->gradeFor($overall), $overall,
-                        json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                        $certificateTemplate['template_id'], $certificateTemplate['version_id'], $certificateTemplate['version_number'], $now,
-                    ];
-                    $certificateSequence++;
                 }
             }
             unset($context, $enrolmentIds);
@@ -1029,13 +1011,6 @@ final class SeedGenerator
                 $resultRows
             );
             unset($resultRows);
-
-            $this->write(
-                'certificates',
-                ['public_id', 'enrolment_id', 'certificate_number', 'learner_name', 'course_title', 'grade_code', 'overall_percentage', 'document_data', 'template_id', 'template_version_id', 'template_version_number', 'issued_at'],
-                $certificateRows
-            );
-            unset($certificateRows);
         }
     }
 

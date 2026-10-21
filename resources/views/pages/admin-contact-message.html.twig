@@ -1,0 +1,40 @@
+{#
+	One contact message (owner, 2026-10-20; ContactService): everything the sender gave, links to their
+	account, their order and the course, a reply by email, and Mark as answered (PLATFORM.PERSON.MANAGE).
+	An account reference typed by someone not signed in is shown as typed: it was not checked against
+	the email address.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_kicker = 'Contact Messages' %}{% set ph_title = 'Message ' ~ message.reference %}
+	{# The sender is a person, linked to their account with their account reference when they have one (owner, 2026-10-21): the lead is captured so it can hold them. #}
+	{% set ph_lead %}{{ message.reason_label }}, received {{ message.received }}.<br>{{ ui('data.person', message.sender|merge({full: true, email: message.sender_email})) }}{% endset %}
+	{% set ph_actions %}{{ ui('action.link', {label: 'Reply by email', variant: 'primary', href: 'mailto:' ~ message.sender_email ~ '?subject=' ~ ('Re: your message ' ~ message.reference)|url_encode}) }}{{ ui('action.link', {label: 'All messages', variant: 'secondary', href: '/admin/messages'}) }}{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Who wrote, and about what'}) }}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'From', person: message.sender|merge({email: message.sender_email})},
+			{label: 'Account reference', value: message.account_reference ? message.account_reference ~ (message.user_id ? ' (from their signed-in account)' : ' (typed by someone not signed in, not checked against the email)') : 'None given'},
+			{label: 'Reason', value: message.reason_label},
+		] | merge(message.order_number ? [{label: 'Order', value: message.order_number}] : []) | merge(message.course_title ? [{label: 'Course', value: message.course_title}] : []) | merge(message.detail_lines) | merge([
+			{label: 'Emailed to the site', value: message.emailed_at ? 'Yes' : 'No: read it here'},
+			{label: 'Acknowledged to the sender', value: message.acknowledged_at ? 'Yes, with its reference' : 'No'},
+			{label: 'Status', value: message.answered ? 'Answered on ' ~ (message.answered_at|date('j M Y H:i')) : 'Not answered yet'},
+		] | merge(message.answered_by ? [{label: 'Answered by', person: message.answered_by}] : []))}) }}
+		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
+			{% if message.user_id %}{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: '/admin/people/' ~ message.user_id}) }}{% endif %}
+			{% if message.order_id %}{{ ui('action.link', {label: 'Open order ' ~ message.order_number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ message.order_id}) }}{% endif %}
+			{% if message.course_slug %}{{ ui('action.link', {label: 'Open the course page', variant: 'secondary', size: 'small', href: '/courses/' ~ message.course_slug}) }}{% endif %}
+		{% endblock %}{% endembed %}
+	{% endblock %}{% endembed %}</section>
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'The message'}) }}
+		<p class="cl-contact-message-text">{{ message.message|nl2br }}</p>
+		{% if can_manage and not message.answered %}
+		<form action="/admin/messages/{{ message.id }}/answered" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as answered', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+		</form>
+		{% endif %}
+	{% endblock %}{% endembed %}</section>
+{% endblock %}

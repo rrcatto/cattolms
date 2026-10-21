@@ -50,7 +50,7 @@ final class PageStructureContractTest extends TestCase
         'admin-certificate-designs' => 'Administration', 'admin-commerce-orders' => 'Administration',
         'admin-promotions' => 'Administration', 'admin-financial-documents' => 'Administration',
         'admin-control-centre' => 'Administration', 'account-control-centre' => 'Account',
-        'company-control-centre' => 'Company', 'commerce-orders' => 'Account', 'library' => 'Account',
+        'company-control-centre' => 'Company', 'commerce-orders' => 'Account',
         'admin-refund-requests' => 'Administration', 'admin-wallets' => 'Administration',
         'admin-money-ledger' => 'Administration', 'admin-eft-payment' => 'Administration', 'admin-unmatched-money' => 'Administration',
         'commerce-wallet' => 'Account', 'company-wallet' => 'Company',

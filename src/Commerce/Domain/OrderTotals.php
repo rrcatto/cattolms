@@ -13,12 +13,16 @@ use CattoLearning\Support\Money;
  *     Subtotal                    R1,200.00
  *     Promo SAVE10 (10% off)       −R120.00
  *     Total                       R1,080.00
+ *
+ * A promotion the cart applied by itself (owner, 2026-10-20) says so: "Promo SPRING25 (25% off,
+ * applied automatically)".
  */
 final class OrderTotals
 {
     /** @return list<array{label:string,value:string}> */
-    public static function rows(int $subtotalMinor, int $discountMinor, int $totalMinor, string $currency, ?string $code = null, ?string $label = null): array
+    public static function rows(int $subtotalMinor, int $discountMinor, int $totalMinor, string $currency, ?string $code = null, ?string $label = null, bool $automatic = false): array
     {
+        if ($automatic) $label = ($label === null ? '' : $label . ', ') . 'applied automatically';
         $format = static fn(int $minor): string => Money::strictMinorUnits($minor, $currency)->format();
         if ($discountMinor === 0) return [['label' => 'Total', 'value' => $format($totalMinor)]];
         return [
@@ -41,7 +45,7 @@ final class OrderTotals
         foreach ((array) ($snapshot['items'] ?? []) as $item) $subtotal += (int) ($item['line_total_minor'] ?? 0);
         $promotion = is_array($snapshot['promotion'] ?? null) ? $snapshot['promotion'] : null;
         return self::rows($subtotal, (int) ($promotion['discount_minor'] ?? 0), (int) $snapshot['total_minor'], (string) $snapshot['currency'],
-            $promotion === null ? null : (string) $promotion['code'], $promotion === null ? null : (string) $promotion['label']);
+            $promotion === null ? null : (string) $promotion['code'], $promotion === null ? null : (string) $promotion['label'], (bool) ($promotion['automatic'] ?? false));
     }
 
     /** A discount as shown beside a total: "−R120.00". */

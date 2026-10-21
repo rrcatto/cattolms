@@ -54,7 +54,8 @@
 					{% for enrolment in enrolments %}
 						<tr>
 							<td>
-								{{ enrolment.learner_name }}
+								{# The name and account reference, linked to the person's page (owner, 2026-10-21). #}
+								{{ ui('data.person', {name: enrolment.learner_name, reference: enrolment.learner_reference, href: '/company/people/' ~ enrolment.user_id}) }}
 							</td>
 							<td>
 								{{ enrolment.course_title }}

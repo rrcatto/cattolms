@@ -28,6 +28,11 @@
 					{% endif %}
 				</div>
 			</div>
+			{# The account reference at the band's right edge, opening the person's profile (owner, 2026-10-21: "right align
+			   the Account Reference number and link it to the person's profile"). #}
+			{% if identity_reference|default('') %}
+				<a class="cl-identity-reference" href="/account/profile" title="Your account reference: open your profile">{{ identity_reference|account_reference }}</a>
+			{% endif %}
 		{% else %}
 			<div class="cl-identity-avatar cl-identity-avatar-empty cl-identity-head-anonymous" aria-hidden="true">
 				<svg width="34" height="34" viewBox="0 0 24 24"><use href="{{ platform.icon_sprite }}#nav-account"></use></svg>

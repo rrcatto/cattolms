@@ -79,10 +79,23 @@ final class IdentityDisplayNameContractTest extends TestCase
         foreach (['ThandiN', ''] as $displayName) {
             $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/account/identity-compact', [
                 'identity_display_name' => $displayName, 'identity_name' => 'Thandi Nkosi',
-                'identity_email' => 'reader@example.test', 'user' => ['name' => 'Fallback'],
+                'identity_email' => 'reader@example.test', 'user' => ['name' => 'Fallback'], 'identity_reference' => 'CL202601010001K',
             ]);
-            self::assertStringContainsString('<strong class="cl-identity-name">' . ($displayName ?: 'Thandi Nkosi') . '</strong>', $html);
+            // The name, then the reader's account reference opening their profile (owner, 2026-10-21).
+            self::assertStringContainsString('<strong class="cl-identity-name">' . ($displayName ?: 'Thandi Nkosi') . '</strong> <a class="cl-identity-reference" href="/account/profile"', $html);
+            self::assertStringContainsString('>CL-20260101-0001-K</a>', $html);
         }
+    }
+
+    /** The identity band's account reference sits at its right edge and opens the person's profile (owner, 2026-10-21). */
+    public function testTheIdentityBandLinksTheAccountReferenceToTheProfile(): void
+    {
+        $html = \CattoLearning\Tests\Support\RenderHarness::render('partials/account/identity-head', [
+            'is_authenticated' => true, 'identity_name' => 'Thandi Nkosi', 'identity_email' => 'reader@example.test',
+            'identity_reference' => 'CL202601010001K', 'identity_roles' => [], 'identity_status' => '', 'identity_image' => '',
+        ]);
+        self::assertMatchesRegularExpression('#<h2 class="cl-identity-name">\s*Thandi Nkosi\s*</h2>#', $html);
+        self::assertStringContainsString('<a class="cl-identity-reference" href="/account/profile" title="Your account reference: open your profile">CL-20260101-0001-K</a>', $html);
     }
 
     /**

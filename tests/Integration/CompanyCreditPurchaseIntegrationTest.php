@@ -226,12 +226,6 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $request=IntegrationContainer::get()->get(AdministrationRepository::class)->createRequest($learner,$this->companyId,$this->courseId,86400,'Please enrol me.');
         $this->purchases->startForRequest($this->buyer,$this->companyId,$request);
         $review=$this->purchases->review($this->buyer,$this->companyId);
-        try {
-            $this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'eft','',false,true);
-            self::fail('A request-linked purchase must use immediate payment.');
-        } catch (RuntimeException $exception) {
-            self::assertStringContainsString('immediate confirmed payment',$exception->getMessage());
-        }
         $order=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'dummy','demo_failure',false,true);
         $this->db->executeStatement("UPDATE course_requests SET status='rejected' WHERE id=:id",['id'=>$request]);
         $this->payments->purchase($this->buyer,$order,Uuid::v4(),'demo_success');
@@ -243,6 +237,32 @@ final class CompanyCreditPurchaseIntegrationTest extends TestCase
         $refunds->approve($this->financeAdmin(),$order,(int)$item['id'],Uuid::v4(),'service_failure','Request changed before fulfilment; refund the unissued credit.',1,0);
         self::assertSame('refunded',$this->records->order($order)['state']);
         self::assertSame((int)$item['amount_minor'],WalletFixture::wallets($this->db,$this->clock)->balance(\CattoLearning\Commerce\Wallet\WalletOwner::company($this->companyId)));
+    }
+
+    /**
+     * A company may pay for a learner's request by any payment method the site offers (owner,
+     * 2026-10-19): by EFT, nothing is issued until ADMIN records the payment, and then the credit goes
+     * to the request and the learner is enrolled.
+     */
+    public function testARequestPurchasePaidByEftEnrolsTheLearnerWhenThePaymentIsConfirmed(): void
+    {
+        $suffix=$this->fixture->suffix();
+        $learner=$this->fixture->createUser('EFT learner '.$suffix,'eft-learner-'.$suffix.'@example.test');
+        $this->addCompanyMember($learner);
+        $request=IntegrationContainer::get()->get(AdministrationRepository::class)->createRequest($learner,$this->companyId,$this->courseId,86400,'Please enrol me.');
+        $this->purchases->startForRequest($this->buyer,$this->companyId,$request);
+        $review=$this->purchases->review($this->buyer,$this->companyId);
+        $order=$this->purchases->place($this->buyer,$this->companyId,$review['purchase_key'],$review['quote'],BillingFixture::company(),'eft','',false,true);
+        self::assertSame('awaiting_payment',$this->records->order($order)['state']);
+        self::assertSame(0,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE user_id=:user AND course_id=:course',['user'=>$learner,'course'=>$this->courseId]), 'Nobody is enrolled before the money arrives.');
+        $service=new PaymentAdministrationService($this->records,new TransactionManager($this->db),$this->payments,
+            new FulfilmentService($this->records,IntegrationContainer::get()->get(TransitionService::class),$this->access,new TransactionManager($this->db),$this->orders,$this->clock,
+                new CompanyCreditFulfilment($this->records,IntegrationContainer::get()->get(AdministrationRepository::class),IntegrationContainer::get()->get(CourseRepository::class),$this->clock),$this->analytics(),PromotionFixture::service($this->db,$this->clock)),
+            IntegrationContainer::get()->get(TransitionService::class),$this->clock);
+        $service->confirmBank($this->financeAdmin(),$order,Uuid::v4(),(int)$this->records->order($order)['total_minor'],'2026-09-23T11:00:00+02:00','BANK-REQUEST-'.Uuid::v4(),'Matched the company EFT for the learner request.');
+        self::assertSame('fulfilled',$this->records->order($order)['state']);
+        self::assertSame('fulfilled',(string)$this->db->fetchOne('SELECT status FROM course_requests WHERE id=:id',['id'=>$request]));
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT COUNT(*) FROM course_enrolments WHERE user_id=:user AND course_id=:course',['user'=>$learner,'course'=>$this->courseId]), 'The learner is enrolled when the EFT is confirmed.');
     }
 
     private function financeAdmin(): CurrentUser

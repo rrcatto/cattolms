@@ -15,8 +15,37 @@ final class DataComponentContractTest extends TestCase
         $html = ComponentHarness::render('data.stat-card', ['value' => 24, 'label' => '<Courses>']);
         self::assertStringContainsString('&lt;Courses&gt;', $html);
         self::assertStringNotContainsString('cl-ui-stat-note', $html);
+        self::assertStringNotContainsString('cl-ui-stat-card--large', $html);
+        // The one figure a page is opened for, such as a wallet's balance (owner, 2026-10-21).
+        self::assertStringContainsString('class="cl-ui-stat-card cl-ui-stat-card--large"', ComponentHarness::render('data.stat-card', ['value' => 'R10.00', 'label' => 'Wallet balance', 'size' => 'large']));
+        try {
+            ComponentHarness::render('data.stat-card', ['value' => 1, 'label' => 'x', 'size' => 'huge']);
+            self::fail('An unknown stat card size was accepted.');
+        } catch (\Throwable $refused) {
+            self::assertStringContainsString('size', $refused->getMessage());
+        }
         self::assertStringContainsString('&lt;value&gt;', ComponentHarness::render('data.key-value-list', ['items' => [['label' => 'Name', 'value' => '<value>']]]));
+        // A value marked down from a was value (owner, 2026-10-20): the was value struck through first, named for screen readers.
+        $marked = ComponentHarness::render('data.key-value-list', ['items' => [['label' => 'Price', 'value' => 'R1,800.00', 'was' => '<R2,400.00>']]]);
+        self::assertStringContainsString('<dd><s class="cl-ui-key-value-was"><span class="visually-hidden">Was </span>&lt;R2,400.00&gt;</s> <span class="visually-hidden">now </span>R1,800.00</dd>', $marked);
+        self::assertStringNotContainsString('<s', ComponentHarness::render('data.key-value-list', ['items' => [['label' => 'Price', 'value' => 'R1,800.00', 'was' => null]]]));
     }
+    /**
+     * A person with an account (owner, 2026-10-21): their name linked to their profile; the page's own person (full) once,
+     * with the account reference and email each on its own line. Every other mention, and every table, the name alone.
+     */
+    public function testAPersonIsTheirNameAndAccountReferenceLinkedToTheirAccount(): void
+    {
+        $name = ComponentHarness::render('data.person', ['name' => '<Thandi Nkosi>', 'reference' => 'CL202610200001X', 'href' => '/admin/people/7', 'email' => 'thandi@example.test']);
+        self::assertStringContainsString('<span class="cl-ui-person"><a class="cl-ui-person-account" href="/admin/people/7"><span class="cl-ui-person-name">&lt;Thandi Nkosi&gt;</span></a></span>', $name);
+        self::assertStringNotContainsString('CL-', $name, 'A mention names the person without their reference.');
+        self::assertStringNotContainsString('mailto:', $name, 'or their email.');
+        $full = ComponentHarness::render('data.person', ['name' => 'Thandi Nkosi', 'reference' => 'CL202610200001X', 'href' => '/admin/people/7', 'email' => 'thandi@example.test', 'full' => true]);
+        self::assertStringContainsString('<span class="cl-ui-person cl-ui-person--full"><span class="cl-ui-person-line"><a class="cl-ui-person-account" href="/admin/people/7"><span class="cl-ui-person-name">Thandi Nkosi</span></a></span><span class="cl-ui-person-line cl-ui-person-reference">CL-20261020-0001-X</span><span class="cl-ui-person-line"><a class="cl-ui-person-email" href="mailto:thandi@example.test">thandi@example.test</a></span></span>', $full);
+        $plain = ComponentHarness::render('data.person', ['name' => 'Sender']);
+        self::assertStringNotContainsString('<a', $plain, 'No account to open: the name alone.');
+    }
+
     public function testDatasetRetainsTwoSharedPagersAndDurableRegion(): void
     {
         $pg = \CattoLearning\Application\PlatformAdministrationService::paginationPayload('example', \CattoLearning\Support\Pagination::create(2, 25, 100), '/example', 'Examples');

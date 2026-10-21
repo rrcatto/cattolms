@@ -19,8 +19,16 @@ use Symfony\Component\Clock\ClockInterface;
  * rejected code leaves the current one in place). The discount is always calculated here, from the
  * cart and the current promotion definition: the browser submits only the code.
  *
+ * Automatic promotions (owner, 2026-10-20) need no code: whenever the cart is priced, each one that is
+ * switched on is tried against it, and the cart says which applied ("SPRING25, applied automatically").
+ * One promotion applies to an order, the one that saves the purchaser the most: a typed code that saves
+ * less than an automatic promotion is refused when it is applied, and if the cart later changes so that
+ * an automatic promotion saves more, the order uses that one and the cart says why. Guests' carts show
+ * automatic promotions too, and course and bundle pages announce the ones that cover them.
+ *
  * The promotion is evaluated again whenever the cart is priced, and once more at placement under
- * the promotion's row lock, which is where a use is taken. A use is redeemed when the order is paid.
+ * the row locks of every promotion it could use, which is where a use is taken. A use is redeemed when
+ * the order is paid.
  */
 final class PromotionService
 {
@@ -33,23 +41,106 @@ final class PromotionService
     ) {}
 
     /**
-     * The cart's promotion as it stands now. With $lock (placement only) the promotion row is
-     * locked first, so the usage read here cannot be overtaken before the order is inserted.
+     * The cart's promotion as it stands now: the code typed on it, if any, or the automatic promotion
+     * that saves the most, whichever saves more. With $lock (placement only) every promotion row it
+     * could use is locked first, in id order, so the usage read here cannot be overtaken before the
+     * order is inserted.
+     *
+     * code is the promotion that applies (or the typed code that no longer does, with its rejection);
+     * typed_code is the code the purchaser typed, kept on the cart even when an automatic promotion
+     * saves more (note says so); automatic says the cart applied the promotion by itself.
      *
      * @param array<string,mixed> $cart a cart row with its items and bundles
-     * @return array{code:?string,discount:?PromotionDiscount,rejection:?string}
+     * @return array{code:?string,discount:?PromotionDiscount,rejection:?string,automatic:bool,typed_code:?string,note:?string}
      */
     public function forCart(array $cart, int $userId, bool $lock = false): array
     {
-        $id = $cart['promotion_id'] ?? null;
-        if ($id === null) return ['code' => null, 'discount' => null, 'rejection' => null];
-        $promotion = $this->promotions->find((int) $id, $lock);
-        if ($promotion === null) return ['code' => null, 'discount' => null, 'rejection' => null];
-        try {
-            return ['code' => $promotion->code, 'discount' => $this->evaluate($promotion, (array) $cart['items'], (array) ($cart['bundles'] ?? []), $userId), 'rejection' => null];
-        } catch (PromotionRejected $rejected) {
-            return ['code' => $promotion->code, 'discount' => null, 'rejection' => $rejected->getMessage()];
+        $typedId = isset($cart['promotion_id']) ? (int) $cart['promotion_id'] : null;
+        $items = (array) ($cart['items'] ?? []);
+        $bundles = (array) ($cart['bundles'] ?? []);
+        // An empty cart with no code typed has nothing to price: most page views, every one a guest's.
+        if ($typedId === null && $items === [] && $bundles === []) return ['code' => null, 'discount' => null, 'rejection' => null, 'automatic' => false, 'typed_code' => null, 'note' => null];
+        $typed = null;
+        $typedDiscount = null;
+        $rejection = null;
+        $best = null;
+        foreach ($this->promotions->automatic($typedId, $lock) as $promotion) {
+            $isTyped = $promotion->id === $typedId;
+            if ($isTyped) $typed = $promotion;
+            if (!$isTyped && !$promotion->appliesAutomatically) continue;
+            try {
+                $discount = $this->evaluate($promotion, $items, $bundles, $userId);
+            } catch (PromotionRejected $rejected) {
+                if ($isTyped) $rejection = $rejected->getMessage();
+                continue;
+            }
+            if ($isTyped) $typedDiscount = $discount;
+            elseif ($best === null || $discount->discountMinor > $best->discountMinor) $best = $discount;
         }
+        $result = ['code' => null, 'discount' => null, 'rejection' => null, 'automatic' => false, 'typed_code' => $typed?->code, 'note' => null];
+        // A typed code that no longer applies is shown with its reason and stops placement until it is removed.
+        if ($typed !== null && $rejection !== null) return ['code' => $typed->code, 'rejection' => $rejection] + $result;
+        if ($typedDiscount !== null && ($best === null || $typedDiscount->discountMinor >= $best->discountMinor)) {
+            return ['code' => $typed?->code, 'discount' => $typedDiscount] + $result;
+        }
+        if ($best === null) return $result;
+        $note = $typedDiscount === null ? null
+            : 'Your code ' . $typedDiscount->promotion->code . ' saves less than ' . $best->promotion->code . ', which is applied automatically, so your order uses ' . $best->promotion->code . '.';
+        return ['code' => $best->promotion->code, 'discount' => $best->appliedAutomatically(), 'automatic' => true, 'note' => $note] + $result;
+    }
+
+    /**
+     * A guest's cart: no code can be typed before signing in, so only the automatic promotion that saves
+     * the most, judged as for a purchaser who has not used it yet.
+     *
+     * @param list<array<string,mixed>> $items
+     * @param list<array<string,mixed>> $bundles
+     * @return array{code:?string,discount:?PromotionDiscount,rejection:?string,automatic:bool,typed_code:?string,note:?string}
+     */
+    public function forGuest(array $items, array $bundles): array
+    {
+        return $this->forCart(['promotion_id' => null, 'items' => $items, 'bundles' => $bundles], 0);
+    }
+
+    /**
+     * What a course or bundle page says about the automatic promotions that cover it (owner, 2026-10-20):
+     * each one switched on, within its dates and limits, with what the default price comes to when the
+     * course or bundle alone meets the promotion's minimum spend.
+     *
+     * @param 'course'|'bundle' $productType
+     * @return list<array{code:string,name:string,label:string,price_label:?string,minimum_label:?string,until_label:?string}>
+     */
+    public function announcements(string $productType, int $productId, int $priceMinor, string $currency, ?int $userId = null): array
+    {
+        $announced = [];
+        if ($priceMinor < 1) return $announced;
+        $now = $this->clock->now();
+        foreach ($this->promotions->automatic() as $promotion) {
+            if (!$promotion->appliesAutomatically || !$promotion->appliesTo($productType, $productId)) continue;
+            $usage = $this->promotions->usage($promotion->id, $userId ?? 0);
+            $line = ['key' => $productType . ':' . $productId, 'product_type' => $productType, 'product_id' => $productId, 'amount_minor' => $priceMinor];
+            $price = null;
+            try {
+                $price = $priceMinor - PromotionCalculator::evaluate($promotion, [$line], $currency, $now, $usage['total'], $usage['customer'])->discountMinor;
+            } catch (PromotionRejected) {
+                // Announced only when the minimum spend is all that stands in the way: the cart then applies it once it holds enough.
+                if ($promotion->minimumOrderMinor === null || $promotion->minimumOrderMinor <= $priceMinor) continue;
+                try {
+                    PromotionCalculator::evaluate($promotion, [['amount_minor' => $promotion->minimumOrderMinor] + $line], $currency, $now, $usage['total'], $usage['customer']);
+                } catch (PromotionRejected) {
+                    continue;
+                }
+            }
+            $until = $promotion->endsAt?->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+            $announced[] = [
+                'code' => $promotion->code, 'name' => $promotion->name, 'label' => $promotion->discountLabel(),
+                'price_label' => $price === null ? null : Money::strictMinorUnits($price, $currency)->format(),
+                'minimum_label' => $price === null ? Money::strictMinorUnits((int) $promotion->minimumOrderMinor, $currency)->format() : null,
+                // The last moment it applies: the end is exclusive, so a promotion ending at midnight ends the day before.
+                'until_label' => $until?->modify('-1 second')->format('j F Y'),
+            ];
+        }
+        return $announced;
     }
 
     public function apply(CurrentUser $actor, string $code): PromotionDiscount
@@ -66,6 +157,11 @@ final class PromotionService
             $promotion = Promotion::isValidCode($canonical) ? $this->promotions->findByCode($canonical) : null;
             if ($promotion === null) throw new PromotionRejected('We don’t recognise that promo code.');
             $discount = $this->evaluate($promotion, $items, $bundles, $actor->id);
+            // One promotion applies to an order, the one that saves the most (owner, 2026-10-20).
+            $automatic = $this->forCart(['promotion_id' => null, 'items' => $items, 'bundles' => $bundles], $actor->id)['discount'];
+            if ($automatic !== null && $automatic->promotion->id !== $promotion->id && $automatic->discountMinor >= $discount->discountMinor) {
+                throw new PromotionRejected($automatic->promotion->code . ', which is applied automatically, already saves you at least as much as ' . $promotion->code . ' would. One promotion applies to an order.', $promotion->code);
+            }
             if ((int) ($cart['promotion_id'] ?? 0) === $promotion->id) return $discount;
             $this->records->setCartPromotion((int) $cart['id'], $promotion->id);
             $this->analytics->recordSafely(AnalyticsEventType::PromoCodeApplied, AnalyticsSource::Checkout, ['user_id' => $actor->id], [

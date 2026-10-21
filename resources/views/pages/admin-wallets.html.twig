@@ -15,7 +15,8 @@
         {% block body %}
         {% for row in rows %}
         {% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-        {% block body %}<a href="{{ row.href }}">{{ row.owner_name }}</a> · {{ row.owner_company_id ? 'Company' : 'Person' }} · {{ row.reference_label }} · {{ row.balance_label }}{% endblock %}
+        {# A person's name opens their profile and the balance their wallet (owner, 2026-10-21); a company's name opens its wallet. #}
+        {% block body %}{% if row.owner_person %}{{ ui('data.person', row.owner_person) }} · Person · {{ row.reference_label }} · <a href="{{ row.href }}">{{ row.balance_label }}</a>{% else %}<a href="{{ row.href }}">{{ row.owner_name }}</a> · Company · {{ row.reference_label }} · {{ row.balance_label }}{% endif %}{% endblock %}
         {% endembed %}
         {% endfor %}
         {% endblock %}

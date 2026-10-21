@@ -1,6 +1,6 @@
 {% extends layout %}
 {% block page_body %}
-{% set ph_kicker = 'Administration' %}{% set ph_title = 'Promotions' %}{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New promotion', variant: 'primary', href: '/admin/promotions/new', icon: 'action-add'}) }}{% endset %}{% endif %}{% set ph_lead = 'Promo codes purchasers enter when they review an order at checkout. A code takes a percentage or an amount off the courses it applies to; course prices are never changed. A use is held when an order is placed and counted as redeemed when it is paid.' %}{% include '@platform/partials/page-head.html.twig' %}
+{% set ph_kicker = 'Administration' %}{% set ph_title = 'Promotions' %}{% if can_manage %}{% set ph_actions %}{{ ui('action.link', {label: 'New promotion', variant: 'primary', href: '/admin/promotions/new', icon: 'action-add'}) }}{% endset %}{% endif %}{% set ph_lead = 'Promo codes purchasers enter when they review an order at checkout, or that apply automatically in the cart. A code takes a percentage or an amount off the courses it applies to; course prices are never changed. A use is held when an order is placed and counted as redeemed when it is paid.' %}{% include '@platform/partials/page-head.html.twig' %}
 <section class="cl-page-section">
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Promo codes', eyebrow: 'Promotions', summary: 'Every code with its discount, validity and uses.'}) }}
@@ -15,7 +15,7 @@
 {% block body %}
 {% for row in promotions %}
 <tr>
-	<td><a href="/admin/promotions/{{ row.id }}"><strong>{{ row.code }}</strong></a></td>
+	<td><a href="/admin/promotions/{{ row.id }}"><strong>{{ row.code }}</strong></a>{% if row.automatic %}<br>{{ ui('feedback.badge', {label: 'Applies automatically', tone: 'info', size: 'small'}) }}{% endif %}</td>
 	<td>{{ row.name }}</td>
 	<td>{{ row.discount }}{% if row.minimum %}<br><small>Minimum {{ row.minimum }}</small>{% endif %}</td>
 	<td>{{ row.validity }}</td>

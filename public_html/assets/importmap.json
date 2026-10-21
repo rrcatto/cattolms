@@ -4,7 +4,7 @@
         "type": "js"
     },
     "\/assets\/@symfony\/stimulus-bundle\/controllers.js": {
-        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-3QI3c6Q.js",
+        "path": "\/assets\/@symfony\/stimulus-bundle\/controllers-T2xpg2J.js",
         "type": "js"
     },
     "\/assets\/controllers\/category_tree_controller.js": {
@@ -21,6 +21,10 @@
     },
     "\/assets\/controllers\/course_content_controller.js": {
         "path": "\/assets\/controllers\/course_content_controller-CeeAsVC.js",
+        "type": "js"
+    },
+    "\/assets\/controllers\/course_order_controller.js": {
+        "path": "\/assets\/controllers\/course_order_controller-Hnvfrim.js",
         "type": "js"
     },
     "\/assets\/controllers\/landing_sections_controller.js": {

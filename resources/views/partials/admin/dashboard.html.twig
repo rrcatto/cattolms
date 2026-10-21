@@ -3,6 +3,37 @@
 	the section's actions (Manage courses, View activity) are in the page head on the Dashboard's own
 	page and in this card's head on the "All sections" page.
 #}
+{# The commerce job sends every order email and cancels unpaid orders: the dashboard warns when it stops (owner, 2026-10-19). #}
+{% if setup_progress|default(null) and setup_progress.done < setup_progress.total %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Setup: ' ~ setup_progress.done ~ ' of ' ~ setup_progress.total ~ ' steps done', section_spacing: true})} %}{% block body %}<p>Next: {{ setup_progress.next.title }}. {{ ui('action.link', {label: 'Continue setup', variant: 'primary', size: 'small', href: '/admin/setup#setup-' ~ setup_progress.next.key}) }}</p>{% endblock %}{% endembed %}
+{% endif %}
+{% if scheduler_warning|default(null) %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: scheduler_warning, section_spacing: true})} %}{% block body %}<p>Buyers are not being emailed and unpaid orders are not being cancelled until it runs again. Start the scheduler (<span class="mono">php bin/console schedule:run --watch</span>, or cron every minute) and see Settings, Maintenance.</p>{% endblock %}{% endembed %}
+{% endif %}
+{#
+	Needs your attention (owner, 2026-10-21: "I should have a list of things which need my attention that I can click on
+	to resolve"): AdminAttention's rows, one for each thing waiting, never a count. Each says what it is and who it
+	concerns, what to do, and has a button named for that action which opens that one thing.
+#}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Needs your attention', eyebrow: 'Dashboard', summary: attention|default([]) ? (attention|length == 1 ? '1 thing is' : attention|length ~ ' things are') ~ ' waiting for you, each with what to do. It leaves this list once it is done.' : 'Everything that waits for you appears here, with what to do.'}) }}
+	{% if attention|default([]) %}
+	{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+	{% block body %}
+		{% for entry in attention %}
+		{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+		{# The person, their name linked to their profile as a listing names them (owner, 2026-10-21), is the title's subject
+		   ("<person> reviewed …"), or for money is named in front of the summary. #}
+		{% block body %}{{ ui('feedback.badge', {label: entry.badge, tone: entry.kind == 'money' ? 'warning' : 'info'}) }} {% if entry.subject %}{{ ui('data.person', entry.person) }} {% endif %}<strong><a href="{{ entry.href }}">{{ entry.title }}</a></strong><p>{% if entry.person and not entry.subject %}{{ ui('data.person', entry.person) }} · {% endif %}{{ entry.summary }}</p>{% endblock %}
+		{% block actions %}{{ ui('action.link', {label: entry.action, variant: 'primary', size: 'small', href: entry.href}) }}{% endblock %}
+		{% endembed %}
+		{% endfor %}
+	{% endblock %}
+	{% endembed %}
+	{% else %}{{ ui('feedback.empty', {summary: 'Nothing needs your attention.'}) }}{% endif %}
+{% endblock %}
+{% endembed %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
@@ -20,53 +51,7 @@
 
 {% endblock %}
 {% endembed %}
-{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: true})} %}
-{% block body %}
-
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
-{% block surface_body %}
-
-		{{ ui('layout.section-head', {heading: 'Needs attention', summary: 'Administrative work waiting for action.'}) }}
-		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-{% block body %}
-
-			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-					<strong>{{ overview.pending_requests }} pending course requests</strong>
-					<p>
-						Approve or reject learner requests and allocate matching credits where available.
-					</p>
-
-{% endblock %}
-{% block actions %}
-
-				{{ ui('action.link', {label: 'Review', variant: 'primary', size: 'small', href: '/admin/course/enrolments'}) }}
-
-{% endblock %}
-{% endembed %}
-			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-{% block body %}
-
-					<strong>{{ overview.draft_courses }} course drafts</strong>
-					<p>
-						Review course content, ownership and publication readiness.
-					</p>
-
-{% endblock %}
-{% block actions %}
-
-				{{ ui('action.link', {label: 'Review', variant: 'primary', size: 'small', href: '/admin/courses'}) }}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-
-{% endblock %}
-{% endembed %}
-	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Recent activity', summary: 'The latest audited actions across the site.'})} %}
@@ -82,7 +67,7 @@
 					<div>
 						<strong>{{ event.event_label }}</strong>
 						<p>
-							{{ event.actor_name }} · {{ event.subject }} · {{ event.created_at }}
+							{{ ui('data.person', event.actor_person) }} · {% if event.subject_person %}{{ ui('data.person', event.subject_person) }}{% else %}{{ event.subject }}{% endif %} · {{ event.created_at }}
 						</p>
 					</div>
 				</div>
@@ -91,28 +76,6 @@
 
 {% endblock %}
 {% endembed %}
-
-{% endblock %}
-{% endembed %}
-{% if attention_items is defined and attention_items is not null %}
-{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
-{% block surface_body %}
-	{{ ui('layout.section-head', {heading: 'Transactions that need attention', eyebrow: 'Recent activity', summary: 'Money matters waiting for you, oldest first. Open one to see it and to email the person.'}) }}
-	{% if attention_items %}
-	{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
-	{% block body %}
-		{% for entry in attention_items %}
-		{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
-		{# The title is the link, so each says where it goes (a list of links all named Open does not). #}
-		{% block body %}<strong><a href="{{ entry.href }}">{{ entry.title }}</a></strong><p>{{ entry.summary }}</p>{% endblock %}
-		{% endembed %}
-		{% endfor %}
-	{% endblock %}
-	{% endembed %}
-	{% else %}{{ ui('feedback.empty', {summary: 'Nothing needs your attention.'}) }}{% endif %}
-{% endblock %}
-{% endembed %}
-{% endif %}
 {# The money of a period (MoneyRecords::dashboard, owner 2026-10-18): each figure opens the list it adds up, for the same period. #}
 {% if money is defined and money is not null %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}

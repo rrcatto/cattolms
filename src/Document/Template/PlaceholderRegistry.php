@@ -16,13 +16,19 @@ value CattoLMS actually holds:
   phone or registration number in CattoLMS, so there is no placeholder for one;
 - invoice, receipt and credit note values come from the order snapshot each financial document is
   rendered from: the billing snapshot, the lines, the subtotal, promotion and total, the refund;
-- certificate values are the learner, course, result and certificate identity of an issue. The
-  wording, signatory and small print belong to the certificate design itself and are written
-  into it, so they are not placeholders.
+- certificate values are the learner, course and certificate identity of an issue, never a mark or
+  a grade. The wording, signatory and small print belong to the certificate design itself and are
+  written into it, so they are not placeholders;
+- transcript values are the learner, the course, the transcript's identity, every assessment mark
+  and the overall result (50% module assessments, 50% final assessment).
 
 A placeholder not listed for a type is an error in a template of that type, never an empty string.
 
 Changelog:
+2026/10/19 SAST
+- A certificate proves that the learner took the course (owner, 2026-10-19): result.percentage and
+  result.grade are gone from it. Transcripts: the learner, course and transcript identity, the overall
+  result and each assessment's mark (assessments).
 2026/10/07 SAST
 - Certificates: course.accreditation added; certificate.title, certificate.body, certificate.footer and
   signatory.* removed, as the certificate design now holds its own wording and signatory.
@@ -45,6 +51,7 @@ final class PlaceholderRegistry
     {
         return $this->sets[$type->value] ??= match ($type) {
             DocumentType::Certificate => new PlaceholderSet([...self::business(), ...self::certificate()]),
+            DocumentType::Transcript => new PlaceholderSet([...self::business(), ...self::transcript()], [self::assessments()]),
             DocumentType::Invoice => new PlaceholderSet([...self::document(), ...self::business(), ...self::customer(), ...self::order(), ...self::invoice(), ...self::promotion(), ...self::bank()], [self::lines(false)]),
             DocumentType::Receipt => new PlaceholderSet([...self::document(), ...self::business(), ...self::customer(), ...self::order(), ...self::receipt(), ...self::promotion()], [self::lines(false)]),
             DocumentType::CreditNote => new PlaceholderSet([...self::document(), ...self::business(), ...self::customer(), ...self::order(false), ...self::creditNote()], [self::lines(true)]),
@@ -174,9 +181,37 @@ final class PlaceholderRegistry
             self::p('course.provider', 'The company that provides the course.'),
             self::p('course.completion_date', 'When the learner completed the course.', PlaceholderKind::Date, true),
             self::p('course.accreditation', 'The course’s accreditation or CPD line, for example Legal Practice Council CPD: 2 points.'),
-            self::p('result.percentage', 'The overall result, for example 84.50%.', PlaceholderKind::Percent),
-            self::p('result.grade', 'The overall grade from the course’s grading scale.'),
         ];
+    }
+
+    /** @return list<PlaceholderDefinition> */
+    private static function transcript(): array
+    {
+        return [
+            self::p('transcript.number', 'The transcript number.', PlaceholderKind::Text, true),
+            self::p('transcript.certificate_number', 'The number of the certificate the transcript belongs to.', PlaceholderKind::Text, true),
+            self::p('transcript.issue_date', 'When the transcript was issued.', PlaceholderKind::Date, true),
+            self::p('transcript.verification_url', 'Where the transcript can be checked.', PlaceholderKind::Url),
+            self::p('learner.name', 'The learner’s verified name.', PlaceholderKind::Text, true),
+            self::p('course.title', 'The course title.', PlaceholderKind::Text, true),
+            self::p('course.provider', 'The company that provides the course.'),
+            self::p('course.completion_date', 'When the learner completed every assessment.', PlaceholderKind::Date, true),
+            self::p('course.accreditation', 'The course’s accreditation or CPD line.'),
+            self::p('result.module_average', 'The average of the module assessment marks, for example 72.50%; empty when the course has none.', PlaceholderKind::Percent),
+            self::p('result.final', 'The final assessment mark.', PlaceholderKind::Percent, true),
+            self::p('result.overall', 'The overall grade: half the module average, half the final mark.', PlaceholderKind::Percent, true),
+            self::p('result.grade', 'The grade from the course’s grading scale, for example Distinction.'),
+        ];
+    }
+
+    /** Every graded assessment of the course, in course order, with its mark. */
+    private static function assessments(): CollectionDefinition
+    {
+        return new CollectionDefinition('assessments', 'assessment', 'Every graded assessment, in course order.', [
+            self::p('assessment.title', 'The assessment’s title.', PlaceholderKind::Text, true),
+            self::p('assessment.kind', 'Module assessment or Final assessment.', PlaceholderKind::Text, true),
+            self::p('assessment.mark', 'The mark that counts, for example 80.00%.', PlaceholderKind::Percent, true),
+        ]);
     }
 
     /** The order's lines. A credit note's lines are the refunded ones, with what was credited. */

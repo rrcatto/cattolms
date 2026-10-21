@@ -5,9 +5,9 @@
 		<button type="button" class="cl-tree-handle" aria-label="Move {{ node.name }}" aria-describedby="category-tree-keys" data-category-tree-target="handle" data-action="pointerdown->category-tree#arm keydown->category-tree#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>
 		<div class="cl-tree-label">
 			{% if has_children %}
-				<button type="submit" form="category-tree-view" name="toggle" value="{{ node.id }}" class="cl-tree-toggle" aria-expanded="{{ node.open ? 'true' : 'false' }}" aria-controls="category-branch-{{ node.id }}" data-category-tree-target="toggle" data-action="category-tree#toggle">{{ ui('icon', {name: 'action-chevron', decorative: true}) }}<span class="cl-tree-name">{{ node.name }}</span></button>
+				<button type="submit" form="category-tree-view" name="toggle" value="{{ node.id }}" class="cl-tree-toggle" aria-expanded="{{ node.open ? 'true' : 'false' }}" aria-controls="category-branch-{{ node.id }}" data-category-tree-target="toggle" data-action="category-tree#toggle">{{ ui('icon', {name: 'action-chevron', decorative: true}) }}{% if node.icon_svg|default('') %}<span class="cl-category-icon" aria-hidden="true">{{ node.icon_svg|raw }}</span>{% endif %}<span class="cl-tree-name">{{ node.name }}</span></button>
 			{% else %}
-				<span class="cl-tree-leaf"><span class="cl-tree-spacer" aria-hidden="true"></span><span class="cl-tree-name">{{ node.name }}</span></span>
+				<span class="cl-tree-leaf"><span class="cl-tree-spacer" aria-hidden="true"></span>{% if node.icon_svg|default('') %}<span class="cl-category-icon" aria-hidden="true">{{ node.icon_svg|raw }}</span>{% endif %}<span class="cl-tree-name">{{ node.name }}</span></span>
 			{% endif %}
 			<span class="cl-tree-meta">{{ node.course_count }} course{{ node.course_count == 1 ? '' : 's' }}{% if has_children %} · {{ node.descendant_course_count }} with subcategories · {{ node.children|length }} subcategor{{ node.children|length == 1 ? 'y' : 'ies' }}{% endif %}</span>
 		</div>

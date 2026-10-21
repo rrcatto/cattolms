@@ -15,7 +15,8 @@ use RuntimeException;
  * Coordinates the purchaser's details, payment selection and review; payment is attempted only
  * after order commit. The details step keeps two things apart: personal particulars go to the
  * person's profile, billing details to their reusable billing profile. Placement copies the billing
- * profile as it is at that moment into the order's immutable snapshot.
+ * profile as it is at that moment into the order's immutable snapshot. Nothing about identity is asked
+ * before a purchase (owner, 2026-10-20: "We accept all payments"): verification is for certificates.
  */
 final class CheckoutService
 {
@@ -106,7 +107,7 @@ final class CheckoutService
 
     public static function validateMethod(string $method, string $token): void
     {
-        if (!in_array($method, ['dummy','eft'], true)) throw new RuntimeException('Choose a payment method.');
+        if (!in_array($method, ['dummy','eft','card'], true)) throw new RuntimeException('Choose a payment method.');
         if ($method === 'dummy' && !in_array($token, ['demo_success','demo_failure'], true)) throw new RuntimeException('Choose a simulated card outcome.');
     }
 
@@ -159,7 +160,6 @@ final class CheckoutService
             $this->records->lockPurchaser($actor->id);
             $order = $this->records->order($orderId, true);
             if ($order['state'] !== 'awaiting_payment') throw new RuntimeException('This order is no longer awaiting payment.');
-            if ($order['request_id'] !== null && $method !== 'dummy') throw new RuntimeException('A request purchase needs immediate confirmed payment to enrol the learner. Use the simulated card payment.');
             foreach ($this->records->payments($orderId) as $attempt) {
                 if (in_array($attempt['state'], ['created','pending','paid'], true)) throw new RuntimeException('A payment is already being processed.');
             }

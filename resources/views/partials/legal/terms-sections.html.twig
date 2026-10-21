@@ -1,0 +1,177 @@
+{#
+  The numbered sections of the Terms and Conditions, each a closed accordion with its icon (owner, 2026-10-20). One source for the page and its PDF
+  (partials/legal/document-pdf.html.twig), which prints each section open under its heading. The text is the
+  legal text: change its date in CattoLearning\Legal\LegalDocuments whenever it changes.
+#}
+{% set a = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"' %}
+{% set icons = {
+	'supplier': '<svg ' ~ a ~ '><path d="M3 21h18"/><path d="M5 21V5l7-2v18"/><path d="M12 9h7v12"/><path d="M8 8h1M8 11h1M8 14h1M8 17h1M15 12h1M15 15h1M15 18h1"/></svg>',
+	'about': '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></svg>',
+	'what-we-sell': '<svg ' ~ a ~ '><path d="M5 8h14l-1 13H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+	'prices': '<svg ' ~ a ~ '><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/></svg>',
+	'access': '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+	'account': '<svg ' ~ a ~ '><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
+	'wallet': '<svg ' ~ a ~ '><path d="M3 7a2 2 0 0 1 2-2h13v4"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 13.5h2"/></svg>',
+	'acceptable-use': '<svg ' ~ a ~ '><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
+	'certificates': '<svg ' ~ a ~ '><circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.5 7 21l5-2.5 5 2.5-1.5-7.5"/></svg>',
+	'intellectual-property': '<svg ' ~ a ~ '><circle cx="12" cy="12" r="9"/><path d="M15 9.5a3.5 3.5 0 1 0 0 5"/></svg>',
+	'refunds': '<svg ' ~ a ~ '><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/><circle cx="12" cy="12" r="2.5"/></svg>',
+	'liability': '<svg ' ~ a ~ '><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>',
+	'privacy': '<svg ' ~ a ~ '><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+	'complaints': '<svg ' ~ a ~ '><path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17H9l-5 4v-4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 5z"/><path d="M8 10h8M8 13h5"/></svg>',
+	'law': '<svg ' ~ a ~ '><path d="M12 4v16M8 20h8M5 7h14"/><path d="M5 7l-3 6h6zM19 7l-3 6h6z"/></svg>',
+} %}
+<div class="cl-faq">
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'supplier', eyebrow: 'Section 1', icon: icons['supplier'], heading: 'Supplier information'})} %}{% block body %}
+		<p>Given as section 43 of the Electronic Communications and Transactions Act 25 of 2002 (ECTA) requires.</p>
+{{ ui('data.key-value-list', {items: [
+	{label: 'Full name', value: supplier.legal_name},
+	{label: 'Legal status', value: supplier.legal_status},
+	{label: 'Registration number', value: supplier.registration_number},
+	{label: 'Trading name', value: supplier.trading_name},
+	{label: 'Physical address', value: supplier.physical_address},
+	{label: 'Address for legal service', value: supplier.physical_address},
+	{label: 'Telephone', value: supplier.phone},
+	{label: 'Email address', value: supplier.email},
+	{label: 'Website', value: supplier.website},
+	{label: 'Information Officer', value: supplier.information_officer},
+	{label: 'Self-regulatory bodies and codes of conduct', value: supplier.memberships},
+	{label: 'Accreditation', value: supplier.accreditation},
+]}) }}
+<p>{{ supplier.trading_name }} is the seller. When you buy on this site you buy from {{ supplier.legal_name }}, {{ supplier.legal_form_phrase }}, not from a payment provider or any other party.{% if not supplier.is_company %} The seller is not a company, so there is no company registration number.{% endif %}</p>
+<p>Legal documents may be served on the seller at the address for legal service above. The seller also accepts service by email at <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>.</p>
+<p>The rest of the information ECTA requires is in these sections:</p>
+<ul>
+	<li>what is sold - <a href="#what-we-sell">section 3</a></li>
+	<li>the full price and how to pay - <a href="#prices">section 4</a></li>
+	<li>when a course starts and how long access lasts - <a href="#access">section 5</a></li>
+	<li>the record of your purchase - <a href="#prices">section 4</a></li>
+	<li>cancellation and refunds - <a href="#refunds">section 11</a> and the <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a></li>
+	<li>payment security and privacy - <a href="#prices">section 4</a> and the <a href="{{ legal_documents.privacy.path }}">{{ legal_documents.privacy.title }}</a></li>
+	<li>complaints and disputes - <a href="#complaints">section 14</a></li>
+</ul>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'about', eyebrow: 'Section 2', icon: icons['about'], heading: 'About these terms'})} %}{% block body %}
+<p>In these terms 'we', 'us' and 'the seller' mean {{ supplier.legal_name }} trading as {{ supplier.trading_name }}. 'You' means the person using the site or placing an order. 'The site' means {{ supplier.website }}.</p>
+<p>You accept these terms and the <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a> by ticking the acceptance box at checkout. You also tick a box to agree that your courses start as soon as your payment is confirmed. An order cannot be placed without both. Before you place an order, checkout shows you the whole order so that you can review it, correct it or leave without buying.</p>
+<p>Your order records when you accepted these terms. The date at the top of this page shows when they last changed. A PDF copy of these terms can be downloaded from the top of the page.</p>
+<p>We may change these terms from time to time. The terms that apply to a purchase are the ones in force when you made it, and changes apply only to later purchases unless the law requires otherwise or the change gives you more rights. If a change affects your account or wallet credit, we will email you at least 30 days before it takes effect.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'what-we-sell', eyebrow: 'Section 3', icon: icons['what-we-sell'], heading: 'What we sell'})} %}{% block body %}
+<p>We sell access to self-study courses that you take on this site at your own pace.</p>
+<ul>
+	<li><strong>A course.</strong> Each price is for access to one course for a fixed period. The course page shows every price and its access period before you buy. There is no lifetime access.</li>
+	<li><strong>A bundle.</strong> A bundle is two or more courses sold together for one price and one access period.</li>
+	<li><strong>Company credits.</strong> A company can buy credits. One credit gives one staff member access to one named course for the access period shown. Only the Company Administrator buys credits for a company. Bundles are not sold to companies.</li>
+	<li><strong>A free course.</strong> A free course is added to your library when you complete checkout. Its access period starts at once. It has no order, invoice or payment.</li>
+	<li><strong>Wallet credit is not sold.</strong> <a href="#wallet">Section 7</a> explains where wallet credit comes from.</li>
+</ul>
+<p>You get a course as it is published. We may correct or update a course while you have access to it.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'prices', eyebrow: 'Section 4', icon: icons['prices'], heading: 'Prices and payment'})} %}{% block body %}
+<p>All prices are in South African Rand (ZAR). The price is shown on the course or bundle page, in your cart and at checkout before you place an order.</p>
+<p>The seller is not registered for VAT. No VAT is charged. The price shown is the full price.</p>
+<p>A promo code is entered at checkout, or applied automatically while a promotion says so. One promotion applies to an order. If more than one could, the one that saves you the most applies. The discount is shown before you place the order. Promo codes cannot be used on company credit orders.</p>
+<p>We accept the payment methods shown at checkout. They may change from time to time.</p>
+<p>Card payments are made on our payment provider's secure page. Card details never reach this site and are never stored by it.</p>
+<p>When you pay by EFT, you pay into our bank account and use your account reference as the payment reference (<a href="#account">section 6</a>). An EFT is confirmed when we see the payment in our bank account. If you pay more than the amount due, the difference is added to your wallet. If you pay less, the order waits until the rest is paid.</p>
+<p>You can pay all or part of an order with wallet credit. The rest is paid by a payment method shown at checkout.</p>
+<p>An order that is not paid in full within {{ payment_due }} is cancelled automatically. Anything you paid towards it is added to your wallet.</p>
+<p>We issue an invoice when you place an order and a receipt when your payment is confirmed. Both are PDF documents that stay available under My Orders in your account. We keep order and transaction records for at least 5 years.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'access', eyebrow: 'Section 5', icon: icons['access'], heading: 'Access to a course'})} %}{% block body %}
+<p><strong>Every course you buy starts as soon as your payment is confirmed.</strong> At checkout you tick a box to agree to this. The course is added to your library and your access period begins at that moment. Every course in a bundle starts in the same way.</p>
+<p>The access period is fixed. It runs from its start to its end. Unused time is not refunded. Your dashboard shows when each course started, when its access ends and how many days are left.</p>
+<p>When the access period ends, the course leaves your library and you can no longer open it. The records of your work on the course are kept.</p>
+<p>For a company credit, the staff member's access period starts when they press Start course and confirm it. Starting uses the credit. If the Company Administrator removes a staff member from a course before they start, the credit returns to the company.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'account', eyebrow: 'Section 6', icon: icons['account'], heading: 'Your account'})} %}{% block body %}
+<p>You need an account to buy or take a course. You sign in with a one-time link sent to your email address. There are no passwords. A sign-in link works once and expires after 30 minutes.</p>
+<p>Anyone who can read your email can sign in as you. Keep your email account secure. You are responsible for what is done through your account. You can see your active sessions in your account and end any of them.</p>
+<p>This site is for adults. You must be 18 or older to use it. You give your date of birth when you register or, if someone else created your account, the first time you sign in. We do not accept anyone under 18. If your verified identity document shows that you are under 18, your account cannot be used.</p>
+<p>You may take a course under any name you choose. <a href="#certificates">Section 9</a> explains the name that appears on a certificate and a transcript.</p>
+<p>Your account has an account reference, such as CL-20261017-0001-U. It never changes. It is shown on your dashboard, on your profile and on your orders. Quote it when you pay by EFT or write to us. A company has an account reference of its own.</p>
+<p>Your invoice is made out to the billing details you give at checkout. Give details that are correct.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'wallet', eyebrow: 'Section 7', icon: icons['wallet'], heading: 'Wallet credit'})} %}{% block body %}
+<p>Your account has a wallet. Wallet credit can be spent on courses on this site. A company's wallet can also buy company credits.</p>
+<p>Wallet credit comes from:</p>
+<ul>
+	<li>a refund you chose to take as wallet credit</li>
+	<li>an EFT payment that was more than the amount due</li>
+	<li>an order that was cancelled after you had paid towards it</li>
+</ul>
+<p>Each amount of wallet credit expires {{ wallet_expiry }} after it was added, if it has not been spent. When you spend wallet credit, the credit that expires first is used first. We email you {{ wallet_reminder }} before credit expires.</p>
+<p>Wallet credit earns no interest. It is not paid out as cash and cannot be passed to another person or company.</p>
+<p>My Wallet in your account shows your balance and a statement of every amount added, spent and expired, with its expiry date.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'acceptable-use', eyebrow: 'Section 8', icon: icons['acceptable-use'], heading: 'Acceptable use'})} %}{% block body %}
+<p>You may not:</p>
+<ul>
+	<li>share your account or a sign-in link with another person</li>
+	<li>copy, record, publish or pass on course content, except a file that a course offers for download for your own study</li>
+	<li>have another person complete an assessment for you, or complete an assessment for another person</li>
+	<li>try to get around access controls, interfere with the site or reach another person's account or information</li>
+	<li>use the site for anything unlawful</li>
+</ul>
+<p>We may suspend or close an account that is used to break these rules.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'certificates', eyebrow: 'Section 9', icon: icons['certificates'], heading: 'Certificates and transcripts'})} %}{% block body %}
+<p>A certificate proves that you took a course. It never states that you passed. You earn it when you have completed every assessment in the course, whether you pass or fail.</p>
+<p>A certificate and a transcript are issued only after your identity has been verified. Both state your name exactly as it appears on your identity document. If you complete every assessment before you are verified, they wait, and once you are verified they are issued with the date you completed the course.</p>
+<p>Your identity is verified by an identity verification provider. On its secure page you photograph your identity document and take a live selfie, and the provider checks them. This site keeps no images. It keeps only the result, your verified name, the type, number and issuing country of your document, your date of birth and when you were verified.</p>
+<p>You verify once, when your first certificate is due. Nothing about your identity is asked before you buy. A verified account is not asked again. If a check is declined, you are told why and may try again up to three times. After that, contact us.</p>
+<p>The purpose of verification is to protect the credibility of certificates and transcripts.</p>
+<p>A certificate shows your verified name, the course, the date you completed it, the certificate number, any accreditation stated for the course and the provider. It shows no mark or grade.</p>
+<p>A transcript records each module assessment mark, the final assessment mark and the overall grade. The overall grade is 50% module assessments and 50% final assessment.</p>
+<p>We may revoke a certificate and its transcript, for example if it was obtained by breaking these terms. A revoked certificate or transcript says so, with the reason, to anyone who can see it.</p>
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'You decide who can see your certificates and transcripts'})} %}
+{% block body %}
+	Each certificate and each transcript is private until you make it public, and you decide for each one separately. A private one can be seen only by you. A public one can be seen without signing in by anyone who has its address. They will see your name and, on a transcript, your marks and your grade. We never link to it, list it or tell anyone where to find it. You can make it public or private, or give it a new address, at any time in your account. The old address then stops working.
+{% endblock %}
+{% endembed %}
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'intellectual-property', eyebrow: 'Section 10', icon: icons['intellectual-property'], heading: 'Intellectual property'})} %}{% block body %}
+<p>Course content and the other material on this site belong to the seller or to the course's provider. They are protected by copyright.</p>
+<p>Buying access gives you a personal right to use a course for your own study during your access period. You cannot transfer that right to another person. Buying access does not make you the owner of any content.</p>
+<p>A company that buys credits may give access only to its own staff members.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'refunds', eyebrow: 'Section 11', icon: icons['refunds'], heading: 'Cancellation and refunds'})} %}{% block body %}
+<p>Section 44 of ECTA gives a consumer the right to cancel an electronic transaction for a service, without reason and without penalty, within 7 days after the agreement is concluded. Under section 42(2)(d) of ECTA that right does not apply to a service that began with the consumer's consent before the 7 days ended.</p>
+<p>Every course you buy starts as soon as your payment is confirmed, and at checkout you agree to this. <strong>Once a course has started, its content has been supplied to you and cannot be returned. No refund of any kind is given for it: no money back and no wallet credit.</strong></p>
+<p>Company credits that no learner has started can be refunded as wallet credit within {{ refund_window }} of buying them.</p>
+<p>When a refund is given, a refund of a card payment is less any fee the payment provider charged us for that payment and, for money back, for the refund. Money back for an EFT payment is less our EFT refund fee. Anything you paid from your wallet goes back to your wallet.</p>
+<p>None of this affects your rights if a course is faulty, is not as described or cannot be provided. Tell us and we will put it right or refund you as the law requires.</p>
+<p>The <a href="{{ legal_documents.refunds.path }}">{{ legal_documents.refunds.title }}</a> sets out the full rule, every deduction, how a refund is paid and how to ask for one. It is part of these terms.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'liability', eyebrow: 'Section 12', icon: icons['liability'], heading: 'Limitation of liability'})} %}{% block body %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Please read this section carefully'})} %}
+{% block body %}
+	It limits what the seller is responsible for.
+{% endblock %}
+{% endembed %}
+<p>Courses are provided for education. We do not promise that a course will lead to a particular result, qualification or job.</p>
+<p>We work to keep the site available, but we do not promise that it will always be available or free of faults.</p>
+<p>To the extent the law allows, we are not liable for indirect or consequential loss, such as lost income, lost profit or lost data, that arises from your use of the site or of a course.</p>
+<p>To the extent the law allows, our total liability to you for a claim about a course, bundle or credit is limited to the amount you paid for it.</p>
+<p>Nothing in these terms limits or excludes liability that the law does not allow to be limited or excluded. Nothing in these terms takes away a right you have under the Consumer Protection Act 68 of 2008 or under ECTA.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'privacy', eyebrow: 'Section 13', icon: icons['privacy'], heading: 'Privacy'})} %}{% block body %}
+<p>We collect and use personal information as the <a href="{{ legal_documents.privacy.path }}">{{ legal_documents.privacy.title }}</a> describes. It explains what is collected, who receives it, how long it is kept and your rights under the Protection of Personal Information Act 4 of 2013.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'complaints', eyebrow: 'Section 14', icon: icons['complaints'], heading: 'Complaints and disputes'})} %}{% block body %}
+<p>If you have a complaint, contact us first:</p>
+<ul>
+	<li>email <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a></li>
+	<li>telephone <a href="{{ supplier.phone_href }}">{{ supplier.phone }}</a></li>
+	<li>the <a href="/contact">contact form</a></li>
+	<li>post to {{ supplier.legal_name }}, {{ supplier.physical_address }}</li>
+</ul>
+<p>If your complaint is about a purchase, give your account reference and your order number. We respond to every complaint promptly.</p>
+<p>If we cannot settle a complaint with you, you may refer it free of charge to the Consumer Goods and Services Ombud (<a href="https://www.cgso.org.za" target="_blank" rel="noopener">www.cgso.org.za</a>). You may also refer it to the National Consumer Commission or to a court that has jurisdiction.</p>
+	{% endblock %}{% endembed %}
+	{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {id: 'law', eyebrow: 'Section 15', icon: icons['law'], heading: 'Governing law'})} %}{% block body %}
+<p>These terms and every purchase made on this site are governed by the law of South Africa.</p>
+<p>If a court finds that part of these terms cannot be enforced, the rest of these terms still applies.</p>
+	{% endblock %}{% endembed %}
+</div>

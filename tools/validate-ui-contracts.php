@@ -81,7 +81,8 @@ foreach (['activity-filters','event.ip_address','event.geo_location','activity_p
 // v0.5.7.6 large-data contracts. Every standalone list must be able to state its own size,
 // and no list partial may reintroduce a whole-table <select> or an undefined table wrapper.
 $pagination = $read($root . '/resources/views/partials/pagination.html.twig');
-foreach (['pagination-row','pagination-summary','pagination-page-size','Showing {{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·','Page {{ pg.page }} of {{ pg.total_pages }}',"rel: 'prev'","rel: 'next'"] as $token) {
+// The short wording (owner, 2026-10-21): "X–Y of N · Pg P of T", icons for first, previous, next and last.
+foreach (['pagination-row','pagination-summary','pagination-page-size','{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·','Pg {{ pg.page }} of {{ pg.total_pages }}',"rel: 'prev'","rel: 'next'","icon: 'page-first'","icon: 'page-last'",'>Show Pg</label>','>Rows per pg</label>'] as $token) {
     $need(str_contains($pagination, $token), 'Shared pagination control missing: ' . $token);
 }
 
@@ -208,7 +209,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is built as a plain array now rather than written into F3's hive, so these look
 // for the assignment rather than for set(). What is being protected is unchanged: every page is
 // given navigation, a footer and its section keys, whichever engine renders it.
-foreach (["PLATFORM_ASSET_VERSION = '0.9.5'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.9.6'", "\$model['navigation']", "\$model['footer_navigation']", 'account_sections','account_section','company_sections','company_section','admin_sections','admin_section'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer contract missing: ' . $token);
 }
 foreach (['page_content','theme_package_asset_url'] as $token) $need(!str_contains($renderer, $token), 'Obsolete Theme API alias remains: ' . $token);
@@ -223,12 +224,12 @@ foreach (glob($root . '/src/Http/Controller/*.php') ?: [] as $controller) {
         }
     }
 }
-foreach (['GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses','GET /admin/roles'] as $route) {
+foreach (['GET /account/dashboard','GET /account/profile','GET /account/courses','GET /account/sessions','GET /account/activity','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses','GET /admin/roles'] as $route) {
     $need(str_contains($app, $route), 'Semantic workspace route missing: ' . $route);
 }
 $account = $read($root . '/src/Http/Controller/AccountController.php');
 $need(
-    (bool) preg_match("/#\[Route\('\/account\/library'[^\n]*\n\s*public function learning\(/", $account),
+    (bool) preg_match("/#\[Route\('\/account\/courses'[^\n]*\n\s*public function learning\(/", $account),
     'My Learning direct route must render through AccountController::learning().'
 );
 

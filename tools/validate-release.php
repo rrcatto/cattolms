@@ -7,6 +7,8 @@ Description:
 Validates the Catto Learning v0.5.8 Seed Database release contract: PHP 8.5.9, rebased development schema, database-backed ACL, presentation-neutral Account/Company/Administration workspaces, filesystem-authoritative theme recovery, standard navigation/footer APIs and the slim bundled-theme footprint.
 
 Changelog:
+2026/10/19 SAST
+- 101 permissions with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE.
 2026/10/08 SAST
 - 92 permissions with PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE (the financial document design).
 2026/10/17 SAST
@@ -61,7 +63,7 @@ $read = static function (string $path) use (&$errors): string {
 
 $composer = json_decode($read($root . '/composer.json'), true);
 $need(is_array($composer), 'composer.json must decode as JSON.');
-$need(($composer['version'] ?? '') === '0.9.5', 'composer.json version must be 0.9.5.');
+$need(($composer['version'] ?? '') === '0.9.6', 'composer.json version must be 0.9.6.');
 $need(($composer['require']['php'] ?? '') === '>=8.5.9 <9.0', 'PHP runtime target must be >=8.5.9 <9.0.');
 // ext-gd: profile images and certificate pictures are processed with GD, and an installation without
 // it answered an upload with HTTP 500, so `composer install` refuses a server that lacks it.
@@ -107,12 +109,13 @@ $permissionKeys = array_values(array_unique($permissionMatches[1] ?? []));
 // BUNDLE.MANAGEMENT.VIEW and BUNDLE.MANAGE: course bundles are a catalogue offer of their own. 90 with
 // CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE: certificate designs. 97 with the wallet and refund request keys
 // (COMMERCE.WALLET.VIEW, COMMERCE.REFUND.REQUEST, COMPANY.WALLET.VIEW, PLATFORM.WALLET.VIEW/MANAGE). 92 with PLATFORM.DOCUMENT.VIEW
-// and PLATFORM.DOCUMENT.MANAGE: the design of invoices, receipts and credit notes.
-$need(count($permissionKeys) === 97, 'PermissionCatalog must define exactly 97 reserved/current secure actions for this release.');
+// and PLATFORM.DOCUMENT.MANAGE: the design of invoices, receipts and credit notes. 101 with CERTIFICATE.ISSUED.VIEW/MANAGE
+// (issued certificates, revoking one) and PLATFORM.IDENTITY.VIEW/MANAGE (identity verification).
+$need(count($permissionKeys) === 101, 'PermissionCatalog must define exactly 101 reserved/current secure actions for this release.');
 foreach ($permissionKeys as $key) $need(str_contains($baseline, "('" . $key . "'"), 'Baseline missing ACL permission ' . $key . '.');
 $systemPermissionCount = count(array_filter($permissionKeys, static fn(string $key): bool => str_starts_with($key, 'SYSTEM.')));
 $businessPermissionCount = count($permissionKeys) - $systemPermissionCount;
-$need($systemPermissionCount === 10 && $businessPermissionCount === 87, 'ACL catalogue must contain 10 SYSTEM and 87 shared business permissions.');
+$need($systemPermissionCount === 10 && $businessPermissionCount === 91, 'ACL catalogue must contain 10 SYSTEM and 91 shared business permissions.');
 $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
 foreach ($permissionKeys as $key) {
     $need(preg_match('/^[A-Z]+(?:\\.[A-Z]+)*$/', $key) === 1, 'Invalid ACL permission grammar: ' . $key);
@@ -166,7 +169,7 @@ foreach (glob($root . '/src/Http/Controller/*.php') ?: [] as $controller) {
     }
 }
 $requiredRoutes = [
-    'GET /account','GET /account/dashboard','GET /account/profile','GET /account/library','GET /account/sessions','GET /account/activity',
+    'GET /account','GET /account/dashboard','GET /account/profile','GET /account/courses','GET /account/sessions','GET /account/activity',
     'GET /company','GET /company/dashboard','GET /company/people','GET /company/requests','GET /company/enrolments','GET /company/credits','GET /company/courses',
     'GET /admin','GET /admin/dashboard','GET /admin/courses','GET /admin/people','GET /admin/companies','GET /admin/course/enrolments','GET /admin/course/credits','GET /admin/activity','GET /admin/reports','GET /admin/themes','GET /admin/roles','GET /admin/settings',
     'POST /admin/roles/{id}/permissions','POST /admin/themes/resync',
@@ -174,8 +177,8 @@ $requiredRoutes = [
 foreach ($requiredRoutes as $route) $need(str_contains($app, $route), 'Required semantic route missing: ' . $route);
 $accountController = $read($root . '/src/Http/Controller/AccountController.php');
 $need(
-    (bool) preg_match("/#\[Route\('\/account\/library'[^\n]*\n\s*public function learning\(/", $accountController),
-    '/account/library must be a standalone Account section, not an unrelated page controller.'
+    (bool) preg_match("/#\[Route\('\/account\/courses'[^\n]*\n\s*public function learning\(/", $accountController),
+    '/account/courses must be a standalone Account section, not an unrelated page controller.'
 );
 $need(!str_contains($app, '/admin?tab=') && !str_contains($app, '/account?tab=') && !str_contains($app, '/company?tab='), 'Top-level workspaces must not use query-string section routing.');
 $need(!str_contains($app, 'http_response_code('), 'App ONERROR must not call http_response_code() after F3 has already emitted an HTTP status header.');
@@ -184,7 +187,7 @@ $renderer = $read($root . '/src/View/ThemeRenderer.php');
 // The view model is a plain array now rather than writes into F3's hive, so these look for the
 // assignment. The API being protected is the same: navigation, a footer, and the section keys every
 // workspace family is given.
-foreach (["PLATFORM_ASSET_VERSION = '0.9.5'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
+foreach (["PLATFORM_ASSET_VERSION = '0.9.6'", "\$model['navigation']", "\$model['footer_navigation']","\$admin['sections']","\$admin['section']","\$account['sections']","\$account['section']","\$company['sections']","\$company['section']",'$this->adminSections->all()','$this->accountSections->all()','$this->companySections->all()'] as $token) {
     $need(str_contains($renderer, $token), 'ThemeRenderer standard presentation API missing: ' . $token);
 }
 
@@ -249,7 +252,7 @@ foreach ($bundledNames as $bundledName) {
     $need(preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*-v\d+\.\d+\.\d+\.zip$/', $bundledName) === 1, 'Bundled theme package must be named <slug>-v<version>.zip: ' . $bundledName);
 }
 
-$requiredDocs = ['PROJECT-INSTRUCTIONS.md','HANDOFF.md','ROADMAP.md','THEME-SDK.md','COURSE-SPECIFICATION.md','OPERATIONS.md'];
+$requiredDocs = ['THEME-SDK.md','COURSE-SPECIFICATION.md','OPERATIONS.md','UI-COMPONENTS.md','ux-ui-rules.md'];
 foreach ($requiredDocs as $doc) $need(is_file($root . '/docs/' . $doc), 'Required documentation missing: ' . $doc);
 $themeSdk = $read($root . '/docs/THEME-SDK.md');
 $need(str_contains($themeSdk, 'self-contained') || str_contains($themeSdk, 'standalone'), 'Theme SDK must be sufficient for external theme generation.');
@@ -275,7 +278,9 @@ $need($forbidden === [], 'Release contains patch residue: ' . implode(', ', $for
 $pages = glob($root . '/resources/views/pages/*.html.twig') ?: [];
 $need(count($pages) >= 35, 'Expected at least 35 platform-owned page templates.');
 $help = $read($root . '/resources/views/pages/help.html.twig');
-$need(!str_contains($help, 'data-help-accordion') && !str_contains($help, 'overlay.accordion-section'), 'Public Help must remain visible rather than using nested accordions.');
+// Help's topics are the canonical accordion with an icon and a category, like the FAQ (owner, 2026-10-20),
+// never a page-local disclosure.
+$need(!str_contains($help, 'data-help-accordion') && substr_count($help, "ui_template('overlay.accordion-section')") >= 6 && str_contains($help, 'href="/faq"'), 'Public Help lists its topics as canonical accordions and links to the FAQ.');
 foreach (['find-a-course', 'buy-access', 'course-structure', 'learn', 'sign-in', 'answers'] as $helpSection) {
     $need(str_contains($help, "id: '" . $helpSection . "'"), 'Public Help is missing section: ' . $helpSection);
 }

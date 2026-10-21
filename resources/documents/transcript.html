@@ -1,0 +1,51 @@
+<table class="head">
+	<tr>
+		<td>
+			<p class="business">{{ business.name }}</p>
+			{{#if business.legal_name}}<p>{{ business.legal_name }}</p>{{/if}}
+			{{#if business.registration_number}}<p>Registration number: {{ business.registration_number }}</p>{{/if}}
+			{{#if business.address}}<p>{{ business.address }}</p>{{/if}}
+			{{#if business.email}}<p>{{ business.email }}</p>{{/if}}
+			{{#if business.website}}<p>{{ business.website }}</p>{{/if}}
+		</td>
+		<td class="title">
+			<h1>Transcript</h1>
+			<p>Transcript {{ transcript.number }}</p>
+			<p>Certificate {{ transcript.certificate_number }}</p>
+			<p>Issued {{ transcript.issue_date }}</p>
+		</td>
+	</tr>
+</table>
+
+<h2>Learner and course</h2>
+<table class="facts">
+	<tr><th>Learner</th><td>{{ learner.name }}</td></tr>
+	<tr><th>Course</th><td>{{ course.title }}</td></tr>
+	{{#if course.provider}}<tr><th>Provider</th><td>{{ course.provider }}</td></tr>{{/if}}
+	{{#if course.accreditation}}<tr><th>Accreditation</th><td>{{ course.accreditation }}</td></tr>{{/if}}
+	<tr><th>Completed</th><td>{{ course.completion_date }}</td></tr>
+</table>
+
+<h2>Assessment marks</h2>
+<table class="lines">
+	<thead>
+		<tr><th>Assessment</th><th>Kind</th><th class="mark">Mark</th></tr>
+	</thead>
+	<tbody>
+		{{#each assessments}}
+		<tr>
+			<td>{{ assessment.title }}</td>
+			<td>{{ assessment.kind }}</td>
+			<td class="mark">{{ assessment.mark }}</td>
+		</tr>
+		{{/each}}
+	</tbody>
+</table>
+
+<table class="totals">
+	<tr><th>Module assessments (average, 50% of the grade)</th><td>{{#if result.module_average}}{{ result.module_average }}{{else}}None{{/if}}</td></tr>
+	<tr><th>Final assessment (50% of the grade)</th><td>{{ result.final }}</td></tr>
+	<tr class="total"><th>Overall grade</th><td>{{ result.overall }}{{#if result.grade}} ({{ result.grade }}){{/if}}</td></tr>
+</table>
+
+<p class="note">This transcript records the learner's marks. Anyone with its number or link can check it{{#if transcript.verification_url}} at {{ transcript.verification_url }}{{/if}}.</p>

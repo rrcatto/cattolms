@@ -72,8 +72,64 @@ final class AuthService
         private readonly MailerInterface $mailer,
         private readonly EventDispatcher $events,
         private readonly UserProfileRepository $profiles,
-        private readonly ?CompanyService $companies = null
+        private readonly ?CompanyService $companies = null,
+        private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
+        private readonly ?SignInRestriction $signIn = null
     ) {
+    }
+
+    /** Whether this address belongs to an administrator: the configured one, or an account with the ADMIN role. */
+    private function isAdministrator(string $email, ?int $userId): bool
+    {
+        $configured = strtolower(trim(Env::string('APP_ADMIN_EMAIL')));
+        if ($configured !== '' && strtolower(trim($email)) === $configured) return true;
+        if ($userId === null) return false;
+        try {
+            return in_array(RoleCatalog::ADMIN, array_map('strtoupper', $this->roles->roles($userId)), true);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** Refuses someone the sign-in restriction keeps out (owner, 2026-10-21). */
+    private function assertMaySignIn(string $email, ?int $userId): void
+    {
+        if ($this->signIn !== null && !$this->signIn->allows($email, $this->isAdministrator($email, $userId))) {
+            throw new RuntimeException(SignInRestriction::REFUSED);
+        }
+    }
+
+    /** Where a new account on a demo site goes once its email is confirmed: it waits for ADMIN's approval. */
+    public const AWAITING_APPROVAL_PATH = '/register/awaiting-approval';
+    public const AWAITING_APPROVAL_MESSAGE = 'Your account is waiting for approval. You will receive an email as soon as it is approved.';
+
+    /**
+     * On a demo site every account registered through the site waits for ADMIN's approval before it can sign in (owner,
+     * 2026-10-21: "if someone logs in, in demo mode, admin still must allow them to operate. otherwise my IP will get
+     * stolen"): a stranger who finds the site cannot buy courses with the simulated card and read them. Accounts ADMIN
+     * makes are approved already; a live site approves nobody by hand.
+     */
+    private function needsApproval(string $email = ''): bool
+    {
+        // An address the administrator listed under Who can sign in is approved already (owner, 2026-10-21).
+        if ($email !== '' && ($this->signIn?->isListed($email) ?? false)) return false;
+        return $this->site?->isDemo() ?? false;
+    }
+
+    /** ADMIN approves an account waiting for approval: it can sign in from now, and its holder is told by email. */
+    public function approveAccount(int $userId, int $actorUserId): void
+    {
+        $user = $this->users->findById($userId);
+        if ($user === null) throw new RuntimeException('The user account does not exist.');
+        if ((string) ($user['status'] ?? '') !== 'awaiting_approval') throw new RuntimeException('This account is not waiting for approval.');
+        $this->users->setStatus($userId, 'active');
+        $this->audit->record($actorUserId, 'user.approved', ['user_id' => $userId]);
+        $email = (string) ($user['primary_email'] ?? '');
+        if ($email !== '') {
+            $site = trim(Env::string('APP_NAME')) ?: 'the site';
+            $this->mailer->sendAdministratorMessage($email, 'Your account is approved',
+                "Your account at {$site} has been approved.\n\nSign in with your email address at " . rtrim(Env::string('APP_URL'), '/') . '/login');
+        }
     }
 
     /**
@@ -83,7 +139,7 @@ final class AuthService
      * render. hasImage() is an existence check and never loads the bytes - the header only needs
      * to know whether to address the image route or draw an initial.
      *
-     * @return array{name:string,email:string,status:string,has_image:bool}
+     * @return array{name:string,email:string,status:string,has_image:bool,reference:string}
      */
     public function identityCard(int $userId): array
     {
@@ -94,14 +150,20 @@ final class AuthService
             'email' => (string) ($profile['primary_email'] ?? ''),
             'status' => (string) ($profile['status'] ?? ''),
             'has_image' => $this->profiles->hasImage($userId),
+            // Shown beside the name on every page (owner, 2026-10-21: every page that names a person gives their account reference).
+            'reference' => (string) ($profile['account_reference'] ?? ''),
         ];
     }
 
-    public function requestLogin(string $inputEmail, string $returnPath = '/account/library'): void
+    public function requestLogin(string $inputEmail, string $returnPath = '/account/courses'): void
     {
         $email = EmailAddress::normalize($inputEmail);
         $known = $this->users->findByVerifiedEmail($email);
         $admin = strtolower(trim(Env::string('APP_ADMIN_EMAIL')));
+        if ($known === null && $this->users->statusOfVerifiedEmail($email) === 'awaiting_approval') {
+            throw new RuntimeException(self::AWAITING_APPROVAL_MESSAGE);
+        }
+        $this->assertMaySignIn($email, $known === null ? null : (int) $known['id']);
         if ($known === null && ($admin === '' || strtolower($email) !== $admin)) {
             throw new UnknownLoginEmailException($email);
         }
@@ -163,6 +225,8 @@ final class AuthService
                 Env::string('APP_ADMIN_EMAIL')
             );
 
+            // Who can sign in (owner, 2026-10-21): checked again here, for a link sent before the restriction.
+            $this->assertMaySignIn($email, (int) $user['id']);
             // A suspended company's members may not obtain a session. Checked here, after the
             // identity is known and before the session is created, so the magic link is consumed
             // by nobody and no session exists to clean up. The token is left unused deliberately:
@@ -193,8 +257,8 @@ final class AuthService
                 'session_public_id' => $sessionPublicId,
                 'return_path' => $this->safeReturnPath(
                     is_array($context)
-                        ? (string) ($context['return_path'] ?? '/account/library')
-                        : '/account/library'
+                        ? (string) ($context['return_path'] ?? '/account/courses')
+                        : '/account/courses'
                 ),
             ];
         });
@@ -281,6 +345,14 @@ final class AuthService
             return null;
         }
 
+        // Who can sign in (owner, 2026-10-21): a session held by someone no longer allowed stops working now.
+        if ($this->signIn !== null && !$this->signIn->allows($authenticatedEmail, in_array('ADMIN', $roles, true)) && !$this->signIn->isListed($primaryEmail)) {
+            $this->sessions->revokeByTokenHash(Token::hash($rawToken));
+            $this->clearSessionCookie();
+
+            return null;
+        }
+
         $permissions = $this->acl->permissionsForUser($userId, $roles);
 
         $this->currentUser = new CurrentUser(
@@ -291,9 +363,38 @@ final class AuthService
             $roles,
             $permissions,
             (string) $session['public_id'],
-            $authenticatedEmail
+            $authenticatedEmail,
+            self::accountStep($session)
         );
         return $this->currentUser;
+    }
+
+    /**
+     * What a signed-in person must do first (owner, 2026-10-20, adults only): give their date of birth
+     * once, unless they did at registration. A verified identity document showing them under 18 stops the
+     * account at the adults-only page for good. AccountStepListener sends them there before any other page.
+     *
+     * @param array<string,mixed> $session
+     */
+    private static function accountStep(array $session): string
+    {
+        if (self::isTrue($session['verified_minor'] ?? false)) return 'adults_only';
+        if (($session['birthdate'] ?? null) === null) return 'age';
+        return '';
+    }
+
+    /**
+     * The date of birth at the first sign-in of an account someone else made (owner, 2026-10-20). Someone
+     * under 18 is refused and nothing is kept (AdultAge).
+     */
+    public function giveDateOfBirth(CurrentUser $user, mixed $dateOfBirth): void
+    {
+        $born = AdultAge::fromInput($dateOfBirth, new \DateTimeImmutable());
+        $this->transactions->run(function () use ($user, $born): void {
+            $this->users->updateProfile($user->id, ['birthdate' => $born]);
+            $this->audit->record($user->id, 'user.date_of_birth_given', ['user_id' => $user->id, 'when' => 'first sign-in']);
+        });
+        $this->currentUser = null;
     }
 
     public function logout(): void
@@ -325,15 +426,13 @@ final class AuthService
     /** @param array<string,mixed> $data */
     public function updateProfile(int $userId, array $data): void
     {
-        foreach (['first_name','last_name','identification_number','gender','mobile_number','display_name','certificate_name'] as $field) {
+        foreach (['first_name','last_name','identification_number','gender','mobile_number','display_name'] as $field) {
             if (isset($data[$field]) && mb_strlen(trim((string) $data[$field])) > 160) {
                 throw new RuntimeException('Profile fields may not exceed 160 characters.');
             }
         }
-        $birthdate = trim((string) ($data['birthdate'] ?? ''));
-        if ($birthdate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthdate) !== 1) {
-            throw new RuntimeException('Enter the birthdate in YYYY-MM-DD format.');
-        }
+        // Adults only (owner, 2026-10-20): a date of birth is checked as at registration.
+        if (array_key_exists('birthdate', $data)) $data['birthdate'] = AdultAge::optionalInput($data['birthdate'], new \DateTimeImmutable());
         $this->users->updateProfile($userId, $data);
         $this->audit->record($userId, 'user.profile_updated');
     }
@@ -431,17 +530,21 @@ final class AuthService
     }
 
     /** @param array<string,string> $data */
-    public function requestRegistration(array $data, string $returnPath = '/account/library'): void
+    public function requestRegistration(array $data, string $returnPath = '/account/courses'): void
     {
         $email = EmailAddress::normalize((string) ($data['email'] ?? ''));
+        if ($this->users->statusOfVerifiedEmail($email) === 'awaiting_approval') throw new RuntimeException(self::AWAITING_APPROVAL_MESSAGE);
         if ($this->users->findByVerifiedEmail($email) !== null) throw new RuntimeException('That email already has an account. Sign in instead.');
+        $this->assertMaySignIn($email, null);
         $type = (string) ($data['account_type'] ?? 'individual');
         if (!in_array($type, ['individual', 'company'], true)) throw new RuntimeException('Choose an account type.');
         $first = trim((string) ($data['first_name'] ?? '')); $last = trim((string) ($data['last_name'] ?? ''));
         if ($first === '' || $last === '') throw new RuntimeException('Enter your first and last name.');
+        // Adults only (owner, 2026-10-20): someone under 18 is refused, and nothing they typed is kept.
+        $born = AdultAge::fromInput($data['date_of_birth'] ?? '', new \DateTimeImmutable());
         $company = trim((string) ($data['company_name'] ?? ''));
         if ($type === 'company' && $company === '') throw new RuntimeException('Enter your company name.');
-        $context = ['return_path' => $this->safeReturnPath($returnPath), 'registration' => ['account_type'=>$type,'first_name'=>$first,'middle_names'=>trim((string)($data['middle_names'] ?? '')),'last_name'=>$last,'company_name'=>$company]];
+        $context = ['return_path' => $this->safeReturnPath($returnPath), 'registration' => ['account_type'=>$type,'first_name'=>$first,'middle_names'=>trim((string)($data['middle_names'] ?? '')),'last_name'=>$last,'company_name'=>$company,'birthdate'=>$born]];
         $raw = Token::generate(); $hash = Token::hash($raw);
         $this->tokens->create($hash, $email, 'registration', null, $context, Env::int('AUTH_MAGIC_LINK_TTL', 1800), ClientFingerprint::ipHash());
         $url = rtrim(Env::string('APP_URL'), '/') . '/auth/consume?token=' . rawurlencode($raw);
@@ -456,19 +559,42 @@ final class AuthService
             if ($row === null) throw new RuntimeException('The registration link is invalid or has expired.');
             $email = (string) $row['email'];
             if ($this->users->findByVerifiedEmail($email) !== null) throw new RuntimeException('That email already has an account.');
+            $this->assertMaySignIn($email, null);
             $context = json_decode((string) $row['context'], true); $reg = is_array($context['registration'] ?? null) ? $context['registration'] : [];
             $user = $this->users->createWithPrimaryEmail($email);
             $this->users->updateProfile((int)$user['id'], $reg);
+            // The date of birth given on the registration form went in with the profile.
+            if (is_string($reg['birthdate'] ?? null)) $this->audit->record((int)$user['id'], 'user.date_of_birth_given', ['user_id' => (int)$user['id'], 'when' => 'registration']);
             $this->roles->assign((int)$user['id'], RoleCatalog::STUDENT);
             if (($reg['account_type'] ?? 'individual') === 'company') {
                 if ($this->companies === null) throw new RuntimeException('Company registration is unavailable.');
                 $this->companies->register((int)$user['id'], $email, (string)$reg['company_name'], EmailAddress::domain($email));
             }
+            if ($this->needsApproval($email)) {
+                // A demo site: the account waits for ADMIN, with no session, and ADMIN is told.
+                $this->users->setStatus((int)$user['id'], 'awaiting_approval');
+                $this->tokens->markUsed((int)$row['id']);
+                $this->audit->record((int)$user['id'], 'user.awaiting_approval', ['user_id' => (int)$user['id']]);
+                return ['user'=>$user,'awaiting'=>true,'email'=>$email,'name'=>trim(((string)($reg['first_name'] ?? '')) . ' ' . ((string)($reg['last_name'] ?? '')))];
+            }
             $this->tokens->markUsed((int)$row['id']); $this->users->markLogin((int)$user['id']);
             $sessionToken = Token::generate();
             $sessionId = $this->sessions->create((int)$user['id'], Token::hash($sessionToken), Env::int('AUTH_SESSION_TTL',86400), ClientFingerprint::ipHash(), ClientFingerprint::userAgent(), $email);
-            return ['user'=>$user,'token'=>$sessionToken,'session'=>$sessionId,'return'=>$this->safeReturnPath((string)($context['return_path'] ?? '/account/library'))];
+            return ['user'=>$user,'token'=>$sessionToken,'session'=>$sessionId,'return'=>$this->safeReturnPath((string)($context['return_path'] ?? '/account/courses'))];
         });
+        if (($state['awaiting'] ?? false) === true) {
+            $admin = trim(Env::string('APP_ADMIN_EMAIL'));
+            if ($admin !== '') {
+                try {
+                    $this->mailer->sendAdministratorMessage($admin, 'An account is waiting for your approval',
+                        ($state['name'] !== '' ? $state['name'] . ' (' . $state['email'] . ')' : $state['email']) . " registered on the demo site and is waiting for your approval.\n\n"
+                        . 'Approve or disable the account at ' . rtrim(Env::string('APP_URL'), '/') . '/admin/people/' . (int)$state['user']['id']);
+                } catch (\Throwable) {
+                    // The account still waits; ADMIN sees it on the dashboard.
+                }
+            }
+            return self::AWAITING_APPROVAL_PATH;
+        }
         $this->setSessionCookie((string)$state['token']);
         $this->events->dispatch('auth.logged_in', ['user_id'=>(int)$state['user']['id'],'session_id'=>(string)$state['session']]);
         return (string)$state['return'];
@@ -516,7 +642,7 @@ final class AuthService
 
     private function safeReturnPath(string $path): string
     {
-        return str_starts_with($path, '/') && !str_starts_with($path, '//') ? $path : '/account/library';
+        return str_starts_with($path, '/') && !str_starts_with($path, '//') ? $path : '/account/courses';
     }
 
     private function setSessionCookie(string $token): void

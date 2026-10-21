@@ -26,6 +26,9 @@ use Symfony\Component\Clock\ClockInterface;
  * Amounts are in the platform currency, the only currency checkout accepts. Dates and times are
  * entered and shown in the platform time zone; a promotion is valid from its start (inclusive)
  * until its end (exclusive).
+ *
+ * A promotion is entered as a code at checkout or, when it applies automatically (owner, 2026-10-20),
+ * applied by the cart itself and announced on the pages of the courses and bundles it covers.
  */
 final class PromotionAdministrationService
 {
@@ -115,12 +118,13 @@ final class PromotionAdministrationService
         $time = static fn(?DateTimeImmutable $value): string => $value?->setTimezone(self::timezone())->format('Y-m-d\TH:i') ?? '';
         $amount = static fn(?int $minor): string => $minor === null ? '' : Money::strictMinorUnits($minor, Money::platformCurrency())->toMajorUnits();
         if ($promotion === null) {
-            return ['code' => '', 'name' => '', 'description' => '', 'active' => true, 'discount_type' => Promotion::PERCENTAGE, 'discount_value' => '',
+            return ['code' => '', 'name' => '', 'description' => '', 'active' => true, 'applies_automatically' => false, 'discount_type' => Promotion::PERCENTAGE, 'discount_value' => '',
                 'minimum_order' => '', 'maximum_total_uses' => '', 'maximum_uses_per_customer' => '', 'starts_at' => '', 'ends_at' => '',
                 'course_scope' => Promotion::SCOPE_ALL, 'bundle_scope' => Promotion::SCOPE_NONE, 'courses' => [], 'bundles' => []];
         }
         return [
             'code' => $promotion->code, 'name' => $promotion->name, 'description' => (string) $promotion->description, 'active' => $promotion->active,
+            'applies_automatically' => $promotion->appliesAutomatically,
             'discount_type' => $promotion->discountType,
             'discount_value' => $promotion->discountType === Promotion::PERCENTAGE ? Promotion::percentText($promotion->discountValue) : $amount($promotion->discountValue),
             'minimum_order' => $amount($promotion->minimumOrderMinor),
@@ -142,6 +146,7 @@ final class PromotionAdministrationService
         $text = static fn(string $key): string => is_scalar($input[$key] ?? null) ? (string) $input[$key] : '';
         return [
             'code' => $text('code'), 'name' => $text('name'), 'description' => $text('description'), 'active' => ($input['active'] ?? '') === '1',
+            'applies_automatically' => ($input['applies_automatically'] ?? '') === '1',
             'discount_type' => $text('discount_type') === Promotion::FIXED_AMOUNT ? Promotion::FIXED_AMOUNT : Promotion::PERCENTAGE,
             'discount_value' => $text('discount_value'), 'minimum_order' => $text('minimum_order'),
             'maximum_total_uses' => $text('maximum_total_uses'), 'maximum_uses_per_customer' => $text('maximum_uses_per_customer'),
@@ -225,6 +230,7 @@ final class PromotionAdministrationService
             'starts_at' => $starts?->format(DATE_ATOM), 'ends_at' => $ends?->format(DATE_ATOM), 'active' => ($input['active'] ?? '') === '1',
             'minimum_order_minor' => $minimum, 'maximum_total_uses' => $uses['maximum_total_uses'], 'maximum_uses_per_customer' => $uses['maximum_uses_per_customer'],
             'course_scope' => $courseScope, 'bundle_scope' => $bundleScope,
+            'applies_automatically' => ($input['applies_automatically'] ?? '') === '1',
         ], $courses, $bundles];
     }
 
@@ -277,7 +283,7 @@ final class PromotionAdministrationService
     private static function changes(Promotion $before, Promotion $after): array
     {
         $changed = [];
-        foreach (['code', 'name', 'description', 'discountType', 'discountValue', 'currency', 'active', 'minimumOrderMinor', 'maximumTotalUses', 'maximumUsesPerCustomer', 'courseScope', 'bundleScope', 'courseIds', 'bundleIds'] as $field) {
+        foreach (['code', 'name', 'description', 'discountType', 'discountValue', 'currency', 'active', 'minimumOrderMinor', 'maximumTotalUses', 'maximumUsesPerCustomer', 'courseScope', 'bundleScope', 'courseIds', 'bundleIds', 'appliesAutomatically'] as $field) {
             if ($before->{$field} !== $after->{$field}) $changed[] = $field;
         }
         foreach (['startsAt', 'endsAt'] as $field) {

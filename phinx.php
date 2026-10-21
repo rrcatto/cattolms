@@ -38,7 +38,9 @@ require __DIR__ . '/vendor/autoload.php';
  * to work without exporting an environment variable for every command.
  */
 $deploymentRoot = dirname(__DIR__);
-$envFile = $deploymentRoot . '/.env';
+// CATTO_LEARNING_ENV_FILE names the site's .env directly (the install script sets it, 2026-10-20), so one code
+// directory can serve several sites; CliBootstrap reads it first too.
+$envFile = (string) (getenv('CATTO_LEARNING_ENV_FILE') ?: $deploymentRoot . '/.env');
 
 if (!is_file($envFile)) {
     throw new RuntimeException(
@@ -46,7 +48,7 @@ if (!is_file($envFile)) {
     );
 }
 
-Dotenv::createImmutable($deploymentRoot)->load();
+Dotenv::createImmutable(dirname($envFile), basename($envFile))->load();
 
 $env = static fn(string $key, string $default = ''): string =>
     is_string($_ENV[$key] ?? null) ? trim((string) $_ENV[$key]) : $default;

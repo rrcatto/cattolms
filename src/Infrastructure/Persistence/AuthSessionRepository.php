@@ -78,6 +78,11 @@ final class AuthSessionRepository
         // suspension from locking an administrator out of their own installation.
         $rows = $this->db->fetchAllAssociative(
             "SELECT s.*, u.public_id AS user_public_id, u.status, u.display_name, u.first_name, u.last_name, ue.email AS primary_email,
+                    u.birthdate,
+                    EXISTS (
+                        SELECT 1 FROM identity_verifications iv
+                        WHERE iv.user_id = u.id AND iv.status = 'approved' AND iv.date_of_birth > CURRENT_DATE - INTERVAL '18 years'
+                    ) AS verified_minor,
                     EXISTS (
                         SELECT 1 FROM company_users cu
                         JOIN companies c ON c.id = cu.company_id

@@ -1,0 +1,39 @@
+{#
+	One issued certificate (owner, 2026-10-19), with its transcript, and the form to revoke both with a reason.
+	ADMIN opens both here, never at their addresses: the learner decides who sees them there, and the site
+	tells nobody, ADMIN included, where they are.
+#}
+{% extends layout %}
+{% block page_body %}
+	{% set ph_back_href = '/admin/certificates' %}{% set ph_back_label = 'Issued Certificates' %}
+	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Certificate ' ~ certificate.certificate_number %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2}) }}
+		{% if certificate.revoked_at %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'Revoked on ' ~ (certificate.revoked_at|date('j F Y \\a\\t H:i')) ~ '.'})} %}{% block body %}{% if certificate.revoked_by_user_id %}<p>By {{ ui('data.person', {name: certificate.revoked_by_name ?: 'User ' ~ certificate.revoked_by_user_id, reference: certificate.revoked_by_reference, href: '/admin/people/' ~ certificate.revoked_by_user_id}) }}.</p>{% endif %}<p>{{ certificate.revocation_reason }}</p>{% endblock %}{% endembed %}
+		{% endif %}
+		{{ ui('data.key-value-list', {items: [
+			{label: 'Certificate number', value: certificate.certificate_number},
+			{label: 'Transcript number', value: certificate.transcript_number ?: 'None'},
+			{label: 'Learner (verified name)', person: {name: certificate.learner_name, reference: certificate.learner_reference, href: '/admin/people/' ~ certificate.user_id, full: true}},
+			{label: 'Course', value: certificate.course_title},
+			{label: 'Completed', value: certificate.completed_at|date('j F Y')},
+			{label: 'Issued', value: certificate.issued_at|date('j F Y \\a\\t H:i')},
+			{label: 'Design', value: certificate.template_name ~ ', version ' ~ certificate.template_version_number},
+			{label: 'Who can see the certificate', value: certificate.is_public ? 'Public: anyone who has its address' : 'Private: only the learner'},
+		] | merge(certificate.transcript_id ? [{label: 'Who can see the transcript', value: certificate.transcript_is_public ? 'Public: anyone who has its address' : 'Private: only the learner'}] : [])}) }}
+		<p class="cl-ui-field-help">The learner decides who can see each one. Only the learner is shown their addresses.</p>
+		<p>{{ ui('action.link', {label: 'Certificate PDF', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ certificate.id ~ '/certificate.pdf'}) }}{% if certificate.transcript_id %} {{ ui('action.link', {label: 'Transcript PDF', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ certificate.id ~ '/transcript.pdf'}) }}{% endif %} {{ ui('action.link', {label: 'The learner', variant: 'quiet', size: 'small', href: '/admin/people/' ~ certificate.user_id}) }}</p>
+	{% endblock %}{% endembed %}</section>
+	{% if can_revoke and not certificate.revoked_at %}
+	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'revoke'})} %}{% block surface_body %}
+		{{ ui('layout.section-head', {heading: 'Revoke this certificate', heading_level: 2, summary: 'The certificate and its transcript are revoked together. Their pages say so, with your reason, and have no PDF. This cannot be undone.'}) }}
+		<form action="/admin/certificates/{{ certificate.id }}/revoke" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
+			<input type="hidden" name="csrf" value="{{ csrf }}">
+			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason, shown on the certificate and transcript pages', full_width: true, for: 'revoke-reason', required: true})} %}{% block control %}<textarea id="revoke-reason" name="reason" rows="3" maxlength="500" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Revoke certificate and transcript', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Revoke this certificate and its transcript? This cannot be undone.'}) }}{% endblock %}{% endembed %}
+		{% endblock %}{% endembed %}</form>
+	{% endblock %}{% endembed %}</section>
+	{% endif %}
+{% endblock %}

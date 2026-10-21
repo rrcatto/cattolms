@@ -24,6 +24,9 @@ final class AccountSectionRegistry
             $this->s('emails','Email Addresses','contact','/account/emails','partials/account/emails.html.twig','The addresses you sign in with.'),
             $this->s('social','Social Media','social','/account/social','partials/account/social.html.twig','Links to your profiles elsewhere.'),
             $this->s('learning','My Courses','learning','/account/courses','partials/account/learning.html.twig','Current, completed, favourite and requested courses.'),
+            // Each certificate and transcript is private until its learner makes it public; the learner
+            // decides here, and can give either a new address (owner, 2026-10-19).
+            $this->s('certificates','My Certificates','reports','/account/certificates','partials/account/certificates.html.twig','Your certificates and transcripts, and who can see each one.'),
             $this->s('sessions','Sessions','sessions','/account/sessions','partials/account/sessions.html.twig','Active sign-in sessions and device access.'),
             $this->s('activity','Activity','activity','/account/activity','partials/account/activity.html.twig','Audit activity performed by this account.'),
         ];

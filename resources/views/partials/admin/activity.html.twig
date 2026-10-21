@@ -70,7 +70,7 @@
 								{{ event.created_at }}
 							</td>
 							<td>
-								{{ event.actor_name }}
+								{{ ui('data.person', event.actor_person) }}
 							</td>
 							<td>
 								{{ event.company_name ?: '—' }}
@@ -82,7 +82,7 @@
 								</div>
 							</td>
 							<td title="{{ event.subject }}">
-								{{ event.subject }}
+								{% if event.subject_person %}{{ ui('data.person', event.subject_person) }}{% else %}{{ event.subject }}{% endif %}
 							</td>
 							<td class="small">
 								{{ event.ip_address ?: '—' }}

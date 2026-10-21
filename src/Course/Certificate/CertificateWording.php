@@ -25,6 +25,9 @@ whose field is empty is left out, and every literal brace is written as an entit
 can become template syntax.
 
 Changelog:
+2026/10/19 SAST
+- No Result or Grade field: a certificate proves that the learner took the course, never that they
+  passed (owner, 2026-10-19). Marks are on the transcript.
 2026/10/07 SAST
 - Created for certificate designs.
 */
@@ -45,8 +48,6 @@ final class CertificateWording
         'course.title' => ['Course title', false],
         'course.completion_date' => ['Completion date', false],
         'certificate.issue_date' => ['Date issued', false],
-        'result.percentage' => ['Result', true],
-        'result.grade' => ['Grade', true],
         'course.accreditation' => ['Accreditation line', true],
         'course.provider' => ['Course provider', true],
         'certificate.number' => ['Certificate number', false],

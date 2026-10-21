@@ -1,0 +1,68 @@
+{# My Certificates (owner, 2026-10-19): each certificate and each transcript is private until the learner
+   makes it public, decided separately and changed at any time, and either can be given a new address. The
+   addresses are shown only here and to the learner: the site never links to them anywhere else. #}
+{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+	{{ ui('layout.section-head', {heading: 'Who can see your certificates and transcripts', eyebrow: 'My Certificates', summary: 'You decide for each certificate and each transcript separately, and you can change your mind at any time.'}) }}
+	{{ ui('data.key-value-list', {items: [
+		{label: 'Private', value: 'Only you can see it. Every new certificate and transcript starts private.'},
+		{label: 'Public', value: 'Anyone who has its address can see it without signing in. We never link to it, list it or tell anyone where to find it, so only the people you give the address to can open it.'},
+		{label: 'New address', value: 'Replaces the address at once. The old address, and any PDF that shows it, then lead nowhere.'},
+	]}) }}
+{% endblock %}
+{% endembed %}
+{% for cert in account_certificates %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'certificate-' ~ cert.id})} %}
+	{% block surface_body %}
+		{{ ui('layout.section-head', {heading: cert.course_title, summary: 'Certificate ' ~ cert.certificate_number ~ ' · completed ' ~ cert.completed_at|date('j F Y')}) }}
+		{% if cert.revoked_at %}
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This certificate and its transcript were revoked on ' ~ (cert.revoked_at|date('j F Y')) ~ '.'})} %}{% block body %}{% if cert.revocation_reason %}<p>{{ cert.revocation_reason }}</p>{% endif %}{% endblock %}{% endembed %}
+		{% endif %}
+		{% set documents = [
+			{key: 'certificate', label: 'Certificate', noun: 'certificate', public: cert.is_public, url: cert.certificate_url, path: '/certificates/' ~ cert.public_id},
+			{key: 'transcript', label: 'Transcript', noun: 'transcript', public: cert.transcript_is_public, url: cert.transcript_url, path: cert.transcript_public_id ? '/transcripts/' ~ cert.transcript_public_id : ''},
+		]|filter(document => document.url) %}
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+		{% block body %}
+			{% for document in documents %}
+				{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+				{% block body %}
+					<div class="cl-certificate-share">
+					<p><strong>{{ document.label }}</strong> {{ ui('feedback.badge', {label: document.public ? 'Public' : 'Private', tone: document.public ? 'success' : 'neutral'}) }}</p>
+					<p>{{ document.public ? 'Anyone who has its address can see your ' ~ document.noun ~ '.' : 'Only you can see your ' ~ document.noun ~ '.' }}</p>
+					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Address of your ' ~ document.noun, for: document.key ~ '-address-' ~ cert.id})} %}
+					{% block control %}<input type="text" id="{{ document.key }}-address-{{ cert.id }}" value="{{ document.url }}" readonly {{ ui_field_attrs(props) }}>{% endblock %}
+					{% endembed %}
+					</div>
+				{% endblock %}
+				{% block actions %}
+					{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: document.path, aria_label: 'Open your ' ~ document.noun ~ ' for ' ~ cert.course_title}) }}
+					<form action="/account/certificates/{{ cert.id }}/visibility" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<input type="hidden" name="document" value="{{ document.key }}">
+						<input type="hidden" name="public" value="{{ document.public ? '0' : '1' }}">
+						{% if document.public %}
+							{{ ui('action.button', {label: 'Make private', variant: 'secondary', size: 'small', type: 'submit', aria_label: 'Make your ' ~ document.noun ~ ' for ' ~ cert.course_title ~ ' private'}) }}
+						{% else %}
+							{{ ui('action.button', {label: 'Make public', variant: 'primary', size: 'small', type: 'submit', aria_label: 'Make your ' ~ document.noun ~ ' for ' ~ cert.course_title ~ ' public', confirm: 'Make your ' ~ document.noun ~ ' public? Anyone who has its address will be able to see it.'}) }}
+						{% endif %}
+					</form>
+					<form action="/account/certificates/{{ cert.id }}/address" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						<input type="hidden" name="document" value="{{ document.key }}">
+						{{ ui('action.button', {label: 'New address', variant: 'secondary', size: 'small', type: 'submit', aria_label: 'Give your ' ~ document.noun ~ ' for ' ~ cert.course_title ~ ' a new address', confirm: 'Give your ' ~ document.noun ~ ' a new address? The old address will stop working at once.'}) }}
+					</form>
+				{% endblock %}
+				{% endembed %}
+			{% endfor %}
+		{% endblock %}
+		{% endembed %}
+	{% endblock %}
+	{% endembed %}
+{% else %}
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+	{% block surface_body %}
+		{{ ui('feedback.empty', {heading: 'No certificates yet', summary: 'A certificate and its transcript are issued when you have completed every assessment in a course and your identity has been verified.'}) }}
+	{% endblock %}
+	{% endembed %}
+{% endfor %}

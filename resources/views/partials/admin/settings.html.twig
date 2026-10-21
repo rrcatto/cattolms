@@ -12,7 +12,7 @@
 {% block body %}
 
 			<p>This site is {{ site_mode.mode == 'live' ? 'live' : 'a demo site' }}. {% if site_mode.source == 'database' %}This is saved here and overrides <span class="mono">APP_SITE_MODE</span>, which says {{ site_mode.environment }}.{% elseif site_mode.source == 'environment' %}<span class="mono">APP_SITE_MODE</span> in <span class="mono">.env</span> sets it.{% else %}<span class="mono">APP_SITE_MODE</span> is not set in <span class="mono">.env</span>, so it is a demo site.{% endif %}</p>
-			<p>A demo site says so on every page and in every email, keeps out of search engines, marks every order and its documents as a simulation, shows fake bank details labelled as fake, and offers the simulated card. A live site does none of that and takes EFT until card payments are built.</p>
+			<p>A demo site says so on every page and in every email, keeps out of search engines, marks every order and its documents as a simulation, shows fake bank details labelled as fake, and offers the simulated card. A live site does none of that: it offers only the payment methods ticked under Payment methods, and never the simulated card.</p>
 			<form action="/admin/settings/site-mode" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}
 {% block body %}
 
@@ -40,6 +40,27 @@
 			</form>
 			{% endif %}
 
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {# Who can sign in (owner, 2026-10-21: "disallow all non-admin logins ... a whitelist of allowed emails"). #}
+    {% if sign_in|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Who can sign in', summary: sign_in.restricted ? 'Administrators and the listed addresses only.' : 'Everyone.', id: 'settings-sign-in', open: settings_open_section|default('') == 'sign-in'})} %}
+{% block body %}
+			<p>Everyone, or administrators and the email addresses you list only. While it is limited, anyone else is refused when they sign in or register, and a session they already have stops working at once. A listed address needs no approval on a demo site: listing it is the approval.</p>
+			<form action="/admin/settings/sign-in" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('form.picture-choice', {name: 'sign_in', legend: 'Who can sign in', id: 'sign-in-choice', size: 'small', selected: sign_in.restricted ? 'listed' : 'everyone', items: [
+					{value: 'everyone', label: 'Everyone', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20v-1a5.5 5.5 0 0 1 11 0v1"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.2A4.5 4.5 0 0 1 21.5 18.5v1.5"/></svg>', note: 'Anyone with an account, as normal.'},
+					{value: 'listed', label: 'Administrators and the listed addresses', icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>', note: 'Everyone else is kept out.'}
+				]}) }}
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Allowed email addresses', for: 'allowed-emails', full_width: true, help: 'One a line. Used only while sign-in is limited to them.'})} %}
+{% block control %}<textarea class="cl-input" id="allowed-emails" name="allowed_emails" rows="6" {{ ui_field_attrs(props) }}>{{ sign_in.emails }}</textarea>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save who can sign in', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% endembed %}
+			</form>
 {% endblock %}
 {% endembed %}
     {% endif %}
@@ -230,6 +251,41 @@
 {% endblock %}
 {% endembed %}
     {% endif %}
+    {# Payment methods (owner, 2026-10-19): one tick box per method; a method can be ticked only when it is configured. #}
+    {% if payment_methods|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Payment methods', summary: 'What checkout offers. The wallet is always available to spend.', id: 'settings-payment-methods', open: settings_open_section|default('') == 'payment-methods'})} %}
+{% block body %}
+
+			<p>Checkout offers only the ticked methods, each named with its provider. No method collects card details on this site: a card is paid on the provider's own page. Wallet credit is not a payment method here: it can always be spent. Every change is recorded in the Activity log.</p>
+			<form action="/admin/settings/payment-methods" method="post">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% for method in payment_methods %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: method.label ~ (method.problem ? ' (cannot be ticked: ' ~ method.problem ~ ')' : '')})} %}{% block control %}<input type="checkbox" name="methods[]" value="{{ method.key }}" {{ method.ticked ? 'checked' : '' }} {{ method.problem ? 'disabled' : '' }} data-payment-method="{{ method.key }}">{% endblock %}{% endembed %}
+				{% endfor %}
+				{% if can_manage_settings|default(false) %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save payment methods', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				{% endif %}
+			</form>
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
+    {# Identity verification (owner, 2026-10-19): through Didit's hosted page; the keys come from .env only. #}
+    {% if identity_settings|default(null) %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Identity verification', summary: identity_settings.available ? 'Connected to Didit.' : 'Not available: keys missing from .env.', id: 'settings-identity-verification', open: settings_open_section|default('') == 'identity'})} %}
+{% block body %}
+
+			<p>Learners verify on Didit's hosted page: they photograph their ID or passport and take a live selfie, and Didit matches them. This site keeps no images. Verification is needed only before a certificate and transcript are issued. Nothing is asked before a purchase.</p>
+			{% if identity_settings.available %}
+				{{ ui('feedback.notice', {tone: 'success', heading: 'Didit is configured: DIDIT_API_KEY, DIDIT_WORKFLOW_ID and DIDIT_WEBHOOK_SECRET are in .env.'}) }}
+			{% else %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Identity verification is not available.'})} %}{% block body %}<p>Add {{ identity_settings.missing_keys|join(', ') }} to <span class="mono">.env</span>. Until then certificates and transcripts wait. Verification is never skipped.</p>{% endblock %}{% endembed %}
+			{% endif %}
+			{{ ui('data.key-value-list', {items: [{label: 'Webhook address for the Didit console', value: identity_settings.webhook_url}]}) }}
+
+{% endblock %}
+{% endembed %}
+    {% endif %}
     {% include '@platform/partials/admin/commerce-settings.html.twig' %}
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Configuration model', summary: 'How platform configuration is stored.', id: 'settings-configuration', open: settings_open_section|default('') == 'configuration'})} %}
 {% block body %}
@@ -269,8 +325,31 @@
 
 {% endblock %}
 {% endembed %}
-    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Maintenance', summary: 'Clean up expired login and session records.', id: 'settings-maintenance', open: settings_open_section|default('') == 'maintenance'})} %}
+    {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Maintenance', summary: 'The scheduled jobs, and expired login and session records.', id: 'settings-maintenance', open: settings_open_section|default('') == 'maintenance'})} %}
 {% block body %}
+
+		{# The scheduled jobs (owner, 2026-10-19): schedule:run runs them and records each run. #}
+		{% if scheduled_jobs|default(null) %}
+		<h3 class="h5">Scheduled jobs</h3>
+		<p>One scheduler, <span class="mono">schedule:run</span>, runs these on this installation (see <span class="mono">docs/OPERATIONS.md</span>, Scheduled work).</p>
+		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% block body %}
+			{% for job in scheduled_jobs %}
+			{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
+{% block body %}
+					<strong>{{ job.label }}</strong>
+					<p>{{ job.description }}</p>
+					<p>Last run: {{ job.last_run }}. Last success: {{ job.last_success }}.{% if job.last_failure %} Failed at {{ job.last_failure }}: {{ job.error }}{% elseif job.summary %} {{ job.summary }}{% endif %}</p>
+{% endblock %}
+{% block actions %}
+				{{ ui('feedback.badge', {label: job.overdue ? 'Not running' : 'Running', tone: job.overdue ? 'danger' : 'success'}) }}
+{% endblock %}
+{% endembed %}
+			{% endfor %}
+{% endblock %}
+{% endembed %}
+		<h3 class="h5 mt-7">Expired records</h3>
+		{% endif %}
 
 		{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}

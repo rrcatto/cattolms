@@ -32,7 +32,11 @@ final class RefundRequestController extends BaseController
     {
         $actor = $this->requirePermission('PLATFORM.REFUND.VIEW');
         $rows = $this->refundRequests->queue();
-        foreach ($rows as &$row) $row['reference_label'] = AccountReference::format((string) $row['requester_reference']);
+        foreach ($rows as &$row) {
+            $row['reference_label'] = AccountReference::format((string) $row['requester_reference']);
+            // Who asked, as a person (owner, 2026-10-21).
+            $row['requester'] = \CattoLearning\Commerce\Application\MoneyRecords::person((int) $row['requested_by_user_id'], (string) $row['requester_name'], (string) $row['requester_reference'], (string) ($row['requester_email'] ?? ''));
+        }
         unset($row);
 
         return $this->render('admin-refund-requests', ['title' => 'Refund Requests', 'active_nav' => 'admin', 'requests' => $rows, 'can_decide' => $actor->hasPermission('PLATFORM.REFUND.MANAGE')]);

@@ -1,0 +1,8 @@
+{#
+	The automatic promotions that cover a course or bundle (owner, 2026-10-20), from
+	PromotionService::announcements(): the cart applies each by itself, so the purchaser types nothing.
+	announcement_price is the price the promotion is taken off.
+#}
+{% for promotion in announcements|default([]) %}
+	<p class="cl-promotion-announcement">{{ ui('feedback.badge', {label: promotion.code, tone: 'success', size: 'small'}) }} <strong>{{ promotion.label }}</strong>, applied automatically in your cart{% if promotion.price_label %}: you pay {{ promotion.price_label }} instead of {{ announcement_price }}{% elseif promotion.minimum_label %} when it holds {{ promotion.minimum_label }} or more of what the promotion covers{% endif %}.{% if promotion.until_label %} Until {{ promotion.until_label }}.{% endif %}</p>
+{% endfor %}

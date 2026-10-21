@@ -13,6 +13,10 @@ The Administration course list and the public published catalogue are bounded an
 the home page asks for only the handful of courses it renders.
 
 Changelog:
+2026/10/20 SAST
+- Price options store their optional was price (was_price_minor_units), and the catalogue card row the default price's (owner, 2026-10-20).
+2026/10/19 SAST
+- The catalogue lists every course of a category's whole branch (owner, 2026-10-19): categoryCourses(), categoryCourseTotal() and featuredPublishedCourses() are gone.
 2026/10/07 SAST
 - Category tree: lockCategories(), saveCategoryArrangement() (parent, level and position in tree order, the sibling position constraint deferred and checked again before it returns) and compactCategorySiblings(); categoryTree() returns positions; updateCategory() changes only details; nextCategoryPosition() is the next of 1..n; swapCategoryPositions() and categoryDescendantDepth() are gone.
 2026/10/07 SAST
@@ -134,7 +138,8 @@ final class CourseRepository
             : $sorts[$sort->key] . ' ' . $sort->sql() . ' NULLS LAST, ' . $tiebreaker;
     }
 
-    private const ADMIN_COURSE_ORDER = 'c.updated_at DESC, c.title, c.id';
+    // The catalogue's own order (owner, 2026-10-20: "display them according to the position number assigned to them").
+    private const ADMIN_COURSE_ORDER = 'c.catalogue_position ASC NULLS LAST, c.published_at DESC NULLS LAST, c.title, c.id';
 
     /**
      * The columns the Administration Courses list may be sorted by.
@@ -145,14 +150,21 @@ final class CourseRepository
      * @var array<string,string>
      */
     public const ADMIN_COURSE_SORTS = [
+        // Its place in the catalogue (owner, 2026-10-20); the courses without one follow, newest first.
+        'position' => 'c.catalogue_position',
         'title' => 'c.title',
+        // What the course is sold at now (owner, 2026-10-20): its active default price.
+        'price' => '(SELECT spv.price_minor_units FROM course_price_variants spv WHERE spv.course_id = c.id AND spv.is_active = TRUE AND spv.is_default = TRUE)',
         'category' => '(SELECT scc.name FROM course_categories scc WHERE scc.id = c.category_id)',
         'status' => 'c.status',
         'editors' => '(SELECT COUNT(*) FROM course_editors sed WHERE sed.course_id = c.id)',
         'learners' => '(SELECT COUNT(*) FROM course_enrolments sen WHERE sen.course_id = c.id AND sen.is_preview = FALSE)',
         'updated' => 'c.updated_at',
     ];
-    private const CATALOGUE_ORDER = 'c.published_at DESC NULLS LAST, c.title, c.id';
+    // Numbered courses first, lowest first, then the rest newest first (owner, 2026-10-20).
+    private const CATALOGUE_ORDER = 'c.catalogue_position ASC NULLS LAST, c.published_at DESC NULLS LAST, c.title, c.id';
+    // Newest first, whatever the position: the home page tops up Popular Courses with the newest courses.
+    private const NEWEST_ORDER = 'c.published_at DESC NULLS LAST, c.title, c.id';
 
     /**
      * The catalogue card row for every course in the `page` key set: the one projection the
@@ -163,12 +175,15 @@ final class CourseRepository
                     c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
                     c.course_style_key, c.category_id, cc.name AS category_name, cc.slug AS category_slug,
                     NULL::text AS cover_media_public_id,
+                    -- The cover picture in the card's header (owner, 2026-10-20), on catalogue pages only.
+                    c.cover_svg,
                     (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id = c.id) AS item_count,
                     (SELECT COUNT(*)::int FROM assessment_questions aq
                        JOIN course_item_placements cip ON cip.course_item_id = aq.course_item_id
                       WHERE cip.course_id = c.id) AS question_count,
                     (SELECT cpv.id FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_variant_id,
                     (SELECT cpv.price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
+                    (SELECT cpv.was_price_minor_units FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_was_price_minor_units,
                     (SELECT cpv.currency_code FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code,
                     (SELECT cpv.access_period_seconds FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_access_period_seconds,
                     (SELECT COUNT(*)::int FROM course_price_variants cpv WHERE cpv.course_id=c.id AND cpv.is_active=TRUE) AS active_price_variant_count
@@ -185,11 +200,11 @@ final class CourseRepository
     ];
 
     /**
-     * One page of the public published-course catalogue.
+     * One page of the public published-course catalogue: in the catalogue's order, or newest first.
      *
      * @return list<array<string,mixed>>
      */
-    public function publishedCourses(CatalogueFilter $filter, int $limit, int $offset): array
+    public function publishedCourses(CatalogueFilter $filter, int $limit, int $offset, bool $newestFirst = false): array
     {
         [$narrow, $bindings] = self::andCatalogueFilter($filter);
 
@@ -209,7 +224,7 @@ final class CourseRepository
         $detail = self::CATALOGUE_DETAIL;
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            PageQuery::deferred($keys, $detail, self::CATALOGUE_ORDER, $limit, $offset),
+            PageQuery::deferred($keys, $detail, $newestFirst ? self::NEWEST_ORDER : self::CATALOGUE_ORDER, $limit, $offset),
             $bindings
         ));
     }
@@ -550,7 +565,7 @@ final class CourseRepository
      */
     public function allCourses(int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
-        $order = self::orderFor($sort, self::ADMIN_COURSE_SORTS, self::ADMIN_COURSE_ORDER, 'c.id');
+        $order = self::orderFor($sort, self::ADMIN_COURSE_SORTS, self::ADMIN_COURSE_ORDER, self::adminTiebreaker($sort));
         [$where, $bindings] = self::whereSearch($search);
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
@@ -572,21 +587,41 @@ final class CourseRepository
      * the five correlated sub-selects here are the reason both are deferred. Written out twice
      * before, which is how one of them ends up with a column the other lacks.
      */
+    /** The courses without a position follow those with one in the catalogue's order: newest first. */
+    private static function adminTiebreaker(?SortOrder $sort): string
+    {
+        return $sort !== null && $sort->key === 'position' ? 'c.published_at DESC NULLS LAST, c.title, c.id' : 'c.id';
+    }
+
+    /**
+     * Every course in the catalogue's order, each row locked, for a move in it (owner, 2026-10-20).
+     *
+     * @return list<array{id:int,position:?int}>
+     */
+    public function catalogueOrderForUpdate(): array
+    {
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'position' => $row['catalogue_position'] === null ? null : (int) $row['catalogue_position']],
+            $this->db->fetchAllAssociative('SELECT id, catalogue_position FROM courses ORDER BY ' . str_replace('c.', '', self::ADMIN_COURSE_ORDER) . ' FOR UPDATE'));
+    }
+
     private static function courseAdministrationDetail(): string
     {
-        return "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status, c.level,
+        return "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position,
                     c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id,
                     cc.name AS category_name,
                     oc.name AS owner_company_name,
                     COALESCE(NULLIF(trim(concat_ws(' ',ou.first_name,ou.last_name)),''),ou.display_name,oue.email) AS owner_person_name,
+                    ou.account_reference AS owner_person_reference,
                     (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id=c.id) AS item_count,
                     (SELECT COUNT(*)::int FROM assessment_questions aq JOIN course_item_placements cip ON cip.course_item_id=aq.course_item_id WHERE cip.course_id=c.id) AS question_count,
                     (SELECT COUNT(*)::int FROM course_editors ced WHERE ced.course_id=c.id) AS editor_count,
                     (SELECT COUNT(DISTINCT ce.user_id)::int FROM course_enrolments ce WHERE ce.course_id=c.id AND ce.status IN ('assigned','active','completed') AND ce.is_preview=FALSE) AS learner_count,
-                    (SELECT COUNT(DISTINCT ce.user_id)::int FROM course_enrolments ce WHERE ce.course_id=c.id AND ce.started_at IS NOT NULL AND ce.is_preview=FALSE) AS started_count
+                    dpv.price_minor_units AS default_price_minor_units, dpv.was_price_minor_units AS default_was_price_minor_units,
+                    dpv.currency_code AS default_currency_code, dpv.access_period_seconds AS default_price_access_period_seconds
              FROM page
              JOIN courses c ON c.id=page.id
              LEFT JOIN course_categories cc ON cc.id=c.category_id
+             LEFT JOIN course_price_variants dpv ON dpv.course_id=c.id AND dpv.is_active=TRUE AND dpv.is_default=TRUE
              LEFT JOIN companies oc ON oc.id=c.owner_company_id
              LEFT JOIN users ou ON ou.id=c.owner_user_id
              LEFT JOIN user_emails oue ON oue.user_id=ou.id AND oue.is_primary=TRUE";
@@ -599,19 +634,6 @@ final class CourseRepository
         $rows = $this->db->fetchAllAssociative('SELECT COUNT(*)::int AS total FROM courses c' . $where, $bindings);
 
         return (int) ($rows[0]['total'] ?? 0);
-    }
-
-    /**
-     * The small featured set rendered on the home page.
-     *
-     * The home page previously built the entire published catalogue and then discarded all but
-     * six rows in PHP. This asks PostgreSQL for only the rows that will actually be displayed.
-     *
-     * @return list<array<string,mixed>>
-     */
-    public function featuredPublishedCourses(int $limit = 6): array
-    {
-        return $this->publishedCourses(CatalogueFilter::none(), max(1, min(max(Pagination::PAGE_SIZES), $limit)), 0);
     }
 
     /**
@@ -735,44 +757,6 @@ final class CourseRepository
     }
 
     /**
-     * One page of the courses filed directly in one category, for the catalogue's category browser.
-     *
-     * Ordinary browsing shows exact category membership. Descendant-inclusive keyword search
-     * continues to use the shared CatalogueFilter predicate.
-     *
-     * The cover comes back with the row because the browser draws a card per course. It is the one
-     * list projection that selects cover_svg, which is why the column can sit on the table without
-     * costing every other list anything.
-     *
-     * @return list<array<string,mixed>>
-     */
-    public function categoryCourses(int $categoryId, int $limit, int $offset): array
-    {
-        $keys = "SELECT c.id FROM courses c
-                  WHERE c.status = 'published' AND c.category_id = :category_id"
-            . '';
-
-        $detail = "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.level,
-                          c.estimated_minutes, c.default_access_period_seconds, c.certificate_enabled,
-                          c.cover_svg, c.category_id,
-                          cat.name AS category_name, cat.slug AS category_slug,
-                          NULL::text AS cover_media_public_id,
-                          (SELECT COUNT(*)::int FROM course_item_placements cip WHERE cip.course_id = c.id) AS item_count,
-                          (SELECT cpv.price_minor_units FROM course_price_variants cpv
-                            WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_price_minor_units,
-                          (SELECT cpv.currency_code FROM course_price_variants cpv
-                            WHERE cpv.course_id=c.id AND cpv.is_active=TRUE AND cpv.is_default=TRUE LIMIT 1) AS default_currency_code
-                   FROM page
-                   JOIN courses c ON c.id = page.id
-                   LEFT JOIN course_categories cat ON cat.id = c.category_id";
-
-        return $this->normaliseRows($this->db->fetchAllAssociative(
-            PageQuery::deferred($keys, $detail, self::CATALOGUE_ORDER, $limit, $offset),
-            ['category_id' => $categoryId]
-        ));
-    }
-
-    /**
      * Every category's published-course total, in one query.
      *
      * The browser renders a few hundred categories at once. Asked one at a time that is a few
@@ -794,18 +778,6 @@ final class CourseRepository
         }
 
         return $totals;
-    }
-
-    /** The total behind {@see categoryCourses()}, under the identical membership rule. */
-    public function categoryCourseTotal(int $categoryId): int
-    {
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT COUNT(*)::int AS total FROM courses c
-              WHERE c.status = 'published' AND c.category_id = :category_id" . '',
-            ['category_id' => $categoryId]
-        );
-
-        return (int) ($rows[0]['total'] ?? 0);
     }
 
     /** @return array<string,mixed>|null */
@@ -876,7 +848,7 @@ final class CourseRepository
     public function categoryTree(): array
     {
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT cc.id, cc.parent_id, cc.level, cc.position, cc.name, cc.slug
+            "SELECT cc.id, cc.parent_id, cc.level, cc.position, cc.name, cc.slug, cc.icon_svg
              FROM course_categories cc
              LEFT JOIN course_categories parent ON parent.id = cc.parent_id
              LEFT JOIN course_categories grandparent ON grandparent.id = parent.parent_id
@@ -1078,7 +1050,7 @@ final class CourseRepository
         [$match, $bindings] = self::andTagSearch($search);
 
         $keys = 'SELECT t.id FROM tags t WHERE TRUE' . $match;
-        $detail = 'SELECT t.id, t.name, t.slug, t.created_at
+        $detail = 'SELECT t.id, t.name, t.slug, t.created_at, t.icon_svg
                    FROM page JOIN tags t ON t.id = page.id';
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
@@ -1160,7 +1132,7 @@ final class CourseRepository
     {
         $scope = '';
         $rows = $this->db->fetchAllAssociative(
-            "SELECT t.id, t.name, t.slug,
+            "SELECT t.id, t.name, t.slug, t.icon_svg,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
                       WHERE ct.tag_id = t.id AND c.status = 'published') AS course_count
@@ -1222,7 +1194,7 @@ final class CourseRepository
 
         $grouped = [];
         foreach ($this->db->fetchAllAssociative(
-            "SELECT ct.course_id, t.id, t.name, t.slug
+            "SELECT ct.course_id, t.id, t.name, t.slug, t.icon_svg
                FROM course_tags ct JOIN tags t ON t.id = ct.tag_id
               WHERE ct.course_id IN ({$ids})
               ORDER BY t.name"
@@ -1231,6 +1203,7 @@ final class CourseRepository
                 'id' => (int) $row['id'],
                 'name' => (string) $row['name'],
                 'slug' => (string) $row['slug'],
+                'icon_svg' => (string) ($row['icon_svg'] ?? ''),
             ];
         }
 
@@ -1247,7 +1220,7 @@ final class CourseRepository
         $scope = '';
 
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            "SELECT t.id, t.name, t.slug,
+            "SELECT t.id, t.name, t.slug, t.icon_svg,
                     (SELECT COUNT(*)::int FROM course_tags ct
                        JOIN courses c ON c.id = ct.course_id
                       WHERE ct.tag_id = t.id AND c.status = 'published') AS course_count
@@ -1336,11 +1309,150 @@ final class CourseRepository
                 'slug' => $slug,
                 // Seeded on the slug, which is unique and stable: renaming a tag keeps the icon a
                 // reader who recognises it by colour already knows.
-                'icon_svg' => $this->artwork->tagIcon($slug, $name),
+                'icon_svg' => (string) ($data['icon_svg'] ?? $this->artwork->tagIcon($slug, $name)),
             ]
         );
 
         return (int) ($rows[0]['id'] ?? 0);
+    }
+
+    /**
+     * Every tag, alphabetically, for choosing a course's tags.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function tagOptions(): array
+    {
+        return $this->db->fetchAllAssociative('SELECT id, name, slug, icon_svg FROM tags ORDER BY name, id');
+    }
+
+    /** @return list<int> the tags a course carries */
+    public function courseTagIds(int $courseId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT tag_id FROM course_tags WHERE course_id = :c ORDER BY tag_id', ['c' => $courseId]));
+    }
+
+    /**
+     * The courses related to this one, in the catalogue's order (owner, 2026-10-20). A relation is one row for the pair,
+     * so it is the same from either course.
+     *
+     * @return list<int>
+     */
+    public function relatedCourseIds(int $courseId): array
+    {
+        return array_map('intval', $this->db->fetchFirstColumn(
+            'SELECT c.id FROM course_relations r JOIN courses c ON c.id = CASE WHEN r.course_low_id = :course THEN r.course_high_id ELSE r.course_low_id END
+              WHERE r.course_low_id = :course OR r.course_high_id = :course ORDER BY ' . self::ADMIN_COURSE_ORDER,
+            ['course' => $courseId]
+        ));
+    }
+
+    /**
+     * Makes these the courses related to this one: each new pair is kept once, lower id first, and each pair no longer
+     * wanted goes, so the other course gains or loses the relation too.
+     *
+     * @param list<int> $relatedIds
+     */
+    public function replaceRelatedCourses(int $courseId, array $relatedIds): void
+    {
+        $wanted = array_values(array_unique(array_filter(array_map('intval', $relatedIds), static fn(int $id): bool => $id !== $courseId && $id > 0)));
+        $this->db->executeStatement(
+            'DELETE FROM course_relations WHERE (course_low_id = :course OR course_high_id = :course)'
+            . ($wanted === [] ? '' : ' AND (CASE WHEN course_low_id = :course THEN course_high_id ELSE course_low_id END) <> ALL (CAST(:wanted AS BIGINT[]))'),
+            ['course' => $courseId] + ($wanted === [] ? [] : ['wanted' => '{' . implode(',', $wanted) . '}'])
+        );
+        foreach ($wanted as $other) {
+            $this->db->executeStatement(
+                'INSERT INTO course_relations (course_low_id, course_high_id) VALUES (:low, :high) ON CONFLICT DO NOTHING',
+                ['low' => min($courseId, $other), 'high' => max($courseId, $other)]
+            );
+        }
+    }
+
+    /**
+     * Every course but this one, each marked when it is related, for the course's Related courses choice: in the
+     * catalogue's order.
+     *
+     * @return list<array{id:int,title:string,status:string,checked:bool}>
+     */
+    public function relatedCourseOptions(int $courseId): array
+    {
+        $related = $this->relatedCourseIds($courseId);
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'title' => (string) $row['title'], 'status' => (string) $row['status'],
+            'checked' => in_array((int) $row['id'], $related, true)],
+            $this->db->fetchAllAssociative('SELECT c.id, c.title, c.status FROM courses c WHERE c.id <> :course ORDER BY ' . self::ADMIN_COURSE_ORDER, ['course' => $courseId]));
+    }
+
+    /**
+     * The tags a course carries, replaced by the ones given.
+     *
+     * @param list<int> $tagIds
+     */
+    public function replaceCourseTags(int $courseId, array $tagIds): void
+    {
+        $this->db->executeStatement('DELETE FROM course_tags WHERE course_id = :c', ['c' => $courseId]);
+        foreach (array_values(array_unique(array_map('intval', $tagIds))) as $tagId) {
+            $this->db->executeStatement('INSERT INTO course_tags (course_id, tag_id) VALUES (:c, :t)', ['c' => $courseId, 't' => $tagId]);
+        }
+    }
+
+    /**
+     * The categories as the catalogue file keeps them (owner, 2026-10-20), parents before children.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function catalogueCategories(): array
+    {
+        return $this->db->fetchAllAssociative('SELECT id, parent_id, level, position, name, slug, description, icon_svg FROM course_categories ORDER BY level, position, name, id');
+    }
+
+    /**
+     * Every course with what the catalogue file keeps of it: where it came from, its category, its tags,
+     * its cover and its default price.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function catalogueCourses(): array
+    {
+        return $this->db->fetchAllAssociative(
+            "SELECT c.id, c.slug, c.title, c.status, c.source_filename, c.category_id, c.cover_svg, c.catalogue_position,
+                    COALESCE((SELECT string_agg(o.slug, '|' ORDER BY o.slug) FROM course_relations r JOIN courses o
+                               ON o.id = CASE WHEN r.course_low_id = c.id THEN r.course_high_id ELSE r.course_low_id END
+                              WHERE r.course_low_id = c.id OR r.course_high_id = c.id), '') AS related_slugs,
+                    dpv.price_minor_units, dpv.was_price_minor_units, dpv.access_period_seconds,
+                    COALESCE((SELECT string_agg(t.name, '|' ORDER BY t.name) FROM course_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.course_id = c.id), '') AS tag_names
+               FROM courses c
+               LEFT JOIN course_price_variants dpv ON dpv.course_id = c.id AND dpv.is_active = TRUE AND dpv.is_default = TRUE
+              ORDER BY c.id"
+        );
+    }
+
+    /** A course's cover picture, replaced with one ADMIN uploaded (owner, 2026-10-20). */
+    public function setCourseCover(int $courseId, string $coverSvg): void
+    {
+        $this->db->executeStatement('UPDATE courses SET cover_svg = :cover, updated_at = NOW() WHERE id = :id', ['cover' => $coverSvg, 'id' => $courseId]);
+    }
+
+    /** Where the course stands in the catalogue, or null for after the numbered courses (owner, 2026-10-20). */
+    public function setCataloguePosition(int $courseId, ?int $position): void
+    {
+        $this->db->executeStatement('UPDATE courses SET catalogue_position = :position, updated_at = NOW() WHERE id = :id', ['position' => $position, 'id' => $courseId]);
+    }
+
+    /**
+     * Puts an uncategorised course in a category (the catalogue file, owner 2026-10-20). A course that already has
+     * one keeps it: false then.
+     */
+    public function categoriseIfUncategorised(int $courseId, int $categoryId): bool
+    {
+        return $this->db->executeStatement('UPDATE courses SET category_id = :category, updated_at = NOW() WHERE id = :id AND category_id IS NULL',
+            ['category' => $categoryId, 'id' => $courseId]) === 1;
+    }
+
+    /** Replaces a tag's icon with one ADMIN uploaded (owner, 2026-10-20). */
+    public function setTagIcon(int $id, string $iconSvg): void
+    {
+        $this->db->executeStatement('UPDATE tags SET icon_svg = :icon, updated_at = now() WHERE id = :id', ['icon' => $iconSvg, 'id' => $id]);
     }
 
     /** @param array<string,mixed> $data */
@@ -1410,11 +1522,17 @@ final class CourseRepository
                 'slug' => (string) $data['slug'],
                 'description' => (string) $data['description'],
                 'position' => (int) $data['position'],
-                'icon_svg' => $this->artwork->categoryIcon((string) $data['slug'], (string) $data['name']),
+                'icon_svg' => (string) ($data['icon_svg'] ?? $this->artwork->categoryIcon((string) $data['slug'], (string) $data['name'])),
             ]
         );
 
         return (int) ($rows[0]['id'] ?? 0);
+    }
+
+    /** Replaces a category's icon with one ADMIN uploaded (owner, 2026-10-20). */
+    public function setCategoryIcon(int $categoryId, string $iconSvg): void
+    {
+        $this->db->executeStatement('UPDATE course_categories SET icon_svg=:icon, updated_at=NOW() WHERE id=:id', ['icon' => $iconSvg, 'id' => $categoryId]);
     }
 
     /**
@@ -1575,9 +1693,9 @@ final class CourseRepository
     {
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO course_price_variants
-                 (public_id,course_id,access_period_seconds,price_minor_units,currency_code,
+                 (public_id,course_id,access_period_seconds,price_minor_units,was_price_minor_units,currency_code,
                   label,position,is_active,is_default,created_by_user_id,updated_by_user_id,created_at,updated_at)
-             VALUES (:public_id,:course_id,:access_period_seconds,:price_minor_units,:currency_code,
+             VALUES (:public_id,:course_id,:access_period_seconds,:price_minor_units,:was_price_minor_units,:currency_code,
                      :label,:position,:is_active,:is_default,:created_by,:updated_by,:created_at,:updated_at)
              RETURNING id',
             [
@@ -1585,6 +1703,7 @@ final class CourseRepository
                 'course_id' => $courseId,
                 'access_period_seconds' => (int) $data['access_period_seconds'],
                 'price_minor_units' => (int) $data['price_minor_units'],
+                'was_price_minor_units' => isset($data['was_price_minor_units']) ? (int) $data['was_price_minor_units'] : null,
                 'currency_code' => (string) $data['currency_code'],
                 'label' => trim((string) ($data['label'] ?? '')) ?: null,
                 'position' => (int) $data['position'],
@@ -1606,12 +1725,13 @@ final class CourseRepository
         $updated = $this->db->executeStatement(
             'UPDATE course_price_variants
                 SET access_period_seconds=:access_period_seconds,price_minor_units=:price_minor_units,
-                    currency_code=:currency_code,label=:label,is_active=:is_active,is_default=:is_default,
+                    was_price_minor_units=:was_price_minor_units,currency_code=:currency_code,label=:label,is_active=:is_active,is_default=:is_default,
                     updated_by_user_id=:updated_by,updated_at=:updated_at
               WHERE course_id=:course_id AND id=:id',
             [
                 'access_period_seconds' => (int) $data['access_period_seconds'],
                 'price_minor_units' => (int) $data['price_minor_units'],
+                'was_price_minor_units' => isset($data['was_price_minor_units']) ? (int) $data['was_price_minor_units'] : null,
                 'currency_code' => (string) $data['currency_code'],
                 'label' => trim((string) ($data['label'] ?? '')) ?: null,
                 'is_active' => (bool) $data['is_active'],
@@ -1689,7 +1809,8 @@ final class CourseRepository
         $rows = $this->db->fetchAllAssociative(
             'SELECT c.*, cc.name AS category_name, cc.slug AS category_slug,
                     oc.name AS owner_company_name,
-                    COALESCE(NULLIF(trim(concat_ws(\' \',ou.first_name,ou.last_name)),\'\'),ou.display_name,oue.email) AS owner_person_name
+                    COALESCE(NULLIF(trim(concat_ws(\' \',ou.first_name,ou.last_name)),\'\'),ou.display_name,oue.email) AS owner_person_name,
+                    ou.account_reference AS owner_person_reference
              FROM courses c
              LEFT JOIN course_categories cc ON cc.id = c.category_id
              LEFT JOIN companies oc ON oc.id = c.owner_company_id
@@ -1746,8 +1867,10 @@ final class CourseRepository
     public function history(int $courseId, int $limit = 50): array
     {
         return $this->normaliseRows($this->db->fetchAllAssociative(
-            'SELECT ceh.*, ue.email AS user_email
+            'SELECT ceh.*, ue.email AS user_email,
+                    COALESCE(NULLIF(trim(concat_ws(\' \',u.first_name,u.last_name)),\'\'),u.display_name,ue.email) AS user_name, u.account_reference AS user_reference
              FROM course_edit_history ceh
+             LEFT JOIN users u ON u.id = ceh.user_id
              LEFT JOIN user_emails ue ON ue.user_id = ceh.user_id AND ue.is_primary = TRUE
              WHERE ceh.course_id = :course_id
              ORDER BY ceh.created_at DESC LIMIT ' . max(1, min(200, $limit)),
@@ -2292,7 +2415,7 @@ final class CourseRepository
     public function findUserByEmail(string $email): ?array
     {
         $rows = $this->db->fetchAllAssociative(
-            'SELECT u.id, u.public_id, u.display_name, u.certificate_name, ue.email
+            'SELECT u.id, u.public_id, u.display_name, ue.email
              FROM users u JOIN user_emails ue ON ue.user_id = u.id
              WHERE ue.email = :email AND ue.verified_at IS NOT NULL AND u.status = :status LIMIT 1',
             ['email' => $email, 'status' => 'active']
@@ -2425,7 +2548,7 @@ final class CourseRepository
      */
     public function manageableCourses(int $userId, int $limit, int $offset, string $search = '', ?SortOrder $sort = null): array
     {
-        $order = self::orderFor($sort, self::ADMIN_COURSE_SORTS, self::ADMIN_COURSE_ORDER, 'c.id');
+        $order = self::orderFor($sort, self::ADMIN_COURSE_SORTS, self::ADMIN_COURSE_ORDER, self::adminTiebreaker($sort));
         [$match, $bindings] = self::andTitleSearch($search);
 
         $keys = "SELECT c.id FROM courses c WHERE (" . self::MANAGEABLE_COURSES_WHERE . ")"

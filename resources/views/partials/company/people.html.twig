@@ -25,7 +25,8 @@
 					{% for person in people %}
 						<tr>
 							<td>
-								<strong>{{ person.name }}</strong>
+								{# The name and account reference, linked to the person's page (owner, 2026-10-21). #}
+								<strong>{{ ui('data.person', {name: person.name, reference: person.account_reference|default(''), href: '/company/people/' ~ person.id}) }}</strong>
 								<div class="small muted">
 									{{ person.email }}
 								</div>
@@ -98,13 +99,6 @@
 {% block control %}
 
 									<input name="last_name" value="{{ person.last_name }}" id="field-people-7-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-
-{% endblock %}
-{% endembed %}
-								{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Certificate name', full_width: true, for: 'field-people-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), help: 'The name printed on certificates. Left blank, the person\'s ordinary name is used.'})} %}
-{% block control %}
-
-									<input name="certificate_name" value="{{ person.certificate_name }}" id="field-people-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}

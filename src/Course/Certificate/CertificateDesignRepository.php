@@ -33,7 +33,7 @@ final class CertificateDesignRepository
 {
     private const ROW = "SELECT t.id, t.name, t.is_current, t.created_at, t.updated_at, t.published_version_id,
                 v.version_number, v.design,
-                COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS updated_by_name,
+                COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS updated_by_name, t.updated_by_user_id, u.account_reference AS updated_by_reference,
                 (SELECT COUNT(*) FROM courses c WHERE c.certificate_design_id = t.id) AS course_count
            FROM document_templates t
            JOIN document_template_versions v ON v.id = t.published_version_id

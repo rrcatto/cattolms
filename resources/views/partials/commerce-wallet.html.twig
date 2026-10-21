@@ -2,7 +2,7 @@
     <section class="cl-page-section">
         {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
             {{ ui('layout.section-head', {heading: 'Balance', eyebrow: ph_title, summary: is_company ? 'Credit the company can spend on course credits. It is not paid out as cash.' : 'Credit you can spend on any course. It is not paid out as cash.'}) }}
-            {{ ui('data.key-value-list', {items: [{label: 'Wallet balance', value: balance_label}]}) }}
+            {{ ui('data.stat-card', {value: balance_label, label: 'Wallet balance', size: 'large'}) }}
             <p>Each credit expires {{ expiry_words }} after it was added, if it has not been spent. The oldest credit is spent first, and we email a reminder {{ reminder_words }} before any credit expires. Wallet credit earns no interest.</p>
             {% if expiring %}
             {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Credit expiring soon'})} %}{% block body %} {% for credit in expiring %}{{ credit.amount_label }} expires on {{ credit.expires_label }}.{% if not loop.last %} {% endif %}{% endfor %} Spend it on {{ is_company ? 'course credits' : 'a course' }} before then.{% endblock %}{% endembed %}

@@ -17,4 +17,11 @@ final class HelpController extends BaseController
             'page_kicker' => 'How to find, buy and use courses',
         ]);
     }
+
+    /** Frequently asked questions, each answer closed until its question is chosen (owner, 2026-10-20). */
+    #[Route('/faq', name: 'help_faq', methods: ['GET'])]
+    public function faq(): Response
+    {
+        return $this->render('faq', ['title' => 'Frequently asked questions']);
+    }
 }

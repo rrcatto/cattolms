@@ -49,9 +49,9 @@
 			{% block body %}
 				{% for row in rows %}
 					<tr data-ledger-id="{{ row.id }}" data-ledger-kind="{{ row.kind }}">
-						<td class="cell-text">{% if row.reference_label %}<strong>{% if row.account_href %}<a href="{{ row.account_href }}">{{ row.reference_label }}</a>{% else %}{{ row.reference_label }}{% endif %}</strong><br>{% endif %}<span class="small">{{ row.account_name ?: '—' }}</span></td>
+						<td class="cell-text">{% if row.reference_label %}<strong>{% if row.account_href %}<a href="{{ row.account_href }}">{{ row.reference_label }}</a>{% else %}{{ row.reference_label }}{% endif %}</strong><br>{% endif %}<span class="small">{% if row.account_person %}{{ ui('data.person', row.account_person) }}{% else %}{{ row.account_name ?: '—' }}{% endif %}</span></td>
 						<td class="small">{{ row.when }}</td>
-						<td class="cell-text">{{ row.sentence }}</td>
+						<td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: row.sentence_parts} only %}</td>
 						<td>{{ row.money_in_label }}</td>
 						<td>{{ row.money_out_label }}</td>
 						<td>{{ row.wallet_change_label }}</td>

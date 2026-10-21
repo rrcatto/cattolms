@@ -147,7 +147,10 @@ final class CommerceController extends BaseController
             'wallet_balance_minor'=>$balance, 'wallet_balance_label'=>Money::ofMinorUnits($balance)->format(),
             'wallet_applied_label'=>Money::ofMinorUnits($applied)->format(), 'wallet_applied_minor'=>$applied,
             'to_pay_label'=>Money::ofMinorUnits(max(0, $total - $applied))->format(), 'to_pay_minor'=>max(0, $total - $applied),
-            'payment_due_words'=>$this->commerceSettings->paymentDue()->words(), 'immediate_start'=>OrderService::IMMEDIATE_START]);
+            'payment_due_words'=>$this->commerceSettings->paymentDue()->words(), 'immediate_start'=>OrderService::IMMEDIATE_START,
+            // The payment methods the site offers (Settings > Payment methods, owner 2026-10-19), each named with its provider.
+            'payment_options'=>$this->orders->paymentMethods()->checkoutOptions(),
+            'payment_method_label'=>\CattoLearning\Commerce\Settings\PaymentMethods::label((string) ($state['payment_method'] ?? ''))]);
     }
 
     #[Route('/checkout/profile', name:'commerce_checkout_profile', methods:['POST'])]
@@ -246,7 +249,8 @@ final class CommerceController extends BaseController
         $reference=$order['company_id']!==null ? $this->records->companyAccountReference((int)$order['company_id']) : $this->records->userAccountReference($actor->id);
         $due=$this->records->dueAmount($id);
         return $this->render('commerce-order',['title'=>'Order '.$id,'account_reference'=>\CattoLearning\Support\AccountReference::format($reference),
-            'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),'payment_due_words'=>$this->commerceSettings->paymentDue()->words(),'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->payableBankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format()]);
+            'due_minor'=>$due,'due_label'=>Money::ofMinorUnits($due,(string)$order['currency'])->format(),'payment_due_words'=>$this->commerceSettings->paymentDue()->words(),'totals'=>OrderTotals::forSnapshot($order['details']),'active_nav'=>'account','order'=>$order,'billing_lines'=>BillingDetails::fromSnapshot((array)$order['details']['billing'])->documentLines(),'can_pay'=>$canPay,'payment_key'=>Uuid::v4(),'payment_method'=>$this->records->paymentMethod($id),'change_method'=>$this->request()->query->get('payment') === 'change','bank_details'=>$this->settings->payableBankDetails(),'total_label'=>Money::strictMinorUnits((int)$order['total_minor'],(string)$order['currency'])->format(),
+            'payment_options'=>$this->orders->paymentMethods()->checkoutOptions()]);
     }
 
     #[Route('/account/orders/{id}/refund-request',name:'commerce_refund_request',requirements:['id'=>'[0-9]+'],methods:['POST'])]

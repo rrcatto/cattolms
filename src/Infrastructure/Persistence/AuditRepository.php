@@ -11,6 +11,9 @@ Description:
 Provides PostgreSQL persistence queries and data-access operations for audit records.
 
 Changelog:
+2026/10/19 SAST
+- deleteBefore(): the daily clean-up deletes activity log entries older than 5 years, as the Privacy
+  Policy states (owner, 2026-10-19).
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -26,6 +29,7 @@ declare(strict_types=1);
 namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Support\ClientFingerprint;
+use DateTimeImmutable;
 
 final class AuditRepository
 {
@@ -52,5 +56,11 @@ final class AuditRepository
                 'created_at' => gmdate('Y-m-d H:i:sP'),
             ]
         );
+    }
+
+    /** Retention: removes activity log entries recorded before a moment. @return int entries deleted */
+    public function deleteBefore(DateTimeImmutable $before): int
+    {
+        return $this->db->executeStatement('DELETE FROM audit_log WHERE created_at < :before', ['before' => $before->format('Y-m-d H:i:sP')]);
     }
 }

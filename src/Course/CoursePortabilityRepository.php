@@ -56,6 +56,11 @@ final class CoursePortabilityRepository
     {
         // Re-import discards course work and ordinary grants. Purchased enrolments stay
         // attached to immutable commerce history, but their old course work is cleared.
+        // A certificate's transcript goes with it (owner, 2026-10-19).
+        $this->db->executeStatement(
+            'DELETE FROM transcripts WHERE certificate_id IN (SELECT cert.id FROM certificates cert JOIN course_enrolments ce ON ce.id = cert.enrolment_id WHERE ce.course_id=:course_id)',
+            ['course_id' => $courseId]
+        );
         $this->db->executeStatement(
             'DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)',
             ['course_id' => $courseId]
@@ -140,6 +145,11 @@ final class CoursePortabilityRepository
         );
         $this->db->executeStatement('DELETE FROM course_credits WHERE course_id=:course_id', ['course_id' => $courseId]);
         $this->db->executeStatement('DELETE FROM course_requests WHERE course_id=:course_id', ['course_id' => $courseId]);
+        // A certificate's transcript goes with it (owner, 2026-10-19).
+        $this->db->executeStatement(
+            'DELETE FROM transcripts WHERE certificate_id IN (SELECT cert.id FROM certificates cert JOIN course_enrolments ce ON ce.id = cert.enrolment_id WHERE ce.course_id=:course_id)',
+            ['course_id' => $courseId]
+        );
         $this->db->executeStatement(
             'DELETE FROM certificates WHERE enrolment_id IN (SELECT id FROM course_enrolments WHERE course_id=:course_id)',
             ['course_id' => $courseId]

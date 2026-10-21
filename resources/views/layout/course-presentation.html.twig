@@ -15,7 +15,7 @@
 {% if course is defined %}
 {% set admin_public_preview = public_preview and course.public_preview_query|default('') == '?preview=1' %}
 <header class="cl-course-presentation-head">
-<a href="{{ admin_public_preview ? '/admin/courses/' ~ course.id ~ '/content' : (public_preview ? '/courses/' ~ course.slug : (is_preview|default(false) ? '/admin/courses/' ~ course.id ~ '/content' : '/account/library')) }}">← {{ admin_public_preview ? 'Exit public preview' : 'Exit course' }}</a>
+<a href="{{ admin_public_preview ? '/admin/courses/' ~ course.id ~ '/content' : (public_preview ? '/courses/' ~ course.slug : (is_preview|default(false) ? '/admin/courses/' ~ course.id ~ '/content' : '/account/courses')) }}">← {{ admin_public_preview ? 'Exit public preview' : 'Exit course' }}</a>
 <strong>{{ course.title }}</strong>
 {% if course.remaining_access_label|default('') %}<span>Access remaining: {{ course.remaining_access_label }}</span>{% endif %}
 </header>
@@ -45,7 +45,7 @@
 <main class="cl-course-reader-content">{% block page_body %}{% endblock %}</main>
 </div>
 {% else %}
-<header class="cl-course-presentation-head"><a href="{{ course_url|default('/account/library') }}">← Exit assessment</a></header>
+<header class="cl-course-presentation-head"><a href="{{ course_url|default('/account/courses') }}">← Exit assessment</a></header>
 {{ block('page_body') }}
 {% endif %}
 {% for resourceUrl in platform.scripts %}<script src="{{ resourceUrl }}"></script>{% endfor %}

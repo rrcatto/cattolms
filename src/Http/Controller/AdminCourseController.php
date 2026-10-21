@@ -58,6 +58,7 @@ use CattoLearning\Course\CoursePortabilityService;
 
 use CattoLearning\Course\CourseService;
 
+use CattoLearning\View\Artwork\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 
 use CattoLearning\Auth\AuthService;
@@ -141,6 +142,8 @@ final class AdminCourseController extends BaseController
             'content_summary' => in_array($activeTab, ['overview', 'content'], true) ? $this->courses->contentSummary($course['structure']) : null,
             'category_picker' => null,
             'category_places' => null,
+            'tag_options' => [],
+            'related_options' => [],
             'course_states' => ['draft', 'published', 'retired', 'archived'],
             'owner_people' => [],
             'owner_companies' => [],
@@ -152,6 +155,8 @@ final class AdminCourseController extends BaseController
             $currentCategoryId = (int) ($course['category_id'] ?? 0);
             $data['category_picker'] = $this->courses->courseCategoryPicker($currentCategoryId > 0 ? $currentCategoryId : null);
             $data['category_places'] = $this->courses->categoryLocationPicker();
+            $data['tag_options'] = $this->courses->courseTagOptions($courseId);
+            $data['related_options'] = $this->courses->relatedCourseOptions($courseId);
         }
         if ($activeTab === 'people') {
             // People and companies are loaded only for this tab; the development dataset is large.
@@ -214,6 +219,40 @@ final class AdminCourseController extends BaseController
         $this->redirect(self::tabUrl($courseId, 'test-access'));
     }
 
+    /**
+     * Moves a course in the catalogue's order (owner, 2026-10-20: "a drag handle so I can drag the course into position"):
+     * after the course in `after` (empty for first), from a drag; or up, down, top or bottom in `direction`, from the ⋯
+     * menu without JavaScript. A drag asks for JSON and is answered with each course whose number changed.
+     */
+    #[Route('/admin/courses/{id}/catalogue-move', name: 'admin_course_catalogue_move', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function catalogueMove(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.DASHBOARD.VIEW');
+        $courseId = $this->courseId();
+        $wantsJson = str_contains((string) $this->request()->headers->get('Accept', ''), 'application/json');
+        $move = function () use ($courseId, $user): array {
+            if (array_key_exists('after', $_POST)) {
+                $after = trim($this->posted('after'));
+                if ($after !== '' && !ctype_digit($after)) throw new InvalidArgumentException('Choose a valid position.');
+                return $this->courses->arrangeInCatalogue($courseId, $after === '' ? null : (int) $after, $user->id);
+            }
+            return $this->courses->moveInCatalogue($courseId, trim($this->posted('direction')), $user->id);
+        };
+        if ($wantsJson) {
+            try {
+                return new \Symfony\Component\HttpFoundation\JsonResponse(['positions' => (object) $move()]);
+            } catch (InvalidArgumentException $refused) {
+                return new \Symfony\Component\HttpFoundation\JsonResponse(['error' => $refused->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+        return $this->handle(function () use ($move): void {
+            $move();
+            $this->flash('success', 'The course was moved in the catalogue.');
+            $this->redirect('/admin/courses');
+        }, '/admin/courses');
+    }
+
     #[Route('/admin/courses/{id}', name: 'admin_course_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function update(): Response
     {
@@ -222,7 +261,7 @@ final class AdminCourseController extends BaseController
         $courseId = $this->courseId();
         $this->requireManagedCourse($courseId);
         return $this->handle(function () use ($user, $courseId): void {
-            $this->courses->updateCourse($courseId, $_POST, $user->id);
+            $this->courses->updateCourse($courseId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['cover'] ?? null, UploadedSvg::COVER_BYTES, 'cover picture'));
             $this->flash('success', 'The course details were updated.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/' . $courseId);

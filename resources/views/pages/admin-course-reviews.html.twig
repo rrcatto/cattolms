@@ -16,12 +16,13 @@
 {% if reviews %}
 <ol class="cl-review-list">
 {% for review in reviews %}
-<li class="cl-review">
+{# Each review has its own anchor, which the dashboard's Needs your attention opens (owner, 2026-10-21); the learner's name and account reference open their account. #}
+<li class="cl-review" id="review-{{ review.id }}">
 	<div class="cl-review-head">
 		<strong><a href="/courses/{{ review.course_slug }}">{{ review.course_title }}</a></strong>
 		{{ ui('feedback.badge', {label: review.status == 'pending' ? 'Pending' : (review.status == 'approved' ? 'Approved' : 'Rejected'), tone: review.status == 'pending' ? 'warning' : (review.status == 'approved' ? 'success' : 'danger')}) }}
 	</div>
-	<p class="cl-review-byline">{{ review.learner_name }} · published as “{{ review.reviewer }}” · revision {{ review.revision }} · {{ review.updated_at|date('j M Y H:i') }}</p>
+	<p class="cl-review-byline">{{ ui('data.person', {name: review.learner_name, reference: review.learner_reference, href: '/admin/people/' ~ review.user_id}) }} · published as “{{ review.reviewer }}” · revision {{ review.revision }} · {{ review.updated_at|date('j M Y H:i') }}</p>
 	<p class="cl-review-rating"><span class="cl-rating-stars" aria-hidden="true">{% for stars in 1..5 %}<span class="{{ stars <= review.rating ? 'is-filled' : '' }}">{{ stars <= review.rating ? '★' : '☆' }}</span>{% endfor %}</span> <span>{{ review.rating }} of 5</span></p>
 	{% if review.comment %}<p class="cl-review-comment">{{ review.comment|nl2br }}</p>{% else %}<p class="cl-review-comment"><em>No comment, rating only.</em></p>{% endif %}
 	{% if review.published_rating is not null and (review.published_rating != review.rating or review.published_comment != review.comment) %}
@@ -32,7 +33,7 @@
 	{% elseif review.status == 'rejected' and review.published_rating is null %}
 		<p class="cl-review-byline">Not published.</p>
 	{% endif %}
-	{% if review.moderated_at %}<p class="cl-review-byline">Last decision {{ review.moderated_at|date('j M Y H:i') }}{% if review.moderator_name %} by {{ review.moderator_name }}{% endif %}{% if review.moderation_note %} · Note: {{ review.moderation_note }}{% endif %}</p>{% endif %}
+	{% if review.moderated_at %}<p class="cl-review-byline">Last decision {{ review.moderated_at|date('j M Y H:i') }}{% if review.moderated_by_user_id %} by {{ ui('data.person', {name: review.moderator_name ?: 'User ' ~ review.moderated_by_user_id, reference: review.moderator_reference, href: '/admin/people/' ~ review.moderated_by_user_id}) }}{% endif %}{% if review.moderation_note %} · Note: {{ review.moderation_note }}{% endif %}</p>{% endif %}
 	<form class="cl-review-moderation" action="/admin/course-reviews/{{ review.id }}/moderate" method="post">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		<input type="hidden" name="revision" value="{{ review.revision }}">

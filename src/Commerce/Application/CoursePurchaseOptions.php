@@ -24,10 +24,15 @@ a page never offers what checkout would then turn down.
   company: can_request), which a private account, having no company, is not offered.
 - unavailable: the course is not published or has no active price; nothing to buy.
 
+An available course also carries the automatic promotions that cover it (promotions, owner,
+2026-10-20), so the page can say that the cart applies them by itself and what the price comes to.
+
 A visitor who is not signed in can add to the cart as before (checkout asks them to sign in) and
 is also offered Sign in, so a learner who already has the course can reach it.
 
 Changelog:
+2026/10/20 SAST
+- promotions: the automatic promotions that cover the course, for a visitor who may buy it.
 2026/10/18 SAST
 - A company account is offered Request from my company and never Add to cart or Buy now; a private
   account is offered buying and never Request from my company (can_buy, can_request).
@@ -48,6 +53,7 @@ final class CoursePurchaseOptions
     public function __construct(
         private readonly CourseService $courses,
         private readonly CommerceRepository $records,
+        private readonly PromotionService $promotions,
     ) {
     }
 
@@ -71,6 +77,7 @@ final class CoursePurchaseOptions
             'can_buy' => true,
             'can_request' => false,
             'company_note' => '',
+            'promotions' => [],
             'sign_in_href' => $viewer === null ? '/login?return=' . rawurlencode($returnTo) : '',
             'orders_href' => '/account/orders',
         ];
@@ -100,10 +107,12 @@ final class CoursePurchaseOptions
             }
         }
         $company = $viewer !== null && $this->records->isCompanyAccount($viewer->id);
+        $default ??= $variants[0];
         return [
             'state' => 'available',
             'variants' => $variants,
-            'default_variant' => $default ?? $variants[0],
+            'default_variant' => $default,
+            'promotions' => $company ? [] : $this->promotions->announcements('course', $courseId, (int) ($default['price_minor_units'] ?? 0), (string) ($default['currency_code'] ?? 'ZAR'), $viewer?->id),
             'can_buy' => !$company,
             'can_request' => $company && $viewer->hasPermission('CATALOGUE.COURSE.REQUEST'),
             'company_note' => $company ? OrderService::COMPANY_ACCOUNT : '',

@@ -18,16 +18,20 @@
 	</section>
 	<section class="cl-page-section">
 		{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {})} %}{% block body %}
+			{# The bundle itself in a card, as every page's content is (UX rule 1.7; 2026-10-21). #}
 			<div>
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
+				<h2 class="h4">About this bundle</h2>
 				{% if bundle.description_html %}<div class="cl-prose mb-12">{{ bundle.description_html|raw }}</div>{% endif %}
-				<h2 class="h3 mb-5" id="bundle-courses-heading">Courses in this bundle</h2>
+				<h3 class="h4 mb-5" id="bundle-courses-heading">Courses in this bundle</h3>
 				<ol aria-labelledby="bundle-courses-heading">{% for course in bundle.courses %}<li>{{ course.title }}</li>{% endfor %}</ol>
 				{{ ui('catalogue.course-grid', {courses: bundle.course_cards}) }}
+				{% endblock %}{% endembed %}
 			</div>
 			<aside>
 				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}{% block surface_body %}
 					<h2 class="h4">Bundle price</h2>
-					{% if bundle.price_label %}<p class="h3">{{ bundle.price_label }}</p>{% endif %}
+					{% if bundle.price_label %}<p class="h3">{% include '@platform/partials/price.html.twig' with {price: bundle} %}</p>{% if bundle.saving_label %}<p class="cl-course-purchase-saving">You save {{ bundle.saving_label }}</p>{% endif %}{% endif %}
 					{% if bundle.comparison and bundle.price_label %}
 						{# Informational: today's prices for the same courses one by one. The bundle is sold at its own price. #}
 						{{ ui('data.key-value-list', {items: [{label: 'Individual course prices', value: bundle.comparison.individual_label}, {label: 'Bundle price', value: bundle.price_label}]|merge(bundle.comparison.saving_label ? [{label: 'You save', value: bundle.comparison.saving_label}] : [])}) }}
@@ -41,6 +45,7 @@
 					{% elseif company_note %}
 						<p class="cl-course-purchase-note">{{ company_note }}</p>
 					{% else %}
+						{% include '@platform/partials/promotion-announcements.html.twig' with {announcements: promotions, announcement_price: bundle.price_label} %}
 						<form action="/cart/add-bundle" method="post">
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							<input type="hidden" name="bundle_offer_id" value="{{ bundle.offer_id }}">

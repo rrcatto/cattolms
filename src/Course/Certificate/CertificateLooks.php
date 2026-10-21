@@ -18,6 +18,9 @@ defaultWording() is what a new design on a look starts with, in the editor's own
 CertificateWording); the small print default is the certificate number and where to verify it.
 
 Changelog:
+2026/10/19 SAST
+- The default wording says the learner completed the course, with no result or grade and not
+  "successfully": a certificate never says the learner passed (owner, 2026-10-19).
 2026/10/08 SAST
 - Professional CPD's foot is 26 mm, as tall as the others', so a signature picture has room above the line.
 2026/10/07 SAST
@@ -81,8 +84,8 @@ final class CertificateLooks
     {
         $f = static fn(string $path): string => CertificateWording::chip($path);
         $lead = $key === 'gold-frame'
-            ? ['This is proudly presented to', 'for successfully completing']
-            : ['This is to certify that', 'has successfully completed'];
+            ? ['This is proudly presented to', 'for completing']
+            : ['This is to certify that', 'has completed'];
         $italic = in_array($key, ['classic', 'legal-seal', 'gold-frame', CertificateLooks::CUSTOM], true);
         $wrap = static fn(string $text): string => $italic ? '<em>' . $text . '</em>' : $text;
         return '<p class="cert-caps">' . $f('course.provider') . '</p>'
@@ -91,7 +94,7 @@ final class CertificateLooks
             . '<p class="cert-name">' . $f('learner.name') . '</p>'
             . '<p>' . $wrap($lead[1]) . '</p>'
             . '<p class="cert-course">' . $f('course.title') . '</p>'
-            . '<p>on ' . $f('course.completion_date') . ' with a result of ' . $f('result.percentage') . ' (' . $f('result.grade') . ')</p>'
+            . '<p>on ' . $f('course.completion_date') . '</p>'
             . '<p class="cert-small">' . $f('course.accreditation') . '</p>';
     }
 

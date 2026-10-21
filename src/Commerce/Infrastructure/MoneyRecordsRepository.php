@@ -42,7 +42,8 @@ final class MoneyRecordsRepository
         LEFT JOIN users ou ON ou.id = o.purchaser_user_id
         LEFT JOIN user_emails oue ON oue.user_id = o.purchaser_user_id AND oue.is_primary
         LEFT JOIN companies oc ON oc.id = o.company_id
-        LEFT JOIN users a ON a.id = l.actor_user_id";
+        LEFT JOIN users a ON a.id = l.actor_user_id
+        LEFT JOIN user_emails ae ON ae.user_id = l.actor_user_id AND ae.is_primary";
 
     private const LEDGER_COLUMNS = "l.id, l.kind, l.occurred_at, l.recorded_at, l.amount_minor, l.currency, l.wallet_effect, l.cash_effect, l.method,
         l.order_id, l.order_item_id, l.payment_id, l.refund_id, l.document_number, l.external_reference, l.corrects_entry_id, l.memo,
@@ -53,7 +54,7 @@ final class MoneyRecordsRepository
         CASE WHEN l.owner_company_id IS NOT NULL OR (l.owner_user_id IS NULL AND o.company_id IS NOT NULL) THEN 'company' ELSE 'person' END AS account_type,
         COALESCE(l.owner_user_id, CASE WHEN l.owner_company_id IS NULL AND o.company_id IS NULL THEN o.purchaser_user_id END) AS account_user_id,
         COALESCE(l.owner_company_id, CASE WHEN l.owner_user_id IS NULL THEN o.company_id END) AS account_company_id,
-        a.display_name AS actor_name";
+        a.display_name AS actor_name, l.actor_user_id, a.account_reference AS actor_reference, ae.email AS actor_email";
 
     public function __construct(private readonly Database $db)
     {
@@ -181,13 +182,15 @@ final class MoneyRecordsRepository
     /** An event with whoever did it and whose order it belongs to. */
     private const TRAIL_FROM = "FROM commerce_audit_events e LEFT JOIN users a ON a.id = e.actor_user_id LEFT JOIN user_emails ae ON ae.user_id = e.actor_user_id AND ae.is_primary
         LEFT JOIN commerce_orders o ON o.id = e.order_id LEFT JOIN users ou ON ou.id = o.purchaser_user_id LEFT JOIN companies oc ON oc.id = o.company_id
-        LEFT JOIN course_enrolments te ON te.id = CAST(e.payload->>'enrolment_id' AS BIGINT) LEFT JOIN users tu ON tu.id = te.user_id";
+        LEFT JOIN course_enrolments te ON te.id = CAST(e.payload->>'enrolment_id' AS BIGINT) LEFT JOIN users tu ON tu.id = te.user_id
+        LEFT JOIN user_emails oue ON oue.user_id = o.purchaser_user_id AND oue.is_primary LEFT JOIN user_emails tue ON tue.user_id = te.user_id AND tue.is_primary";
 
     /**
      * What an event's sentence needs besides its payload: the customer, the payment it names and the
      * course of the enrolment or order line it names.
      */
-    private const TRAIL_COLUMNS = "e.id, e.order_id, e.actor_user_id, e.event, e.payload, e.created_at, a.display_name AS actor_name, ae.email AS actor_email,
+    private const TRAIL_COLUMNS = "e.id, e.order_id, e.actor_user_id, e.event, e.payload, e.created_at, a.display_name AS actor_name, ae.email AS actor_email, a.account_reference AS actor_reference,
+        CASE WHEN o.company_id IS NULL THEN COALESCE(oue.email, tue.email) END AS account_email,
         o.total_minor AS order_total_minor, COALESCE(o.currency, 'ZAR') AS currency, o.company_id AS account_company_id,
         CASE WHEN o.company_id IS NULL THEN COALESCE(o.purchaser_user_id, te.user_id) END AS account_user_id,
         COALESCE(oc.name, ou.display_name, tu.display_name, '') AS account_name, COALESCE(oc.account_reference, ou.account_reference, tu.account_reference, '') AS account_reference,
@@ -252,11 +255,13 @@ final class MoneyRecordsRepository
 
     private const PAYMENT_EVENT_COLUMNS = "pe.id, pe.payment_id, pe.event_key, pe.state, pe.payload, pe.created_at, p.order_id, p.gateway, p.amount_minor, p.currency, p.provider_reference, p.state AS payment_state,
         COALESCE(oc.name, ou.display_name, '') AS account_name, COALESCE(oc.account_reference, ou.account_reference, '') AS account_reference,
-        o.company_id AS account_company_id, CASE WHEN o.company_id IS NULL THEN o.purchaser_user_id END AS account_user_id";
+        o.company_id AS account_company_id, CASE WHEN o.company_id IS NULL THEN o.purchaser_user_id END AS account_user_id,
+        CASE WHEN o.company_id IS NULL THEN oue.email END AS account_email";
 
     /** A payment event with its payment and whose order it pays. */
     private const PAYMENT_EVENT_FROM = 'FROM commerce_payment_events pe JOIN commerce_payments p ON p.id = pe.payment_id
-        LEFT JOIN commerce_orders o ON o.id = p.order_id LEFT JOIN users ou ON ou.id = o.purchaser_user_id LEFT JOIN companies oc ON oc.id = o.company_id';
+        LEFT JOIN commerce_orders o ON o.id = p.order_id LEFT JOIN users ou ON ou.id = o.purchaser_user_id LEFT JOIN companies oc ON oc.id = o.company_id
+        LEFT JOIN user_emails oue ON oue.user_id = o.purchaser_user_id AND oue.is_primary';
 
     /** @param array<string,mixed> $f */
     public function paymentEventCount(array $f): int
@@ -328,7 +333,7 @@ final class MoneyRecordsRepository
         [$where, $params] = $this->orderWhere($f);
         $order = (self::ORDER_SORTS[$sort] ?? 'o.placed_at') . ($direction === 'asc' ? ' ASC' : ' DESC') . ', o.id' . ($direction === 'asc' ? ' ASC' : ' DESC');
         return $this->db->fetchAllAssociative("SELECT o.id, o.state, o.total_minor, o.currency, o.placed_at, o.company_id, o.request_id,
-                u.display_name AS purchaser_name, ue.email AS purchaser_email, c.name AS company_name,
+                o.purchaser_user_id, u.display_name AS purchaser_name, ue.email AS purchaser_email, u.account_reference AS purchaser_reference, c.name AS company_name,
                 COALESCE(c.account_reference, u.account_reference) AS account_reference,
                 (SELECT COALESCE(SUM(p.amount_minor), 0) FROM commerce_payments p WHERE p.order_id = o.id AND p.state IN ('paid','partially_refunded','refunded')) AS paid_minor,
                 (SELECT COALESCE(SUM(r.amount_minor), 0) FROM commerce_refunds r WHERE r.order_id = o.id) AS refunded_minor,

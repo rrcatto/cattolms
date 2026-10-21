@@ -11,6 +11,20 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/20 SAST (marked-down prices and automatic promotions)
+- Related courses (owner, 2026-10-20: "the relationship must be bijective ... if I relate one course to another, then the other course must reciprocally related"): course_relations keeps each related pair once, the lower course id first, so a relation is the same from either course and can never be one-sided.
+- Catalogue order (owner, 2026-10-20): courses.catalogue_position, an optional whole number set on the course's Details tab. The catalogue lists numbered courses first, lowest first, then the rest newest first; numbering in hundreds leaves room between courses.
+- No built-in categories (owner, 2026-10-20): the 369-category industry taxonomy is removed; ADMIN creates only the categories the site's courses need. course_categories.icon_svg and tags.icon_svg hold an icon ADMIN may upload (a generated one until then), and courses.cover_svg a cover picture ADMIN may upload.
+- Was prices (owner, 2026-10-20): course_price_variants.was_price_minor_units and bundle_offers.was_price_minor_units, an optional higher price shown struck through beside the price, so a course or bundle is seen to be marked down without a promo code. Only the price is ever charged.
+- Contact messages (owner, 2026-10-20): contact_messages keeps every message sent through the contact form, with its reason, the sender's account reference, an order, a course and the reason's own answers, when it was emailed, acknowledged and answered.
+- Adults only (owner, 2026-10-20): users.age_confirmed_at and users.guardian_consent_at are gone. The date of birth (users.birthdate) is given at registration or at the first sign-in of an account someone else made, and someone under 18 is refused.
+- Automatic promotions (owner, 2026-10-20): promotions.applies_automatically, a promotion the cart applies by itself, with no code to type, and says so. One promotion applies to an order: the one that saves the purchaser the most.
+2026/10/19 SAST (launch items)
+- Age and guardian consent (owner, 2026-10-19): users gains age_confirmed_at (the "I am 18 or older, or my parent or guardian has consented" tick, at registration or at the first sign-in of an account someone else made), guardian_consent_at (a learner whose verified identity shows them under 18 confirms that a parent or guardian consented) and identity_attempts_reset_at (ADMIN allows another try after three declined identity checks). certificate_name is gone: a certificate carries the verified name.
+- Identity verification (owner, 2026-10-19): identity_verifications, one row per check made on the provider's hosted page (Didit), keeping only the status, the verified name, document type, number and issuing country, date of birth, the provider's session id and when, never an image; identity_webhook_events keeps each handled webhook's event id once.
+- Who sees a certificate or transcript (owner, 2026-10-19): certificates.public_id and transcripts.public_id are random 32-digit hex codes (CHAR(32)) the learner can replace, and is_public (default false) says whether anyone with the address may see it.
+- Scheduled jobs (owner, 2026-10-19): scheduled_jobs records each job's last run (schedule:run).
+- Certificates and transcripts (owner, 2026-10-19): a certificate proves that the learner took the course, never that they passed. certificates loses grade_code and overall_percentage and gains completed_at, identity_verification_id (the verification its name came from) and revoked_by_user_id. transcripts holds each certificate's public transcript (document_templates type transcript, installed from resources/documents/transcript.html). CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE (101 permissions).
 2026/10/19 SAST
 - Unmatched money (owner, 2026-10-19): commerce_unmatched_payments, money that reached the bank with no order to pay, kept until ADMIN matches it to an order or records that it was paid back (one decision, commerce_unmatched_payment_guard).
 2026/10/18 SAST (the Site Owner)
@@ -86,8 +100,8 @@ use CattoLearning\Course\Certificate\CertificateDesignCompiler;
 use CattoLearning\Commerce\Document\FinancialDocumentDesign;
 use CattoLearning\Commerce\Document\FinancialDocumentDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateLooks;
+use CattoLearning\Course\Certificate\TranscriptTemplate;
 use CattoLearning\Document\DocumentType;
-use CattoLearning\View\Artwork\ArtworkGenerator;
 use Phinx\Migration\AbstractMigration;
 
 final class CreateV088Baseline extends AbstractMigration
@@ -188,6 +202,9 @@ private const FOREIGN_KEY_INDEXES = [
         'assessment_sessions_structure_node_fk_idx' => 'assessment_sessions (structure_node_id)',
         'assessment_sessions_legacy_attempt_fk_idx' => 'assessment_sessions (legacy_attempt_id)',
         'auth_login_tokens_user_fk_idx' => 'auth_login_tokens (user_id)',
+        'certificates_identity_verification_fk_idx' => 'certificates (identity_verification_id)',
+        'certificates_revoked_by_user_fk_idx' => 'certificates (revoked_by_user_id)',
+        'identity_verifications_revoked_by_user_fk_idx' => 'identity_verifications (revoked_by_user_id)',
         'companies_created_by_user_fk_idx' => 'companies (created_by_user_id)',
         'course_credit_allocations_assigned_by_user_fk_idx' => 'course_credit_allocations (assigned_by_user_id)',
         'course_credit_allocations_enrolment_fk_idx' => 'course_credit_allocations (enrolment_id)',
@@ -289,10 +306,14 @@ CREATE TABLE users (
         )
     ) STORED,
     identification_number VARCHAR(120) NULL,
+    -- The date of birth (owner, 2026-10-20: adults only): given at registration, or at the first
+    -- sign-in of an account someone else made, and 18 or older then (AdultAge). NULL until given.
     birthdate DATE NULL,
     gender VARCHAR(40) NULL,
     mobile_number VARCHAR(60) NULL,
-    certificate_name VARCHAR(160) NULL,
+    -- Declined identity checks before this moment no longer count towards the three tries: set when
+    -- ADMIN allows another try.
+    identity_attempts_reset_at TIMESTAMPTZ NULL,
     status VARCHAR(24) NOT NULL DEFAULT 'active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -430,6 +451,10 @@ INSERT INTO permissions (permission_key,permission_name,permission_group,permiss
     ('BUNDLE.MANAGE','ManageBundles','Bundles','Create, compose, price, publish and retire course bundles, and delete unused drafts.'),
     ('CERTIFICATE.DESIGN.VIEW','ViewCertificateDesigns','Courses','See the certificate designs and preview them.'),
     ('CERTIFICATE.DESIGN.MANAGE','ManageCertificateDesigns','Courses','Create, edit, duplicate and delete certificate designs and choose the default for new courses.'),
+    ('CERTIFICATE.ISSUED.VIEW','ViewIssuedCertificates','Courses','See the issued certificates and their transcripts, and search them.'),
+    ('CERTIFICATE.ISSUED.MANAGE','ManageIssuedCertificates','Courses','Revoke an issued certificate and its transcript, with a written reason.'),
+    ('PLATFORM.IDENTITY.VIEW','ViewIdentityVerification','Platform','See each person''s identity verification status and history.'),
+    ('PLATFORM.IDENTITY.MANAGE','ManageIdentityVerification','Platform','Revoke an identity verification with a reason, and allow another try after three declined checks.'),
     ('PLATFORM.DOCUMENT.VIEW','ViewFinancialDocumentDesign','Commerce · Platform','See the design of invoices, receipts and credit notes and preview it when Commerce is installed.'),
     ('PLATFORM.DOCUMENT.MANAGE','ManageFinancialDocumentDesign','Commerce · Platform','Change the design of invoices, receipts and credit notes when Commerce is installed.');
 
@@ -769,7 +794,7 @@ CREATE TABLE course_categories (
     CONSTRAINT course_categories_sibling_position
         UNIQUE NULLS NOT DISTINCT (parent_id, position) DEFERRABLE INITIALLY IMMEDIATE
 );
-COMMENT ON COLUMN course_categories.icon_svg IS 'Generated title-bar icon.';
+COMMENT ON COLUMN course_categories.icon_svg IS 'The category''s icon: uploaded by ADMIN, or generated until one is.';
 CREATE INDEX course_categories_position_idx ON course_categories(position, name);
 
 -- A child sits exactly one level below its parent. This cannot be a CHECK constraint because it
@@ -805,751 +830,9 @@ CREATE TRIGGER course_categories_depth
     BEFORE INSERT OR UPDATE ON course_categories
     FOR EACH ROW EXECUTE FUNCTION enforce_category_depth();
 
--- The built-in taxonomy: 16 top-level categories, 77 sub-categories and 276
--- sub-sub-categories. Shipped rather than left to the operator because an empty taxonomy is
--- the thing that stops a catalogue being usable on day one, and because the three-level rule
--- is far easier to follow from a worked example than from a description of it.
---
--- Every name is distinct across the whole tree, which the unique constraint on `name`
--- requires. That is why branches are named for what they are - "Mining Safety" and
--- "Construction Safety" rather than "Safety" under each parent - and why the deepest level
--- carries qualifiers like "Practice". Rename freely; the constraint is the only rule.
---
--- Inserted level by level so each row's parent already exists when the depth trigger checks
--- it, and by slug lookup rather than by id so nothing depends on sequence values.
-
-INSERT INTO course_categories (name, slug, position, level, parent_id) VALUES
-    ('Health and Safety', 'health-and-safety', 10, 1, NULL),
-    ('Mining and Resources', 'mining-and-resources', 20, 1, NULL),
-    ('Construction and Built Environment', 'construction-and-built-environment', 30, 1, NULL),
-    ('Engineering and Technical', 'engineering-and-technical', 40, 1, NULL),
-    ('Information Technology', 'information-technology', 50, 1, NULL),
-    ('Business and Management', 'business-and-management', 60, 1, NULL),
-    ('Finance and Accounting', 'finance-and-accounting', 70, 1, NULL),
-    ('Human Resources', 'human-resources', 80, 1, NULL),
-    ('Transport and Logistics', 'transport-and-logistics', 90, 1, NULL),
-    ('Healthcare and Clinical', 'healthcare-and-clinical', 100, 1, NULL),
-    ('Agriculture and Environment', 'agriculture-and-environment', 110, 1, NULL),
-    ('Hospitality and Food Services', 'hospitality-and-food-services', 120, 1, NULL),
-    ('Retail and Customer Service', 'retail-and-customer-service', 130, 1, NULL),
-    ('Legal and Compliance', 'legal-and-compliance', 140, 1, NULL),
-    ('Education and Training', 'education-and-training', 150, 1, NULL),
-    ('Personal and Professional Development', 'personal-and-professional-development', 160, 1, NULL);
-
-INSERT INTO course_categories (name, slug, position, level, parent_id)
-SELECT 'Occupational Health', 'occupational-health', 10, 2, id FROM course_categories WHERE slug = 'health-and-safety'
-UNION ALL
-SELECT 'Workplace Safety', 'workplace-safety', 20, 2, id FROM course_categories WHERE slug = 'health-and-safety'
-UNION ALL
-SELECT 'Hazardous Substances', 'hazardous-substances', 30, 2, id FROM course_categories WHERE slug = 'health-and-safety'
-UNION ALL
-SELECT 'Fire and Emergency', 'fire-and-emergency', 40, 2, id FROM course_categories WHERE slug = 'health-and-safety'
-UNION ALL
-SELECT 'First Aid and Medical Response', 'first-aid-and-medical-response', 50, 2, id FROM course_categories WHERE slug = 'health-and-safety'
-UNION ALL
-SELECT 'Safety Leadership', 'safety-leadership', 60, 2, id FROM course_categories WHERE slug = 'health-and-safety'
-UNION ALL
-SELECT 'Underground Mining', 'underground-mining', 10, 2, id FROM course_categories WHERE slug = 'mining-and-resources'
-UNION ALL
-SELECT 'Surface Mining', 'surface-mining', 20, 2, id FROM course_categories WHERE slug = 'mining-and-resources'
-UNION ALL
-SELECT 'Explosives and Blasting', 'explosives-and-blasting', 30, 2, id FROM course_categories WHERE slug = 'mining-and-resources'
-UNION ALL
-SELECT 'Mineral Processing', 'mineral-processing', 40, 2, id FROM course_categories WHERE slug = 'mining-and-resources'
-UNION ALL
-SELECT 'Mine Environment', 'mine-environment', 50, 2, id FROM course_categories WHERE slug = 'mining-and-resources'
-UNION ALL
-SELECT 'Site Management', 'site-management', 10, 2, id FROM course_categories WHERE slug = 'construction-and-built-environment'
-UNION ALL
-SELECT 'Civil Works', 'civil-works', 20, 2, id FROM course_categories WHERE slug = 'construction-and-built-environment'
-UNION ALL
-SELECT 'Building Trades', 'building-trades', 30, 2, id FROM course_categories WHERE slug = 'construction-and-built-environment'
-UNION ALL
-SELECT 'Access and Lifting', 'access-and-lifting', 40, 2, id FROM course_categories WHERE slug = 'construction-and-built-environment'
-UNION ALL
-SELECT 'Building Compliance', 'building-compliance', 50, 2, id FROM course_categories WHERE slug = 'construction-and-built-environment'
-UNION ALL
-SELECT 'Mechanical Engineering', 'mechanical-engineering', 10, 2, id FROM course_categories WHERE slug = 'engineering-and-technical'
-UNION ALL
-SELECT 'Electrical Engineering', 'electrical-engineering', 20, 2, id FROM course_categories WHERE slug = 'engineering-and-technical'
-UNION ALL
-SELECT 'Instrumentation and Control', 'instrumentation-and-control', 30, 2, id FROM course_categories WHERE slug = 'engineering-and-technical'
-UNION ALL
-SELECT 'Welding and Fabrication', 'welding-and-fabrication', 40, 2, id FROM course_categories WHERE slug = 'engineering-and-technical'
-UNION ALL
-SELECT 'Maintenance and Reliability', 'maintenance-and-reliability', 50, 2, id FROM course_categories WHERE slug = 'engineering-and-technical'
-UNION ALL
-SELECT 'Non Destructive Testing', 'non-destructive-testing', 60, 2, id FROM course_categories WHERE slug = 'engineering-and-technical'
-UNION ALL
-SELECT 'Cyber Security', 'cyber-security', 10, 2, id FROM course_categories WHERE slug = 'information-technology'
-UNION ALL
-SELECT 'Infrastructure and Networks', 'infrastructure-and-networks', 20, 2, id FROM course_categories WHERE slug = 'information-technology'
-UNION ALL
-SELECT 'Software and Development', 'software-and-development', 30, 2, id FROM course_categories WHERE slug = 'information-technology'
-UNION ALL
-SELECT 'Data and Analytics', 'data-and-analytics', 40, 2, id FROM course_categories WHERE slug = 'information-technology'
-UNION ALL
-SELECT 'End User Computing', 'end-user-computing', 50, 2, id FROM course_categories WHERE slug = 'information-technology'
-UNION ALL
-SELECT 'Leadership and Supervision', 'leadership-and-supervision', 10, 2, id FROM course_categories WHERE slug = 'business-and-management'
-UNION ALL
-SELECT 'Project Management', 'project-management', 20, 2, id FROM course_categories WHERE slug = 'business-and-management'
-UNION ALL
-SELECT 'Operations Management', 'operations-management', 30, 2, id FROM course_categories WHERE slug = 'business-and-management'
-UNION ALL
-SELECT 'Quality Management', 'quality-management', 40, 2, id FROM course_categories WHERE slug = 'business-and-management'
-UNION ALL
-SELECT 'Strategy and Governance', 'strategy-and-governance', 50, 2, id FROM course_categories WHERE slug = 'business-and-management'
-UNION ALL
-SELECT 'Financial Accounting', 'financial-accounting', 10, 2, id FROM course_categories WHERE slug = 'finance-and-accounting'
-UNION ALL
-SELECT 'Management Accounting', 'management-accounting', 20, 2, id FROM course_categories WHERE slug = 'finance-and-accounting'
-UNION ALL
-SELECT 'Taxation', 'taxation', 30, 2, id FROM course_categories WHERE slug = 'finance-and-accounting'
-UNION ALL
-SELECT 'Treasury and Credit', 'treasury-and-credit', 40, 2, id FROM course_categories WHERE slug = 'finance-and-accounting'
-UNION ALL
-SELECT 'Financial Crime', 'financial-crime', 50, 2, id FROM course_categories WHERE slug = 'finance-and-accounting'
-UNION ALL
-SELECT 'Recruitment and Onboarding', 'recruitment-and-onboarding', 10, 2, id FROM course_categories WHERE slug = 'human-resources'
-UNION ALL
-SELECT 'Employee Relations', 'employee-relations', 20, 2, id FROM course_categories WHERE slug = 'human-resources'
-UNION ALL
-SELECT 'Learning and Development', 'learning-and-development', 30, 2, id FROM course_categories WHERE slug = 'human-resources'
-UNION ALL
-SELECT 'Reward and Wellbeing', 'reward-and-wellbeing', 40, 2, id FROM course_categories WHERE slug = 'human-resources'
-UNION ALL
-SELECT 'Employment Equity and Transformation', 'employment-equity-and-transformation', 50, 2, id FROM course_categories WHERE slug = 'human-resources'
-UNION ALL
-SELECT 'Road Transport', 'road-transport', 10, 2, id FROM course_categories WHERE slug = 'transport-and-logistics'
-UNION ALL
-SELECT 'Dangerous Goods', 'dangerous-goods', 20, 2, id FROM course_categories WHERE slug = 'transport-and-logistics'
-UNION ALL
-SELECT 'Warehousing', 'warehousing', 30, 2, id FROM course_categories WHERE slug = 'transport-and-logistics'
-UNION ALL
-SELECT 'Supply Chain', 'supply-chain', 40, 2, id FROM course_categories WHERE slug = 'transport-and-logistics'
-UNION ALL
-SELECT 'Maritime and Aviation', 'maritime-and-aviation', 50, 2, id FROM course_categories WHERE slug = 'transport-and-logistics'
-UNION ALL
-SELECT 'Clinical Practice', 'clinical-practice', 10, 2, id FROM course_categories WHERE slug = 'healthcare-and-clinical'
-UNION ALL
-SELECT 'Infection Prevention', 'infection-prevention', 20, 2, id FROM course_categories WHERE slug = 'healthcare-and-clinical'
-UNION ALL
-SELECT 'Emergency and Critical Care', 'emergency-and-critical-care', 30, 2, id FROM course_categories WHERE slug = 'healthcare-and-clinical'
-UNION ALL
-SELECT 'Care Support', 'care-support', 40, 2, id FROM course_categories WHERE slug = 'healthcare-and-clinical'
-UNION ALL
-SELECT 'Health Administration', 'health-administration', 50, 2, id FROM course_categories WHERE slug = 'healthcare-and-clinical'
-UNION ALL
-SELECT 'Crop Production', 'crop-production', 10, 2, id FROM course_categories WHERE slug = 'agriculture-and-environment'
-UNION ALL
-SELECT 'Livestock Production', 'livestock-production', 20, 2, id FROM course_categories WHERE slug = 'agriculture-and-environment'
-UNION ALL
-SELECT 'Agrochemicals', 'agrochemicals', 30, 2, id FROM course_categories WHERE slug = 'agriculture-and-environment'
-UNION ALL
-SELECT 'Environmental Management', 'environmental-management', 40, 2, id FROM course_categories WHERE slug = 'agriculture-and-environment'
-UNION ALL
-SELECT 'Sustainability', 'sustainability', 50, 2, id FROM course_categories WHERE slug = 'agriculture-and-environment'
-UNION ALL
-SELECT 'Food Safety', 'food-safety', 10, 2, id FROM course_categories WHERE slug = 'hospitality-and-food-services'
-UNION ALL
-SELECT 'Kitchen Operations', 'kitchen-operations', 20, 2, id FROM course_categories WHERE slug = 'hospitality-and-food-services'
-UNION ALL
-SELECT 'Front of House', 'front-of-house', 30, 2, id FROM course_categories WHERE slug = 'hospitality-and-food-services'
-UNION ALL
-SELECT 'Accommodation', 'accommodation', 40, 2, id FROM course_categories WHERE slug = 'hospitality-and-food-services'
-UNION ALL
-SELECT 'Events and Tourism', 'events-and-tourism', 50, 2, id FROM course_categories WHERE slug = 'hospitality-and-food-services'
-UNION ALL
-SELECT 'Store Operations', 'store-operations', 10, 2, id FROM course_categories WHERE slug = 'retail-and-customer-service'
-UNION ALL
-SELECT 'Customer Experience', 'customer-experience', 20, 2, id FROM course_categories WHERE slug = 'retail-and-customer-service'
-UNION ALL
-SELECT 'Sales', 'sales', 30, 2, id FROM course_categories WHERE slug = 'retail-and-customer-service'
-UNION ALL
-SELECT 'Marketing', 'marketing', 40, 2, id FROM course_categories WHERE slug = 'retail-and-customer-service'
-UNION ALL
-SELECT 'Commercial Law', 'commercial-law', 10, 2, id FROM course_categories WHERE slug = 'legal-and-compliance'
-UNION ALL
-SELECT 'Labour Law', 'labour-law', 20, 2, id FROM course_categories WHERE slug = 'legal-and-compliance'
-UNION ALL
-SELECT 'Data and Privacy', 'data-and-privacy', 30, 2, id FROM course_categories WHERE slug = 'legal-and-compliance'
-UNION ALL
-SELECT 'Regulatory Compliance', 'regulatory-compliance', 40, 2, id FROM course_categories WHERE slug = 'legal-and-compliance'
-UNION ALL
-SELECT 'Teaching Practice', 'teaching-practice', 10, 2, id FROM course_categories WHERE slug = 'education-and-training'
-UNION ALL
-SELECT 'Assessment Practice', 'assessment-practice', 20, 2, id FROM course_categories WHERE slug = 'education-and-training'
-UNION ALL
-SELECT 'Digital Learning', 'digital-learning', 30, 2, id FROM course_categories WHERE slug = 'education-and-training'
-UNION ALL
-SELECT 'Communication', 'communication', 10, 2, id FROM course_categories WHERE slug = 'personal-and-professional-development'
-UNION ALL
-SELECT 'Personal Effectiveness', 'personal-effectiveness', 20, 2, id FROM course_categories WHERE slug = 'personal-and-professional-development'
-UNION ALL
-SELECT 'Working with Others', 'working-with-others', 30, 2, id FROM course_categories WHERE slug = 'personal-and-professional-development'
-UNION ALL
-SELECT 'Wellbeing', 'wellbeing', 40, 2, id FROM course_categories WHERE slug = 'personal-and-professional-development';
-
-INSERT INTO course_categories (name, slug, position, level, parent_id)
-SELECT 'Hearing Conservation', 'hearing-conservation', 10, 3, id FROM course_categories WHERE slug = 'occupational-health'
-UNION ALL
-SELECT 'Respiratory Health', 'respiratory-health', 20, 3, id FROM course_categories WHERE slug = 'occupational-health'
-UNION ALL
-SELECT 'Ergonomics and Manual Handling', 'ergonomics-and-manual-handling', 30, 3, id FROM course_categories WHERE slug = 'occupational-health'
-UNION ALL
-SELECT 'Occupational Hygiene Monitoring', 'occupational-hygiene-monitoring', 40, 3, id FROM course_categories WHERE slug = 'occupational-health'
-UNION ALL
-SELECT 'Working at Heights', 'working-at-heights', 10, 3, id FROM course_categories WHERE slug = 'workplace-safety'
-UNION ALL
-SELECT 'Confined Space Entry', 'confined-space-entry', 20, 3, id FROM course_categories WHERE slug = 'workplace-safety'
-UNION ALL
-SELECT 'Lockout and Isolation', 'lockout-and-isolation', 30, 3, id FROM course_categories WHERE slug = 'workplace-safety'
-UNION ALL
-SELECT 'Machine Guarding', 'machine-guarding', 40, 3, id FROM course_categories WHERE slug = 'workplace-safety'
-UNION ALL
-SELECT 'Slips Trips and Falls', 'slips-trips-and-falls', 50, 3, id FROM course_categories WHERE slug = 'workplace-safety'
-UNION ALL
-SELECT 'Chemical Handling and Storage', 'chemical-handling-and-storage', 10, 3, id FROM course_categories WHERE slug = 'hazardous-substances'
-UNION ALL
-SELECT 'Asbestos Awareness', 'asbestos-awareness', 20, 3, id FROM course_categories WHERE slug = 'hazardous-substances'
-UNION ALL
-SELECT 'Silica and Dust Control', 'silica-and-dust-control', 30, 3, id FROM course_categories WHERE slug = 'hazardous-substances'
-UNION ALL
-SELECT 'Spill Response', 'spill-response', 40, 3, id FROM course_categories WHERE slug = 'hazardous-substances'
-UNION ALL
-SELECT 'Fire Warden Duties', 'fire-warden-duties', 10, 3, id FROM course_categories WHERE slug = 'fire-and-emergency'
-UNION ALL
-SELECT 'Fire Extinguisher Use', 'fire-extinguisher-use', 20, 3, id FROM course_categories WHERE slug = 'fire-and-emergency'
-UNION ALL
-SELECT 'Evacuation Planning', 'evacuation-planning', 30, 3, id FROM course_categories WHERE slug = 'fire-and-emergency'
-UNION ALL
-SELECT 'Emergency Response Teams', 'emergency-response-teams', 40, 3, id FROM course_categories WHERE slug = 'fire-and-emergency'
-UNION ALL
-SELECT 'Basic First Aid', 'basic-first-aid', 10, 3, id FROM course_categories WHERE slug = 'first-aid-and-medical-response'
-UNION ALL
-SELECT 'Advanced First Aid', 'advanced-first-aid', 20, 3, id FROM course_categories WHERE slug = 'first-aid-and-medical-response'
-UNION ALL
-SELECT 'Resuscitation and Defibrillation', 'resuscitation-and-defibrillation', 30, 3, id FROM course_categories WHERE slug = 'first-aid-and-medical-response'
-UNION ALL
-SELECT 'Trauma Response', 'trauma-response', 40, 3, id FROM course_categories WHERE slug = 'first-aid-and-medical-response'
-UNION ALL
-SELECT 'Incident Investigation', 'incident-investigation', 10, 3, id FROM course_categories WHERE slug = 'safety-leadership'
-UNION ALL
-SELECT 'Hazard Identification and Risk Assessment', 'hazard-identification-and-risk-assessment', 20, 3, id FROM course_categories WHERE slug = 'safety-leadership'
-UNION ALL
-SELECT 'Safety Culture and Behaviour', 'safety-culture-and-behaviour', 30, 3, id FROM course_categories WHERE slug = 'safety-leadership'
-UNION ALL
-SELECT 'Legal Appointments', 'legal-appointments', 40, 3, id FROM course_categories WHERE slug = 'safety-leadership'
-UNION ALL
-SELECT 'Underground Ventilation', 'underground-ventilation', 10, 3, id FROM course_categories WHERE slug = 'underground-mining'
-UNION ALL
-SELECT 'Ground Support and Strata Control', 'ground-support-and-strata-control', 20, 3, id FROM course_categories WHERE slug = 'underground-mining'
-UNION ALL
-SELECT 'Mine Rescue', 'mine-rescue', 30, 3, id FROM course_categories WHERE slug = 'underground-mining'
-UNION ALL
-SELECT 'Underground Gas Monitoring', 'underground-gas-monitoring', 40, 3, id FROM course_categories WHERE slug = 'underground-mining'
-UNION ALL
-SELECT 'Opencast Operations', 'opencast-operations', 10, 3, id FROM course_categories WHERE slug = 'surface-mining'
-UNION ALL
-SELECT 'Slope Stability', 'slope-stability', 20, 3, id FROM course_categories WHERE slug = 'surface-mining'
-UNION ALL
-SELECT 'Haul Road Management', 'haul-road-management', 30, 3, id FROM course_categories WHERE slug = 'surface-mining'
-UNION ALL
-SELECT 'Blast Design', 'blast-design', 10, 3, id FROM course_categories WHERE slug = 'explosives-and-blasting'
-UNION ALL
-SELECT 'Shotfiring', 'shotfiring', 20, 3, id FROM course_categories WHERE slug = 'explosives-and-blasting'
-UNION ALL
-SELECT 'Misfire Procedures', 'misfire-procedures', 30, 3, id FROM course_categories WHERE slug = 'explosives-and-blasting'
-UNION ALL
-SELECT 'Crushing and Screening', 'crushing-and-screening', 10, 3, id FROM course_categories WHERE slug = 'mineral-processing'
-UNION ALL
-SELECT 'Flotation Circuits', 'flotation-circuits', 20, 3, id FROM course_categories WHERE slug = 'mineral-processing'
-UNION ALL
-SELECT 'Leaching and Refining', 'leaching-and-refining', 30, 3, id FROM course_categories WHERE slug = 'mineral-processing'
-UNION ALL
-SELECT 'Metallurgical Accounting', 'metallurgical-accounting', 40, 3, id FROM course_categories WHERE slug = 'mineral-processing'
-UNION ALL
-SELECT 'Tailings Management', 'tailings-management', 10, 3, id FROM course_categories WHERE slug = 'mine-environment'
-UNION ALL
-SELECT 'Mine Closure and Rehabilitation', 'mine-closure-and-rehabilitation', 20, 3, id FROM course_categories WHERE slug = 'mine-environment'
-UNION ALL
-SELECT 'Water Management in Mining', 'water-management-in-mining', 30, 3, id FROM course_categories WHERE slug = 'mine-environment'
-UNION ALL
-SELECT 'Site Establishment', 'site-establishment', 10, 3, id FROM course_categories WHERE slug = 'site-management'
-UNION ALL
-SELECT 'Construction Programme Control', 'construction-programme-control', 20, 3, id FROM course_categories WHERE slug = 'site-management'
-UNION ALL
-SELECT 'Site Safety Files', 'site-safety-files', 30, 3, id FROM course_categories WHERE slug = 'site-management'
-UNION ALL
-SELECT 'Excavation and Trenching', 'excavation-and-trenching', 10, 3, id FROM course_categories WHERE slug = 'civil-works'
-UNION ALL
-SELECT 'Concrete Practice', 'concrete-practice', 20, 3, id FROM course_categories WHERE slug = 'civil-works'
-UNION ALL
-SELECT 'Reinforcement and Formwork', 'reinforcement-and-formwork', 30, 3, id FROM course_categories WHERE slug = 'civil-works'
-UNION ALL
-SELECT 'Road Construction', 'road-construction', 40, 3, id FROM course_categories WHERE slug = 'civil-works'
-UNION ALL
-SELECT 'Bricklaying and Masonry', 'bricklaying-and-masonry', 10, 3, id FROM course_categories WHERE slug = 'building-trades'
-UNION ALL
-SELECT 'Carpentry and Joinery', 'carpentry-and-joinery', 20, 3, id FROM course_categories WHERE slug = 'building-trades'
-UNION ALL
-SELECT 'Plumbing Practice', 'plumbing-practice', 30, 3, id FROM course_categories WHERE slug = 'building-trades'
-UNION ALL
-SELECT 'Roofing and Waterproofing', 'roofing-and-waterproofing', 40, 3, id FROM course_categories WHERE slug = 'building-trades'
-UNION ALL
-SELECT 'Scaffold Erection and Inspection', 'scaffold-erection-and-inspection', 10, 3, id FROM course_categories WHERE slug = 'access-and-lifting'
-UNION ALL
-SELECT 'Crane Operations', 'crane-operations', 20, 3, id FROM course_categories WHERE slug = 'access-and-lifting'
-UNION ALL
-SELECT 'Rigging and Slinging', 'rigging-and-slinging', 30, 3, id FROM course_categories WHERE slug = 'access-and-lifting'
-UNION ALL
-SELECT 'Mobile Elevating Platforms', 'mobile-elevating-platforms', 40, 3, id FROM course_categories WHERE slug = 'access-and-lifting'
-UNION ALL
-SELECT 'Building Regulations', 'building-regulations', 10, 3, id FROM course_categories WHERE slug = 'building-compliance'
-UNION ALL
-SELECT 'Occupational Health and Safety Construction Regulations', 'occupational-health-and-safety-construction-regulations', 20, 3, id FROM course_categories WHERE slug = 'building-compliance'
-UNION ALL
-SELECT 'Rotating Equipment', 'rotating-equipment', 10, 3, id FROM course_categories WHERE slug = 'mechanical-engineering'
-UNION ALL
-SELECT 'Hydraulics and Pneumatics', 'hydraulics-and-pneumatics', 20, 3, id FROM course_categories WHERE slug = 'mechanical-engineering'
-UNION ALL
-SELECT 'Pumps and Valves', 'pumps-and-valves', 30, 3, id FROM course_categories WHERE slug = 'mechanical-engineering'
-UNION ALL
-SELECT 'Bearings and Lubrication', 'bearings-and-lubrication', 40, 3, id FROM course_categories WHERE slug = 'mechanical-engineering'
-UNION ALL
-SELECT 'Low Voltage Practice', 'low-voltage-practice', 10, 3, id FROM course_categories WHERE slug = 'electrical-engineering'
-UNION ALL
-SELECT 'High Voltage Switching', 'high-voltage-switching', 20, 3, id FROM course_categories WHERE slug = 'electrical-engineering'
-UNION ALL
-SELECT 'Motors and Drives', 'motors-and-drives', 30, 3, id FROM course_categories WHERE slug = 'electrical-engineering'
-UNION ALL
-SELECT 'Electrical Protection', 'electrical-protection', 40, 3, id FROM course_categories WHERE slug = 'electrical-engineering'
-UNION ALL
-SELECT 'Process Instrumentation', 'process-instrumentation', 10, 3, id FROM course_categories WHERE slug = 'instrumentation-and-control'
-UNION ALL
-SELECT 'Programmable Logic Controllers', 'programmable-logic-controllers', 20, 3, id FROM course_categories WHERE slug = 'instrumentation-and-control'
-UNION ALL
-SELECT 'Control Loop Tuning', 'control-loop-tuning', 30, 3, id FROM course_categories WHERE slug = 'instrumentation-and-control'
-UNION ALL
-SELECT 'Functional Safety Systems', 'functional-safety-systems', 40, 3, id FROM course_categories WHERE slug = 'instrumentation-and-control'
-UNION ALL
-SELECT 'Arc Welding Practice', 'arc-welding-practice', 10, 3, id FROM course_categories WHERE slug = 'welding-and-fabrication'
-UNION ALL
-SELECT 'Welding Inspection', 'welding-inspection', 20, 3, id FROM course_categories WHERE slug = 'welding-and-fabrication'
-UNION ALL
-SELECT 'Plate and Pipe Fabrication', 'plate-and-pipe-fabrication', 30, 3, id FROM course_categories WHERE slug = 'welding-and-fabrication'
-UNION ALL
-SELECT 'Preventive Maintenance', 'preventive-maintenance', 10, 3, id FROM course_categories WHERE slug = 'maintenance-and-reliability'
-UNION ALL
-SELECT 'Condition Monitoring', 'condition-monitoring', 20, 3, id FROM course_categories WHERE slug = 'maintenance-and-reliability'
-UNION ALL
-SELECT 'Root Cause Failure Analysis', 'root-cause-failure-analysis', 30, 3, id FROM course_categories WHERE slug = 'maintenance-and-reliability'
-UNION ALL
-SELECT 'Total Productive Maintenance', 'total-productive-maintenance', 40, 3, id FROM course_categories WHERE slug = 'maintenance-and-reliability'
-UNION ALL
-SELECT 'Ultrasonic Testing Practice', 'ultrasonic-testing-practice', 10, 3, id FROM course_categories WHERE slug = 'non-destructive-testing'
-UNION ALL
-SELECT 'Radiographic Testing Practice', 'radiographic-testing-practice', 20, 3, id FROM course_categories WHERE slug = 'non-destructive-testing'
-UNION ALL
-SELECT 'Magnetic Particle and Dye Penetrant', 'magnetic-particle-and-dye-penetrant', 30, 3, id FROM course_categories WHERE slug = 'non-destructive-testing'
-UNION ALL
-SELECT 'Security Awareness', 'security-awareness', 10, 3, id FROM course_categories WHERE slug = 'cyber-security'
-UNION ALL
-SELECT 'Identity and Access Management', 'identity-and-access-management', 20, 3, id FROM course_categories WHERE slug = 'cyber-security'
-UNION ALL
-SELECT 'Incident Response and Forensics', 'incident-response-and-forensics', 30, 3, id FROM course_categories WHERE slug = 'cyber-security'
-UNION ALL
-SELECT 'Secure Development', 'secure-development', 40, 3, id FROM course_categories WHERE slug = 'cyber-security'
-UNION ALL
-SELECT 'Network Fundamentals', 'network-fundamentals', 10, 3, id FROM course_categories WHERE slug = 'infrastructure-and-networks'
-UNION ALL
-SELECT 'Server Administration', 'server-administration', 20, 3, id FROM course_categories WHERE slug = 'infrastructure-and-networks'
-UNION ALL
-SELECT 'Virtualisation and Containers', 'virtualisation-and-containers', 30, 3, id FROM course_categories WHERE slug = 'infrastructure-and-networks'
-UNION ALL
-SELECT 'Cloud Platforms', 'cloud-platforms', 40, 3, id FROM course_categories WHERE slug = 'infrastructure-and-networks'
-UNION ALL
-SELECT 'Programming Foundations', 'programming-foundations', 10, 3, id FROM course_categories WHERE slug = 'software-and-development'
-UNION ALL
-SELECT 'Web Development', 'web-development', 20, 3, id FROM course_categories WHERE slug = 'software-and-development'
-UNION ALL
-SELECT 'Version Control and Delivery', 'version-control-and-delivery', 30, 3, id FROM course_categories WHERE slug = 'software-and-development'
-UNION ALL
-SELECT 'Software Testing', 'software-testing', 40, 3, id FROM course_categories WHERE slug = 'software-and-development'
-UNION ALL
-SELECT 'Database Fundamentals', 'database-fundamentals', 10, 3, id FROM course_categories WHERE slug = 'data-and-analytics'
-UNION ALL
-SELECT 'Data Analysis and Reporting', 'data-analysis-and-reporting', 20, 3, id FROM course_categories WHERE slug = 'data-and-analytics'
-UNION ALL
-SELECT 'Business Intelligence', 'business-intelligence', 30, 3, id FROM course_categories WHERE slug = 'data-and-analytics'
-UNION ALL
-SELECT 'Data Governance', 'data-governance', 40, 3, id FROM course_categories WHERE slug = 'data-and-analytics'
-UNION ALL
-SELECT 'Spreadsheets', 'spreadsheets', 10, 3, id FROM course_categories WHERE slug = 'end-user-computing'
-UNION ALL
-SELECT 'Word Processing and Documents', 'word-processing-and-documents', 20, 3, id FROM course_categories WHERE slug = 'end-user-computing'
-UNION ALL
-SELECT 'Collaboration Tools', 'collaboration-tools', 30, 3, id FROM course_categories WHERE slug = 'end-user-computing'
-UNION ALL
-SELECT 'Digital Literacy', 'digital-literacy', 40, 3, id FROM course_categories WHERE slug = 'end-user-computing'
-UNION ALL
-SELECT 'First Line Supervision', 'first-line-supervision', 10, 3, id FROM course_categories WHERE slug = 'leadership-and-supervision'
-UNION ALL
-SELECT 'Middle Management Practice', 'middle-management-practice', 20, 3, id FROM course_categories WHERE slug = 'leadership-and-supervision'
-UNION ALL
-SELECT 'Strategic Leadership', 'strategic-leadership', 30, 3, id FROM course_categories WHERE slug = 'leadership-and-supervision'
-UNION ALL
-SELECT 'Delegation and Accountability', 'delegation-and-accountability', 40, 3, id FROM course_categories WHERE slug = 'leadership-and-supervision'
-UNION ALL
-SELECT 'Project Planning and Scheduling', 'project-planning-and-scheduling', 10, 3, id FROM course_categories WHERE slug = 'project-management'
-UNION ALL
-SELECT 'Project Cost Control', 'project-cost-control', 20, 3, id FROM course_categories WHERE slug = 'project-management'
-UNION ALL
-SELECT 'Agile Delivery', 'agile-delivery', 30, 3, id FROM course_categories WHERE slug = 'project-management'
-UNION ALL
-SELECT 'Programme and Portfolio Management', 'programme-and-portfolio-management', 40, 3, id FROM course_categories WHERE slug = 'project-management'
-UNION ALL
-SELECT 'Lean Practice', 'lean-practice', 10, 3, id FROM course_categories WHERE slug = 'operations-management'
-UNION ALL
-SELECT 'Six Sigma Practice', 'six-sigma-practice', 20, 3, id FROM course_categories WHERE slug = 'operations-management'
-UNION ALL
-SELECT 'Capacity and Demand Planning', 'capacity-and-demand-planning', 30, 3, id FROM course_categories WHERE slug = 'operations-management'
-UNION ALL
-SELECT 'Continuous Improvement', 'continuous-improvement', 40, 3, id FROM course_categories WHERE slug = 'operations-management'
-UNION ALL
-SELECT 'Quality Management Systems', 'quality-management-systems', 10, 3, id FROM course_categories WHERE slug = 'quality-management'
-UNION ALL
-SELECT 'Internal Quality Auditing', 'internal-quality-auditing', 20, 3, id FROM course_categories WHERE slug = 'quality-management'
-UNION ALL
-SELECT 'Statistical Process Control', 'statistical-process-control', 30, 3, id FROM course_categories WHERE slug = 'quality-management'
-UNION ALL
-SELECT 'Supplier Quality', 'supplier-quality', 40, 3, id FROM course_categories WHERE slug = 'quality-management'
-UNION ALL
-SELECT 'Corporate Governance', 'corporate-governance', 10, 3, id FROM course_categories WHERE slug = 'strategy-and-governance'
-UNION ALL
-SELECT 'Risk Management Practice', 'risk-management-practice', 20, 3, id FROM course_categories WHERE slug = 'strategy-and-governance'
-UNION ALL
-SELECT 'Business Continuity', 'business-continuity', 30, 3, id FROM course_categories WHERE slug = 'strategy-and-governance'
-UNION ALL
-SELECT 'Ethics and Anti Corruption', 'ethics-and-anti-corruption', 40, 3, id FROM course_categories WHERE slug = 'strategy-and-governance'
-UNION ALL
-SELECT 'Bookkeeping Practice', 'bookkeeping-practice', 10, 3, id FROM course_categories WHERE slug = 'financial-accounting'
-UNION ALL
-SELECT 'Financial Statements', 'financial-statements', 20, 3, id FROM course_categories WHERE slug = 'financial-accounting'
-UNION ALL
-SELECT 'Consolidation and Group Reporting', 'consolidation-and-group-reporting', 30, 3, id FROM course_categories WHERE slug = 'financial-accounting'
-UNION ALL
-SELECT 'Budgeting and Forecasting', 'budgeting-and-forecasting', 10, 3, id FROM course_categories WHERE slug = 'management-accounting'
-UNION ALL
-SELECT 'Cost Accounting Practice', 'cost-accounting-practice', 20, 3, id FROM course_categories WHERE slug = 'management-accounting'
-UNION ALL
-SELECT 'Investment Appraisal', 'investment-appraisal', 30, 3, id FROM course_categories WHERE slug = 'management-accounting'
-UNION ALL
-SELECT 'Value Added Tax Practice', 'value-added-tax-practice', 10, 3, id FROM course_categories WHERE slug = 'taxation'
-UNION ALL
-SELECT 'Payroll Taxes', 'payroll-taxes', 20, 3, id FROM course_categories WHERE slug = 'taxation'
-UNION ALL
-SELECT 'Corporate Tax Compliance', 'corporate-tax-compliance', 30, 3, id FROM course_categories WHERE slug = 'taxation'
-UNION ALL
-SELECT 'Cash Flow Management', 'cash-flow-management', 10, 3, id FROM course_categories WHERE slug = 'treasury-and-credit'
-UNION ALL
-SELECT 'Credit Control Practice', 'credit-control-practice', 20, 3, id FROM course_categories WHERE slug = 'treasury-and-credit'
-UNION ALL
-SELECT 'Foreign Exchange Exposure', 'foreign-exchange-exposure', 30, 3, id FROM course_categories WHERE slug = 'treasury-and-credit'
-UNION ALL
-SELECT 'Anti Money Laundering', 'anti-money-laundering', 10, 3, id FROM course_categories WHERE slug = 'financial-crime'
-UNION ALL
-SELECT 'Fraud Detection and Prevention', 'fraud-detection-and-prevention', 20, 3, id FROM course_categories WHERE slug = 'financial-crime'
-UNION ALL
-SELECT 'Sanctions and Screening', 'sanctions-and-screening', 30, 3, id FROM course_categories WHERE slug = 'financial-crime'
-UNION ALL
-SELECT 'Job Analysis and Grading', 'job-analysis-and-grading', 10, 3, id FROM course_categories WHERE slug = 'recruitment-and-onboarding'
-UNION ALL
-SELECT 'Interviewing and Selection', 'interviewing-and-selection', 20, 3, id FROM course_categories WHERE slug = 'recruitment-and-onboarding'
-UNION ALL
-SELECT 'Induction Programmes', 'induction-programmes', 30, 3, id FROM course_categories WHERE slug = 'recruitment-and-onboarding'
-UNION ALL
-SELECT 'Disciplinary Procedure', 'disciplinary-procedure', 10, 3, id FROM course_categories WHERE slug = 'employee-relations'
-UNION ALL
-SELECT 'Grievance Handling', 'grievance-handling', 20, 3, id FROM course_categories WHERE slug = 'employee-relations'
-UNION ALL
-SELECT 'Collective Bargaining', 'collective-bargaining', 30, 3, id FROM course_categories WHERE slug = 'employee-relations'
-UNION ALL
-SELECT 'Workplace Investigations', 'workplace-investigations', 40, 3, id FROM course_categories WHERE slug = 'employee-relations'
-UNION ALL
-SELECT 'Training Needs Analysis', 'training-needs-analysis', 10, 3, id FROM course_categories WHERE slug = 'learning-and-development'
-UNION ALL
-SELECT 'Facilitation Practice', 'facilitation-practice', 20, 3, id FROM course_categories WHERE slug = 'learning-and-development'
-UNION ALL
-SELECT 'Assessment and Moderation', 'assessment-and-moderation', 30, 3, id FROM course_categories WHERE slug = 'learning-and-development'
-UNION ALL
-SELECT 'Learnership Administration', 'learnership-administration', 40, 3, id FROM course_categories WHERE slug = 'learning-and-development'
-UNION ALL
-SELECT 'Remuneration Practice', 'remuneration-practice', 10, 3, id FROM course_categories WHERE slug = 'reward-and-wellbeing'
-UNION ALL
-SELECT 'Employee Wellness', 'employee-wellness', 20, 3, id FROM course_categories WHERE slug = 'reward-and-wellbeing'
-UNION ALL
-SELECT 'Workplace Mental Health', 'workplace-mental-health', 30, 3, id FROM course_categories WHERE slug = 'reward-and-wellbeing'
-UNION ALL
-SELECT 'Employment Equity Practice', 'employment-equity-practice', 10, 3, id FROM course_categories WHERE slug = 'employment-equity-and-transformation'
-UNION ALL
-SELECT 'Diversity and Inclusion Practice', 'diversity-and-inclusion-practice', 20, 3, id FROM course_categories WHERE slug = 'employment-equity-and-transformation'
-UNION ALL
-SELECT 'Skills Development Reporting', 'skills-development-reporting', 30, 3, id FROM course_categories WHERE slug = 'employment-equity-and-transformation'
-UNION ALL
-SELECT 'Defensive Driving', 'defensive-driving', 10, 3, id FROM course_categories WHERE slug = 'road-transport'
-UNION ALL
-SELECT 'Driver Fatigue Management', 'driver-fatigue-management', 20, 3, id FROM course_categories WHERE slug = 'road-transport'
-UNION ALL
-SELECT 'Vehicle Inspection and Maintenance', 'vehicle-inspection-and-maintenance', 30, 3, id FROM course_categories WHERE slug = 'road-transport'
-UNION ALL
-SELECT 'Abnormal and Heavy Loads', 'abnormal-and-heavy-loads', 40, 3, id FROM course_categories WHERE slug = 'road-transport'
-UNION ALL
-SELECT 'Dangerous Goods by Road', 'dangerous-goods-by-road', 10, 3, id FROM course_categories WHERE slug = 'dangerous-goods'
-UNION ALL
-SELECT 'Dangerous Goods by Air', 'dangerous-goods-by-air', 20, 3, id FROM course_categories WHERE slug = 'dangerous-goods'
-UNION ALL
-SELECT 'Dangerous Goods by Sea', 'dangerous-goods-by-sea', 30, 3, id FROM course_categories WHERE slug = 'dangerous-goods'
-UNION ALL
-SELECT 'Warehouse Operations', 'warehouse-operations', 10, 3, id FROM course_categories WHERE slug = 'warehousing'
-UNION ALL
-SELECT 'Forklift Operation', 'forklift-operation', 20, 3, id FROM course_categories WHERE slug = 'warehousing'
-UNION ALL
-SELECT 'Stock Control and Cycle Counting', 'stock-control-and-cycle-counting', 30, 3, id FROM course_categories WHERE slug = 'warehousing'
-UNION ALL
-SELECT 'Racking Inspection', 'racking-inspection', 40, 3, id FROM course_categories WHERE slug = 'warehousing'
-UNION ALL
-SELECT 'Demand Planning', 'demand-planning', 10, 3, id FROM course_categories WHERE slug = 'supply-chain'
-UNION ALL
-SELECT 'Procurement Practice', 'procurement-practice', 20, 3, id FROM course_categories WHERE slug = 'supply-chain'
-UNION ALL
-SELECT 'Freight Forwarding', 'freight-forwarding', 30, 3, id FROM course_categories WHERE slug = 'supply-chain'
-UNION ALL
-SELECT 'Customs and Border Compliance', 'customs-and-border-compliance', 40, 3, id FROM course_categories WHERE slug = 'supply-chain'
-UNION ALL
-SELECT 'Port and Terminal Operations', 'port-and-terminal-operations', 10, 3, id FROM course_categories WHERE slug = 'maritime-and-aviation'
-UNION ALL
-SELECT 'Sea Survival and Marine Safety', 'sea-survival-and-marine-safety', 20, 3, id FROM course_categories WHERE slug = 'maritime-and-aviation'
-UNION ALL
-SELECT 'Airside Safety', 'airside-safety', 30, 3, id FROM course_categories WHERE slug = 'maritime-and-aviation'
-UNION ALL
-SELECT 'Aircraft Ground Handling', 'aircraft-ground-handling', 40, 3, id FROM course_categories WHERE slug = 'maritime-and-aviation'
-UNION ALL
-SELECT 'Patient Assessment', 'patient-assessment', 10, 3, id FROM course_categories WHERE slug = 'clinical-practice'
-UNION ALL
-SELECT 'Medication Administration Practice', 'medication-administration-practice', 20, 3, id FROM course_categories WHERE slug = 'clinical-practice'
-UNION ALL
-SELECT 'Wound Care Practice', 'wound-care-practice', 30, 3, id FROM course_categories WHERE slug = 'clinical-practice'
-UNION ALL
-SELECT 'Chronic Disease Management', 'chronic-disease-management', 40, 3, id FROM course_categories WHERE slug = 'clinical-practice'
-UNION ALL
-SELECT 'Hand Hygiene and Standard Precautions', 'hand-hygiene-and-standard-precautions', 10, 3, id FROM course_categories WHERE slug = 'infection-prevention'
-UNION ALL
-SELECT 'Sterilisation and Decontamination', 'sterilisation-and-decontamination', 20, 3, id FROM course_categories WHERE slug = 'infection-prevention'
-UNION ALL
-SELECT 'Clinical Waste Handling', 'clinical-waste-handling', 30, 3, id FROM course_categories WHERE slug = 'infection-prevention'
-UNION ALL
-SELECT 'Emergency Triage', 'emergency-triage', 10, 3, id FROM course_categories WHERE slug = 'emergency-and-critical-care'
-UNION ALL
-SELECT 'Advanced Life Support', 'advanced-life-support', 20, 3, id FROM course_categories WHERE slug = 'emergency-and-critical-care'
-UNION ALL
-SELECT 'Pre Hospital Care', 'pre-hospital-care', 30, 3, id FROM course_categories WHERE slug = 'emergency-and-critical-care'
-UNION ALL
-SELECT 'Elder Care Practice', 'elder-care-practice', 10, 3, id FROM course_categories WHERE slug = 'care-support'
-UNION ALL
-SELECT 'Disability Support Practice', 'disability-support-practice', 20, 3, id FROM course_categories WHERE slug = 'care-support'
-UNION ALL
-SELECT 'Palliative Care Practice', 'palliative-care-practice', 30, 3, id FROM course_categories WHERE slug = 'care-support'
-UNION ALL
-SELECT 'Clinical Record Keeping', 'clinical-record-keeping', 10, 3, id FROM course_categories WHERE slug = 'health-administration'
-UNION ALL
-SELECT 'Health Information Governance', 'health-information-governance', 20, 3, id FROM course_categories WHERE slug = 'health-administration'
-UNION ALL
-SELECT 'Medical Scheme Administration', 'medical-scheme-administration', 30, 3, id FROM course_categories WHERE slug = 'health-administration'
-UNION ALL
-SELECT 'Soil and Nutrient Management', 'soil-and-nutrient-management', 10, 3, id FROM course_categories WHERE slug = 'crop-production'
-UNION ALL
-SELECT 'Irrigation Practice', 'irrigation-practice', 20, 3, id FROM course_categories WHERE slug = 'crop-production'
-UNION ALL
-SELECT 'Integrated Pest Management', 'integrated-pest-management', 30, 3, id FROM course_categories WHERE slug = 'crop-production'
-UNION ALL
-SELECT 'Harvest and Post Harvest', 'harvest-and-post-harvest', 40, 3, id FROM course_categories WHERE slug = 'crop-production'
-UNION ALL
-SELECT 'Animal Health and Welfare', 'animal-health-and-welfare', 10, 3, id FROM course_categories WHERE slug = 'livestock-production'
-UNION ALL
-SELECT 'Livestock Handling Practice', 'livestock-handling-practice', 20, 3, id FROM course_categories WHERE slug = 'livestock-production'
-UNION ALL
-SELECT 'Dairy Operations', 'dairy-operations', 30, 3, id FROM course_categories WHERE slug = 'livestock-production'
-UNION ALL
-SELECT 'Poultry Operations', 'poultry-operations', 40, 3, id FROM course_categories WHERE slug = 'livestock-production'
-UNION ALL
-SELECT 'Pesticide Application Practice', 'pesticide-application-practice', 10, 3, id FROM course_categories WHERE slug = 'agrochemicals'
-UNION ALL
-SELECT 'Spray Equipment Calibration', 'spray-equipment-calibration', 20, 3, id FROM course_categories WHERE slug = 'agrochemicals'
-UNION ALL
-SELECT 'Agrochemical Storage', 'agrochemical-storage', 30, 3, id FROM course_categories WHERE slug = 'agrochemicals'
-UNION ALL
-SELECT 'Environmental Impact Assessment Practice', 'environmental-impact-assessment-practice', 10, 3, id FROM course_categories WHERE slug = 'environmental-management'
-UNION ALL
-SELECT 'Waste Management Practice', 'waste-management-practice', 20, 3, id FROM course_categories WHERE slug = 'environmental-management'
-UNION ALL
-SELECT 'Water and Effluent Management', 'water-and-effluent-management', 30, 3, id FROM course_categories WHERE slug = 'environmental-management'
-UNION ALL
-SELECT 'Air Quality Management', 'air-quality-management', 40, 3, id FROM course_categories WHERE slug = 'environmental-management'
-UNION ALL
-SELECT 'Carbon Footprint Measurement', 'carbon-footprint-measurement', 10, 3, id FROM course_categories WHERE slug = 'sustainability'
-UNION ALL
-SELECT 'Energy Efficiency Practice', 'energy-efficiency-practice', 20, 3, id FROM course_categories WHERE slug = 'sustainability'
-UNION ALL
-SELECT 'Circular Economy Practice', 'circular-economy-practice', 30, 3, id FROM course_categories WHERE slug = 'sustainability'
-UNION ALL
-SELECT 'Biodiversity Management', 'biodiversity-management', 40, 3, id FROM course_categories WHERE slug = 'sustainability'
-UNION ALL
-SELECT 'Food Hygiene Practice', 'food-hygiene-practice', 10, 3, id FROM course_categories WHERE slug = 'food-safety'
-UNION ALL
-SELECT 'HACCP Practice', 'haccp-practice', 20, 3, id FROM course_categories WHERE slug = 'food-safety'
-UNION ALL
-SELECT 'Allergen Management Practice', 'allergen-management-practice', 30, 3, id FROM course_categories WHERE slug = 'food-safety'
-UNION ALL
-SELECT 'Food Traceability', 'food-traceability', 40, 3, id FROM course_categories WHERE slug = 'food-safety'
-UNION ALL
-SELECT 'Commercial Cookery', 'commercial-cookery', 10, 3, id FROM course_categories WHERE slug = 'kitchen-operations'
-UNION ALL
-SELECT 'Bakery and Pastry', 'bakery-and-pastry', 20, 3, id FROM course_categories WHERE slug = 'kitchen-operations'
-UNION ALL
-SELECT 'Butchery Practice', 'butchery-practice', 30, 3, id FROM course_categories WHERE slug = 'kitchen-operations'
-UNION ALL
-SELECT 'Kitchen Equipment Safety', 'kitchen-equipment-safety', 40, 3, id FROM course_categories WHERE slug = 'kitchen-operations'
-UNION ALL
-SELECT 'Restaurant Service Practice', 'restaurant-service-practice', 10, 3, id FROM course_categories WHERE slug = 'front-of-house'
-UNION ALL
-SELECT 'Bar and Beverage Service', 'bar-and-beverage-service', 20, 3, id FROM course_categories WHERE slug = 'front-of-house'
-UNION ALL
-SELECT 'Barista Practice', 'barista-practice', 30, 3, id FROM course_categories WHERE slug = 'front-of-house'
-UNION ALL
-SELECT 'Responsible Alcohol Service', 'responsible-alcohol-service', 40, 3, id FROM course_categories WHERE slug = 'front-of-house'
-UNION ALL
-SELECT 'Housekeeping Practice', 'housekeeping-practice', 10, 3, id FROM course_categories WHERE slug = 'accommodation'
-UNION ALL
-SELECT 'Front Desk Operations', 'front-desk-operations', 20, 3, id FROM course_categories WHERE slug = 'accommodation'
-UNION ALL
-SELECT 'Reservations and Revenue', 'reservations-and-revenue', 30, 3, id FROM course_categories WHERE slug = 'accommodation'
-UNION ALL
-SELECT 'Event Planning Practice', 'event-planning-practice', 10, 3, id FROM course_categories WHERE slug = 'events-and-tourism'
-UNION ALL
-SELECT 'Crowd and Venue Safety', 'crowd-and-venue-safety', 20, 3, id FROM course_categories WHERE slug = 'events-and-tourism'
-UNION ALL
-SELECT 'Tour Guiding Practice', 'tour-guiding-practice', 30, 3, id FROM course_categories WHERE slug = 'events-and-tourism'
-UNION ALL
-SELECT 'Point of Sale Practice', 'point-of-sale-practice', 10, 3, id FROM course_categories WHERE slug = 'store-operations'
-UNION ALL
-SELECT 'Cash Handling and Reconciliation', 'cash-handling-and-reconciliation', 20, 3, id FROM course_categories WHERE slug = 'store-operations'
-UNION ALL
-SELECT 'Merchandising Practice', 'merchandising-practice', 30, 3, id FROM course_categories WHERE slug = 'store-operations'
-UNION ALL
-SELECT 'Stock Loss Prevention', 'stock-loss-prevention', 40, 3, id FROM course_categories WHERE slug = 'store-operations'
-UNION ALL
-SELECT 'Customer Service Practice', 'customer-service-practice', 10, 3, id FROM course_categories WHERE slug = 'customer-experience'
-UNION ALL
-SELECT 'Complaint Resolution Practice', 'complaint-resolution-practice', 20, 3, id FROM course_categories WHERE slug = 'customer-experience'
-UNION ALL
-SELECT 'Contact Centre Practice', 'contact-centre-practice', 30, 3, id FROM course_categories WHERE slug = 'customer-experience'
-UNION ALL
-SELECT 'Retail Selling Skills', 'retail-selling-skills', 10, 3, id FROM course_categories WHERE slug = 'sales'
-UNION ALL
-SELECT 'Business to Business Selling', 'business-to-business-selling', 20, 3, id FROM course_categories WHERE slug = 'sales'
-UNION ALL
-SELECT 'Negotiation Practice', 'negotiation-practice', 30, 3, id FROM course_categories WHERE slug = 'sales'
-UNION ALL
-SELECT 'Key Account Management', 'key-account-management', 40, 3, id FROM course_categories WHERE slug = 'sales'
-UNION ALL
-SELECT 'Digital Marketing Practice', 'digital-marketing-practice', 10, 3, id FROM course_categories WHERE slug = 'marketing'
-UNION ALL
-SELECT 'Content and Copywriting', 'content-and-copywriting', 20, 3, id FROM course_categories WHERE slug = 'marketing'
-UNION ALL
-SELECT 'Brand Management Practice', 'brand-management-practice', 30, 3, id FROM course_categories WHERE slug = 'marketing'
-UNION ALL
-SELECT 'Market Research Practice', 'market-research-practice', 40, 3, id FROM course_categories WHERE slug = 'marketing'
-UNION ALL
-SELECT 'Contract Law Practice', 'contract-law-practice', 10, 3, id FROM course_categories WHERE slug = 'commercial-law'
-UNION ALL
-SELECT 'Consumer Protection Practice', 'consumer-protection-practice', 20, 3, id FROM course_categories WHERE slug = 'commercial-law'
-UNION ALL
-SELECT 'Competition Law Practice', 'competition-law-practice', 30, 3, id FROM course_categories WHERE slug = 'commercial-law'
-UNION ALL
-SELECT 'Employment Law Practice', 'employment-law-practice', 10, 3, id FROM course_categories WHERE slug = 'labour-law'
-UNION ALL
-SELECT 'Health and Safety Law', 'health-and-safety-law', 20, 3, id FROM course_categories WHERE slug = 'labour-law'
-UNION ALL
-SELECT 'Dispute Resolution Practice', 'dispute-resolution-practice', 30, 3, id FROM course_categories WHERE slug = 'labour-law'
-UNION ALL
-SELECT 'Data Protection Practice', 'data-protection-practice', 10, 3, id FROM course_categories WHERE slug = 'data-and-privacy'
-UNION ALL
-SELECT 'Records Management Practice', 'records-management-practice', 20, 3, id FROM course_categories WHERE slug = 'data-and-privacy'
-UNION ALL
-SELECT 'Access to Information Practice', 'access-to-information-practice', 30, 3, id FROM course_categories WHERE slug = 'data-and-privacy'
-UNION ALL
-SELECT 'Compliance Monitoring', 'compliance-monitoring', 10, 3, id FROM course_categories WHERE slug = 'regulatory-compliance'
-UNION ALL
-SELECT 'Regulatory Reporting', 'regulatory-reporting', 20, 3, id FROM course_categories WHERE slug = 'regulatory-compliance'
-UNION ALL
-SELECT 'Licensing and Permits', 'licensing-and-permits', 30, 3, id FROM course_categories WHERE slug = 'regulatory-compliance'
-UNION ALL
-SELECT 'Curriculum Design', 'curriculum-design', 10, 3, id FROM course_categories WHERE slug = 'teaching-practice'
-UNION ALL
-SELECT 'Lesson Planning and Delivery', 'lesson-planning-and-delivery', 20, 3, id FROM course_categories WHERE slug = 'teaching-practice'
-UNION ALL
-SELECT 'Classroom Management', 'classroom-management', 30, 3, id FROM course_categories WHERE slug = 'teaching-practice'
-UNION ALL
-SELECT 'Assessment Design Practice', 'assessment-design-practice', 10, 3, id FROM course_categories WHERE slug = 'assessment-practice'
-UNION ALL
-SELECT 'Moderation Practice', 'moderation-practice', 20, 3, id FROM course_categories WHERE slug = 'assessment-practice'
-UNION ALL
-SELECT 'Recognition of Prior Learning', 'recognition-of-prior-learning', 30, 3, id FROM course_categories WHERE slug = 'assessment-practice'
-UNION ALL
-SELECT 'E Learning Design', 'e-learning-design', 10, 3, id FROM course_categories WHERE slug = 'digital-learning'
-UNION ALL
-SELECT 'Learning Management Administration', 'learning-management-administration', 20, 3, id FROM course_categories WHERE slug = 'digital-learning'
-UNION ALL
-SELECT 'Instructional Media Production', 'instructional-media-production', 30, 3, id FROM course_categories WHERE slug = 'digital-learning'
-UNION ALL
-SELECT 'Business Writing Practice', 'business-writing-practice', 10, 3, id FROM course_categories WHERE slug = 'communication'
-UNION ALL
-SELECT 'Presentation and Public Speaking', 'presentation-and-public-speaking', 20, 3, id FROM course_categories WHERE slug = 'communication'
-UNION ALL
-SELECT 'Active Listening Practice', 'active-listening-practice', 30, 3, id FROM course_categories WHERE slug = 'communication'
-UNION ALL
-SELECT 'Cross Cultural Communication', 'cross-cultural-communication', 40, 3, id FROM course_categories WHERE slug = 'communication'
-UNION ALL
-SELECT 'Time Management Practice', 'time-management-practice', 10, 3, id FROM course_categories WHERE slug = 'personal-effectiveness'
-UNION ALL
-SELECT 'Problem Solving and Decision Making', 'problem-solving-and-decision-making', 20, 3, id FROM course_categories WHERE slug = 'personal-effectiveness'
-UNION ALL
-SELECT 'Critical Thinking Practice', 'critical-thinking-practice', 30, 3, id FROM course_categories WHERE slug = 'personal-effectiveness'
-UNION ALL
-SELECT 'Emotional Intelligence Practice', 'emotional-intelligence-practice', 40, 3, id FROM course_categories WHERE slug = 'personal-effectiveness'
-UNION ALL
-SELECT 'Team Building Practice', 'team-building-practice', 10, 3, id FROM course_categories WHERE slug = 'working-with-others'
-UNION ALL
-SELECT 'Conflict Resolution Practice', 'conflict-resolution-practice', 20, 3, id FROM course_categories WHERE slug = 'working-with-others'
-UNION ALL
-SELECT 'Coaching and Mentoring Practice', 'coaching-and-mentoring-practice', 30, 3, id FROM course_categories WHERE slug = 'working-with-others'
-UNION ALL
-SELECT 'Difficult Conversations', 'difficult-conversations', 40, 3, id FROM course_categories WHERE slug = 'working-with-others'
-UNION ALL
-SELECT 'Stress and Resilience', 'stress-and-resilience', 10, 3, id FROM course_categories WHERE slug = 'wellbeing'
-UNION ALL
-SELECT 'Financial Literacy Practice', 'financial-literacy-practice', 20, 3, id FROM course_categories WHERE slug = 'wellbeing'
-UNION ALL
-SELECT 'Work Life Balance', 'work-life-balance', 30, 3, id FROM course_categories WHERE slug = 'wellbeing';
-
--- Written above in tens for readability; stored as 1..n within each parent like every later move.
-UPDATE course_categories c
-   SET position = ordered.position
-  FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY parent_id ORDER BY position, name)::int AS position
-          FROM course_categories) ordered
- WHERE ordered.id = c.id;
+-- No built-in categories (owner, 2026-10-20: "I ONLY NEED CATEGORIES THAT MY COURSES ACTUALLY
+-- COVER!!! THE REST IS DEAD WEIGHT"). The 369-category industry taxonomy that was seeded here is gone:
+-- ADMIN creates the categories the courses on the site need, at Course categories, each with its icon.
 
 -- Tags are the other half of discovery and are universe-free for the same reason categories are.
 -- Categories are for browsing and are hierarchical; tags are for searching, are flat, and a
@@ -1569,7 +852,7 @@ CREATE TABLE tags (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     icon_svg TEXT NOT NULL DEFAULT ''
 );
-COMMENT ON COLUMN tags.icon_svg IS 'Generated chip icon.';
+COMMENT ON COLUMN tags.icon_svg IS 'The tag''s icon: uploaded by ADMIN, or generated until one is.';
 CREATE INDEX tags_name_idx ON tags(name);
 
 -- No starter tags.
@@ -1614,10 +897,13 @@ CREATE TABLE courses (
     published_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    cover_svg TEXT NOT NULL DEFAULT ''
+    cover_svg TEXT NOT NULL DEFAULT '',
+    catalogue_position INTEGER NULL CHECK (catalogue_position BETWEEN 1 AND 2000000000)
 );
+COMMENT ON COLUMN courses.catalogue_position IS
+    'Where the course stands in the catalogue (owner, 2026-10-20): numbered courses first, lowest first, then the rest newest first. Number in hundreds (100, 200, 300) to leave room for courses in between.';
 COMMENT ON COLUMN courses.cover_svg IS
-    'Generated cover artwork, replaced when a real cover image is uploaded. Never selected by a list query.';
+    'The course''s cover picture: uploaded by ADMIN as an SVG, or generated until one is. Selected only for catalogue cards and the course''s own pages.';
 CREATE INDEX courses_status_title_idx ON courses(status, title);
 CREATE INDEX courses_category_idx ON courses(category_id);
 CREATE INDEX courses_owner_user_idx ON courses(owner_user_id);
@@ -1630,6 +916,8 @@ CREATE TABLE course_price_variants (
     course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     access_period_seconds INTEGER NOT NULL CHECK (access_period_seconds > 0),
     price_minor_units BIGINT NOT NULL CHECK (price_minor_units >= 0),
+    -- The was price (owner, 2026-10-20): shown struck through beside the price, never charged.
+    was_price_minor_units BIGINT NULL,
     currency_code CHAR(3) NOT NULL DEFAULT 'ZAR' CHECK (currency_code ~ '^[A-Z]{3}$'),
     label VARCHAR(120) NULL,
     position INTEGER NOT NULL CHECK (position > 0),
@@ -1640,7 +928,8 @@ CREATE TABLE course_price_variants (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (course_id, position),
-    UNIQUE (course_id, access_period_seconds, currency_code)
+    UNIQUE (course_id, access_period_seconds, currency_code),
+    CONSTRAINT course_price_variants_was_price CHECK (was_price_minor_units IS NULL OR was_price_minor_units > price_minor_units)
 );
 CREATE UNIQUE INDEX course_price_variants_one_active_default_uq
     ON course_price_variants(course_id)
@@ -1970,23 +1259,105 @@ CREATE TABLE course_results (
 -- with. A certificate is drawn again from those two whenever it is viewed or downloaded, so it never
 -- changes when the learner, the course or the certificate templates change later. A later passing
 -- final reissues it under the same number and public id with the data and version of that issue.
+-- Identity verification (owner, 2026-10-19): one row per check, made on the identity verification
+-- provider's hosted page (Didit), where the learner photographs their identity document and takes a
+-- live selfie. Only what the owner chose to keep: the status, the verified name, the document type,
+-- number and issuing country, the date of birth, the provider's session id and when. Never an image.
+-- A revoked verification was approved until ADMIN revoked it, with a reason.
+CREATE TABLE identity_verifications (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider VARCHAR(24) NOT NULL DEFAULT 'didit' CHECK (provider IN ('didit')),
+    session_id VARCHAR(80) NOT NULL UNIQUE,
+    status VARCHAR(16) NOT NULL DEFAULT 'started' CHECK (status IN ('started','in_review','approved','declined','abandoned','expired','revoked')),
+    verified_name VARCHAR(240) NULL,
+    document_type VARCHAR(80) NULL,
+    document_number VARCHAR(80) NULL,
+    issuing_country VARCHAR(80) NULL,
+    date_of_birth DATE NULL,
+    -- Why the check was declined, in plain words for the learner.
+    decline_reason VARCHAR(500) NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    decided_at TIMESTAMPTZ NULL,
+    revoked_at TIMESTAMPTZ NULL,
+    revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    revocation_reason VARCHAR(500) NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT identity_verifications_approved_has_name CHECK (status NOT IN ('approved','revoked') OR (verified_name IS NOT NULL AND decided_at IS NOT NULL)),
+    CONSTRAINT identity_verifications_revoked_has_reason CHECK (status <> 'revoked' OR (revoked_at IS NOT NULL AND revocation_reason IS NOT NULL AND btrim(revocation_reason) <> ''))
+);
+CREATE INDEX identity_verifications_user_idx ON identity_verifications(user_id, started_at DESC);
+CREATE INDEX identity_verifications_review_idx ON identity_verifications(started_at) WHERE status = 'in_review';
+-- A person has at most one approved verification at a time.
+CREATE UNIQUE INDEX identity_verifications_one_approved ON identity_verifications(user_id) WHERE status = 'approved';
+
+-- Each webhook event of the identity verification provider is handled once: its event id, and
+-- nothing else, is kept.
+CREATE TABLE identity_webhook_events (
+    event_id UUID PRIMARY KEY,
+    received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- A certificate proves that the learner took the course, never that they passed (owner,
+-- 2026-10-19). It is earned by completing every assessment, pass or fail, and issued only to a
+-- verified account, in the verified name (identity_verification_id), with the original completion
+-- date (completed_at). It carries no grade or percentage: those are on its transcript.
+-- A certificate's address is /certificates/{public_id}, a random 32-digit hex code the learner can
+-- replace at any time. Each certificate and each transcript is private (only the learner sees it) until
+-- the learner makes it public (anyone with its address sees it); the site never links to it or lists it
+-- (owner, 2026-10-19).
 CREATE TABLE certificates (
     id BIGSERIAL PRIMARY KEY,
-    public_id UUID NOT NULL UNIQUE,
+    public_id CHAR(32) NOT NULL UNIQUE CHECK (public_id ~ '^[0-9a-f]{32}$'),
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
     enrolment_id BIGINT NOT NULL UNIQUE REFERENCES course_enrolments(id) ON DELETE RESTRICT,
     certificate_number VARCHAR(80) NOT NULL UNIQUE,
     -- Copies of the certified values the verification page and lists show without rendering.
     learner_name VARCHAR(240) NOT NULL,
     course_title VARCHAR(240) NOT NULL,
-    grade_code VARCHAR(24) NULL,
-    overall_percentage NUMERIC(5,2) NULL,
+    completed_at TIMESTAMPTZ NOT NULL,
+    identity_verification_id BIGINT NOT NULL REFERENCES identity_verifications(id) ON DELETE RESTRICT,
     document_data JSONB NOT NULL CHECK (jsonb_typeof(document_data) = 'object'),
     template_id BIGINT NOT NULL,
     template_version_id BIGINT NOT NULL,
     template_version_number INTEGER NOT NULL CHECK (template_version_number > 0),
     issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- A revoked certificate and its transcript say so publicly and have no PDF.
     revoked_at TIMESTAMPTZ NULL,
-    revocation_reason VARCHAR(500) NULL
+    revoked_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    revocation_reason VARCHAR(500) NULL,
+    CONSTRAINT certificates_revoked_has_reason CHECK (revoked_at IS NULL OR (revocation_reason IS NOT NULL AND btrim(revocation_reason) <> ''))
+);
+CREATE INDEX certificates_issued_idx ON certificates(issued_at DESC, id DESC);
+
+-- A certificate's public transcript (owner, 2026-10-19): every module and final assessment mark and
+-- the overall grade (50% module assessments, 50% final assessment), drawn by the document template
+-- engine like the certificate and kept with the values and version it was issued with. It is
+-- revoked with its certificate.
+CREATE TABLE transcripts (
+    id BIGSERIAL PRIMARY KEY,
+    public_id CHAR(32) NOT NULL UNIQUE CHECK (public_id ~ '^[0-9a-f]{32}$'),
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    certificate_id BIGINT NOT NULL UNIQUE REFERENCES certificates(id) ON DELETE RESTRICT,
+    transcript_number VARCHAR(80) NOT NULL UNIQUE,
+    document_data JSONB NOT NULL CHECK (jsonb_typeof(document_data) = 'object'),
+    template_id BIGINT NOT NULL,
+    template_version_id BIGINT NOT NULL,
+    template_version_number INTEGER NOT NULL CHECK (template_version_number > 0),
+    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The scheduled jobs (owner, 2026-10-19): schedule:run runs each one when it is due and records its
+-- last run here; Settings > Maintenance shows them and the dashboard warns when the commerce job stops.
+CREATE TABLE scheduled_jobs (
+    job_key VARCHAR(40) PRIMARY KEY,
+    last_started_at TIMESTAMPTZ NULL,
+    last_finished_at TIMESTAMPTZ NULL,
+    last_succeeded_at TIMESTAMPTZ NULL,
+    last_failed_at TIMESTAMPTZ NULL,
+    last_error VARCHAR(1000) NULL,
+    last_summary VARCHAR(1000) NULL,
+    run_count BIGINT NOT NULL DEFAULT 0 CHECK (run_count >= 0)
 );
 
 CREATE TABLE api_tokens (
@@ -2029,6 +1400,17 @@ CREATE TABLE course_tags (
 -- The primary key serves "which tags does this course carry"; this serves the other direction,
 -- which is the one a tag cloud, a tag page and the admin distribution charts all read.
 CREATE INDEX course_tags_tag_idx ON course_tags(tag_id, course_id);
+
+-- Related courses (owner, 2026-10-20): one row per related pair, the lower course id first. A relation is therefore the
+-- same seen from either course: relating A to B relates B to A, and removing it from either removes it from both.
+CREATE TABLE course_relations (
+    course_low_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    course_high_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (course_low_id, course_high_id),
+    CONSTRAINT course_relations_ordered CHECK (course_low_id < course_high_id)
+);
+CREATE INDEX course_relations_high_idx ON course_relations(course_high_id, course_low_id);
 
 CREATE TABLE course_favourites (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2110,6 +1492,8 @@ CREATE TABLE bundle_offers (
     public_id UUID NOT NULL UNIQUE,
     bundle_id BIGINT NOT NULL UNIQUE REFERENCES bundles(id) ON DELETE CASCADE,
     price_minor_units BIGINT NOT NULL CHECK (price_minor_units > 0),
+    -- The was price (owner, 2026-10-20): shown struck through beside the price, never charged.
+    was_price_minor_units BIGINT NULL CHECK (was_price_minor_units IS NULL OR was_price_minor_units > price_minor_units),
     currency_code CHAR(3) NOT NULL DEFAULT 'ZAR' CHECK (currency_code ~ '^[A-Z]{3}$'),
     access_period_seconds INTEGER NOT NULL CHECK (access_period_seconds > 0),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -2121,6 +1505,8 @@ CREATE TABLE bundle_offers (
 
 -- Promo codes. Canonical form only: upper case, so SAVE10, save10 and Save10 are one code. Each
 -- cart line is eligible by its own product type: course_scope and bundle_scope are independent.
+-- applies_automatically (owner, 2026-10-20): the cart applies the promotion by itself, with no code
+-- to type, and says so; one promotion applies to an order, the one that saves the most.
 CREATE TABLE promotions (
     id BIGSERIAL PRIMARY KEY,
     code VARCHAR(40) NOT NULL UNIQUE CHECK (code ~ '^[A-Z0-9][A-Z0-9_-]{2,39}$'),
@@ -2141,6 +1527,7 @@ CREATE TABLE promotions (
     updated_by BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     course_scope TEXT NOT NULL DEFAULT 'all' CHECK (course_scope IN ('none','all','selected')),
     bundle_scope TEXT NOT NULL DEFAULT 'none' CHECK (bundle_scope IN ('none','all','selected')),
+    applies_automatically BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT promotions_discount_value CHECK (
         (discount_type = 'percentage' AND discount_value BETWEEN 1 AND 10000)
         OR (discount_type = 'fixed_amount' AND discount_value > 0)),
@@ -2149,6 +1536,7 @@ CREATE TABLE promotions (
     CONSTRAINT promotions_scope CHECK (course_scope <> 'none' OR bundle_scope <> 'none')
 );
 CREATE INDEX promotions_active_idx ON promotions (active, id DESC);
+CREATE INDEX promotions_automatic_idx ON promotions (id) WHERE applies_automatically AND active;
 
 CREATE TABLE promotion_courses (
     promotion_id BIGINT NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
@@ -2255,6 +1643,35 @@ CREATE UNIQUE INDEX commerce_order_company_variant_idx ON commerce_order_items(o
 CREATE UNIQUE INDEX commerce_order_bundle_idx ON commerce_order_items (order_id, bundle_id) WHERE product_type = 'bundle';
 CREATE INDEX commerce_order_items_company_idx ON commerce_order_items(company_id,order_id) WHERE company_id IS NOT NULL;
 CREATE INDEX commerce_order_items_bundle_idx ON commerce_order_items (bundle_id, order_id) WHERE bundle_id IS NOT NULL;
+
+-- Messages sent through the contact form (owner, 2026-10-20: one form whose fields follow the reason
+-- chosen, each message kept on the site, listed in Administration and acknowledged to its sender with
+-- its reference). user_id is the signed-in sender: their account reference then comes from the
+-- account, never from the form. A sender who is not signed in may type an account reference (checked)
+-- and an order number (its shape only): neither is looked up for them. details holds the reason's own
+-- answers (topic, EFT date, amount and reference, company and learners, where in a course). Deleted 5
+-- years after it was sent (RetentionCleanup), as the Privacy Policy states.
+CREATE TABLE contact_messages (
+    id BIGSERIAL PRIMARY KEY,
+    reference VARCHAR(20) NOT NULL UNIQUE,
+    reason VARCHAR(20) NOT NULL CHECK (reason IN ('before_buying','account','order','course','other')),
+    sender_name VARCHAR(120) NOT NULL,
+    sender_email VARCHAR(254) NOT NULL,
+    user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+    account_reference VARCHAR(40) NULL,
+    order_id BIGINT NULL REFERENCES commerce_orders(id) ON DELETE SET NULL,
+    order_number VARCHAR(20) NULL,
+    course_id BIGINT NULL REFERENCES courses(id) ON DELETE SET NULL,
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
+    message TEXT NOT NULL CHECK (char_length(message) BETWEEN 1 AND 5000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    emailed_at TIMESTAMPTZ NULL,
+    acknowledged_at TIMESTAMPTZ NULL,
+    answered_at TIMESTAMPTZ NULL,
+    answered_by_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX contact_messages_unanswered_idx ON contact_messages (created_at) WHERE answered_at IS NULL;
+CREATE INDEX contact_messages_created_idx ON contact_messages (created_at DESC);
 
 CREATE TABLE commerce_order_preferences (
     order_id BIGINT PRIMARY KEY REFERENCES commerce_orders(id) ON DELETE RESTRICT,
@@ -3033,7 +2450,7 @@ CREATE INDEX course_popularity_run_idx ON course_popularity (run_id);
 -- version they were rendered from, so an old document can be rendered again exactly as it was.
 CREATE TABLE document_templates (
     id BIGSERIAL PRIMARY KEY,
-    document_type VARCHAR(32) NOT NULL CHECK (document_type IN ('certificate','invoice','receipt','credit_note')),
+    document_type VARCHAR(32) NOT NULL CHECK (document_type IN ('certificate','transcript','invoice','receipt','credit_note')),
     name VARCHAR(120) NOT NULL CHECK (btrim(name) <> ''),
     description VARCHAR(1000) NULL CHECK (description IS NULL OR btrim(description) <> ''),
     status VARCHAR(16) NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
@@ -3148,6 +2565,12 @@ ALTER TABLE certificates
     ADD CONSTRAINT certificates_template_version_fkey FOREIGN KEY (template_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
 CREATE INDEX certificates_template_version_fk_idx ON certificates (template_version_id);
 CREATE INDEX certificates_template_fk_idx ON certificates (template_id);
+-- A transcript names the exact template version that drew it, in the same way.
+ALTER TABLE transcripts
+    ADD CONSTRAINT transcripts_template_fkey FOREIGN KEY (template_id) REFERENCES document_templates(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT transcripts_template_version_fkey FOREIGN KEY (template_version_id) REFERENCES document_template_versions(id) ON DELETE RESTRICT;
+CREATE INDEX transcripts_template_version_fk_idx ON transcripts (template_version_id);
+CREATE INDEX transcripts_template_fk_idx ON transcripts (template_id);
 
 -- An issued financial document names the exact published version of a template of its own kind
 -- that drew it, with that version's number.
@@ -3223,17 +2646,6 @@ SQL);
             $this->execute('CREATE INDEX IF NOT EXISTS ' . $name . ' ON ' . $definition);
         }
 
-        // The built-in categories get their generated icons here, with the same generator the
-        // application uses, so a category installed by the baseline and one created later are
-        // indistinguishable.
-        $artwork = new ArtworkGenerator();
-        foreach ($this->fetchAll("SELECT id, slug, name FROM course_categories WHERE icon_svg = '' ORDER BY id") as $row) {
-            $this->execute(
-                'UPDATE course_categories SET icon_svg = ' . $this->quote($artwork->categoryIcon((string) $row['slug'], (string) $row['name']))
-                . ' WHERE id = ' . (int) $row['id']
-            );
-        }
-
         // The invoice, receipt and credit note templates, each published as version 1 and current
         // from the standard financial document design, so every financial document can be issued
         // from the moment the platform is installed. ADMIN changes the design at Commerce →
@@ -3292,6 +2704,23 @@ SQL);
             $position++;
         }
 
+        // The transcript template (owner, 2026-10-19), published as version 1 and current, so a
+        // transcript can be issued with its certificate from the moment the platform is installed.
+        $settings = DocumentType::Transcript->defaultSettings()->toArray();
+        $templateId = (int) $this->fetchRow(
+            "INSERT INTO document_templates (document_type, name, description) VALUES ('transcript', 'Transcript', "
+            . $this->quote('Every assessment mark and the overall grade of a certificate.') . ') RETURNING id'
+        )['id'];
+        $versionId = (int) $this->fetchRow(
+            'INSERT INTO document_template_versions (template_id, version_number, state, html, css, page_size, page_orientation,'
+            . ' margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm, change_note, published_at) VALUES ('
+            . $templateId . ", 1, 'published', " . $this->quote(TranscriptTemplate::html()) . ', ' . $this->quote(TranscriptTemplate::css()) . ', '
+            . $this->quote((string) $settings['page_size']) . ', ' . $this->quote((string) $settings['page_orientation']) . ', '
+            . (int) $settings['margin_top_mm'] . ', ' . (int) $settings['margin_right_mm'] . ', ' . (int) $settings['margin_bottom_mm'] . ', ' . (int) $settings['margin_left_mm']
+            . ", 'Installed design.', NOW()) RETURNING id"
+        )['id'];
+        $this->execute('UPDATE document_templates SET published_version_id = ' . $versionId . ', is_current = TRUE WHERE id = ' . $templateId);
+
     }
 
     /**
@@ -3305,7 +2734,7 @@ DROP TABLE IF EXISTS
     document_assets, document_template_versions, document_templates, analytics_events, api_tokens, app_options, assessment_attempts, assessment_options,
     assessment_questions, assessment_responses, assessment_session_questions, assessment_sessions,
     audit_log, auth_login_tokens, auth_sessions, bundle_courses, bundle_offers, bundles,
-    certificates, commerce_audit_events, commerce_bundle_grants, commerce_cart_bundles,
+    certificates, transcripts, identity_verifications, identity_webhook_events, scheduled_jobs, commerce_audit_events, commerce_bundle_grants, commerce_cart_bundles,
     commerce_cart_items, commerce_carts, commerce_document_files, commerce_document_numbers,
     commerce_documents, commerce_entitlements, commerce_ledger_entries, commerce_wallets, commerce_wallet_lots,
     commerce_wallet_allocations, commerce_wallet_reminders, commerce_refund_requests, commerce_refund_payouts,

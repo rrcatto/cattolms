@@ -245,7 +245,7 @@ final class CertificateDesignController extends BaseController
             ],
             'errors' => $errors,
             'preview_src' => $previewSource,
-            'saved' => $saved === null ? null : ['updated_at' => $saved['updated_at'], 'updated_by' => $saved['updated_by_name'], 'course_count' => $saved['course_count']],
+            'saved' => $saved === null ? null : ['updated_at' => $saved['updated_at'], 'updated_by' => self::lastEditor($saved), 'course_count' => $saved['course_count']],
             'return_to' => $this->returnTo(),
             'can_manage' => $user->hasPermission('CERTIFICATE.DESIGN.MANAGE'),
             'load_certificate_editor' => true,
@@ -303,9 +303,22 @@ final class CertificateDesignController extends BaseController
         $value = $design['design'];
         return [
             'id' => (int) $design['id'], 'name' => (string) $design['name'], 'is_default' => (bool) $design['is_current'],
-            'course_count' => (int) $design['course_count'], 'updated_at' => $design['updated_at'], 'updated_by' => $design['updated_by_name'],
+            'course_count' => (int) $design['course_count'], 'updated_at' => $design['updated_at'], 'updated_by' => self::lastEditor($design),
             'image' => $value->background !== null && $value->isCustom() ? self::pictureUrl($value->background->sha) : self::lookImage($value->look),
         ];
+    }
+
+    /**
+     * Who last edited a design, as data.person's props (owner, 2026-10-21: every person named is linked to their account,
+     * with their account reference), or null when nobody is recorded.
+     *
+     * @param array<string,mixed> $design
+     * @return ?array{name:string,reference:string,href:string}
+     */
+    private static function lastEditor(array $design): ?array
+    {
+        $id = (int) ($design['updated_by_user_id'] ?? 0);
+        return $id > 0 ? ['name' => (string) ($design['updated_by_name'] ?? '') ?: 'User ' . $id, 'reference' => (string) ($design['updated_by_reference'] ?? ''), 'href' => '/admin/people/' . $id] : null;
     }
 
     public static function lookImage(string $look): string

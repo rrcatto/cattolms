@@ -210,7 +210,8 @@ final class CompanyManagementContractTest extends TestCase
     {
         $markup = self::source('resources/views/partials/company/people.html.twig');
 
-        self::assertStringContainsString('name="certificate_name"', $markup);
+        // A certificate carries the verified name (owner, 2026-10-19): there is no certificate name to edit.
+        self::assertStringNotContainsString('name="certificate_name"', $markup);
         self::assertStringContainsString('name="mobile_number"', $markup);
         self::assertStringNotContainsString('name="roles[]"', $markup, 'Company administration does not grant platform roles.');
         self::assertStringNotContainsString('name="primary_email"', $markup, 'Email is part of the sign-in identity.');

@@ -1,0 +1,47 @@
+{% extends layout %}
+{% block page_body %}
+	{# A certificate's transcript (owner, 2026-10-19): every assessment mark and the overall grade
+	   (50% module assessments, 50% final assessment). Revoked with its certificate. Seen by its learner
+	   and, once the learner makes it public, by anyone with its address; only the learner is shown the
+	   way to the certificate. #}
+	{% set ph_compact = 1 %}
+	{% if is_owner %}{% set ph_back_href = '/certificates/' ~ transcript.certificate_public_id %}{% set ph_back_label = 'Certificate' %}{% endif %}
+	{% set ph_title = 'Transcript' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: transcript.course_title, heading_level: 2, summary: 'This page verifies the transcript record held by ' ~ app_name ~ '.'}) }}
+			{% if is_owner %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: transcript.is_public ? 'Public: anyone who has this page\'s address can see it.' : 'Private: only you can see this page.'})} %}{% block body %}<p>{{ ui('action.link', {label: 'Change who can see it', variant: 'secondary', size: 'small', href: '/account/certificates#certificate-' ~ transcript.certificate_id}) }}</p>{% endblock %}{% endembed %}
+			{% endif %}
+			{% if transcript.revoked_at %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This transcript and its certificate were revoked on ' ~ (transcript.revoked_at|date('j F Y')) ~ '.'})} %}{% block body %}{% if transcript.revocation_reason %}<p>{{ transcript.revocation_reason }}</p>{% endif %}{% endblock %}{% endembed %}
+			{% endif %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Transcript number', value: transcript.transcript_number},
+				{label: 'Certificate number', value: transcript.certificate_number},
+				{label: 'Learner', value: transcript.learner_name},
+				{label: 'Course', value: transcript.course_title},
+				{label: 'Completed', value: values['course.completion_date']|date('j F Y')},
+				{label: 'Issued', value: values['transcript.issue_date']|date('j F Y')},
+			]}) }}
+		{% endblock %}{% endembed %}
+	</section>
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'transcript-marks'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Marks', heading_level: 2, summary: 'The overall grade is half the module assessments\' average and half the final assessment\'s mark.'}) }}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Assessment marks'})} %}
+			{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 60, label: 'Assessment'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Kind', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 15, label: 'Mark'}} %}</tr>{% endblock %}
+			{% block body %}{% for assessment in values['assessments']|default([]) %}<tr><td class="cell-text">{{ assessment.title }}</td><td>{{ assessment.kind }}</td><td>{{ assessment.mark }}%</td></tr>{% endfor %}{% endblock %}
+			{% endembed %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Module assessments (average)', value: values['result.module_average'] is not null ? values['result.module_average'] ~ '%' : 'None'},
+				{label: 'Final assessment', value: values['result.final'] ~ '%'},
+				{label: 'Overall grade', value: values['result.overall'] ~ '%' ~ (values['result.grade'] ? ' (' ~ values['result.grade'] ~ ')' : '')},
+			]}) }}
+			{% if not transcript.revoked_at %}
+				<p>{{ ui('action.link', {label: 'Download PDF', variant: 'primary', href: '/transcripts/' ~ transcript.public_id ~ '/transcript.pdf', icon: 'action-open'}) }}</p>
+			{% endif %}
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

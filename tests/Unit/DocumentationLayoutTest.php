@@ -31,13 +31,14 @@ final class DocumentationLayoutTest extends TestCase
         self::assertFileExists($root . '/CHANGELOG.md');
         self::assertFileExists($root . '/LICENSE');
 
+        // The public documentation (2026-10-20): the specifications and operations. The development logs are
+        // kept privately, outside the repository, and must not return to it.
         $required = [
             'COURSE-SPECIFICATION.md',
-            'HANDOFF.md',
             'OPERATIONS.md',
-            'PROJECT-INSTRUCTIONS.md',
-            'ROADMAP.md',
             'THEME-SDK.md',
+            'UI-COMPONENTS.md',
+            'ux-ui-rules.md',
         ];
         $docs = array_map('basename', glob($root . '/docs/*.md') ?: []);
         foreach ($required as $document) {
@@ -47,5 +48,9 @@ final class DocumentationLayoutTest extends TestCase
                 'Required documentation is missing from docs/: ' . $document
             );
         }
+        foreach (['HANDOFF.md', 'ROADMAP.md', 'PROJECT-INSTRUCTIONS.md'] as $private) {
+            self::assertNotContains($private, $docs, 'The development log ' . $private . ' is kept outside the public repository.');
+        }
+        self::assertFileExists($root . '/install/README.md');
     }
 }

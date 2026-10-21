@@ -5,7 +5,7 @@
 	buttons post), eft_hidden (the fields each button carries) and eft_button (its label).
 #}
 {% if eft_match.found %}
-	<p data-eft-account>Account <strong>{{ eft_match.account.label }}</strong></p>
+	<p data-eft-account>Account {% if eft_match.account.person %}{{ ui('data.person', eft_match.account.person|merge({full: true})) }}{% else %}<strong>{{ eft_match.account.label }}</strong>{% endif %}</p>
 {% endif %}
 {% if eft_match.orders %}
 	{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}

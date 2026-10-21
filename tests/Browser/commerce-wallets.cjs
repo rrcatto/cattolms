@@ -143,8 +143,10 @@ async function buyWithWalletAndEft(page, fixture) {
         });
         await check(`${name}: an EFT above what is due starts the course and credits the wallet`, async () => {
             await adminPage.goto(`${base}/admin/commerce/orders/${placed.id}`);
-            // The order page names the account first and says what to do next (owner, 2026-10-18).
-            assert.match(await adminPage.locator('.cl-page-head').innerText(), new RegExp(`Account ${learner.reference}`));
+            // The order page names the account first and says what to do next (owner, 2026-10-18): under the order number,
+            // the person linked to their profile, their account reference and their email, each on its own line (owner, 2026-10-21).
+            assert.match(await adminPage.locator('.cl-page-head').innerText(), new RegExp(`Thandi Nkosi\\s+${learner.reference}`), 'the name, then the account reference on its own line');
+            assert.equal(await adminPage.locator('.cl-page-head a.cl-ui-person-account').getAttribute('href'), `/admin/people/${learner.id}`, 'the name opens their account');
             assert.match(await text(adminPage), /Waiting for the EFT payment/);
             if (name === 'chromium') {
                 // Record EFT Payment starts from the bank statement: no hunting for the order (owner, 2026-10-18).
@@ -297,7 +299,12 @@ async function buyWithWalletAndEft(page, fixture) {
         assert.match(await flash(page), /Commerce settings saved/);
         const refunds = await open(chromium, fixture.admin_token);
         await refunds.page.goto(`${base}/refunds`);
-        assert.match(await text(refunds.page), new RegExp(`the Stitch transaction fee on what you paid \\(2\\.9% of the amount plus ${rand(150)}\\)`), 'the Refund Policy prints the fee in force');
+        // The Refund Policy names no payment provider (owner, 2026-10-19): it deducts whatever fee the provider charged.
+        // Its sections are closed accordions (owner, 2026-10-20): they are opened to be read.
+        await refunds.page.evaluate(() => document.querySelectorAll('details.cl-ui-accordion-section').forEach((section) => { section.open = true; }));
+        const policy = await text(refunds.page);
+        assert.match(policy, /any fee the payment provider charged us for your payment/, 'the Refund Policy states the provider\'s fee in general');
+        assert.doesNotMatch(policy, /Stitch/, 'the Refund Policy names no payment provider');
         await refunds.ctx.close();
         await page.goto(`${base}/admin/settings?section=commerce-wallet#commerce-settings-wallet`);
         // The address opens the Wallet credit section.

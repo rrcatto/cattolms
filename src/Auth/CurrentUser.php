@@ -35,7 +35,11 @@ final readonly class CurrentUser
         public array $roles,
         public array $permissions,
         public string $sessionPublicId,
-        public string $authenticatedEmail = ''
+        public string $authenticatedEmail = '',
+        // What the person must do before anything else (owner, 2026-10-20, adults only): 'age' to give
+        // their date of birth, 'adults_only' when their verified identity shows them under 18 (the account
+        // goes no further); empty otherwise.
+        public string $accountStep = ''
     ) {
     }
 

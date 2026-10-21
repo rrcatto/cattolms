@@ -29,7 +29,7 @@
 			{% block body %}
 				{% for order in rows %}
 					<tr data-order-id="{{ order.id }}">
-						<td class="cell-text"><strong>{{ order.reference_label }}</strong><br><span class="small">{{ order.company_name ?: order.purchaser_name ?: order.purchaser_email }}{% if order.company_id %} (company){% endif %}</span></td>
+						<td class="cell-text"><strong>{{ order.reference_label }}</strong><br><span class="small">{% if order.company_id %}{{ order.company_name }} (company){% elseif order.purchaser_person %}{{ ui('data.person', order.purchaser_person) }}{% else %}{{ order.purchaser_name ?: order.purchaser_email }}{% endif %}</span></td>
 						<td>{{ order.number }}<br><span class="small">{{ order.when }}</span></td>
 						<td class="cell-text">{{ order.bought }}</td>
 						<td>{{ order.total_label }}</td>

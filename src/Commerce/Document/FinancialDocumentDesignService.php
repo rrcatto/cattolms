@@ -85,7 +85,7 @@ final class FinancialDocumentDesignService
     /**
      * When the design was last saved and by whom, and the version each document is drawn in now.
      *
-     * @return array{updated_at:string,updated_by:?string,versions:array<string,int>}
+     * @return array{updated_at:string,updated_by:?string,updated_by_person:array{name:string,reference:string,href:string,email:string}|null,versions:array<string,int>}
      */
     public function summary(): array
     {
@@ -99,6 +99,9 @@ final class FinancialDocumentDesignService
         return [
             'updated_at' => (string) $latest['updated_at'],
             'updated_by' => $latest['updated_by_name'] === null ? null : (string) $latest['updated_by_name'],
+            // Who saved it, as a person (owner, 2026-10-21).
+            'updated_by_person' => $latest['updated_by_name'] === null ? null
+                : \CattoLearning\Commerce\Application\MoneyRecords::person((int) $latest['updated_by_user_id'], (string) $latest['updated_by_name'], (string) ($latest['updated_by_reference'] ?? '')),
             'versions' => array_map(static fn(array $row): int => (int) $row['version_number'], $current),
         ];
     }

@@ -84,7 +84,9 @@ final class BankPayments
         $orders = $this->bank->eftOrders($account['kind'], $account['id']);
         if ($orderId !== null) $orders = array_values(array_filter($orders, static fn(array $o): bool => (int) $o['id'] === $orderId));
         $result['found'] = true;
-        $result['account'] = $account + ['label' => AccountReference::format($account['reference']) . ' · ' . $account['name']];
+        $result['account'] = $account + ['label' => AccountReference::format($account['reference']) . ' · ' . $account['name'],
+            // A person's account is the person, linked to their account with their reference and email (owner, 2026-10-21).
+            'person' => $account['kind'] === 'person' ? MoneyRecords::person($account['id'], $account['name'], $account['reference'], $account['email']) : null];
         $result['orders'] = array_map(self::orderRow(...), $orders);
         if ($result['orders'] === []) {
             $result['message'] = $orderId !== null
@@ -258,6 +260,14 @@ final class BankPayments
     {
         $amount = Money::ofMinorUnits((int) $row['amount_minor'], (string) $row['currency'])->format();
         $received = (new DateTimeImmutable((string) $row['received_at']))->format('j M Y');
+        $resolver = ['person' => MoneyRecords::person((int) ($row['resolved_by_user_id'] ?? 0), (string) ($row['resolved_by_name'] ?? ''), (string) ($row['resolved_by_reference'] ?? ''), (string) ($row['resolved_by_email'] ?? ''))];
+        $outcome = match ((string) $row['state']) {
+            'matched' => [['text' => 'Matched to order ' . MoneyRecords::orderNumber((int) $row['order_id']) . ' by '], $resolver,
+                ['text' => ' on ' . (new DateTimeImmutable((string) $row['resolved_at']))->format('j M Y') . ': it is that order’s EFT payment, received on ' . $received . '.']],
+            'returned' => [['text' => 'Paid back to the sender on ' . (new DateTimeImmutable((string) $row['returned_at']))->format('j M Y') . ', bank reference ' . $row['return_reference'] . ', recorded by '], $resolver,
+                ['text' => '.' . (trim((string) $row['resolution_note']) !== '' ? ' ' . trim((string) $row['resolution_note']) : '')]],
+            default => [],
+        };
 
         return [
             'id' => (int) $row['id'], 'href' => '/admin/commerce/unmatched/' . (int) $row['id'], 'state' => (string) $row['state'],
@@ -265,16 +275,13 @@ final class BankPayments
             'received_on' => (new DateTimeImmutable((string) $row['received_at']))->format('Y-m-d'),
             'payer_reference' => (string) $row['payer_reference'], 'bank_reference' => (string) $row['bank_reference'], 'seen_where' => (string) $row['seen_where'],
             'recorded' => (new DateTimeImmutable((string) $row['recorded_at']))->format('j M Y \a\t H:i'), 'recorded_by' => (string) $row['recorded_by_name'],
+            'recorded_by_person' => MoneyRecords::person((int) $row['recorded_by_user_id'], (string) $row['recorded_by_name'], (string) ($row['recorded_by_reference'] ?? ''), (string) ($row['recorded_by_email'] ?? '')),
             'sentence' => $amount . ' arrived on ' . $received . ' with the reference "' . $row['payer_reference'] . '", and no unpaid order could be matched to it.',
             'status_label' => match ((string) $row['state']) { 'matched' => 'Matched', 'returned' => 'Paid back', default => 'To sort out' },
             'status_tone' => $row['state'] === 'open' ? 'warning' : 'neutral',
-            'outcome' => match ((string) $row['state']) {
-                'matched' => 'Matched to order ' . MoneyRecords::orderNumber((int) $row['order_id']) . ' by ' . $row['resolved_by_name'] . ' on '
-                    . (new DateTimeImmutable((string) $row['resolved_at']))->format('j M Y') . ': it is that order’s EFT payment, received on ' . $received . '.',
-                'returned' => 'Paid back to the sender on ' . (new DateTimeImmutable((string) $row['returned_at']))->format('j M Y') . ', bank reference ' . $row['return_reference']
-                    . ', recorded by ' . $row['resolved_by_name'] . '.' . (trim((string) $row['resolution_note']) !== '' ? ' ' . trim((string) $row['resolution_note']) : ''),
-                default => '',
-            },
+            'outcome' => implode('', array_map(static fn(array $part): string => $part['text'] ?? $part['person']['name'], $outcome)),
+            // The same sentence with whoever resolved it as a person (owner, 2026-10-21).
+            'outcome_parts' => $outcome,
             'order_href' => $row['order_id'] === null ? '' : '/admin/commerce/orders/' . (int) $row['order_id'],
             'order_label' => $row['order_id'] === null ? '' : MoneyRecords::orderNumber((int) $row['order_id']),
         ];

@@ -149,7 +149,8 @@ enum LandingSectionType: string
             self::Contents => ['heading' => '', 'text' => '', 'show_items' => true, 'show_descriptions' => false],
             self::Benefits => ['heading' => '', 'text' => '', 'items' => []],
             self::Instructor, self::Pricing, self::Cta => ['heading' => '', 'text' => ''],
-            self::Reviews => ['heading' => '', 'text' => '', 'limit' => 3, 'when_empty' => 'hide'],
+            // With no approved review the section is always left out (owner, 2026-10-20).
+            self::Reviews => ['heading' => '', 'text' => '', 'limit' => 3],
             self::Faq => ['heading' => '', 'text' => '', 'items' => []],
         };
     }
@@ -187,7 +188,6 @@ enum LandingSectionType: string
                 'heading' => $heading(),
                 'text' => $text(),
                 'limit' => self::limit($input['limit'] ?? 3),
-                'when_empty' => in_array($input['when_empty'] ?? 'hide', ['hide', 'show'], true) ? (string) ($input['when_empty'] ?? 'hide') : throw new InvalidArgumentException('Choose what the section does when there are no reviews.'),
             ],
             self::Pricing, self::Cta => ['heading' => $heading(), 'text' => $text(600)],
             self::Faq => [

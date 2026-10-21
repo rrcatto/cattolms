@@ -40,6 +40,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Support\Pagination;
+use CattoLearning\View\Artwork\UploadedSvg;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -50,7 +51,8 @@ final class AdminCourseTagController extends BaseController
         AuthService $auth,
         ThemeRenderer $view,
         RequestStack $requests,
-        private readonly CourseService $courses
+        private readonly CourseService $courses,
+        private readonly \CattoLearning\View\Artwork\IconLibrary $icons
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -102,12 +104,24 @@ final class AdminCourseTagController extends BaseController
         $this->requireCsrf();
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
         return $this->handle(function () use ($user): void {
-            $tag = $this->courses->createTag($_POST, $user->id);
+            $tag = $this->courses->createTag($_POST, $user->id, UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
             $this->flash('success', 'The tag “' . (string) $tag['name'] . '” was created.');
             $this->redirect('/admin/courses/tags');
         }, '/admin/courses/tags');
     }
 
+
+    /** A tag's own page: its name and its icon (owner, 2026-10-20: "each tag also needs a custom svg icon"). */
+    #[Route('/admin/courses/tags/{id}', name: 'admin_course_tag_edit', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function edit(): Response
+    {
+        $this->requirePermission('COURSE.TAG.MANAGE');
+        $tag = $this->courses->tag((int) $this->param('id'));
+        $iconQuery = trim((string) $this->request()->query->get('icon_q', ''));
+        return $this->render('admin-course-tag-edit', ['title' => 'Edit tag · ' . (string) $tag['name'], 'tag' => $tag,
+            // The icon library (owner, 2026-10-20): the icons that fit the name, or those found by a search.
+            'icon_choice' => ['query' => $iconQuery, 'items' => $this->icons->choices((string) $tag['name'], $iconQuery), 'action' => '/admin/courses/tags/' . (int) $tag['id']]]);
+    }
 
     #[Route('/admin/courses/tags/{id}', name: 'admin_course_tag_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function update(): Response
@@ -116,12 +130,28 @@ final class AdminCourseTagController extends BaseController
         $user = $this->requirePermission('COURSE.TAG.MANAGE');
         $tagId = (int) $this->param('id');
         return $this->handle(function () use ($user, $tagId): void {
-            $this->courses->updateTag($tagId, $_POST, $user->id);
+            $this->courses->updateTag($tagId, $_POST, $user->id, UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon'));
             $this->flash('success', 'The tag was updated.');
             $this->redirect('/admin/courses/tags');
-        }, '/admin/courses/tags');
+        }, '/admin/courses/tags/' . $tagId);
     }
 
+
+    /** The tag's icon, from its own card: one chosen from the icon library or an SVG uploaded (owner, 2026-10-20). */
+    #[Route('/admin/courses/tags/{id}/icon', name: 'admin_course_tag_icon', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function icon(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('COURSE.TAG.MANAGE');
+        $id = (int) $this->param('id');
+        return $this->handle(function () use ($user, $id): void {
+            $icon = UploadedSvg::fromUpload($_FILES['icon'] ?? null, UploadedSvg::ICON_BYTES, 'icon') ?? $this->icons->chosen($_POST['library_icon'] ?? '');
+            if ($icon === null) throw new \InvalidArgumentException('Choose an icon from the library or upload an SVG file.');
+            $this->courses->replaceTagIcon($id, $icon, $user->id);
+            $this->flash('success', 'The icon was saved.');
+            $this->redirect('/admin/courses/tags/' . $id . '#icon');
+        }, '/admin/courses/tags/' . $id . '#icon');
+    }
 
     #[Route('/admin/courses/tags/{id}/delete', name: 'admin_course_tag_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function delete(): Response

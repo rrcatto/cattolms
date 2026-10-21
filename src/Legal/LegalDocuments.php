@@ -22,6 +22,19 @@ print comes from there. No name, address or legal form of a real business is wri
 Changing a document's text means changing its date here in the same change.
 
 Changelog:
+2026/10/20 SAST
+- Terms: a promo code is entered at checkout or applied automatically, and one promotion applies to an
+  order, the one that saves the most (owner, 2026-10-20).
+- Terms and Privacy Policy: adults only, with the date of birth given at registration or at the first
+  sign-in, and identity verified only for certificates and transcripts, never before a purchase
+  (owner, 2026-10-20).
+2026/10/19 SAST
+- All three texts changed (owner, 2026-10-19): no payment or verification provider is named; the
+  payment methods are those shown at checkout; identity is verified by an identity verification
+  provider (document and live selfie, no images kept); the age confirmation; certificates prove that the
+  learner took the course, never that they passed; processors are described by role.
+- Terms and Privacy Policy again the same day: each certificate and transcript is private until the
+  learner makes it public, and the learner can give either a new address (owner, 2026-10-19).
 2026/10/18 SAST
 - The seller is the Site Owner: every detail from SiteOwner, the wording following its legal form
   (company or sole proprietor), and each page dated by the later of its text and the Site Owner.
@@ -48,14 +61,17 @@ final class LegalDocuments
 
     /**
      * Each document's page template is its key. label is the footer wording; text_updated is the date
-     * its text last changed.
+     * its text last changed; intro is the sentence the page and its PDF open with.
      *
-     * @var array<string,array{title:string,label:string,path:string,text_updated:string}>
+     * @var array<string,array{title:string,label:string,path:string,text_updated:string,intro:string}>
      */
     private const DOCUMENTS = [
-        self::TERMS => ['title' => 'Terms and Conditions', 'label' => 'Terms', 'path' => '/terms', 'text_updated' => '2026-10-18'],
-        self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-10-17'],
-        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-10-18'],
+        self::TERMS => ['title' => 'Terms and Conditions', 'label' => 'Terms', 'path' => '/terms', 'text_updated' => '2026-10-20',
+            'intro' => 'These terms apply to everyone who uses this site and to every purchase made on it.'],
+        self::REFUNDS => ['title' => 'Refund Policy', 'label' => 'Refunds', 'path' => '/refunds', 'text_updated' => '2026-10-19',
+            'intro' => 'This policy applies to every purchase made on this site. It is part of the Terms and Conditions.'],
+        self::PRIVACY => ['title' => 'Privacy Policy', 'label' => 'Privacy', 'path' => '/privacy', 'text_updated' => '2026-10-20',
+            'intro' => 'This policy explains how personal information is handled on this site, as the Protection of Personal Information Act 4 of 2013 (POPIA) requires.'],
     ];
 
     /** What the pages say when the Site Owner sets no membership or accreditation. */
@@ -70,7 +86,7 @@ final class LegalDocuments
      * One document as its page shows it: its last-updated date is the later of its text's date and
      * the date a Site Owner detail it prints last changed.
      *
-     * @return array{key:string,title:string,label:string,path:string,text_updated:string,updated:string,updated_label:string}
+     * @return array{key:string,title:string,label:string,path:string,text_updated:string,intro:string,updated:string,updated_label:string}
      */
     public function document(string $key): array
     {
@@ -85,7 +101,7 @@ final class LegalDocuments
     /**
      * The three documents in the order the footer and each page list them.
      *
-     * @return array<string,array{key:string,title:string,label:string,path:string,text_updated:string,updated:string,updated_label:string}>
+     * @return array<string,array{key:string,title:string,label:string,path:string,text_updated:string,intro:string,updated:string,updated_label:string}>
      */
     public function all(): array
     {
@@ -158,7 +174,7 @@ final class LegalDocuments
         ];
     }
 
-    /** @return array{title:string,label:string,path:string,text_updated:string} */
+    /** @return array{title:string,label:string,path:string,text_updated:string,intro:string} */
     private static function definition(string $key): array
     {
         return self::DOCUMENTS[$key] ?? throw new InvalidArgumentException('Unknown legal document: ' . $key);

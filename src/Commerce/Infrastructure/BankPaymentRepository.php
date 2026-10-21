@@ -25,8 +25,10 @@ use CattoLearning\Infrastructure\Persistence\Database;
 
 final class BankPaymentRepository
 {
-    private const UNMATCHED_COLUMNS = 'u.*, r.display_name AS recorded_by_name, s.display_name AS resolved_by_name';
-    private const UNMATCHED_FROM = 'FROM commerce_unmatched_payments u JOIN users r ON r.id = u.recorded_by_user_id LEFT JOIN users s ON s.id = u.resolved_by_user_id';
+    private const UNMATCHED_COLUMNS = 'u.*, r.display_name AS recorded_by_name, r.account_reference AS recorded_by_reference, re.email AS recorded_by_email,
+        s.display_name AS resolved_by_name, s.account_reference AS resolved_by_reference, se.email AS resolved_by_email';
+    private const UNMATCHED_FROM = 'FROM commerce_unmatched_payments u JOIN users r ON r.id = u.recorded_by_user_id LEFT JOIN users s ON s.id = u.resolved_by_user_id
+        LEFT JOIN user_emails re ON re.user_id = r.id AND re.is_primary LEFT JOIN user_emails se ON se.user_id = s.id AND se.is_primary';
 
     public function __construct(private readonly Database $db)
     {
@@ -35,31 +37,31 @@ final class BankPaymentRepository
     /**
      * The person or company whose account reference this is.
      *
-     * @return array{kind:string,id:int,name:string,reference:string}|null
+     * @return array{kind:string,id:int,name:string,reference:string,email:string}|null
      */
     public function accountByReference(string $stored): ?array
     {
-        $person = $this->db->fetchAssociative('SELECT id, display_name AS name, account_reference FROM users WHERE account_reference = :r', ['r' => $stored]);
-        if ($person !== false) return ['kind' => 'person', 'id' => (int) $person['id'], 'name' => (string) $person['name'], 'reference' => (string) $person['account_reference']];
+        $person = $this->db->fetchAssociative('SELECT u.id, u.display_name AS name, u.account_reference, ue.email FROM users u LEFT JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary WHERE u.account_reference = :r', ['r' => $stored]);
+        if ($person !== false) return ['kind' => 'person', 'id' => (int) $person['id'], 'name' => (string) $person['name'], 'reference' => (string) $person['account_reference'], 'email' => (string) ($person['email'] ?? '')];
         $company = $this->db->fetchAssociative('SELECT id, name, account_reference FROM companies WHERE account_reference = :r', ['r' => $stored]);
 
-        return $company === false ? null : ['kind' => 'company', 'id' => (int) $company['id'], 'name' => (string) $company['name'], 'reference' => (string) $company['account_reference']];
+        return $company === false ? null : ['kind' => 'company', 'id' => (int) $company['id'], 'name' => (string) $company['name'], 'reference' => (string) $company['account_reference'], 'email' => ''];
     }
 
     /**
      * The account an order belongs to: its company for a company order, otherwise its buyer.
      *
-     * @return array{kind:string,id:int,name:string,reference:string}|null
+     * @return array{kind:string,id:int,name:string,reference:string,email:string}|null
      */
     public function accountForOrder(int $orderId): ?array
     {
-        $row = $this->db->fetchAssociative('SELECT o.company_id, o.purchaser_user_id, u.display_name, u.account_reference AS user_reference, c.name AS company_name, c.account_reference AS company_reference
-            FROM commerce_orders o JOIN users u ON u.id = o.purchaser_user_id LEFT JOIN companies c ON c.id = o.company_id WHERE o.id = :id', ['id' => $orderId]);
+        $row = $this->db->fetchAssociative('SELECT o.company_id, o.purchaser_user_id, u.display_name, u.account_reference AS user_reference, ue.email AS user_email, c.name AS company_name, c.account_reference AS company_reference
+            FROM commerce_orders o JOIN users u ON u.id = o.purchaser_user_id LEFT JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary LEFT JOIN companies c ON c.id = o.company_id WHERE o.id = :id', ['id' => $orderId]);
         if ($row === false) return null;
 
         return $row['company_id'] !== null
-            ? ['kind' => 'company', 'id' => (int) $row['company_id'], 'name' => (string) $row['company_name'], 'reference' => (string) $row['company_reference']]
-            : ['kind' => 'person', 'id' => (int) $row['purchaser_user_id'], 'name' => (string) $row['display_name'], 'reference' => (string) $row['user_reference']];
+            ? ['kind' => 'company', 'id' => (int) $row['company_id'], 'name' => (string) $row['company_name'], 'reference' => (string) $row['company_reference'], 'email' => '']
+            : ['kind' => 'person', 'id' => (int) $row['purchaser_user_id'], 'name' => (string) $row['display_name'], 'reference' => (string) $row['user_reference'], 'email' => (string) ($row['user_email'] ?? '')];
     }
 
     /**

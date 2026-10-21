@@ -1,1 +1,2 @@
-<dl class="cl-ui-key-value-list">{% for item in props.items %}<dt>{{ item.label }}</dt><dd>{{ item.value }}</dd>{% endfor %}</dl>
+{# An item's value is text, or a person with an account (item.person, data.person's props: owner 2026-10-21, every person named is linked to their account with their account reference). #}
+<dl class="cl-ui-key-value-list">{% for item in props.items %}<dt>{{ item.label }}</dt><dd>{% if item.was|default(null) %}<s class="cl-ui-key-value-was"><span class="visually-hidden">Was </span>{{ item.was }}</s> <span class="visually-hidden">now </span>{% endif %}{% if item.person|default(null) %}{{ ui('data.person', item.person) }}{% else %}{{ item.value }}{% endif %}</dd>{% endfor %}</dl>

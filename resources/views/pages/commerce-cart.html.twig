@@ -9,7 +9,7 @@
         {% for item in cart.items %}
             <div class="cl-border-bottom py-5">
                 <h2 class="h5"><a href="/courses/{{ item.slug }}">{{ item.title }}</a></h2>
-                <p>{{ item.days }} days of access · {{ item.price_label }}</p>
+                <p>{{ item.days }} days of access · {% include '@platform/partials/price.html.twig' with {price: item, price_saving: true} %}</p>
                 <form action="/cart/remove" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.id }}">
                     {{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit'}) }}
@@ -29,7 +29,8 @@
         {% for overlap in cart.overlaps %}{{ ui('feedback.notice', {tone: 'warning', heading: overlap}) }}{% endfor %}
         {% if cart.count > 0 and cart.buyer %}
             <div class="mt-7">{{ ui('data.key-value-list', {items: cart.totals}) }}</div>
-            {% if cart.promo.code %}<p class="help">Promo code {{ cart.promo.code }} is on this cart{{ cart.promo.applied ? '' : ' but no longer applies' }}. You can change it when you review your order at checkout.</p>{% endif %}
+            {% if cart.promo.automatic %}<p class="cl-cart-promo-automatic">Promo code <strong>{{ cart.promo.code }}</strong> was applied automatically: you save {{ cart.promo.saving_label }}.</p>{% if cart.promo.note %}<p class="help">{{ cart.promo.note }}</p>{% endif %}
+            {% elseif cart.promo.code %}<p class="help">Promo code {{ cart.promo.code }} is on this cart{{ cart.promo.applied ? '' : ' but no longer applies' }}. You can change it when you review your order at checkout.</p>{% endif %}
             {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 {{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'normal', href: '/checkout'}) }}

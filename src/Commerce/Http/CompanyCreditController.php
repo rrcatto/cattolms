@@ -29,7 +29,8 @@ final class CompanyCreditController extends BaseController
         private readonly CompanyCreditPurchaseService $purchases,
         private readonly CommerceMaintenance $maintenance,
         private readonly WalletService $wallets,
-        private readonly CommerceSettings $settings
+        private readonly CommerceSettings $settings,
+        private readonly \CattoLearning\Commerce\Settings\PaymentMethods $paymentMethods
     ) { parent::__construct($auth,$view,$requests); }
 
     private function companyId(CurrentUser $actor): int
@@ -97,13 +98,14 @@ final class CompanyCreditController extends BaseController
             $companyId=$this->companyId($actor);
             $basket=$this->purchases->startCheckout($actor,$companyId);
             if ($basket['items'] === []) $this->redirect('/company/credits/buy');
-            // The company wallet pays as much as it holds when the administrator chooses it (owner, 2026-10-17);
-            // a learner's request purchase is paid by card so the learner is enrolled at once.
-            $balance=$basket['request_id']===null ? $this->wallets->spendable(WalletOwner::company($companyId),'ZAR') : 0;
+            // The company wallet pays as much as it holds when the administrator chooses it (owner, 2026-10-17),
+            // for a learner's request too (owner, 2026-10-19).
+            $balance=$this->wallets->spendable(WalletOwner::company($companyId),'ZAR');
             return $this->render('company-credit-checkout',['title'=>'Company credit checkout','active_nav'=>'company','basket'=>$basket,
                 'billing'=>$this->purchases->billingForm($actor,$companyId),'billing_fields'=>BillingDetails::formFields(false),
                 'wallet_balance_minor'=>$balance,'wallet_balance_label'=>Money::ofMinorUnits($balance,'ZAR')->format(),
-                'payment_due'=>$this->settings->paymentDue()->words(),'refund_window'=>$this->settings->refundWindow()->words()]);
+                'payment_due'=>$this->settings->paymentDue()->words(),'refund_window'=>$this->settings->refundWindow()->words(),
+                'payment_options'=>$this->paymentMethods->checkoutOptions()]);
         },'/company/credits/buy');
     }
 

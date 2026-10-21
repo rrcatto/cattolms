@@ -10,6 +10,9 @@ Description:
 Handles the consolidated Account workspace and standalone account sections. Profile contains only personal/account identity fields; dashboard, learning, login sessions and audit activity are independent sections with direct routes.
 
 Changelog:
+2026/10/19 SAST
+- My Certificates (/account/certificates): each certificate and transcript private or public, decided
+  separately by the learner, and a new address for either at any time (owner, 2026-10-19).
 2026/09/03 03:18 SAST
 - Fixed the ALL-universe SQL error on Administration Courses search, the undefined universe 500 on Account routes, and rebuilt the Switch Company picker on the shared search, the shared pagination and the standard universe query parameter.
 2026/08/31 19:05 SAST
@@ -55,7 +58,9 @@ final class AccountController extends BaseController
         private readonly CompanyService $companies,
         private readonly AccountSectionRegistry $sections,
         private readonly UserProfileRepository $profiles,
-        private readonly BillingProfileService $billing
+        private readonly BillingProfileService $billing,
+        private readonly \CattoLearning\Identity\IdentityVerificationService $identity,
+        private readonly \CattoLearning\Course\Certificate\CertificateSharing $sharing
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -89,11 +94,55 @@ final class AccountController extends BaseController
 
 
     #[Route('/account/courses', name: 'account_courses', methods: ['GET'])]
-    #[Route('/account/library', name: 'account_learning', methods: ['GET'])]
     public function learning(): Response
     {
         $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
         return $this->renderAccountSection('learning', $this->learningData($user->id, $this->libraryRequest()));
+    }
+
+    /**
+     * The learner's certificates and transcripts, and who can see each one (owner, 2026-10-19): private
+     * (only the learner) until the learner makes it public (anyone with its address), each decided
+     * separately and changed at any time, and each can be given a new address.
+     */
+    #[Route('/account/certificates', name: 'account_certificates', methods: ['GET'])]
+    public function certificates(): Response
+    {
+        $user = $this->requirePermission('LEARNING.CERTIFICATE.VIEW');
+        return $this->renderAccountSection('certificates', $this->certificateData($user->id));
+    }
+
+    #[Route('/account/certificates/{id}/visibility', name: 'account_certificate_visibility', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function certificateVisibility(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('LEARNING.CERTIFICATE.VIEW');
+        $id = (int) $this->param('id');
+        $back = '/account/certificates#certificate-' . $id;
+        return $this->handle(function () use ($user, $id, $back): void {
+            $document = (string) ($_POST['document'] ?? '');
+            $public = ($_POST['public'] ?? '') === '1';
+            $this->sharing->setPublic($user->id, $id, $document, $public);
+            $this->flash('success', ($document === 'transcript' ? 'Your transcript' : 'Your certificate') . ($public
+                ? ' is now public. Anyone who has its address can see it.'
+                : ' is now private. Only you can see it.'));
+            $this->redirect($back);
+        }, $back);
+    }
+
+    #[Route('/account/certificates/{id}/address', name: 'account_certificate_address', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function certificateAddress(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('LEARNING.CERTIFICATE.VIEW');
+        $id = (int) $this->param('id');
+        $back = '/account/certificates#certificate-' . $id;
+        return $this->handle(function () use ($user, $id, $back): void {
+            $document = (string) ($_POST['document'] ?? '');
+            $this->sharing->newAddress($user->id, $id, $document);
+            $this->flash('success', ($document === 'transcript' ? 'Your transcript' : 'Your certificate') . ' has a new address. The old address no longer works.');
+            $this->redirect($back);
+        }, $back);
     }
 
     #[Route('/account/profile', name: 'account_profile', methods: ['GET'])]
@@ -349,6 +398,12 @@ final class AccountController extends BaseController
     }
 
     /** @return array<string,mixed> */
+    private function certificateData(int $userId): array
+    {
+        return ['account_certificates' => $this->sharing->forLearner($userId)];
+    }
+
+    /** @return array<string,mixed> */
     private function dashboardData(int $userId): array
     {
         $courses = $this->learning->library($userId);
@@ -381,35 +436,37 @@ final class AccountController extends BaseController
      */
     private function learningData(int $userId, array $request): array
     {
+        $companyAccount = $this->companies->forUser($userId) !== null;
+        // A list the account does not have is not found (owner, 2026-10-21: "make it a 404").
+        if ($request['list'] !== null && !in_array($request['list'], $this->learning->libraryLists($companyAccount), true)) {
+            throw new NotFoundHttpException('There is no such list of courses.');
+        }
         return $this->learning->courseLibraryView(
             $userId,
+            $companyAccount,
             $request,
             fn(string $dataset, array $req, int $total) => $this->platformAdministration->paginationFor($dataset, $req, $total),
-            fn(string $dataset, $pagination, string $label, string $search) => $this->platformAdministration->paginationView(
+            fn(string $dataset, $pagination, string $label, string $search, string $list) => $this->platformAdministration->paginationView(
                 $dataset,
                 $pagination,
                 '/account/courses',
                 $label,
-                $search === '' ? [] : [PlatformAdministrationService::searchParam($dataset) => $search]
+                ['list' => $list] + ($search === '' ? [] : [PlatformAdministrationService::searchParam($dataset) => $search])
             )
         );
     }
 
     /**
-     * Page, page size and search term for each Course Library dataset.
+     * The chosen list of My Courses, and its page, page size and search term.
      *
      * @return array<string,mixed>
      */
     private function libraryRequest(): array
     {
-        $request = [];
-        foreach (array_keys(LearningService::LIBRARY_DATASETS) as $dataset) {
-            $request[$dataset . '_page'] = $_GET[$dataset . '_page'] ?? null;
-            $request[$dataset . '_page_size'] = $_GET[$dataset . '_page_size'] ?? null;
-            $param = PlatformAdministrationService::searchParam($dataset);
+        $request = ['list' => isset($_GET['list']) ? (is_string($_GET['list']) ? $_GET['list'] : '') : null];
+        foreach ([PlatformAdministrationService::pageParam('library'), PlatformAdministrationService::sizeParam('library'), PlatformAdministrationService::searchParam('library')] as $param) {
             $request[$param] = $_GET[$param] ?? null;
         }
-
         return $request;
     }
 
@@ -435,6 +492,7 @@ final class AccountController extends BaseController
                 'emails' => $this->emailData($user->id),
                 'social' => $this->socialData($user->id),
                 'learning' => $this->learningData($user->id, $this->libraryRequest()),
+                'certificates' => $this->certificateData($user->id),
                 'sessions' => ['sessions' => $this->auth->activeSessions($user->id)],
                 'activity' => ['account_activity' => $this->platformAdministration->activityEvents(['actor_id' => $user->id], 100)],
                 default => [],
@@ -453,6 +511,7 @@ final class AccountController extends BaseController
             'emails' => 'ACCOUNT.PROFILE.VIEW',
             'social' => 'ACCOUNT.PROFILE.VIEW',
             'learning' => 'LEARNING.LIBRARY.VIEW',
+            'certificates' => 'LEARNING.CERTIFICATE.VIEW',
             'sessions' => 'ACCOUNT.SESSION.VIEW',
             'activity' => 'ACCOUNT.ACTIVITY.VIEW',
         ];
@@ -506,6 +565,8 @@ final class AccountController extends BaseController
                 : '/account/profile/image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
             'profile_image_size' => ProfileImage::SIZE,
             'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($profile['account_reference'] ?? '')),
+            // Certificates carry the verified name (owner, 2026-10-19); the profile says where the account stands.
+            'identity_verification' => $this->identity->state($userId),
         ];
     }
 

@@ -6,7 +6,9 @@
 	{% set ph_title = 'Switch company' %}
 	{% set ph_lead = 'Choose the company you are administering.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
-<section class="cl-company-picker">
+{# Built like every page (UX rule 1.7): its content in a card in a page section. #}
+<section class="cl-page-section cl-company-picker">
+	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Switch company', summary: 'Choose the company to administer. The company you choose decides whether the workspace shows real or generated data.'})} %}
 {% block section_actions %}
 {{ ui('action.link', {label: 'Back to Company', variant: 'secondary', size: 'small', href: '/company'}) }}
@@ -15,5 +17,6 @@
 
 			{% include '@platform/partials/company-picker-results.html.twig' %}
 
+	{% endblock %}{% endembed %}
 	</section>
 {% endblock %}

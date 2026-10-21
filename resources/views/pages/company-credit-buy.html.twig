@@ -14,7 +14,7 @@
                 </form>
                 {% if offers %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
                     {% for offer in offers %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
-                        <strong>{{ offer.title }}</strong><p>{{ offer.days }} days · {{ offer.price_label }} per credit</p>
+                        <strong>{{ offer.title }}</strong><p>{{ offer.days }} days · {% include '@platform/partials/price.html.twig' with {price: offer} %} per credit</p>
                     {% endblock %}{% block actions %}
                         <form action="/company/credits/buy/add" method="post">
                             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ offer.id }}">

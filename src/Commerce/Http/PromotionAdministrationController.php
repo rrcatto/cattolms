@@ -204,6 +204,7 @@ final class PromotionAdministrationController extends BaseController
         return [
             'id' => $promotion->id, 'code' => $promotion->code, 'name' => $promotion->name, 'description' => $promotion->description,
             'discount' => $promotion->discountLabel(), 'active' => $promotion->active, 'status' => $promotion->status($now),
+            'automatic' => $promotion->appliesAutomatically,
             'validity' => match (true) {
                 $from !== null && $until !== null => $from . ' until ' . $until,
                 $from !== null => 'From ' . $from,

@@ -8,6 +8,7 @@ Protects the simplified shared business-permission catalogue, SYSTEM-only infras
 
 Changelog:
 2026/10/08 SAST
+- 101 permissions (91 business): CERTIFICATE.ISSUED.VIEW/MANAGE for issued certificates and PLATFORM.IDENTITY.VIEW/MANAGE for identity verification (2026-10-19).
 - 92 permissions (82 business): PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE for the financial document design.
 2026/10/17 SAST
 - 97 permissions (87 business): the wallet and refund request keys.
@@ -66,7 +67,8 @@ final class AclContractTest extends TestCase
         // CERTIFICATE.DESIGN.VIEW and CERTIFICATE.DESIGN.MANAGE for certificate designs. 82 with
         // PLATFORM.DOCUMENT.VIEW and PLATFORM.DOCUMENT.MANAGE for the financial document design. 87
         // with COMMERCE.WALLET.VIEW, COMMERCE.REFUND.REQUEST, COMPANY.WALLET.VIEW and PLATFORM.WALLET.VIEW/MANAGE.
-        self::assertCount(87, $catalog->businessKeys());
+        // 91 with CERTIFICATE.ISSUED.VIEW/MANAGE and PLATFORM.IDENTITY.VIEW/MANAGE (owner, 2026-10-19).
+        self::assertCount(91, $catalog->businessKeys());
 
         $actions = ['VIEW','CREATE','EDIT','MANAGE','DELETE','START','TAKE','REQUEST','FAVOURITE','PREVIEW','PUBLISH','IMPORT','EXPORT','PRUNE','TEST','RECONCILE'];
         foreach ($keys as $key) {

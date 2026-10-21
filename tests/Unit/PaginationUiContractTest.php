@@ -60,10 +60,19 @@ final class PaginationUiContractTest extends TestCase
     {
         $markup = self::read('resources/views/partials/pagination.html.twig');
 
-        self::assertStringContainsString('Showing {{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·', $markup);
-        self::assertStringContainsString('Page {{ pg.page }} of {{ pg.total_pages }}', $markup);
-        self::assertStringContainsString('>Previous<', $markup);
-        self::assertStringContainsString('>Next<', $markup);
+        self::assertStringContainsString('{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·', $markup);
+        // Short, so the row fits one line (owner, 2026-10-21): "Pg", icons for first, previous, next and last with their words
+        // for screen readers, "Show Pg", the page count once, and the rows drop-down before its words.
+        self::assertStringContainsString('Pg {{ pg.page }} of {{ pg.total_pages }}', $markup);
+        foreach (['page-first' => 'First page', 'page-previous' => 'Previous page', 'page-next' => 'Next page', 'page-last' => 'Last page'] as $icon => $words) {
+            self::assertStringContainsString("label: '" . $words . "', icon: '" . $icon . "', icon_only: true", $markup);
+            self::assertStringContainsString("{{ ui('icon', {name: '" . $icon . "', decorative: true}) }}<span class=\"visually-hidden\">" . $words . '</span>', $markup);
+        }
+        self::assertStringContainsString('>Show Pg</label>', $markup);
+        self::assertStringContainsString('data-digits="{{ (pg.total_pages ~ \'\')|length }}"', $markup, 'The page box grows with the last page number.');
+        self::assertStringNotContainsString('-jump-help', $markup, 'The page count is said once, in the summary.');
+        self::assertMatchesRegularExpression('#</select>\s*<label for="\{\{ pg_id \}\}-page-size">Rows per pg</label>#', $markup);
+        foreach (['Jump to page', 'Rows per page', '« First', 'Last »'] as $long) self::assertStringNotContainsString($long, $markup);
         self::assertStringContainsString('name="{{ pg.size_param }}"', $markup);
         self::assertStringContainsString('pagination-page-size', $markup);
     }

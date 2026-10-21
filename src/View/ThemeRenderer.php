@@ -10,6 +10,8 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/20 SAST (v0.9.6)
+- Advanced PLATFORM_ASSET_VERSION to 0.9.6. Themes receive page.name; Administration lists Setup and Contact Messages.
 2026/10/19 SAST (v0.9.5)
 - Credits & Orders no longer lists Payment Events and Commerce Trail: each order's page shows its own. It lists Record EFT Payment and Unmatched Money.
 - Advanced PLATFORM_ASSET_VERSION to 0.9.5.
@@ -112,7 +114,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.5';
+    private const PLATFORM_ASSET_VERSION = '0.9.6';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -137,7 +139,8 @@ final class ThemeRenderer
         private readonly CompanySectionRegistry $companySections,
         private readonly ?\CattoLearning\Commerce\Application\CartService $carts = null,
         private readonly ?\CattoLearning\Course\CourseReviewRepository $reviews = null,
-        private readonly ?\CattoLearning\Configuration\SiteMode $site = null
+        private readonly ?\CattoLearning\Configuration\SiteMode $site = null,
+        private readonly ?\CattoLearning\Contact\ContactMessageRepository $contactMessages = null
     ) {
     }
 
@@ -200,22 +203,16 @@ final class ThemeRenderer
      * each one means five edits, a Theme SDK change, and a new theme that silently omits it. Done
      * here, no theme can leave it out and none has to know it exists.
      *
-     * The version is read from the code root's own directory name rather than from a constant, so
-     * it cannot disagree with reality. `code/current` is a symlink and the served version is
-     * whatever it resolves to; a constant would keep saying 0.7 after the link moved, which is
-     * exactly the question this tag exists to answer. Copying the tree to make v0.8 makes it say
-     * v0.8 with nothing to remember.
+     * The version is the release's own, in full (AppVersion: the "version" in composer.json; owner,
+     * 2026-10-20: "I want the FULL FUCKING VERSION NUMBER ON EACH PAGE"). It used to be read from the
+     * code directory's name, which on the development checkout (cattolms-v0.9) printed only v0.9.
      *
      * Inserted after the opening head tag, so it is present before any stylesheet or script and a
      * truncated response still carries it.
      */
     private function stampGenerator(string $html): string
     {
-        $directory = basename($this->themes->codeRoot());
-        // "cattolms-v0.7" -> "0.7". A directory that does not follow the convention falls back to
-        // its own name, which is still the honest answer to which tree served the request.
-        $version = preg_match('/-v([0-9][0-9.]*)$/', $directory, $m) === 1 ? $m[1] : $directory;
-        $tag = '<meta name="generator" content="CattoLMS v' . htmlspecialchars($version, ENT_QUOTES) . '">';
+        $tag = '<meta name="generator" content="CattoLMS v' . htmlspecialchars(\CattoLearning\Support\AppVersion::current(), ENT_QUOTES) . '">';
 
         // On its own line, indented one step further than the head tag it follows. Injected markup
         // is still markup somebody has to read, and a fixed single tab put it at the wrong depth in
@@ -385,6 +382,9 @@ final class ThemeRenderer
         $model['body_class'] = $bodyClass;
         $model['page'] = [
             'type' => $family,
+            // The page itself within its family (owner, 2026-10-20): the sign-in family shows one picture
+            // for signing in and another for registering.
+            'name' => $page,
             'title' => (string) ($data['page_title'] ?? $data['title'] ?? ''),
             'subtitle' => (string) ($data['page_kicker'] ?? ''),
             'body_class' => $bodyClass,
@@ -613,6 +613,10 @@ final class ThemeRenderer
 
         foreach ($adminGroups as $groupKey => $group) {
             $grandchildren = [];
+            // The setup wizard comes first in System (owner, 2026-10-20): a new installation starts there.
+            if ($groupKey === 'system' && $this->can($data, 'SYSTEM.SETTING.VIEW')) {
+                $grandchildren[] = $child('admin-setup', 'Setup', '/admin/setup', 'settings');
+            }
             foreach ($group['sections'] as $sectionKey) {
                 if (!isset($visibleSections[$sectionKey])) {
                     continue;
@@ -645,12 +649,22 @@ final class ThemeRenderer
                 if ($sectionKey === 'courses' && $this->can($data, 'CERTIFICATE.DESIGN.VIEW')) {
                     $grandchildren[] = $child('admin-certificate-designs', 'Certificate Designs', '/admin/certificates/designs', 'courses');
                 }
+                // Every issued certificate, searchable, each revocable with a reason (owner, 2026-10-19).
+                if ($sectionKey === 'courses' && $this->can($data, 'CERTIFICATE.ISSUED.VIEW')) {
+                    $grandchildren[] = $child('admin-issued-certificates', 'Issued Certificates', '/admin/certificates', 'courses');
+                }
                 // Companies keeps the name it has always had in the menu. Its second view sits
                 // beneath it rather than replacing it: renaming the entry to "Course Consumers"
                 // read as the Companies item having been deleted, which is a navigation people
                 // already know their way around.
                 if ($sectionKey === 'companies' && isset($visibleSections['company_creators'])) {
                     $grandchildren[] = $child('admin-company-creators', 'Course Creators', '/admin/companies/creators', 'companies');
+                }
+                // Messages sent through the contact form (owner, 2026-10-20), those not answered counted in
+                // the label, as Course Reviews counts its queue.
+                if ($sectionKey === 'companies' && $this->can($data, 'PLATFORM.PERSON.VIEW')) {
+                    $unanswered = isset($this->contactMessages) ? $this->contactMessages->unansweredCount() : 0;
+                    $grandchildren[] = $child('admin-contact-messages', 'Contact Messages' . ($unanswered > 0 ? ' (' . $unanswered . ' new)' : ''), '/admin/messages', 'people');
                 }
             }
             if ($groupKey === 'commerce' && $this->can($data, 'PLATFORM.ORDER.VIEW')) {
@@ -701,6 +715,7 @@ final class ThemeRenderer
                 'emails' => 'ACCOUNT.PROFILE.VIEW',
                 'social' => 'ACCOUNT.PROFILE.VIEW',
                 'learning' => 'LEARNING.LIBRARY.VIEW',
+                'certificates' => 'LEARNING.CERTIFICATE.VIEW',
                 'sessions' => 'ACCOUNT.SESSION.VIEW',
                 'activity' => 'ACCOUNT.ACTIVITY.VIEW',
             ];
@@ -735,6 +750,10 @@ final class ThemeRenderer
                 }
                 if ($section['key'] === 'learning') {
                     $coursesChildren[] = $child('account-learning','My Courses','/account/courses','learning');
+                    continue;
+                }
+                if ($section['key'] === 'certificates') {
+                    $coursesChildren[] = $entry;
                     continue;
                 }
                 if ($section['key'] === 'dashboard') {
@@ -954,7 +973,7 @@ final class ThemeRenderer
                     $appendCurrent($crumbs, $courseTitle !== '' ? $courseTitle : ($title !== '' ? $title : 'Course'));
                 }
             } else {
-                // /account/library itself
+                // /learn without a course
                 array_pop($crumbs);
                 $appendCurrent($crumbs, 'My Course Library');
             }
@@ -996,6 +1015,12 @@ final class ThemeRenderer
             $sectionKey = (string) ($segments[1] ?? 'dashboard');
             try { $section = $this->companySections->get($sectionKey); }
             catch (\InvalidArgumentException) { $section = ['label' => $title !== '' ? $title : 'Company']; }
+            // A page below a section (a person's page, owner 2026-10-21) links the section and ends at its own title.
+            if (count($segments) > 2 && isset($section['route'])) {
+                $appendLink($crumbs, (string) $section['label'], (string) $section['route']);
+                $appendCurrent($crumbs, (string) preg_replace('/ · Company$/', '', $title));
+                return $crumbs;
+            }
             $appendCurrent($crumbs, (string) $section['label']);
             return $crumbs;
         }

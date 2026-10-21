@@ -5,7 +5,11 @@ administrator session. Component checks select theme previews without changing t
 the canonical matrix temporarily activates themes and restores the original. Both use bundled manifests' actual versions. They fail if authentication redirects or the wrong theme loads.
 No Node dependency or frontend build is added; use an existing Playwright installation.
 
-Run from the code repository (`code/current`) on the host (adjust the instance/container paths if necessary). In the
+Every fixture person has a date of birth (set by `DevelopmentFixture::createUser` as registration sets
+it), so no check stops at the first-sign-in date of birth step (adults only, owner, 2026-10-20). Nothing
+about identity is asked before a purchase, so the checks that place orders need no setting changed.
+
+Run from the code repository on the host (adjust the instance/container paths if necessary). In the
 development pod (`docs/OPERATIONS.md`, "Local development environment") Playwright is
 installed on the host, so `CATTO_PLAYWRIGHT_MODULE` is `$HOME/tools/playwright/node_modules/playwright`;
 the runners accept the local mkcert certificate (`ignoreHTTPSErrors`), which Playwright's Firefox does not trust:
@@ -302,7 +306,8 @@ after 4.5 seconds.
 - **List.** The six installed designs are listed with their pictures, Classic is the default for new courses, the navigation leads there, and the page says nothing of states, versions, HTML or CSS.
 - **Editor.** ADMIN picks Modern by picture, types wording and inserts the Date issued field with Insert field (CKEditor), adds a signatory; each change redraws the PDF preview, typing the name does not, and the field is stored as a field. Save keeps the look, wording and signatory.
 - **Course page.** The course picks that design by picture and sets its accreditation line; the previews show this course's certificate with both, and Save keeps them. Edit this design carries `return_to`.
-- **Learner.** A learner passes the final in the reader, opens View certificate from the course page, sees the details and the PDF, and downloads one-page PDFs from the certificate page and the course page that print their name, the course, the design's wording, the accreditation line and the signatory.
+- **Learner.** A verified learner (the fixture gives the service Didit's answer, as Didit's webhook would: there are no Didit keys on a development machine) completes the final in the reader, opens View certificate from the course page, sees the details and the PDF with no result, and downloads one-page PDFs from the certificate page and the course page that print their name, the course, the design's wording, the accreditation line and the signatory; View transcript shows the mark and the overall grade, with its PDF.
+- **Pass or fail, verified only.** The second learner gives the wrong answer: the course page says "You have completed every assessment. Verify your identity to receive your certificate and transcript." with Verify my identity and no certificate; once verified (`certificates-fixture.php verify`), the certificate is there and the transcript records 0.00%.
 - **History.** Editing the design (opened from the course, returning there) changes the next learner's certificate and leaves the issued PDF's text exactly as it was; ADMIN sees the design it was drawn in.
 - **Upload (Firefox).** The sample Canva-sized background (`design/certificate-samples/01-classic-background.png` in the workspace, or `CATTO_CERTIFICATE_BACKGROUND`) becomes the look; the preview differs from Classic, then follows the placement and typeface; after saving, Your own background is chosen and shows its picture (scrolled to first: the look pictures load lazily below the preview), also on the list.
 - **Duplicate, default and delete.** A duplicate becomes the default for new courses and is deleted with Classic as the replacement; deleting the course's design moves the course to Minimal, and the issued certificate still prints exactly as it did.
@@ -381,7 +386,7 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 `demo-site.cjs` checks a demo site (`APP_SITE_MODE=demo`, owner 2026-10-18). catto.test is a demo site: `env/.env` says `APP_SITE_MODE=demo`.
 
-- **Chromium (6).** Signed out, the home page, catalogue, a course, sign-in and the Terms say they are a demo site and carry `noindex, nofollow` in their robots meta and `X-Robots-Tag`; the notice shows without JavaScript; checkout offers the simulated card and says the purchase is a simulation; an EFT order says it is a simulation, shows fake bank details labelled as fake and the account reference, and its invoice says the same (checked by `demo-site-fixture.php order`); a sign-in email starts with `[DEMO]` and says it comes from a demo site (Mailpit, `CATTO_MAILPIT_URL`). ADMIN sets Site mode to live: no notice, no demo robots rule, only EFT at checkout, and the earlier order still a simulation; Reset returns to `APP_SITE_MODE`. With `APP_DEBUG` on, Symfony itself sends `X-Robots-Tag: noindex`, so the live check looks only for the absence of the demo site's own rule.
+- **Chromium (6).** Signed out, the home page, catalogue, a course, sign-in and the Terms say they are a demo site and carry `noindex, nofollow` in their robots meta and `X-Robots-Tag`; the notice shows without JavaScript; checkout offers EFT and then the simulated card (Settings → Payment methods) and says the purchase is a simulation; an EFT order says it is a simulation, shows fake bank details labelled as fake and the account reference, and its invoice says the same (checked by `demo-site-fixture.php order`); a sign-in email starts with `[DEMO]` and says it comes from a demo site (Mailpit, `CATTO_MAILPIT_URL`). ADMIN sets Site mode to live: no notice, no demo robots rule, only EFT at checkout, and the earlier order still a simulation; Reset returns to `APP_SITE_MODE`. With `APP_DEBUG` on, Symfony itself sends `X-Robots-Tag: noindex`, so the live check looks only for the absence of the demo site's own rule.
 - **Firefox (1).** The notice and the checkout statement.
 - **Every theme at 1440, 820 and 390px.** The home page, catalogue, a course and the order show the notice, with one `h1` and no sideways scrolling. Each theme is activated in turn and the one that was active is put back.
 
@@ -410,18 +415,31 @@ podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && ph
 
 ## One learner buys one course
 
-`one-learner-scenario.cjs` builds the owner's example (2026-10-18: "a system with 1 learner, 4 courses, places an order for 1 course and pays for it via stitch. transaction fee is 3%. course starts immediately") on a demo site with a clean database, only through the pages, and leaves it all for the owner to follow:
+`one-learner-scenario.cjs` builds an example site on a demo site with a clean database, only through the pages, and leaves it all to follow. It needs a catalogue file with its courses (`CATTO_CATALOGUE`; the file published with the code holds only categories and tags) and the courses' HTML files (`CATTO_COURSES_DIR`):
 
-1. ADMIN signs in with the link Mailpit receives for `APP_ADMIN_EMAIL` (read from the workspace `env/.env`, never printed); the first sign-in makes the ADMIN account.
-2. ADMIN sets the Stitch transaction fee to 3% (Settings → Commerce fees).
-3. ADMIN imports four courses from the workspace's `COURSES` folder (Bookkeeping, Basic Financial Statements, Accounts Payable, Advanced Financial Statements; `CATTO_COURSES_DIR`), gives each a 12-month price (365 days; R450, R550, R500 and R750) and publishes it.
-4. ADMIN adds the learner Thandi Nkosi under People, with the account notification email.
-5. Thandi signs in with her own link, puts Example Course 1 in her cart, gives her details at checkout and pays with the simulated card, which stands in for Stitch on a demo site; the course starts at once.
-6. ADMIN's order page is read for its ledger lines (the R450.00 payment and Stitch's R13.50 fee), payment events, trail and documents (invoice and receipt).
+1. ADMIN signs in with the link Mailpit receives for `APP_ADMIN_EMAIL` (never printed); the first sign-in makes the ADMIN account, which then gives its date of birth (adults only).
+2. ADMIN sets the card provider's transaction fee to 3% (Settings → Commerce fees).
+3. ADMIN loads the catalogue file (`catalogue:import`) and imports every course it lists into its category, with its 12-month price and was price, its tags and its cover picture, and publishes it.
+4. ADMIN adds the learner Thandi Nkosi, a made-up person, under People, with the account notification email.
+5. Thandi signs in with her own link and, her account having been made by ADMIN, gives her date of birth first (a date that makes her 17 is refused first). She puts one course (`CATTO_BOUGHT`, or the catalogue's first) in her cart; checkout asks nothing about her identity. She gives her details at checkout and pays with the simulated card, which stands in for the card provider on a demo site; the course starts at once.
+6. ADMIN's order page is read for its ledger lines (the payment and the provider's 3% fee), payment events, trail and documents (invoice and receipt).
 7. Thandi's order confirmation, with her receipt attached and her account reference, and the email saying her course has started, with its link, arrive in Mailpit (the commerce worker sends them within a minute; the script waits up to two and a half minutes), and every email sent is listed.
 
-It refuses to run when one of the courses is already on the site. Screenshots, `results.json` and `summary.json` go to `/tmp/catto-one-learner-scenario` (`CATTO_BROWSER_OUTPUT`). Rebuild the database (`docs/OPERATIONS.md`) and make the owner's theme active first.
+It refuses to run when one of the courses is already on the site. Screenshots, `results.json` and `summary.json` go to `/tmp/catto-one-learner-scenario` (`CATTO_BROWSER_OUTPUT`). Rebuild the database (`docs/OPERATIONS.md`) and make the theme you want active first.
 
 ```sh
 CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright CATTO_MAILPIT_URL=http://127.0.0.1:8025 node tests/Browser/one-learner-scenario.cjs
+```
+
+## Every page, by following links
+
+`page-construction.cjs` holds the checks both share: one `h1`, only page rows in main, no words on the texture, the first card's edge on an unboxed page head's title, every painted notice, page head and identity band with the cards' edges (UX rule 1.7a), no sideways scrolling, nothing standing out of a table, and a pagination bar that fits a desktop line.
+
+`every-page.cjs` follows every link on the site from the home page, the catalogue, Administration, Account and Company, as an ADMIN who also runs a company and as a visitor, at 1440 and 390px, and checks each page with the same tests `section-pages.cjs` applies to the menu pages (`page-construction.cjs`): one h1, only page rows directly in main, no words on the page texture, the first card's edge on the page head's (or its picture's) edge, no sideways scrolling, nothing standing out of a table, no action cut off by its cell; and that no link leads to an error page (a failure names the page the link was on). Pages that differ only in an id are visited twice at most. Home, course landing pages, the course reader and its public preview are built another way on purpose and are not judged. It uses the section pages fixture's session:
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php create /tmp/catto-section-pages-state.json'
+podman exec env_php_1 cat /tmp/catto-section-pages-state.json > /tmp/catto-section-pages-state.json
+CATTO_PLAYWRIGHT_MODULE=$HOME/tools/playwright/node_modules/playwright node tests/Browser/every-page.cjs
+podman exec -u cattotest env_php_1 sh -lc 'php tests/Browser/section-pages-fixture.php cleanup /tmp/catto-section-pages-state.json'
 ```

@@ -121,7 +121,7 @@ A bounded example dataset.
 {% block body %}
 {{ ui('data.stat-card', {value: 24, label: 'With a note', note: 'Sample metric, no live data.'}) }}{{ ui('data.stat-card', {value: 12, label: 'Without a note'}) }}
 {% endblock %}
-{% endembed %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
+{% endembed %}{{ ui('data.stat-card', {value: 'R1,250.00', label: 'Large, for the one figure a page is opened for', size: 'large'}) }}<p>{{ ui('data.person', {name: 'Jane Learner', reference: 'CL202610200001A', href: '/admin/people'}) }} · {{ ui('data.person', {name: 'Jane Learner', reference: 'CL202610200001A', href: '/admin/people', email: 'jane@example.test'}) }}</p>{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}
 {% block body %}
 {% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
@@ -136,7 +136,7 @@ Example list item without actions.
 {% endblock %}
 {% endembed %}
 {% endblock %}
-{% endembed %}{{ ui('data.key-value-list', {items: [{label: 'Reference', value: 'EXAMPLE'}, {label: 'Source', value: 'Static gallery data'}]}) }}
+{% endembed %}{{ ui('data.key-value-list', {items: [{label: 'Reference', value: 'EXAMPLE'}, {label: 'Source', value: 'Static gallery data'}, {label: 'Price (marked down)', value: 'R 1 800,00', was: 'R 2 400,00'}]}) }}
 {% endblock %}
 {% endembed %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
@@ -183,7 +183,8 @@ Example list item without actions.
 {% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Catalogue'}) }}
 {% set sample_tag = {name: 'Sample tag', slug: 'sample', course_count: 1, weight: 3} %}
-{% set sample_course = {title: 'Example course', slug: 'example', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', item_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
+{# The sample course card opens the catalogue: there is no course called example (2026-10-21: its link was a not-found page). #}
+{% set sample_course = {title: 'Example course', slug: 'example', href: '/courses', summary: 'Static component example.', cover_media_public_id: null, level: 'Introductory', item_count: 3, default_price_label: 'Free', tags: [], category_path: []} %}
 
 <form method="get" action="/admin/system/ui-components">{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Sample tree select', for: 'gallery-tree-select'})} %}{% block control %}{{ ui('form.tree-select', {id: 'gallery-tree-select', name: 'sample_category', items: [{value: '', label: 'All categories', depth: 0, path: 'All categories'}, {value: '1', label: 'Business', depth: 1, path: 'Business', children: [{value: '2', label: 'Management', depth: 2, path: 'Business › Management', children: [{value: '3', label: 'Project Management', depth: 3, path: 'Business › Management › Project Management'}]}, {value: '4', label: 'Finance', depth: 2, path: 'Business › Finance'}]}, {value: '5', label: 'Technology', depth: 1, path: 'Technology'}], selected: '3', placeholder: 'All categories', list_label: 'Sample categories'}) }}{% endblock %}{% endembed %}</form><form method="get" action="/admin/system/ui-components">{{ ui('form.picture-choice', {name: 'sample_placement', legend: 'Sample picture choice', items: [{value: 'centre', label: 'Centre', image: '/img/certificates/placement-centre.svg'}, {value: 'right', label: 'Right side', image: '/img/certificates/placement-right.svg', note: 'With a note'}, {value: 'left', label: 'Left side', image: '/img/certificates/placement-left.svg'}], selected: 'centre', help: 'Static example: native radios, one per picture.'}) }}</form>{{ ui('catalogue.tag-browser', {tags: [sample_tag], selected_slug: 'sample'}) }}{{ ui('catalogue.tag-chip', {tag: sample_tag}) }}{{ ui('catalogue.course-grid', {courses: [sample_course]}) }}{{ ui('catalogue.workspace', {courses: [], workspace: {heading: 'Sample workspace', summary: 'The existing catalogue composition.', paginated: false, empty_heading: 'No sample courses', empty_summary: 'This is static reference content.'}}) }}
 {% endblock %}

@@ -146,7 +146,7 @@ async function checkoutToReview(page) {
             assert.deepEqual(await totals(page), [['Subtotal', rand(120000)], [`Promo ${fixture.code} (10% off)`, `−${rand(12000)}`], ['Total', rand(108000)]]);
             const pdf = await ctx.request.get(`${base}${await page.locator('a[href*="/documents/"]').first().getAttribute('href')}`);
             assert.equal((await pdf.body()).subarray(0, 5).toString(), '%PDF-');
-            await page.goto(`${base}/account/library`);
+            await page.goto(`${base}/account/courses`);
             const library = clean(await page.locator('main').innerText());
             for (const key of ['a', 'b', 'c']) assert.ok(library.includes(title(key)), `${title(key)} is in the library`);
             assert.ok(!library.includes(title('d')), 'the removed course is not');

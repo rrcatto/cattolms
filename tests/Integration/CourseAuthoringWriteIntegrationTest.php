@@ -25,7 +25,7 @@ Changelog:
 2026/10/07 SAST
 - Certificate settings are the switch, a design and the accreditation line.
 2026/10/07 SAST
-- A reissue is checked through CertificateIssuer (Phase J).
+- A reissue is checked through CertificateIssuer (Phase J), for a verified account (2026-10-19).
 2026/09/08 19:52 SAST
 - Reads and writes through the Database interface rather than F3's DB\SQL.
 
@@ -284,15 +284,17 @@ final class CourseAuthoringWriteIntegrationTest extends TestCase
 
             // A certificate keeps the identity a learner may already have shared, so reissuing
             // records the new issue and carries the public id and the number forward unchanged.
+            // Only a verified account receives one, in the verified name (owner, 2026-10-19).
             $issuer = \CattoLearning\Tests\Support\IntegrationContainer::get()->get(\CattoLearning\Course\Certificate\CertificateIssuer::class);
-            $db->executeStatement("UPDATE users SET certificate_name = 'First Learner' WHERE id = :id", ['id' => $ownerId]);
+            $db->executeStatement('UPDATE course_enrolments SET completed_at = NOW() WHERE id = :id', ['id' => $enrolmentId]);
+            \CattoLearning\Tests\Support\IdentityFixture::verify($ownerId, 'First', 'Learner');
             $first = $issuer->issue($enrolmentId);
-            $db->executeStatement("UPDATE users SET certificate_name = 'Second Learner' WHERE id = :id", ['id' => $ownerId]);
             $second = $issuer->issue($enrolmentId);
             self::assertSame((string) $first['public_id'], (string) $second['public_id']);
             self::assertSame((string) $first['certificate_number'], (string) $second['certificate_number']);
-            self::assertSame('Second Learner', (string) $second['learner_name']);
-            self::assertSame('Second Learner', $second['document_data']['learner.name']);
+            self::assertSame('First Learner', (string) $second['learner_name']);
+            self::assertSame('First Learner', $second['document_data']['learner.name']);
+            $db->executeStatement('DELETE FROM transcripts WHERE certificate_id IN (SELECT id FROM certificates WHERE enrolment_id = :id)', ['id' => $enrolmentId]);
             $db->executeStatement('DELETE FROM certificates WHERE enrolment_id = :id', ['id' => $enrolmentId]);
 
             $repository->markEnrolmentExpired($enrolmentId);

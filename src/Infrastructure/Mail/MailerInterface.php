@@ -57,7 +57,20 @@ interface MailerInterface
 
     public function sendCourseTestInvitation(string $email, string $courseTitle, string $courseSlug, string $expiresAt): void;
 
-    public function sendContactMessage(string $name, string $email, string $subject, string $message): void;
+    /**
+     * A contact form message to the site's mailbox, replying to its sender (owner, 2026-10-20; ContactService):
+     * its reference, reason, sender, account reference (from the account when signed_in, else as typed),
+     * order number, course, the reason's own answers, the message and its page in Administration.
+     *
+     * @param array{reference:string,reason:string,name:string,email:string,account_reference:string,signed_in:bool,order_number:string,course:string,details:list<array{label:string,value:string}>,message:string,admin_url:string} $message
+     */
+    public function sendContactMessage(array $message): void;
+
+    /**
+     * Tells a contact form's sender that the message arrived, with its reference. Fixed words only: nothing
+     * the sender typed is sent back, so the form cannot carry words to someone else's inbox.
+     */
+    public function sendContactAcknowledgement(string $email, string $reference, string $reason): void;
 
     public function sendInvoice(string $email, string $number, string $pdf): void;
 

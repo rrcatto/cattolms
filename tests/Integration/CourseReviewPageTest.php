@@ -118,17 +118,21 @@ final class CourseReviewPageTest extends TestCase
         $_COOKIE = $this->cookies;
         $pending = $this->html('/courses/' . $this->slug);
         self::assertStringNotContainsString('Thorough and well paced.', $pending, 'A pending review is not public.');
-        self::assertStringContainsString('No reviews yet', $pending);
+        // A course with no approved review shows no Reviews section and no "No reviews yet" (owner, 2026-10-20).
+        self::assertStringNotContainsString('No reviews yet', $pending);
+        self::assertStringNotContainsString('id="reviews"', $pending);
 
         $this->signIn($this->admin);
-        self::assertStringContainsString('Course Reviews (1 pending)', $this->html('/admin'), 'The Administration menu shows the queue.');
+        // The queue is the site's: other people's reviews may be waiting too.
+        $waiting = (int) $this->db->fetchOne("SELECT COUNT(*) FROM course_reviews WHERE status = 'pending'");
+        self::assertStringContainsString('Course Reviews (' . $waiting . ' pending)', $this->html('/admin'), 'The Administration menu shows the queue.');
         $queue = $this->html('/admin/course-reviews');
         self::assertStringContainsString('Thorough and well paced.', $queue);
         self::assertStringContainsString('Approve', $queue);
         $review = $this->db->fetchAssociative('SELECT id, revision FROM course_reviews WHERE course_id=:c', ['c' => $this->course]) ?: [];
         $this->post('/admin/course-reviews/' . $review['id'] . '/moderate', ['decision' => 'approve', 'revision' => (string) $review['revision'], 'note' => 'Moderator-only remark', 'return' => '/admin/course-reviews']);
         self::assertSame('approved', $this->db->fetchOne('SELECT status FROM course_reviews WHERE id=:id', ['id' => $review['id']]));
-        self::assertStringContainsString('No reviews are waiting', $this->html('/admin/course-reviews'));
+        self::assertStringNotContainsString('Thorough and well paced.', $this->html('/admin/course-reviews'), 'It has left the pending queue.');
         self::assertStringContainsString('Thorough and well paced.', $this->html('/admin/course-reviews?status=approved&rating=4&course_id=' . $this->course), 'The filters find it.');
         self::assertStringNotContainsString('Thorough and well paced.', $this->html('/admin/course-reviews?status=approved&rating=1'));
 

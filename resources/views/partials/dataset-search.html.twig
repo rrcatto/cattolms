@@ -16,6 +16,8 @@
 		should still supply the key; this makes forgetting it a missing hidden field rather than a
 		broken page.
 	#}
+	{# ds_hidden: what else the list shown depends on, kept by the search (My Courses' chosen list). #}
+	{% for hidden_name, hidden_value in ds_hidden|default({}) %}<input type="hidden" name="{{ hidden_name }}" value="{{ hidden_value }}">{% endfor %}
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: (ds_label), full_width: false, for: (ds_name) ~ '-search-input'})} %}
 {% block control %}
 
@@ -42,6 +44,6 @@
 		{% endif %}
 	</div>
 	<p class="help">
-		Searches every matching record, not only the rows on this page.
+		{{ ds_help|default('Searches every matching record, not only the rows on this page.') }}
 	</p>
 </form>

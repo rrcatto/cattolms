@@ -70,7 +70,7 @@ final class CommerceRepository
         ) ?: null;
     }
 
-    private const BUNDLE_OFFER = 'SELECT o.id, o.bundle_id, o.price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
+    private const BUNDLE_OFFER = 'SELECT o.id, o.bundle_id, o.price_minor_units, o.was_price_minor_units, o.currency_code, o.access_period_seconds, o.is_active AS offer_active,
             b.title, b.slug, b.status, b.available_from, b.available_until
         FROM bundle_offers o JOIN bundles b ON b.id = o.bundle_id';
 
@@ -569,7 +569,7 @@ final class CommerceRepository
     /** @return list<array<string,mixed>> */
     public function refunds(int $orderId): array
     {
-        return $this->db->fetchAllAssociative('SELECT r.*,u.display_name AS actor_name,p.paid_at AS payout_paid_at,p.external_reference AS payout_reference FROM commerce_refunds r JOIN users u ON u.id=r.approved_by_user_id LEFT JOIN commerce_refund_payouts p ON p.refund_id=r.id WHERE r.order_id=:id ORDER BY r.id', ['id'=>$orderId]);
+        return $this->db->fetchAllAssociative('SELECT r.*,u.display_name AS actor_name,u.id AS actor_user_id,u.account_reference AS actor_reference,ue.email AS actor_email,p.paid_at AS payout_paid_at,p.external_reference AS payout_reference FROM commerce_refunds r JOIN users u ON u.id=r.approved_by_user_id LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary LEFT JOIN commerce_refund_payouts p ON p.refund_id=r.id WHERE r.order_id=:id ORDER BY r.id', ['id'=>$orderId]);
     }
     public function refundedAmount(int $orderId, ?int $itemId = null): int
     {
@@ -672,9 +672,9 @@ final class CommerceRepository
      */
     public function openRefundRequests(int $limit = 200): array
     {
-        return $this->db->fetchAllAssociative("SELECT r.*,o.total_minor,o.currency,o.state AS order_state,i.product_type,i.snapshot AS item_snapshot,u.display_name AS requester_name,u.account_reference AS requester_reference,c.name AS company_name,
+        return $this->db->fetchAllAssociative("SELECT r.*,o.total_minor,o.currency,o.state AS order_state,i.product_type,i.snapshot AS item_snapshot,u.display_name AS requester_name,u.account_reference AS requester_reference,ue.email AS requester_email,c.name AS company_name,
                 (SELECT COUNT(*) FROM commerce_refund_requests p WHERE p.requested_by_user_id=r.requested_by_user_id AND p.id<>r.id) AS earlier_requests
-            FROM commerce_refund_requests r JOIN commerce_orders o ON o.id=r.order_id JOIN commerce_order_items i ON i.id=r.order_item_id JOIN users u ON u.id=r.requested_by_user_id LEFT JOIN companies c ON c.id=r.company_id
+            FROM commerce_refund_requests r JOIN commerce_orders o ON o.id=r.order_id JOIN commerce_order_items i ON i.id=r.order_item_id JOIN users u ON u.id=r.requested_by_user_id LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary LEFT JOIN companies c ON c.id=r.company_id
             WHERE r.status='requested' ORDER BY r.requested_at,r.id LIMIT ".max(1,$limit));
     }
     public function openRefundRequestCount(): int
@@ -693,6 +693,11 @@ final class CommerceRepository
     public function companyName(int $companyId): string
     {
         return (string)$this->db->fetchOne('SELECT name FROM companies WHERE id=:id', ['id'=>$companyId]);
+    }
+    /** A person's primary email address, for naming them on a money page (owner, 2026-10-21). */
+    public function userEmail(int $userId): string
+    {
+        return (string)$this->db->fetchOne('SELECT email FROM user_emails WHERE user_id=:id AND is_primary', ['id'=>$userId]);
     }
     public function userAccountReference(int $userId): string
     {

@@ -6,7 +6,8 @@
     {% if requests %}
         {% for request in requests %}
         {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-            {{ ui('layout.section-head', {heading: request.title, eyebrow: request.order_label ~ ' · asked ' ~ request.requested_at|date('j M Y H:i'), summary: (request.company_name ? request.company_name ~ ', by ' : '') ~ request.requester_name ~ ' (' ~ request.reference_label ~ ')' ~ (request.earlier_requests > 0 ? ' · ' ~ request.earlier_requests ~ ' earlier refund request(s)' : '')}) }}
+            {{ ui('layout.section-head', {heading: request.title, eyebrow: request.order_label ~ ' · asked ' ~ request.requested_at|date('j M Y H:i'), summary: (request.company_name ? 'For ' ~ request.company_name : '') ~ (request.company_name and request.earlier_requests > 0 ? ' · ' : '') ~ (request.earlier_requests > 0 ? request.earlier_requests ~ ' earlier refund request(s)' : '')}) }}
+            <p data-refund-requester><strong>Asked by:</strong> {{ ui('data.person', request.requester) }}</p>
             <p><strong>Why:</strong> {{ request.customer_reason }}</p>
             <p><strong>Asked for:</strong> {{ request.destination_label }}{% if request.company_id %} · {{ request.quantity }} unused credit(s){% endif %} · <strong>Paid for the line:</strong> {{ request.paid_label }} · <strong>Refund if approved in full:</strong> {{ request.net_label }}{% for line in request.deduction_lines %} · less {{ line }}{% endfor %}</p>
             {% if request.rule_refusals %}{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Outside the Refund Policy when asked'})} %}{% block body %} {{ request.rule_refusals }} Approving it needs an override reason, kept with the refund and shown only to administrators.{% endblock %}{% endembed %}{% else %}<p class="help">Within the Refund Policy when asked.</p>{% endif %}

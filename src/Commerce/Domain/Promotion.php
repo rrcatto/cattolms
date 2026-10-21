@@ -18,6 +18,9 @@ use DateTimeImmutable;
  * What it discounts is two scopes, one per product type: courses and bundles, each none, all or
  * selected. A line is eligible by its own product type and id only: a bundle is never eligible
  * because it contains a course the promotion selects.
+ *
+ * An automatic promotion (owner, 2026-10-20) needs no typing: the cart applies it by itself and says
+ * so ("SPRING25, applied automatically"). Its code still names it on the order and its documents.
  */
 final readonly class Promotion
 {
@@ -54,6 +57,7 @@ final readonly class Promotion
         public string $bundleScope,
         public array $courseIds,
         public array $bundleIds,
+        public bool $appliesAutomatically = false,
     ) {}
 
     /**
@@ -71,6 +75,7 @@ final readonly class Promotion
             $time($row['starts_at']), $time($row['ends_at']), (bool) $row['active'],
             $int($row['minimum_order_minor']), $int($row['maximum_total_uses']), $int($row['maximum_uses_per_customer']),
             (string) $row['course_scope'], (string) $row['bundle_scope'], array_map('intval', $courseIds), array_map('intval', $bundleIds),
+            (bool) ($row['applies_automatically'] ?? false),
         );
     }
 

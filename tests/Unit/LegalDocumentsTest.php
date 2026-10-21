@@ -15,6 +15,9 @@ lifetimes matching the instance defaults; the Refund Policy's rule; and the one 
 both checkouts include, with the linked label the choice component now takes.
 
 Changelog:
+2026/10/19 SAST
+- No payment or verification provider is named, processors are described by role, the manual identity
+  document handling is gone, and a certificate never states that the learner passed (owner, 2026-10-19).
 2026/10/17 SAST
 - Dates without versions, the launch rules (immediate start, started content not refunded, fees,
   wallet credit, the change clause, the Ombud) and the new RefundRule.
@@ -66,23 +69,26 @@ final class LegalDocumentsTest extends TestCase
         (new \ReflectionMethod(LegalDocuments::class, 'definition'))->invoke(null, 'cookies');
     }
 
+    /**
+     * Each section is a closed accordion, numbered in order, with its icon, like the FAQ and Help (owner,
+     * 2026-10-20: "The terms, refund and privacy pages need to use <details> <summary> tags styled as
+     * accordions"). The accordions are the contents, so there is no separate contents list.
+     */
     #[DataProvider('documents')]
-    public function testEveryContentsEntryIsANumberedSectionOfThePage(string $key): void
+    public function testEverySectionIsANumberedAccordionWithItsIcon(string $key): void
     {
-        $source = self::source('pages/' . $key);
-        preg_match_all("/\\{id: '([a-z-]+)', label: '([^']+)'\\}/", $source, $contents, PREG_SET_ORDER);
-        self::assertGreaterThanOrEqual(8, count($contents), 'The page lists its sections.');
-        foreach ($contents as $index => [, $id, $label]) {
-            $number = $index + 1;
-            self::assertMatchesRegularExpression(
-                "/ui_props\\('layout\\.surface', \\{(?:section_spacing: true, )?id: '" . preg_quote($id, '/') . "'\\}\\)\\} %\\}\\s*\\{% block surface_body %\\}\\s*\\{\\{ ui\\('layout\\.section-head', \\{heading: '" . $number . '\\. ' . preg_quote($label, '/') . "'/",
-                $source,
-                'Section ' . $number . ' (' . $label . ') is a card with the id #' . $id . ' and that numbered heading.'
-            );
+        $source = self::document($key);
+        preg_match_all("/ui_props\\('overlay\\.accordion-section', \\{id: '([a-z-]+)', eyebrow: 'Section ([0-9]+)', icon: icons\\['([a-z-]+)'\\], heading: '/", $source, $sections, PREG_SET_ORDER);
+        self::assertGreaterThanOrEqual(8, count($sections), 'The page has its sections.');
+        foreach ($sections as $index => [, $id, $number, $icon]) {
+            self::assertSame((string) ($index + 1), $number, 'Section ' . $id . ' is numbered in order.');
+            self::assertSame($id, $icon, 'Section ' . $id . ' has its own icon.');
+            self::assertStringContainsString("'" . $id . "': '<svg ' ~ a ~ '>", $source, 'The icon of ' . $id . ' is drawn.');
         }
-        self::assertSame(count($contents), preg_match_all("/heading: '[0-9]+\\. /", $source), 'No numbered section is missing from the contents.');
-        // Every in-page link and every numbered cross-reference points at a section that exists.
-        $ids = array_column($contents, 1);
+        self::assertStringNotContainsString("ui_props('layout.section-head', {heading: '1.", $source, 'No section is still a card of its own.');
+        self::assertStringNotContainsString('Contents', self::source('partials/legal-document-head'), 'The accordions are the contents.');
+        // Every numbered cross-reference points at the section with that number.
+        $ids = array_column($sections, 1);
         preg_match_all('/href="#([a-z-]+)">section ([0-9]+)</i', $source, $references, PREG_SET_ORDER);
         foreach ($references as [, $id, $number]) {
             self::assertSame($id, $ids[(int) $number - 1] ?? null, 'A reference to section ' . $number . ' links to #' . $id . '.');
@@ -92,7 +98,7 @@ final class LegalDocumentsTest extends TestCase
     #[DataProvider('documents')]
     public function testThePageTextKeepsTheWritingConventionsAndLeavesNoPlaceholder(string $key): void
     {
-        foreach ([self::source('pages/' . $key), self::source('partials/legal-document-head')] as $source) {
+        foreach ([self::document($key), self::source('partials/legal-document-head')] as $source) {
             $text = (string) preg_replace('/\{#.*?#\}/s', '', $source);
             foreach (['—' => 'an em dash', '–' => 'an en dash', ';' => 'a semicolon', '’' => 'a curly apostrophe', '‘' => 'a curly quote', '“' => 'a curly quote', '”' => 'a curly quote', '&mdash' => 'an em dash'] as $mark => $name) {
                 self::assertStringNotContainsString($mark, $text, $key . ' contains ' . $name . '.');
@@ -107,8 +113,8 @@ final class LegalDocumentsTest extends TestCase
 
     public function testThePagesPrintThePeriodsAndFeesInForceAndNeverHardCodeTheSupplier(): void
     {
-        $terms = self::source('pages/terms');
-        $refunds = self::source('pages/refunds');
+        $terms = self::document('terms');
+        $refunds = self::document('refunds');
         foreach (['terms' => $terms, 'refunds' => $refunds] as $key => $source) {
             self::assertStringContainsString('Once a course has started, its content has been supplied to you and cannot be returned. No refund of any kind is given for it: no money back and no wallet credit.', $source, $key . ' states that started content is not refunded.');
             self::assertStringContainsString('within {{ refund_window }} of', $source, $key . ' prints the refund window setting.');
@@ -127,15 +133,31 @@ final class LegalDocumentsTest extends TestCase
         self::assertStringContainsString('changes apply only to later purchases unless the law requires otherwise or the change gives you more rights', $terms);
         self::assertStringContainsString('Consumer Goods and Services Ombud', $terms);
         self::assertStringContainsString('Address for legal service', $terms);
-        foreach (['{{ stitch_fee }}', '{{ stitch_refund_fee }}', '{{ eft_refund_fee }}', '{{ wallet_expiry }}'] as $setting) {
+        foreach (['{{ eft_refund_fee }}', '{{ wallet_expiry }}'] as $setting) {
             self::assertStringContainsString($setting, $refunds, 'The Refund Policy prints ' . $setting . ' from the settings in force.');
         }
+        // No payment or verification provider is named (owner, 2026-10-19): the methods are those shown at
+        // checkout, a card is paid on the payment provider's page and the provider's fees are deducted.
+        self::assertStringContainsString('We accept the payment methods shown at checkout. They may change from time to time.', $terms);
+        self::assertStringContainsString('Card payments are made on our payment provider\'s secure page. Card details never reach this site and are never stored by it.', $terms);
+        self::assertStringContainsString('a refund of a card payment is less any fee the payment provider charged us for that payment and, for money back, for the refund. Money back for an EFT payment is less our EFT refund fee.', $terms);
+        self::assertStringContainsString('A refund of a card payment is less any fee the payment provider charged us for that payment and, for money back, for the refund. Money back for an EFT payment is less our EFT refund fee.', $refunds);
+        foreach (self::KEYS as $key) {
+            foreach (['Stitch', 'Didit', '{{ stitch_fee }}', '{{ stitch_refund_fee }}'] as $name) {
+                self::assertStringNotContainsString($name, self::document($key), $key . ' names no payment or verification provider.');
+            }
+        }
+        // A certificate proves that the learner took the course, never that they passed (owner, 2026-10-19).
+        self::assertStringContainsString('It never states that you passed. You earn it when you have completed every assessment in the course, whether you pass or fail.', $terms);
+        self::assertStringContainsString('Your identity is verified by an identity verification provider.', $terms);
+        self::assertStringContainsString('take a live selfie', $terms);
+        self::assertStringContainsString('This site keeps no images.', $terms);
         self::assertStringContainsString('within 7 days of your refund request', $refunds);
         self::assertSame(7, RefundAdministrationService::PAYOUT_DAYS, 'The Refund Policy states the payout time the code sets.');
         foreach (self::KEYS as $key) {
-            self::assertDoesNotMatchRegularExpression('/[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/', self::source('pages/' . $key), 'The email address comes from configuration.');
-            self::assertStringNotContainsString('catto.test', self::source('pages/' . $key));
-            self::assertStringNotContainsString('legal.version', self::source('pages/' . $key));
+            self::assertDoesNotMatchRegularExpression('/[A-Za-z0-9._-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/', self::document($key), 'The email address comes from configuration.');
+            self::assertStringNotContainsString('catto.test', self::document($key));
+            self::assertStringNotContainsString('legal.version', self::document($key));
         }
         self::assertStringNotContainsString('certificate', strtolower($refunds), 'The Refund Policy says nothing about certificates.');
     }
@@ -149,9 +171,9 @@ final class LegalDocumentsTest extends TestCase
         }
         self::assertSame(['catto_learning_web', 'catto_learning_session', '86400', '86400', '1800'],
             [$defaults['PHP_SESSION_COOKIE'], $defaults['AUTH_SESSION_COOKIE'], $defaults['PHP_SESSION_TTL'], $defaults['AUTH_SESSION_TTL'], $defaults['AUTH_MAGIC_LINK_TTL']]);
-        $privacy = self::source('pages/privacy');
+        $privacy = self::document('privacy');
         foreach (['<strong>catto_learning_web</strong> keeps your browser session', '<strong>catto_learning_session</strong> keeps you signed in', 'It lasts 24 hours and is renewed while you use the site.', '<strong>cl_palette</strong> remembers the colour palette', 'It lasts 1 year.', "{label: 'Sign-in links', value: '30 minutes'}", "{label: 'Sessions', value: '24 hours'}",
-            "{label: 'Orders and transaction records', value: 'At least 5 years'}", "{label: 'Activity log', value: '5 years'}", "{label: 'Analytics events', value: '5 years'}", "{label: 'Offline copies of identity documents', value: '5 years'}"] as $stated) {
+            "{label: 'Orders and transaction records', value: 'At least 5 years'}", "{label: 'Activity log', value: '5 years'}", "{label: 'Analytics events', value: '5 years'}"] as $stated) {
             self::assertStringContainsString($stated, $privacy);
         }
         self::assertStringContainsString("cl_palette='+encodeURIComponent(String(index))+';path=/;max-age=31536000", (string) file_get_contents(RenderHarness::root() . '/public_html/js/platform-overrides.js'), 'The palette cookie still lasts the year the policy states.');
@@ -159,6 +181,15 @@ final class LegalDocumentsTest extends TestCase
         self::assertStringContainsString('stores a hashed IP address and your browser\'s user agent', $privacy);
         self::assertStringContainsString('Analytics events store neither an IP address nor a user agent.', $privacy);
         self::assertStringContainsString('https://inforegulator.org.za', $privacy);
+        // Processors by role, and no manual handling of identity documents (owner, 2026-10-19).
+        foreach (['<strong>A payment provider.</strong>', '<strong>An identity verification provider.</strong>', '<strong>A hosting provider.</strong>'] as $role) {
+            self::assertStringContainsString($role, $privacy);
+        }
+        foreach (['Offline copies', 'download it for secure offline storage', 'OVHcloud', 'Google', 'YouTube'] as $gone) {
+            self::assertStringNotContainsString($gone, $privacy);
+        }
+        self::assertStringContainsString('Activity log entries, analytics events and contact messages older than 5 years are deleted automatically every day.', $privacy);
+        self::assertSame(5, \CattoLearning\Maintenance\RetentionCleanup::YEARS, 'The clean-up deletes what the Privacy Policy says it does.');
     }
 
     public function testTheRefundRuleRefusesAStartedCourseAndAPurchaseOutsideTheWindow(): void
@@ -209,6 +240,12 @@ final class LegalDocumentsTest extends TestCase
         return (string) file_get_contents(RenderHarness::root() . '/resources/views/' . $template . '.html.twig');
     }
 
+    /** A document's text: its page and its numbered sections, which its PDF prints too (partials/legal). */
+    private static function document(string $key): string
+    {
+        return self::source('pages/' . $key) . self::source('partials/legal/' . $key . '-sections');
+    }
+
     /** Every seller detail comes from the Site Owner, and the wording follows its legal form (owner, 2026-10-18). */
     public function testTheSellerIsTheSiteOwnerAndTheWordingFollowsItsLegalForm(): void
     {
@@ -221,7 +258,7 @@ final class LegalDocumentsTest extends TestCase
         self::assertStringStartsWith('None.', (string) $supplier['accreditation']);
         $sole = (new LegalDocuments(SiteOwner::fixed(['trading_name' => 'Placeholder', 'legal_name' => 'A Placeholder Person', 'legal_form' => 'sole_proprietor'])))->supplier();
         self::assertSame([false, 'a sole proprietor', 'None: not a registered company'], [$sole['is_company'], $sole['legal_form_phrase'], $sole['registration_number']]);
-        $privacy = self::source('pages/privacy');
+        $privacy = self::document('privacy');
         self::assertStringNotContainsString(' He ', $privacy, 'The seller is not assumed to be a man.');
         self::assertStringContainsString('{{ supplier.legal_form_phrase }}', $privacy);
     }

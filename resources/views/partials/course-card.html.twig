@@ -53,7 +53,9 @@
 				{% endfor %}
 			</div>
 		{% endif %}
-		{{ ui('data.key-value-list', {items: course.facts is defined ? course.facts : [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label)}]}) }}
+		{# A marked-down course or bundle is flagged as a special (owner, 2026-10-20), its was price struck through in the Price row. #}
+		{% if course.saving_percent|default(null) %}<p class="cl-course-card-special">{{ ui('feedback.badge', {label: 'Special: save ' ~ course.saving_percent ~ '%', tone: 'success'}) }}</p>{% endif %}
+		{{ ui('data.key-value-list', {items: course.facts is defined ? course.facts : [{label: 'Level', value: (course.level)}, {label: 'Course Items', value: (course.item_count)}, {label: 'Price', value: (course.default_price_label), was: course.default_was_label|default(null)}]}) }}
 		<div class="cl-course-card-foot">
 			{{ ui('action.link', {label: course.link_label|default('View course'), variant: 'primary', size: 'small', href: course.href|default('/courses/' ~ (course.slug))}) }}
 		</div>

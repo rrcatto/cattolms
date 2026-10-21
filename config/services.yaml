@@ -65,7 +65,7 @@ services:
 
     CattoLearning\Auth\:
         resource: '../src/Auth/'
-        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,Security/WebUser.php,*Exception.php}'
+        exclude: '../src/Auth/{CurrentUser.php,RoleCatalog.php,AdultAge.php,Security/WebUser.php,*Exception.php}'
 
     CattoLearning\Configuration\:
         resource: '../src/Configuration/'
@@ -173,8 +173,10 @@ services:
     CattoLearning\Event\:
         resource: '../src/Event/'
 
+    # ScheduledJob is the list of scheduled jobs, an enum, not a service.
     CattoLearning\Maintenance\:
         resource: '../src/Maintenance/'
+        exclude: '../src/Maintenance/ScheduledJob.php'
 
     # LmsMcpTools is constructed per MCP session with that session's identity, by the MCP server
     # entrypoint. It is not a service.
@@ -197,6 +199,21 @@ services:
     CattoLearning\Infrastructure\Persistence\SessionTimeZoneMiddleware:
         arguments: ['%env(APP_TIMEZONE)%']
         tags: ['doctrine.middleware']
+
+    # Identity verification through Didit (owner, 2026-10-19). A decision and the webhook signature are
+    # values and rules, and the refusal is an exception, not a service.
+    CattoLearning\Identity\:
+        resource: '../src/Identity/'
+        exclude: '../src/Identity/{IdentityDecision.php,DiditSignature.php,InvalidDiditWebhook.php}'
+
+    # The setup wizard (owner, 2026-10-20): Administration → System → Setup.
+    CattoLearning\Setup\:
+        resource: '../src/Setup/'
+
+    # The contact form and its messages (owner, 2026-10-20). The reasons are a list of values.
+    CattoLearning\Contact\:
+        resource: '../src/Contact/'
+        exclude: '../src/Contact/ContactReason.php'
 
     # The public legal documents (Terms, Refund Policy, Privacy Policy): their dates and footer entries.
     # The seller they name is the Site Owner (Configuration\SiteOwner).

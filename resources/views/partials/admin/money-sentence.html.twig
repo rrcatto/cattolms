@@ -1,0 +1,7 @@
+{#
+	A money record's sentence with every person it names drawn as a person (owner, 2026-10-21): their name, linked to their
+	profile. ms_parts comes from
+	MoneyRecords::ledgerSentenceParts, paymentEventSentenceParts or trailSentenceParts, or OrderStory's parts. A person's
+	markup is trimmed, so "'s" or a full stop follows the name directly.
+#}
+{% for part in ms_parts %}{% if part.person is defined %}{{ ui('data.person', part.person)|trim|raw }}{% else %}{{ part.text }}{% endif %}{% endfor %}

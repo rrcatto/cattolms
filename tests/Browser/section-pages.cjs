@@ -26,7 +26,7 @@ const widths = (process.env.CATTO_WIDTHS || '1440,390').split(',').map(Number);
 // The 55 menu pages: Account, Company and Administration, as their menus list them.
 const pages = [
   '/account', '/account/dashboard', '/account/profile', '/account/billing', '/account/emails', '/account/social',
-  '/account/courses', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
+  '/account/courses', '/account/certificates', '/account/orders', '/account/wallet', '/account/sessions', '/account/activity',
   '/company', '/company/dashboard', '/company/people', '/company/requests', '/company/enrolments', '/company/performance',
   '/company/courses', '/company/favourites', '/company/training', '/company/credits', '/company/wallet', '/company/billing',
   '/admin', '/admin/dashboard', '/admin/courses', '/admin/course-items', '/admin/resources', '/admin/courses/categories',
@@ -36,69 +36,7 @@ const pages = [
   '/admin/commerce/eft', '/admin/commerce/unmatched', '/admin/commerce/ledger', '/admin/commerce/payment-events', '/admin/commerce/trail', '/admin/activity', '/admin/reports',
   '/admin/reports/companies', '/admin/themes', '/admin/roles', '/admin/seed', '/admin/settings', '/admin/system/ui-components',
 ];
-const inspect = () => {
-  const main = document.querySelector('main.cl-main');
-  const allowed = ['cl-flash-stack', 'cl-page-head', 'cl-identity-head', 'cl-page-section', 'cl-page-family', 'cl-ui-modal'];
-  const strays = [...main.children].filter(c => !['SCRIPT', 'LINK', 'STYLE', 'TEMPLATE'].includes(c.tagName))
-    .filter(c => !allowed.some(a => c.classList.contains(a))).map(c => c.tagName.toLowerCase() + '.' + [...c.classList].join('.'));
-  // Words whose nearest painted ancestor is the body: they stand on the texture.
-  const bare = [];
-  const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    if (!node.textContent.trim()) continue;
-    const el = node.parentElement;
-    if (!el || el.closest('[hidden], script, style, template, svg, dialog:not([open]), .cl-ui-modal:not(.open)')) continue;
-    const cs = getComputedStyle(el);
-    if (cs.visibility === 'hidden' || cs.display === 'none' || !el.getClientRects().length) continue;
-    let a = el, painted = false;
-    while (a && a !== document.body) {
-      const s = getComputedStyle(a);
-      if ((s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent') || s.backgroundImage !== 'none') { painted = true; break; }
-      a = a.parentElement;
-    }
-    if (!painted) bare.push(node.textContent.trim().slice(0, 40));
-  }
-  const h1 = main.querySelector('.cl-page-head h1');
-  // The first box in document order: a card, or the accordion that holds a section on an "All sections" page.
-  const card = main.querySelector([':scope > .cl-page-section', ':scope > .cl-page-family .cl-page-section']
-    .flatMap(row => [`${row} .cl-ui-surface`, `${row} .cl-ui-accordion-section`]).join(', '));
-  const rows = [...main.children].filter(c => c.getClientRects().length && !['SCRIPT', 'LINK', 'STYLE', 'TEMPLATE'].includes(c.tagName));
-  const last = rows[rows.length - 1];
-  const footer = document.querySelector('.cl-footer');
-  // Anything standing out past its table's right edge (a menu's open panel aside), unless a box
-  // inside the table scrolls or clips it; and every action control cut off by its own cell.
-  const clipped = (el, stop) => { for (let a = el.parentElement; a && a !== stop; a = a.parentElement) if (getComputedStyle(a).overflowX !== 'visible') return true; return false; };
-  const tableSpill = [], cutActions = [];
-  for (const table of main.querySelectorAll('.cl-ui-table')) {
-    const edge = table.getBoundingClientRect().right;
-    if (!table.getClientRects().length) continue;
-    for (const el of table.querySelectorAll('*')) {
-      if (el.closest('.cl-ui-row-panel')) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width && r.height && r.right > edge + 1 && !clipped(el, table)) { tableSpill.push(`${el.tagName.toLowerCase()} "${el.textContent.trim().slice(0, 20)}" by ${Math.round(r.right - edge)}px`); break; }
-    }
-    for (const control of table.querySelectorAll('td .cl-ui-action, td .cl-ui-row-trigger')) {
-      if (control.closest('.cl-ui-row-panel') || !control.getClientRects().length) continue;
-      const td = control.closest('td'), cs = getComputedStyle(td);
-      const right = td.getBoundingClientRect().right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
-      const name = `"${control.textContent.trim().replace(/\s+/g, ' ').slice(0, 20)}"`;
-      if (control.getBoundingClientRect().right > right + 1) { cutActions.push(`${name} by ${Math.round(control.getBoundingClientRect().right - right)}px`); break; }
-      if (control.scrollWidth > control.clientWidth + 1) { cutActions.push(`${name} squeezed to ${control.clientWidth}px`); break; }
-    }
-  }
-  return {
-    tableSpill, cutActions,
-    h1: main.querySelectorAll('h1').length,
-    strays, bare: bare.slice(0, 6), bareCount: bare.length,
-    headLeft: h1 ? Math.round(h1.getBoundingClientRect().left) : null,
-    cardLeft: card ? Math.round(card.getBoundingClientRect().left) : null,
-    gapAboveFooter: footer && main ? Math.round(footer.getBoundingClientRect().top - main.getBoundingClientRect().bottom) : null,
-    lastRowBottom: last ? Math.round(main.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom) : null,
-    overflowX: document.documentElement.scrollWidth > innerWidth + 1,
-    theme: [...document.querySelectorAll('link[href*="/themes/"]')].map(l => l.getAttribute('href')).join(' '),
-  };
-};
+const {inspect, judge} = require('./page-construction.cjs');
 
 (async () => {
   fs.mkdirSync(output, {recursive: true});
@@ -118,13 +56,7 @@ const inspect = () => {
         results.push({theme: theme.slug, width, route, status: response.status(), ...r});
         if (response.status() !== 200) { failures.push(`${label}: status ${response.status()}`); continue; }
         if (!r.theme.includes(`/${key}/`)) failures.push(`${label}: the previewed theme was not served`);
-        if (r.h1 !== 1) failures.push(`${label}: ${r.h1} h1 elements`);
-        if (r.strays.length) failures.push(`${label}: not a page row in main: ${r.strays.join(', ')}`);
-        if (r.bareCount) failures.push(`${label}: words on the texture: ${JSON.stringify(r.bare)}`);
-        if (r.headLeft !== null && r.cardLeft !== null && Math.abs(r.headLeft - r.cardLeft) > 3) failures.push(`${label}: first card at ${r.cardLeft}px, page head text at ${r.headLeft}px`);
-        if (r.overflowX) failures.push(`${label}: scrolls sideways`);
-        if (r.tableSpill.length) failures.push(`${label}: stands out of its table: ${r.tableSpill.join(', ')}`);
-        if (r.cutActions.length) failures.push(`${label}: an action wider than its cell: ${r.cutActions.join(', ')}`);
+        failures.push(...judge(r, label));
         if (r.gapAboveFooter !== null) gaps.set(route, r.gapAboveFooter);
         const file = `${theme.slug}__${route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}__${width}.jpg`;
         await page.screenshot({path: path.join(output, file), type: 'jpeg', quality: 60, fullPage: true});

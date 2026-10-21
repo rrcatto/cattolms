@@ -151,7 +151,8 @@ final class AnalyticsEventIntegrationTest extends TestCase
         self::assertSame(6, $this->events->countEvents(AnalyticsEventType::CourseView, $since, $this->course), 'Raw views in the period; the older view is outside it.');
         self::assertSame(['users' => 2, 'anonymous_visitors' => 2, 'total' => 4], $this->events->uniqueViewers($this->course, $since), 'Unique viewers are not raw views.');
         self::assertSame(1, $this->events->countEvents(AnalyticsEventType::CourseFavouriteAdded, $since, $this->course));
-        self::assertSame([['course_id' => $this->course, 'events' => 6], ['course_id' => $this->otherCourse, 'events' => 1]], array_values(array_filter($this->events->countsByCourse(AnalyticsEventType::CourseView, $since), fn(array $row): bool => in_array($row['course_id'], [$this->course, $this->otherCourse], true))));
+        // Every course, not the top fifty: other courses on the site may have more views than these two.
+        self::assertSame([['course_id' => $this->course, 'events' => 6], ['course_id' => $this->otherCourse, 'events' => 1]], array_values(array_filter($this->events->countsByCourse(AnalyticsEventType::CourseView, $since, 1000000), fn(array $row): bool => in_array($row['course_id'], [$this->course, $this->otherCourse], true))));
         $days = array_values(array_filter($this->events->countsByTypeAndDay($since), static fn(array $row): bool => in_array($row['day'], ['2026-10-02', '2026-10-03'], true)));
         self::assertContains(['day' => '2026-10-02', 'event_type' => 'course_view', 'events' => 7], $days);
         self::assertContains(['day' => '2026-10-03', 'event_type' => 'course_favourite_added', 'events' => 1], $days);

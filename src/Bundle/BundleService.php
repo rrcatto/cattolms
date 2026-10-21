@@ -8,7 +8,7 @@ use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Course\CourseService;
 use CattoLearning\Infrastructure\Persistence\AuditRepository;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
-use CattoLearning\Support\{AccessPeriod, Money};
+use CattoLearning\Support\{AccessPeriod, Money, WasPrice};
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
@@ -25,6 +25,8 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * shown beside it for context only. The offer and the composition are current data, edited in place:
  * an order keeps the price, access period and courses it was placed with in its snapshot, so a later
  * change affects later purchases only. A bundle anyone bought is kept; only an unused draft is deleted.
+ * The offer may carry a was price (owner, 2026-10-20), a higher price shown struck through beside the
+ * bundle price; only the bundle price is charged.
  */
 final class BundleService
 {
@@ -137,16 +139,21 @@ final class BundleService
         $minor = Money::ofMajorUnits($price, Money::platformCurrency())->minorUnits;
         if ($minor < 1) throw new RuntimeException('A bundle price must be greater than zero.');
         try {
+            $was = WasPrice::fromInput($input['was_price'] ?? '', $minor);
+        } catch (\InvalidArgumentException $invalid) {
+            throw new RuntimeException($invalid->getMessage());
+        }
+        try {
             $period = AccessPeriod::fromInput($input['access_period_value'] ?? 0, $input['access_period_unit'] ?? 'years');
         } catch (\InvalidArgumentException $invalid) {
             throw new RuntimeException($invalid->getMessage());
         }
         $active = ($input['is_active'] ?? '') === '1';
-        $this->transactions->run(function () use ($actor, $id, $minor, $period, $active): void {
+        $this->transactions->run(function () use ($actor, $id, $minor, $was, $period, $active): void {
             $before = $this->bundles->find($id, true) ?? throw self::missing();
-            $this->bundles->saveOffer($id, $minor, Money::platformCurrency(), $period, $active, $actor->id, $this->now());
-            $previous = $before['offer_id'] === null ? null : ['price_minor' => (int) $before['price_minor_units'], 'access_period_seconds' => (int) $before['access_period_seconds'], 'on_sale' => (bool) $before['offer_active']];
-            $current = ['price_minor' => $minor, 'access_period_seconds' => $period, 'on_sale' => $active];
+            $this->bundles->saveOffer($id, $minor, Money::platformCurrency(), $period, $active, $actor->id, $this->now(), $was);
+            $previous = $before['offer_id'] === null ? null : ['price_minor' => (int) $before['price_minor_units'], 'was_price_minor' => $before['was_price_minor_units'] === null ? null : (int) $before['was_price_minor_units'], 'access_period_seconds' => (int) $before['access_period_seconds'], 'on_sale' => (bool) $before['offer_active']];
+            $current = ['price_minor' => $minor, 'was_price_minor' => $was, 'access_period_seconds' => $period, 'on_sale' => $active];
             if ($previous !== $current) $this->audit->record($actor->id, 'bundle.offer_updated', ['bundle_id' => $id, 'from' => $previous, 'to' => $current, 'currency' => Money::platformCurrency()]);
         });
     }
@@ -210,6 +217,7 @@ final class BundleService
             'courses' => $courses,
             'course_count' => count($courses),
             'price_label' => $price === null ? null : Money::strictMinorUnits($price, $currency)->format(),
+        ] + ($price === null ? ['was_label' => null, 'saving_label' => null, 'saving_percent' => null] : WasPrice::labels($price, $bundle['was_price_minor_units'] ?? null, $currency)) + [
             'access_label' => $bundle['offer_id'] === null ? null : AccessPeriod::label((int) $bundle['access_period_seconds']),
             'comparison' => self::comparison($courses, $price, $currency),
             'unavailable' => BundleRules::unavailableReason($bundle, $courses, $this->clock->now()),
@@ -227,11 +235,11 @@ final class BundleService
     {
         return array_map(function (array $bundle): array {
             $presented = $this->present($bundle);
-            $facts = [['label' => 'Courses', 'value' => $presented['course_count']], ['label' => 'Access', 'value' => $presented['access_label'] ?? '—'], ['label' => 'Price', 'value' => $presented['price_label'] ?? '—']];
+            $facts = [['label' => 'Courses', 'value' => $presented['course_count']], ['label' => 'Access', 'value' => $presented['access_label'] ?? '—'], ['label' => 'Price', 'value' => $presented['price_label'] ?? '—', 'was' => $presented['was_label']]];
             if ($presented['unavailable'] !== null) $facts[] = ['label' => 'Availability', 'value' => 'Not available now'];
             return ['title' => (string) $bundle['title'], 'slug' => (string) $bundle['slug'], 'href' => '/bundles/' . $bundle['slug'], 'link_label' => 'View bundle',
                 'summary' => (string) $bundle['short_description'], 'cover_svg' => (string) $bundle['cover_svg'], 'cover_media_public_id' => null,
-                'cover_initial' => mb_strtoupper(mb_substr((string) $bundle['title'], 0, 1)), 'facts' => $facts];
+                'cover_initial' => mb_strtoupper(mb_substr((string) $bundle['title'], 0, 1)), 'facts' => $facts, 'saving_percent' => $presented['saving_percent']];
         }, $this->bundles->published($limit, $offset));
     }
 
@@ -266,6 +274,7 @@ final class BundleService
             'description_html' => (string) ($bundle['description_html'] ?? ''), 'cover_svg' => (string) ($bundle['cover_svg'] ?? ''),
             'available_from' => $time($bundle['available_from'] ?? null), 'available_until' => $time($bundle['available_until'] ?? null),
             'price' => isset($bundle['price_minor_units']) ? Money::strictMinorUnits((int) $bundle['price_minor_units'], (string) $bundle['currency_code'])->toMajorUnits() : '',
+            'was_price' => WasPrice::input($bundle['was_price_minor_units'] ?? null),
             'access_period_value' => $value, 'access_period_unit' => $unit, 'is_active' => $bundle === null || $bundle['offer_id'] === null || (bool) $bundle['offer_active'],
         ];
     }

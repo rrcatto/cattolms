@@ -214,7 +214,7 @@ final class AnalyticsEventRepository
         return $this->db->fetchAllAssociative(
             "SELECT e.id, e.event_type, e.source, e.occurred_at, e.user_id, e.visitor_id, e.course_id, e.course_item_id,
                     e.order_id, e.order_item_id, e.metadata::text AS metadata, e.idempotency_key,
-                    c.title AS course_title, u.display_name AS user_name
+                    c.title AS course_title, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name) AS user_name, u.account_reference AS user_reference
                FROM analytics_events e
                LEFT JOIN courses c ON c.id = e.course_id
                LEFT JOIN users u ON u.id = e.user_id

@@ -167,20 +167,30 @@ class SymfonyMailerAdapter implements MailerInterface
         );
     }
 
-    public function sendContactMessage(string $name, string $email, string $subject, string $message): void
+    public function sendContactMessage(array $message): void
     {
         $configuration = $this->settings->mailConfiguration();
-        $safeSubject = trim((string) preg_replace('/[\r\n]+/', ' ', $subject));
-        $this->send(
-            $configuration['from_address'],
-            'Website contact: ' . $safeSubject,
-            '<p><strong>From:</strong> ' . $this->escape($name) . ' &lt;' . $this->escape($email) . '&gt;</p>'
-            . '<p><strong>Subject:</strong> ' . $this->escape($safeSubject) . '</p>'
-            . '<p>' . nl2br($this->escape($message)) . '</p>',
-            "From: {$name} <{$email}>\nSubject: {$safeSubject}\n\n{$message}",
-            $email,
-            $name
-        );
+        $name = trim((string) preg_replace('/[\r\n]+/', ' ', $message['name']));
+        $account = $message['account_reference'] === '' ? 'None given' : $message['account_reference'] . ($message['signed_in'] ? ' (from their signed-in account)' : ' (typed by someone not signed in, not checked against the email)');
+        $rows = [['From', $name . ' <' . $message['email'] . '>'], ['Reason', $message['reason']], ['Account reference', $account]];
+        if ($message['order_number'] !== '') $rows[] = ['Order', $message['order_number']];
+        if ($message['course'] !== '') $rows[] = ['Course', $message['course']];
+        foreach ($message['details'] as $line) $rows[] = [$line['label'], $line['value']];
+        $html = '<table cellpadding="4">';
+        $text = '';
+        foreach ($rows as [$label, $value]) {
+            $html .= '<tr><td><strong>' . $this->escape($label) . '</strong></td><td>' . $this->escape($value) . '</td></tr>';
+            $text .= $label . ': ' . $value . "\n";
+        }
+        $html .= '</table><p>' . nl2br($this->escape($message['message'])) . '</p><p><a href="' . $this->escape($message['admin_url']) . '">Open ' . $this->escape($message['reference']) . ' in Administration</a></p>';
+        $text .= "\n" . $message['message'] . "\n\nOpen it in Administration: " . $message['admin_url'] . "\n";
+        $this->send($configuration['from_address'], 'Website contact ' . $message['reference'] . ': ' . $message['reason'], $html, $text, $message['email'], $name);
+    }
+
+    public function sendContactAcknowledgement(string $email, string $reference, string $reason): void
+    {
+        $words = 'Thank you for writing to us. Your message about "' . $reason . '" has arrived and we will reply to this email address. Its reference is ' . $reference . ': quote it if you write to us again about the same question.';
+        $this->send($email, 'We have your message (' . $reference . ')', '<p>' . $this->escape($words) . '</p>', $words . "\n");
     }
 
     public function sendInvoice(string $email, string $number, string $pdf): void

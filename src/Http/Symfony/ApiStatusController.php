@@ -43,7 +43,7 @@ final class ApiStatusController
             'data' => [
                 'name' => $this->settings->platformName(),
                 'api_version' => 'v1',
-                'application_version' => '0.9.5',
+                'application_version' => \CattoLearning\Support\AppVersion::current(),
                 'authentication' => 'Bearer token',
             ],
         ]);

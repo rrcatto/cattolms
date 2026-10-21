@@ -35,7 +35,6 @@ use CattoLearning\Analytics\AnalyticsEventRecorder;
 use CattoLearning\Analytics\AnalyticsSource;
 use CattoLearning\Application\PlatformAdministrationService;
 use Symfony\Component\HttpFoundation\RequestStack;
-use CattoLearning\Application\AccountSectionRegistry;
 use Symfony\Component\Routing\Attribute\Route;
 
 use CattoLearning\Course\LearningService;
@@ -68,82 +67,12 @@ final class LearningController extends BaseController
         RequestStack $requests,
         private readonly LearningService $learning,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly AccountSectionRegistry $accountSections,
         private readonly AnalyticsEventRecorder $analytics
     ) {
         parent::__construct($auth, $view, $requests);
     }
 
-    /**
-     * The learner's Course Library.
-     *
-     * Four independent datasets on one page - current, completed, favourites and requests - each
-     * with its own pagination and its own search, exactly as the Administration and Company
-     * screens compose several datasets. They previously arrived as four unbounded arrays filtered
-     * in PHP, which is the pattern that makes a list quietly lie about its size once the data
-     * grows.
-     */
-    public function library(): Response
-    {
-        $user = $this->requirePermission('LEARNING.LIBRARY.VIEW');
-        $request = $this->libraryRequest();
-
-        $data = [
-            'title' => 'My Course Library',
-            'page_kicker' => 'Current, completed, favourite and requested courses',
-            'account_section' => $this->accountSections->get('learning'),
-            'account_layout' => 'section',
-            'active_nav' => 'account',
-            // The shared search control carries the data scope so that searching does not silently
-            // reset it. It is emitted only for an identity that may actually choose a scope: for
-            // an ordinary learner the parameter would be inert, and naming a scope tells a reader
-            // that a second population of data exists, which they must never learn from this page.
-            //
-            // It must always be present as a key even when empty, because the template reads it -
-            // an absent key is an undefined variable, and strict_variables makes that an error for the whole
-            // page. That is exactly how /account and /account/library began returning
-            // "Undefined variable $universe" the moment this page started using the shared control.
-        ];
-
-        $data += $this->learning->courseLibraryView(
-            $user->id,
-            $request,
-            fn(string $dataset, array $req, int $total) => $this->platformAdministration->paginationFor($dataset, $req, $total),
-            fn(string $dataset, $pagination, string $label, string $search) => $this->platformAdministration->paginationView(
-                $dataset,
-                $pagination,
-                '/account/library',
-                $label,
-                $search === '' ? [] : [PlatformAdministrationService::searchParam($dataset) => $search]
-            )
-        );
-
-        return $this->render('library', $data);
-    }
-
-    /**
-     * Page, page size and search term for each Course Library dataset.
-     *
-     * Read from the declaration rather than written out, for the same reason Administration reads
-     * its own: a dataset added here cannot then be forgotten one layer above the query.
-     *
-     * @return array<string,mixed>
-     */
-    private function libraryRequest(): array
-    {
-        $request = [];
-        foreach (array_keys(LearningService::LIBRARY_DATASETS) as $dataset) {
-            $request[$dataset . '_page'] = $_GET[$dataset . '_page'] ?? null;
-            $request[$dataset . '_page_size'] = $_GET[$dataset . '_page_size'] ?? null;
-            $param = PlatformAdministrationService::searchParam($dataset);
-            $request[$param] = $_GET[$param] ?? null;
-        }
-
-        return $request;
-    }
-
-
-    #[Route('/account/library/enrolments/{id}/remove', name: 'learning_remove_own_access', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/account/courses/enrolments/{id}/remove', name: 'learning_remove_own_access', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function removeOwnAccess(): Response
     {
         $this->requireCsrf();
@@ -155,7 +84,7 @@ final class LearningController extends BaseController
         }
         $this->platformAdministration->removeEnrolment($enrolmentId, $user->id, 'Removed from the platform administrator’s own test library.');
         $this->flash('success', 'The course was removed from your library. The consumed credit was not returned.');
-        $this->redirect('/account/library');
+        $this->redirect('/account/courses');
     }
 
 
@@ -176,7 +105,7 @@ final class LearningController extends BaseController
                 'preview_query' => $preview ? '?preview=1' : '',
                 'course_content_mode' => true,
             ]);
-        }, '/account/library');
+        }, '/account/courses');
     }
 
 

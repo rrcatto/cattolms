@@ -436,7 +436,7 @@ final class BundlePurchaseIntegrationTest extends TestCase
     {
         $auth = clone IntegrationContainer::get()->get(AuthService::class);
         (new \ReflectionProperty(AuthService::class, 'currentUser'))->setValue($auth, $buyer);
-        return (new CartService($auth, $this->orders, $this->records))->summary();
+        return (new CartService($auth, $this->orders, $this->records, $this->promotions))->summary();
     }
 
     private function checkout(CurrentUser $buyer): CheckoutService

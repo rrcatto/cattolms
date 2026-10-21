@@ -1,0 +1,47 @@
+{% extends layout %}
+{% block page_body %}
+	{# Identity verification (owner, 2026-10-19): on the identity verification provider's hosted page, never an upload here. #}
+	{% set ph_back_href = '/account/profile' %}
+	{% set ph_back_label = 'Personal Particulars' %}
+	{% set ph_kicker = 'Account' %}
+	{% set ph_title = 'Identity verification' %}
+	{% set ph_lead = 'Your certificates and transcripts carry your name exactly as it appears on your identity document.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'identity-status'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Your identity', heading_level: 2}) }}
+			{% if identity.verified %}
+				{{ ui('feedback.notice', {tone: 'success', heading: 'Your identity is verified. You are never asked again.'}) }}
+				{{ ui('data.key-value-list', {items: [
+					{label: 'Verified name', value: identity.verification.verified_name},
+					{label: 'Document', value: (identity.verification.document_type|default('') ?: 'Identity document') ~ (identity.verification.issuing_country|default('') ? ', ' ~ identity.verification.issuing_country : '')},
+					{label: 'Verified on', value: identity.verification.decided_at|date('j F Y')},
+				]}) }}
+			{% elseif not identity.available %}
+				{{ ui('feedback.notice', {tone: 'warning', heading: 'Identity verification is not available at the moment. Please try again later.'}) }}
+			{% elseif identity.in_review %}
+				{{ ui('feedback.notice', {tone: 'info', heading: 'Your identity check is being reviewed. We will let you know the result.'}) }}
+			{% elseif identity.blocked %}
+				{{ ui('feedback.notice', {tone: 'warning', heading: 'Your identity check was declined ' ~ tries ~ ' times. Please contact us so we can allow another try.'}) }}
+			{% else %}
+				{% if identity.latest.status|default('') == 'declined' %}
+					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Your last identity check was declined.'})} %}{% block body %}<p>{{ identity.latest.decline_reason|default('') }}</p><p>You may try again {{ identity.tries_left }} more {{ identity.tries_left == 1 ? 'time' : 'times' }}.</p>{% endblock %}{% endembed %}
+				{% elseif identity.latest.status|default('') in ['started', 'abandoned', 'expired'] %}
+					{{ ui('feedback.notice', {tone: 'info', heading: 'Your last identity check was not finished. Start a new one when you are ready.'}) }}
+				{% endif %}
+				<p>Verification takes a few minutes on our identity verification provider's secure page. You photograph your ID or passport and take a live selfie, and the provider matches them. This site keeps no images: only the result, your verified name, the document's type, number and issuing country, your date of birth and when.</p>
+				<form action="/account/verification/start" method="post">
+					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Verify my identity', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				</form>
+			{% endif %}
+			{% if return_path %}<p><a href="{{ return_path }}">Go back to where you were</a></p>{% endif %}
+		{% endblock %}{% endembed %}
+	</section>
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'identity-why'})} %}{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Why we verify', heading_level: 2}) }}
+			<p>Verification protects the credibility of certificates and transcripts. You verify once, when your first certificate is due. Browsing, registering, buying and learning need nothing. The <a href="/privacy">Privacy Policy</a> explains what is kept and for how long.</p>
+		{% endblock %}{% endembed %}
+	</section>
+{% endblock %}

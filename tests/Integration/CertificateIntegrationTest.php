@@ -10,8 +10,9 @@ Version: 0.8.8.10
 Description:
 Certificates and certificate designs against the database and through the real controllers.
 
-A passing final issues a certificate drawn with the course's own design, recording its version; a
-course that gives no certificate issues none. An issued certificate draws byte for byte the same
+Completing every assessment, pass or fail, earns the certificate, issued with its transcript only to a
+verified account in the verified name and drawn with the course's own design, recording its version; a
+course that gives no certificate issues none (owner, 2026-10-19). An issued certificate draws byte for byte the same
 after the learner and course are renamed, the design is edited and the course moves to another
 design; a new issue uses the design as it is now, and a reissue keeps the number and public id. The
 public page shows the certificate's details and its PDF, a revoked one says so and has no PDF.
@@ -25,6 +26,11 @@ uploaded background, and open only to those with the certificate design permissi
 Every test runs inside a transaction that is rolled back.
 
 Changelog:
+2026/10/19 SAST
+- A certificate proves that the learner took the course (owner, 2026-10-19): a failed final earns it,
+  only a verified account receives it, in the verified name, with its transcript; an unverified
+  learner waits and is issued on verification with the original completion date; revoking closes the
+  certificate and its transcript; the Issued Certificates pages.
 2026/10/08 SAST
 - A design saves with an uploaded signature picture, sized to the foot and centred on the line.
 2026/10/07 SAST
@@ -39,6 +45,7 @@ namespace CattoLearning\Tests\Integration;
 use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Auth\PermissionCatalog;
 use CattoLearning\Course\AssessmentService;
+use CattoLearning\Course\Certificate\CertificateAddress;
 use CattoLearning\Course\Certificate\CertificateDesignCompiler;
 use CattoLearning\Course\Certificate\CertificateDesignRepository;
 use CattoLearning\Course\Certificate\CertificateDesignService;
@@ -47,6 +54,7 @@ use CattoLearning\Course\Certificate\CertificateImage;
 use CattoLearning\Course\Certificate\CertificateIssuer;
 use CattoLearning\Course\Certificate\CertificateLooks;
 use CattoLearning\Course\Certificate\CertificateRepository;
+use CattoLearning\Course\Certificate\CertificateSharing;
 use CattoLearning\Course\Certificate\CertificateWording;
 use CattoLearning\Course\LearningService;
 use CattoLearning\Document\DocumentAssetRepository;
@@ -60,6 +68,7 @@ use CattoLearning\Infrastructure\Persistence\Database;
 use CattoLearning\Infrastructure\Persistence\TransactionManager;
 use CattoLearning\Support\Uuid;
 use CattoLearning\Tests\Support\DevelopmentFixture;
+use CattoLearning\Tests\Support\IdentityFixture;
 use CattoLearning\Tests\Support\InProcessPage;
 use CattoLearning\Tests\Support\IntegrationContainer;
 use PHPUnit\Framework\TestCase;
@@ -105,7 +114,12 @@ final class CertificateIntegrationTest extends TestCase
         $_FILES = [];
     }
 
-    public function testAPassingFinalIssuesWithTheCoursesOwnDesignAndOnlyWhenTheCourseGivesOne(): void
+    /**
+     * A certificate proves that the learner took the course, never that they passed (owner,
+     * 2026-10-19): a failed final earns it, it is issued only to a verified account in the verified
+     * name, and a course that gives no certificate issues none.
+     */
+    public function testCompletingEveryAssessmentPassOrFailEarnsTheCertificateOnlyForAVerifiedAccount(): void
     {
         $container = IntegrationContainer::get();
         $learning = $container->get(LearningService::class);
@@ -121,32 +135,68 @@ final class CertificateIntegrationTest extends TestCase
             $final = $this->fixture->createAssessmentItem($courseId, $this->adminId, 'final', 1);
             $question = $this->fixture->createQuestion($final['item_id']);
             $learnerId = $this->fixture->createUser('Certificate learner', 'certificate-learner-' . $this->fixture->suffix() . '@example.test');
-            $this->db->executeStatement("UPDATE users SET certificate_name = 'Ayanda Nkosi' WHERE id = :id", ['id' => $learnerId]);
+            IdentityFixture::verify($learnerId, 'Ayanda', 'Nkosi');
             $enrolmentId = $this->fixture->createEnrolment($learnerId, $courseId, $this->adminId, 2592000);
             $learning->start($learnerId, $slug);
             $attempt = $assessments->startAttempt($learnerId, $slug, $final['node_id'], $final['key'], 'graded');
-            $assessments->respond($learnerId, (string) $attempt['public_id'], $question['question_id'], $question['correct_option_id'], false);
+            // A wrong answer: the learner fails the final.
+            $assessments->respond($learnerId, (string) $attempt['public_id'], $question['question_id'], $question['wrong_option_id'], false);
+            self::assertFalse((bool) $this->db->fetchOne('SELECT passed FROM course_results WHERE enrolment_id = :id', ['id' => $enrolmentId]), 'The learner failed.');
 
             $certificate = $this->certificates->forEnrolment($enrolmentId);
             if (!$enabled) {
                 self::assertNull($certificate, 'A course that gives no certificate issues none.');
                 continue;
             }
-            self::assertNotNull($certificate);
+            self::assertNotNull($certificate, 'Failing the final still earns the certificate.');
             self::assertSame($legalSeal['id'], (int) $certificate['template_id'], 'Drawn in the course’s own design, not the default.');
             self::assertSame((int) $legalSeal['published_version_id'], (int) $certificate['template_version_id']);
-            self::assertSame('Ayanda Nkosi', $certificate['document_data']['learner.name']);
+            self::assertSame('Ayanda Nkosi', $certificate['document_data']['learner.name'], 'The verified name, exactly as on the document.');
             self::assertSame('Legal Practice Council CPD: 2 points', $certificate['document_data']['course.accreditation']);
-            self::assertSame('50.00', $certificate['document_data']['result.percentage'], 'No module assessments and a full final: the fixed 50/50 split.');
+            foreach (['result.percentage', 'result.grade'] as $absent) self::assertArrayNotHasKey($absent, $certificate['document_data'], 'A certificate carries no mark or grade.');
             self::assertMatchesRegularExpression('/^CL-\d{4}-[0-9A-F]{12}$/', (string) $certificate['certificate_number']);
             $body = $this->documents->render($certificate)->body;
             foreach (['Ayanda Nkosi', 'Certificate Course On', 'Legal Practice Council CPD: 2 points', (string) $certificate['certificate_number']] as $text) {
                 self::assertStringContainsString($text, $body);
             }
+            self::assertStringNotContainsString('%', strip_tags($body), 'No mark is printed.');
+            $transcript = $this->certificates->transcriptForCertificate((int) $certificate['id']);
+            self::assertNotNull($transcript, 'The transcript is issued with the certificate.');
+            self::assertSame('0.00', $transcript['document_data']['result.final'], 'The transcript records the failed final.');
+            self::assertSame('0.00', $transcript['document_data']['result.overall']);
+            self::assertNull($transcript['document_data']['result.module_average'], 'No module assessments.');
+            self::assertEquals([['title' => 'QA assessment', 'kind' => 'Final assessment', 'mark' => '0.00']], $transcript['document_data']['assessments']);
+            self::assertSame('TR-' . substr((string) $certificate['certificate_number'], 3), (string) $transcript['transcript_number']);
             $audit = $this->db->fetchAssociative("SELECT metadata FROM audit_log WHERE event_key = 'certificate.issued' AND metadata->>'enrolment_id' = :id", ['id' => (string) $enrolmentId]);
             self::assertNotFalse($audit);
             self::assertSame((int) $legalSeal['published_version_id'], (int) json_decode((string) $audit['metadata'], true)['template_version_id']);
         }
+    }
+
+    /**
+     * A learner who completed every assessment but is not verified is told to verify; once verified,
+     * the certificate and transcript are issued with the original completion date (owner, 2026-10-19).
+     */
+    public function testAnUnverifiedLearnerWaitsAndIsIssuedOnVerificationWithTheOriginalCompletionDate(): void
+    {
+        [, $enrolmentId, $learnerId] = $this->completedEnrolment('Waiting Learner', 'Waiting Course', true, false);
+        $this->db->executeStatement("UPDATE course_enrolments SET completed_at = '2026-09-01 10:00:00+02' WHERE id = :id", ['id' => $enrolmentId]);
+        $awards = IntegrationContainer::get()->get(\CattoLearning\Course\Certificate\CertificateAwards::class);
+        self::assertTrue($awards->earned($enrolmentId));
+        self::assertSame(['state' => 'waiting', 'certificate' => null, 'message' => 'You have completed every assessment. Verify your identity to receive your certificate and transcript.'], $awards->forLearner($enrolmentId, $learnerId));
+        try {
+            $this->issuer->issue($enrolmentId);
+            self::fail('An unverified account is never issued a certificate.');
+        } catch (\RuntimeException $refused) {
+            self::assertStringContainsString('only to a verified account', $refused->getMessage());
+        }
+        IdentityFixture::verify($learnerId, 'Waiting', 'Learner-Verified');
+        $certificate = $this->certificates->forEnrolment($enrolmentId);
+        self::assertNotNull($certificate, 'Verifying issues the certificate that was waiting.');
+        self::assertSame('Waiting Learner-Verified', $certificate['learner_name']);
+        self::assertSame('2026-09-01', substr((string) $certificate['document_data']['course.completion_date'], 0, 10), 'The original completion date.');
+        self::assertSame('issued', $awards->forLearner($enrolmentId, $learnerId)['state']);
+        self::assertNotNull($this->certificates->transcriptForCertificate((int) $certificate['id']));
     }
 
     public function testAnIssuedCertificateNeverChangesWhenTheLearnerCourseOrDesignChange(): void
@@ -156,9 +206,9 @@ final class CertificateIntegrationTest extends TestCase
         $before = $this->documents->render($first);
         self::assertSame(1, self::pages($this->documents->pdf($first)));
 
-        // Everything a certificate is drawn from changes afterwards: the learner, the course, the
+        // Everything a certificate is drawn from changes afterwards: the learner's names, the course, the
         // design's wording, and which design the course uses.
-        $this->db->executeStatement("UPDATE users SET certificate_name = 'Renamed Learner', display_name = 'Renamed Learner' WHERE id = :id", ['id' => $learnerId]);
+        $this->db->executeStatement("UPDATE users SET display_name = 'Renamed Learner', first_name = 'Renamed' WHERE id = :id", ['id' => $learnerId]);
         $this->db->executeStatement("UPDATE courses SET title = 'Renamed Course Title', certificate_accreditation = 'New line' WHERE id = :id", ['id' => $courseId]);
         $classic = $this->designs->find((int) $first['template_id']);
         self::assertNotNull($classic);
@@ -186,57 +236,200 @@ final class CertificateIntegrationTest extends TestCase
         self::assertNotNull($again);
         self::assertSame($before->html, $this->documents->render($again)->html);
 
-        // A reissue keeps the identity a learner may have shared and is drawn with the course's design now.
+        // A reissue keeps the identity a learner may have shared, is drawn with the course's design now
+        // and keeps the verified name, whatever the profile says.
         $reissued = $this->issuer->issue($firstEnrolment, $this->adminId);
         self::assertSame((string) $first['public_id'], (string) $reissued['public_id']);
         self::assertSame((string) $first['certificate_number'], (string) $reissued['certificate_number']);
         self::assertSame($minimal['id'], (int) $reissued['template_id']);
-        self::assertStringContainsString('Renamed Learner', $this->documents->render($reissued)->body);
+        self::assertStringContainsString('Original Learner', $this->documents->render($reissued)->body);
+        self::assertStringNotContainsString('Renamed Learner', $this->documents->render($reissued)->body);
     }
 
-    public function testACertificateWithoutAResultPrintsNoResultAndAMissingEnrolmentIsRefused(): void
+    public function testACertificateCarriesNoMarkAndAMissingEnrolmentIsRefused(): void
     {
-        [, $enrolmentId] = $this->completedEnrolment('No Result Learner', 'Attendance Course', false);
+        [, $enrolmentId] = $this->completedEnrolment('No Mark Learner', 'Attendance Course');
         $certificate = $this->issuer->issue($enrolmentId);
-        self::assertNull($certificate['document_data']['result.percentage']);
+        self::assertArrayNotHasKey('result.percentage', $certificate['document_data']);
         $body = $this->documents->render($certificate)->body;
-        self::assertStringContainsString('No Result Learner', $body);
+        self::assertStringContainsString('No Mark Learner', $body);
         self::assertStringNotContainsString('%', strip_tags($body));
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('does not exist');
         $this->issuer->issue(999999999);
     }
 
-    public function testThePublicPageShowsTheDetailsAndThePdf(): void
+    /**
+     * A new certificate and transcript are private (owner, 2026-10-19): at their addresses, which are
+     * random 32-digit hex codes, nobody but the learner finds anything, ADMIN included, exactly as at an
+     * address that does not exist. Made public, each is seen by anyone with its address, and only the
+     * learner is shown the way from one to the other. A revocation closes both.
+     */
+    public function testThePagesShowTheCertificateAndTranscriptToWhomTheLearnerChoosesAndARevocationClosesBoth(): void
     {
-        [, $enrolmentId] = $this->completedEnrolment('Verified Learner', 'Verified Course');
+        [, $enrolmentId, $learnerId] = $this->completedEnrolment('Verified Learner', 'Verified Course');
         $certificate = $this->issuer->issue($enrolmentId);
+        $learner = $this->learner($learnerId);
         $id = ['public_id' => (string) $certificate['public_id']];
+        $transcript = $this->certificates->transcriptForCertificate((int) $certificate['id']);
+        self::assertNotNull($transcript);
+        $tid = ['public_id' => (string) $transcript['public_id']];
+        foreach ([$id['public_id'], $tid['public_id']] as $code) self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $code);
+        self::assertNotSame($id['public_id'], $tid['public_id']);
+        self::assertFalse((bool) $certificate['is_public'], 'A new certificate is private.');
+        self::assertFalse((bool) $transcript['is_public'], 'A new transcript is private.');
+        self::assertStringNotContainsString(strtoupper(substr($id['public_id'], 0, 12)), (string) $certificate['certificate_number'], 'The number tells nobody the address.');
 
+        foreach ([null, $this->admin] as $viewer) {
+            foreach (['show' => $id, 'pdf' => $id, 'transcript' => $tid, 'transcriptPdf' => $tid] as $method => $attributes) {
+                $this->assertNotFound($viewer, $method, $attributes);
+            }
+        }
+        $own = InProcessPage::run($learner, CertificateController::class, 'show', $id);
+        self::assertSame(200, $own['status']);
+        foreach (['Private: only you can see this page.', 'View transcript', '/transcripts/' . $tid['public_id'], '/account/certificates#certificate-' . $certificate['id'], 'My Certificates'] as $text) {
+            self::assertStringContainsString($text, $own['body']);
+        }
+        self::assertStringStartsWith('%PDF-', InProcessPage::run($learner, CertificateController::class, 'pdf', $id)['body']);
+        $ownTranscript = InProcessPage::run($learner, CertificateController::class, 'transcript', $tid);
+        self::assertStringContainsString('Private: only you can see this page.', $ownTranscript['body']);
+        self::assertStringContainsString('/certificates/' . $id['public_id'], $ownTranscript['body'], 'The learner is led back to the certificate.');
+
+        // The learner makes the certificate public: anyone with its address sees it, and nothing there
+        // leads to the transcript, which is still private.
+        $sharing = IntegrationContainer::get()->get(CertificateSharing::class);
+        $sharing->setPublic($learnerId, (int) $certificate['id'], 'certificate', true);
         $page = InProcessPage::run(null, CertificateController::class, 'show', $id);
         self::assertSame(200, $page['status']);
-        foreach (['Verified Learner', 'Verified Course', (string) $certificate['certificate_number'], '<object class="cl-certificate-pdf"', '/certificate.pdf', 'Download PDF'] as $text) {
+        foreach (['Verified Learner', 'Verified Course', (string) $certificate['certificate_number'], '<object class="cl-certificate-pdf"', '/certificate.pdf', 'Download PDF', 'It shows no mark or grade', '<meta name="robots" content="noindex, nofollow">'] as $text) {
             self::assertStringContainsString($text, $page['body']);
         }
+        foreach (['/transcripts/', 'View transcript', 'My Certificates', 'only you can see', 'Result'] as $text) {
+            self::assertStringNotContainsString($text, $page['body'], $text);
+        }
+        self::assertSame('noindex, nofollow', $page['headers']['x-robots-tag'] ?? null);
+        self::assertSame('no-referrer', $page['headers']['referrer-policy'] ?? null);
+        self::assertStringContainsString('no-store', $page['headers']['cache-control'] ?? '');
         self::assertStringNotContainsString('Drawn in the design', $page['body'], 'Only design viewers see the design line.');
         self::assertStringContainsString('Drawn in the design “Classic”', InProcessPage::run($this->admin, CertificateController::class, 'show', $id)['body']);
-
         $pdf = InProcessPage::run(null, CertificateController::class, 'pdf', $id);
         self::assertStringStartsWith('%PDF-', $pdf['body']);
         self::assertSame(1, self::pages($pdf['body']));
+        $this->assertNotFound(null, 'transcript', $tid);
 
-        $this->db->executeStatement("UPDATE certificates SET revoked_at = NOW(), revocation_reason = 'Issued in error.' WHERE id = :id", ['id' => (int) $certificate['id']]);
+        $sharing->setPublic($learnerId, (int) $certificate['id'], 'transcript', true);
+        $tpage = InProcessPage::run(null, CertificateController::class, 'transcript', $tid);
+        foreach (['Transcript', (string) $transcript['transcript_number'], 'Verified Learner', 'Overall grade', '80.00%', 'Merit', '/transcript.pdf'] as $text) {
+            self::assertStringContainsString($text, $tpage['body']);
+        }
+        self::assertStringNotContainsString('/certificates/', $tpage['body'], 'Nothing on the transcript tells a visitor where the certificate is.');
+        self::assertStringStartsWith('%PDF-', InProcessPage::run(null, CertificateController::class, 'transcriptPdf', $tid)['body']);
+
+        // ADMIN revokes the certificate, with a reason: both pages say so and neither has a PDF.
+        IntegrationContainer::get()->get(\CattoLearning\Course\Certificate\CertificateAwards::class)->revoke((int) $certificate['id'], $this->adminId, 'Issued in error.');
+        self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM audit_log WHERE event_key = 'certificate.revoked' AND metadata->>'certificate_id' = :id", ['id' => (string) $certificate['id']]));
         $revoked = InProcessPage::run(null, CertificateController::class, 'show', $id);
         self::assertStringContainsString('This certificate was revoked', $revoked['body']);
+        self::assertStringContainsString('Issued in error.', $revoked['body']);
         self::assertStringNotContainsString('<object', $revoked['body']);
-        try {
-            InProcessPage::run(null, CertificateController::class, 'pdf', $id);
-            self::fail('A revoked certificate has no PDF.');
-        } catch (NotFoundHttpException) {
-            self::addToAssertionCount(1);
+        self::assertStringContainsString('were revoked on', InProcessPage::run(null, CertificateController::class, 'transcript', $tid)['body']);
+        foreach (['pdf' => $id, 'transcriptPdf' => $tid] as $method => $attributes) {
+            $this->assertNotFound(null, $method, $attributes);
         }
-        $this->expectException(NotFoundHttpException::class);
-        InProcessPage::run(null, CertificateController::class, 'show', ['public_id' => Uuid::v4()]);
+        // A later graded attempt never brings a revoked certificate back.
+        $this->issuer->issue($enrolmentId);
+        self::assertNotNull($this->certificates->forEnrolment($enrolmentId)['revoked_at']);
+        $this->assertNotFound(null, 'show', ['public_id' => CertificateAddress::generate()]);
+        $this->assertNotFound($learner, 'show', ['public_id' => strtoupper($id['public_id'])]);
+    }
+
+    /**
+     * My Certificates (owner, 2026-10-19): the learner makes each document public or private and gives
+     * either a new address, at any time; the old address stops working, the PDF shows the new one, a
+     * reissue keeps the learner's choices, and nobody else can make these changes.
+     */
+    public function testTheLearnerDecidesWhoSeesEachDocumentAndCanGiveItANewAddress(): void
+    {
+        [, $enrolmentId, $learnerId] = $this->completedEnrolment('Sharing Learner', 'Sharing Course');
+        $certificate = $this->issuer->issue($enrolmentId);
+        $certificateId = (int) $certificate['id'];
+        $learner = $this->learner($learnerId);
+        $old = (string) $certificate['public_id'];
+        $oldTranscript = (string) $certificate['transcript_public_id'];
+
+        $panel = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificates');
+        self::assertSame(200, $panel['status']);
+        foreach (['Sharing Course', (string) $certificate['certificate_number'], '/certificates/' . $old, '/transcripts/' . $oldTranscript, 'Make public', 'New address', 'Only you can see your certificate.', 'Only you can see your transcript.'] as $text) {
+            self::assertStringContainsString($text, $panel['body']);
+        }
+
+        $made = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificateVisibility', ['id' => $certificateId], ['csrf' => $_SESSION['csrf'], 'document' => 'transcript', 'public' => '1']);
+        self::assertSame('/account/certificates#certificate-' . $certificateId, $made['location']);
+        $row = $this->certificates->find($certificateId);
+        self::assertNotNull($row);
+        self::assertTrue((bool) $row['transcript_is_public'], 'The transcript is public.');
+        self::assertFalse((bool) $row['is_public'], 'The certificate stays private: each is decided separately.');
+
+        $moved = InProcessPage::run($learner, \CattoLearning\Http\Controller\AccountController::class, 'certificateAddress', ['id' => $certificateId], ['csrf' => $_SESSION['csrf'], 'document' => 'transcript']);
+        self::assertSame('/account/certificates#certificate-' . $certificateId, $moved['location']);
+        $transcript = $this->certificates->transcriptForCertificate($certificateId);
+        self::assertNotNull($transcript);
+        $new = (string) $transcript['public_id'];
+        self::assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $new);
+        self::assertNotSame($oldTranscript, $new);
+        self::assertSame($old, (string) $this->certificates->find($certificateId)['public_id'], 'Only the transcript moved.');
+        $this->assertNotFound($learner, 'transcript', ['public_id' => $oldTranscript]);
+        self::assertSame(200, InProcessPage::run(null, CertificateController::class, 'transcript', ['public_id' => $new])['status'], 'It is still public, at its new address.');
+        $url = $transcript['document_data']['transcript.verification_url'];
+        if ($url !== null) self::assertStringEndsWith('/transcripts/' . $new, (string) $url, 'The PDF shows the address that works.');
+
+        // A later graded attempt reissues both and keeps the learner's choices and addresses.
+        $this->issuer->issue($enrolmentId);
+        $again = $this->certificates->find($certificateId);
+        self::assertNotNull($again);
+        self::assertSame([$old, $new, false, true], [(string) $again['public_id'], (string) $again['transcript_public_id'], (bool) $again['is_public'], (bool) $again['transcript_is_public']]);
+
+        // Every change is the learner's and is in the Activity log, without the address.
+        foreach (['transcript.made_public', 'transcript.address_changed'] as $event) {
+            $logged = $this->db->fetchAssociative("SELECT user_id, metadata::text AS metadata FROM audit_log WHERE event_key = :event AND metadata->>'certificate_id' = :id", ['event' => $event, 'id' => (string) $certificateId]);
+            self::assertNotFalse($logged, $event);
+            self::assertSame($learnerId, (int) $logged['user_id']);
+            foreach ([$old, $oldTranscript, $new] as $code) self::assertStringNotContainsString($code, (string) $logged['metadata']);
+        }
+
+        // Nobody else can change them, and ADMIN's page says what the learner chose without the addresses.
+        $sharing = IntegrationContainer::get()->get(CertificateSharing::class);
+        try {
+            $sharing->setPublic($this->adminId, $certificateId, 'certificate', true);
+            self::fail('Only the learner decides.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertSame('That certificate is not one of yours.', $refused->getMessage());
+        }
+        self::assertFalse((bool) $this->certificates->find($certificateId)['is_public']);
+        $adminPage = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['id' => $certificateId]);
+        foreach (['Private: only the learner', 'Public: anyone who has its address', '/admin/certificates/' . $certificateId . '/certificate.pdf', '/admin/certificates/' . $certificateId . '/transcript.pdf'] as $text) {
+            self::assertStringContainsString($text, $adminPage['body']);
+        }
+        foreach ([$old, $new] as $code) self::assertStringNotContainsString($code, $adminPage['body'], 'ADMIN is never shown an address.');
+        self::assertStringStartsWith('%PDF-', InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'pdf', ['id' => $certificateId, 'document' => 'transcript'])['body']);
+    }
+
+    /** Administration > Courses > Issued Certificates lists, finds and opens each certificate, and revokes it with a reason. */
+    public function testIssuedCertificatesAreListedSearchedAndRevokedWithAReason(): void
+    {
+        [, $enrolmentId] = $this->completedEnrolment('Listed Learner', 'Listed Course');
+        $certificate = $this->issuer->issue($enrolmentId);
+        $list = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'index', [], null, ['q' => 'Listed Learner']);
+        self::assertStringContainsString((string) $certificate['certificate_number'], $list['body']);
+        self::assertStringContainsString('In force', $list['body']);
+        $one = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'show', ['id' => (int) $certificate['id']]);
+        self::assertStringContainsString('Revoke this certificate', $one['body']);
+        $revoked = InProcessPage::run($this->admin, \CattoLearning\Http\Controller\IssuedCertificateController::class, 'revoke', ['id' => (int) $certificate['id']], ['csrf' => $_SESSION['csrf'], 'reason' => 'The learner shared the account.']);
+        self::assertSame('/admin/certificates/' . (int) $certificate['id'], $revoked['location']);
+        $row = $this->certificates->find((int) $certificate['id']);
+        self::assertNotNull($row);
+        self::assertSame('The learner shared the account.', $row['revocation_reason']);
+        self::assertSame($this->adminId, (int) $row['revoked_by_user_id']);
     }
 
     public function testTheCoursePageChoosesADesignAndPreviewsWhatIssuingWillDraw(): void
@@ -442,18 +635,39 @@ final class CertificateIntegrationTest extends TestCase
      *
      * @return array{0:int,1:int,2:int} course id, enrolment id, learner id
      */
-    private function completedEnrolment(string $learnerName, string $courseTitle, bool $withResult = true): array
+    private function completedEnrolment(string $learnerName, string $courseTitle, bool $withResult = true, bool $verified = true): array
     {
         $suffix = $this->fixture->suffix();
         $courseId = $this->fixture->createCourse($this->adminId, $this->companyId, 'qa-certificate-' . $suffix, $courseTitle, 'published');
         $this->db->executeStatement('UPDATE courses SET certificate_enabled = TRUE WHERE id = :id', ['id' => $courseId]);
         $learnerId = $this->fixture->createUser($learnerName, 'certificate-' . $suffix . '@example.test');
-        $this->db->executeStatement('UPDATE users SET certificate_name = :name WHERE id = :id', ['name' => $learnerName, 'id' => $learnerId]);
         $enrolmentId = $this->fixture->createEnrolment($learnerId, $courseId, $this->adminId, 2592000, false, 'completed');
         if ($withResult) {
             $this->db->executeStatement('INSERT INTO course_results (enrolment_id, module_percentage, final_percentage, overall_percentage, grade_code, passed) VALUES (:id, 80, 80, 80, :grade, TRUE)', ['id' => $enrolmentId, 'grade' => 'Merit']);
         }
+        if ($verified) {
+            // The verified name is the learner's name exactly as on the identity document.
+            [$first, $last] = array_pad(explode(' ', $learnerName, 2), 2, '');
+            IdentityFixture::verify($learnerId, $first, $last);
+        }
         return [$courseId, $enrolmentId, $learnerId];
+    }
+
+    /** The learner as a signed-in person. */
+    private function learner(int $learnerId): CurrentUser
+    {
+        return new CurrentUser($learnerId, Uuid::v4(), 'learner-' . $learnerId . '@example.test', 'Learner', ['STUDENT'], ['ACCOUNT.VIEW', 'LEARNING.LIBRARY.VIEW', 'LEARNING.CERTIFICATE.VIEW'], Uuid::v4());
+    }
+
+    /** @param array<string,mixed> $attributes */
+    private function assertNotFound(?CurrentUser $viewer, string $method, array $attributes): void
+    {
+        try {
+            InProcessPage::run($viewer, CertificateController::class, $method, $attributes);
+            self::fail($method . ' must not be found for this viewer.');
+        } catch (NotFoundHttpException) {
+            self::addToAssertionCount(1);
+        }
     }
 
     private static function pages(string $pdf): int

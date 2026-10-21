@@ -96,7 +96,11 @@ final class DemoSiteIntegrationTest extends TestCase
     {
         $this->orders(SiteMode::fixed('demo'))->requirePaymentMethod('dummy', 'demo_success');
         $this->orders(SiteMode::fixed('live'))->requirePaymentMethod('eft', '');
-        $this->expectExceptionMessage('Card payments are not available yet. Pay by EFT.');
+        // Settings > Payment methods (owner, 2026-10-19): a live site never offers the simulated card,
+        // whatever is ticked, and checkout lists only what it offers.
+        self::assertSame(['eft'], array_column($this->orders(SiteMode::fixed('live'))->paymentMethods()->checkoutOptions(), 'key'));
+        self::assertSame(['eft', 'dummy'], array_column($this->orders(SiteMode::fixed('demo'))->paymentMethods()->checkoutOptions(), 'key'));
+        $this->expectExceptionMessage('That payment method is not available. Choose one of the methods shown.');
         $this->orders(SiteMode::fixed('live'))->requirePaymentMethod('dummy', 'demo_success');
     }
 

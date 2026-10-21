@@ -123,9 +123,17 @@ final class AdminController extends BaseController
         private readonly RoleAdministrationService $roleAdministration,
         private readonly SelectedCompanyContext $companyContext,
         private readonly CompanyCreditPurchaseService $creditPurchases,
-        private readonly \CattoLearning\Commerce\Application\TransactionAttention $attention,
+        private readonly \CattoLearning\Application\AdminAttention $attention,
         private readonly \CattoLearning\Commerce\Application\MoneyRecords $money,
-        private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings
+        private readonly \CattoLearning\Commerce\Settings\CommerceSettings $commerceSettings,
+        private readonly \CattoLearning\Commerce\Settings\PaymentMethods $paymentMethods,
+        private readonly \CattoLearning\Identity\IdentitySettings $identitySettings,
+        private readonly \CattoLearning\Setup\SetupChecklist $setup,
+        private readonly \CattoLearning\Identity\IdentityVerificationService $identity,
+        private readonly \CattoLearning\Maintenance\ScheduledJobStatus $scheduledJobs,
+        private readonly \CattoLearning\Infrastructure\Persistence\UserProfileRepository $profiles,
+        private readonly \CattoLearning\Auth\SignInRestriction $signIn,
+        private readonly \CattoLearning\Infrastructure\Persistence\AuditRepository $auditLog
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -411,33 +419,84 @@ final class AdminController extends BaseController
         ]);
     }
 
+    /** A person's profile picture, for their page in Administration only (owner, 2026-10-20). */
+    #[Route('/admin/people/{id}/profile-image', name: 'admin_person_profile_image', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function personProfileImage(): Response
+    {
+        $this->requirePermission('PLATFORM.PERSON.VIEW');
+        $image = $this->profiles->image(max(1, (int) $this->param('id')));
+        if ($image === null) {
+            throw new NotFoundHttpException('This person has no profile picture.');
+        }
+        return new Response($image['bytes'], 200, [
+            'Content-Type' => $image['mime_type'],
+            'Content-Length' => (string) strlen($image['bytes']),
+            // Private, because it is one person's picture; immutable, because the address carries a fingerprint of it.
+            'Cache-Control' => 'private, max-age=604800, immutable',
+        ]);
+    }
+
+    /**
+     * Find a person (owner, 2026-10-21): by name, email address or account reference. One person found opens their profile;
+     * several are listed, each name opening its profile.
+     */
+    #[Route('/admin/people/find', name: 'admin_find_person', methods: ['GET'])]
+    public function findPerson(): Response
+    {
+        $this->requirePermission('PLATFORM.PERSON.VIEW');
+        $query = trim((string) ($_GET['q'] ?? ''));
+        $found = $this->platformAdministration->findPerson($query);
+        if ($found['open'] !== null) $this->redirect('/admin/people/' . $found['open']);
+        return $this->render('admin-person-find', ['title' => 'Find a person', 'active_nav' => 'admin', 'query' => $query, 'matches' => $found['matches']]);
+    }
+
     #[Route('/admin/people/{id}', name: 'admin_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function person(): Response
     {
         $this->requirePermission('PLATFORM.PERSON.VIEW');
         $target = max(1, (int) $this->param('id'));
         $data = $this->platformAdministration->personForAdministration($target);
-        $library = $this->learning->library($target);
+        // Their courses; searched by title once there are five or more (owner, 2026-10-20).
+        $libraryAll = $this->learning->library($target);
+        $librarySearch = count($libraryAll) >= 5 ? PlatformAdministrationService::searchTerm('library', $_GET) : '';
+        $library = $librarySearch === '' ? $libraryAll : array_values(array_filter($libraryAll,
+            static fn(array $course): bool => mb_stripos((string) ($course['title'] ?? ''), $librarySearch) !== false));
         $favourites = $this->platformAdministration->favourites($target);
-        $requests = $this->platformAdministration->userRequests($target);
+        // Course requests are a company account's (owner, 2026-10-21: "a function of company accounts, not individuals"):
+        // a private account's page has no Course requests block at all.
+        $companyAccount = ($data['company'] ?? null) !== null;
+        $requests = $companyAccount ? $this->platformAdministration->userRequests($target) : [];
         $sessions = $this->auth->activeSessions($target);
         $courseSearch = PlatformAdministrationService::searchTerm('grant_courses', $_GET);
         $grantCourses = $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE') && mb_strlen($courseSearch) >= 2
             ? $this->platformAdministration->lookupEntities('courses', $courseSearch)
             : [];
+        // The person's own picture, when they uploaded one (owner, 2026-10-20: "When I open a person's profile, you can show
+        // me the attached image, if it has one - or a placeholder if it does not").
+        $image = $this->profiles->image($target);
         return $this->render('admin-person-profile', $data + [
+            'profile_image_url' => $image === null ? '' : '/admin/people/' . $target . '/profile-image?v=' . substr(sha1($image['updated_at'] . $image['byte_size']), 0, 12),
             'account_reference_label' => \CattoLearning\Support\AccountReference::format((string) ($data['profile']['account_reference'] ?? '')),
             'title' => 'Manage person',
             'page_kicker' => 'Complete profile, roles, company and learning access',
             'target_user_id' => $target,
             'target_company_id' => (int) (($data['company']['id'] ?? 0)),
             'library_courses' => $library,
+            'library_total' => count($libraryAll),
+            'library_search' => $librarySearch,
             'favourites' => $favourites,
             'requests' => $requests,
+            'company_account' => $companyAccount,
             'sessions' => $sessions,
             'grant_course_search' => $courseSearch,
             'grant_courses' => $grantCourses,
             'test_grants' => $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE') ? $this->courses->personTestGrants($target) : [],
+            // The age tick and identity verification (owner, 2026-10-19).
+            'identity' => $this->requireUser()->hasPermission('PLATFORM.IDENTITY.VIEW') ? $this->identity->state($target) : null,
+            'identity_history' => $this->requireUser()->hasPermission('PLATFORM.IDENTITY.VIEW') ? $this->identity->history($target) : [],
+            'can_manage_identity' => $this->requireUser()->hasPermission('PLATFORM.IDENTITY.MANAGE'),
+            'can_manage_enrolments' => $this->requireUser()->hasPermission('PLATFORM.ENROLMENT.MANAGE'),
+            'identity_console' => \CattoLearning\Identity\IdentityVerificationService::CONSOLE,
         ]);
     }
 
@@ -525,6 +584,20 @@ final class AdminController extends BaseController
         }, '/admin/people/' . $target);
     }
 
+    /** A demo site's new account approved (owner, 2026-10-21): it can sign in, and its holder is emailed. */
+    #[Route('/admin/people/{id}/approve', name: 'admin_approve_person', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function approvePerson(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('PLATFORM.PERSON.MANAGE');
+        $target = max(1, (int) $this->param('id'));
+        return $this->handle(function () use ($user, $target): void {
+            $this->auth->approveAccount($target, $user->id);
+            $this->flash('success', 'The account is approved. The person has been emailed that they can sign in.');
+            $this->redirect('/admin/people/' . $target);
+        }, '/admin/people/' . $target);
+    }
+
     #[Route('/admin/people/{id}/sessions/revoke', name: 'admin_revoke_person_session', requirements: ['id' => '\\d+'], methods: ['POST'])]
     public function revokePersonSession(): Response
     {
@@ -589,7 +662,7 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $this->platformAdministration->removeEnrolment($id, $user->id, (string) ($_POST['reason'] ?? 'Removed by platform administrator'));
         $this->flash('success', 'Course access was removed. Progress and results were retained.');
-        $this->redirect('/admin/course/enrolments');
+        $this->redirect($this->enrolmentReturn());
     }
 
     #[Route('/admin/course/enrolments/{id}/restore', name: 'admin_restore_enrolment', requirements: ['id' => '\\d+'], methods: ['POST'])]
@@ -600,7 +673,14 @@ final class AdminController extends BaseController
         $id = max(1, (int) $this->param('id'));
         $this->platformAdministration->restoreEnrolment($id, $user->id);
         $this->flash('success', 'Course access was restored.');
-        $this->redirect('/admin/course/enrolments');
+        $this->redirect($this->enrolmentReturn());
+    }
+
+    /** Where removing or restoring access goes back to: the person's page it was done from, else the enrolments list. */
+    private function enrolmentReturn(): string
+    {
+        $return = (string) ($_POST['return'] ?? '');
+        return preg_match('#^/admin/people/\d+$#', $return) === 1 ? $return : '/admin/course/enrolments';
     }
 
     #[Route('/admin/course/credits', name: 'admin_add_credit', methods: ['POST'])]
@@ -740,6 +820,22 @@ final class AdminController extends BaseController
         }, '/admin/settings?section=site#settings-site');
     }
 
+    /** Settings > Who can sign in (owner, 2026-10-21): everyone, or administrators and the listed addresses only. */
+    #[Route('/admin/settings/sign-in', name: 'admin_save_sign_in', methods: ['POST'])]
+    public function saveSignIn(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            $saved = $this->signIn->save(($_POST['sign_in'] ?? '') === 'listed', (string) ($_POST['allowed_emails'] ?? ''));
+            $this->auditLog->record($user->id, 'settings.sign_in_saved', ['restricted' => $saved['restricted'], 'allowed_count' => count($saved['emails'])]);
+            $this->flash('success', $saved['restricted']
+                ? 'Only administrators and the ' . count($saved['emails']) . ' listed ' . (count($saved['emails']) === 1 ? 'address' : 'addresses') . ' can sign in now.'
+                : 'Everyone can sign in.');
+            $this->redirect('/admin/settings?section=sign-in#settings-sign-in');
+        }, '/admin/settings?section=sign-in#settings-sign-in');
+    }
+
     #[Route('/admin/settings/site-mode/reset', name: 'admin_reset_site_mode', methods: ['POST'])]
     public function resetSiteMode(): Response
     {
@@ -748,6 +844,23 @@ final class AdminController extends BaseController
         $this->platformAdministration->resetSiteMode($user->id);
         $this->flash('success', 'The site mode now follows APP_SITE_MODE in .env.');
         $this->redirect('/admin/settings?section=site#settings-site');
+    }
+
+    /** Settings > Payment methods (owner, 2026-10-19): the ticked methods checkout offers; the change is logged. */
+    #[Route('/admin/settings/payment-methods', name: 'admin_save_payment_methods', methods: ['POST'])]
+    public function savePaymentMethods(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        return $this->handle(function () use ($user): void {
+            try {
+                $this->paymentMethods->save(array_values(array_map('strval', (array) ($_POST['methods'] ?? []))), $user->id);
+            } catch (\InvalidArgumentException $refused) {
+                throw new \RuntimeException($refused->getMessage());
+            }
+            $this->flash('success', 'Payment methods saved. Checkout offers only the ticked methods.');
+            $this->redirect('/admin/settings?section=payment-methods#settings-payment-methods');
+        }, '/admin/settings?section=payment-methods#settings-payment-methods');
     }
 
     #[Route('/admin/settings/platform-name/reset', name: 'admin_reset_platform_name', methods: ['POST'])]
@@ -815,6 +928,8 @@ final class AdminController extends BaseController
         $user = $this->requirePermission('SYSTEM.MAIL.TEST');
         return $this->handle(function () use ($user): void {
             $this->mailer->sendTestMessage($user->primaryEmail);
+            // A test email that went marks the setup wizard's mail step (owner, 2026-10-20).
+            if ($user->hasPermission('SYSTEM.SETTING.MANAGE')) $this->setup->mark('mail', true, $user->id);
             $this->flash('success', 'A test email was sent to ' . $user->primaryEmail . '.');
             $this->redirect('/admin/settings?section=mail#settings-mail');
         }, '/admin/settings?section=mail#settings-mail');
@@ -905,14 +1020,25 @@ final class AdminController extends BaseController
             $data['active_theme_name'] = $this->themes->activeTheme();
             $data['theme_registry_out_of_sync'] = $this->themes->registryOutOfSync();
         }
-        // Transactions that need attention, on the dashboard (owner, 2026-10-17).
         if (in_array('dashboard', $sectionKeys, true)) {
-            $data['attention_items'] = $this->currentUser()?->hasPermission('PLATFORM.PAYMENT.VIEW') ? $this->attention->items() : null;
+            // Needs your attention: one row for each thing waiting for this administrator (owner, 2026-10-21).
+            $data['attention'] = $this->attention->items($this->requireUser());
             // The money of a period, each figure opening the list it adds up (owner, 2026-10-18).
             $data['money'] = $this->currentUser()?->hasPermission('PLATFORM.PAYMENT.VIEW') ? $this->money->dashboard($this->request()->query->all()) : null;
+            // The warning when the commerce job stops (owner, 2026-10-19).
+            $data['scheduler_warning'] = $this->scheduledJobs->commerceWarning();
+            // A new installation's setup, until every step is done (owner, 2026-10-20).
+            $data['setup_progress'] = $this->currentUser()?->hasPermission('SYSTEM.SETTING.VIEW') ? $this->setup->progress() : null;
         }
         if (in_array('settings', $sectionKeys, true)) {
+            // Who can sign in (owner, 2026-10-21).
+            $data['sign_in'] = ['restricted' => $this->signIn->restricted(), 'emails' => implode("\n", $this->signIn->allowedEmails())];
             $data['maintenance'] = $this->maintenance->pending();
+            // Each scheduled job's last run, the payment methods and identity verification (owner, 2026-10-19).
+            $data['scheduled_jobs'] = $this->scheduledJobs->jobs();
+            $data['payment_methods'] = $this->paymentMethods->settingsView();
+            $data['identity_settings'] = ['available' => $this->identitySettings->available(),
+                'missing_keys' => $this->identitySettings->missingKeys(), 'webhook_url' => \CattoLearning\Identity\IdentitySettings::webhookUrl()];
             $data['settings_open_section'] = (string) $this->request()->query->get('section', '');
             // The commerce settings are sections of Settings (owner, 2026-10-18: one settings area).
             $data['commerce_fields'] = \CattoLearning\Commerce\Http\CommerceSettingsController::fieldsView($this->commerceSettings);

@@ -13,7 +13,7 @@
 				<h2 class="h4">
 					Category details
 				</h2>
-				<form action="/admin/courses/categories/{{ category.id }}" method="post" class="vstack gap-5">
+				<form action="/admin/courses/categories/{{ category.id }}" method="post" enctype="multipart/form-data" class="vstack gap-5">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Name', full_width: false, for: 'field-admin-course-category-edit-1-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0)), required: true})} %}
 {% block control %}
@@ -49,6 +49,8 @@
 
 {% endblock %}
 {% endembed %}
+		{# The category's icon (owner, 2026-10-20): shown in the category picker, the catalogue and the tree. #}
+		{% include '@platform/partials/admin/icon-choice.html.twig' with {ic_current: category.icon_svg|default(''), ic_kind: 'category', ic_choice: icon_choice, ic_save: '/admin/courses/categories/' ~ category.id ~ '/icon'} %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'danger'})} %}
 {% block surface_body %}
 

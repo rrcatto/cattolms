@@ -98,14 +98,7 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How many reviews to show', for: 'landing-limit', help: 'The latest approved reviews, from 1 to ' ~ review_limit_max ~ '. The rating counts every approved review.'})} %}
 {% block control %}<input type="number" id="landing-limit" name="limit" value="{{ values.limit }}" min="1" max="{{ review_limit_max }}" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
-					<fieldset>
-						<legend>While the course has no approved reviews</legend>
-						{% for choice in [{value: 'hide', label: 'Leave the section out'}, {value: 'show', label: 'Show it, saying there are no reviews yet'}] %}
-							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: choice.label})} %}
-{% block control %}<input class="cl-check mt-1" type="radio" name="when_empty" value="{{ choice.value }}"{{ values.when_empty == choice.value ? ' checked' : '' }}>{% endblock %}
-{% endembed %}
-						{% endfor %}
-					</fieldset>
+					<p class="cl-landing-note">While the course has no approved review the page leaves this section out.</p>
 				{% elseif section.type == 'pricing' %}
 					<p class="cl-landing-note">The prices and access periods are the course’s own, read when the page is shown, with the buy buttons a visitor can use.</p>
 				{% elseif section.type == 'cta' %}

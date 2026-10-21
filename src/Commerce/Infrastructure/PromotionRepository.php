@@ -27,6 +27,23 @@ final class PromotionRepository
         return $row === false ? null : Promotion::fromRow($row, $this->courseIds($id), $this->bundleIds($id));
     }
 
+    /**
+     * The automatic promotions that are switched on (owner, 2026-10-20), oldest first; their dates and
+     * limits are checked by the calculator. With $alsoId (a code the purchaser typed) that promotion is
+     * read with them. With $lock (placement only) every row read is locked, in id order, so two
+     * placements lock them in the same order and neither can overtake the other's usage count.
+     *
+     * @return list<Promotion>
+     */
+    public function automatic(?int $alsoId = null, bool $lock = false): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT * FROM promotions WHERE (applies_automatically AND active) OR id = :also ORDER BY id' . ($lock ? ' FOR UPDATE' : ''),
+            ['also' => $alsoId ?? 0]
+        );
+        return array_map(fn(array $row): Promotion => Promotion::fromRow($row, $this->courseIds((int) $row['id']), $this->bundleIds((int) $row['id'])), $rows);
+    }
+
     public function findByCode(string $canonicalCode): ?Promotion
     {
         $row = $this->db->fetchAssociative('SELECT * FROM promotions WHERE code=:code', ['code' => $canonicalCode]);
@@ -115,8 +132,8 @@ final class PromotionRepository
     public function create(array $fields, array $courseIds, int $actorId, string $now, array $bundleIds = []): int
     {
         $id = (int) $this->db->fetchOne(
-            'INSERT INTO promotions(code,name,description,discount_type,discount_value,currency,starts_at,ends_at,active,minimum_order_minor,maximum_total_uses,maximum_uses_per_customer,course_scope,bundle_scope,created_at,updated_at,created_by,updated_by)
-             VALUES (:code,:name,:description,:discount_type,:discount_value,:currency,:starts_at,:ends_at,:active,:minimum_order_minor,:maximum_total_uses,:maximum_uses_per_customer,:course_scope,:bundle_scope,:now,:now,:actor,:actor) RETURNING id',
+            'INSERT INTO promotions(code,name,description,discount_type,discount_value,currency,starts_at,ends_at,active,minimum_order_minor,maximum_total_uses,maximum_uses_per_customer,course_scope,bundle_scope,applies_automatically,created_at,updated_at,created_by,updated_by)
+             VALUES (:code,:name,:description,:discount_type,:discount_value,:currency,:starts_at,:ends_at,:active,:minimum_order_minor,:maximum_total_uses,:maximum_uses_per_customer,:course_scope,:bundle_scope,:applies_automatically,:now,:now,:actor,:actor) RETURNING id',
             self::bind($fields) + ['now' => $now, 'actor' => $actorId]
         );
         $this->replaceSelection($id, $courseIds, $bundleIds);
@@ -133,7 +150,7 @@ final class PromotionRepository
         $this->db->executeStatement(
             'UPDATE promotions SET code=:code,name=:name,description=:description,discount_type=:discount_type,discount_value=:discount_value,currency=:currency,
                 starts_at=:starts_at,ends_at=:ends_at,active=:active,minimum_order_minor=:minimum_order_minor,maximum_total_uses=:maximum_total_uses,
-                maximum_uses_per_customer=:maximum_uses_per_customer,course_scope=:course_scope,bundle_scope=:bundle_scope,updated_at=:now,updated_by=:actor WHERE id=:id',
+                maximum_uses_per_customer=:maximum_uses_per_customer,course_scope=:course_scope,bundle_scope=:bundle_scope,applies_automatically=:applies_automatically,updated_at=:now,updated_by=:actor WHERE id=:id',
             self::bind($fields) + ['now' => $now, 'actor' => $actorId, 'id' => $id]
         );
         $this->replaceSelection($id, $courseIds, $bundleIds);
@@ -216,8 +233,9 @@ final class PromotionRepository
     public function orders(int $promotionId, int $limit, int $offset): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT o.id, o.state, o.total_minor, o.discount_minor, o.currency, o.placed_at, u.display_name AS purchaser_name, r.redeemed_at, r.code AS redeemed_code
-               FROM commerce_orders o JOIN users u ON u.id=o.purchaser_user_id LEFT JOIN promotion_redemptions r ON r.order_id=o.id
+            'SELECT o.id, o.state, o.total_minor, o.discount_minor, o.currency, o.placed_at, u.display_name AS purchaser_name, o.purchaser_user_id, u.account_reference AS purchaser_reference, ue.email AS purchaser_email,
+                    r.redeemed_at, r.code AS redeemed_code
+               FROM commerce_orders o JOIN users u ON u.id=o.purchaser_user_id LEFT JOIN user_emails ue ON ue.user_id=u.id AND ue.is_primary LEFT JOIN promotion_redemptions r ON r.order_id=o.id
               WHERE o.promotion_id=:id ORDER BY o.id DESC LIMIT :limit OFFSET :offset',
             ['id' => $promotionId, 'limit' => $limit, 'offset' => $offset]
         );
@@ -250,6 +268,7 @@ final class PromotionRepository
             $bound[$key] = $fields[$key] ?? null;
         }
         $bound['active'] = ($fields['active'] ?? false) ? 't' : 'f';
+        $bound['applies_automatically'] = ($fields['applies_automatically'] ?? false) ? 't' : 'f';
         return $bound;
     }
 

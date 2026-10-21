@@ -102,7 +102,7 @@ final class LegalPagesIntegrationTest extends TestCase
         self::assertNotSame('', $domain);
 
         $terms = $this->html('/terms');
-        self::assertStringContainsString('1. Supplier information', $terms);
+        self::assertStringContainsString('<span class="cl-ui-accordion-eyebrow">Section 1</span><span class="cl-ui-accordion-title">Supplier information</span>', $terms, 'Section 1, an accordion (owner, 2026-10-20).');
         // The page prints whatever the Site Owner says (.env or Settings): no detail is written into the code.
         $supplier = IntegrationContainer::get()->get(LegalDocuments::class)->supplier();
         foreach ([

@@ -1,7 +1,8 @@
 {# The full tag vocabulary stays visible; animation is an optional enhancement of its real links. #}
 {% extends layout %}
 {% block page_body %}
-	{% include '@platform/partials/page-head.html.twig' with {ph_back_href: '/courses', ph_back_label: 'Browse by category', ph_kicker: 'Browse', ph_title: 'Browse by tag', ph_lead: 'Discover courses through the labels they share.'} %}
+	{% set tags_hero %}{% include '@platform/partials/artwork/tags-hero.html.twig' %}{% endset %}
+	{% include '@platform/partials/page-head.html.twig' with {ph_hero: tags_hero, ph_back_href: '/courses', ph_back_label: 'Browse by category', ph_kicker: 'Browse', ph_title: 'Browse by tag', ph_lead: 'Discover courses through the labels they share.'} %}
 	<section class="cl-page-section">
 		{{ importmap() }}
 		{{ ui('catalogue.tag-browser', {tags: tag_index, selected_slug: selected_tag.slug|default('')}) }}
