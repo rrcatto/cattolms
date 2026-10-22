@@ -123,6 +123,9 @@ SQL);
      * An empty term contributes no predicate at all, so clearing a search returns the whole
      * selected universe rather than nothing.
      *
+     * A column that already names :search_term is a whole predicate, used as it stands: a person's other email addresses
+     * are matched that way (PEOPLE_ANY_EMAIL).
+     *
      * @param list<string> $columns SQL expressions to match against, e.g. 'c.name'
      * @return array{0:string,1:array<string,string>}
      */
@@ -134,7 +137,7 @@ SQL);
         $term = trim($search);
         $term = self::referenceTerm($term);
         if ($term !== '' && $columns !== []) {
-            $matches = array_map(static fn(string $column): string => $column . ' ILIKE :search_term', $columns);
+            $matches = array_map(self::searchMatch(...), $columns);
             $conditions[] = '(' . implode(' OR ', $matches) . ')';
             $bindings['search_term'] = '%' . addcslashes($term, '%_\\') . '%';
         }
@@ -160,12 +163,18 @@ SQL);
             return ['', []];
         }
 
-        $matches = array_map(static fn(string $column): string => $column . ' ILIKE :search_term', $columns);
+        $matches = array_map(self::searchMatch(...), $columns);
 
         return [
             ' AND (' . implode(' OR ', $matches) . ')',
             ['search_term' => '%' . addcslashes($term, '%_\\') . '%'],
         ];
+    }
+
+    /** One column's part of a search: the column matched against the term, or a predicate that names the term itself. */
+    private static function searchMatch(string $column): string
+    {
+        return str_contains($column, ':search_term') ? $column : $column . ' ILIKE :search_term';
     }
 
     /**
@@ -183,8 +192,13 @@ SQL);
     // from its index - even by a cast - simply will not use it, and the search silently falls back
     // to a sequential scan. DatasetSearchIndexTest asserts the pairing.
     private const FULLNAME = "(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,''))";
+    // The name with the middle names, so a middle name or the whole name is found too (owner, 2026-10-21: the People search
+    // took over from Find a person, which matched them).
+    private const FULLNAME_WITH_MIDDLE = "(coalesce(u.first_name,'') || ' ' || coalesce(u.middle_names,'') || ' ' || coalesce(u.last_name,''))";
+    // Any of a person's email addresses, not only the main one (the same owner instruction).
+    private const PEOPLE_ANY_EMAIL = 'EXISTS (SELECT 1 FROM user_emails ae WHERE ae.user_id = u.id AND ae.email::text ILIKE :search_term)';
     // A person is found by their account reference too; referenceTerm() takes the hyphens out of one typed as shown.
-    private const PEOPLE_SEARCH = [self::FULLNAME, 'u.display_name::text', 'ue.email::text', 'u.account_reference::text'];
+    private const PEOPLE_SEARCH = [self::FULLNAME, self::FULLNAME_WITH_MIDDLE, 'u.display_name::text', self::PEOPLE_ANY_EMAIL, 'u.account_reference::text'];
 
     /**
      * The learner-facing lists all search one thing: the course title. They are already narrowed

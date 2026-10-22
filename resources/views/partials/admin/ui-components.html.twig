@@ -10,7 +10,7 @@
 {% endblock %}
 {% endembed %}{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Heading with actions', heading_level: 3})} %}
 {% block section_actions %}
-{{ ui('action.link', {label: 'View reference', href: '#gallery-actions'}) }}
+{{ ui('action.link', {label: 'View reference', href: '#gallery-actions', icon: 'action-view'}) }}
 {% endblock %}
 {% endembed %}
 {% endblock %}
@@ -22,15 +22,15 @@
 {{ ui('layout.section-head', {heading: 'Actions'}) }}
 <div id="gallery-actions"></div>{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-{% for variant in ['primary', 'secondary', 'quiet', 'danger'] %}{% for size in ['small', 'normal', 'large'] %}{{ ui('action.button', {label: variant ~ ' ' ~ size, type: 'button', variant: variant, size: size}) }}{% endfor %}{{ ui('action.link', {label: variant ~ ' link', href: '#gallery-actions', variant: variant}) }}{% endfor %}{{ ui('action.button', {label: 'Disabled', disabled: true}) }}
+{% for variant in ['primary', 'secondary', 'quiet', 'danger'] %}{% for size in ['small', 'normal', 'large'] %}{{ ui('action.button', {label: variant ~ ' ' ~ size, type: 'button', variant: variant, size: size, icon: 'action-save-changes'}) }}{% endfor %}{{ ui('action.link', {label: variant ~ ' link', href: '#gallery-actions', variant: variant, icon: 'action-open'}) }}{% endfor %}{{ ui('action.button', {label: 'Disabled', disabled: true, icon: 'action-save-changes'}) }}
 {% endblock %}
-{% endembed %}{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+{% endembed %}{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
-{{ ui('action.link', {label: 'Inspect sample', href: '#gallery-actions'}) }}
+{{ ui('action.link', {label: 'Inspect sample', href: '#gallery-actions', icon: 'action-inspect'}) }}
 {% endblock %}
 {% endembed %}{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
-{{ ui('action.button', {label: 'Row action', type: 'button'}) }}
+{{ ui('action.button', {label: 'Row action', type: 'button', icon: 'action-edit'}) }}
 {% endblock %}
 {% endembed %}
 {% endblock %}
@@ -74,15 +74,15 @@ This is sample feedback with a <a href="#gallery-actions">real link</a>.
 {% endblock %}
 {% endembed %}{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Save example', type: 'submit', variant: 'primary'}) }}
+{{ ui('action.button', {label: 'Save example', type: 'submit', variant: 'primary', icon: 'action-save-changes'}) }}
 {% endblock %}
 {% block secondary_actions %}
-{{ ui('action.button', {label: 'Reset example', type: 'reset', variant: 'danger'}) }}
+{{ ui('action.button', {label: 'Reset example', type: 'reset', variant: 'danger', icon: 'action-reset'}) }}
 {% endblock %}
 {% endembed %}</form>
 <form method="get" action="/admin/system/ui-components">{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
 {% block body %}
-<label for="gallery-select">One immediate choice</label><select id="gallery-select" name="sample"><option>Example</option></select>{{ ui('action.button', {label: 'Apply'}) }}
+<label for="gallery-select">One immediate choice</label><select id="gallery-select" name="sample"><option>Example</option></select>{{ ui('action.button', {label: 'Apply', icon: 'action-done'}) }}
 {% endblock %}
 {% endembed %}</form>
 {% endblock %}
@@ -97,7 +97,7 @@ This is sample feedback with a <a href="#gallery-actions">real link</a>.
 A bounded example dataset.
 {% endblock %}
 {% block toolbar_actions %}
-{{ ui('action.button', {label: 'Example control', type: 'button'}) }}
+{{ ui('action.button', {label: 'Example control', type: 'button', icon: 'action-open'}) }}
 {% endblock %}
 {% endembed %}
 {% endblock %}
@@ -128,7 +128,7 @@ A bounded example dataset.
 <strong>Example email</strong><p>sample@example.invalid</p>
 {% endblock %}
 {% block actions %}
-{{ ui('action.link', {label: 'Inspect', href: '#gallery-actions'}) }}
+{{ ui('action.link', {label: 'Inspect', href: '#gallery-actions', icon: 'action-inspect'}) }}
 {% endblock %}
 {% endembed %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}
 {% block body %}
@@ -144,7 +144,7 @@ Example list item without actions.
 {{ ui('layout.section-head', {heading: 'Empty states and progress'}) }}
 {{ ui('feedback.empty', {summary: 'Compact text-only empty state.'}) }}{% embed ui_template('feedback.empty') with {props: ui_props('feedback.empty', {heading: 'No sample records', summary: 'A full empty state can offer a next action.'})} %}
 {% block actions %}
-{{ ui('action.link', {label: 'See examples', href: '#gallery-actions'}) }}
+{{ ui('action.link', {label: 'See examples', href: '#gallery-actions', icon: 'action-view'}) }}
 {% endblock %}
 {% endembed %}{% for size in ['normal', 'large'] %}{% for value in [0, 45, 100] %}{{ ui('feedback.progress', {value: value, label: 'Example ' ~ size ~ ' progress', show_value: true, size: size}) }}{% endfor %}{% endfor %}
 {% endblock %}
@@ -152,19 +152,19 @@ Example list item without actions.
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
 {{ ui('layout.section-head', {heading: 'Modals and accordions'}) }}
-{% for size in ['normal', 'wide'] %}{{ ui('action.button', {label: 'Open ' ~ size ~ ' modal', type: 'button', modal: 'gallery-modal-' ~ size}) }}{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'gallery-modal-' ~ size, title: size|capitalize ~ ' sample modal', size: size})} %}
+{% for size in ['normal', 'wide'] %}{{ ui('action.button', {label: 'Open ' ~ size ~ ' modal', type: 'button', modal: 'gallery-modal-' ~ size, icon: 'action-open'}) }}{% embed ui_template('overlay.modal') with {props: ui_props('overlay.modal', {id: 'gallery-modal-' ~ size, title: size|capitalize ~ ' sample modal', size: size})} %}
 {% block modal_body %}
 <p>This dialog uses the shared shell and focus behaviour.</p>
 {% endblock %}
 {% block modal_actions %}
-{{ ui('action.button', {label: 'Close', type: 'button', close_modal: true}) }}
+{{ ui('action.button', {label: 'Close', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 {% endblock %}
 {% endembed %}{% endfor %}{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Closed disclosure', summary: 'Works with keyboard and without JavaScript.'})} %}
 {% block body %}
 <p>Sample section content.</p>
 {% endblock %}
 {% block actions %}
-{{ ui('action.link', {label: 'Reference', href: '#gallery-actions'}) }}
+{{ ui('action.link', {label: 'Reference', href: '#gallery-actions', icon: 'action-view'}) }}
 {% endblock %}
 {% endembed %}{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Open disclosure', open: true})} %}
 {% block body %}

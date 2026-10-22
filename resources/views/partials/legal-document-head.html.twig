@@ -10,6 +10,6 @@
 		<p>{{ legal.intro }}</p>
 		<p>Read this with the
 			{%- for other in legal_documents|filter(other => other.key != legal.key) %} <a href="{{ other.path }}">{{ other.title }}</a>{{ loop.last ? '.' : ' and the' }}{% endfor %}</p>
-		<p class="cl-legal-pdf">{{ ui('action.link', {label: 'Download the ' ~ legal.title ~ ' (PDF)', variant: 'secondary', size: 'small', href: legal.path ~ '.pdf', new_window: true}) }} Every section, with the date it was last updated and our details.</p>
+		<p class="cl-legal-pdf">{{ ui('action.link', {label: 'Download the ' ~ legal.title ~ ' (PDF)', variant: 'secondary', size: 'small', href: legal.path ~ '.pdf', new_window: true, icon: 'action-download'}) }} Every section, with the date it was last updated and our details.</p>
 {% endblock %}
 {% endembed %}

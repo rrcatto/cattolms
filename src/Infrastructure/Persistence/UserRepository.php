@@ -50,49 +50,18 @@ final class UserRepository
     }
 
     /**
-     * Find a person (owner, 2026-10-21: "enter their name or their email or their account reference and get back a link to
-     * their profile or in the case of partial matches, a list of all matches"): the people whose name, any of their email
-     * addresses or their account reference (typed with or without its dashes) contains the term, exact matches first.
-     *
-     * @return list<array{id:int,name:string,email:string,account_reference:string,company_name:string,status:string,exact:bool}>
-     */
-    public function findPeople(string $term, int $limit = 100): array
-    {
-        $term = trim($term);
-        $reference = strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $term));
-        $rows = $this->db->fetchAllAssociative(
-            "SELECT u.id, COALESCE(NULLIF(trim(concat_ws(' ', NULLIF(u.first_name, ''), NULLIF(u.middle_names, ''), NULLIF(u.last_name, ''))), ''), u.display_name, '') AS name,
-                    pe.email, u.account_reference, u.status, COALESCE(co.name, '') AS company_name,
-                    (u.account_reference = :reference OR EXISTS (SELECT 1 FROM user_emails x WHERE x.user_id = u.id AND lower(x.email) = lower(:term))) AS exact
-               FROM users u
-               JOIN user_emails pe ON pe.user_id = u.id AND pe.is_primary = TRUE
-               LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.status = 'active'
-               LEFT JOIN companies co ON co.id = cu.company_id AND co.status = 'active'
-              WHERE concat_ws(' ', u.first_name, u.middle_names, u.last_name, u.display_name) ILIKE :like
-                 OR EXISTS (SELECT 1 FROM user_emails x WHERE x.user_id = u.id AND x.email ILIKE :like)
-                 OR (:reference <> '' AND u.account_reference ILIKE :reference_like)
-              ORDER BY exact DESC, u.last_name NULLS LAST, u.first_name, u.id
-              LIMIT " . max(1, $limit),
-            ['term' => $term, 'like' => '%' . addcslashes($term, '%_\\') . '%', 'reference' => $reference, 'reference_like' => '%' . $reference . '%']
-        );
-        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'name' => trim((string) $row['name']), 'email' => (string) $row['email'],
-            'account_reference' => (string) $row['account_reference'], 'company_name' => (string) $row['company_name'], 'status' => (string) $row['status'],
-            'exact' => (bool) $row['exact']], $rows);
-    }
-
-    /**
      * The accounts waiting for ADMIN's approval, oldest first.
      *
      * @return list<array{id:int,name:string,email:string,created_at:string,account_reference:string}>
      */
-    public function awaitingApproval(int $limit = 20): array
+    public function awaitingApproval(): array
     {
         return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'name' => trim((string) $row['name']), 'email' => (string) $row['email'], 'created_at' => (string) $row['created_at'], 'account_reference' => (string) $row['account_reference']],
             $this->db->fetchAllAssociative(
                 "SELECT u.id, COALESCE(NULLIF(trim(concat_ws(' ', u.first_name, u.last_name)), ''), u.display_name, '') AS name, ue.email, u.account_reference,
                         to_char(u.created_at, 'YYYY-MM-DD HH24:MI') AS created_at
                    FROM users u JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
-                  WHERE u.status = 'awaiting_approval' ORDER BY u.created_at, u.id LIMIT " . max(1, $limit)
+                  WHERE u.status = 'awaiting_approval' ORDER BY u.created_at, u.id"
             ));
     }
 

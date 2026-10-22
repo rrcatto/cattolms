@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 0.9.6 **Runtime:** PHP >=8.5.9 <9.0, PostgreSQL 13 or later.
+**LMS:** 0.9.7 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later.
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -123,17 +123,25 @@ One setting says whether a site is real: `APP_SITE_MODE=demo` or `live` in `.env
 
 Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Settings → Site Owner) before providing EFT instructions to customers on a live site; a demo site shows fake details instead (below). The Dummy gateway simulates card outcomes only on a demo site. EFT instructions do not confirm a bank payment; ADMIN must record independently verified bank evidence before settlement. No live payment-processor credentials are included in the current code.
 
+## A site on rootless Podman
+
+`deploy/podman/` (2026-10-22) runs a site as its own Linux user in a pod: `web` (nginx, unprivileged), `php` (PHP-FPM from `deploy/podman/Containerfile`) and `scheduler` (`schedule:run --watch`), a Quadlet systemd user service published on `127.0.0.1:<port>`, behind the server's own web server; PostgreSQL and the mail server stay on the server and are `10.0.2.2` to the pod. The code (`~/cattolms/releases/<version>`, `~/cattolms/current`) is read-only in the containers. Setting up and the root steps: [deploy/podman/README.md](../deploy/podman/README.md).
+
+- **Update:** `cattolms-podman.sh update --version X.Y.Z` as the site's user: the release, its image and Composer packages, the tables, the themes, the web files, then a restart. A database change needs no other step (the one baseline migration, on a fresh database for a new baseline).
+- **A PHP security release:** a CattoLMS release raises the pinned PHP version in the Containerfile; updating to it rebuilds the image.
+- **Logs and commands:** `cattolms-podman.sh logs web|php|scheduler`, `cattolms-podman.sh console <command>` (in the running pod), `systemctl --user status cattolms`.
+
 ## Publishing a release
 
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.6`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.7`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.6   # the tag being released
+   V=v0.9.7   # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

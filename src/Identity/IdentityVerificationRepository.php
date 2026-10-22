@@ -131,8 +131,8 @@ final class IdentityVerificationRepository
         ) === 1;
     }
 
-    /** @return list<array<string,mixed>> the checks Didit is reviewing, oldest first, with whose they are */
-    public function inReview(int $limit = 50): array
+    /** @return list<array<string,mixed>> every check Didit is reviewing, oldest first, with whose they are */
+    public function inReview(): array
     {
         return $this->db->fetchAllAssociative(
             "SELECT iv.id, iv.user_id, iv.session_id, iv.started_at, iv.decided_at,
@@ -141,8 +141,7 @@ final class IdentityVerificationRepository
                JOIN users u ON u.id = iv.user_id
                LEFT JOIN user_emails ue ON ue.user_id = u.id AND ue.is_primary = TRUE
               WHERE iv.status = 'in_review'
-              ORDER BY iv.started_at, iv.id LIMIT :limit",
-            ['limit' => $limit]
+              ORDER BY iv.started_at, iv.id"
         );
     }
 

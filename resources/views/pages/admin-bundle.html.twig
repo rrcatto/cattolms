@@ -10,9 +10,9 @@
 	{% if can_manage %}
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
 		{% for target, label in {published: bundle.status == 'retired' ? 'Publish again' : 'Publish', draft: 'Return to draft', retired: 'Retire'} %}
-			{% if bundle.status != target %}<form action="/admin/bundles/{{ bundle.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ target }}">{{ ui('action.button', {label: label, variant: target == 'published' ? 'primary' : 'secondary', type: 'submit'}) }}</form>{% endif %}
+			{% if bundle.status != target %}<form action="/admin/bundles/{{ bundle.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ target }}">{{ ui('action.button', {label: label, variant: target == 'published' ? 'primary' : 'secondary', type: 'submit', icon: (target == 'published' ? 'action-publish' : (target == 'draft' ? 'action-hide' : 'action-archive'))}) }}</form>{% endif %}
 		{% endfor %}
-		{% if bundle.status == 'draft' and not bundle.sold %}<form action="/admin/bundles/{{ bundle.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete bundle', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ bundle.title ~ '? Nobody has bought it.'}) }}</form>{% endif %}
+		{% if bundle.status == 'draft' and not bundle.sold %}<form action="/admin/bundles/{{ bundle.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete bundle', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ bundle.title ~ '? Nobody has bought it.', icon: 'action-remove'}) }}</form>{% endif %}
 	{% endblock %}{% endembed %}
 	{% if bundle.sold %}<p class="help">This bundle has been sold, so it is kept for its order history and cannot be deleted. Retire it to stop selling it.</p>{% endif %}
 	{% endif %}
@@ -27,9 +27,9 @@
 			<span><strong>{{ course.title }}</strong> <small>{{ course.slug }}</small>{% if course.status != 'published' %} {{ ui('feedback.badge', {label: course.status|capitalize, tone: 'warning', size: 'small'}) }}{% endif %}</span>
 			{% if can_manage %}
 			<span class="cl-bundle-course-actions">
-				{% if not loop.first %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' up'}) }}</form>{% endif %}
-				{% if not loop.last %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' down'}) }}</form>{% endif %}
-				<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Remove ' ~ course.title}) }}</form>
+				{% if not loop.first %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' up', icon: 'action-move-up'}) }}</form>{% endif %}
+				{% if not loop.last %}<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Move ' ~ course.title ~ ' down', icon: 'action-move-down'}) }}</form>{% endif %}
+				<form action="/admin/bundles/{{ bundle.id }}/courses/{{ course.course_id }}/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Remove ' ~ course.title, icon: 'action-remove'}) }}</form>
 			</span>
 			{% endif %}
 		</li>
@@ -42,7 +42,7 @@
 	<form action="/admin/bundles/{{ bundle.id }}/courses" method="post">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_course_id', lk_type: 'courses', lk_label: 'Add a course', lk_empty: 'Search for a course to add', lk_selected: 0, lk_required: 1} %}
-		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add course', variant: 'secondary', type: 'submit'}) }}{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add course', variant: 'secondary', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
 	</form>
 	{% endif %}
 {% endblock %}{% endembed %}
@@ -60,7 +60,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Unit', for: 'bundle-unit', required: true})} %}{% block control %}<select id="bundle-unit" name="access_period_unit" required {{ ui_field_attrs(props) }}>{% for unit in units %}<option value="{{ unit }}"{% if form.access_period_unit == unit %} selected{% endif %}>{{ unit|capitalize }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}
 		{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'On sale: a published bundle can be bought'})} %}{% block control %}<input type="checkbox" name="is_active" value="1" {{ form.is_active ? 'checked' : '' }}>{% endblock %}{% endembed %}
-		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save price', variant: 'primary', type: 'submit'}) }}{% endblock %}{% endembed %}
+		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save price', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 	</form>
 	{% else %}
 	{{ ui('data.key-value-list', {items: [{label: 'Price', value: bundle.price_label ?? 'No price yet', was: bundle.was_label}, {label: 'Access', value: bundle.access_label ?? '—'}]}) }}
@@ -82,7 +82,7 @@
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'On sale from (optional)', for: 'bundle-from'})} %}{% block control %}<input id="bundle-from" name="available_from" type="datetime-local" value="{{ form.available_from }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'On sale until (optional)', for: 'bundle-until', help: 'No longer sold from this moment.'})} %}{% block control %}<input id="bundle-until" name="available_until" type="datetime-local" value="{{ form.available_until }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}
-	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: bundle ? 'Save details' : 'Create bundle', variant: 'primary', type: 'submit'}) }}<a href="/admin/bundles{{ bundle ? '/' ~ bundle.id : '' }}">Cancel</a>{% endblock %}{% endembed %}
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: bundle ? 'Save details' : 'Create bundle', variant: 'primary', type: 'submit', icon: (bundle ? 'action-save-changes' : 'action-add')}) }}<a href="/admin/bundles{{ bundle ? '/' ~ bundle.id : '' }}">Cancel</a>{% endblock %}{% endembed %}
 </form>
 {% else %}
 {{ ui('data.key-value-list', {items: [{label: 'Title', value: bundle.title}, {label: 'Web address', value: '/bundles/' ~ bundle.slug}, {label: 'Short description', value: bundle.short_description}]}) }}

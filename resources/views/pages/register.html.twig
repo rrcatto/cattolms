@@ -26,7 +26,7 @@
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Email address', for: 'registration-email', required: true})} %}{% block control %}<input type="email" id="registration-email" name="email" value="{{ email|default('') }}" autocomplete="email" required>{% endblock %}{% endembed %}
                 {# Adults only (owner, 2026-10-20): someone under 18 is refused, and nothing they typed is kept. #}
                 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', for: 'date-of-birth', required: true, help: 'You must be 18 or older. For example 14 March 1990.'})} %}{% block control %}<input type="date" id="date-of-birth" name="date_of_birth" value="{{ date_of_birth|default('') }}" max="{{ 'now'|date_modify('-18 years')|date('Y-m-d') }}" autocomplete="bday" required>{% endblock %}{% endembed %}
-                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send registration link', variant: 'primary', size: 'large', type: 'submit'}) }}{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Send registration link', variant: 'primary', size: 'large', type: 'submit', icon: 'action-email'}) }}{% endblock %}{% endembed %}
             </form>
             <p class="small cl-text-secondary mt-5 mb-0">Already have an account? <a href="/login">Sign in</a>.</p>
         {% endblock %}

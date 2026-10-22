@@ -28,10 +28,14 @@
 					{% endif %}
 				</div>
 			</div>
-			{# The account reference at the band's right edge, opening the person's profile (owner, 2026-10-21: "right align
-			   the Account Reference number and link it to the person's profile"). #}
+			{# The account reference at the band's right edge under its label, opening the person's profile (owner, 2026-10-21:
+			   "right align the Account Reference number and link it to the person's profile", then "Put the label
+			   "Account Reference:" in a line above it. Without a label, people will not know what it is"). #}
 			{% if identity_reference|default('') %}
-				<a class="cl-identity-reference" href="/account/profile" title="Your account reference: open your profile">{{ identity_reference|account_reference }}</a>
+				<div class="cl-identity-account">
+					<span class="cl-identity-account-label">Account Reference:</span>
+					<a class="cl-identity-reference" href="/account/profile" title="Open your profile">{{ identity_reference|account_reference }}</a>
+				</div>
 			{% endif %}
 		{% else %}
 			<div class="cl-identity-avatar cl-identity-avatar-empty cl-identity-head-anonymous" aria-hidden="true">
@@ -45,8 +49,8 @@
 					Sign in to see your courses, or register to start one.
 				</p>
 				<div class="cl-identity-roles cl-mt-2">
-					{{ ui('action.link', {label: 'Sign in', variant: 'primary', size: 'small', href: '/login'}) }}
-                    {{ ui('action.link', {label: 'Register', variant: 'secondary', size: 'small', href: '/register'}) }}
+					{{ ui('action.link', {label: 'Sign in', variant: 'primary', size: 'small', href: '/login', icon: 'nav-signin'}) }}
+                    {{ ui('action.link', {label: 'Register', variant: 'secondary', size: 'small', href: '/register', icon: 'action-register'}) }}
 				</div>
 			</div>
 		{% endif %}

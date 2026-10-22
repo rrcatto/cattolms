@@ -15,7 +15,7 @@
 			<td class="cell-text"><a href="{{ order.href }}">{{ order.number }}</a><br><span class="small">Placed {{ order.placed }}</span></td>
 			<td class="cell-text">{{ order.bought }}<br><span class="small">{{ order.note }}</span></td>
 			<td>{{ order.state == 'cancelled' ? 'Cancelled' : order.due_label }}</td>
-			<td class="cell-actions"><form action="{{ eft_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_id" value="{{ order.id }}">{% for name, value in eft_hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}{{ ui('action.button', {label: eft_button, variant: 'primary', size: 'small', type: 'submit', aria_label: eft_button ~ ' ' ~ order.number}) }}</form></td>
+			<td class="cell-actions"><form action="{{ eft_action }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="order_id" value="{{ order.id }}">{% for name, value in eft_hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}{{ ui('action.button', {label: eft_button, variant: 'primary', size: 'small', type: 'submit', aria_label: eft_button ~ ' ' ~ order.number, icon: 'action-record-money'}) }}</form></td>
 		</tr>
 	{% endfor %}{% endblock %}
 	{% endembed %}

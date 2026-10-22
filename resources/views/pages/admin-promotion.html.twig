@@ -13,8 +13,8 @@
 	{% endblock %}{% endembed %}
 	{% if can_manage %}
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
-		<form action="/admin/promotions/{{ promotion.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="active" value="{{ promotion.active ? '0' : '1' }}">{{ ui('action.button', {label: promotion.active ? 'Deactivate' : 'Activate', variant: promotion.active ? 'secondary' : 'primary', type: 'submit'}) }}</form>
-		{% if usage.deletable %}<form action="/admin/promotions/{{ promotion.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete promotion', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ promotion.code ~ '? No order has used it.'}) }}</form>{% endif %}
+		<form action="/admin/promotions/{{ promotion.id }}/status" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="active" value="{{ promotion.active ? '0' : '1' }}">{{ ui('action.button', {label: promotion.active ? 'Deactivate' : 'Activate', variant: promotion.active ? 'secondary' : 'primary', type: 'submit', icon: (promotion.active ? 'action-disable' : 'action-enable')}) }}</form>
+		{% if usage.deletable %}<form action="/admin/promotions/{{ promotion.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete promotion', variant: 'danger', type: 'submit', confirm: 'Delete ' ~ promotion.code ~ '? No order has used it.', icon: 'action-remove'}) }}</form>{% endif %}
 	{% endblock %}{% endembed %}
 	{% if not usage.deletable %}<p class="help">Orders were placed with this promotion, so it is kept for their history and cannot be deleted. Deactivate it to stop new uses. Changes apply to checkouts from now on; orders already placed keep the promotion as it was.</p>{% endif %}
 	{% endif %}
@@ -67,7 +67,7 @@
 		{% include '@platform/partials/entity-lookup.html.twig' with {lk_name: 'add_bundle_id', lk_type: 'bundles', lk_label: 'Add a bundle', lk_empty: 'Search for a bundle to add', lk_selected: 0, lk_required: 0} %}
 	</fieldset>
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
-		{{ ui('action.button', {label: promotion ? 'Save promotion' : 'Create promotion', variant: 'primary', type: 'submit'}) }}<a href="/admin/promotions{{ promotion ? '/' ~ promotion.id : '' }}">Cancel</a>
+		{{ ui('action.button', {label: promotion ? 'Save promotion' : 'Create promotion', variant: 'primary', type: 'submit', icon: (promotion ? 'action-save-changes' : 'action-add')}) }}<a href="/admin/promotions{{ promotion ? '/' ~ promotion.id : '' }}">Cancel</a>
 	{% endblock %}{% endembed %}
 </form>
 {% else %}

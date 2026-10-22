@@ -10,7 +10,7 @@
                 {{ ui('layout.section-head', {heading: 'Available course access', heading_level: 2, summary: 'Search published paid courses. Each access period is a separate credit type.'}) }}
                 <form action="/company/credits/buy" method="get">
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Find a course', for: 'credit-course-search'})} %}{% block control %}<input id="credit-course-search" name="search" value="{{ search }}" maxlength="120" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-                    {{ ui('action.button', {label: 'Search', variant: 'secondary', size: 'small', type: 'submit'}) }}
+                    {{ ui('action.button', {label: 'Search', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-search'}) }}
                 </form>
                 {% if offers %}{% embed ui_template('data.list') with {props: ui_props('data.list', {})} %}{% block body %}
                     {% for offer in offers %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
@@ -19,7 +19,7 @@
                         <form action="/company/credits/buy/add" method="post">
                             <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ offer.id }}">
                             <label for="credit-quantity-{{ offer.id }}">Quantity</label> <input id="credit-quantity-{{ offer.id }}" type="number" name="quantity" min="1" max="10000" value="1" required>
-                            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add credits', variant: 'secondary', size: 'small', type: 'submit'}) }}{% endblock %}{% endembed %}
+                            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Add credits', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-add'}) }}{% endblock %}{% endembed %}
                         </form>
                     {% endblock %}{% endembed %}{% endfor %}
                 {% endblock %}{% endembed %}{% else %}{{ ui('feedback.empty', {summary: 'No paid course offers match this search.'}) }}{% endif %}
@@ -31,12 +31,12 @@
                     {% for item in basket.items %}{% embed ui_template('data.list-item') with {props: ui_props('data.list-item', {})} %}{% block body %}
                         <strong>{{ item.course_title }}</strong><p>{{ item.access_period_seconds / 86400 }} days · {{ item.quantity }} × {{ item.unit_label }} = {{ item.line_label }}</p>
                     {% endblock %}{% block actions %}
-                        <form action="/company/credits/buy/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.variant_id }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit'}) }}</form>
+                        <form action="/company/credits/buy/remove" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.variant_id }}">{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-remove'}) }}</form>
                     {% endblock %}{% endembed %}{% endfor %}
                 {% endblock %}{% endembed %}<p><strong>Total: {{ basket.total_label }}</strong></p>
-                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'Review and pay', variant: 'primary', size: 'normal', href: '/company/credits/checkout'}) }}{% endblock %}{% endembed %}
+                    {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.link', {label: 'Review and pay', variant: 'primary', size: 'normal', href: '/company/credits/checkout', icon: 'action-pay'}) }}{% endblock %}{% endembed %}
                 {% else %}{{ ui('feedback.empty', {summary: 'No credits selected yet.'}) }}{% endif %}
-                <form action="/company/credits/buy/cancel" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Cancel this purchase', variant: 'quiet', size: 'small', type: 'submit'}) }}</form>
+                <form action="/company/credits/buy/cancel" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Cancel this purchase', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-cancel'}) }}</form>
             {% endblock %}{% endembed %}
         {% endblock %}{% endembed %}
     </section>

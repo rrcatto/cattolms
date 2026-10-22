@@ -51,7 +51,7 @@
 								{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 
-									{{ ui('action.link', {label: 'Manage', variant: 'secondary', size: 'small', href: '/admin/roles/' ~ (role.id)}) }}
+									{{ ui('action.link', {label: 'Manage', variant: 'secondary', size: 'small', href: '/admin/roles/' ~ (role.id), icon: 'action-manage'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -98,7 +98,7 @@
 {% endblock %}
 {% block modal_actions %}
 
-							{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true}) }}
+							{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 							{{ ui('action.button', {label: 'Create role', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
 
 {% endblock %}

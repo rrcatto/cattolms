@@ -12,6 +12,6 @@
 	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Icon (an SVG file, optional)', for: field_prefix ~ '-icon', help: 'Shown beside the category in the category picker, the catalogue and the tree. Without one, a lettered icon is made.', full_width: true})} %}{% block control %}<input class="cl-input" type="file" id="{{ props.for }}" name="icon" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 		{% block primary_actions %}{{ ui('action.button', {label: parent ? 'Add subcategory' : 'Add category', variant: 'primary', type: 'submit', icon: 'action-add'}) }}{% endblock %}
-		{% block secondary_actions %}{% if in_modal|default(false) %}{{ ui('action.button', {label: 'Cancel', variant: 'quiet', type: 'button', close_modal: true}) }}{% else %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/courses/categories' ~ (parent ? '?reveal=' ~ parent.id ~ '#category-' ~ parent.id : '')}) }}{% endif %}{% endblock %}
+		{% block secondary_actions %}{% if in_modal|default(false) %}{{ ui('action.button', {label: 'Cancel', variant: 'quiet', type: 'button', close_modal: true, icon: 'action-cancel'}) }}{% else %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/courses/categories' ~ (parent ? '?reveal=' ~ parent.id ~ '#category-' ~ parent.id : ''), icon: 'action-cancel'}) }}{% endif %}{% endblock %}
 	{% endembed %}
 </form>

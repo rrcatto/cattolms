@@ -60,14 +60,14 @@
 											<small class="cl-text-muted">{% if course.owner_user_id %}{{ ui('data.person', {name: course.owner_person_name, reference: course.owner_person_reference|default(''), href: '/admin/people/' ~ course.owner_user_id}) }}{% else %}—{% endif %}</small>
 										</td>
 										<td class="cell-actions">
-											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-													{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id)}) }}
-													{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/preview'}) }}
-													{{ ui('action.link', {label: 'Export', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/export'}) }}
+													{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/' ~ (course.id), icon: 'action-manage'}) }}
+													{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/preview', icon: 'action-preview'}) }}
+													{{ ui('action.link', {label: 'Export', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ (course.id) ~ '/export', icon: 'action-export'}) }}
 													{% if arrange %}
-														{% for move in [['up', 'Move up', 'action-move-up'], ['down', 'Move down', 'action-move-down'], ['top', 'Move to the top', 'action-move-up']] %}
+														{% for move in [['up', 'Move up', 'action-move-up'], ['down', 'Move down', 'action-move-down'], ['top', 'Move to the top', 'action-move-top']] %}
 														<form action="/admin/courses/{{ course.id }}/catalogue-move" method="post">
 															<input type="hidden" name="csrf" value="{{ csrf }}">
 															<input type="hidden" name="direction" value="{{ move[0] }}">
@@ -78,12 +78,15 @@
 													{% if can_delete_courses %}
 														<form action="/admin/courses/{{ course.id }}/reset" method="post">
 															<input type="hidden" name="csrf" value="{{ csrf }}">
-															{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'submit', confirm: 'Reset ' ~ (course.title) ~ '? This removes all course content and learner test data but keeps the empty course shell for re-import.'}) }}
+															{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'submit', confirm: 'Reset ' ~ (course.title) ~ '? This removes all course content and learner test data but keeps the empty course shell for re-import.', icon: 'action-reset'}) }}
 														</form>
+														{# Never for a course that was bought: its orders, invoices and receipts are kept for good (owner, 2026-10-21). #}
+														{% if not course.bought_lines %}
 														<form action="/admin/courses/{{ course.id }}/delete" method="post">
 															<input type="hidden" name="csrf" value="{{ csrf }}">
 															{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Permanently delete ' ~ (course.title) ~ ' and all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}
 														</form>
+														{% endif %}
 													{% endif %}
 
 {% endblock %}
@@ -103,7 +106,7 @@
 						{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 
-							{{ ui('action.link', {label: 'Import HTML', variant: 'primary', size: 'normal', href: '/admin/courses/import'}) }}
+							{{ ui('action.link', {label: 'Import HTML', variant: 'primary', size: 'normal', href: '/admin/courses/import', icon: 'action-import'}) }}
 							{{ ui('action.link', {label: 'Create manually', variant: 'secondary', size: 'normal', href: '/admin/courses/new', icon: 'action-add'}) }}
 
 {% endblock %}
@@ -123,7 +126,7 @@
 						{% if courses_preview_has_more %}
 							<div class="pagination-row">
 								<span class="pagination-summary">Showing the first {{ preview_page_size }} courses.</span>
-								{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'small', href: '/admin/courses'}) }}
+								{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'small', href: '/admin/courses', icon: 'action-view-all'}) }}
 							</div>
 						{% endif %}
 					{% endblock %}

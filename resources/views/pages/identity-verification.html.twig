@@ -32,7 +32,7 @@
 				<p>Verification takes a few minutes on our identity verification provider's secure page. You photograph your ID or passport and take a live selfie, and the provider matches them. This site keeps no images: only the result, your verified name, the document's type, number and issuing country, your date of birth and when.</p>
 				<form action="/account/verification/start" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
-					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Verify my identity', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Verify my identity', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-verify'}) }}{% endblock %}{% endembed %}
 				</form>
 			{% endif %}
 			{% if return_path %}<p><a href="{{ return_path }}">Go back to where you were</a></p>{% endif %}

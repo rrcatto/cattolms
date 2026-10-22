@@ -40,12 +40,12 @@
 			{% endif %}
 			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-				{{ ui('action.link', {label: 'Preview', variant: published ? 'secondary' : 'primary', href: '/admin/courses/' ~ course.id ~ '/landing/preview', new_window: true, icon: 'action-open'}) }}
+				{{ ui('action.link', {label: 'Preview', variant: published ? 'secondary' : 'primary', href: '/admin/courses/' ~ course.id ~ '/landing/preview', new_window: true, icon: 'action-preview'}) }}
 				{% if can_publish %}
 					{% if published %}
-						<form action="/admin/courses/{{ course.id }}/landing/unpublish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Unpublish', type: 'submit', confirm: 'Unpublish the landing page? Its address will be not found until you publish it again. Nothing on it is lost.'}) }}</form>
+						<form action="/admin/courses/{{ course.id }}/landing/unpublish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Unpublish', type: 'submit', confirm: 'Unpublish the landing page? Its address will be not found until you publish it again. Nothing on it is lost.', icon: 'action-hide'}) }}</form>
 					{% else %}
-						<form action="/admin/courses/{{ course.id }}/landing/publish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Publish', variant: 'primary', type: 'submit', disabled: landing_page.problems is not empty, title: landing_page.problems is not empty ? 'Put right what is listed above first.' : ''}) }}</form>
+						<form action="/admin/courses/{{ course.id }}/landing/publish" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Publish', variant: 'primary', type: 'submit', disabled: landing_page.problems is not empty, title: landing_page.problems is not empty ? 'Put right what is listed above first.' : '', icon: 'action-publish'}) }}</form>
 					{% endif %}
 				{% endif %}
 				{% if not landing_page.was_published %}
@@ -102,7 +102,7 @@
 {% endblock %}
 				{% endembed %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% endembed %}
 			</form>
 {% endblock %}

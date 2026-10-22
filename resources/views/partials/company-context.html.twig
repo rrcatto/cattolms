@@ -11,9 +11,9 @@
 		</div>
 		{{ ui('feedback.badge', {label: (company_context_domain), tone: 'info'}) }}
 		<div class="company-context-actions">
-			{{ ui('action.button', {label: 'Switch company', variant: 'secondary', size: 'small', type: 'button', modal: 'company-switch'}) }}
+			{{ ui('action.button', {label: 'Switch company', variant: 'secondary', size: 'small', type: 'button', modal: 'company-switch', icon: 'action-switch'}) }}
 			<noscript>
-				{{ ui('action.link', {label: 'Switch company', variant: 'secondary', size: 'small', href: '/company/picker'}) }}
+				{{ ui('action.link', {label: 'Switch company', variant: 'secondary', size: 'small', href: '/company/picker', icon: 'action-switch'}) }}
 			</noscript>
 		</div>
 	</div>
@@ -25,7 +25,7 @@
 {% endblock %}
 {% block modal_actions %}
 
-				{{ ui('action.button', {label: 'Close', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}
+				{{ ui('action.button', {label: 'Close', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 
 {% endblock %}
 {% endembed %}

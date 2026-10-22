@@ -78,9 +78,9 @@ final class AdministrationSectionRegistry
         $link = static fn(string $label, string $href, string $variant = 'secondary', string $icon = '', string $when = ''): array => ['label' => $label, 'href' => $href, 'modal' => '', 'variant' => $variant, 'icon' => $icon, 'when' => $when];
         $opens = static fn(string $label, string $modal, string $when = ''): array => ['label' => $label, 'href' => '', 'modal' => $modal, 'variant' => 'primary', 'icon' => 'action-add', 'when' => $when];
         return match ($key) {
-            'dashboard' => [$link('Manage courses', '/admin/courses'), $link('View activity', '/admin/activity')],
-            'courses' => [$link('Import HTML course', '/admin/courses/import'), $link('Create course', '/admin/courses/new', 'primary', 'action-add')],
-            'people' => [$link('Find a person', '/admin/people/find'), $opens('Add person', 'quickAddPersonModal', 'can_manage_people')],
+            'dashboard' => [$link('Manage courses', '/admin/courses', 'secondary', 'action-manage'), $link('View activity', '/admin/activity', 'secondary', 'action-view-all')],
+            'courses' => [$link('Import HTML course', '/admin/courses/import', 'secondary', 'action-import'), $link('Create course', '/admin/courses/new', 'primary', 'action-add')],
+            'people' => [$opens('Add person', 'quickAddPersonModal', 'can_manage_people')],
             'companies', 'company_creators' => [$opens('Add company', 'company-add', 'can_manage_companies')],
             'roles' => [$opens('Create role', 'createRoleModal', 'can_manage_roles')],
             default => [],

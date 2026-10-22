@@ -79,8 +79,8 @@
 {% endblock %}{% endembed %}
 
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-	{% block primary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endif %}{% endblock %}
-	{% block secondary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'certificate-preview-button', form_action: '/admin/certificates/designs/preview.pdf', form_target: 'certificate-preview', skip_validation: true, icon: 'action-open'}) }}{% endif %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: return_to ?: '/admin/certificates/designs'}) }}{% endblock %}
+	{% block primary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endif %}{% endblock %}
+	{% block secondary_actions %}{% if can_manage %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'certificate-preview-button', form_action: '/admin/certificates/designs/preview.pdf', form_target: 'certificate-preview', skip_validation: true, icon: 'action-refresh'}) }}{% endif %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: return_to ?: '/admin/certificates/designs', icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 <p class="cl-ui-field-help">Saving changes certificates issued from now on. Certificates already issued keep the design they were issued with.</p>
 </div>

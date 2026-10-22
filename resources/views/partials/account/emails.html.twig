@@ -23,7 +23,7 @@
 					{% if email.is_primary %}
 						{{ ui('feedback.badge', {label: 'Primary', tone: 'permanent'}) }}
 					{% else %}
-						<form action="/account/email/promote" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="email_id" value="{{ email.id }}">{{ ui('action.button', {label: 'Make primary', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+						<form action="/account/email/promote" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="email_id" value="{{ email.id }}">{{ ui('action.button', {label: 'Make primary', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>
 						<form action="/account/email/remove" method="post">
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							<input type="hidden" name="email_id" value="{{ email.id }}">
@@ -56,7 +56,7 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-			{{ ui('action.button', {label: 'Send verification', variant: 'primary', size: 'small', type: 'submit'}) }}
+			{{ ui('action.button', {label: 'Send verification', variant: 'primary', size: 'small', type: 'submit', icon: 'action-email'}) }}
 
 {% endblock %}
 {% endembed %}

@@ -10,7 +10,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: certificate.course_title, heading_level: 2, summary: 'This page verifies the certificate record held by ' ~ app_name ~ '.'}) }}
 			{% if is_owner %}
-				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: certificate.is_public ? 'Public: anyone who has this page\'s address can see it.' : 'Private: only you can see this page.'})} %}{% block body %}<p>{{ ui('action.link', {label: 'Change who can see it', variant: 'secondary', size: 'small', href: '/account/certificates#certificate-' ~ certificate.id}) }}</p>{% endblock %}{% endembed %}
+				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: certificate.is_public ? 'Public: anyone who has this page\'s address can see it.' : 'Private: only you can see this page.'})} %}{% block body %}<p>{{ ui('action.link', {label: 'Change who can see it', variant: 'secondary', size: 'small', href: '/account/certificates#certificate-' ~ certificate.id, icon: 'action-share'}) }}</p>{% endblock %}{% endembed %}
 			{% endif %}
 			{% if certificate.revoked_at %}
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: 'This certificate was revoked on ' ~ (certificate.revoked_at|date('j F Y')) ~ '.'})} %}{% block body %}{% if certificate.revocation_reason %}<p>{{ certificate.revocation_reason }}</p>{% endif %}{% endblock %}{% endembed %}
@@ -24,7 +24,7 @@
 			] | merge(certificate_values.accreditation ? [{label: 'Accreditation', value: certificate_values.accreditation}] : []) | merge(certificate_values.provider ? [{label: 'Provider', value: certificate_values.provider}] : [])}) }}
 			<p class="cl-ui-field-help">A certificate states that the learner took the course. It shows no mark or grade: those are on its transcript.</p>
 			{% if not certificate.revoked_at %}
-				<p>{{ ui('action.link', {label: 'Download PDF', variant: 'primary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf', icon: 'action-open'}) }}{% if is_owner and certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', href: '/transcripts/' ~ certificate.transcript_public_id}) }}{% endif %}</p>
+				<p>{{ ui('action.link', {label: 'Download PDF', variant: 'primary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf', icon: 'action-download'}) }}{% if is_owner and certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', href: '/transcripts/' ~ certificate.transcript_public_id, icon: 'action-view'}) }}{% endif %}</p>
 			{% endif %}
 			{% if can_view_designs %}
 				<p class="cl-ui-field-help">Drawn in the design “{{ certificate.template_name }}” as it was when the certificate was issued. Only administrators see this line.</p>
@@ -34,7 +34,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'certificate-document'})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'The certificate', heading_level: 2}) }}
 			<object class="cl-certificate-pdf" data="/certificates/{{ certificate.public_id }}/certificate.pdf#view=Fit&amp;toolbar=0" type="application/pdf" aria-label="The certificate for {{ certificate.learner_name }}">
-				<p>This browser cannot show the certificate on the page. {{ ui('action.link', {label: 'Download the PDF', variant: 'secondary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf'}) }}</p>
+				<p>This browser cannot show the certificate on the page. {{ ui('action.link', {label: 'Download the PDF', variant: 'secondary', href: '/certificates/' ~ certificate.public_id ~ '/certificate.pdf', icon: 'action-download'}) }}</p>
 			</object>
 		{% endblock %}{% endembed %}
 		{% endif %}

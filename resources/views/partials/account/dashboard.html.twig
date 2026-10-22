@@ -3,14 +3,15 @@
 
 		{{ ui('layout.section-head', {heading: 'Your learning at a glance', eyebrow: 'Dashboard', summary: 'Learning progress, course history and account statistics.'}) }}
 		<p>Your account reference: <strong>{{ account_reference_label }}</strong>. Quote it as the reference when you pay by EFT.</p>
-		{# The figures sit in the card they summarise. #}
-		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+		{# The figures sit in the card they summarise, four to a row, each with its icon and opening what it counts (owner,
+		   2026-10-21: "Dashboard cards also need svg icons"). #}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 		{% block body %}
 
-			{{ ui('data.stat-card', {value: (account_stats.current_courses), label: 'Current courses', note: 'Assigned or in progress'}) }}
-			{{ ui('data.stat-card', {value: (account_stats.completed_courses), label: 'Completed', note: 'Courses completed'}) }}
-			{{ ui('data.stat-card', {value: (account_stats.certificates), label: 'Certificates', note: 'Issued certificates'}) }}
-			{{ ui('data.stat-card', {value: (account_stats.average_progress) ~ '%', label: 'Current progress', note: 'Average active-course progress'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.current_courses), label: 'Current courses', note: 'Assigned or in progress', icon: 'figure-courses', href: '/account/courses'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.completed_courses), label: 'Completed', note: 'Courses completed', icon: 'figure-completed', href: '/account/courses?list=completed'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.certificates), label: 'Certificates', note: 'Issued certificates', icon: 'figure-certificates', href: '/account/certificates'}) }}
+			{{ ui('data.stat-card', {value: (account_stats.average_progress) ~ '%', label: 'Current progress', note: 'Average active-course progress', icon: 'figure-progress', href: '/account/courses'}) }}
 
 		{% endblock %}
 		{% endembed %}
@@ -25,7 +26,7 @@
 		{% block surface_body %}
 			{{ ui('layout.section-head', {heading: course.title, eyebrow: 'Your course', heading_level: 3}) }}
 			{% for line in course.timing.lines %}<p>{{ line }}</p>{% endfor %}
-			<p>{{ ui('action.link', {label: course.timing.state == 'not_started' ? 'Review and start' : 'Open course', variant: 'primary', size: 'small', href: '/learn/' ~ course.slug}) }}</p>
+			<p>{{ ui('action.link', {label: course.timing.state == 'not_started' ? 'Review and start' : 'Open course', variant: 'primary', size: 'small', icon: 'action-start', href: '/learn/' ~ course.slug}) }}</p>
 		{% endblock %}
 		{% endembed %}
 		{% endfor %}
@@ -70,7 +71,7 @@
 							</td>
 							<td>
 								{% if course.certificate_public_id %}
-									{{ ui('feedback.badge', {label: 'Issued', tone: 'success'}) }} {{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/certificates/' ~ (course.certificate_public_id)}) }}
+									{{ ui('feedback.badge', {label: 'Issued', tone: 'success'}) }} {{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', icon: 'action-view', href: '/certificates/' ~ (course.certificate_public_id)}) }}
 								{% else %}
 									<span class="muted">Not issued</span>
 								{% endif %}

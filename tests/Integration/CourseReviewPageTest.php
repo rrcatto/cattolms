@@ -152,6 +152,53 @@ final class CourseReviewPageTest extends TestCase
         self::assertSame(1, (int) $this->db->fetchOne("SELECT COUNT(*) FROM analytics_events WHERE course_id=:c AND event_type='review_rejected'", ['c' => $this->course]));
     }
 
+    /**
+     * The course page's reviews (owner, 2026-10-22): their own card under Course access, numbered newest first, each number of
+     * stars a filter with View all reviews to take it away, and no pagination bar without a second page.
+     */
+    public function testReviewsHaveTheirOwnCardNumberedNewestFirstAndFilteredByStars(): void
+    {
+        $reviews = [[$this->learner, '5', 'First and glowing.'], [$this->learnerWithAccess('Sipho'), '3', 'Second and middling.'], [$this->learnerWithAccess('Lerato'), '5', 'Third and glowing.']];
+        foreach ($reviews as [$learner, $rating, $comment]) {
+            $this->signIn($learner);
+            $this->post('/learn/' . $this->slug . '/review', ['rating' => $rating, 'comment' => $comment]);
+            $this->signIn($this->admin);
+            $review = $this->db->fetchAssociative('SELECT id, revision FROM course_reviews WHERE course_id=:c AND user_id=:u', ['c' => $this->course, 'u' => $learner]) ?: [];
+            $this->post('/admin/course-reviews/' . $review['id'] . '/moderate', ['decision' => 'approve', 'revision' => (string) $review['revision'], 'return' => '/admin/course-reviews']);
+        }
+        $_COOKIE = $this->cookies;
+        $page = $this->html('/courses/' . $this->slug);
+        self::assertGreaterThan(strpos($page, 'Course access'), (int) strpos($page, 'id="reviews"'), 'The Reviews card follows Course access.');
+        self::assertStringNotContainsString('</aside>', substr($page, (int) strpos($page, 'Course access'), (int) strpos($page, 'id="reviews"') - (int) strpos($page, 'Course access')), 'in the same column.');
+        self::assertGreaterThan((int) strpos($page, 'Third and glowing.'), (int) strpos($page, 'First and glowing.'), 'The newest first.');
+        self::assertStringContainsString('<ol class="cl-review-list" start="1">', $page);
+        foreach (['1.', '2.', '3.'] as $number) self::assertStringContainsString('<span class="cl-review-number" aria-hidden="true">' . $number . '</span>', $page);
+        self::assertStringNotContainsString('pagination-row', $page, 'No pagination bar without a second page.');
+        self::assertStringContainsString('href="/courses/' . $this->slug . '?reviews_stars=5#reviews"', $page, 'A number of stars with reviews is a filter.');
+        self::assertStringNotContainsString('?reviews_stars=4#reviews', $page, 'One with none is not.');
+        self::assertStringNotContainsString('View all reviews', $page);
+
+        $five = $this->html('/courses/' . $this->slug . '?reviews_stars=5');
+        self::assertStringContainsString('First and glowing.', $five);
+        self::assertStringContainsString('Third and glowing.', $five);
+        self::assertStringNotContainsString('Second and middling.', $five, 'Only the reviews giving five stars.');
+        self::assertStringContainsString('?reviews_stars=5#reviews" aria-current="true"', $five);
+        self::assertStringContainsString('2 reviews give 5 stars.', $five);
+        self::assertStringContainsString('href="/courses/' . $this->slug . '#reviews"', $five, 'View all reviews takes the filter away.');
+        self::assertSame(404, $this->send('/courses/' . $this->slug . '?reviews_stars=9')->getStatusCode(), 'There is no nine-star filter.');
+    }
+
+    private function learnerWithAccess(string $name): int
+    {
+        $learner = $this->fixture->createUser($name . ' Learner', strtolower($name) . '-' . $this->fixture->suffix() . '@seed.test');
+        $this->fixture->grantRole($learner, 'STUDENT');
+        $this->db->executeStatement(
+            "INSERT INTO course_enrolments (public_id,user_id,course_id,status,access_period_seconds,assigned_by_user_id,is_preview) VALUES (:public_id,:user,:course,'assigned',31536000,:admin,FALSE)",
+            ['public_id' => Uuid::v4(), 'user' => $learner, 'course' => $this->course, 'admin' => $this->admin]
+        );
+        return $learner;
+    }
+
     public function testALearnerCannotModerate(): void
     {
         $this->signIn($this->learner);

@@ -19,11 +19,11 @@
 					{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 
-						{{ ui('action.link', {label: 'Browse courses', variant: 'primary', size: 'large', href: '/courses'}) }}
+						{{ ui('action.link', {label: 'Browse courses', variant: 'primary', size: 'large', href: '/courses', icon: 'nav-catalogue'}) }}
 						{% if is_authenticated %}
-							{{ ui('action.link', {label: 'Open my library', variant: 'secondary', size: 'large', href: '/account/courses'}) }}
+							{{ ui('action.link', {label: 'Open my library', variant: 'secondary', size: 'large', href: '/account/courses', icon: 'nav-learning'}) }}
 						{% else %}
-							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/register', icon: 'action-add'}) }}
+							{{ ui('action.link', {label: 'Create an account', variant: 'secondary', size: 'large', href: '/register', icon: 'action-register'}) }}
 						{% endif %}
 
 {% endblock %}
@@ -70,7 +70,7 @@
 				</p>
 			</div>
 			<div class="lg:col-4 lg:text-end mt-5 lg:mt-0">
-				{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'normal', href: '/courses'}) }}
+				{{ ui('action.link', {label: 'View all courses', variant: 'secondary', size: 'normal', href: '/courses', icon: 'nav-catalogue'}) }}
 			</div>
 		</div>
 

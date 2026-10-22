@@ -1,10 +1,12 @@
 # Installing CattoLMS
 
-`install.sh` puts a clean installation of CattoLMS on a Linux server. Run it as root. After it finishes, Administration → System → Setup takes you through the rest of the setup in the browser.
+`install.sh` puts a clean installation of CattoLMS on a Linux server, running with the server's own PHP. Run it as root. After it finishes, Administration → System → Setup takes you through the rest of the setup in the browser.
+
+To run the site in rootless Podman containers instead (its own user, the code read-only, behind the server's own web server, database and mail), follow [deploy/podman/README.md](../deploy/podman/README.md).
 
 ## What the server needs
 
-- **PHP 8.5.9 or later**, with its command line and PHP-FPM, and these extensions: dom, fileinfo, gd, json, mbstring, openssl, pdo, pdo_pgsql and zip. intl is recommended, for money and dates in your locale.
+- **PHP 8.5.12 or later** (8.5.12 fixes two remote code execution flaws, CVE-2026-109618 and CVE-2026-109619; the installer refuses anything earlier), with its command line and PHP-FPM, and these extensions: dom, fileinfo, gd, json, mbstring, openssl, pdo, pdo_pgsql and zip. intl is recommended, for money and dates in your locale.
 - **Composer** (https://getcomposer.org) and **Git**.
 - **PostgreSQL 13 or later**, on the same server or elsewhere.
   - When it runs on the same server, the script can create the site's database user and database for you.
@@ -54,7 +56,7 @@ It then does the following:
 
 | Option | Meaning |
 |---|---|
-| `--version 0.9.6` | Install this version. The default is the newest release. |
+| `--version 0.9.7` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -86,8 +88,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  0.9.6/                    the code of each installed version (root)
-  current -> 0.9.6          the version the site runs
+  0.9.7/                    the code of each installed version (root)
+  current -> 0.9.7          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

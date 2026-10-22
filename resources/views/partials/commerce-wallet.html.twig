@@ -15,7 +15,7 @@
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Amount (ZAR)', for: 'correction-amount', required: true, help: 'Such as 150.00 or -150.00'})} %}{% block control %}<input id="correction-amount" name="amount" inputmode="decimal" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
                     {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason', for: 'correction-reason', required: true})} %}{% block control %}<textarea id="correction-reason" name="reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
                 {% endblock %}{% endembed %}
-                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the correction', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+                {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the correction', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-record-money'}) }}{% endblock %}{% endembed %}
             </form>
             {% endif %}
         {% endblock %}{% endembed %}

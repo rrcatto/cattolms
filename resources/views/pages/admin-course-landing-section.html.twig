@@ -108,8 +108,8 @@
 {% endblock %}
 			{% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', href: landing_home ~ '#landing-section-' ~ section.id}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', href: landing_home ~ '#landing-section-' ~ section.id, icon: 'action-cancel'}) }}{% endblock %}
 			{% endembed %}
 		</form>
 {% endblock %}

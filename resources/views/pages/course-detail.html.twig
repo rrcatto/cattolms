@@ -83,35 +83,19 @@
                 {% endfor %}
                 </ol>
                 {% if course.has_public_preview %}
-                    {{ ui('action.link', {label: 'Preview this course', href: '/courses/' ~ course.slug ~ '/preview', variant: 'secondary'}) }}
+                    {{ ui('action.link', {label: 'Preview this course', href: '/courses/' ~ course.slug ~ '/preview', variant: 'secondary', icon: 'action-preview'}) }}
                 {% endif %}
 				{# How results are worked out is in the FAQ (owner, 2026-10-20: "the grading belongs elsewhere, in a FAQ"). #}
-				<p class="cl-course-grading-link mt-7">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading'}) }}</p>
+				<p class="cl-course-grading-link mt-7">{{ ui('action.link', {label: 'How assessments and results work', variant: 'quiet', size: 'small', href: '/faq#grading', icon: 'nav-help'}) }}</p>
 				{# A question opens the contact form with this course chosen: a problem with it once it is yours, a question before buying until then (owner, 2026-10-20). #}
-				<p class="cl-course-contact-link">{{ purchase.state == 'owned' ? ui('action.link', {label: 'Report a problem with this course', variant: 'quiet', size: 'small', href: '/contact?reason=course&course=' ~ course.slug}) : ui('action.link', {label: 'Ask a question about this course', variant: 'quiet', size: 'small', href: '/contact?reason=before_buying&course=' ~ course.slug}) }}</p>
+				<p class="cl-course-contact-link">{{ purchase.state == 'owned' ? ui('action.link', {label: 'Report a problem with this course', variant: 'quiet', size: 'small', href: '/contact?reason=course&course=' ~ course.slug, icon: 'action-report'}) : ui('action.link', {label: 'Ask a question about this course', variant: 'quiet', size: 'small', href: '/contact?reason=before_buying&course=' ~ course.slug, icon: 'action-ask'}) }}</p>
 
-				{# Shown only when the course has a published review (owner, 2026-10-20: "just leave it out entirely if there are no reviews"). #}
-				{% if rating.count > 0 %}
-				<section id="reviews" aria-labelledby="course-reviews-heading">
-					<h3 class="h4 mt-12 mb-5" id="course-reviews-heading">Reviews</h3>
-					{% if rating.count > 0 %}
-						<div class="cl-rating-overview">
-							{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
-							<dl class="cl-rating-distribution">
-								{% for band in rating.distribution %}
-									<div><dt>{{ band.stars }} {{ band.stars == 1 ? 'star' : 'stars' }}</dt><dd>{{ ui('feedback.progress', {value: band.percent, label: band.percent ~ '% of reviews give ' ~ band.stars ~ (band.stars == 1 ? ' star' : ' stars')}) }}<span>{{ band.count }}</span></dd></div>
-								{% endfor %}
-							</dl>
-						</div>
-					{% endif %}
-					{% include '@platform/partials/course-reviews.html.twig' %}
-				</section>
-				{% endif %}
 {% endblock %}
 {% endembed %}
 			</div>
 			<aside>
-				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: true})} %}
+				{# Sticky only when it is alone in the column: a sticky card would ride over the Reviews card beneath it. #}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {sticky: rating.count == 0})} %}
 {% block surface_body %}
 
 						<h2 class="h4">
@@ -127,12 +111,40 @@
 								{% if own_review %}
 									<p>Your review: {{ own_review.status == 'approved' ? 'published' : (own_review.status == 'pending' ? 'pending moderation' : 'not published') }}.</p>
 								{% endif %}
-								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review'}) }}
+								{{ ui('action.link', {label: own_review ? 'Edit your review' : 'Rate this course', variant: 'secondary', size: 'normal', full_width: true, href: '/learn/' ~ course.slug ~ '/review', icon: (own_review ? 'action-edit' : 'action-rate')}) }}
 							</div>
 						{% endif %}
 
 {% endblock %}
 {% endembed %}
+				{#
+					Reviews in their own card under Course access (owner, 2026-10-22), only when the course has a published review
+					(owner, 2026-10-20: "just leave it out entirely if there are no reviews"). Each number of stars with reviews shows
+					just those, and View all reviews takes the choice away again; the list is numbered, newest first.
+				#}
+				{% if rating.count > 0 %}
+				{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+					<section id="reviews" class="cl-course-reviews" aria-labelledby="course-reviews-heading" data-keep-scroll>
+						<h2 class="h4" id="course-reviews-heading">Reviews</h2>
+						<div class="cl-rating-overview">
+							{% include '@platform/partials/course-rating-summary.html.twig' with {rating: rating} %}
+							<dl class="cl-rating-distribution">
+								{% for band in rating.distribution %}
+									{% set band_words = band.stars ~ (band.stars == 1 ? ' star' : ' stars') %}
+									<div><dt>{% if band.count > 0 %}<a href="/courses/{{ course.slug }}?reviews_stars={{ band.stars }}#reviews"{% if band.stars == reviews_stars %} aria-current="true"{% endif %}>{{ band_words }}</a>{% else %}{{ band_words }}{% endif %}</dt><dd>{{ ui('feedback.progress', {value: band.percent, label: band.percent ~ '% of reviews give ' ~ band_words}) }}<span>{{ band.count }}</span></dd></div>
+								{% endfor %}
+							</dl>
+						</div>
+						{% if reviews_stars %}
+							{% set shown = rating.distribution|filter(band => band.stars == reviews_stars)|first %}
+							<p class="cl-review-filtered">{{ shown.count == 1 ? '1 review gives' : shown.count ~ ' reviews give' }} {{ reviews_stars }} {{ reviews_stars == 1 ? 'star' : 'stars' }}. {{ ui('action.link', {label: 'View all reviews', variant: 'secondary', size: 'small', href: '/courses/' ~ course.slug ~ '#reviews', icon: 'action-view-all'}) }}</p>
+						{% endif %}
+						{% include '@platform/partials/course-reviews.html.twig' %}
+					</section>
+{% endblock %}
+{% endembed %}
+				{% endif %}
 			</aside>
 
 {% endblock %}

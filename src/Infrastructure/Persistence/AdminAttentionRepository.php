@@ -11,6 +11,8 @@ Description:
 The SQL behind the ADMIN dashboard's Needs your attention list (AdminAttention): the reviews waiting for
 moderation, the company course requests waiting for a decision, the contact messages not yet answered and
 the courses not yet published, each with what its row names and who it concerns (their id and account reference).
+Every one of them, never the first so many: the list says how many things are waiting, so it is never cut short (owner,
+2026-10-21, of a list that stopped at 100 and called that the number found).
 
 Changelog:
 2026/10/21 SAST
@@ -30,41 +32,41 @@ final class AdminAttentionRepository
     }
 
     /** @return list<array<string,mixed>> */
-    public function pendingReviews(int $limit = 100): array
+    public function pendingReviews(): array
     {
         return $this->db->fetchAllAssociative(
             'SELECT r.id, r.rating, r.submitted_at, r.published_at IS NOT NULL AS is_edit, c.title AS course_title, ' . self::PERSON . ' AS person_name, u.id AS person_id, u.account_reference AS person_reference
                FROM course_reviews r JOIN courses c ON c.id = r.course_id JOIN users u ON u.id = r.user_id
-              WHERE r.status = \'pending\' ORDER BY r.submitted_at, r.id LIMIT ' . max(1, $limit)
+              WHERE r.status = \'pending\' ORDER BY r.submitted_at, r.id'
         );
     }
 
     /** @return list<array<string,mixed>> */
-    public function pendingCourseRequests(int $limit = 100): array
+    public function pendingCourseRequests(): array
     {
         return $this->db->fetchAllAssociative(
             'SELECT r.id, r.requested_at, c.title AS course_title, co.name AS company_name, ' . self::PERSON . ' AS person_name, u.id AS person_id, u.account_reference AS person_reference
                FROM course_requests r JOIN courses c ON c.id = r.course_id JOIN users u ON u.id = r.user_id
                LEFT JOIN companies co ON co.id = r.company_id
-              WHERE r.status = \'pending\' ORDER BY r.requested_at, r.id LIMIT ' . max(1, $limit)
+              WHERE r.status = \'pending\' ORDER BY r.requested_at, r.id'
         );
     }
 
     /** @return list<array<string,mixed>> */
-    public function unansweredMessages(int $limit = 100): array
+    public function unansweredMessages(): array
     {
         return $this->db->fetchAllAssociative(
             'SELECT m.id, m.reference, m.reason, m.sender_name, m.created_at, u.id AS person_id, u.account_reference AS person_reference
                FROM contact_messages m LEFT JOIN users u ON u.id = m.user_id
-              WHERE m.answered_at IS NULL ORDER BY m.created_at, m.id LIMIT ' . max(1, $limit)
+              WHERE m.answered_at IS NULL ORDER BY m.created_at, m.id'
         );
     }
 
     /** @return list<array<string,mixed>> */
-    public function draftCourses(int $limit = 100): array
+    public function draftCourses(): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT id, title, updated_at FROM courses WHERE status = \'draft\' ORDER BY updated_at, id LIMIT ' . max(1, $limit)
+            'SELECT id, title, updated_at FROM courses WHERE status = \'draft\' ORDER BY updated_at, id'
         );
     }
 }

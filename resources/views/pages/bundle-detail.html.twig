@@ -50,8 +50,8 @@
 							<input type="hidden" name="csrf" value="{{ csrf }}">
 							<input type="hidden" name="bundle_offer_id" value="{{ bundle.offer_id }}">
 							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
-								{{ ui('action.button', {label: 'Add bundle to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-add'}) }}
-								{{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now'}) }}
+								{{ ui('action.button', {label: 'Add bundle to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-cart'}) }}
+								{{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now', icon: 'action-buy'}) }}
 							{% endblock %}{% endembed %}
 						</form>
 					{% endif %}

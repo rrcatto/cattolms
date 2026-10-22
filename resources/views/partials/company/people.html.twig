@@ -7,7 +7,7 @@
 {% block surface_body %}
 
 	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'People', eyebrow: 'People', summary: 'People in the company you are administering.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
-{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/company/people'}})} %}
+{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/company/people', ds_help: 'Searches every page by name, any email address or account reference.'}})} %}
 {% block results %}
 
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
@@ -41,21 +41,21 @@
 								{{ ui('feedback.badge', {label: (person.status=='active' ? 'Active' : 'Disabled'), tone: person.status=='active' ? 'success' : 'danger'}) }}
 							</td>
 							<td class="cell-actions">
-								{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+								{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-										{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ (person.id)}) }}
+										{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-person-' ~ (person.id), icon: 'action-edit'}) }}
 										{% if person.status=='active' %}
 											<form action="/company/people/{{ person.id }}/status" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="status" value="disabled">
-												{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.'}) }}
+												{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.', icon: 'action-disable'}) }}
 											</form>
 										{% else %}
 											<form action="/company/people/{{ person.id }}/status" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
 												<input type="hidden" name="status" value="active">
-												{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small'}) }}
+												{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small', icon: 'action-enable'}) }}
 											</form>
 										{% endif %}
 										<form action="/company/people/{{ person.id }}/remove" method="post">
@@ -121,8 +121,8 @@
 {% endblock %}
 {% block modal_actions %}
 
-							{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}
-							{{ ui('action.button', {label: 'Save person', variant: 'primary', size: 'normal', type: 'submit'}) }}
+							{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+							{{ ui('action.button', {label: 'Save person', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -134,7 +134,7 @@
 			{% if people_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} people.</span>
-					{{ ui('action.link', {label: 'View all people', variant: 'secondary', size: 'small', href: '/company/people'}) }}
+					{{ ui('action.link', {label: 'View all people', variant: 'secondary', size: 'small', href: '/company/people', icon: 'action-view-all'}) }}
 				</div>
 			{% endif %}
 
@@ -181,7 +181,7 @@
 {% endblock %}
 {% block modal_actions %}
 
-		{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}
+		{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 		{{ ui('action.button', {label: 'Create account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
 
 {% endblock %}

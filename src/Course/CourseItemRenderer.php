@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace CattoLearning\Course;
 
+use CattoLearning\View\Ui\PlatformUi;
+
 /** Resolves stored Course Item source at display time and delegates output to bounded type renderers. */
 final class CourseItemRenderer
 {
     /** The shared primary action's classes plus the Download-specific hook. */
     public const DOWNLOAD_ACTION_CLASSES = 'cl-ui-action cl-ui-action--primary cl-ui-action--normal cl-course-item-download-link';
 
-    public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources)
+    /** @param PlatformUi|null $ui The platform UI, for the icon sprite's fingerprinted address. */
+    public function __construct(private readonly CourseItemRepository $items, private readonly ResourceLibraryService $resources, private readonly ?PlatformUi $ui = null)
     {
     }
 
@@ -57,7 +60,8 @@ final class CourseItemRenderer
      * public preview shows the card without a link. The title is printed only when the file is
      * embedded in a lesson, because an item page already heads it. Download is the shared primary
      * action (the classes `ui('action.link', {variant: 'primary', size: 'normal'})` emits), so it
-     * takes the reader's primary-action colours rather than restating them.
+     * takes the reader's primary-action colours rather than restating them, with the download icon
+     * before its label as the component draws one.
      *
      * @param array<string,mixed> $item
      */
@@ -68,7 +72,7 @@ final class CourseItemRenderer
         $meta = $filename === '' ? 'File not yet attached' : $filename . ' · ' . ResourceLibraryService::formatLabel($filename) . ' · ' . ResourceLibraryService::sizeLabel((int) ($item['byte_size'] ?? 0));
         $action = $public || $filename === ''
             ? '<p class="cl-course-item-download-note">' . ($filename === '' ? 'This file is not available yet.' : 'Available to download after you start the course.') . '</p>'
-            : '<p><a class="' . self::DOWNLOAD_ACTION_CLASSES . '" href="/learn/' . rawurlencode($slug) . '/item/' . $contextNodeId . '/download/' . rawurlencode((string) ($item['item_key'] ?? '')) . '" download><span>Download</span><span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
+            : '<p><a class="' . self::DOWNLOAD_ACTION_CLASSES . '" href="/learn/' . rawurlencode($slug) . '/item/' . $contextNodeId . '/download/' . rawurlencode((string) ($item['item_key'] ?? '')) . '" download>' . $this->downloadIcon() . '<span>Download</span><span class="visually-hidden"> ' . self::escape($title) . '</span></a></p>';
         return '<section class="cl-course-item-download">'
             . ($embedded ? '<h3 class="cl-course-item-download-title">' . self::escape($title) . '</h3>' : '')
             . $description
@@ -153,6 +157,13 @@ final class CourseItemRenderer
         $escaped = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $escaped) ?? $escaped;
         $escaped = preg_replace('/(?<!\*)\*([^*]+)\*(?!\*)/', '<em>$1</em>', $escaped) ?? $escaped;
         return preg_replace('/`([^`]+)`/', '<code>$1</code>', $escaped) ?? $escaped;
+    }
+
+    /** The action-download symbol, drawn as the `icon` component draws a decorative icon. */
+    private function downloadIcon(): string
+    {
+        $sprite = $this->ui?->iconSprite() ?? '/img/nav-icons.svg';
+        return '<svg class="cl-ui-icon cl-ui-icon--normal" aria-hidden="true" focusable="false"><use href="' . self::escape($sprite . '#action-download') . '"></use></svg>';
     }
 
     private static function escape(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }

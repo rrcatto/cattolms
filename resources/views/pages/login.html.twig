@@ -21,7 +21,7 @@
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-					{{ ui('action.button', {label: 'Email my secure link', variant: 'primary', size: 'large', full_width: true, type: 'submit'}) }}
+					{{ ui('action.button', {label: 'Email my secure link', variant: 'primary', size: 'large', full_width: true, type: 'submit', icon: 'action-email'}) }}
 
 {% endblock %}
 {% endembed %}

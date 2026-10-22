@@ -6,7 +6,7 @@
 <div class="cl-certificate-pictures"><img class="cl-certificate-design-thumb" src="{{ design.image }}" alt=""><strong>{{ design.name }}</strong></div>
 {% if others is empty %}
 	{{ ui('feedback.notice', {tone: 'warning', heading: 'This is the only design, so it cannot be deleted. Make another design first.'}) }}
-	<p>{{ ui('action.link', {label: 'Back to the designs', href: '/admin/certificates/designs'}) }}</p>
+	<p>{{ ui('action.link', {label: 'Back to the designs', href: '/admin/certificates/designs', icon: 'action-back'}) }}</p>
 {% else %}
 	{% if courses %}
 		<p>{{ design.course_count == 1 ? 'One course uses' : design.course_count ~ ' courses use' }} this design:</p>
@@ -23,7 +23,7 @@
 		{% else %}<input type="hidden" name="replacement_id" value="{{ suggested }}">{% endif %}
 		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 			{% block primary_actions %}{{ ui('action.button', {label: 'Delete design', variant: 'danger', type: 'submit', icon: 'action-remove'}) }}{% endblock %}
-			{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/certificates/designs'}) }}{% endblock %}
+			{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/certificates/designs', icon: 'action-cancel'}) }}{% endblock %}
 		{% endembed %}
 	</form>
 {% endif %}

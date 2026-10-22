@@ -17,7 +17,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Placed to', full_width: false, for: 'orders-to'})} %}{% block control %}<input type="date" id="orders-to" name="to" value="{{ filters.to }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', full_width: false, for: 'orders-state'})} %}{% block control %}<select id="orders-state" name="state" {{ ui_field_attrs(props) }}><option value="">Any status</option>{% for key, label in states %}<option value="{{ key }}" {{ filters.state == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Bought by', full_width: false, for: 'orders-account'})} %}{% block control %}<select id="orders-account" name="account" {{ ui_field_attrs(props) }}><option value="">People and companies</option><option value="person" {{ filters.account == 'person' ? 'selected' : '' }}>People</option><option value="company" {{ filters.account == 'company' ? 'selected' : '' }}>Companies</option></select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/orders'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/orders', icon: 'action-clear'}) }}{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}</form>
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
@@ -34,7 +34,7 @@
 						<td class="cell-text">{{ order.bought }}</td>
 						<td>{{ order.total_label }}</td>
 						<td>{{ ui('feedback.badge', {label: order.status_label, tone: order.status_tone}) }}{% if order.status_note %}<br><span class="small">{{ order.status_note }}</span>{% endif %}</td>
-						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: order.href, aria_label: 'Open order ' ~ order.number}) }}</td>
+						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: order.href, aria_label: 'Open order ' ~ order.number, icon: 'action-open'}) }}</td>
 					</tr>
 				{% endfor %}
 			{% endblock %}

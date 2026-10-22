@@ -80,7 +80,8 @@ Paths are relative to `resources/views/ui/`. Slots in this table are the only va
 - A picture choice (`form.picture-choice`) is a fieldset with a `legend`, an optional `help` and `id`, and one native radio per `{value, label, image, note?}` item, the picture inside the radio's label with empty alt text; `image` is a path on this site and `selected` is the checked value. The choice is sent with the form's own Save, so it works without JavaScript (certificate looks, word placement and a course's certificate design). An item may carry an SVG `icon` (checked by `View\Artwork\UploadedSvg`: nothing that runs, no link out) instead of the `image`, `{value, label, icon, note?}`: when every item does, the choice is a grid of feature cards (`cl-ui-picture-choice--cards`), each with the icon in the theme's accent (filled when chosen), the label as a bold title and the note as its description, as Register's account type (owner, 2026-10-20). `size: 'small'` draws smaller cards, the icon beside the title, for a choice under a larger one (the contact form's topics and Who is it for?). `columns: 4` puts at most four cards in a row, further rows beneath, left-aligned (two on a tablet, one on a phone), as the catalogue's categories; a form that should open the chosen card at once carries `data-choose-submits` and a `<noscript>` submit button.
 - A table cell that holds a sentence, such as what happened on a Money Ledger line, is `td.cell-text`: it wraps within its own column instead of ending in an ellipsis (UX rule 2.4).
 - A person with an account is always `data.person` (owner, 2026-10-21): their name linked to their profile (`href`: `/admin/people/{id}` in Administration, `/company/people/{id}` in the Company workspace). The page's own person is named once with `full: true`: the linked name, the account reference and the email (`email`), each on its own line. Every other mention, and every table, is the linked name alone. No page prints a person's name on its own.
-- A stat card (`data.stat-card`) takes `size: 'large'` for the one figure a page is opened for, big and bold in a border of the theme's accent (`cl-ui-stat-card--large`, owner 2026-10-21: a wallet's balance). It takes an optional `href`: the whole card is then the link to what it counts, as the dashboard's money figures are (`cl-ui-stat-link`, owner 2026-10-18).
+- A stat card (`data.stat-card`) takes `size: 'large'` for the one figure a page is opened for, big and bold in a border of the theme's accent (`cl-ui-stat-card--large`, owner 2026-10-21: a wallet's balance). It takes an optional `href`: the whole card is then the link to what it counts, as the dashboard's money figures are (`cl-ui-stat-link`, owner 2026-10-18). `icon` names a sprite symbol drawn above the value in the theme's accent (`cl-ui-stat-icon`; the dashboards' cards use the `figure-*` symbols, owner 2026-10-21: "Dashboard cards also need svg icons"). `size: 'small'` is a money amount in a row of figures: its value is drawn at 0.88 of the theme's own size on one line (owner, 2026-10-21: "-2pt, possibly -4pt"), and `platform-overrides.js` (`fitFigures`) shrinks it further only when it still does not fit its card. A dashboard's grid (`data.stat-grid`) takes `columns: 4` or `columns: 5`: four or five to a row, five falling to three (never four and a lone card) where five would be narrower than 10.5rem.
+- A column chart (`partials/column-chart.html.twig`) draws amounts over time, one column per slice with the empty ones kept, a column with an amount linking to what it adds up; `partials/distribution-chart.html.twig` draws one bar per row, a row optionally linking (`href`) and saying more under its total (`note`). The ADMIN dashboard's money uses both, for one period (`MoneyRecords::dashboard`).
 - A tree select (`form.tree-select`) is the one hierarchical picker (categories everywhere). It is one form-control row showing the chosen option's full path, opening a native `popover` that holds nested options: `{value, label, depth, path}`, an optional `icon` (a category's SVG icon, drawn before the label, owner 2026-10-20) and an optional `children` list one level deeper (depth 0 only at the top and without children, at most depth 3, children only at depths 1 and 2). Beside an option that has children sits a disclosure button (`aria-expanded`, `aria-controls` naming its `role="group"` branch list) that only opens or closes the branch; it never chooses. Branches are rendered open and the buttons hidden, so without JavaScript the whole tree is listed; core script shows the buttons and, every time the list opens, closes every branch except those leading to the chosen option. The chosen option carries `aria-current` (submit mode) or `checked` (field mode) and `autofocus`. In the default `mode: submit` each option is a submit button carrying its value, so choosing one submits the enclosing form without JavaScript (the catalogue). `mode: field` renders the options as radios in a `radiogroup`, so the choice is sent with the form's own Save; core script shows the chosen path and closes the list on a pointer choice, Enter or Space, and leaves it open while arrow keys move the choice. `window.CattoTreeSelect.initialise(root)` wires up pickers swapped into the page. The panel anchors below its toggle where CSS anchor positioning exists. Stat grids take `density: compact` for many small counts, keeping two or more per row on a phone. Tables own the wrapper, table, head and body. Rows/cells remain authored slots and column headers delegate to sortable-header. A cell that holds a row's actions is `td.cell-actions`: Core never makes its column narrower than its control (UX rule 2.8).
 
 On a phone (700px and narrower, UX rule 2.9):
@@ -119,6 +120,86 @@ Supported uses added in v0.8.8.x, each through the existing component rather tha
 
 - **An icon for a category or tag.** `partials/admin/icon-choice.html.twig` is its own card after the details card: the current icon, the shared search control (`ds_name: 'icon'`, `ds_help`), which reloads the page's own address with `icon_q` and swaps `#icon-results` into `#icon-region` as one types, the icon library's icons that fit the name (or those the search finds) as `form.picture-choice` cards named `library_icon`, an upload of one's own and Save icon, posted to `/admin/courses/categories/{id}/icon` or `/admin/courses/tags/{id}/icon`. `View\Artwork\IconLibrary` holds the library (Lucide, `resources/icons/lucide.json`). The shared search control takes an optional `ds_help` for its help line.
 - **A sortable table.** Administration → Courses in the catalogue's order: each row `tr[data-course-id]` carries its number (`[data-position]`) and a hidden `.cl-row-handle`, which `assets/controllers/course_order_controller.js` shows; it moves rows while dragging or with the keys and saves each move, and the ⋯ menu's forms move a course without JavaScript.
+
+## Action icons
+
+Every button and button-styled link carries an icon before its label that says what it does (owner, 2026-10-21: "add an svg icon to the left of the Button title", table rows included). Every `ui('action.button')` and `ui('action.link')` call names its `icon`, every Actions menu (`action.row` with `menu` or `narrow_menu`) names its trigger's, and every section registry action (`actions()`) names one; `ActionIconContractTest` fails a call without one. `action.button`'s tick or arrow when no icon is named is only a safety net. The only button without an icon is a pagination page number, which is its own label. A label never repeats its icon (UX rule 3.3), so the reader's paging reads Previous and Next, not "← Previous" and "Next →". The reader's Download link, drawn by `CourseItemRenderer`, carries `action-download` the same way.
+
+One meaning has one symbol everywhere. The symbols are in `public_html/img/nav-icons.svg`, drawn from Lucide 1.52.0 (ISC, `resources/icons/lucide.json`); add a symbol there, named by its meaning, only for a meaning not listed here.
+
+| Meaning (examples) | Symbol |
+| --- | --- |
+| Add, create, new, add here | `action-add` |
+| Remove, delete, uninstall, clean expired records | `action-remove` |
+| Edit, change, edit Course Content, landing page | `action-edit` |
+| Save, save details, change status | `action-save-changes` |
+| Mark done, mark as answered, apply, answered | `action-done` |
+| Cancel, cancel changes, close | `action-cancel` |
+| Clear (a filter, a tag, a selection) | `action-clear` |
+| Search, find, find the account | `action-search` |
+| Filter, show reviews, show events, show courses | `action-filter` |
+| Open a record or a related page, Go (pagination) | `action-open` |
+| View, show, details, view certificate | `action-view` |
+| View all ..., all messages, every deposit, read every review | `action-view-all` |
+| Preview, preview as learner, start public preview | `action-preview` |
+| Inspect, analyse course, inspect package | `action-inspect` |
+| Manage | `action-manage` |
+| An issued document (invoice, receipt, credit note) | `action-document` |
+| Not answered, to sort out | `action-inbox` |
+| Back, back to ..., all certificate designs, course overview | `action-back` |
+| Previous, newer events | `action-previous` |
+| Next, continue, review my order, older events | `action-next` |
+| A landing page's jump to a part of the page | `action-jump-down` |
+| Open another site (the Didit console) | `action-external` |
+| Switch company | `action-switch` |
+| Browse by tag | `action-tags` |
+| Duplicate, save as | `action-copy` |
+| A Move menu | `action-move` |
+| Move to top, up, down, to bottom | `action-move-top`, `action-move-up`, `action-move-down`, `action-move-bottom` |
+| Move into, move here | `action-move-into` |
+| Move out | `action-move-out` |
+| Expand all, collapse all | `action-chevron` |
+| An Actions menu (⋯) | `action-more` |
+| Download, a PDF | `action-download` |
+| Upload | `action-upload` |
+| Import, install a theme package, load the starter catalogue | `action-import` |
+| Export | `action-export` |
+| Send, submit, request from my company | `action-send` |
+| Email (sign-in link, verification, invitation, test email) | `action-email` |
+| Reply by email | `action-reply` |
+| Ask a question | `action-ask` |
+| Report a problem | `action-report` |
+| Approve, release paid order | `action-approve` |
+| Reject, refuse | `action-reject` |
+| Enable, activate | `action-enable` |
+| Disable, deactivate | `action-disable` |
+| Revoke | `action-revoke` |
+| Restore, withdraw a request, mark not done | `action-restore` |
+| Reset, use the .env value | `action-reset` |
+| Update preview, re-sync, new address, take again | `action-refresh` |
+| Publish, make public | `action-publish` |
+| Unpublish, hide, return to draft | `action-hide` |
+| Make private | `action-private` |
+| Retire | `action-archive` |
+| Who can see it | `action-share` |
+| Make default, make primary | `action-default` |
+| Grant access, assign course | `action-grant` |
+| Verify my identity | `action-verify` |
+| Register, create an account | `action-register` |
+| Checkout, pay, continue to payment, payment method | `action-pay` |
+| Add to cart | `action-cart` |
+| Buy now, buy credits, place my order | `action-buy` |
+| I'll sort it out later | `action-later` |
+| Record a payment, a refund payment or a correction | `action-record-money` |
+| Put it on the unmatched money list | `action-list-add` |
+| Start, begin, resume, continue a course | `action-start` |
+| Skip for now | `action-skip` |
+| Finish assessment now | `action-finish` |
+| Rate this course | `action-rate` |
+| Rotate left, rotate right | `action-rotate-left`, `action-rotate-right` |
+| Generate | `action-generate` |
+| Pause rotation, resume rotation | `action-pause`, `action-play` |
+| A menu destination: home, catalogue, my library, help, contact, sign in, sign out | `nav-home`, `nav-catalogue`, `nav-learning`, `nav-help`, `nav-contact`, `nav-signin`, `nav-signout` |
 
 ## Core classes under Bootstrap 6
 

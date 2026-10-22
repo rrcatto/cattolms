@@ -73,7 +73,7 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-				{{ ui('action.button', {label: 'Save particulars', variant: 'primary', size: 'normal', type: 'submit'}) }}
+				{{ ui('action.button', {label: 'Save particulars', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -87,7 +87,7 @@
 	{% if identity_verification|default(null) %}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'identity-verification'})} %}
 {% block surface_body %}
-		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Identity verification', heading_level: 2, summary: 'Your certificates and transcripts carry your name exactly as it appears on your identity document.'})} %}{% block section_actions %}{{ ui('action.link', {label: identity_verification.verified ? 'View' : 'Verify my identity', variant: identity_verification.verified ? 'secondary' : 'primary', size: 'small', href: '/account/verification'}) }}{% endblock %}{% endembed %}
+		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Identity verification', heading_level: 2, summary: 'Your certificates and transcripts carry your name exactly as it appears on your identity document.'})} %}{% block section_actions %}{{ ui('action.link', {label: identity_verification.verified ? 'View' : 'Verify my identity', variant: identity_verification.verified ? 'secondary' : 'primary', size: 'small', href: '/account/verification', icon: (identity_verification.verified ? 'action-view' : 'action-verify')}) }}{% endblock %}{% endembed %}
 		{{ ui('data.key-value-list', {items: [{label: 'Status', value: identity_verification.status_words}] | merge(identity_verification.verified ? [{label: 'Verified name', value: identity_verification.verification.verified_name}] : [])}) }}
 {% endblock %}
 {% endembed %}
@@ -147,9 +147,9 @@
 						</div>
 						<div class="cl-image-editor-controls">
 							<div class="cl-image-editor-buttons">
-								{{ ui('action.button', {label: '↺ Left', variant: 'secondary', size: 'small', type: 'button', title: 'Rotate a quarter turn anticlockwise', stimulus_action: 'profile-image#rotateLeft'}) }}
-								{{ ui('action.button', {label: '↻ Right', variant: 'secondary', size: 'small', type: 'button', title: 'Rotate a quarter turn clockwise', stimulus_action: 'profile-image#rotateRight'}) }}
-								{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'button', title: 'Back to the starting position', stimulus_action: 'profile-image#recentre'}) }}
+								{{ ui('action.button', {label: 'Left', variant: 'secondary', size: 'small', type: 'button', title: 'Rotate a quarter turn anticlockwise', stimulus_action: 'profile-image#rotateLeft', icon: 'action-rotate-left'}) }}
+								{{ ui('action.button', {label: 'Right', variant: 'secondary', size: 'small', type: 'button', title: 'Rotate a quarter turn clockwise', stimulus_action: 'profile-image#rotateRight', icon: 'action-rotate-right'}) }}
+								{{ ui('action.button', {label: 'Reset', variant: 'secondary', size: 'small', type: 'button', title: 'Back to the starting position', stimulus_action: 'profile-image#recentre', icon: 'action-reset'}) }}
 							</div>
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Size', full_width: false, for: 'profile-image-zoom', help: 'Drag the picture to choose what the square holds.'})} %}
 {% block control %}
@@ -176,7 +176,7 @@
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-						{{ ui('action.button', {label: 'Save profile image', variant: 'primary', size: 'normal', type: 'submit'}) }}
+						{{ ui('action.button', {label: 'Save profile image', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
 {% block secondary_actions %}

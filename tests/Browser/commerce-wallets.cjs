@@ -320,7 +320,7 @@ async function buyWithWalletAndEft(page, fixture) {
     await check('chromium: a dashboard money figure opens the ledger, an entry, the trail and the payment events', async () => {
         const admin = await open(chromium, fixture.admin_token);
         const page = admin.page;
-        await page.goto(`${base}/admin/dashboard?money_period=year`);
+        await page.goto(`${base}/admin/dashboard?money_period=ytd`);
         const received = page.locator('a.cl-ui-stat-link', {hasText: 'Money received'});
         assert.equal(await received.count(), 1, 'the Money received figure is a link');
         await Promise.all([page.waitForNavigation(), received.click()]);

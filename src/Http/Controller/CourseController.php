@@ -242,7 +242,15 @@ final class CourseController extends BaseController
         // course is offered the review page, with where their own review stands.
         $courseId = (int) $course['id'];
         $rating = $this->reviews->ratingSummary($courseId);
-        $reviewsPagination = Pagination::fixed($this->request()->query->get('reviews_page'), CourseReviewService::PUBLIC_PAGE_SIZE, $rating->count);
+        // A number of stars chosen in the rating's breakdown shows only the reviews that give it (owner, 2026-10-22: "The number
+        // of stars should be clickable filters"); anything but 1 to 5 is not a page (no unknown option is quietly ignored).
+        $stars = null;
+        if ($this->request()->query->has('reviews_stars')) {
+            $stars = (string) $this->request()->query->get('reviews_stars');
+            if (preg_match('/^[1-5]$/', $stars) !== 1) throw new NotFoundHttpException('There is no such rating.');
+            $stars = (int) $stars;
+        }
+        $reviewsPagination = Pagination::fixed($this->request()->query->get('reviews_page'), CourseReviewService::PUBLIC_PAGE_SIZE, $stars === null ? $rating->count : $rating->distribution[$stars]);
         $canReview = $user !== null && $user->hasPermission('LEARNING.REVIEW.CREATE') && $this->reviews->canReview($user->id, $courseId);
 
         return $this->render('course-detail', [
@@ -256,8 +264,12 @@ final class CourseController extends BaseController
             'favourite_return' => '/courses/' . (string) $course['slug'],
             'course_content_mode' => true,
             'rating' => $rating->toArray(),
-            'reviews' => $this->reviews->publishedReviews($courseId, $reviewsPagination->pageSize, $reviewsPagination->offset),
-            'reviews_pagination' => PlatformAdministrationService::paginationPayload('reviews', $reviewsPagination, '/courses/' . (string) $course['slug'], 'Reviews'),
+            'reviews' => $this->reviews->publishedReviews($courseId, $reviewsPagination->pageSize, $reviewsPagination->offset, $stars),
+            'reviews_stars' => $stars,
+            // Numbered down the list, newest first, across pages (owner, 2026-10-22: "I also would like to see the reviews numbered").
+            'reviews_number_from' => $reviewsPagination->offset + 1,
+            // No bar when there is no second page (owner, 2026-10-22).
+            'reviews_pagination' => $reviewsPagination->totalPages > 1 ? PlatformAdministrationService::paginationPayload('reviews', $reviewsPagination, '/courses/' . (string) $course['slug'], 'Reviews', ['reviews_stars' => $stars]) : null,
             'can_review' => $canReview,
             'own_review' => $canReview ? $this->reviews->learnerReview($courseId, $user->id) : null,
             // The published courses related to this one (owner, 2026-10-20), as catalogue cards.

@@ -19,7 +19,7 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-				{{ ui('action.button', {label: 'Assign course', variant: 'primary', size: 'normal', type: 'submit'}) }}
+				{{ ui('action.button', {label: 'Assign course', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -70,7 +70,7 @@
 								{% if enrolment.status=='cancelled' %}
 									<form action="/company/enrolments/{{ enrolment.id }}/restore" method="post">
 										<input type="hidden" name="csrf" value="{{ csrf }}">
-										{{ ui('action.button', {label: 'Restore', variant: 'secondary', size: 'small', title: 'Restore this learner\'s course access'}) }}
+										{{ ui('action.button', {label: 'Restore', variant: 'secondary', size: 'small', title: 'Restore this learner\'s course access', icon: 'action-restore'}) }}
 									</form>
 								{% else %}
 									<form action="/company/enrolments/{{ enrolment.id }}/remove" method="post">
@@ -91,7 +91,7 @@
 			{% if enrolments_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the first {{ preview_page_size }} enrolments.</span>
-					{{ ui('action.link', {label: 'View all enrolments', variant: 'secondary', size: 'small', href: '/company/enrolments'}) }}
+					{{ ui('action.link', {label: 'View all enrolments', variant: 'secondary', size: 'small', href: '/company/enrolments', icon: 'action-view-all'}) }}
 				</div>
 			{% endif %}
 

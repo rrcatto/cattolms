@@ -311,10 +311,25 @@ final class CoursePortabilityService
         $this->audit->record($userId, 'course.reset', ['course_id' => $courseId]);
     }
 
+    /** How many orders bought the course; one that was bought is never deleted. */
+    public function buyingOrders(int $courseId): int
+    {
+        return $this->portability->buyingOrders($courseId);
+    }
+
     public function deleteCourse(int $courseId, int $userId): void
     {
         $course = $this->requireCourse($courseId);
-        $this->transactions->run(fn() => $this->portability->deleteCourse($courseId));
+        $this->transactions->run(function () use ($courseId, $course): void {
+            // A course that was bought keeps its orders, invoices, receipts and ledger lines for good, so it is retired, never
+            // deleted (owner, 2026-10-21: deleting one failed with a foreign key error instead of saying so).
+            $orders = $this->portability->buyingOrders($courseId);
+            if ($orders > 0) {
+                throw new InvalidArgumentException($course['title'] . ' has been bought (' . ($orders === 1 ? '1 order' : $orders . ' orders') . '), and orders, invoices and receipts are kept for good, so it cannot be deleted. '
+                    . ((string) ($course['status'] ?? '') === 'retired' ? 'It is retired: it is out of the catalogue and nobody can buy it.' : 'Retire it on its Publication tab instead: it leaves the catalogue and nobody can buy it.'));
+            }
+            $this->portability->deleteCourse($courseId);
+        });
         $this->audit->record($userId, 'course.deleted', ['course_id' => $courseId, 'title' => $course['title']]);
     }
 

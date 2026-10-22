@@ -21,7 +21,7 @@
 {% endset %}
 {% if not can_manage %}
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
-		<form method="get" action="/admin/commerce/documents">{{ choosers }}{{ ui('action.button', {label: 'Show', type: 'submit'}) }}</form>
+		<form method="get" action="/admin/commerce/documents">{{ choosers }}{{ ui('action.button', {label: 'Show', type: 'submit', icon: 'action-view'}) }}</form>
 		{{ preview }}
 	{% endblock %}{% endembed %}
 {% else %}
@@ -60,8 +60,8 @@
 {% endblock %}{% endembed %}
 
 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-	{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit'}) }}{% endblock %}
-	{% block secondary_actions %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'financial-preview-button', form_action: '/admin/commerce/documents/preview.pdf', form_target: 'financial-preview', skip_validation: true, icon: 'action-open'}) }}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/commerce/documents'}) }}{% endblock %}
+	{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'primary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+	{% block secondary_actions %}{{ ui('action.button', {label: 'Update preview', type: 'submit', id: 'financial-preview-button', form_action: '/admin/commerce/documents/preview.pdf', form_target: 'financial-preview', skip_validation: true, icon: 'action-refresh'}) }}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: '/admin/commerce/documents', icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 <p class="cl-ui-field-help">Saving changes invoices, receipts and credit notes issued from now on. Documents already issued keep the design they were issued with.</p>
 </div>

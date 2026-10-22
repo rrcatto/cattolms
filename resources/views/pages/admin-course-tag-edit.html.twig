@@ -18,8 +18,8 @@
 {% endblock %}
 {% endembed %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save tag', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'normal', href: '/admin/courses/tags'}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save tag', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'normal', href: '/admin/courses/tags', icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 			</form>
 {% endblock %}

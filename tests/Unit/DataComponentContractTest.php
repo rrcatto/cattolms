@@ -18,6 +18,14 @@ final class DataComponentContractTest extends TestCase
         self::assertStringNotContainsString('cl-ui-stat-card--large', $html);
         // The one figure a page is opened for, such as a wallet's balance (owner, 2026-10-21).
         self::assertStringContainsString('class="cl-ui-stat-card cl-ui-stat-card--large"', ComponentHarness::render('data.stat-card', ['value' => 'R10.00', 'label' => 'Wallet balance', 'size' => 'large']));
+        // A money amount in a row of figures (owner, 2026-10-21: "-2pt, possibly -4pt"), and a card's icon (owner: "Dashboard
+        // cards also need svg icons").
+        $small = ComponentHarness::render('data.stat-card', ['value' => 'R54,177.05', 'label' => 'Money received', 'size' => 'small', 'icon' => 'figure-money-in', 'href' => '/admin/commerce/ledger']);
+        self::assertStringContainsString('<a class="cl-ui-stat-card cl-ui-stat-card--small cl-ui-stat-link" href="/admin/commerce/ledger"><span class="cl-ui-stat-icon">', $small);
+        self::assertStringContainsString('#figure-money-in', $small);
+        self::assertStringContainsString('<div class="cl-ui-stat-value"><span>R54,177.05</span></div>', $small);
+        self::assertStringNotContainsString('cl-ui-stat-icon', $html, 'No icon unless one is named.');
+        self::assertStringContainsString('data-columns="5"', ComponentHarness::render('data.stat-grid', ['columns' => 5]));
         try {
             ComponentHarness::render('data.stat-card', ['value' => 1, 'label' => 'x', 'size' => 'huge']);
             self::fail('An unknown stat card size was accepted.');

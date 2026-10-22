@@ -121,6 +121,8 @@ final class AdminCourseController extends BaseController
         $course = $this->requireManagedCourse($courseId);
         $course['access_days'] = max(1, (int) round((int) $course['default_access_period_seconds'] / 86400));
         $course['has_started_learners'] = $this->portability->hasStartedLearners($courseId);
+        // A course that was bought is never deleted (owner, 2026-10-21): the Reset / Delete tab says so instead of offering it.
+        $course['buying_orders'] = $this->portability->buyingOrders($courseId);
         $tabs = [];
         foreach (self::EDIT_TABS as $key => [$label, $permission]) {
             if ($permission === null || $user->hasPermission($permission)) {

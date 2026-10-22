@@ -6,7 +6,7 @@
         {{ ui('layout.section-head', {heading: 'Wallets', eyebrow: 'Balances', summary: 'Search by name or account reference.'}) }}
         <form method="get" action="/admin/wallets" class="cl-row-inline">
             <input name="wallets_q" value="{{ wallets_search }}" placeholder="Name or account reference" class="cl-flex-fill cl-input" aria-label="Search wallets">
-            {{ ui('action.button', {label: 'Search', variant: 'primary', size: 'normal', type: 'submit'}) }}
+            {{ ui('action.button', {label: 'Search', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-search'}) }}
         </form>
         {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'wallets', pagination: wallets_pagination})} %}
         {% block results %}

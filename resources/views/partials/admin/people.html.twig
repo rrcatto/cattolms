@@ -3,7 +3,7 @@
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Everyone on the platform', eyebrow: 'People', summary: 'People, roles, organisations and learner access.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
 
-		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people'}})} %}
+		{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'people', pagination: people_pagination, search: {ds_name: 'people', ds_label: 'Search people', ds_value: people_search, ds_action: '/admin/people', ds_help: 'Searches every page by name, any email address or account reference.'}})} %}
 {% block results %}
 
 				{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', section_spacing: false})} %}
@@ -64,7 +64,7 @@
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
 
-											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile'}) }}
+											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/people/' ~ (person.id), title: 'Open this person\'s full profile', icon: 'action-edit'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -81,7 +81,7 @@
 					{% if people_preview_has_more %}
 						<div class="pagination-row">
 							<span class="pagination-summary">Showing the first {{ preview_page_size }} people.</span>
-							{{ ui('action.link', {label: 'View all people', variant: 'secondary', size: 'small', href: '/admin/people'}) }}
+							{{ ui('action.link', {label: 'View all people', variant: 'secondary', size: 'small', href: '/admin/people', icon: 'action-view-all'}) }}
 						</div>
 					{% endif %}
 
@@ -141,7 +141,7 @@
 {% endblock %}
 {% block modal_actions %}
 
-							{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true}) }}
+							{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 							{{ ui('action.button', {label: 'Create person', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
 
 {% endblock %}

@@ -27,7 +27,7 @@
 {% block control %}<input class="cl-input" type="file" id="{{ ic_kind }}-icon" name="icon" accept=".svg,image/svg+xml" {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save icon', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save icon', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% endembed %}
 		</form>
 	</div>

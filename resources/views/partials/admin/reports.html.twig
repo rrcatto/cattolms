@@ -10,8 +10,8 @@
 			{{ ui('data.stat-card', {value: (report_summary.certificates), label: 'Certificates', note: 'Currently valid certificates'}) }}
 		{% endblock %}
 		{% endembed %}
-		<p>{{ ui('action.link', {label: 'Analytics events', href: '/admin/analytics/events', size: 'small'}) }} The first-party event stream: course views, favourites, checkouts, purchases and refunds as they are recorded.</p>
-		<p>{{ ui('action.link', {label: 'Course popularity', href: '/admin/reports/popularity', size: 'small'}) }} The popularity ranking of published courses, with the views, favourites, purchases, refunds, ratings and momentum behind each score.</p>
+		<p>{{ ui('action.link', {label: 'Analytics events', href: '/admin/analytics/events', size: 'small', icon: 'action-open'}) }} The first-party event stream: course views, favourites, checkouts, purchases and refunds as they are recorded.</p>
+		<p>{{ ui('action.link', {label: 'Course popularity', href: '/admin/reports/popularity', size: 'small', icon: 'action-open'}) }} The popularity ranking of published courses, with the views, favourites, purchases, refunds, ratings and momentum behind each score.</p>
 {% endblock %}
 {% endembed %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}

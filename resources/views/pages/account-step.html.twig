@@ -14,14 +14,14 @@
 			<form action="/account/confirm-age" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="return_path" value="{{ return_path }}">
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date of birth', for: 'date-of-birth', required: true, help: 'For example 14 March 1990.'})} %}{% block control %}<input type="date" id="date-of-birth" name="date_of_birth" max="{{ 'now'|date_modify('-18 years')|date('Y-m-d') }}" autocomplete="bday" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Continue', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Continue', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-next'}) }}{% endblock %}{% endembed %}
 			</form>
 			{% else %}
 			{{ ui('layout.section-head', {heading: 'Your account cannot be used', heading_level: 2, summary: 'Learners must be 18 or older.'}) }}
 			<p>The identity document you verified shows that you are under 18. This site is for adults, so your account goes no further. If this is wrong, <a href="/contact">contact us</a>.</p>
 			{% endif %}
 			<p>Read the <a href="/terms">Terms and Conditions</a> and the <a href="/privacy">Privacy Policy</a>.</p>
-			<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: step == 'age' ? 'Sign out instead' : 'Sign out', variant: 'quiet', size: 'small', type: 'submit'}) }}</form>
+			<form action="/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: step == 'age' ? 'Sign out instead' : 'Sign out', variant: 'quiet', size: 'small', type: 'submit', icon: 'nav-signout'}) }}</form>
 		{% endblock %}{% endembed %}
 	</section>
 {% endblock %}

@@ -39,7 +39,7 @@
 
 			<div class="cl-row-inline">
 				<input name="q" value="{{ activity_filters.q }}" placeholder="Event, person, ID or metadata" class="cl-flex-fill" id="field-activity-4-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>
-				{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/activity'}) }}
+				{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/activity', icon: 'action-clear'}) }}
 			</div>
 
 {% endblock %}
@@ -91,7 +91,7 @@
 								{{ event.geo_location }}
 							</td>
 							<td class="cell-actions">
-								{{ ui('action.link', {label: 'Details', variant: 'secondary', size: 'small', href: '/admin/activity/' ~ (event.id)}) }}
+								{{ ui('action.link', {label: 'Details', variant: 'secondary', size: 'small', href: '/admin/activity/' ~ (event.id), icon: 'action-view'}) }}
 							</td>
 						</tr>
 					{% endfor %}
@@ -117,7 +117,7 @@
 			{% if activity_preview_has_more %}
 				<div class="pagination-row">
 					<span class="pagination-summary">Showing the {{ preview_page_size }} most recent events.</span>
-					{{ ui('action.link', {label: 'View all activity', variant: 'secondary', size: 'small', href: '/admin/activity'}) }}
+					{{ ui('action.link', {label: 'View all activity', variant: 'secondary', size: 'small', href: '/admin/activity', icon: 'action-view-all'}) }}
 				</div>
 			{% endif %}
 

@@ -14,14 +14,14 @@
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 			{% if node.level < 3 %}{{ ui('action.link', {label: 'Add subcategory', variant: 'quiet', size: 'small', href: '/admin/courses/categories/' ~ node.id ~ '/new', get: '/admin/courses/categories/' ~ node.id ~ '/new', target: '#category-create-body', modal: 'category-create', icon: 'action-add', aria_label: 'Add a subcategory to ' ~ node.name}) }}{% endif %}
-			{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/categories/' ~ node.id, aria_label: 'Manage ' ~ node.name}) }}
+			{{ ui('action.link', {label: 'Manage', variant: 'primary', size: 'small', href: '/admin/courses/categories/' ~ node.id, aria_label: 'Manage ' ~ node.name, icon: 'action-manage'}) }}
 			{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, compact: true, icon: 'action-more', aria_label: 'Move ' ~ node.name})} %}
 {% block body %}
-				{% for move in [{direction: 'top', label: 'Move to top', allowed: not node.is_first_sibling}, {direction: 'up', label: 'Move up', allowed: not node.is_first_sibling}, {direction: 'down', label: 'Move down', allowed: not node.is_last_sibling}, {direction: 'bottom', label: 'Move to bottom', allowed: not node.is_last_sibling}] %}
-					<form action="/admin/courses/categories/{{ node.id }}/move" method="post" data-tree-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed}) }}</form>
+				{% for move in [{direction: 'top', label: 'Move to top', icon: 'action-move-top', allowed: not node.is_first_sibling}, {direction: 'up', label: 'Move up', icon: 'action-move-up', allowed: not node.is_first_sibling}, {direction: 'down', label: 'Move down', icon: 'action-move-down', allowed: not node.is_last_sibling}, {direction: 'bottom', label: 'Move to bottom', icon: 'action-move-bottom', allowed: not node.is_last_sibling}] %}
+					<form action="/admin/courses/categories/{{ node.id }}/move" method="post" data-tree-direction="{{ move.direction }}"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="{{ move.direction }}">{{ ui('action.button', {label: move.label, type: 'submit', size: 'small', variant: 'quiet', disabled: not move.allowed, icon: move.icon}) }}</form>
 				{% endfor %}
-				{{ ui('action.link', {label: 'Move into…', href: '/admin/courses/categories/' ~ node.id ~ '/move-into', size: 'small', variant: 'quiet'}) }}
-				<form action="/admin/courses/categories/{{ node.id }}/move" method="post" data-tree-direction="out"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="out">{{ ui('action.button', {label: 'Move out', type: 'submit', size: 'small', variant: 'quiet', disabled: node.level == 1, title: node.level == 1 ? 'It is already a main category.' : ''}) }}</form>
+				{{ ui('action.link', {label: 'Move into…', href: '/admin/courses/categories/' ~ node.id ~ '/move-into', size: 'small', variant: 'quiet', icon: 'action-move-into'}) }}
+				<form action="/admin/courses/categories/{{ node.id }}/move" method="post" data-tree-direction="out"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="out">{{ ui('action.button', {label: 'Move out', type: 'submit', size: 'small', variant: 'quiet', disabled: node.level == 1, title: node.level == 1 ? 'It is already a main category.' : '', icon: 'action-move-out'}) }}</form>
 {% endblock %}
 			{% endembed %}
 {% endblock %}

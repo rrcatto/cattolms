@@ -36,7 +36,7 @@
 
 				<form action="/admin/themes/resync" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					{{ ui('action.button', {label: 'Re-sync themes', variant: 'secondary', size: 'normal', type: 'submit'}) }}
+					{{ ui('action.button', {label: 'Re-sync themes', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-refresh'}) }}
 				</form>
 				{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Import theme ZIP'})} %}
 {% block body %}
@@ -54,7 +54,7 @@
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Inspect package', variant: 'primary', size: 'normal'}) }}
+{{ ui('action.button', {label: 'Inspect package', variant: 'primary', size: 'normal', icon: 'action-inspect'}) }}
 {% endblock %}
 {% endembed %}
 
@@ -146,15 +146,15 @@
 						{% endif %}
 					</td>
 					<td class="cell-actions" data-no-row-menu="the control that recovers from a broken theme must not itself depend on that theme rendering a menu; on a phone the Core-drawn Actions menu holds them (owner, 2026-10-17)">
-						{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true})} %}
+						{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-							{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/?theme_preview=' ~ (themeItem.key|urlencode), new_window: true}) }}
+							{{ ui('action.link', {label: 'Preview', variant: 'secondary', size: 'small', href: '/?theme_preview=' ~ (themeItem.key|urlencode), new_window: true, icon: 'action-preview'}) }}
 							{% if not themeItem.active %}
 								<form action="/admin/themes/activate" method="post">
 									<input type="hidden" name="csrf" value="{{ csrf }}">
 									<input type="hidden" name="theme" value="{{ themeItem.key }}">
-									{{ ui('action.button', {label: 'Activate', variant: 'primary', size: 'small'}) }}
+									{{ ui('action.button', {label: 'Activate', variant: 'primary', size: 'small', icon: 'action-enable'}) }}
 								</form>
 							{% endif %}
 							{% if not themeItem.is_default and not themeItem.active %}

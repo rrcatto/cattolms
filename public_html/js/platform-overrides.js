@@ -497,8 +497,44 @@
         wrapper.dataset.columnFit = 'fitted';
       });
     };
-    const fitAndExplain = root => { fitTableColumns(root); applyCellTooltips(root); };
+    /* The pagination row fits its line (owner, 2026-10-21: it must not scroll on a desktop screen). A list of a hundred
+       pages or more has three-digit page numbers, and a theme with a narrow content column (Factory Reset Sidebar at
+       1440px) could not hold the whole numbered window. Where the row is too wide, the numbered pages farthest from the
+       current one are hidden, one at a time, until it fits: never the first, the last or the current page, and only in a
+       window that already has an ellipsis, so a hidden page always sits in a gap the reader can see. They come back
+       when there is room again. Without JavaScript the row scrolls inside itself. */
+    const fitPagination = root => {
+      const scope = root instanceof Element ? root : document;
+      within(scope, 'nav.pagination-row').forEach(row => {
+        const items = [...row.querySelectorAll('.pagination-pages-list > li')];
+        items.filter(item => 'pagerTrimmed' in item.dataset).forEach(item => { item.hidden = false; delete item.dataset.pagerTrimmed; });
+        if (!row.clientWidth || row.scrollWidth <= row.clientWidth + 1 || !row.querySelector('.pagination-gap')) return;
+        const current = items.findIndex(item => item.querySelector('[aria-current="page"]'));
+        const trimmable = items.map((item, index) => index)
+          .filter(index => index > 0 && index < items.length - 1 && index !== current && !items[index].querySelector('.pagination-gap'))
+          .sort((a, b) => Math.abs(b - current) - Math.abs(a - current));
+        for (const index of trimmable) {
+          if (row.scrollWidth <= row.clientWidth + 1) break;
+          items[index].hidden = true;
+          items[index].dataset.pagerTrimmed = '';
+        }
+      });
+    };
+    /* A small stat card's money amount stays on one line inside its card (owner, 2026-10-21: the dashboard's amounts ran
+       out of their cards). Core draws it at 0.88 of the theme's own size; an amount still too wide for its card, a very
+       large one or a card on a narrow screen, is drawn smaller until it fits. */
+    const fitFigures = root => {
+      const scope = root instanceof Element ? root : document;
+      within(scope, '.cl-ui-stat-card--small .cl-ui-stat-value > span').forEach(amount => {
+        amount.style.fontSize = '';
+        const room = amount.parentElement.clientWidth, width = amount.getBoundingClientRect().width;
+        if (room && width > room) amount.style.fontSize = (parseFloat(getComputedStyle(amount).fontSize) * room / width * 0.98).toFixed(2) + 'px';
+      });
+    };
+    const fitAndExplain = root => { fitTableColumns(root); applyCellTooltips(root); fitPagination(root); fitFigures(root); };
     fitAndExplain(document);
+    // Again once the theme's web fonts have arrived: a figure or a column measured in the fallback font can change width.
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitAndExplain(document));
     // htmx 4's event name; the swapped element can be gone (an outerHTML swap), so the page is looked at again.
     document.addEventListener('htmx:after:swap', () => fitAndExplain(document));
     // A table inside a section that was closed had no width to share out until it opened.

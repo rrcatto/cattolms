@@ -11,7 +11,7 @@
 	{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}{% block surface_body %}
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Switch company', summary: 'Choose the company to administer. The company you choose decides whether the workspace shows real or generated data.'})} %}
 {% block section_actions %}
-{{ ui('action.link', {label: 'Back to Company', variant: 'secondary', size: 'small', href: '/company'}) }}
+{{ ui('action.link', {label: 'Back to Company', variant: 'secondary', size: 'small', href: '/company', icon: 'action-back'}) }}
 {% endblock %}
 {% endembed %}
 

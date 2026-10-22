@@ -165,9 +165,9 @@ final class CourseReviewService
     }
 
     /** @return list<array{id:int,rating:int,comment:string,published_at:string,reviewer:string}> */
-    public function publishedReviews(int $courseId, int $limit, int $offset): array
+    public function publishedReviews(int $courseId, int $limit, int $offset, ?int $stars = null): array
     {
-        return $this->reviews->published($courseId, $limit, $offset);
+        return $this->reviews->published($courseId, $limit, $offset, $stars);
     }
 
     /** A rating is a whole number of stars from 1 to 5, as an int or its decimal string. */

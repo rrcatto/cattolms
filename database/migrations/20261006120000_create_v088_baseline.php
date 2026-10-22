@@ -110,6 +110,7 @@ private const SEARCH_INDEXES = [
         'companies_name_trgm_idx' => 'companies USING GIN ((name::text) gin_trgm_ops)',
         'companies_domain_trgm_idx' => 'companies USING GIN ((domain::text) gin_trgm_ops)',
         'users_fullname_trgm_idx' => "users USING GIN ((coalesce(first_name,'') || ' ' || coalesce(last_name,'')) gin_trgm_ops)",
+        'users_fullname_middle_trgm_idx' => "users USING GIN ((coalesce(first_name,'') || ' ' || coalesce(middle_names,'') || ' ' || coalesce(last_name,'')) gin_trgm_ops)",
         'users_display_name_trgm_idx' => 'users USING GIN ((display_name::text) gin_trgm_ops)',
         'user_emails_email_trgm_idx' => 'user_emails USING GIN ((email::text) gin_trgm_ops)',
         'courses_title_trgm_idx' => 'courses USING GIN ((title::text) gin_trgm_ops)',

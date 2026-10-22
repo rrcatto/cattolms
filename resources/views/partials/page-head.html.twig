@@ -16,12 +16,13 @@
 		{#
 			The page's actions: ph_actions is captured markup (a {% set %} block of ui() actions) for a
 			page whose main actions are its own; ph_action_href is the single secondary link a sub-page
-			may have. A section's own actions arrive as ph_actions from its page template.
+			may have, with its ph_action_label and ph_action_icon (Back and action-back unless given).
+			A section's own actions arrive as ph_actions from its page template.
 		#}
 		{% if ph_actions|default('')|trim %}
 			<div class="cl-page-head-actions">{{ ph_actions }}</div>
 		{% elseif ph_action_href|default('') %}
-			<div class="cl-page-head-actions">{{ ui('action.link', {label: ph_action_label|default('Back', true), variant: 'secondary', href: ph_action_href}) }}</div>
+			<div class="cl-page-head-actions">{{ ui('action.link', {label: ph_action_label|default('Back', true), variant: 'secondary', href: ph_action_href, icon: ph_action_icon|default('action-back', true)}) }}</div>
 		{% endif %}
 		{% if ph_hero_art %}</div>{% endif %}
 	</div>

@@ -6,20 +6,20 @@
 {% extends layout %}
 {% block page_body %}
 	{% set ph_kicker = 'Administration' %}{% set ph_title = 'Unmatched Money' %}
-	{% set ph_actions %}{{ ui('action.link', {label: 'Record EFT Payment', variant: 'primary', href: '/admin/commerce/eft'}) }}{% endset %}
+	{% set ph_actions %}{{ ui('action.link', {label: 'Record EFT Payment', variant: 'primary', href: '/admin/commerce/eft', icon: 'action-record-money'}) }}{% endset %}
 	{% set ph_lead = 'Money that reached the bank with no unpaid order to record it against. Match each deposit to an order, or record that you paid it back. A deposit enters the Money Ledger only when it is matched to an order.' %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: show_all ? 'Every deposit' : 'To sort out', summary: show_all ? 'Including those matched or paid back, newest first.' : 'Oldest first.'}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{{ ui('action.link', {label: 'To sort out', variant: show_all ? 'secondary' : 'primary', size: 'small', href: '/admin/commerce/unmatched'}) }}
-			{{ ui('action.link', {label: 'Every deposit', variant: show_all ? 'primary' : 'secondary', size: 'small', href: '/admin/commerce/unmatched?show=all'}) }}
+			{{ ui('action.link', {label: 'To sort out', variant: show_all ? 'secondary' : 'primary', size: 'small', href: '/admin/commerce/unmatched', icon: 'action-inbox'}) }}
+			{{ ui('action.link', {label: 'Every deposit', variant: show_all ? 'primary' : 'secondary', size: 'small', href: '/admin/commerce/unmatched?show=all', icon: 'action-view-all'}) }}
 		{% endblock %}{% endembed %}
 		{% if items %}
 		{% embed ui_template('data.table') with {props: ui_props('data.table', {})} %}
 		{% block header %}<tr>{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Arrived'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Amount'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Reference the payer used'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 22, label: 'Bank reference', wide: true}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 16, label: 'Status'}} %}{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 8, label: ''}} %}</tr>{% endblock %}
 		{% block body %}{% for item in items %}
-			<tr data-unmatched-id="{{ item.id }}"><td class="small">{{ item.received }}</td><td>{{ item.amount_label }}</td><td class="cell-text">{{ item.payer_reference }}</td><td class="cell-text">{{ item.bank_reference }}</td><td>{{ ui('feedback.badge', {label: item.status_label, tone: item.status_tone, size: 'small'}) }}</td><td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: item.href, aria_label: 'Open unmatched deposit ' ~ item.id}) }}</td></tr>
+			<tr data-unmatched-id="{{ item.id }}"><td class="small">{{ item.received }}</td><td>{{ item.amount_label }}</td><td class="cell-text">{{ item.payer_reference }}</td><td class="cell-text">{{ item.bank_reference }}</td><td>{{ ui('feedback.badge', {label: item.status_label, tone: item.status_tone, size: 'small'}) }}</td><td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: item.href, aria_label: 'Open unmatched deposit ' ~ item.id, icon: 'action-open'}) }}</td></tr>
 		{% endfor %}{% endblock %}
 		{% endembed %}
 		{% else %}{{ ui('feedback.empty', {summary: show_all ? 'No money has been put on this list yet.' : 'Nothing to sort out.'}) }}{% endif %}

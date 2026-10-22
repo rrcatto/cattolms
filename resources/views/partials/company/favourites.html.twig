@@ -54,10 +54,10 @@
 											{{ favourite.created_at }}
 										</td>
 										<td class="cell-actions">
-											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-													{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/courses/' ~ (favourite.slug)}) }}
+													{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/courses/' ~ (favourite.slug), icon: 'action-view'}) }}
 													{% if can_manage_company_favourites %}
 														<form action="/company/favourites/{{ favourite.id }}/toggle" method="post">
 															<input type="hidden" name="csrf" value="{{ csrf }}">

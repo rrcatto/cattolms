@@ -61,7 +61,7 @@
 {% block body %}
 
 						{% for link in event.related_links %}
-							{{ ui('action.link', {label: (link.label), variant: 'secondary', size: 'small', href: (link.url)}) }}
+							{{ ui('action.link', {label: (link.label), variant: 'secondary', size: 'small', href: (link.url), icon: 'action-open'}) }}
 						{% endfor %}
 
 {% endblock %}

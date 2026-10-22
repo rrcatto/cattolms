@@ -51,7 +51,7 @@
 		] | merge(document_birth and document_birth|date('Y-m-d') != (profile.birthdate|default(null) ? profile.birthdate|date('Y-m-d') : '') ? [{label: 'On their identity document', value: document_birth|date('j F Y') ~ ' (' ~ date(document_birth).diff(date()).y ~ '), not the date they gave'}] : []) | merge(identity and identity.minor ? [{label: 'Adults only', value: 'Under 18 on their identity document: the account stops at the adults-only page'}] : []) | merge(identity ? [{label: 'Identity', value: identity.status_words}, {label: 'Declined checks that count', value: identity.tries_used ~ ' of 3'}] : [])}) }}
 		{% if identity %}
 			{% if can_manage_identity and identity.blocked %}
-			<form action="/admin/people/{{ target_user_id }}/identity/allow-retry" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Allow another try', variant: 'primary', size: 'small', type: 'submit', confirm: 'Allow this person three more identity checks?'}) }}</form>
+			<form action="/admin/people/{{ target_user_id }}/identity/allow-retry" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Allow another try', variant: 'primary', size: 'small', type: 'submit', confirm: 'Allow this person three more identity checks?', icon: 'action-refresh'}) }}</form>
 			{% endif %}
 			{% if identity_history %}
 			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Identity checks, newest first'})} %}
@@ -63,10 +63,10 @@
 				{% if can_manage_identity and check.status == 'approved' %}
 					<form action="/admin/people/{{ target_user_id }}/identity/{{ check.id }}/revoke" method="post" class="cl-mt-2"><input type="hidden" name="csrf" value="{{ csrf }}">
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason for revoking', for: 'revoke-identity-' ~ check.id, required: true})} %}{% block control %}<input id="revoke-identity-{{ check.id }}" name="reason" maxlength="500" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{{ ui('action.button', {label: 'Revoke verification', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this verification? The person must verify again before a purchase or a certificate.'}) }}
+						{{ ui('action.button', {label: 'Revoke verification', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this verification? The person must verify again before a purchase or a certificate.', icon: 'action-revoke'}) }}
 					</form>
 				{% endif %}</td>
-				<td class="small"><span class="mono">{{ check.session_id }}</span><br>{{ ui('action.link', {label: 'Open the Didit console', variant: 'quiet', size: 'small', href: identity_console, new_window: true}) }}</td>
+				<td class="small"><span class="mono">{{ check.session_id }}</span><br>{{ ui('action.link', {label: 'Open the Didit console', variant: 'quiet', size: 'small', href: identity_console, new_window: true, icon: 'action-external'}) }}</td>
 			</tr>{% endfor %}{% endblock %}
 			{% endembed %}
 			<p class="help">Didit's console finds a check by its session id: search for it under Verifications.</p>
@@ -174,7 +174,7 @@
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-					{{ ui('action.button', {label: 'Save complete profile', variant: 'primary', size: 'normal', type: 'submit'}) }}
+					{{ ui('action.button', {label: 'Save complete profile', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -194,18 +194,18 @@
 					{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'warning', heading: 'Waiting for your approval'})} %}{% block body %}<p>This account registered on the demo site and cannot sign in until you approve it. Approving it emails the person that they can sign in.</p>{% endblock %}{% endembed %}
 					<form action="/admin/people/{{ target_user_id }}/approve" method="post" class="cl-mt-2">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
-						{{ ui('action.button', {label: 'Approve account', variant: 'primary', size: 'normal', type: 'submit'}) }}
+						{{ ui('action.button', {label: 'Approve account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}
 					</form>
 					<form action="/admin/people/{{ target_user_id }}/status" method="post" class="cl-mt-2">
 						<input type="hidden" name="csrf" value="{{ csrf }}">
 						<input type="hidden" name="status" value="disabled">
-						{{ ui('action.button', {label: 'Disable account', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disable this account instead of approving it?'}) }}
+						{{ ui('action.button', {label: 'Disable account', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Disable this account instead of approving it?', icon: 'action-disable'}) }}
 					</form>
 				{% else %}
 				<form action="/admin/people/{{ target_user_id }}/status" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
 					<input type="hidden" name="status" value="{{ profile.status=='active' ? 'disabled' : 'active' }}">
-					{{ ui('action.button', {label: (profile.status=='active' ? 'Disable account' : 'Enable account'), variant: profile.status=='active' ? 'danger' : 'primary', size: 'normal', type: 'submit', confirm: (profile.status=='active' ? 'Disable this account?' : 'Enable this account?')}) }}
+					{{ ui('action.button', {label: (profile.status=='active' ? 'Disable account' : 'Enable account'), variant: profile.status=='active' ? 'danger' : 'primary', size: 'normal', type: 'submit', confirm: (profile.status=='active' ? 'Disable this account?' : 'Enable this account?'), icon: (profile.status == 'active' ? 'action-disable' : 'action-enable')}) }}
 				</form>
 				{% endif %}
 
@@ -240,7 +240,7 @@
 									<form action="/admin/people/{{ target_user_id }}/sessions/revoke" method="post">
 										<input type="hidden" name="csrf" value="{{ csrf }}">
 										<input type="hidden" name="session_id" value="{{ session.public_id }}">
-										{{ ui('action.button', {label: 'Revoke', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this session?', icon: 'action-remove'}) }}
+										{{ ui('action.button', {label: 'Revoke', variant: 'danger', size: 'small', type: 'submit', confirm: 'Revoke this session?', icon: 'action-revoke'}) }}
 									</form>
 
 {% endblock %}
@@ -304,7 +304,7 @@
 									<input type="hidden" name="csrf" value="{{ csrf }}">
 									<input type="hidden" name="return" value="/admin/people/{{ target_user_id }}">
 									{% if course.status == 'cancelled' %}
-										{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small'}) }}
+										{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small', icon: 'action-restore'}) }}
 									{% else %}
 										{{ ui('action.button', {label: 'Remove access', variant: 'danger', size: 'small', confirm: 'Remove their access to ' ~ course.title ~ '? Their progress and results are kept, and you can restore it.', icon: 'action-remove'}) }}
 									{% endif %}
@@ -345,7 +345,7 @@
 						{% if grant_courses %}
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'person-grant-course', required: true})} %}{% block control %}<select id="person-grant-course" name="course_id" required {{ ui_field_attrs(props) }}>{% for grant_course in grant_courses %}<option value="{{ grant_course.id }}">{{ grant_course.label }} · {{ grant_course.detail }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Access days', for: 'person-grant-days', required: true, help: 'The countdown begins when access is granted.'})} %}{% block control %}<input id="person-grant-days" type="number" name="access_days" min="1" max="24855" value="30" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant course access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Grant course access', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}{% endembed %}
 						{% else %}<p>No courses match this search.</p>{% endif %}
 					</form>
 				{% endif %}

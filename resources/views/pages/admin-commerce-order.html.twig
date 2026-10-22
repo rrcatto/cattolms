@@ -37,7 +37,7 @@
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The bank’s reference for it', for: 'bank-reference', required: true})} %}{% block control %}<input id="bank-reference" name="bank_reference" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where you saw it', for: 'bank-reason', required: true, help: 'Such as: FNB business account statement, 18 October.'})} %}{% block control %}<textarea id="bank-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
 				{% endblock %}{% endembed %}
-				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the EFT payment', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the EFT payment', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-record-money'}) }}{% endblock %}{% endembed %}
 			</form>
 		{% endblock %}{% endembed %}
 	</section>
@@ -48,7 +48,7 @@
 			{{ ui('layout.section-head', {heading: 'Release the order', heading_level: 2, summary: 'Release it once you have checked the payment and who it is for. Access opens when you do.'}) }}
 			<form action="/admin/commerce/orders/{{ order.id }}/release-review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'What you checked', for: 'review-reason', required: true})} %}{% block control %}<textarea id="review-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
-				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Release paid order', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Release paid order', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-approve'}) }}{% endblock %}{% endembed %}
 			</form>
 		{% endblock %}{% endembed %}
 	</section>
@@ -75,7 +75,7 @@
 			{{ ui('data.key-value-list', {items: money_items}) }}
 			{% if wallet_balance_label is not null %}
 			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-				{{ ui('action.link', {label: 'Open the customer’s wallet', variant: 'secondary', size: 'small', href: wallet_href}) }}
+				{{ ui('action.link', {label: 'Open the customer’s wallet', variant: 'secondary', size: 'small', href: wallet_href, icon: 'action-open'}) }}
 			{% endblock %}{% endembed %}
 			{% endif %}
 		{% endblock %}{% endembed %}
@@ -112,7 +112,7 @@
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 			{{ ui('layout.section-head', {heading: 'Documents', heading_level: 2, summary: 'Each document stays exactly as it was issued.'}) }}
 			{% for document in documents %}
-				<p data-document-kind="{{ document.kind }}" data-design-version="{{ document.template_version_number }}">{{ ui('action.link', {label: document.kind|replace({'_':' '})|capitalize ~ ' ' ~ document.number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id ~ '/documents/' ~ document.id, new_window: true}) }} <a href="/admin/commerce/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download the PDF</a> <span class="small">issued {{ document.issued_at|date('j M Y \\a\\t H:i') }}</span></p>
+				<p data-document-kind="{{ document.kind }}" data-design-version="{{ document.template_version_number }}">{{ ui('action.link', {label: document.kind|replace({'_':' '})|capitalize ~ ' ' ~ document.number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ order.id ~ '/documents/' ~ document.id, new_window: true, icon: 'action-document'}) }} <a href="/admin/commerce/orders/{{ order.id }}/documents/{{ document.id }}?download=1">Download the PDF</a> <span class="small">issued {{ document.issued_at|date('j M Y \\a\\t H:i') }}</span></p>
 			{% else %}
 				<p>No document has been issued yet. The invoice is issued when the order is placed.</p>
 			{% endfor %}
@@ -140,7 +140,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Date you paid it', for: 'payout-date-' ~ refund.id, required: true})} %}{% block control %}<input id="payout-date-{{ refund.id }}" type="date" name="paid_on" max="{{ today }}" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Stitch or bank reference', for: 'payout-reference-' ~ refund.id, required: true})} %}{% block control %}<input id="payout-reference-{{ refund.id }}" name="reference" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% endblock %}{% endembed %}
-					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the refund payment', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record the refund payment', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-record-money'}) }}{% endblock %}{% endembed %}
 				</form>
 				{% endif %}
 			{% endfor %}
@@ -161,7 +161,7 @@
 							{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Your reason', for: 'refund-reason-' ~ item.id, required: true})} %}{% block control %}<textarea id="refund-reason-{{ item.id }}" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
 							{% if item.rule_refusals %}{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Why you override the Refund Policy', for: 'refund-override-' ~ item.id, required: true, help: 'Kept with the refund and shown only to ADMIN.'})} %}{% block control %}<textarea id="refund-override-{{ item.id }}" name="override_reason" minlength="5" maxlength="2000" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}{% endif %}
 						{% endblock %}{% endembed %}
-						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: item.rule_refusals ? 'Override the Refund Policy and approve refund' : 'Approve refund and issue credit note', variant: 'danger', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: item.rule_refusals ? 'Override the Refund Policy and approve refund' : 'Approve refund and issue credit note', variant: 'danger', size: 'normal', type: 'submit', icon: 'action-approve'}) }}{% endblock %}{% endembed %}
 					</form>
 					{% endif %}
 				{% endblock %}{% endembed %}

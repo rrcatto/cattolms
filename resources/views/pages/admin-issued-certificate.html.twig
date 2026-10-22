@@ -24,7 +24,7 @@
 			{label: 'Who can see the certificate', value: certificate.is_public ? 'Public: anyone who has its address' : 'Private: only the learner'},
 		] | merge(certificate.transcript_id ? [{label: 'Who can see the transcript', value: certificate.transcript_is_public ? 'Public: anyone who has its address' : 'Private: only the learner'}] : [])}) }}
 		<p class="cl-ui-field-help">The learner decides who can see each one. Only the learner is shown their addresses.</p>
-		<p>{{ ui('action.link', {label: 'Certificate PDF', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ certificate.id ~ '/certificate.pdf'}) }}{% if certificate.transcript_id %} {{ ui('action.link', {label: 'Transcript PDF', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ certificate.id ~ '/transcript.pdf'}) }}{% endif %} {{ ui('action.link', {label: 'The learner', variant: 'quiet', size: 'small', href: '/admin/people/' ~ certificate.user_id}) }}</p>
+		<p>{{ ui('action.link', {label: 'Certificate PDF', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ certificate.id ~ '/certificate.pdf', icon: 'action-download'}) }}{% if certificate.transcript_id %} {{ ui('action.link', {label: 'Transcript PDF', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ certificate.id ~ '/transcript.pdf', icon: 'action-download'}) }}{% endif %} {{ ui('action.link', {label: 'The learner', variant: 'quiet', size: 'small', href: '/admin/people/' ~ certificate.user_id, icon: 'action-open'}) }}</p>
 	{% endblock %}{% endembed %}</section>
 	{% if can_revoke and not certificate.revoked_at %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {id: 'revoke'})} %}{% block surface_body %}
@@ -32,7 +32,7 @@
 		<form action="/admin/certificates/{{ certificate.id }}/revoke" method="post">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 			<input type="hidden" name="csrf" value="{{ csrf }}">
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Reason, shown on the certificate and transcript pages', full_width: true, for: 'revoke-reason', required: true})} %}{% block control %}<textarea id="revoke-reason" name="reason" rows="3" maxlength="500" required {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Revoke certificate and transcript', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Revoke this certificate and its transcript? This cannot be undone.'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Revoke certificate and transcript', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Revoke this certificate and its transcript? This cannot be undone.', icon: 'action-revoke'}) }}{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}</form>
 	{% endblock %}{% endembed %}</section>
 	{% endif %}

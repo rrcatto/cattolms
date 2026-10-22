@@ -1,12 +1,13 @@
 {#
-	The approved reviews of a course, newest first and a page at a time. Only the published version of
-	each review is shown, under the reviewer's first name and initial: never an email address, an id or
-	a moderation note.
+	The approved reviews of a course, newest first and a page at a time, numbered down the list (owner, 2026-10-22), and only
+	those giving the chosen number of stars when one is chosen. Only the published version of each review is shown, under the
+	reviewer's first name and initial: never an email address, an id or a moderation note. No pagination bar without a second
+	page (the controller gives none).
 #}
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'reviews', pagination: reviews_pagination})} %}
 {% block results %}
 {% if reviews %}
-{% include '@platform/partials/course-review-list.html.twig' %}
+{% include '@platform/partials/course-review-list.html.twig' with {review_number_from: reviews_number_from|default(0)} %}
 {% else %}
 {{ ui('feedback.empty', {heading: 'No reviews yet', summary: 'Reviews from learners who have taken this course appear here once they have been checked.'}) }}
 {% endif %}

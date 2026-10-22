@@ -43,7 +43,7 @@ final class CompanySectionRegistry
         $opens = static fn(string $label, string $modal, string $when = ''): array => ['label' => $label, 'href' => '', 'modal' => $modal, 'variant' => 'primary', 'icon' => 'action-add', 'when' => $when];
         return match ($key) {
             'people' => [$opens('Add person', 'companyAddPersonModal')],
-            'credits' => [$link('Buy credits', '/company/credits/buy', 'primary')],
+            'credits' => [$link('Buy credits', '/company/credits/buy', 'primary', 'action-buy')],
             default => [],
         };
     }

@@ -27,7 +27,7 @@
 {% endembed %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Save site mode', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Change the site mode? A live site takes real orders and real money.'}) }}
+{{ ui('action.button', {label: 'Save site mode', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Change the site mode? A live site takes real orders and real money.', icon: 'action-save-changes'}) }}
 {% endblock %}
 {% endembed %}
 
@@ -36,7 +36,7 @@
 			{% if site_mode.source == 'database' %}
 			<form action="/admin/settings/site-mode/reset" method="post" class="cl-mt-2">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('action.button', {label: 'Reset site mode to .env', variant: 'danger', size: 'small', confirm: 'Remove the saved site mode and follow APP_SITE_MODE in .env?', icon: 'action-remove'}) }}
+				{{ ui('action.button', {label: 'Reset site mode to .env', variant: 'danger', size: 'small', confirm: 'Remove the saved site mode and follow APP_SITE_MODE in .env?', icon: 'action-reset'}) }}
 			</form>
 			{% endif %}
 
@@ -58,7 +58,7 @@
 {% block control %}<textarea class="cl-input" id="allowed-emails" name="allowed_emails" rows="6" {{ ui_field_attrs(props) }}>{{ sign_in.emails }}</textarea>{% endblock %}
 {% endembed %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save who can sign in', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save who can sign in', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% endembed %}
 			</form>
 {% endblock %}
@@ -86,7 +86,7 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-				{{ ui('action.button', {label: 'Save platform identity', variant: 'primary', size: 'normal', type: 'submit'}) }}
+				{{ ui('action.button', {label: 'Save platform identity', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -96,7 +96,7 @@
 		{% if platform_name_source=='database' %}
 			<form action="/admin/settings/platform-name/reset" method="post" class="cl-mt-2">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('action.button', {label: 'Use APP_NAME from .env', variant: 'quiet', size: 'small', type: 'submit'}) }}
+				{{ ui('action.button', {label: 'Use APP_NAME from .env', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-reset'}) }}
 			</form>
 		{% endif %}
 
@@ -149,7 +149,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'SMTP password', full_width: true, for: 'field-settings-8-' ~ (company.id|default('')) ~ '-' ~ (loop.index|default(0))})} %}
 {% block control %}
 
-				<div class="cl-password-control"><input type="password" name="smtp_password" value="" autocomplete="new-password" id="field-settings-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ ui('action.button', {label: 'Show', type: 'button', variant: 'quiet', id: 'smtp-password-toggle', disabled: true, hidden: true}) }}</div>
+				<div class="cl-password-control"><input type="password" name="smtp_password" value="" autocomplete="new-password" id="field-settings-8-{{ company.id|default('') }}-{{ loop.index|default(0) }}" {{ ui_field_attrs(props) }}>{{ ui('action.button', {label: 'Show', type: 'button', variant: 'quiet', id: 'smtp-password-toggle', disabled: true, hidden: true, icon: 'action-view'}) }}</div>
 
 {% endblock %}
 {% block help_content %}
@@ -191,7 +191,7 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-				{{ ui('action.button', {label: 'Save SMTP settings', variant: 'primary', size: 'normal', type: 'submit'}) }}
+				{{ ui('action.button', {label: 'Save SMTP settings', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -201,12 +201,12 @@
 		<div class="cl-row-wrap cl-mt-2">
 			<form action="/admin/mail/test" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('action.button', {label: 'Send test email', variant: 'quiet', size: 'small'}) }}
+				{{ ui('action.button', {label: 'Send test email', variant: 'quiet', size: 'small', icon: 'action-email'}) }}
 			</form>
 			{% if mail_settings.mail_override_active %}
 				<form action="/admin/settings/mail/reset" method="post">
 					<input type="hidden" name="csrf" value="{{ csrf }}">
-					{{ ui('action.button', {label: 'Reset mail settings to .env', variant: 'danger', size: 'small', confirm: 'Discard the database mail override and return to .env mail settings?', icon: 'action-remove'}) }}
+					{{ ui('action.button', {label: 'Reset mail settings to .env', variant: 'danger', size: 'small', confirm: 'Discard the database mail override and return to .env mail settings?', icon: 'action-reset'}) }}
 				</form>
 			{% endif %}
 		</div>
@@ -235,7 +235,7 @@
 				{% endfor %}
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Save Site Owner details', variant: 'primary', size: 'normal', type: 'submit'}) }}
+{{ ui('action.button', {label: 'Save Site Owner details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 {% endblock %}
 {% endembed %}
 
@@ -244,7 +244,7 @@
 			{% if site_owner.overridden %}
 			<form action="/admin/settings/site-owner/reset" method="post" class="cl-mt-2">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
-				{{ ui('action.button', {label: 'Reset Site Owner details to .env', variant: 'danger', size: 'small', confirm: 'Remove every saved Site Owner detail and follow .env?', icon: 'action-remove'}) }}
+				{{ ui('action.button', {label: 'Reset Site Owner details to .env', variant: 'danger', size: 'small', confirm: 'Remove every saved Site Owner detail and follow .env?', icon: 'action-reset'}) }}
 			</form>
 			{% endif %}
 
@@ -263,7 +263,7 @@
 					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: method.label ~ (method.problem ? ' (cannot be ticked: ' ~ method.problem ~ ')' : '')})} %}{% block control %}<input type="checkbox" name="methods[]" value="{{ method.key }}" {{ method.ticked ? 'checked' : '' }} {{ method.problem ? 'disabled' : '' }} data-payment-method="{{ method.key }}">{% endblock %}{% endembed %}
 				{% endfor %}
 				{% if can_manage_settings|default(false) %}
-				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save payment methods', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save payment methods', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 				{% endif %}
 			</form>
 

@@ -1,0 +1,51 @@
+# CattoLMS's PHP image for rootless Podman (deploy/podman/README.md): PHP-FPM and the command line, with the extensions
+# composer.json requires, for the php and scheduler containers of the site's pod.
+#
+# PHP 8.5.12 or later (2026-10-22): 8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution. The base
+# image is pinned to an exact release, so a rebuild never reuses an older cached 8.5 image: raise it for every PHP
+# security release, then run cattolms-podman.sh update.
+ARG PHP_IMAGE=docker.io/library/php:8.5.12-fpm-bookworm
+FROM ${PHP_IMAGE}
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      git unzip ca-certificates tzdata \
+      libonig-dev libpq-dev libxslt1-dev libzip-dev libicu-dev \
+      libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
+ && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
+ && docker-php-ext-install -j"$(nproc)" calendar exif gd gettext intl mbstring pcntl pdo_pgsql pgsql sockets xsl zip \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=docker.io/library/composer:2 /usr/bin/composer /usr/local/bin/composer
+
+# A site's settings, not a development machine's: no errors on the page, every error in the container's log.
+RUN printf '%s\n' \
+    'expose_php=Off' \
+    'memory_limit=256M' \
+    'max_execution_time=120' \
+    'post_max_size=64M' \
+    'upload_max_filesize=64M' \
+    'display_errors=Off' \
+    'display_startup_errors=Off' \
+    'log_errors=On' \
+    'error_log=/proc/self/fd/2' \
+    'opcache.enable=1' \
+    'opcache.validate_timestamps=1' \
+    'opcache.revalidate_freq=2' \
+    > /usr/local/etc/php/conf.d/zz-cattolms.ini
+
+# PHP-FPM runs as the site's own user (the pod keeps its user id), so the pool names no user; the site's environment
+# reaches the workers, and their output goes to the container's log.
+RUN printf '%s\n' \
+    '[www]' \
+    'listen = 127.0.0.1:9000' \
+    'clear_env = no' \
+    'catch_workers_output = yes' \
+    'decorate_workers_output = no' \
+    'pm = dynamic' \
+    'pm.max_children = 12' \
+    'pm.start_servers = 2' \
+    'pm.min_spare_servers = 1' \
+    'pm.max_spare_servers = 4' \
+    > /usr/local/etc/php-fpm.d/zz-cattolms.conf \
+ && sed -i -e 's/^user = .*/; user: the pod keeps the site user/' -e 's/^group = .*/; group: the pod keeps the site user/' /usr/local/etc/php-fpm.d/www.conf

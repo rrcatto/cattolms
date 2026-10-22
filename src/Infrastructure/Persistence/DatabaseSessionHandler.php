@@ -11,6 +11,11 @@ Description:
 Provides PostgreSQL persistence infrastructure for database session handler within Catto Learning.
 
 Changelog:
+2026/10/23 SAST
+- A request that changed nothing in the session only marks it active (SessionUpdateTimestampHandlerInterface, with
+  PHP's session.lazy_write): it no longer writes its copy back over what a request beside it had just saved. The page
+  script's palette request, finishing after a form sent a moment later, wiped the form's message ("Promo code ...
+  applied") from the session, found by the promotions browser check.
 2026/09/08 19:52 SAST
 - Reads and writes the session row through the Database interface rather than F3's DB\SQL.
 2026/08/12 23:56 SAST
@@ -29,8 +34,9 @@ namespace CattoLearning\Infrastructure\Persistence;
 
 use CattoLearning\Support\ClientFingerprint;
 use SessionHandlerInterface;
+use SessionUpdateTimestampHandlerInterface;
 
-final class DatabaseSessionHandler implements SessionHandlerInterface
+final class DatabaseSessionHandler implements SessionHandlerInterface, SessionUpdateTimestampHandlerInterface
 {
     public function __construct(private readonly Database $db, private readonly int $ttl)
     {
@@ -66,6 +72,28 @@ final class DatabaseSessionHandler implements SessionHandlerInterface
                 'id' => $id, 'data' => $data, 'ip_hash' => ClientFingerprint::ipHash(),
                 'user_agent' => ClientFingerprint::userAgent(), 'last_activity' => gmdate('Y-m-d H:i:sP')
             ]
+        );
+        return true;
+    }
+
+    /** Whether the browser's session id still has a live row (asked only with session.use_strict_mode). */
+    public function validateId(string $id): bool
+    {
+        return $this->db->fetchAllAssociative(
+            'SELECT 1 FROM web_sessions WHERE id=:id AND last_activity>=:cutoff LIMIT 1',
+            ['id' => $id, 'cutoff' => gmdate('Y-m-d H:i:sP', time() - $this->ttl)]
+        ) !== [];
+    }
+
+    /**
+     * A request that changed nothing in the session marks it active and leaves its data alone. Writing the copy it read
+     * back would undo what another request of the same visitor saved in the meantime.
+     */
+    public function updateTimestamp(string $id, string $data): bool
+    {
+        $this->db->executeStatement(
+            'UPDATE web_sessions SET last_activity=:last_activity WHERE id=:id',
+            ['id' => $id, 'last_activity' => gmdate('Y-m-d H:i:sP')]
         );
         return true;
     }

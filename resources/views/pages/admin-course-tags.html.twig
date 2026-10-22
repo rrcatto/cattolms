@@ -38,11 +38,11 @@
 											{{ tag.course_count }}
 										</td>
 										<td class="cell-actions">
-											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+											{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-													{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: '/admin/courses/tags/' ~ (tag.id), aria_label: 'Edit ' ~ tag.name}) }}
-													{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/courses/tag/' ~ (tag.slug)}) }}
+													{{ ui('action.link', {label: 'Edit', variant: 'primary', size: 'small', href: '/admin/courses/tags/' ~ (tag.id), aria_label: 'Edit ' ~ tag.name, icon: 'action-edit'}) }}
+													{{ ui('action.link', {label: 'View', variant: 'secondary', size: 'small', href: '/courses/tag/' ~ (tag.slug), icon: 'action-view'}) }}
 													<form action="/admin/courses/tags/{{ tag.id }}/delete" method="post">
 														<input type="hidden" name="csrf" value="{{ csrf }}">
 														{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this tag? It is detached from every course carrying it.', icon: 'action-remove'}) }}
@@ -83,7 +83,7 @@
 {% endblock %}
 {% block modal_actions %}
 
-					{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true}) }}
+					{{ ui('action.button', {label: 'Cancel', variant: 'quiet', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
 					{{ ui('action.button', {label: 'Create tag', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
 
 {% endblock %}

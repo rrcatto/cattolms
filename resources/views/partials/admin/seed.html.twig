@@ -25,7 +25,7 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-				{{ ui('action.button', {label: 'Generate', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Generate this data now? A large volume can take a while.'}) }}
+				{{ ui('action.button', {label: 'Generate', variant: 'primary', size: 'normal', type: 'submit', confirm: 'Generate this data now? A large volume can take a while.', icon: 'action-generate'}) }}
 				<div class="help">
 					Generation runs in one transaction: if it fails, nothing is left behind. No email is sent, whatever the volume.
 				</div>

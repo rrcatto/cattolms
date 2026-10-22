@@ -16,8 +16,8 @@
 		{% if event.actor_person %}<p data-trail-actor><strong>By:</strong> {{ ui('data.person', event.actor_person) }}</p>{% endif %}
 		{{ ui('data.key-value-list', {items: [{label: 'When', value: event.when}]|merge(event.actor_person ? [] : [{label: 'By', value: event.actor_label}])|merge([{label: 'Order', value: event.order_label ?: '—'}])}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{% if event.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href}) }}{{ ui('action.link', {label: 'The order’s money in the ledger', variant: 'secondary', size: 'small', href: event.order_ledger_href}) }}{% endif %}
-			{% if event.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: event.account_href}) }}{% endif %}
+			{% if event.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href, icon: 'action-open'}) }}{{ ui('action.link', {label: 'The order’s money in the ledger', variant: 'secondary', size: 'small', href: event.order_ledger_href, icon: 'action-open'}) }}{% endif %}
+			{% if event.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: event.account_href, icon: 'action-open'}) }}{% endif %}
 		{% endblock %}{% endembed %}
 		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Technical details', summary: 'The event’s code and everything recorded with it'})} %}{% block body %}
 			{{ ui('data.key-value-list', {items: [{label: 'Event code', value: event.event}]|merge(event.lines)}) }}

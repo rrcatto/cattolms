@@ -10,7 +10,7 @@
 {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Outer level of the course'})} %}{% block control %}<input type="radio" name="parent_node_id" value="" required>{% endblock %}{% endembed %}
 {% for row in choices %}<div class="cl-course-move-destination" data-depth="{{ row.depth }}">{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: (row.node_type == 'section' ? 'Section · ' ~ row.section_title : 'Item · ' ~ (row.display_title_override ?: row.item_title)), help: row.child_count ? row.child_count ~ ' inside' : ''})} %}{% block control %}<input type="radio" name="parent_node_id" value="{{ row.id }}" required>{% endblock %}{% endembed %}</div>{% endfor %}
 </fieldset>
-{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Move here', variant: 'primary', type: 'submit'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: content_href}) }}{% endblock %}{% endembed %}
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Move here', variant: 'primary', type: 'submit', icon: 'action-move-into'}) }}{% endblock %}{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', href: content_href, icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
 </form>{% endblock %}{% endembed %}
 </section>
 {% endblock %}

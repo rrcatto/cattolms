@@ -18,6 +18,13 @@ that belong with it.
 
 Changelog:
 2026/10/21 SAST
+- The dashboard's money (owner, 2026-10-21: periods "today, past week, past month, 3,6,9,12 months, YTD, 2 years, All time
+  (in a drop down selector)", and the owner's choices of columns with method bars, Dates kept, a comparison with the
+  period before and three labelled groups of cards): PERIODS is the owner's list and Dates; the chart is one column per
+  hour, day, week, month or year of the whole period, empty slices included (only the slices with money came back, so a
+  month showed two days), each opening the Money Ledger for its slice; money in by method gives each method's share and
+  payments; the cards are Money in and out, Wallet credit and Orders, each with an icon, the amounts small cards, and
+  each money card compared with the period before.
 - Every person a money record names is a person (owner, 2026-10-21: "Every time you mention a person with an account in
   the system, I want their name linked to their account" and with "their unique Account Reference number"): rows carry
   account_person and actor_person, and each sentence has a parts form (ledgerSentenceParts, paymentEventSentenceParts,
@@ -50,7 +57,14 @@ final class MoneyRecords
     /** Each step a payment can reach, in words, for the Payment Events filter. */
     public const PAYMENT_STATE_WORDS = ['created' => 'Started', 'pending' => 'Waiting', 'paid' => 'Went through', 'failed' => 'Failed', 'cancelled' => 'Cancelled',
         'disputed' => 'Disputed', 'reversed' => 'Reversed', 'partially_refunded' => 'Partly refunded', 'refunded' => 'Refunded'];
-    public const PERIODS = ['today' => 'Today', '7d' => 'Last 7 days', '30d' => 'Last 30 days', 'month' => 'This month', 'last_month' => 'Last month', 'year' => 'This year', 'custom' => 'Dates'];
+    /** The dashboard's periods (owner, 2026-10-21), and Dates for any range, such as a VAT period. */
+    public const PERIODS = ['today' => 'Today', 'week' => 'Past week', 'month' => 'Past month', '3m' => 'Past 3 months', '6m' => 'Past 6 months',
+        '9m' => 'Past 9 months', '12m' => 'Past 12 months', 'ytd' => 'Year to date', '2y' => 'Past 2 years', 'all' => 'All time', 'custom' => 'Dates'];
+    /** How many months back each period reaches. */
+    private const PERIOD_MONTHS = ['month' => 1, '3m' => 3, '6m' => 6, '9m' => 9, '12m' => 12, '2y' => 24];
+    /** The period before, as a money card's comparison names it ("Up 23% on the month before"). Today and All time have none. */
+    private const PERIOD_BEFORE = ['week' => 'the week before', 'month' => 'the month before', '3m' => 'the 3 months before', '6m' => 'the 6 months before',
+        '9m' => 'the 9 months before', '12m' => 'the 12 months before', 'ytd' => 'the same days last year', '2y' => 'the 2 years before'];
 
     public function __construct(private readonly MoneyRecordsRepository $records, private readonly ClockInterface $clock) {}
 
@@ -680,42 +694,59 @@ final class MoneyRecords
     }
 
     /**
-     * The period a dashboard shows: a preset or two dates.
+     * The period a dashboard shows: a preset or two dates, the slice its chart is drawn in, and the period before it.
      *
      * @param array<string,mixed> $query
-     * @return array{key:string,label:string,from:string,to:string,from_at:string,to_before:string,unit:string}
+     * @return array{key:string,label:string,from:string,to:string,days:int,previous:?array{label:string,from_at:string,to_before:string},from_at:string,to_before:string,unit:string}
      */
     public function period(array $query): array
     {
         $key = self::choice($query['money_period'] ?? 'month', array_keys(self::PERIODS)) ?: 'month';
         $zone = new DateTimeZone(date_default_timezone_get());
         $today = $this->clock->now()->setTimezone($zone)->setTime(0, 0);
+        $first = $this->records->firstLedgerDay($zone->getName());
         [$from, $to] = match ($key) {
             'today' => [$today, $today],
-            '7d' => [$today->modify('-6 days'), $today],
-            '30d' => [$today->modify('-29 days'), $today],
-            'last_month' => [$today->modify('first day of last month'), $today->modify('last day of last month')],
-            'year' => [$today->modify('first day of january this year'), $today],
+            'week' => [$today->modify('-6 days'), $today],
+            'ytd' => [$today->modify('first day of january this year'), $today],
+            'all' => [$first === null ? $today : min($today, new DateTimeImmutable($first, $zone)), $today],
             'custom' => [null, null],
-            default => [$today->modify('first day of this month'), $today],
+            default => [self::monthsBefore($today, self::PERIOD_MONTHS[$key]), $today],
         };
         if ($key === 'custom') {
             $dates = $this->commonFilters(['from' => $query['money_from'] ?? '', 'to' => $query['money_to'] ?? '']);
-            $from = $dates['from'] === '' ? $today->modify('first day of this month') : new DateTimeImmutable($dates['from'], $zone);
+            $from = $dates['from'] === '' ? self::monthsBefore($today, 1) : new DateTimeImmutable($dates['from'], $zone);
             $to = $dates['to'] === '' ? $today : new DateTimeImmutable($dates['to'], $zone);
             if ($to < $from) [$from, $to] = [$to, $from];
         }
         $days = (int) $from->diff($to)->days + 1;
+        // The period before, for each money card's comparison: as long as this one and just before it, or for Year to
+        // date the same days last year. Today and All time have none.
+        $previous = null;
+        if (!in_array($key, ['today', 'all'], true)) {
+            [$beforeFrom, $beforeTo] = $key === 'ytd' ? [$from->modify('-1 year'), $to->modify('-1 year')] : [$from->modify('-' . $days . ' days'), $from->modify('-1 day')];
+            $previous = ['label' => self::PERIOD_BEFORE[$key] ?? ($days === 1 ? 'the day before' : 'the ' . $days . ' days before')] + $this->bounds($beforeFrom->format('Y-m-d'), $beforeTo->format('Y-m-d'));
+        }
         $fromText = $from->format('Y-m-d');
         $toText = $to->format('Y-m-d');
         return ['key' => $key, 'label' => $key === 'custom' ? $from->format('j M Y') . ' to ' . $to->format('j M Y') : self::PERIODS[$key],
-            'from' => $fromText, 'to' => $toText, 'unit' => $days <= 31 ? 'day' : ($days <= 186 ? 'week' : 'month')] + $this->bounds($fromText, $toText);
+            'from' => $fromText, 'to' => $toText, 'days' => $days, 'previous' => $previous,
+            // The chart's slices fit the period: a day by hour, up to a month by day, up to six months by week, then by month,
+            // and by year beyond five years.
+            'unit' => $days === 1 ? 'hour' : ($days <= 31 ? 'day' : ($days <= 186 ? 'week' : ($days <= 1830 ? 'month' : 'year')))] + $this->bounds($fromText, $toText);
+    }
+
+    /** The day after the same day some months back (21 October, one month: 22 September), the end of a short month kept. */
+    private static function monthsBefore(DateTimeImmutable $day, int $months): DateTimeImmutable
+    {
+        $start = $day->modify('first day of this month')->modify('-' . $months . ' months');
+        return $start->setDate((int) $start->format('Y'), (int) $start->format('n'), min((int) $day->format('j'), (int) $start->format('t')))->modify('+1 day');
     }
 
     /**
-     * The dashboard's money: what came in and went out in the period, what the wallets hold, the
-     * orders placed, and a chart of money in by day, week or month. Every figure opens the list it
-     * adds up, for the same period.
+     * The dashboard's money for a period: what came in and went out, wallet credit and the orders placed, as three groups
+     * of figures (owner, 2026-10-21), each money figure compared with the period before; money in as one column per slice
+     * of the period; and money in by method. Every figure, column and method opens the list it adds up, for its dates.
      *
      * @param array<string,mixed> $query
      * @return array<string,mixed>
@@ -726,46 +757,140 @@ final class MoneyRecords
         $range = ['from' => $p['from'], 'to' => $p['to']];
         $ledger = static fn(array $extra = []): string => '/admin/commerce/ledger?' . http_build_query($range + $extra);
         $orders = static fn(array $extra = []): string => '/admin/commerce/orders?' . http_build_query($range + $extra);
-        $totals = $this->records->ledgerTotals(['from_at' => $p['from_at'], 'to_before' => $p['to_before']]);
-        $kinds = [];
-        $methods = [];
-        foreach ($this->records->ledgerByKind($p['from_at'], $p['to_before']) as $row) {
-            $kinds[$row['kind']] = ($kinds[$row['kind']] ?? ['entries' => 0, 'total' => 0]);
-            $kinds[$row['kind']]['entries'] += $row['entries'];
-            $kinds[$row['kind']]['total'] += $row['total'];
-            if ($row['kind'] === 'payment_received') $methods[$row['method']] = ($methods[$row['method']] ?? 0) + $row['total'];
-        }
-        $kind = static fn(string $k): int => (int) ($kinds[$k]['total'] ?? 0);
-        $count = static fn(string $k): int => (int) ($kinds[$k]['entries'] ?? 0);
+        $now = $this->moneyMeasures($p['from_at'], $p['to_before']);
+        $before = $p['previous'] === null ? null : $this->moneyMeasures($p['previous']['from_at'], $p['previous']['to_before']);
+        // "Up 23% on the month before"; nothing to say when the period before had none of it either.
+        $compare = static function (string $measure, string $note) use ($now, $before, $p): string {
+            if ($before === null) return $note;
+            [$is, $was] = [$now[$measure], $before[$measure]];
+            $change = match (true) {
+                $was > 0 => (int) round(100 * ($is - $was) / $was),
+                $was === 0 && $is > 0 => null,
+                default => false,
+            };
+            $words = match (true) {
+                $change === false => '',
+                $change === null => 'None in ' . $p['previous']['label'],
+                $change === 0 => 'The same as ' . $p['previous']['label'],
+                default => ($change > 0 ? 'Up ' : 'Down ') . abs($change) . '% on ' . $p['previous']['label'],
+            };
+            return $words === '' ? $note : $note . ' · ' . $words;
+        };
+        $amount = static fn(string $label, string $measure, string $note, string $href, string $icon): array =>
+            ['label' => $label, 'value' => ($now[$measure] < 0 ? '−' : '') . self::money(abs($now[$measure])), 'note' => $compare($measure, $note), 'href' => $href, 'icon' => $icon, 'size' => 'small'];
         $states = [];
         foreach ($this->records->ordersByState($p['from_at'], $p['to_before']) as $row) $states[$row['state']] = $row;
-        $placed = array_sum(array_column($states, 'orders'));
         $state = static fn(string ...$keys): int => array_sum(array_map(static fn(string $k): int => (int) ($states[$k]['orders'] ?? 0), $keys));
-        $net = $totals['money_in'] - $totals['money_out'];
-        $figures = [
-            ['label' => 'Money received', 'value' => self::money($kind('payment_received')), 'note' => $count('payment_received') . ' payments', 'href' => $ledger(['kind' => 'payment_received'])],
-            ['label' => 'Money paid out', 'value' => self::money($totals['money_out']), 'note' => 'Refunds and payment fees', 'href' => $ledger(['money' => 'out'])],
-            ['label' => 'Net money', 'value' => ($net < 0 ? '−' : '') . self::money(abs($net)), 'note' => 'Received less paid out', 'href' => $ledger()],
-            ['label' => 'Refunds paid out', 'value' => self::money($kind('refund_paid')), 'note' => $count('refund_paid') . ' payouts', 'href' => $ledger(['kind' => 'refund_paid'])],
-            ['label' => 'Payment fees', 'value' => self::money($kind('processor_fee') + $kind('processor_refund_fee')), 'note' => 'Stitch transaction and refund fees', 'href' => $ledger(['kind' => 'processor_fee'])],
-            ['label' => 'Wallet credit added', 'value' => self::money($totals['wallet_in']), 'note' => 'Refunds, overpayments and returns', 'href' => $ledger(['wallet' => 'in'])],
-            ['label' => 'Paid from wallets', 'value' => self::money($kind('wallet_payment')), 'note' => $count('wallet_payment') . ' payments', 'href' => $ledger(['kind' => 'wallet_payment'])],
-            ['label' => 'Wallet credit expired', 'value' => self::money($kind('credit_expired')), 'note' => $count('credit_expired') . ' amounts', 'href' => $ledger(['kind' => 'credit_expired'])],
-            ['label' => 'Wallet credit held now', 'value' => self::money($this->records->walletCreditOutstanding()), 'note' => 'Not yet spent or expired', 'href' => '/admin/wallets'],
-            ['label' => 'Orders placed', 'value' => (string) $placed, 'note' => self::money(array_sum(array_column($states, 'total'))) . ' in total', 'href' => $orders()],
-            ['label' => 'Awaiting payment', 'value' => (string) $state('awaiting_payment', 'placed'), 'note' => 'Placed in the period, not yet paid', 'href' => $orders(['state' => 'awaiting_payment'])],
-            ['label' => 'Fulfilled', 'value' => (string) $state('paid', 'fulfilled'), 'note' => 'Paid in full', 'href' => $orders(['state' => 'fulfilled'])],
-            ['label' => 'Cancelled', 'value' => (string) $state('cancelled'), 'note' => 'Not paid in time', 'href' => $orders(['state' => 'cancelled'])],
-            ['label' => 'Refunded', 'value' => (string) $state('refunded', 'partially_refunded'), 'note' => 'In full or in part', 'href' => $orders(['state' => 'refunded'])],
+        $count = static fn(string $label, int $value, string $note, string $href, string $icon): array => ['label' => $label, 'value' => (string) $value, 'note' => $note, 'href' => $href, 'icon' => $icon];
+        $groups = [
+            ['label' => 'Money in and out', 'columns' => 5, 'figures' => [
+                $amount('Money received', 'received', $now['received_count'] . ' payments', $ledger(['kind' => 'payment_received']), 'figure-money-in'),
+                $amount('Money paid out', 'out', 'Refunds and payment fees', $ledger(['money' => 'out']), 'figure-money-out'),
+                $amount('Net money', 'net', 'Received less paid out', $ledger(), 'figure-net'),
+                $amount('Refunds paid out', 'refunds', $now['refunds_count'] . ' payouts', $ledger(['kind' => 'refund_paid']), 'figure-refunds'),
+                $amount('Payment fees', 'fees', 'Stitch transaction and refund fees', $ledger(['kind' => 'processor_fee']), 'figure-fees'),
+            ]],
+            ['label' => 'Wallet credit', 'columns' => 4, 'figures' => [
+                $amount('Wallet credit added', 'wallet_in', 'Refunds, overpayments and returns', $ledger(['wallet' => 'in']), 'figure-wallet-in'),
+                $amount('Paid from wallets', 'wallet_paid', $now['wallet_paid_count'] . ' payments', $ledger(['kind' => 'wallet_payment']), 'figure-wallet-paid'),
+                $amount('Wallet credit expired', 'expired', $now['expired_count'] . ' amounts', $ledger(['kind' => 'credit_expired']), 'figure-wallet-expired'),
+                ['label' => 'Wallet credit held now', 'value' => self::money($this->records->walletCreditOutstanding()), 'note' => 'Not yet spent or expired, today', 'href' => '/admin/wallets', 'icon' => 'figure-wallet-held', 'size' => 'small'],
+            ]],
+            ['label' => 'Orders', 'columns' => 5, 'figures' => [
+                $count('Orders placed', array_sum(array_column($states, 'orders')), self::money(array_sum(array_column($states, 'total'))) . ' in total', $orders(), 'figure-orders'),
+                $count('Awaiting payment', $state('awaiting_payment', 'placed'), 'Placed in the period, not yet paid', $orders(['state' => 'awaiting_payment']), 'figure-awaiting'),
+                $count('Fulfilled', $state('paid', 'fulfilled'), 'Paid in full', $orders(['state' => 'fulfilled']), 'figure-fulfilled'),
+                $count('Cancelled', $state('cancelled'), 'Not paid in time', $orders(['state' => 'cancelled']), 'figure-cancelled'),
+                $count('Refunded', $state('refunded', 'partially_refunded'), 'In full or in part', $orders(['state' => 'refunded']), 'figure-refunded'),
+            ]],
         ];
-        $series = $this->records->moneySeries($p['from_at'], $p['to_before'], $p['unit'], date_default_timezone_get());
-        $largest = max([1, ...array_column($series, 'money_in')]);
-        $chart = array_map(static fn(array $r): array => ['label' => (new DateTimeImmutable($r['bucket']))->format($p['unit'] === 'month' ? 'M Y' : 'j M'),
-            'share' => (int) round(100 * $r['money_in'] / $largest), 'total' => self::money($r['money_in'])], $series);
-        $largestMethod = max([1, ...array_values($methods)]);
-        $byMethod = [];
-        foreach ($methods as $method => $total) $byMethod[] = ['label' => self::METHODS[$method] ?? $method, 'share' => (int) round(100 * $total / $largestMethod), 'total' => self::money($total)];
-        return ['period' => $p, 'periods' => self::PERIODS, 'figures' => $figures, 'chart' => $chart, 'chart_unit' => $p['unit'], 'by_method' => $byMethod,
+        $methods = [];
+        $largestMethod = max([1, ...array_column($now['methods'], 'total')]);
+        foreach ($now['methods'] as $method => $row) {
+            $methods[] = ['label' => self::METHODS[$method] ?? $method, 'share' => (int) round(100 * $row['total'] / $largestMethod),
+                'total' => self::money($row['total']), 'note' => (int) round(100 * $row['total'] / max(1, $now['received'])) . '% · ' . $row['entries'] . ($row['entries'] === 1 ? ' payment' : ' payments'),
+                'href' => $ledger(['kind' => 'payment_received', 'method' => $method])];
+        }
+        return ['period' => $p, 'periods' => self::PERIODS, 'groups' => $groups, 'columns' => $this->moneyColumns($p), 'chart_unit' => $p['unit'], 'by_method' => $methods,
             'ledger_href' => $ledger()];
+    }
+
+    /**
+     * What the money cards add up for one stretch of time, in minor units, and money received by method.
+     *
+     * @return array<string,mixed>
+     */
+    private function moneyMeasures(string $fromAt, string $toBefore): array
+    {
+        $totals = $this->records->ledgerTotals(['from_at' => $fromAt, 'to_before' => $toBefore]);
+        $kinds = [];
+        $methods = [];
+        foreach ($this->records->ledgerByKind($fromAt, $toBefore) as $row) {
+            $kinds[$row['kind']] ??= ['entries' => 0, 'total' => 0];
+            $kinds[$row['kind']]['entries'] += $row['entries'];
+            $kinds[$row['kind']]['total'] += $row['total'];
+            if ($row['kind'] === 'payment_received') {
+                $methods[$row['method']] ??= ['entries' => 0, 'total' => 0];
+                $methods[$row['method']]['entries'] += $row['entries'];
+                $methods[$row['method']]['total'] += $row['total'];
+            }
+        }
+        arsort($methods);
+        $kind = static fn(string $k): int => (int) ($kinds[$k]['total'] ?? 0);
+        $entries = static fn(string $k): int => (int) ($kinds[$k]['entries'] ?? 0);
+        return ['received' => $kind('payment_received'), 'received_count' => $entries('payment_received'), 'out' => $totals['money_out'],
+            'net' => $totals['money_in'] - $totals['money_out'], 'refunds' => $kind('refund_paid'), 'refunds_count' => $entries('refund_paid'),
+            'fees' => $kind('processor_fee') + $kind('processor_refund_fee'), 'wallet_in' => $totals['wallet_in'], 'wallet_paid' => $kind('wallet_payment'),
+            'wallet_paid_count' => $entries('wallet_payment'), 'expired' => $kind('credit_expired'), 'expired_count' => $entries('credit_expired'), 'methods' => $methods];
+    }
+
+    /**
+     * Money in as one column per slice of the period, the empty slices included, each opening the Money Ledger for its own
+     * dates; about six are labelled under the chart. Today stops at the current hour.
+     *
+     * @param array<string,mixed> $p the period
+     * @return array{columns:list<array<string,mixed>>,top:string}
+     */
+    private function moneyColumns(array $p): array
+    {
+        $zone = new DateTimeZone(date_default_timezone_get());
+        $unit = (string) $p['unit'];
+        $sums = [];
+        foreach ($this->records->moneySeries($p['from_at'], $p['to_before'], $unit, $zone->getName()) as $row) $sums[$row['bucket']] = $row['money_in'];
+        $from = new DateTimeImmutable($p['from'], $zone);
+        $to = new DateTimeImmutable($p['to'], $zone);
+        $start = match ($unit) {
+            'week' => $from->modify('monday this week'),
+            'month' => $from->modify('first day of this month'),
+            'year' => $from->setDate((int) $from->format('Y'), 1, 1),
+            default => $from,
+        };
+        $step = ['hour' => '+1 hour', 'day' => '+1 day', 'week' => '+7 days', 'month' => '+1 month', 'year' => '+1 year'][$unit];
+        $last = $unit === 'hour' && $p['key'] === 'today' ? $this->clock->now()->setTimezone($zone) : $to->modify('+1 day')->modify('-1 second');
+        $slices = [];
+        for ($at = $start; $at <= $last; $at = $at->modify($step)) {
+            $key = $at->format($unit === 'hour' ? 'Y-m-d H' : 'Y-m-d');
+            $sliceFrom = max($at, $from)->format('Y-m-d');
+            $sliceTo = min($at->modify($step)->modify('-1 day'), $to)->format('Y-m-d');
+            $label = match ($unit) { 'hour' => $at->format('H:00'), 'month' => $at->format('M Y'), 'year' => $at->format('Y'), default => $at->format('j M') };
+            $title = match ($unit) {
+                'hour' => $at->format('H:00') . ' to ' . $at->modify('+1 hour')->format('H:00'),
+                'day' => $at->format('D j M Y'),
+                'week' => 'Week of ' . $at->format('j M Y'),
+                'month' => $at->format('F Y'),
+                default => $at->format('Y'),
+            };
+            $slices[] = ['label' => $label, 'minor' => $sums[$key] ?? 0, 'title' => $title, 'from' => $sliceFrom, 'to' => $unit === 'hour' ? $sliceFrom : $sliceTo];
+        }
+        $peak = max([0, ...array_column($slices, 'minor')]);
+        $largest = max(1, $peak);
+        $every = max(1, (int) ceil(count($slices) / 6));
+        $columns = [];
+        foreach ($slices as $index => $slice) {
+            $columns[] = ['label' => $slice['label'], 'labelled' => $index % $every === 0, 'share' => round(100 * $slice['minor'] / $largest, 1),
+                'title' => $slice['title'] . ': ' . self::money($slice['minor']),
+                'href' => $slice['minor'] > 0 ? '/admin/commerce/ledger?' . http_build_query(['from' => $slice['from'], 'to' => $slice['to'], 'money' => 'in']) : ''];
+        }
+        return ['columns' => $columns, 'top' => self::money($peak)];
     }
 }

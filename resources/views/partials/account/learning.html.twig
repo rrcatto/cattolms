@@ -25,7 +25,7 @@
 		<form class="cl-library-lists" method="get" action="/account/courses" data-choose-submits
 		      hx-get="/account/courses" hx-target="#library-list" hx-select="#library-list" hx-swap="outerHTML" hx-push-url="true">
 			{{ ui('form.picture-choice', {name: 'list', legend: 'Which courses', id: 'library-lists', size: 'small', columns: 4, selected: library_list, items: list_cards}) }}
-			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit'}) }}</noscript>
+			<noscript>{{ ui('action.button', {label: 'Show', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
 		</form>
 		<div id="library-list" data-library-list="{{ library_list }}">
 			{% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'library', pagination: library_pagination, search: library_searchable ? {ds_name: 'library', ds_label: 'Search ' ~ list_label|lower, ds_value: library_search, ds_action: '/account/courses', ds_hidden: {list: library_list}} : []})} %}
@@ -62,10 +62,10 @@
 									{{ course.access_period_label }}
 								</td>
 								<td class="cell-actions">
-									{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+									{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
-										{{ ui('action.link', {label: (course.is_started ? 'Resume' : 'Review and start'), variant: 'primary', size: 'small', href: '/learn/' ~ (course.slug)}) }}
+										{{ ui('action.link', {label: (course.is_started ? 'Resume' : 'Review and start'), variant: 'primary', size: 'small', href: '/learn/' ~ (course.slug), icon: 'action-start'}) }}
 										{% if is_platform_admin %}
 											<form action="/account/courses/enrolments/{{ course.id }}/remove" method="post">
 												<input type="hidden" name="csrf" value="{{ csrf }}">
@@ -108,7 +108,7 @@
 								</td>
 								<td>
 									{% if course.certificate_public_id %}
-										{{ ui('action.link', {label: 'View certificate', variant: 'secondary', size: 'small', href: '/certificates/' ~ (course.certificate_public_id)}) }}
+										{{ ui('action.link', {label: 'View certificate', variant: 'secondary', size: 'small', href: '/certificates/' ~ (course.certificate_public_id), icon: 'action-view'}) }}
 									{% endif %}
 								</td>
 							</tr>
@@ -141,7 +141,7 @@
 									{{ course.level ?: '—' }}
 								</td>
 								<td class="cell-actions">
-									{{ ui('action.link', {label: 'View', variant: 'primary', size: 'small', href: '/courses/' ~ (course.slug)}) }}
+									{{ ui('action.link', {label: 'View', variant: 'primary', size: 'small', href: '/courses/' ~ (course.slug), icon: 'action-view'}) }}
 								</td>
 							</tr>
 						{% endfor %}
@@ -174,7 +174,7 @@
 									{{ ui('feedback.badge', {label: (request.status), tone: request.status=='pending' ? 'warning' : 'info'}) }}
 								</td>
 								<td class="cell-actions">
-									{{ ui('action.link', {label: 'View course', variant: 'secondary', size: 'small', href: '/courses/' ~ (request.slug)}) }}
+									{{ ui('action.link', {label: 'View course', variant: 'secondary', size: 'small', href: '/courses/' ~ (request.slug), icon: 'action-view'}) }}
 								</td>
 							</tr>
 						{% endfor %}

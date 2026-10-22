@@ -36,7 +36,7 @@
 		</p>
 	</div>
 	{% if lk_selected %}
-		{{ ui('action.button', {label: 'Clear selection', variant: 'quiet', size: 'small', type: 'button', lookup_clear: (lk_name)}) }}
+		{{ ui('action.button', {label: 'Clear selection', variant: 'quiet', size: 'small', type: 'button', lookup_clear: (lk_name), icon: 'action-clear'}) }}
 	{% endif %}
 
 {% endblock %}

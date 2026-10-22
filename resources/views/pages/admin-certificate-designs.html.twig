@@ -14,9 +14,9 @@
 	<td>{{ row.course_count == 0 ? 'No courses' : (row.course_count == 1 ? '1 course' : row.course_count ~ ' courses') }}</td>
 	<td>{{ row.updated_at|date('j M Y, H:i') }}{% if row.updated_by %} · {{ ui('data.person', row.updated_by) }}{% endif %}</td>
 	{% if can_manage %}<td class="cell-actions">
-		{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, aria_label: 'Actions for ' ~ row.name})} %}{% block body %}
-			{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/certificates/designs/' ~ row.id}) }}
-			<form action="/admin/certificates/designs/{{ row.id }}/duplicate" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Duplicate', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+		{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, aria_label: 'Actions for ' ~ row.name, icon: 'action-more'})} %}{% block body %}
+			{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: '/admin/certificates/designs/' ~ row.id, icon: 'action-edit'}) }}
+			<form action="/admin/certificates/designs/{{ row.id }}/duplicate" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Duplicate', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-copy'}) }}</form>
 			{{ ui('action.link', {label: 'Delete', variant: 'danger', size: 'small', href: '/admin/certificates/designs/' ~ row.id ~ '/delete', icon: 'action-remove'}) }}
 		{% endblock %}{% endembed %}
 	</td>{% endif %}
@@ -33,7 +33,7 @@
 	{% embed ui_template('form.grid') with {props: ui_props('form.grid', {columns: 2})} %}{% block body %}
 		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'New courses start with', for: 'default-design', help: 'Changes nothing for courses that already have a design.'})} %}{% block control %}<select id="default-design" name="design_id" {{ ui_field_attrs(props) }}>{% for row in designs %}<option value="{{ row.id }}"{% if row.id == default_id %} selected{% endif %}>{{ row.name }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}
-	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'secondary', type: 'submit'}) }}{% endblock %}{% endembed %}
+	{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save', variant: 'secondary', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 </form>
 {% endblock %}{% endembed %}
 {% endif %}

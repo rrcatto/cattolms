@@ -18,14 +18,14 @@
 	{% if cart.promo.typed_code %}
 		<form action="/checkout/promo/remove" method="post">
 			<input type="hidden" name="csrf" value="{{ csrf }}">
-			{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Remove promo code ' ~ cart.promo.typed_code}) }}
+			{{ ui('action.button', {label: 'Remove', variant: 'quiet', size: 'small', type: 'submit', aria_label: 'Remove promo code ' ~ cart.promo.typed_code, icon: 'action-remove'}) }}
 		</form>
 	{% endif %}
 	<form action="/checkout/promo" method="post">
 		<input type="hidden" name="csrf" value="{{ csrf }}">
 		{% embed ui_template('form.compact-action') with {props: ui_props('form.compact-action', {})} %}
 {% block body %}
-<label for="promo-code">{{ cart.promo.code ? 'Use a different code' : 'Enter a promo code' }}</label><input id="promo-code" name="promo_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" required>{{ ui('action.button', {label: 'Apply', type: 'submit'}) }}
+<label for="promo-code">{{ cart.promo.code ? 'Use a different code' : 'Enter a promo code' }}</label><input id="promo-code" name="promo_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" required>{{ ui('action.button', {label: 'Apply', type: 'submit', icon: 'action-done'}) }}
 {% endblock %}
 {% endembed %}
 		{% if cart.promo.automatic %}<p class="help">One promotion applies to an order. A code you apply is used instead of {{ cart.promo.code }} only when it saves you more.</p>

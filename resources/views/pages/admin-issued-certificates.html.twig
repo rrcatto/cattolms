@@ -12,7 +12,7 @@
 		<form action="/admin/certificates" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Search', full_width: true, for: 'certificates-q'})} %}{% block control %}<input id="certificates-q" name="q" value="{{ filters.q }}" maxlength="120" placeholder="Number, learner or course" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Show', full_width: false, for: 'certificates-state'})} %}{% block control %}<select id="certificates-state" name="state" {{ ui_field_attrs(props) }}><option value="all" {{ filters.state == 'all' ? 'selected' : '' }}>All certificates</option><option value="valid" {{ filters.state == 'valid' ? 'selected' : '' }}>In force</option><option value="revoked" {{ filters.state == 'revoked' ? 'selected' : '' }}>Revoked</option></select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/certificates'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/certificates', icon: 'action-clear'}) }}{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}</form>
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
@@ -29,7 +29,7 @@
 						<td class="cell-text">{{ row.course_title }}</td>
 						<td class="small">{{ row.issued_at|date('j M Y') }}</td>
 						<td>{{ ui('feedback.badge', {label: row.revoked_at ? 'Revoked' : 'In force', tone: row.revoked_at ? 'danger' : 'success', size: 'small'}) }}</td>
-						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ row.id, aria_label: 'Open certificate ' ~ row.certificate_number}) }}</td>
+						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: '/admin/certificates/' ~ row.id, aria_label: 'Open certificate ' ~ row.certificate_number, icon: 'action-open'}) }}</td>
 					</tr>
 				{% endfor %}
 			{% endblock %}

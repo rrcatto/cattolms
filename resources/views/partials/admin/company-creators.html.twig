@@ -40,18 +40,18 @@
 										{{ ui('feedback.badge', {label: (company.status_label), tone: company.status=='active' ? 'success' : 'danger'}) }}
 									</td>
 									<td class="cell-actions">
-										{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+										{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
 												{% if can_select_company and company.status=='active' %}
 													<form action="/company/context" method="post">
 														<input type="hidden" name="csrf" value="{{ csrf }}">
 														<input type="hidden" name="company_id" value="{{ company.id }}">
-														{{ ui('action.button', {label: 'Manage', variant: 'primary', size: 'small', type: 'submit'}) }}
+														{{ ui('action.button', {label: 'Manage', variant: 'primary', size: 'small', type: 'submit', icon: 'action-manage'}) }}
 													</form>
 												{% endif %}
 												{% if can_manage_companies %}
-													{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ (company.id)}) }}
+													{{ ui('action.button', {label: 'Edit', variant: 'secondary', size: 'small', type: 'button', modal: 'company-edit-' ~ (company.id), icon: 'action-edit'}) }}
 												{% endif %}
 
 {% endblock %}
@@ -69,7 +69,7 @@
 					{% if company_creators_preview_has_more %}
 						<div class="pagination-row">
 							<span class="pagination-summary">Showing the first {{ preview_page_size }} companies.</span>
-							{{ ui('action.link', {label: 'View all course creators', variant: 'secondary', size: 'small', href: '/admin/companies/creators'}) }}
+							{{ ui('action.link', {label: 'View all course creators', variant: 'secondary', size: 'small', href: '/admin/companies/creators', icon: 'action-view-all'}) }}
 						</div>
 					{% endif %}
 

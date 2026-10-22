@@ -26,10 +26,10 @@
 		{{ ui('data.key-value-list', {items: facts}) }}
 		{% if entry.actor_person %}<p data-ledger-recorder><strong>Recorded by:</strong> {{ ui('data.person', entry.actor_person) }}</p>{% endif %}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{% if entry.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: entry.order_href}) }}{% endif %}
-			{% if entry.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: entry.account_href}) }}{% endif %}
-			{% if entry.payment_events_href %}{{ ui('action.link', {label: 'The payment’s steps', variant: 'secondary', size: 'small', href: entry.payment_events_href}) }}{% endif %}
-			{% if entry.corrects_href %}{{ ui('action.link', {label: 'The line this corrects', variant: 'secondary', size: 'small', href: entry.corrects_href}) }}{% endif %}
+			{% if entry.order_href %}{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: entry.order_href, icon: 'action-open'}) }}{% endif %}
+			{% if entry.account_href %}{{ ui('action.link', {label: 'Open the wallet', variant: 'secondary', size: 'small', href: entry.account_href, icon: 'action-open'}) }}{% endif %}
+			{% if entry.payment_events_href %}{{ ui('action.link', {label: 'The payment’s steps', variant: 'secondary', size: 'small', href: entry.payment_events_href, icon: 'action-open'}) }}{% endif %}
+			{% if entry.corrects_href %}{{ ui('action.link', {label: 'The line this corrects', variant: 'secondary', size: 'small', href: entry.corrects_href, icon: 'action-open'}) }}{% endif %}
 		{% endblock %}{% endembed %}
 		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Technical details', summary: 'The codes the ledger stores'})} %}{% block body %}
 			{{ ui('data.key-value-list', {items: [

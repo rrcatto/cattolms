@@ -37,10 +37,10 @@
 	<div class="dataset-search-actions">
 		<span class="dataset-search-status" aria-live="polite" role="status">Searching…</span>
 		<noscript>
-			{{ ui('action.button', {label: 'Search', variant: 'secondary', size: 'small', type: 'submit'}) }}
+			{{ ui('action.button', {label: 'Search', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-search'}) }}
 		</noscript>
 		{% if ds_value %}
-			{{ ui('action.link', {label: 'Clear', variant: 'quiet', size: 'small', href: (ds_action)}) }}
+			{{ ui('action.link', {label: 'Clear', variant: 'quiet', size: 'small', href: (ds_action), icon: 'action-clear'}) }}
 		{% endif %}
 	</div>
 	<p class="help">

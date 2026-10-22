@@ -183,6 +183,8 @@ final class NavigationContractTest extends TestCase
             $groups['admin-group-catalogue'],
             'The taxonomy and both enrolment queues belong with the catalogue they classify.'
         );
+        // People, then Companies: Find a Person is gone, because the People search finds the same people (owner, 2026-10-21).
+        self::assertSame(['admin-people', 'admin-companies'], array_slice($groups['admin-group-directory'], 0, 2));
     }
 
     /**

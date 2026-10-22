@@ -15,7 +15,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Description (optional)', for: cf_id ~ '-new-description', full_width: true})} %}{% block control %}<textarea class="cl-input" id="{{ props.for }}" data-category-description rows="2" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
 			<p class="cl-category-create-result" aria-live="polite">It will be created as <strong data-category-create-path>the new category</strong>.</p>
 			<p class="cl-category-create-error" role="alert" data-category-error hidden></p>
-			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.button', {label: 'Create category', variant: 'primary', size: 'small', type: 'button', icon: 'action-add', category_create: true}) }}{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'small', type: 'button', category_create_cancel: true, icon: 'action-cancel'}) }}{% endblock %}{% endembed %}
 		</div>
 	{% endif %}
 </div>

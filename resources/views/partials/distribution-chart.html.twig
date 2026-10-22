@@ -1,9 +1,10 @@
+{# A row may open what it adds up (href) and say more under its total (note), as money in by method does (owner, 2026-10-21). #}
 <div class="cl-chart" role="table" aria-label="{{ dc_label }}">
 	{% for dc_row in dc_rows %}
 		<div class="cl-chart-row" role="row">
-			<span class="cl-chart-label" role="rowheader">{{ dc_row.label }}</span>
+			<span class="cl-chart-label" role="rowheader">{% if dc_row.href|default('') %}<a href="{{ dc_row.href }}">{{ dc_row.label }}</a>{% else %}{{ dc_row.label }}{% endif %}</span>
 			<span class="cl-chart-track"><span class="cl-chart-bar" style="width:{{ dc_row.share }}%"></span></span>
-			<span class="cl-chart-value" role="cell">{{ dc_row.total }}</span>
+			<span class="cl-chart-value" role="cell">{{ dc_row.total }}{% if dc_row.note|default('') %}<span class="cl-chart-note">{{ dc_row.note }}</span>{% endif %}</span>
 		</div>
 	{% endfor %}
 </div>

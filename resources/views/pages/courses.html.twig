@@ -2,7 +2,7 @@
 {% extends layout %}
 {% block page_body %}
 	{% set catalogue_hero %}{% include '@platform/partials/artwork/catalogue-hero.html.twig' %}{% endset %}
-	{% include '@platform/partials/page-head.html.twig' with {ph_hero: catalogue_hero, ph_kicker: 'Course catalogue', ph_title: 'Browse by category', ph_lead: 'Choose a category, search, or both.', ph_action_href: '/courses/tags', ph_action_label: 'Browse by tag'} %}
+	{% include '@platform/partials/page-head.html.twig' with {ph_hero: catalogue_hero, ph_kicker: 'Course catalogue', ph_title: 'Browse by category', ph_lead: 'Choose a category, search, or both.', ph_action_href: '/courses/tags', ph_action_label: 'Browse by tag', ph_action_icon: 'action-tags'} %}
 	<section class="cl-page-section">
 		{% if bundle_count|default(0) > 0 %}<p class="cl-catalogue-bundles">Several courses for one price: <a href="/bundles">browse course bundles</a>.</p>{% endif %}
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}

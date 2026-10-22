@@ -155,7 +155,7 @@ final class TableRowContractTest extends TestCase
 
         // Several actions kept in a row become one menu on a phone: Themes and the course price list.
         $themes = (string) file_get_contents(self::root() . '/resources/views/partials/admin/themes.html.twig');
-        self::assertStringContainsString("ui_props('action.row', {narrow_menu: true})", $themes);
+        self::assertStringContainsString("ui_props('action.row', {narrow_menu: true, icon: 'action-more'})", $themes);
         $course = (string) file_get_contents(self::root() . '/resources/views/pages/admin-course-edit.html.twig');
         self::assertSame(2, substr_count($course, "narrow_menu: true"));
     }

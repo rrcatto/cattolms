@@ -42,7 +42,7 @@
                 {% include '@platform/partials/billing-fields.html.twig' with {billing_prefix: 'checkout-billing'} %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Continue to payment', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Back to My Cart</a>
+{{ ui('action.button', {label: 'Continue to payment', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-pay'}) }}<a href="/cart">Back to My Cart</a>
 {% endblock %}
 {% endembed %}
             </form>
@@ -67,7 +67,7 @@
                 <p class="mt-5">Your PDF invoice will also be available in Account → COURSES → My Orders.</p>
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Review my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/checkout/profile">Back to my details</a>
+{{ ui('action.button', {label: 'Review my order', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-next'}) }}<a href="/checkout/profile">Back to my details</a>
 {% endblock %}
 {% endembed %}
             </form>
@@ -97,7 +97,7 @@
                 {% include '@platform/partials/commerce-start-acceptance.html.twig' %}
                 {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.button', {label: 'Place my order', variant: 'primary', size: 'normal', type: 'submit'}) }}<a href="/cart">Edit My Cart</a>
+{{ ui('action.button', {label: 'Place my order', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-buy'}) }}<a href="/cart">Edit My Cart</a>
 {% endblock %}
 {% endembed %}
             </form>

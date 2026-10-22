@@ -1,0 +1,81 @@
+# CattoLMS's pod (deploy/podman/README.md), written by cattolms-podman.sh from this template and started by its Quadlet
+# unit: the web server, PHP-FPM and the scheduler. @SITE@ is the site's home directory, @POD@ the pod's name, @IMAGE@
+# and @WEB_IMAGE@ the images, @TZ@ the site's time zone.
+#
+# The code (@SITE@/cattolms: the releases and the current link) is read-only in every container, so a break-in through
+# PHP cannot change it; PHP writes only storage, themes and public_html. The web server reads public_html only.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: @POD@
+spec:
+  restartPolicy: Always
+  containers:
+    - name: php
+      image: @IMAGE@
+      args: ["php-fpm", "--nodaemonize"]
+      workingDir: @SITE@/cattolms/current
+      env: &site_env
+        - name: HOME
+          value: @SITE@
+        - name: CATTO_LEARNING_ENV_FILE
+          value: @SITE@/.env
+        - name: TZ
+          value: @TZ@
+      volumeMounts: &site_mounts
+        - name: code
+          mountPath: @SITE@/cattolms
+          readOnly: true
+        - name: env
+          mountPath: @SITE@/.env
+          readOnly: true
+        - name: public
+          mountPath: @SITE@/public_html
+        - name: storage
+          mountPath: @SITE@/storage
+        - name: themes
+          mountPath: @SITE@/themes
+    # The commerce job every minute, popularity hourly, the clean-up daily (Maintenance\Scheduler).
+    - name: scheduler
+      image: @IMAGE@
+      args: ["php", "bin/console", "schedule:run", "--watch", "--no-debug"]
+      workingDir: @SITE@/cattolms/current
+      env: *site_env
+      volumeMounts: *site_mounts
+    - name: web
+      image: @WEB_IMAGE@
+      env:
+        - name: TZ
+          value: @TZ@
+      volumeMounts:
+        - name: webconf
+          mountPath: /etc/nginx/conf.d/default.conf
+          readOnly: true
+        - name: public
+          mountPath: @SITE@/public_html
+          readOnly: true
+  volumes:
+    - name: code
+      hostPath:
+        path: @SITE@/cattolms
+        type: Directory
+    - name: env
+      hostPath:
+        path: @SITE@/.env
+        type: File
+    - name: public
+      hostPath:
+        path: @SITE@/public_html
+        type: Directory
+    - name: storage
+      hostPath:
+        path: @SITE@/storage
+        type: Directory
+    - name: themes
+      hostPath:
+        path: @SITE@/themes
+        type: Directory
+    - name: webconf
+      hostPath:
+        path: @SITE@/cattolms/pod/web.conf
+        type: File

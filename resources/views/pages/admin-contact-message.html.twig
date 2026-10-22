@@ -9,7 +9,7 @@
 	{% set ph_kicker = 'Contact Messages' %}{% set ph_title = 'Message ' ~ message.reference %}
 	{# The sender is a person, linked to their account with their account reference when they have one (owner, 2026-10-21): the lead is captured so it can hold them. #}
 	{% set ph_lead %}{{ message.reason_label }}, received {{ message.received }}.<br>{{ ui('data.person', message.sender|merge({full: true, email: message.sender_email})) }}{% endset %}
-	{% set ph_actions %}{{ ui('action.link', {label: 'Reply by email', variant: 'primary', href: 'mailto:' ~ message.sender_email ~ '?subject=' ~ ('Re: your message ' ~ message.reference)|url_encode}) }}{{ ui('action.link', {label: 'All messages', variant: 'secondary', href: '/admin/messages'}) }}{% endset %}
+	{% set ph_actions %}{{ ui('action.link', {label: 'Reply by email', variant: 'primary', href: 'mailto:' ~ message.sender_email ~ '?subject=' ~ ('Re: your message ' ~ message.reference)|url_encode, icon: 'action-reply'}) }}{{ ui('action.link', {label: 'All messages', variant: 'secondary', href: '/admin/messages', icon: 'action-view-all'}) }}{% endset %}
 	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Who wrote, and about what'}) }}
@@ -23,9 +23,9 @@
 			{label: 'Status', value: message.answered ? 'Answered on ' ~ (message.answered_at|date('j M Y H:i')) : 'Not answered yet'},
 		] | merge(message.answered_by ? [{label: 'Answered by', person: message.answered_by}] : []))}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{% if message.user_id %}{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: '/admin/people/' ~ message.user_id}) }}{% endif %}
-			{% if message.order_id %}{{ ui('action.link', {label: 'Open order ' ~ message.order_number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ message.order_id}) }}{% endif %}
-			{% if message.course_slug %}{{ ui('action.link', {label: 'Open the course page', variant: 'secondary', size: 'small', href: '/courses/' ~ message.course_slug}) }}{% endif %}
+			{% if message.user_id %}{{ ui('action.link', {label: 'Open their account', variant: 'secondary', size: 'small', href: '/admin/people/' ~ message.user_id, icon: 'action-open'}) }}{% endif %}
+			{% if message.order_id %}{{ ui('action.link', {label: 'Open order ' ~ message.order_number, variant: 'secondary', size: 'small', href: '/admin/commerce/orders/' ~ message.order_id, icon: 'action-open'}) }}{% endif %}
+			{% if message.course_slug %}{{ ui('action.link', {label: 'Open the course page', variant: 'secondary', size: 'small', href: '/courses/' ~ message.course_slug, icon: 'action-open'}) }}{% endif %}
 		{% endblock %}{% endembed %}
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
@@ -33,7 +33,7 @@
 		<p class="cl-contact-message-text">{{ message.message|nl2br }}</p>
 		{% if can_manage and not message.answered %}
 		<form action="/admin/messages/{{ message.id }}/answered" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as answered', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Mark as answered', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-done'}) }}{% endblock %}{% endembed %}
 		</form>
 		{% endif %}
 	{% endblock %}{% endembed %}</section>

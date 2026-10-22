@@ -2,8 +2,11 @@
 <div class="cl-identity cl-identity-compact" data-nav-item="identity">
 	{% if identity_image|default('') %}<img class="cl-identity-avatar" src="{{ identity_image }}" alt="" width="46" height="46">
 	{% else %}<span class="cl-identity-avatar cl-identity-avatar-empty" aria-hidden="true">{{ compact_name ? compact_name|slice(0, 1)|upper : '?' }}</span>{% endif %}
-	{# The name with the account reference beside it (owner, 2026-10-21), the reference opening the person's profile. #}
-	<span class="cl-identity-meta"><strong class="cl-identity-name">{{ compact_name }}</strong>{% if identity_reference|default('') %} <a class="cl-identity-reference" href="/account/profile" title="Your account reference: open your profile">{{ identity_reference|account_reference }}</a>{% endif %}
+	{# The name, then the account reference under its label (owner, 2026-10-21: "Without a label, people will not know
+	   what it is"), the reference opening the person's profile. Only where this chip stands in for the identity band
+	   (navigation placement): elsewhere the band under the page head shows it, once on the page (owner, 2026-10-21:
+	   "It's only necessary to supply this additional info ONCE on a page"). #}
+	<span class="cl-identity-meta"><strong class="cl-identity-name">{{ compact_name }}</strong>{% if identity_reference|default('') and identity_placement|default('page') == 'navigation' %} <span class="cl-identity-account"><span class="cl-identity-account-label">Account Reference:</span> <a class="cl-identity-reference" href="/account/profile" title="Open your profile">{{ identity_reference|account_reference }}</a></span>{% endif %}
 		{% if identity_email|default('') %}<span class="cl-identity-email">{{ identity_email }}</span>{% endif %}
 	</span>
 	{% if identity_role|default('') %}<span class="cl-identity-roles">{{ identity_role }}</span>{% endif %}

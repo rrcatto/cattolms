@@ -185,6 +185,77 @@ final class WalletLedgerIntegrationTest extends TestCase
         self::assertStringContainsString('href="mailto:' . $placedWith . '"', $page, 'and the email the order was placed with.');
     }
 
+    /**
+     * The dashboard's money follows one period (owner, 2026-10-21: "today, past week, past month, 3,6,9,12 months, YTD,
+     * 2 years, All time", Dates kept, columns over time, a comparison with the period before, three labelled groups).
+     */
+    public function testTheDashboardsMoneyFollowsOnePeriodWithColumnsForTheWholePeriod(): void
+    {
+        $records = new \CattoLearning\Commerce\Application\MoneyRecords(new \CattoLearning\Commerce\Infrastructure\MoneyRecordsRepository($this->db), $this->clock);
+        self::assertSame(['today', 'week', 'month', '3m', '6m', '9m', '12m', 'ytd', '2y', 'all', 'custom'], array_keys(\CattoLearning\Commerce\Application\MoneyRecords::PERIODS));
+        $period = static fn(array $query): array => array_intersect_key($records->period($query), ['from' => 1, 'to' => 1, 'unit' => 1]) + ['before' => $records->period($query)['previous']['label'] ?? null];
+        self::assertSame(['from' => '2026-10-17', 'to' => '2026-10-17', 'unit' => 'hour', 'before' => null], $period(['money_period' => 'today']));
+        self::assertSame(['from' => '2026-10-11', 'to' => '2026-10-17', 'unit' => 'day', 'before' => 'the week before'], $period(['money_period' => 'week']));
+        self::assertSame(['from' => '2026-09-18', 'to' => '2026-10-17', 'unit' => 'day', 'before' => 'the month before'], $period([]), 'Past month is the default.');
+        self::assertSame(['from' => '2026-07-18', 'to' => '2026-10-17', 'unit' => 'week', 'before' => 'the 3 months before'], $period(['money_period' => '3m']));
+        self::assertSame(['from' => '2026-01-18', 'to' => '2026-10-17', 'unit' => 'month', 'before' => 'the 9 months before'], $period(['money_period' => '9m']));
+        self::assertSame(['from' => '2026-01-01', 'to' => '2026-10-17', 'unit' => 'month', 'before' => 'the same days last year'], $period(['money_period' => 'ytd']));
+        self::assertSame(['from' => '2024-10-18', 'to' => '2026-10-17', 'unit' => 'month', 'before' => 'the 2 years before'], $period(['money_period' => '2y']));
+        self::assertSame(['from' => '2026-10-01', 'to' => '2026-10-17', 'unit' => 'day', 'before' => 'the 17 days before'], $period(['money_period' => 'custom', 'money_from' => '2026-10-01', 'money_to' => '2026-10-17']));
+        self::assertNull($records->period(['money_period' => 'all'])['previous'], 'All time has nothing before it.');
+        $before = $records->period(['money_period' => 'month'])['previous'];
+        self::assertSame([(new \DateTimeImmutable('2026-08-19 00:00:00'))->format(DATE_ATOM), (new \DateTimeImmutable('2026-09-18 00:00:00'))->format(DATE_ATOM)], [$before['from_at'], $before['to_before']], 'The 30 days before.');
+
+        $buyer = $this->buyer();
+        $this->orders->changeCart($buyer, $this->course['A']['variant']);
+        $this->buy($buyer);
+        $money = $records->dashboard(['money_period' => 'month']);
+        self::assertCount(30, $money['columns']['columns'], 'Every day of the month, the empty ones included.');
+        $today = array_values(array_filter($money['columns']['columns'], static fn(array $column): bool => str_contains($column['href'], 'from=2026-10-17&to=2026-10-17&money=in')));
+        self::assertCount(1, $today, 'The day of the payment opens the Money Ledger for that day.');
+        self::assertStringStartsWith('Sat 17 Oct 2026: R', $today[0]['title']);
+        self::assertSame(['Money in and out', 'Wallet credit', 'Orders'], array_column($money['groups'], 'label'));
+        self::assertSame([5, 4, 5], array_map(static fn(array $group): int => count($group['figures']), $money['groups']));
+        foreach ($money['groups'] as $group) foreach ($group['figures'] as $figure) {
+            self::assertStringStartsWith('figure-', $figure['icon'], $figure['label'] . ' has its icon.');
+            self::assertSame($group['label'] === 'Orders' ? null : 'small', $figure['size'] ?? null, $figure['label'] . ': amounts are small cards.');
+        }
+        self::assertMatchesRegularExpression('/^\d+ payments · ((Up|Down) \d+% on|None in|The same as) the month before$/', $money['groups'][0]['figures'][0]['note'], 'Money received is compared with the month before.');
+        self::assertNotSame([], $money['by_method']);
+        foreach ($money['by_method'] as $method) {
+            self::assertMatchesRegularExpression('/^\d+% · \d+ payments?$/', $method['note']);
+            self::assertStringContainsString('kind=payment_received&method=', $method['href']);
+        }
+    }
+
+    /**
+     * A course that was bought is never deleted (owner, 2026-10-21: deleting one failed with "update or delete on table
+     * course_enrolments violates foreign key constraint commerce_entitlements_enrolment_id_fkey"): the delete says why and
+     * removes nothing. A course nobody bought deletes, even while it is in somebody's cart.
+     */
+    public function testABoughtCourseIsNeverDeletedAndOneInACartIs(): void
+    {
+        $portability = IntegrationContainer::get()->get(\CattoLearning\Course\CoursePortabilityService::class);
+        $buyer = $this->buyer();
+        $this->orders->changeCart($buyer, $this->course['A']['variant']);
+        $this->buy($buyer);
+        try {
+            $portability->deleteCourse($this->course['A']['id'], $this->owner);
+            self::fail('A bought course was deleted.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringContainsString('Course A has been bought (1 order), and orders, invoices and receipts are kept for good, so it cannot be deleted. Retire it on its Publication tab instead', $refused->getMessage());
+        }
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM courses WHERE id = :id', ['id' => $this->course['A']['id']]), 'Nothing was removed.');
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_order_items WHERE course_id = :id', ['id' => $this->course['A']['id']]), 'Its order line stays.');
+
+        $shopper = $this->buyer();
+        $this->orders->changeCart($shopper, $this->course['B']['variant']);
+        self::assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM commerce_cart_items WHERE variant_id = :v', ['v' => $this->course['B']['variant']]), 'The course is in a cart.');
+        self::assertSame(0, $portability->buyingOrders($this->course['B']['id']));
+        $portability->deleteCourse($this->course['B']['id'], $this->owner);
+        self::assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM courses WHERE id = :id', ['id' => $this->course['B']['id']]), 'A course nobody bought is deleted, its cart line with it.');
+    }
+
     public function testAnEftThatIsTooLittleWaitsAndOneThatIsTooMuchCreditsTheWallet(): void
     {
         $buyer = $this->buyer();

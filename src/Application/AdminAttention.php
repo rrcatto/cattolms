@@ -54,6 +54,19 @@ final class AdminAttention
         'unmatched' => 'Match it or pay it back',
     ];
 
+    /** Each kind's button icon, in keeping with what its button does (owner, 2026-10-21: every button has an icon). */
+    private const ICONS = ['account' => 'action-approve', 'review' => 'action-approve', 'request' => 'action-approve', 'message' => 'action-reply', 'identity' => 'action-open', 'draft' => 'action-open'];
+
+    /** And each money item's. */
+    private const MONEY_ICONS = [
+        'underpaid' => 'action-view',
+        'overpaid' => 'action-done',
+        'cancelled_paid' => 'action-done',
+        'refund_request' => 'action-approve',
+        'refund_to_pay' => 'action-record-money',
+        'unmatched' => 'action-record-money',
+    ];
+
     public function __construct(
         private readonly AdminAttentionRepository $records,
         private readonly UserRepository $users,
@@ -67,7 +80,7 @@ final class AdminAttention
      * account, with their account reference) is the subject of its title ("<person> reviewed …") or, for money, named
      * in front of its summary.
      *
-     * @return list<array{kind:string,badge:string,person:?array{name:string,reference:string,href:string},subject:bool,title:string,summary:string,href:string,action:string,at:string}>
+     * @return list<array{kind:string,badge:string,person:?array{name:string,reference:string,href:string},subject:bool,title:string,summary:string,href:string,action:string,icon:string,at:string}>
      */
     public function items(CurrentUser $admin): array
     {
@@ -108,8 +121,8 @@ final class AdminAttention
             }
         }
         if ($admin->hasPermission('PLATFORM.PAYMENT.VIEW')) {
-            foreach ($this->money->items(100) as $entry) {
-                $items[] = self::item('money', 'Money', $entry['person'], false, (string) $entry['title'], (string) $entry['summary'], (string) $entry['href'],
+            foreach ($this->money->items(PHP_INT_MAX) as $entry) {
+                $items[] = ['icon' => self::MONEY_ICONS[$entry['kind']] ?? 'action-open'] + self::item('money', 'Money', $entry['person'], false, (string) $entry['title'], (string) $entry['summary'], (string) $entry['href'],
                     self::MONEY_ACTIONS[$entry['kind']] ?? 'Open', (string) $entry['at']);
             }
         }
@@ -134,11 +147,11 @@ final class AdminAttention
 
     /**
      * @param ?array{name:string,reference:string,href:string} $person
-     * @return array{kind:string,badge:string,person:?array{name:string,reference:string,href:string},subject:bool,title:string,summary:string,href:string,action:string,at:string}
+     * @return array{kind:string,badge:string,person:?array{name:string,reference:string,href:string},subject:bool,title:string,summary:string,href:string,action:string,icon:string,at:string}
      */
     private static function item(string $kind, string $badge, ?array $person, bool $subject, string $title, string $summary, string $href, string $action, string $at): array
     {
-        return ['kind' => $kind, 'badge' => $badge, 'person' => $person, 'subject' => $subject && $person !== null, 'title' => $title, 'summary' => $summary, 'href' => $href, 'action' => $action, 'at' => $at];
+        return ['kind' => $kind, 'badge' => $badge, 'person' => $person, 'subject' => $subject && $person !== null, 'title' => $title, 'summary' => $summary, 'href' => $href, 'action' => $action, 'icon' => self::ICONS[$kind] ?? 'action-open', 'at' => $at];
     }
 
     /** @return array{name:string,reference:string,href:string} a person with an account, for data.person */

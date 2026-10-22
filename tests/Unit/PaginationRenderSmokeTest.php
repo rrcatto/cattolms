@@ -136,6 +136,22 @@ final class PaginationRenderSmokeTest extends TestCase
         self::assertNull(self::renderError($template, $hive), $template . ' failed to render in standalone mode.');
     }
 
+    /**
+     * A course that was bought is never offered for deletion (owner, 2026-10-21: deleting one failed with a foreign key
+     * error): of the two sample courses, the one with order lines has no Delete in its row menu.
+     */
+    public function testABoughtCourseHasNoDeleteInTheCoursesList(): void
+    {
+        $hive = self::baseHive();
+        $hive['is_preview'] = false;
+        $hive['can_delete_courses'] = true;
+        $hive['courses_pagination'] = self::pagination('courses', '/admin/courses');
+        $html = RenderHarness::render('partials/admin/courses.html.twig', $hive);
+        self::assertStringContainsString('action="/admin/courses/1/delete"', $html, 'A course nobody bought can be deleted.');
+        self::assertStringNotContainsString('action="/admin/courses/2/delete"', $html, 'A bought course cannot.');
+        self::assertStringContainsString('action="/admin/courses/2/reset"', $html, 'It can still be reset.');
+    }
+
     /** Consolidated preview mode: no pagination array is set, so defaults must carry the template. */
     #[DataProvider('listPartials')]
     public function testListPartialRendersInConsolidatedPreviewMode(string $template, string $dataset, string $base): void

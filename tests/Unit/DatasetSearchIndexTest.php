@@ -113,7 +113,7 @@ final class DatasetSearchIndexTest extends TestCase
     public function testTheMigrationDeclaresItsIndexes(): void
     {
         self::assertNotSame([], self::indexes(), 'The index declarations could not be read.');
-        self::assertCount(8, self::indexes(), 'Six name, email and title indexes, and the account references of people and companies (2026-10-17).');
+        self::assertCount(9, self::indexes(), 'Six name, email and title indexes, the account references of people and companies (2026-10-17) and the full name with middle names (2026-10-21).');
     }
 
     /**
@@ -165,6 +165,8 @@ final class DatasetSearchIndexTest extends TestCase
         $indexes = implode(' ', self::indexes());
 
         foreach (self::searchExpressions() as $expression) {
+            // A predicate that names the term itself (a person's other email addresses) is checked by the column it searches.
+            if (preg_match('/(\S+) ILIKE :search_term/', $expression, $searched) === 1) $expression = $searched[1];
             $unaliased = preg_replace('/\b[a-z]{1,3}\./', '', $expression) ?? $expression;
             self::assertStringContainsString(
                 $unaliased,
@@ -212,10 +214,12 @@ final class DatasetSearchIndexTest extends TestCase
 
             foreach ((array) ($constants[$constant] ?? []) as $expression) {
                 preg_match_all('/\b([a-z]{1,3})\.[a-z_]+/', (string) $expression, $used);
+                // A predicate with its own subquery (a person's other email addresses) brings its own alias.
+                preg_match_all('/(?:FROM|JOIN)\s+[a-z_]+\s+([a-z]{1,3})\b/i', (string) $expression, $own);
                 foreach (array_unique($used[1]) as $alias) {
                     self::assertContains(
                         $alias,
-                        $available,
+                        [...$available, ...$own[1]],
                         $method . '() searches on "' . $alias . '." but never joins it; that is a '
                         . 'missing FROM-clause entry the moment somebody uses the search.'
                     );

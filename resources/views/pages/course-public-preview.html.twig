@@ -8,6 +8,6 @@
 {% if course.summary|default('') %}<p class="course-summary">{{ course.summary }}</p>{% endif %}
 </header>
 <div class="course-introduction-copy"><p>These Course Items are available before enrolment.</p></div>
-{% if course.structure %}{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Start public preview →', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ course.public_preview_query|default('')}) }}{% endif %}
+{% if course.structure %}{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Start public preview →', variant: 'primary', size: 'normal', href: '/courses/' ~ course.slug ~ '/preview/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ course.public_preview_query|default(''), icon: 'action-preview'}) }}{% endif %}
 </section>
 {% endblock %}

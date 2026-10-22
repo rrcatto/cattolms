@@ -21,7 +21,7 @@
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The bank’s own reference for this deposit', for: 'eft-bank-reference', required: true, help: 'So the same deposit is never recorded twice.'})} %}{% block control %}<input id="eft-bank-reference" name="bank_reference" value="{{ statement.bank_reference }}" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Where you saw it', for: 'eft-reason', required: true, full_width: true, help: 'Such as: FNB business account statement, 18 October.'})} %}{% block control %}<textarea id="eft-reason" name="reason" maxlength="2000" required {{ ui_field_attrs(props) }}>{{ statement.reason }}</textarea>{% endblock %}{% endembed %}
 			{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Find the account', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Find the account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-search'}) }}{% endblock %}{% endembed %}
 		</form>
 	{% endblock %}{% endembed %}</section>
 	{% if match %}
@@ -32,7 +32,7 @@
 		<h3 class="h5">If it pays none of these orders</h3>
 		<p>Put it on the Unmatched Money list. It stays there, and on your dashboard, until you match it to an order or record that you paid it back. It is not in the Money Ledger until it is matched.</p>
 		<form action="/admin/commerce/eft/unmatched" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{% for name, value in eft_hidden %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Put it on the unmatched money list', variant: 'secondary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Put it on the unmatched money list', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-list-add'}) }}{% endblock %}{% endembed %}
 		</form>
 	{% endblock %}{% endembed %}</section>
 	{% endif %}

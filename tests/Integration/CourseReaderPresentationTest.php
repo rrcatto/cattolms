@@ -169,14 +169,14 @@ final class CourseReaderPresentationTest extends TestCase
     public function testNextAndPreviousStopAtSectionsEverywhereTheLearnerReads(): void
     {
         $assessment = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix);
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['later'] . '/content', $assessment['Next →'] ?? null, "An assessment's Next goes to the following section with a page, skipping a heading-only section.");
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content', $assessment['← Previous'] ?? null);
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['later'] . '/content', $assessment['Next'] ?? null, "An assessment's Next goes to the following section with a page, skipping a heading-only section.");
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content', $assessment['Previous'] ?? null);
         $pack = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['pack'] . '/content');
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix, $pack['Next →'] ?? null);
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['quiz'] . '/assessment/reader-quiz-' . $this->suffix, $pack['Next'] ?? null);
         $lesson = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content');
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content', $lesson['← Previous'] ?? null, "A content page's Previous goes to its section.");
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content', $lesson['Previous'] ?? null, "A content page's Previous goes to its section.");
         $week = $this->paging('/learn/' . $this->slug . '/item/' . $this->nodes['week'] . '/content');
-        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content', $week['Next →'] ?? null, "A section's Next goes to its first row.");
+        self::assertSame('/learn/' . $this->slug . '/item/' . $this->nodes['lesson'] . '/content', $week['Next'] ?? null, "A section's Next goes to its first row.");
     }
 
     public function testASectionAppearsInThePublicPreviewOnlyWhenMarkedPublic(): void
@@ -187,7 +187,7 @@ final class CourseReaderPresentationTest extends TestCase
         self::assertSame(0, $pack->query('//nav[contains(@class, "cl-course-outline")]//*[starts-with(normalize-space(), "Section:")]')->length, 'Sections are not public by default.');
         self::assertSame(404, $this->send($base . $this->nodes['week'] . '/content')->getStatusCode());
         $lesson = $this->paging($base . $this->nodes['lesson'] . '/content');
-        self::assertArrayNotHasKey('← Previous', $lesson);
+        self::assertArrayNotHasKey('Previous', $lesson);
 
         $this->items->updateSection($this->course, $this->nodes['week'], ['title' => 'Week one', 'introduction_html' => '<p>Welcome to week one.</p>', 'show_outline' => '1', 'public_preview' => '1'], $this->owner);
         $section = $this->page($base . $this->nodes['week'] . '/content');
@@ -198,8 +198,8 @@ final class CourseReaderPresentationTest extends TestCase
         $link = $section->query('//nav[contains(@class, "cl-course-outline")]//a[normalize-space()="Section: Week one"]')->item(0);
         self::assertInstanceOf(\DOMElement::class, $link, 'The public outline shows and links the section.');
         self::assertSame($base . $this->nodes['week'] . '/content', $link->getAttribute('href'));
-        self::assertSame($base . $this->nodes['lesson'] . '/content', $this->paging($base . $this->nodes['week'] . '/content')['Next →'] ?? null);
-        self::assertSame($base . $this->nodes['week'] . '/content', $this->paging($base . $this->nodes['lesson'] . '/content')['← Previous'] ?? null, 'Previous and Next include the public section.');
+        self::assertSame($base . $this->nodes['lesson'] . '/content', $this->paging($base . $this->nodes['week'] . '/content')['Next'] ?? null);
+        self::assertSame($base . $this->nodes['week'] . '/content', $this->paging($base . $this->nodes['lesson'] . '/content')['Previous'] ?? null, 'Previous and Next include the public section.');
         self::assertSame(404, $this->send($base . $this->nodes['later'] . '/content')->getStatusCode(), 'A section not marked public stays out.');
         self::assertTrue((bool) $this->db->fetchOne('SELECT public_preview FROM course_sections WHERE node_id=:id', ['id' => $this->nodes['week']]));
     }

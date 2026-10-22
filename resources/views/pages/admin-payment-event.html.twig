@@ -22,9 +22,9 @@
 			{label: 'Bank or Stitch reference', value: event.provider_reference ?: '—'},
 		]}) }}
 		{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}
-			{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href}) }}
-			{{ ui('action.link', {label: 'Every step of this payment', variant: 'secondary', size: 'small', href: event.payment_events_href}) }}
-			{{ ui('action.link', {label: 'The order’s money in the ledger', variant: 'secondary', size: 'small', href: event.order_ledger_href}) }}
+			{{ ui('action.link', {label: 'Open the order', variant: 'secondary', size: 'small', href: event.order_href, icon: 'action-open'}) }}
+			{{ ui('action.link', {label: 'Every step of this payment', variant: 'secondary', size: 'small', href: event.payment_events_href, icon: 'action-open'}) }}
+			{{ ui('action.link', {label: 'The order’s money in the ledger', variant: 'secondary', size: 'small', href: event.order_ledger_href, icon: 'action-open'}) }}
 		{% endblock %}{% endembed %}
 		{% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Technical details', summary: 'The payment’s codes and what the gateway sent'})} %}{% block body %}
 			{{ ui('data.key-value-list', {items: [{label: 'Payment', value: event.payment_id}, {label: 'Gateway', value: event.gateway}, {label: 'Step code', value: event.state}, {label: 'Event key', value: event.event_key}]|merge(event.lines)}) }}

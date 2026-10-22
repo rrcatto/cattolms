@@ -5,7 +5,7 @@
 #}
 {# The commerce job sends every order email and cancels unpaid orders: the dashboard warns when it stops (owner, 2026-10-19). #}
 {% if setup_progress|default(null) and setup_progress.done < setup_progress.total %}
-{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Setup: ' ~ setup_progress.done ~ ' of ' ~ setup_progress.total ~ ' steps done', section_spacing: true})} %}{% block body %}<p>Next: {{ setup_progress.next.title }}. {{ ui('action.link', {label: 'Continue setup', variant: 'primary', size: 'small', href: '/admin/setup#setup-' ~ setup_progress.next.key}) }}</p>{% endblock %}{% endembed %}
+{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'Setup: ' ~ setup_progress.done ~ ' of ' ~ setup_progress.total ~ ' steps done', section_spacing: true})} %}{% block body %}<p>Next: {{ setup_progress.next.title }}. {{ ui('action.link', {label: 'Continue setup', variant: 'primary', size: 'small', icon: 'action-next', href: '/admin/setup#setup-' ~ setup_progress.next.key}) }}</p>{% endblock %}{% endembed %}
 {% endif %}
 {% if scheduler_warning|default(null) %}
 {% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'danger', heading: scheduler_warning, section_spacing: true})} %}{% block body %}<p>Buyers are not being emailed and unpaid orders are not being cancelled until it runs again. Start the scheduler (<span class="mono">php bin/console schedule:run --watch</span>, or cron every minute) and see Settings, Maintenance.</p>{% endblock %}{% endembed %}
@@ -26,7 +26,7 @@
 		{# The person, their name linked to their profile as a listing names them (owner, 2026-10-21), is the title's subject
 		   ("<person> reviewed …"), or for money is named in front of the summary. #}
 		{% block body %}{{ ui('feedback.badge', {label: entry.badge, tone: entry.kind == 'money' ? 'warning' : 'info'}) }} {% if entry.subject %}{{ ui('data.person', entry.person) }} {% endif %}<strong><a href="{{ entry.href }}">{{ entry.title }}</a></strong><p>{% if entry.person and not entry.subject %}{{ ui('data.person', entry.person) }} · {% endif %}{{ entry.summary }}</p>{% endblock %}
-		{% block actions %}{{ ui('action.link', {label: entry.action, variant: 'primary', size: 'small', href: entry.href}) }}{% endblock %}
+		{% block actions %}{{ ui('action.link', {label: entry.action, variant: 'primary', size: 'small', icon: entry.icon, href: entry.href}) }}{% endblock %}
 		{% endembed %}
 		{% endfor %}
 	{% endblock %}
@@ -38,13 +38,15 @@
 {% block surface_body %}
 
 	{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Overview', eyebrow: 'Dashboard', summary: 'The health of the learning platform, the work that needs attention, and the way to each part of Administration.'})} %}{% block section_actions %}{% if not section_standalone|default(false) %}{% include '@platform/partials/section-actions.html.twig' with {actions: section_actions|default([])} %}{% endif %}{% endblock %}{% endembed %}
-	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+	{# Each figure with its icon opens what it counts (owner, 2026-10-21: "they just need svg icons plus I will like them to
+	   drill down to detail when clicked"). #}
+	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 4})} %}
 	{% block body %}
 
-		{{ ui('data.stat-card', {value: (overview.people), label: 'People', note: 'Active platform accounts'}) }}
-		{{ ui('data.stat-card', {value: (overview.published_courses), label: 'Published courses', note: (overview.draft_courses) ~ ' drafts'}) }}
-		{{ ui('data.stat-card', {value: (overview.enrolments), label: 'Enrolments', note: 'Assigned, active or completed'}) }}
-		{{ ui('data.stat-card', {value: (overview.completion_rate) ~ '%', label: 'Completion rate', note: 'Across learner enrolments'}) }}
+		{{ ui('data.stat-card', {value: (overview.people), label: 'People', note: 'Active platform accounts', icon: 'figure-people', href: '/admin/people'}) }}
+		{{ ui('data.stat-card', {value: (overview.published_courses), label: 'Published courses', note: (overview.draft_courses) ~ ' drafts', icon: 'figure-courses', href: '/admin/courses'}) }}
+		{{ ui('data.stat-card', {value: (overview.enrolments), label: 'Enrolments', note: 'Assigned, active or completed', icon: 'figure-enrolments', href: '/admin/course/enrolments'}) }}
+		{{ ui('data.stat-card', {value: (overview.completion_rate) ~ '%', label: 'Completion rate', note: 'Across learner enrolments', icon: 'figure-completion', href: '/admin/reports'}) }}
 
 	{% endblock %}
 	{% endembed %}
@@ -56,7 +58,7 @@
 
 		{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Recent activity', summary: 'The latest audited actions across the site.'})} %}
 {% block section_actions %}
-{{ ui('action.link', {label: 'View all', variant: 'secondary', size: 'small', href: '/admin/activity'}) }}
+{{ ui('action.link', {label: 'View all', variant: 'secondary', size: 'small', icon: 'action-view-all', href: '/admin/activity'}) }}
 {% endblock %}
 {% endembed %}
 		<div class="timeline">
@@ -76,30 +78,46 @@
 
 {% endblock %}
 {% endembed %}
-{# The money of a period (MoneyRecords::dashboard, owner 2026-10-18): each figure opens the list it adds up, for the same period. #}
+{#
+	The money of a period (MoneyRecords::dashboard; owner, 2026-10-21: one period drop-down for the figures and both charts).
+	The period is chosen once, at the top: choosing one shows it at once (the region is swapped and the address kept), and
+	Dates takes a from-to range, a date typed choosing Dates. Then three labelled groups of figures, each opening the list
+	it adds up for the same dates: Money in and out and Wallet credit (amounts, each compared with the period before) and
+	Orders (counts); then money in as a column for each hour, day, week or month of the period, and money in by method.
+#}
 {% if money is defined and money is not null %}
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
-	{{ ui('layout.section-head', {heading: 'Money', eyebrow: money.period.label, summary: money.period.from ~ ' to ' ~ money.period.to ~ '. What came in and went out, what the wallets hold, and the orders placed. Open a figure for what it adds up.'}) }}
-	<form action="/admin/dashboard" method="get">{% embed ui_template('form.grid') with {props: ui_props('form.grid', {})} %}{% block body %}
-		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'money-period'})} %}{% block control %}<select id="money-period" name="money_period" {{ ui_field_attrs(props) }}>{% for key, label in money.periods %}<option value="{{ key }}" {{ money.period.key == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From (with Dates)', full_width: false, for: 'money-from'})} %}{% block control %}<input type="date" id="money-from" name="money_from" value="{{ money.period.key == 'custom' ? money.period.from : '' }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To (with Dates)', full_width: false, for: 'money-to'})} %}{% block control %}<input type="date" id="money-to" name="money_to" value="{{ money.period.key == 'custom' ? money.period.to : '' }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Show', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Open the Money Ledger for this period', variant: 'secondary', size: 'normal', href: money.ledger_href}) }}{% endblock %}{% endembed %}
-	{% endblock %}{% endembed %}</form>
-	{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}{% block body %}
-		{% for figure in money.figures %}{{ ui('data.stat-card', figure) }}{% endfor %}
-	{% endblock %}{% endembed %}
+<div id="money-region">
+	{{ ui('layout.section-head', {heading: 'Money', eyebrow: money.period.label, summary: money.period.from|date('j M Y') ~ ' to ' ~ money.period.to|date('j M Y') ~ '. What came in and went out, wallet credit and the orders placed. Open a figure, a column or a method for what it adds up.'}) }}
+	<form class="cl-money-period" action="/admin/dashboard" method="get" hx-get="/admin/dashboard" hx-target="#money-region" hx-select="#money-region" hx-swap="outerHTML" hx-push-url="true">
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Period', full_width: false, for: 'money-period'})} %}{% block control %}<select id="money-period" name="money_period" onchange="if (this.value !== 'custom') this.form.requestSubmit()" {{ ui_field_attrs(props) }}>{% for key, label in money.periods %}<option value="{{ key }}" {{ money.period.key == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'From', full_width: false, for: 'money-from'})} %}{% block control %}<input type="date" id="money-from" name="money_from" value="{{ money.period.from }}" onchange="this.form.money_period.value = 'custom'" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'money-to'})} %}{% block control %}<input type="date" id="money-to" name="money_to" value="{{ money.period.to }}" onchange="this.form.money_period.value = 'custom'" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
+		{{ ui('action.button', {label: 'Show', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}
+		{{ ui('action.link', {label: 'Money Ledger for this period', variant: 'secondary', size: 'normal', icon: 'action-open', href: money.ledger_href}) }}
+	</form>
+	{% for group in money.groups %}
+		<div class="cl-money-group">
+			<h3 class="h5">{{ group.label }}</h3>
+			{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: group.columns})} %}{% block body %}
+				{% for figure in group.figures %}{{ ui('data.stat-card', figure) }}{% endfor %}
+			{% endblock %}{% endembed %}
+		</div>
+	{% endfor %}
+	<div class="cl-money-group">
 	{% embed ui_template('layout.section-grid') with {props: ui_props('layout.section-grid', {columns: 2, section_spacing: false})} %}{% block body %}
 		<div>
 			<h3 class="h5">Money in by {{ money.chart_unit }}</h3>
-			{% if money.chart %}{% include '@platform/partials/distribution-chart.html.twig' with {dc_rows: money.chart, dc_label: 'Money in by ' ~ money.chart_unit} %}{% else %}<p>No money came in during this period.</p>{% endif %}
+			{% include '@platform/partials/column-chart.html.twig' with {cc_label: 'Money in by ' ~ money.chart_unit ~ ', ' ~ money.period.label, cc_top: money.columns.top, cc_columns: money.columns.columns} %}
 		</div>
 		<div>
-			<h3 class="h5">Money received by method</h3>
-			{% if money.by_method %}{% include '@platform/partials/distribution-chart.html.twig' with {dc_rows: money.by_method, dc_label: 'Money received by method'} %}{% else %}<p>No payment was received during this period.</p>{% endif %}
+			<h3 class="h5">Money in by method</h3>
+			{% if money.by_method %}{% include '@platform/partials/distribution-chart.html.twig' with {dc_rows: money.by_method, dc_label: 'Money in by method, ' ~ money.period.label} %}{% else %}<p>No payment was received during this period.</p>{% endif %}
 		</div>
 	{% endblock %}{% endembed %}
+	</div>
+</div>
 {% endblock %}
 {% endembed %}
 {% endif %}

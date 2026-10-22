@@ -29,10 +29,10 @@
 						<input type="hidden" name="return" value="{{ back }}">
 						{% if person.status == 'active' %}
 							<input type="hidden" name="status" value="disabled">
-							{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.'}) }}
+							{{ ui('action.button', {label: 'Disable', variant: 'secondary', size: 'small', confirm: 'Disable this account? They will be signed out and cannot sign in again until enabled. Their membership and learning history are kept.', icon: 'action-disable'}) }}
 						{% else %}
 							<input type="hidden" name="status" value="active">
-							{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small'}) }}
+							{{ ui('action.button', {label: 'Enable', variant: 'primary', size: 'small', icon: 'action-enable'}) }}
 						{% endif %}
 					</form>
 					<form action="/company/people/{{ person.id }}/remove" method="post">
@@ -54,7 +54,7 @@
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Last name', for: 'person-last-name'})} %}{% block control %}<input id="person-last-name" name="last_name" value="{{ person.last_name }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 						{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Mobile number', for: 'person-mobile'})} %}{% block control %}<input id="person-mobile" name="mobile_number" value="{{ person.mobile_number }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 					{% endblock %}{% endembed %}
-					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save details', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Save details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}{% endembed %}
 				</form>
 			{% endblock %}{% endembed %}
 		{% endif %}
@@ -79,7 +79,7 @@
 								<input type="hidden" name="csrf" value="{{ csrf }}">
 								<input type="hidden" name="return" value="{{ back }}">
 								{% if enrolment.status == 'cancelled' %}
-									{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small'}) }}
+									{{ ui('action.button', {label: 'Restore access', variant: 'secondary', size: 'small', icon: 'action-restore'}) }}
 								{% else %}
 									{{ ui('action.button', {label: 'Remove access', variant: 'danger', size: 'small', confirm: 'Remove their access to this course?', icon: 'action-remove'}) }}
 								{% endif %}
@@ -102,8 +102,8 @@
 								<form action="/company/requests/{{ request.id }}/decision" method="post">
 									<input type="hidden" name="csrf" value="{{ csrf }}">
 									<input type="hidden" name="return" value="{{ back }}">
-									{{ ui('action.button', {label: 'Approve', variant: 'primary', size: 'small', name: 'decision', value: 'approve'}) }}
-									{{ ui('action.button', {label: 'Reject', variant: 'danger', size: 'small', name: 'decision', value: 'reject', confirm: 'Reject this course request? The learner is told it was declined.'}) }}
+									{{ ui('action.button', {label: 'Approve', variant: 'primary', size: 'small', name: 'decision', value: 'approve', icon: 'action-approve'}) }}
+									{{ ui('action.button', {label: 'Reject', variant: 'danger', size: 'small', name: 'decision', value: 'reject', confirm: 'Reject this course request? The learner is told it was declined.', icon: 'action-reject'}) }}
 								</form>
 							{% endif %}{% endblock %}
 						{% endembed %}

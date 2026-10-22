@@ -22,7 +22,7 @@
 								{% endfor %}
 								<form class="cl-catalogue-categories" method="get" action="/courses" data-choose-submits>
 									{{ ui('form.picture-choice', {name: 'category', legend: navigation.label, id: 'catalogue-categories', size: 'small', columns: 4, items: category_cards}) }}
-									<noscript>{{ ui('action.button', {label: 'Show courses', variant: 'secondary', size: 'small', type: 'submit'}) }}</noscript>
+									<noscript>{{ ui('action.button', {label: 'Show courses', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-filter'}) }}</noscript>
 								</form>
 							{% endif %}
 						</div>

@@ -36,13 +36,13 @@
 										</td>
 										<td class="cell-actions">
 											{% if request.status=='pending' %}
-												{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true})} %}
+												{% embed ui_template('action.row') with {props: ui_props('action.row', {menu: true, icon: 'action-more'})} %}
 {% block body %}
 
 														<form action="/company/requests/{{ request.id }}/decision" method="post">
 															<input type="hidden" name="csrf" value="{{ csrf }}">
-															{{ ui('action.button', {label: 'Approve', variant: 'primary', size: 'small', name: 'decision', value: 'approve'}) }}
-															{{ ui('action.button', {label: 'Reject', variant: 'danger', size: 'small', name: 'decision', value: 'reject', confirm: 'Reject this course request? The learner is told it was declined.', icon: 'action-remove'}) }}
+															{{ ui('action.button', {label: 'Approve', variant: 'primary', size: 'small', name: 'decision', value: 'approve', icon: 'action-approve'}) }}
+															{{ ui('action.button', {label: 'Reject', variant: 'danger', size: 'small', name: 'decision', value: 'reject', confirm: 'Reject this course request? The learner is told it was declined.', icon: 'action-reject'}) }}
 														</form>
 
 {% endblock %}
@@ -71,7 +71,7 @@
 					{% if requests_preview_has_more %}
 						<div class="pagination-row">
 							<span class="pagination-summary">Showing the first {{ preview_page_size }} requests.</span>
-							{{ ui('action.link', {label: 'View all requests', variant: 'secondary', size: 'small', href: '/company/requests'}) }}
+							{{ ui('action.link', {label: 'View all requests', variant: 'secondary', size: 'small', href: '/company/requests', icon: 'action-view-all'}) }}
 						</div>
 					{% endif %}
 

@@ -40,7 +40,8 @@ unset APP_ENV APP_DEBUG SHELL_VERBOSITY
 REPO="https://github.com/rrcatto/cattolms.git"
 BASE="/usr/local/lib/php/cattolms"
 LEGACY_BASE="/usr/local/lib/php/catto-learning"
-PHP_MIN="8.5.9"
+# 8.5.12 fixes CVE-2026-109618 and CVE-2026-109619 (remote code execution); nothing earlier is safe to run.
+PHP_MIN="8.5.12"
 EXTENSIONS=(dom fileinfo gd json mbstring openssl pdo pdo_pgsql zip)
 
 say()  { printf '\n\033[1m%s\033[0m\n' "$*"; }

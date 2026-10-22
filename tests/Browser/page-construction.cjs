@@ -45,6 +45,27 @@ const inspect = () => {
   if (headPainted) add('page head', head);
   const band = main.querySelector(':scope > .cl-identity-head, :scope > .cl-page-family > .cl-identity-head');
   if (band && painted(band)) add('identity band', band);
+  // The reader's account reference, in the identity band or a header chip standing in for it, sits under its label
+  // (owner, 2026-10-21: "Put the label "Account Reference:" in a line above it. Without a label, people will not know
+  // what it is"), clear of the role badge, and shows once on the page.
+  const shown = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const overlaps = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+  const references = [...document.querySelectorAll('.cl-identity-reference')].filter(shown);
+  const referenceFaults = references.length > 1 ? [`shown ${references.length} times`] : [];
+  for (const reference of references) {
+    const tag = reference.closest('.cl-identity-account')?.querySelector('.cl-identity-account-label'), r = reference.getBoundingClientRect();
+    if (!shown(tag) || tag.textContent.trim() !== 'Account Reference:') { referenceFaults.push('without its label'); continue; }
+    const t = tag.getBoundingClientRect();
+    if (t.bottom > r.top + 1 || t.right < r.left || t.left > r.right) referenceFaults.push('not under its label');
+    const roles = reference.closest('.cl-identity')?.querySelector('.cl-identity-roles');
+    if (shown(roles) && [t, r].some((b) => overlaps(b, roles.getBoundingClientRect()))) referenceFaults.push('under the role badge');
+  }
+  // A figure stays inside its card (owner, 2026-10-21: the dashboard's money amounts ran out of their cards).
+  const figureSpill = [...main.querySelectorAll('.cl-ui-stat-card')].filter(shown).filter((card) => {
+    const edge = card.getBoundingClientRect().right, amount = card.querySelector('.cl-ui-stat-value > span');
+    return [...card.children, ...(amount ? [amount] : [])].some((el) => el.getBoundingClientRect().right > edge + 1)
+      || (amount && amount.getBoundingClientRect().right > amount.parentElement.getBoundingClientRect().right + 1);
+  }).map((card) => (card.querySelector('.cl-ui-stat-label')?.textContent || '').trim());
   const rows = [...main.children].filter(c => c.getClientRects().length && !['SCRIPT', 'LINK', 'STYLE', 'TEMPLATE'].includes(c.tagName));
   const last = rows[rows.length - 1];
   const footer = document.querySelector('.cl-footer');
@@ -70,7 +91,7 @@ const inspect = () => {
     }
   }
   return {
-    tableSpill, cutActions,
+    tableSpill, cutActions, referenceFaults, figureSpill,
     h1: main.querySelectorAll('h1').length,
     strays, bare: bare.slice(0, 6), bareCount: bare.length,
     headLeft: picture ? Math.round(picture.getBoundingClientRect().left) : (h1 ? Math.round(h1.getBoundingClientRect().left) : null),
@@ -81,6 +102,10 @@ const inspect = () => {
     overflowX: document.documentElement.scrollWidth > innerWidth + 1,
     // A pagination row that does not fit its line (owner, 2026-10-21: it must not scroll on a desktop screen, 1440px).
     pagerScrolls: [...main.querySelectorAll('nav.pagination-row')].some((row) => row.getClientRects().length && row.scrollWidth > row.clientWidth + 1),
+    // A list longer than the smallest page size keeps its rows drop-down on every page size (owner, 2026-10-21: after
+    // choosing 100, 150 or 250 rows the bar showed "Pg 1 of 1 with no way to change the rows per page back down").
+    pagerWithoutSizes: [...main.querySelectorAll('nav.pagination-row')].filter((row) => row.getClientRects().length)
+      .map((row) => Number((row.querySelector('.pagination-summary')?.textContent.match(/of\s+([\d,]+)\s+·/) || [])[1]?.replace(/,/g, '') || 0) > 25 && !row.querySelector('select') ? row.dataset.pagination : null).filter(Boolean),
     width: innerWidth,
     theme: [...document.querySelectorAll('link[href*="/themes/"]')].map(l => l.getAttribute('href')).join(' '),
   };
@@ -99,8 +124,11 @@ function judge(r, label) {
   }
   if (r.overflowX) failures.push(`${label}: scrolls sideways`);
   if (r.pagerScrolls && r.width >= 1440) failures.push(`${label}: its pagination row scrolls sideways`);
+  if (r.pagerWithoutSizes.length) failures.push(`${label}: a list of more than 25 rows without its rows drop-down: ${r.pagerWithoutSizes.join(', ')}`);
   if (r.tableSpill.length) failures.push(`${label}: stands out of its table: ${r.tableSpill.join(', ')}`);
   if (r.cutActions.length) failures.push(`${label}: an action wider than its cell: ${r.cutActions.join(', ')}`);
+  if (r.referenceFaults.length) failures.push(`${label}: the account reference is ${r.referenceFaults.join(', ')}`);
+  if (r.figureSpill.length) failures.push(`${label}: a figure runs out of its card: ${r.figureSpill.join(', ')}`);
   return failures;
 }
 

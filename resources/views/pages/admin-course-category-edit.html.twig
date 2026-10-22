@@ -40,10 +40,10 @@
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 
-					{{ ui('action.button', {label: 'Save category', variant: 'primary', size: 'normal', type: 'submit'}) }}
+					{{ ui('action.button', {label: 'Save category', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
 
 {% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: tree_href}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: tree_href, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 				</form>
 
@@ -61,7 +61,7 @@
 					<p>
 						This category has {{ category.child_count }} subcategor{{ category.child_count==1 ? 'y' : 'ies' }} beneath it. Move or delete those first — deleting a branch would take its whole subtree with it, which is never what anybody means to do.
 					</p>
-					{{ ui('action.link', {label: 'Back to categories', variant: 'secondary', size: 'normal', href: tree_href}) }}
+					{{ ui('action.link', {label: 'Back to categories', variant: 'secondary', size: 'normal', href: tree_href, icon: 'action-back'}) }}
 				{% else %}
 					{% if category.course_count %}
 						<p>

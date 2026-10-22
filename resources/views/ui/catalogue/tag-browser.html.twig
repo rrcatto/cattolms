@@ -3,7 +3,7 @@
 {% embed ui_template('layout.surface') with {props: ui_props('layout.surface')} %}
 	{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Browse tags', summary: 'The bigger the tag, the more courses it labels. Choose one to see its courses.'}) }}
-		{% if selected_slug %}{{ ui('action.link', {href: '/courses/tags', label: 'Clear tag', variant: 'secondary', size: 'small'}) }}{% endif %}
+		{% if selected_slug %}{{ ui('action.link', {href: '/courses/tags', label: 'Clear tag', variant: 'secondary', size: 'small', icon: 'action-clear'}) }}{% endif %}
 		{% if tags %}
 			<div class="cl-tag-browser cl-tag-cloud-shell" data-controller="tag-cloud" data-tag-cloud-limit-value="30">
 				<div class="cl-tag-cloud-canvas" data-tag-cloud-target="canvas" aria-hidden="true"></div>

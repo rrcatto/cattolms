@@ -483,7 +483,7 @@ final class PlatformAdministrationService
      * @var array<string,string>
      */
     public const SEARCHABLE_DATASETS = [
-        'people' => 'name, email',
+        'people' => 'name, middle names, any email address, account reference',
         'companies' => 'name, domain',
         'company_creators' => 'name, domain',
         'courses' => 'title',
@@ -895,6 +895,7 @@ final class PlatformAdministrationService
         foreach ($pagination->window() as $item) {
             $pages[] = $item + ['href' => $item['is_gap'] ? '' : $href($item['page'])];
         }
+        $sizes = $pagination->pageSize === 24 ? [24] : Pagination::PAGE_SIZES;
 
         return $pagination->toArray() + [
             'prefix' => $dataset,
@@ -902,7 +903,11 @@ final class PlatformAdministrationService
             'size_param' => $sizeParam,
             'base' => $base,
             'label' => $label,
-            'page_sizes' => $pagination->pageSize === 24 ? [24] : Pagination::PAGE_SIZES,
+            'page_sizes' => $sizes,
+            // The rows drop-down stays wherever another size would page the list differently, a list that fits on one
+            // page included (owner, 2026-10-21: after choosing 100, 150 or 250 rows the bar showed "Pg 1 of 1 with no way
+            // to change the rows per page back down"; Companies, 40-odd rows at 50, never showed it at all).
+            'has_sizes' => count($sizes) > 1 && $pagination->total > min($sizes),
             'filters' => $filters,
             'query' => $filters === [] ? '' : http_build_query($filters) . '&',
             'region' => $dataset . '-region',
@@ -2743,26 +2748,6 @@ final class PlatformAdministrationService
         }
         unset($row);
         return self::trimTimestamps($rows);
-    }
-
-    /**
-     * @param list<array<string,mixed>> $rows
-     * @return list<array<string,mixed>>
-     */
-    /**
-     * Find a person by name, email address or account reference (owner, 2026-10-21). The one person an exact email address or
-     * account reference names, or the only match, is opened at once; otherwise every match is listed.
-     *
-     * @return array{open:?int,matches:list<array<string,mixed>>}
-     */
-    public function findPerson(string $query): array
-    {
-        $query = mb_substr(trim($query), 0, 120);
-        if ($query === '') return ['open' => null, 'matches' => []];
-        $matches = $this->users->findPeople($query);
-        $exact = array_values(array_filter($matches, static fn(array $m): bool => $m['exact']));
-        $open = count($exact) === 1 ? $exact[0]['id'] : (count($matches) === 1 ? $matches[0]['id'] : null);
-        return ['open' => $open, 'matches' => $matches];
     }
 
     /**

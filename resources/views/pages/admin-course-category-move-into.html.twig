@@ -21,8 +21,8 @@
 					{% endfor %}
 				</fieldset>
 				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-					{% block primary_actions %}{{ ui('action.button', {label: 'Move here', variant: 'primary', type: 'submit'}) }}{% endblock %}
-					{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: tree_href}) }}{% endblock %}
+					{% block primary_actions %}{{ ui('action.button', {label: 'Move here', variant: 'primary', type: 'submit', icon: 'action-move-into'}) }}{% endblock %}
+					{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel', variant: 'quiet', href: tree_href, icon: 'action-cancel'}) }}{% endblock %}
 				{% endembed %}
 			</form>
 {% endblock %}

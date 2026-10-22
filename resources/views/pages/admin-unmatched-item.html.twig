@@ -23,14 +23,14 @@
 			{label: 'Put on this list', value: item.recorded},
 		]}) }}
 		<p data-unmatched-recorder><strong>Put on this list by:</strong> {{ ui('data.person', item.recorded_by_person) }}</p>
-		{% if item.order_href %}{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.link', {label: 'Open order ' ~ item.order_label, variant: 'secondary', size: 'small', href: item.order_href}) }}{% endblock %}{% endembed %}{% endif %}
+		{% if item.order_href %}{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}{% block body %}{{ ui('action.link', {label: 'Open order ' ~ item.order_label, variant: 'secondary', size: 'small', href: item.order_href, icon: 'action-open'}) }}{% endblock %}{% endembed %}{% endif %}
 	{% endblock %}{% endembed %}</section>
 	{% if item.state == 'open' and can_manage %}
 	<section class="cl-page-section" id="unmatched-match">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
 		{{ ui('layout.section-head', {heading: 'Match it to an order', heading_level: 2, summary: 'When you know who paid it, find their account. Matching records it as that order’s EFT payment on the day it arrived.'}) }}
 		<form action="/admin/commerce/unmatched/{{ item.id }}#unmatched-match" method="get">
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Their account reference or order number', for: 'unmatched-reference', required: true, help: 'Such as CL-20261018-13147-3 or CL-00000183.'})} %}{% block control %}<input id="unmatched-reference" name="reference" value="{{ reference }}" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Find the account', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Find the account', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-search'}) }}{% endblock %}{% endembed %}
 		</form>
 		{% if match %}{% include '@platform/partials/admin/eft-match.html.twig' with {eft_match: match, eft_action: '/admin/commerce/unmatched/' ~ item.id ~ '/match', eft_hidden: {}, eft_button: 'Match it to this order'} %}{% endif %}
 	{% endblock %}{% endembed %}</section>
@@ -42,7 +42,7 @@
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'The bank’s reference for the payment back', for: 'unmatched-return-reference', required: true})} %}{% block control %}<input id="unmatched-return-reference" name="return_reference" maxlength="200" required {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Note', for: 'unmatched-note', full_width: true, help: 'Optional, such as who it was and why it was sent.'})} %}{% block control %}<textarea id="unmatched-note" name="note" maxlength="2000" {{ ui_field_attrs(props) }}></textarea>{% endblock %}{% endembed %}
 			{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record that it was paid back', variant: 'secondary', size: 'normal', type: 'submit'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Record that it was paid back', variant: 'secondary', size: 'normal', type: 'submit', icon: 'action-record-money'}) }}{% endblock %}{% endembed %}
 		</form>
 	{% endblock %}{% endembed %}</section>
 	{% endif %}

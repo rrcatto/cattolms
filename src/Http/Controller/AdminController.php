@@ -436,20 +436,6 @@ final class AdminController extends BaseController
         ]);
     }
 
-    /**
-     * Find a person (owner, 2026-10-21): by name, email address or account reference. One person found opens their profile;
-     * several are listed, each name opening its profile.
-     */
-    #[Route('/admin/people/find', name: 'admin_find_person', methods: ['GET'])]
-    public function findPerson(): Response
-    {
-        $this->requirePermission('PLATFORM.PERSON.VIEW');
-        $query = trim((string) ($_GET['q'] ?? ''));
-        $found = $this->platformAdministration->findPerson($query);
-        if ($found['open'] !== null) $this->redirect('/admin/people/' . $found['open']);
-        return $this->render('admin-person-find', ['title' => 'Find a person', 'active_nav' => 'admin', 'query' => $query, 'matches' => $found['matches']]);
-    }
-
     #[Route('/admin/people/{id}', name: 'admin_person', requirements: ['id' => '\\d+'], methods: ['GET'])]
     public function person(): Response
     {

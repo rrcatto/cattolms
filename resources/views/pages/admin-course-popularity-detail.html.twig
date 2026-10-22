@@ -34,7 +34,7 @@
 	{label: 'Weighted rating', value: course.weighted_rating is null ? '—' : course.weighted_rating|number_format(2) ~ ' of 5 (prior ' ~ p.rating_prior|number_format(2) ~ ', confidence ' ~ p.rating_confidence ~ ' reviews)'},
 	{label: 'Momentum', value: course.recent_views ~ ' viewers in the latest ' ~ p.momentum_days ~ ' days, ' ~ course.previous_views ~ ' in the ' ~ p.momentum_days ~ ' before: growth ×' ~ course.momentum_growth|number_format(2)},
 ]}) }}
-<p>{{ ui('action.link', {label: 'Course page', href: '/courses/' ~ course.slug, size: 'small'}) }} {{ ui('action.link', {label: 'Analytics events for this course', href: '/admin/analytics/events?course_id=' ~ course.course_id, size: 'small'}) }}</p>
+<p>{{ ui('action.link', {label: 'Course page', href: '/courses/' ~ course.slug, size: 'small', icon: 'action-open'}) }} {{ ui('action.link', {label: 'Analytics events for this course', href: '/admin/analytics/events?course_id=' ~ course.course_id, size: 'small', icon: 'action-open'}) }}</p>
 {% endblock %}{% endembed %}
 </section>
 {% endblock %}

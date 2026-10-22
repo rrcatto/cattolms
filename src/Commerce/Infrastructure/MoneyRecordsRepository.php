@@ -409,19 +409,28 @@ final class MoneyRecordsRepository
     }
 
     /**
-     * Money in and out of the business per day, week or month, in the platform's time zone.
+     * Money in and out of the business per hour, day, week, month or year, in the platform's time zone. Only slices with
+     * a ledger line come back; the caller fills the empty ones. An hour's bucket is "YYYY-MM-DD HH", the others the day
+     * the slice starts.
      *
      * @return list<array{bucket:string,money_in:int,money_out:int}>
      */
     public function moneySeries(string $fromAt, string $toBefore, string $unit, string $timezone): array
     {
-        $unit = in_array($unit, ['day', 'week', 'month'], true) ? $unit : 'day';
+        $unit = in_array($unit, ['hour', 'day', 'week', 'month', 'year'], true) ? $unit : 'day';
         return array_map(static fn(array $r): array => ['bucket' => (string) $r['bucket'], 'money_in' => (int) $r['money_in'], 'money_out' => (int) $r['money_out']],
-            $this->db->fetchAllAssociative("SELECT to_char(date_trunc('" . $unit . "', occurred_at AT TIME ZONE :tz), 'YYYY-MM-DD') AS bucket,
+            $this->db->fetchAllAssociative("SELECT to_char(date_trunc('" . $unit . "', occurred_at AT TIME ZONE :tz), '" . ($unit === 'hour' ? 'YYYY-MM-DD HH24' : 'YYYY-MM-DD') . "') AS bucket,
                     COALESCE(SUM(CASE WHEN cash_effect = 1 THEN amount_minor END), 0) AS money_in,
                     COALESCE(SUM(CASE WHEN cash_effect = -1 THEN amount_minor END), 0) AS money_out
                 FROM commerce_ledger_entries WHERE occurred_at >= CAST(:from_at AS TIMESTAMPTZ) AND occurred_at < CAST(:to_before AS TIMESTAMPTZ)
                 GROUP BY 1 ORDER BY 1", ['tz' => $timezone, 'from_at' => $fromAt, 'to_before' => $toBefore]));
+    }
+
+    /** The day of the first ledger line in the platform's time zone, where All time begins; null before any. */
+    public function firstLedgerDay(string $timezone): ?string
+    {
+        $day = $this->db->fetchOne("SELECT to_char(MIN(occurred_at) AT TIME ZONE :tz, 'YYYY-MM-DD') FROM commerce_ledger_entries", ['tz' => $timezone]);
+        return is_string($day) && $day !== '' ? $day : null;
     }
 
     /** @return list<array{state:string,orders:int,total:int}> orders placed between two instants, by state */

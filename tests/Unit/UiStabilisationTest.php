@@ -33,7 +33,8 @@ TWIG, []);
 
     public function testPaginationSummariesRenderSingleAndMultiplePageStates(): void
     {
-        foreach ([0 => 'Pg 1 of 1', 1 => 'Pg 1 of 1', 101 => '1–25 of 101 · Pg 1 of 5'] as $total => $expected) {
+        // One page states its rows too, so "Pg 1 of 1" says why there is one page (owner, 2026-10-21).
+        foreach ([0 => 'Pg 1 of 1', 1 => '1–1 of 1 · Pg 1 of 1', 101 => '1–25 of 101 · Pg 1 of 5'] as $total => $expected) {
             $payload = PlatformAdministrationService::paginationPayload('example', Pagination::create(1, 25, $total), '/example', 'Examples');
             $document = new DOMDocument();
             @$document->loadHTML('<?xml encoding="utf-8" ?>' . RenderHarness::render('partials/pagination', ['pg' => $payload]));

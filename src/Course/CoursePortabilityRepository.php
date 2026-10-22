@@ -135,10 +135,33 @@ final class CoursePortabilityRepository
         ) === 0;
     }
 
+    /**
+     * How many orders bought the course, on its own or in a bundle. Such a course is never deleted: its orders, invoices,
+     * receipts and ledger lines are kept for good (owner, 2026-10-21: deleting one failed with a foreign key error).
+     */
+    public function buyingOrders(int $courseId): int
+    {
+        return (int) $this->db->fetchOne(
+            'SELECT COUNT(DISTINCT bought.order_id) FROM (
+                 SELECT oi.order_id FROM commerce_order_items oi WHERE oi.course_id = :course_id
+                 UNION ALL
+                 SELECT oi.order_id FROM commerce_bundle_grants g JOIN commerce_order_items oi ON oi.id = g.order_item_id WHERE g.course_id = :course_id
+             ) bought',
+            ['course_id' => $courseId]
+        );
+    }
+
     public function deleteCourse(int $courseId): void
     {
         // Platform Administrator deletion scrubs the course and all dependent
         // learner/test data. Explicit RESTRICT relationships are removed first.
+        // Only a course nobody bought reaches here (CoursePortabilityService::deleteCourse), so no order is touched, and
+        // every access source behind its enrolments came from an order. A cart line is not a record: a cart holding the
+        // course loses it, or its prices could not go with the course.
+        $this->db->executeStatement(
+            'DELETE FROM commerce_cart_items WHERE variant_id IN (SELECT id FROM course_price_variants WHERE course_id=:course_id)',
+            ['course_id' => $courseId]
+        );
         $this->db->executeStatement(
             'DELETE FROM course_credit_allocations WHERE credit_id IN (SELECT id FROM course_credits WHERE course_id=:course_id)',
             ['course_id' => $courseId]

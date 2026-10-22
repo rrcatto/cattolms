@@ -7,15 +7,16 @@
 {% endblock %}
 {% endembed %}
 		{% if company.account_reference|default('') %}<p>Company account reference: <strong>{{ company.account_reference|account_reference }}</strong>. Quote it when the company pays by EFT or writes to us.</p>{% endif %}
-		{# The figures sit in the card they summarise. #}
-		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {})} %}
+		{# The figures sit in the card they summarise, five to a row, each with its icon and opening what it counts (owner,
+		   2026-10-21: "Dashboard cards also need svg icons"). #}
+		{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {columns: 5})} %}
 		{% block body %}
 
-			{{ ui('data.stat-card', {value: (people_count), label: 'People'}) }}
-			{{ ui('data.stat-card', {value: (courses_count), label: 'Courses'}) }}
-			{{ ui('data.stat-card', {value: (requests_count), label: 'Requests'}) }}
-			{{ ui('data.stat-card', {value: (enrolments_count), label: 'Enrolments'}) }}
-			{{ ui('data.stat-card', {value: (credits_count), label: 'Credit pools'}) }}
+			{{ ui('data.stat-card', {value: (people_count), label: 'People', icon: 'figure-people', href: '/company/people'}) }}
+			{{ ui('data.stat-card', {value: (courses_count), label: 'Courses', icon: 'figure-courses', href: '/company/courses'}) }}
+			{{ ui('data.stat-card', {value: (requests_count), label: 'Requests', icon: 'figure-requests', href: '/company/requests'}) }}
+			{{ ui('data.stat-card', {value: (enrolments_count), label: 'Enrolments', icon: 'figure-enrolments', href: '/company/enrolments'}) }}
+			{{ ui('data.stat-card', {value: (credits_count), label: 'Credit pools', icon: 'figure-credits', href: '/company/credits'}) }}
 
 		{% endblock %}
 		{% endembed %}
@@ -68,7 +69,7 @@
 {% endembed %}
 
 		<p>
-			{{ ui('action.link', {label: 'Manage company records', variant: 'secondary', size: 'small', href: '/admin/companies'}) }}
+			{{ ui('action.link', {label: 'Manage company records', variant: 'secondary', size: 'small', icon: 'action-manage', href: '/admin/companies'}) }}
 		</p>
 
 {% endblock %}

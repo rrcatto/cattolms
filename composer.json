@@ -3,7 +3,7 @@
     "description": "Open-source learning commerce and delivery platform built with PHP, Symfony, Twig and PostgreSQL.",
     "type": "project",
     "require": {
-        "php": ">=8.5.9 <9.0",
+        "php": ">=8.5.12 <9.0",
         "ext-dom": "*",
         "ext-fileinfo": "*",
         "ext-gd": "*",
@@ -85,7 +85,7 @@
             "symfony/runtime": true
         },
         "platform": {
-            "php": "8.5.9"
+            "php": "8.5.12"
         }
     },
     "scripts": {
@@ -136,7 +136,7 @@
             "role": "Project creator and maintainer"
         }
     ],
-    "version": "0.9.6",
+    "version": "0.9.7",
     "extra": {
         "public-dir": "public_html"
     }

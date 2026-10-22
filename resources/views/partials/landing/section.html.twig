@@ -44,7 +44,7 @@
 		{% elseif section.type == 'reviews' %}
 			{% include '@platform/partials/course-rating-summary.html.twig' with {rating: section.rating} %}
 			{% include '@platform/partials/course-review-list.html.twig' with {reviews: section.reviews} %}
-			{% if section.all_href %}<p class="cl-landing-more">{{ ui('action.link', {label: 'Read every review', variant: 'secondary', size: 'small', href: section.all_href}) }}</p>{% endif %}
+			{% if section.all_href %}<p class="cl-landing-more">{{ ui('action.link', {label: 'Read every review', variant: 'secondary', size: 'small', href: section.all_href, icon: 'action-view-all'}) }}</p>{% endif %}
 		{% elseif section.type == 'pricing' %}
 			{% if section.rating and section.rating.count > 0 %}{% include '@platform/partials/course-rating-summary.html.twig' with {rating: section.rating, rating_compact: true} %}{% endif %}
 			{% include '@platform/partials/course-purchase.html.twig' with {purchase: section.purchase, purchase_style: 'full', purchase_key: 'pricing-' ~ section.id, landing_page_id: landing.landing_page_id, purchase_inert: landing.preview} %}

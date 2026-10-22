@@ -149,17 +149,19 @@ final class CourseReviewRepository
      *
      * @return list<array{id:int,rating:int,comment:string,published_at:string,reviewer:string}>
      */
-    public function published(int $courseId, int $limit, int $offset): array
+    public function published(int $courseId, int $limit, int $offset, ?int $stars = null): array
     {
+        // Only the reviews that give a number of stars when one is chosen (owner, 2026-10-22: "The number of stars should be
+        // clickable filters").
         return array_map(static fn(array $row): array => [
             'id' => (int) $row['id'], 'rating' => (int) $row['rating'], 'comment' => (string) $row['comment'],
             'published_at' => (string) $row['published_at'], 'reviewer' => (string) $row['reviewer'],
         ], $this->db->fetchAllAssociative(
             'SELECT r.id, r.published_rating AS rating, r.published_comment AS comment, r.published_at, ' . self::PUBLIC_NAME . ' AS reviewer
                FROM course_reviews r JOIN users u ON u.id = r.user_id
-              WHERE r.course_id=:course AND r.published_rating IS NOT NULL
+              WHERE r.course_id=:course AND r.published_rating IS NOT NULL' . ($stars === null ? '' : ' AND r.published_rating=:stars') . '
               ORDER BY r.published_at DESC, r.id DESC LIMIT :limit OFFSET :offset',
-            ['course' => $courseId, 'limit' => max(1, $limit), 'offset' => max(0, $offset)]
+            ['course' => $courseId, 'limit' => max(1, $limit), 'offset' => max(0, $offset)] + ($stars === null ? [] : ['stars' => $stars])
         ));
     }
 

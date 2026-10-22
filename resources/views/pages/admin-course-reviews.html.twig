@@ -9,7 +9,7 @@
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Status', for: 'review-status'})} %}{% block control %}<select class="cl-select" id="review-status" name="status" {{ ui_field_attrs(props) }}>{% for value, label in {pending: 'Pending', approved: 'Approved', rejected: 'Rejected', all: 'All reviews'} %}<option value="{{ value }}"{% if filter.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course', for: 'review-course'})} %}{% block control %}<select class="cl-select" id="review-course" name="course_id" {{ ui_field_attrs(props) }}><option value="">All courses</option>{% for reviewed in courses %}<option value="{{ reviewed.id }}"{% if filter.course_id == reviewed.id ~ '' %} selected{% endif %}>{{ reviewed.title }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 {% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Rating', for: 'review-rating'})} %}{% block control %}<select class="cl-select" id="review-rating" name="rating" {{ ui_field_attrs(props) }}><option value="">Any rating</option>{% for stars in 5..1 %}<option value="{{ stars }}"{% if filter.rating == stars ~ '' %} selected{% endif %}>{{ stars }} {{ stars == 1 ? 'star' : 'stars' }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-{{ ui('action.button', {label: 'Show reviews', type: 'submit'}) }}
+{{ ui('action.button', {label: 'Show reviews', type: 'submit', icon: 'action-filter'}) }}
 </form>
 {% embed ui_template('data.dataset') with {props: ui_props('data.dataset', {name: 'reviews', pagination: reviews_pagination})} %}
 {% block results %}
@@ -43,8 +43,8 @@
 			{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'When rejecting, also take down the version that is published now'})} %}{% block control %}<input class="cl-check" type="checkbox" name="withdraw" value="1">{% endblock %}{% endembed %}
 		{% endif %}
 		{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}
-			{% if review.status != 'approved' %}{{ ui('action.button', {label: 'Approve', variant: 'primary', type: 'submit', name: 'decision', value: 'approve'}) }}{% endif %}
-			{% if review.status != 'rejected' %}{{ ui('action.button', {label: review.status == 'approved' ? 'Reject and unpublish' : 'Reject', type: 'submit', name: 'decision', value: 'reject'}) }}{% elseif review.published_rating is not null %}{{ ui('action.button', {label: 'Unpublish earlier version', type: 'submit', name: 'decision', value: 'withdraw'}) }}{% endif %}
+			{% if review.status != 'approved' %}{{ ui('action.button', {label: 'Approve', variant: 'primary', type: 'submit', name: 'decision', value: 'approve', icon: 'action-approve'}) }}{% endif %}
+			{% if review.status != 'rejected' %}{{ ui('action.button', {label: review.status == 'approved' ? 'Reject and unpublish' : 'Reject', type: 'submit', name: 'decision', value: 'reject', icon: 'action-reject'}) }}{% elseif review.published_rating is not null %}{{ ui('action.button', {label: 'Unpublish earlier version', type: 'submit', name: 'decision', value: 'withdraw', icon: 'action-hide'}) }}{% endif %}
 		{% endblock %}{% endembed %}
 	</form>
 </li>

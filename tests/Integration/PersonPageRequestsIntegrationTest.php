@@ -66,27 +66,25 @@ final class PersonPageRequestsIntegrationTest extends TestCase
     }
 
     /**
-     * Find a person (owner, 2026-10-21): an exact email address or account reference opens the one person it names; part of
-     * a name shared by several lists them all, each name linking to its profile.
+     * The People search finds everyone Find a person found, which it replaced (owner, 2026-10-21: "THe find person facility
+     * which you purpose built is already covered by the table listing on People"): a middle name, any of a person's email
+     * addresses and the account reference typed as shown; /admin/people/find no longer exists.
      */
-    public function testFindingAPersonByEmailReferenceOrPartOfTheirName(): void
+    public function testThePeopleSearchFindsAMiddleNameAnyEmailAddressAndTheAccountReference(): void
     {
         $suffix = $this->fixture->suffix();
-        $admin = $this->fixture->createUser('Finder admin ' . $suffix, 'finder-admin-' . $suffix . '@seed.test');
+        $admin = $this->fixture->createUser('Search admin ' . $suffix, 'search-admin-' . $suffix . '@seed.test');
         $this->fixture->grantRole($admin, 'ADMIN');
-        $first = $this->fixture->createUser('Zandile Q' . $suffix, 'zandile-' . $suffix . '@seed.test');
-        $second = $this->fixture->createUser('Bongani Q' . $suffix, 'bongani-' . $suffix . '@seed.test');
-        $this->db->executeStatement("UPDATE users SET first_name = split_part(display_name, ' ', 1), last_name = split_part(display_name, ' ', 2) WHERE id IN (:a, :b)", ['a' => $first, 'b' => $second]);
+        $person = $this->fixture->createUser('Zandile Q' . $suffix, 'zandile-' . $suffix . '@seed.test');
+        $this->db->executeStatement("UPDATE users SET first_name = 'Zandile', middle_names = :middle, last_name = 'Mokoena' WHERE id = :id", ['middle' => 'Nomsa' . $suffix, 'id' => $person]);
+        (new \CattoLearning\Infrastructure\Persistence\UserRepository($this->db))->addVerifiedSecondaryEmail($person, 'second-' . $suffix . '@elsewhere.test');
         $this->signIn($admin);
-        $reference = (string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $first]);
-        foreach (['zandile-' . $suffix . '@seed.test', \CattoLearning\Support\AccountReference::format($reference)] as $exact) {
-            $found = $this->response('/admin/people/find?q=' . rawurlencode($exact));
-            self::assertSame('/admin/people/' . $first, $found->headers->get('Location'), $exact . ' opens the one person it names.');
+        $reference = \CattoLearning\Support\AccountReference::format((string) $this->db->fetchOne('SELECT account_reference FROM users WHERE id = :id', ['id' => $person]));
+        foreach (['Nomsa' . $suffix => 'a middle name', 'Zandile Nomsa' . $suffix . ' Mokoena' => 'the whole name', 'second-' . $suffix . '@elsewhere' => 'a second email address', $reference => 'the account reference typed as shown'] as $term => $what) {
+            $page = (string) $this->response('/admin/people?people_q=' . rawurlencode($term))->getContent();
+            self::assertStringContainsString('href="/admin/people/' . $person . '"', $page, 'The People search finds ' . $what . '.');
         }
-        $both = $this->response('/admin/people/find?q=' . rawurlencode('Q' . $suffix));
-        self::assertSame(200, $both->getStatusCode());
-        foreach ([$first, $second] as $id) self::assertStringContainsString('href="/admin/people/' . $id . '"', (string) $both->getContent(), 'Each match links to its profile.');
-        self::assertStringContainsString('2 people found', (string) $both->getContent());
+        self::assertSame(404, $this->response('/admin/people/find?q=' . rawurlencode('Nomsa' . $suffix))->getStatusCode(), 'Find a person is gone.');
     }
 
     /** A course in a person's library opens in Administration and its access is removed there, back on their page (owner, 2026-10-21). */

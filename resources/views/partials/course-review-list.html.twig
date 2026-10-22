@@ -1,12 +1,13 @@
 {#
 	Approved reviews as a list: the published version of each, its stars, its comment and the reviewer's
-	first name and initial with the date. The course page pages through them; a landing page shows its
-	latest few. Never an email address, an id or a moderation note.
+	first name and initial with the date. The course page pages through them, numbered from review_number_from (owner,
+	2026-10-22); a landing page shows its latest few. Never an email address, an id or a moderation note.
 #}
-<ol class="cl-review-list">
+{% set review_first = review_number_from|default(0) %}
+<ol class="cl-review-list"{% if review_first %} start="{{ review_first }}"{% endif %}>
 	{% for review in reviews %}
 		<li class="cl-review">
-			<p class="cl-review-rating">
+			<p class="cl-review-rating">{% if review_first %}<span class="cl-review-number" aria-hidden="true">{{ review_first + loop.index0 }}.</span>{% endif %}
 				<span class="cl-rating-stars" aria-hidden="true">{% for stars in 1..5 %}<span class="{{ stars <= review.rating ? 'is-filled' : '' }}">{{ stars <= review.rating ? '★' : '☆' }}</span>{% endfor %}</span>
 				<span class="cl-visually-hidden">{{ review.rating }} out of 5 stars</span>
 			</p>

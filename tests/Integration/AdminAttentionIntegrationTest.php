@@ -92,6 +92,25 @@ final class AdminAttentionIntegrationTest extends TestCase
         // Someone who can only moderate reviews sees only the reviews.
         $moderator = array_unique(array_column(IntegrationContainer::get()->get(AdminAttention::class)->items($this->admin($admin, ['COURSE.REVIEW.MANAGE'], [])), 'kind'));
         self::assertSame(['review'], array_values($moderator));
+        // Each button's icon is in keeping with what it does (owner, 2026-10-21).
+        self::assertSame(['action-approve', 'action-reply', 'action-open'], [$byHref['/admin/people/' . $waiting]['icon'], $byHref['/admin/messages/' . $message]['icon'], $byHref['/admin/courses/' . $draft]['icon']]);
+    }
+
+    /**
+     * Every thing waiting is listed, never the first so many (owner, 2026-10-21, of a person search that stopped at 100 and
+     * called that the number found): accounts waiting for approval stopped at 20, the other kinds at 100.
+     */
+    public function testEveryThingWaitingIsListedNotTheFirstSoMany(): void
+    {
+        $fixture = new DevelopmentFixture($this->db);
+        $suffix = $fixture->suffix();
+        $admin = $fixture->createUser('Backlog admin ' . $suffix);
+        $waiting = [];
+        for ($i = 1; $i <= 25; $i++) $waiting[] = $fixture->createUser('Backlog ' . $i . ' ' . $suffix, 'backlog-' . $i . '-' . $suffix . '@example.test');
+        $this->db->executeStatement("UPDATE users SET status = 'awaiting_approval' WHERE id IN (" . implode(',', $waiting) . ')');
+        $rows = IntegrationContainer::get()->get(AdminAttention::class)->items($this->admin($admin, ['PLATFORM.PERSON.MANAGE'], []));
+        $listed = array_intersect(array_map(static fn(int $id): string => '/admin/people/' . $id, $waiting), array_column($rows, 'href'));
+        self::assertCount(25, $listed, 'All 25 accounts waiting for approval are listed.');
     }
 
     /**

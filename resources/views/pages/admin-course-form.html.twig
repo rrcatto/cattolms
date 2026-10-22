@@ -15,7 +15,7 @@
 				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
 
-					{{ ui('action.button', {label: 'Create course', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', size: 'normal', href: '/admin/courses'}) }}
+					{{ ui('action.button', {label: 'Create course', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{{ ui('action.link', {label: 'Cancel', variant: 'secondary', size: 'normal', href: '/admin/courses', icon: 'action-cancel'}) }}
 
 {% endblock %}
 {% endembed %}

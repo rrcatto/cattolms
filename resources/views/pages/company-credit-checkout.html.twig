@@ -25,7 +25,7 @@
             {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Email the invoice to ' ~ user_email})} %}{% block control %}<input type="checkbox" name="invoice_email" value="yes">{% endblock %}{% endembed %}
             <p>Credits are specific to the course and access period shown. They are issued only after confirmed full payment. An order not paid in full within {{ payment_due }} is cancelled, and anything paid towards it goes to the company wallet. No VAT is charged. Credits are refunded only within {{ refund_window }} of purchase, only while no learner has started them, and only as wallet credit.</p>
             {% include '@platform/partials/commerce-terms-acceptance.html.twig' %}
-            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Place company order', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Edit credits', variant: 'secondary', size: 'normal', href: '/company/credits/buy'}) }}{% endblock %}{% endembed %}
+            {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Place company order', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-buy'}) }}{{ ui('action.link', {label: 'Edit credits', variant: 'secondary', size: 'normal', href: '/company/credits/buy', icon: 'action-edit'}) }}{% endblock %}{% endembed %}
         </form>
     {% endblock %}{% endembed %}</section>
 {% endblock %}

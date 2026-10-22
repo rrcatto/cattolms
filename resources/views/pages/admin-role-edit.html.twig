@@ -42,7 +42,7 @@
 {% endblock %}
 {% endembed %}
 					<div class="cl-ui-field--full">
-						{{ ui('action.button', {label: 'Save role', variant: 'primary', size: 'normal', disabled: not can_manage_roles}) }}
+						{{ ui('action.button', {label: 'Save role', variant: 'primary', size: 'normal', disabled: not can_manage_roles, icon: 'action-save-changes'}) }}
 					</div>
 
 {% endblock %}
@@ -137,7 +137,7 @@
 				{% endfor %}
 			</div>
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save permissions', variant: 'primary', disabled: (role_acl.is_admin_role or not can_manage_roles)}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save permissions', variant: 'primary', disabled: (role_acl.is_admin_role or not can_manage_roles), icon: 'action-save-changes'}) }}{% endblock %}
 {% block secondary_actions %}<span class="muted">Changes take effect on the next request after Save.</span>{% endblock %}
 {% endembed %}
 		</form>

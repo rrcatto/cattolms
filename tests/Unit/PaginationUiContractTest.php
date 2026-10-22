@@ -121,6 +121,49 @@ final class PaginationUiContractTest extends TestCase
     }
 
     /**
+     * The rows drop-down outlives the page controls (owner, 2026-10-21: after choosing 100, 150 or 250 rows the bar showed
+     * "Pg 1 of 1 with no way to change the rows per page back down"): a list longer than the smallest size keeps it when it
+     * fits on one page, at any chosen size; a list no size could split, and the fixed catalogue size, show none.
+     */
+    public function testTheRowsDropDownStaysWhileAnotherSizeWouldPageTheList(): void
+    {
+        $render = static fn(int $total, int $size): string => \CattoLearning\Tests\Support\RenderHarness::render('partials/pagination', [
+            'pg' => \CattoLearning\Tests\Support\RenderHarness::pagination('companies', '/admin/companies', 1, $total, $size),
+        ]);
+        foreach ([[42, 50], [52, 100], [52, 150], [52, 250], [26, 25]] as [$total, $size]) {
+            $html = $render($total, $size);
+            self::assertStringContainsString('class="pagination-page-size"', $html, "$total rows at $size a page keep the rows drop-down.");
+            self::assertStringContainsString('<option value="25" ', $html, 'Every approved size is offered, the smallest included.');
+            self::assertMatchesRegularExpression('#<option value="' . $size . '" selected>#', $html, 'The chosen size stays chosen.');
+            self::assertSame($total > $size, str_contains($html, 'class="pagination-jump"'), 'The page controls show only when there is another page.');
+            self::assertStringContainsString('1–' . min($total, $size) . ' of ' . $total . ' ·', $html, 'The rows shown and the total, one page or many.');
+        }
+        foreach ([[25, 25], [20, 50], [3, 250]] as [$total, $size]) {
+            $html = $render($total, $size);
+            self::assertStringNotContainsString('pagination-page-size', $html, "$total rows: no size could split them.");
+            self::assertMatchesRegularExpression('#1–' . $total . ' of ' . $total . ' ·</span>\s*<span class="pagination-pages">Pg 1 of 1</span>#', $html, 'One page says how many rows it holds.');
+        }
+        self::assertStringNotContainsString(' of 0 ·', $render(0, 50), 'An empty list states no rows.');
+        $catalogue = \CattoLearning\Application\PlatformAdministrationService::paginationPayload('catalogue', \CattoLearning\Support\Pagination::catalogue(1, 30), '/courses', 'Courses');
+        self::assertFalse($catalogue['has_sizes'], 'The catalogue has one fixed size and nothing to choose.');
+    }
+
+    /**
+     * A long list's numbered window gives way where the row is too wide for its line (owner, 2026-10-21: the pagination
+     * row must not scroll on a desktop screen; a 110-page list did in Factory Reset Sidebar at 1440px): the script hides
+     * the pages farthest from the current one, never the first, last or current, and only beside an ellipsis.
+     */
+    public function testALongWindowGivesWayWhenTheRowIsTooWide(): void
+    {
+        $script = self::read('public_html/js/platform-overrides.js');
+        self::assertStringContainsString('const fitPagination = root =>', $script);
+        self::assertStringContainsString("fitTableColumns(root); applyCellTooltips(root); fitPagination(root); fitFigures(root);", $script, 'On load, after every swap, on toggle and on resize.');
+        self::assertStringContainsString("!row.querySelector('.pagination-gap')", $script, 'Only a window that already shows an ellipsis.');
+        self::assertStringContainsString('index > 0 && index < items.length - 1 && index !== current', $script, 'Never the first, last or current page.');
+        self::assertStringContainsString('.pagination-pages-list>li[hidden]{display:none}', self::read('public_html/css/catto-platform.css'));
+    }
+
+    /**
      * The numbered pages are never a select. A four-thousand-option element is the same
      * whole-table control this platform removed from every other screen.
      */

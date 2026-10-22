@@ -19,7 +19,7 @@
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'To', full_width: false, for: 'payments-to'})} %}{% block control %}<input type="date" id="payments-to" name="to" value="{{ filters.to }}" {{ ui_field_attrs(props) }}>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Step', full_width: false, for: 'payments-state'})} %}{% block control %}<select id="payments-state" name="state" {{ ui_field_attrs(props) }}><option value="">Any step</option>{% for key, label in states %}<option value="{{ key }}" {{ filters.state == key ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
 			{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'How it was paid', full_width: false, for: 'payments-gateway'})} %}{% block control %}<select id="payments-gateway" name="gateway" {{ ui_field_attrs(props) }}><option value="">Any way</option>{% for gateway, label in gateways %}<option value="{{ gateway }}" {{ filters.gateway == gateway ? 'selected' : '' }}>{{ label }}</option>{% endfor %}</select>{% endblock %}{% endembed %}
-			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/payment-events'}) }}{% endblock %}{% endembed %}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Filter', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-filter'}) }}{{ ui('action.link', {label: 'Clear', variant: 'secondary', size: 'normal', href: '/admin/commerce/payment-events', icon: 'action-clear'}) }}{% endblock %}{% endembed %}
 		{% endblock %}{% endembed %}</form>
 	{% endblock %}{% endembed %}</section>
 	<section class="cl-page-section">{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {})} %}{% block surface_body %}
@@ -35,7 +35,7 @@
 						<td class="small">{{ row.when }}</td>
 						<td class="cell-text">{% include '@platform/partials/admin/money-sentence.html.twig' with {ms_parts: row.sentence_parts} only %}</td>
 						<td>{{ row.amount_label }}</td>
-						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open payment step ' ~ row.id}) }}</td>
+						<td class="cell-actions">{{ ui('action.link', {label: 'Open', variant: 'secondary', size: 'small', href: row.href, aria_label: 'Open payment step ' ~ row.id, icon: 'action-open'}) }}</td>
 					</tr>
 				{% endfor %}
 			{% endblock %}

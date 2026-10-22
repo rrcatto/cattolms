@@ -13,21 +13,21 @@
 {# Starting begins the access period and cannot be undone, so the learner confirms it first (owner, 2026-10-17). #}
 <form action="/learn/{{ course.slug }}/start{{ preview_query }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">
 {% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'I understand that starting begins my access period of ' ~ course.access_period_label ~ ', which then runs to its end, and that a started course can no longer be refunded.'})} %}{% block control %}<input type="checkbox" name="confirm_start" value="yes" required>{% endblock %}{% endembed %}
-{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit'}) }}{% endblock %}{% endembed %}</form>
+{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}{% block primary_actions %}{{ ui('action.button', {label: 'Start course', variant: 'primary', size: 'large', type: 'submit', icon: 'action-start'}) }}{% endblock %}{% endembed %}</form>
 {% elseif course.structure|default([])|length %}
 <nav class="cl-course-item-paging" aria-label="Course content">
-<span></span>{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ preview_query}) }}
+<span></span>{% set first_is_assessment = course.structure[0].item_type|default('') in ['assessment', 'diagnostic'] %}{{ ui('action.link', {label: 'Begin course →', variant: 'primary', size: 'normal', href: '/learn/' ~ course.slug ~ '/item/' ~ course.structure[0].id ~ (first_is_assessment ? '/assessment/' ~ course.structure[0].item_key : '/content') ~ preview_query, icon: 'action-start'}) }}
 </nav>
 {% endif %}
 {% if not is_preview and course.certificate|default(null) %}
-<p class="cl-course-certificate-links">{{ ui('action.link', {label: 'View certificate', variant: 'primary', size: 'small', href: '/certificates/' ~ course.certificate.public_id}) }} {{ ui('action.link', {label: 'Download certificate PDF', variant: 'secondary', size: 'small', href: '/certificates/' ~ course.certificate.public_id ~ '/certificate.pdf'}) }}{% if course.certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', size: 'small', href: '/transcripts/' ~ course.certificate.transcript_public_id}) }}{% endif %} {{ ui('action.link', {label: 'Who can see them', variant: 'quiet', size: 'small', href: '/account/certificates#certificate-' ~ course.certificate.id}) }}</p>
+<p class="cl-course-certificate-links">{{ ui('action.link', {label: 'View certificate', variant: 'primary', size: 'small', href: '/certificates/' ~ course.certificate.public_id, icon: 'action-view'}) }} {{ ui('action.link', {label: 'Download certificate PDF', variant: 'secondary', size: 'small', href: '/certificates/' ~ course.certificate.public_id ~ '/certificate.pdf', icon: 'action-download'}) }}{% if course.certificate.transcript_public_id|default(null) %} {{ ui('action.link', {label: 'View transcript', variant: 'secondary', size: 'small', href: '/transcripts/' ~ course.certificate.transcript_public_id, icon: 'action-view'}) }}{% endif %} {{ ui('action.link', {label: 'Who can see them', variant: 'quiet', size: 'small', href: '/account/certificates#certificate-' ~ course.certificate.id, icon: 'action-share'}) }}</p>
 {% elseif not is_preview and course.certificate_waiting|default(false) %}
 {# A certificate is issued only to a verified account (owner, 2026-10-19). #}
-<div class="cl-course-certificate-links">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: course.certificate_waiting_message})} %}{% block body %}{{ ui('action.link', {label: 'Verify my identity', variant: 'primary', size: 'small', href: '/account/verification?return=' ~ ('/learn/' ~ course.slug)|url_encode}) }}{% endblock %}{% endembed %}</div>
+<div class="cl-course-certificate-links">{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: course.certificate_waiting_message})} %}{% block body %}{{ ui('action.link', {label: 'Verify my identity', variant: 'primary', size: 'small', href: '/account/verification?return=' ~ ('/learn/' ~ course.slug)|url_encode, icon: 'action-verify'}) }}{% endblock %}{% endembed %}</div>
 {% endif %}
 {# Not in an ADMIN preview: previewing a course is authoring it, not studying it. #}
 {% if not is_preview and 'LEARNING.REVIEW.CREATE' in permissions %}
-<p class="cl-course-review-prompt">{{ ui('action.link', {label: 'Rate this course', variant: 'secondary', size: 'small', href: '/learn/' ~ course.slug ~ '/review'}) }}</p>
+<p class="cl-course-review-prompt">{{ ui('action.link', {label: 'Rate this course', variant: 'secondary', size: 'small', href: '/learn/' ~ course.slug ~ '/review', icon: 'action-rate'}) }}</p>
 {% endif %}
 </section>
 {% endblock %}

@@ -350,6 +350,9 @@ Radiant Learning, Factory Reset Sidebar and Saharan Sunset all need individual v
 | identity name | `cl-identity-name` |
 | identity email | `cl-identity-email` |
 | identity role/status area | `cl-identity-roles` |
+| account reference with its label | `cl-identity-account` |
+| the label "Account Reference:" | `cl-identity-account-label` |
+| account reference (opens the profile) | `cl-identity-reference` |
 | ordinary page content section | `cl-page-section` |
 | footer root | `cl-footer` |
 | footer inner wrapper | `cl-footer-inner` |

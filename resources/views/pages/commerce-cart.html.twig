@@ -12,7 +12,7 @@
                 <p>{{ item.days }} days of access · {% include '@platform/partials/price.html.twig' with {price: item, price_saving: true} %}</p>
                 <form action="/cart/remove" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="variant_id" value="{{ item.id }}">
-                    {{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit'}) }}
+                    {{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-remove'}) }}
                 </form>
             </div>
         {% endfor %}
@@ -21,7 +21,7 @@
                 {% include '@platform/partials/commerce-bundle-line.html.twig' %}
                 <form action="/cart/remove-bundle" method="post">
                     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="bundle_offer_id" value="{{ bundle.id }}">
-                    {{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit', aria_label: 'Remove ' ~ bundle.title}) }}
+                    {{ ui('action.button', {label: 'Remove', variant: 'secondary', size: 'small', type: 'submit', aria_label: 'Remove ' ~ bundle.title, icon: 'action-remove'}) }}
                 </form>
             </div>
         {% endfor %}
@@ -33,7 +33,7 @@
             {% elseif cart.promo.code %}<p class="help">Promo code {{ cart.promo.code }} is on this cart{{ cart.promo.applied ? '' : ' but no longer applies' }}. You can change it when you review your order at checkout.</p>{% endif %}
             {% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
-{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'normal', href: '/checkout'}) }}
+{{ ui('action.link', {label: 'Checkout', variant: 'primary', size: 'normal', href: '/checkout', icon: 'action-pay'}) }}
 {% endblock %}
 {% endembed %}
         {% endif %}

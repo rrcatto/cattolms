@@ -1,12 +1,15 @@
 {#
 	The shared pagination row, kept short so it fits one line (owner, 2026-10-21: "be ECONOMICAL with how many chars you
 	splash on the page"): icons for first, previous, next and last (their words for screen readers), "Pg", "Show Pg", the
-	page count said once, and the rows drop-down before its words.
+	page count said once, and the rows drop-down before its words. The page controls show only when there is another
+	page; the rows drop-down whenever the list is longer than the smallest size, so a reader who chose more rows than the
+	list holds can always choose fewer again (owner, 2026-10-21); the rows shown and the total whenever there are any, so
+	"Pg 1 of 1" says why there is one page.
 #}
 {% set pg_id = pg.prefix ~ '-' ~ pg_position|default('single') %}
 <nav class="pagination-row" role="navigation" aria-label="{{ pg.label }} pagination" data-pagination="{{ pg.prefix }}">
 	<div class="pagination-summary" aria-live="polite">
-		{% if pg.total_pages > 1 %}<span>{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
+		{% if pg.total > 0 %}<span>{{ pg.from }}–{{ pg.to }} of {{ pg.total }} ·</span>{% endif %}
 		<span class="pagination-pages">Pg {{ pg.page }} of {{ pg.total_pages }}</span>
 	</div>
 	{% if pg.has_pages %}
@@ -51,8 +54,10 @@
 			<label for="{{ pg_id }}-jump-page">Show Pg</label>
 			<input id="{{ pg_id }}-jump-page" name="{{ pg.page_param }}" type="number" inputmode="numeric"
 		       min="1" max="{{ pg.total_pages }}" step="1" value="{{ pg.page }}" data-digits="{{ (pg.total_pages ~ '')|length }}">
-			{{ ui('action.button', {label: 'Go', variant: 'secondary', size: 'small', type: 'submit'}) }}
+			{{ ui('action.button', {label: 'Go', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-open'}) }}
 		</form>
+	{% endif %}
+	{% if pg.has_sizes %}
 		<form class="pagination-page-size" method="get" action="{{ pg.base }}"
 	      hx-get="{{ pg.base }}" hx-target="#{{ pg.region }}" hx-select="#{{ pg.results }}"
 	      hx-swap="innerHTML" hx-push-url="true" hx-indicator="closest .pagination-row">
@@ -68,7 +73,7 @@
 			</select>
 			<label for="{{ pg_id }}-page-size">Rows per pg</label>
 			<noscript>
-				{{ ui('action.button', {label: 'Apply', variant: 'secondary', size: 'small', type: 'submit'}) }}
+				{{ ui('action.button', {label: 'Apply', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-done'}) }}
 			</noscript>
 		</form>
 	{% endif %}

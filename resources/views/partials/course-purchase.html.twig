@@ -15,10 +15,10 @@
 <div class="cl-course-purchase cl-course-purchase--{{ purchase_style }}">
 	{% if purchase.state == 'owned' %}
 		<p class="cl-course-purchase-note">This course is already in your library.</p>
-		{{ ui('action.link', {label: purchase.continue.label, variant: 'primary', size: 'normal', full_width: purchase_style == 'full', href: purchase.continue.href}) }}
+		{{ ui('action.link', {label: purchase.continue.label, variant: 'primary', size: 'normal', full_width: purchase_style == 'full', href: purchase.continue.href, icon: 'action-start'}) }}
 	{% elseif purchase.state == 'ordered' %}
 		<p class="cl-course-purchase-note">An order of yours already holds this course.</p>
-		{{ ui('action.link', {label: 'View your orders', variant: 'primary', size: 'normal', full_width: purchase_style == 'full', href: purchase.orders_href}) }}
+		{{ ui('action.link', {label: 'View your orders', variant: 'primary', size: 'normal', full_width: purchase_style == 'full', href: purchase.orders_href, icon: 'action-view-all'}) }}
 	{% elseif purchase.state == 'available' %}
 		{% if not purchase.can_buy %}<p class="cl-course-purchase-note">{{ purchase.company_note }}</p>{% endif %}
 		{% if purchase.can_buy or purchase.can_request %}
@@ -46,11 +46,11 @@
 			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}
 				{% if purchase.can_buy %}
-					{{ ui('action.button', {label: 'Add to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-add', disabled: purchase_inert}) }}
-					{{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now', disabled: purchase_inert}) }}
+					{{ ui('action.button', {label: 'Add to cart', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'add', icon: 'action-cart', disabled: purchase_inert}) }}
+					{{ ui('action.button', {label: 'Buy now', variant: 'secondary', size: 'normal', type: 'submit', name: 'action', value: 'buy_now', disabled: purchase_inert, icon: 'action-buy'}) }}
 				{% endif %}
 				{% if purchase.can_request %}
-					{{ ui('action.button', {label: 'Request from my company', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'request', disabled: purchase_inert}) }}
+					{{ ui('action.button', {label: 'Request from my company', variant: 'primary', size: 'normal', type: 'submit', name: 'action', value: 'request', disabled: purchase_inert, icon: 'action-send'}) }}
 				{% endif %}
 {% endblock %}
 {% endembed %}

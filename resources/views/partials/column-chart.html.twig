@@ -1,0 +1,17 @@
+{#
+	Amounts over time as columns (owner, 2026-10-21: the dashboard's money in, "columns over time"): one column for each
+	slice of the period, the empty ones included, the tallest at the top of the scale. A column with an amount opens what it
+	adds up; each says its slice and amount to a pointer and to a screen reader, and about six slices are named beneath.
+	cc_label names the chart, cc_top is the largest amount and cc_columns its columns (label, labelled, share, title, href).
+#}
+<figure class="cl-column-chart" aria-label="{{ cc_label }}">
+	<div class="cl-column-chart-scale" aria-hidden="true"><span>{{ cc_top }}</span><span>0</span></div>
+	<ol class="cl-column-chart-columns">
+		{% for cc_column in cc_columns %}
+			<li class="cl-column-chart-column">
+				{% if cc_column.href %}<a class="cl-column-chart-bar" href="{{ cc_column.href }}" style="height:{{ cc_column.share }}%" title="{{ cc_column.title }}" aria-label="{{ cc_column.title }}"></a>{% else %}<span class="cl-column-chart-bar" title="{{ cc_column.title }}"><span class="visually-hidden">{{ cc_column.title }}</span></span>{% endif %}
+				{% if cc_column.labelled %}<span class="cl-column-chart-label" aria-hidden="true">{{ cc_column.label }}</span>{% endif %}
+			</li>
+		{% endfor %}
+	</ol>
+</figure>

@@ -34,7 +34,7 @@
 {% endblock %}
 {% block modal_actions %}
 
-					{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}{{ ui('action.button', {label: 'Create Company', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
+					{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}{{ ui('action.button', {label: 'Create Company', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}
 
 {% endblock %}
 {% endembed %}
@@ -83,9 +83,9 @@
 {% endblock %}
 {% block modal_actions %}
 
-						{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true}) }}
-						{{ ui('action.button', {label: 'Save company', variant: 'primary', size: 'normal', type: 'submit'}) }}
-					{{ ui('action.button', {label: (company.status=='active' ? 'Disable company' : 'Enable company'), variant: company.status=='active' ? 'danger' : 'secondary', size: 'small', form: 'company-edit-' ~ (company.id) ~ '-status'}) }}
+						{{ ui('action.button', {label: 'Cancel', variant: 'secondary', size: 'normal', type: 'button', close_modal: true, icon: 'action-cancel'}) }}
+						{{ ui('action.button', {label: 'Save company', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}
+					{{ ui('action.button', {label: (company.status=='active' ? 'Disable company' : 'Enable company'), variant: company.status=='active' ? 'danger' : 'secondary', size: 'small', form: 'company-edit-' ~ (company.id) ~ '-status', icon: (company.status == 'active' ? 'action-disable' : 'action-enable')}) }}
 {% endblock %}
 {% block additional_forms %}
 <form action="/admin/companies/{{ company.id }}/status" method="post" id="company-edit-{{ company.id }}-status"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="status" value="{{ company.status=='active' ? 'disabled' : 'active' }}"></form>

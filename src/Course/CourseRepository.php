@@ -616,6 +616,8 @@ final class CourseRepository
                     (SELECT COUNT(*)::int FROM assessment_questions aq JOIN course_item_placements cip ON cip.course_item_id=aq.course_item_id WHERE cip.course_id=c.id) AS question_count,
                     (SELECT COUNT(*)::int FROM course_editors ced WHERE ced.course_id=c.id) AS editor_count,
                     (SELECT COUNT(DISTINCT ce.user_id)::int FROM course_enrolments ce WHERE ce.course_id=c.id AND ce.status IN ('assigned','active','completed') AND ce.is_preview=FALSE) AS learner_count,
+                    /* Order lines that bought the course, on its own or in a bundle: such a course is never deleted (owner, 2026-10-21). */
+                    ((SELECT COUNT(*) FROM commerce_order_items oi WHERE oi.course_id=c.id) + (SELECT COUNT(*) FROM commerce_bundle_grants bg WHERE bg.course_id=c.id))::int AS bought_lines,
                     dpv.price_minor_units AS default_price_minor_units, dpv.was_price_minor_units AS default_was_price_minor_units,
                     dpv.currency_code AS default_currency_code, dpv.access_period_seconds AS default_price_access_period_seconds
              FROM page

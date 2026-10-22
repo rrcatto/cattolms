@@ -9,12 +9,12 @@
 	<section class="cl-page-section">
 		<nav aria-label="Course tools">{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content'}) }}
-			{% if can_preview_courses %}{{ ui('action.link', {label: 'Preview as student', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview'}) }}{% endif %}
-			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate'}) }}{% endif %}
-			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing', aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status)}) }}
-			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export'}) }}
-			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import'}) }}
+			{{ ui('action.link', {label: 'Edit Course Content', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content', icon: 'action-edit'}) }}
+			{% if can_preview_courses %}{{ ui('action.link', {label: 'Preview as student', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/preview', icon: 'action-preview'}) }}{% endif %}
+			{% if can_manage_certificates %}{{ ui('action.link', {label: 'Edit certificate', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/certificate', icon: 'action-edit'}) }}{% endif %}
+			{{ ui('action.link', {label: landing_status == 'none' ? 'Landing page: none' : (landing_status == 'published' ? 'Landing page: published' : 'Landing page: draft'), variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/landing', aria_label: 'Landing page, ' ~ (landing_status == 'none' ? 'none yet' : landing_status), icon: 'action-edit'}) }}
+			{{ ui('action.link', {label: 'Export course JSON', variant: 'secondary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/export', icon: 'action-export'}) }}
+			{{ ui('action.link', {label: 'Import or re-import', variant: 'secondary', size: 'small', href: '/admin/courses/import', icon: 'action-import'}) }}
 {% endblock %}
 {% endembed %}</nav>
 		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true, id: 'course-editor'})} %}
@@ -82,8 +82,8 @@
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save course details', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save course details', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 				</form>
 			{% endif %}
@@ -101,8 +101,8 @@
 {% block control %}<input class="cl-input" id="test-access-days" type="number" name="access_days" min="1" max="24855" value="{{ course.access_days }}" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Grant access', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-grant'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 {% endblock %}
 {% endembed %}
@@ -118,9 +118,9 @@
 				<div class="mt-7">{{ ui('layout.section-head', {heading: 'Your own testing', heading_level: 2, summary: 'Preview uses the real course player without affecting learner records. Adding the course to your library gives you a persistent, non-preview enrolment.'}) }}</div>
 				{% embed ui_template('action.group') with {props: ui_props('action.group', {})} %}
 {% block body %}
-					{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments'}) }}
+					{{ ui('action.link', {label: 'Manage all enrolments', variant: 'secondary', size: 'small', href: '/admin/course/enrolments', icon: 'action-manage'}) }}
 					{% if can_preview_courses %}
-						<form action="/admin/courses/{{ course.id }}/preview/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset my preview progress', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+						<form action="/admin/courses/{{ course.id }}/preview/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset my preview progress', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-reset'}) }}</form>
 						<form action="/admin/courses/{{ course.id }}/grant-self" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Add to my library', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-add'}) }}</form>
 					{% endif %}
 {% endblock %}
@@ -160,8 +160,8 @@
 {% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save owner & editors', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save owner & editors', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 {% endblock %}
 {% endembed %}
@@ -187,7 +187,7 @@
 							{% set price_form = 'price-edit-' ~ price.id %}
 							<tr id="price-{{ price.id }}">
 								<td class="cell-actions">
-									{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, label: 'Move'})} %}
+									{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, label: 'Move', icon: 'action-move'})} %}
 {% block body %}
 										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="up">{{ ui('action.button', {label: 'Up', aria_label: 'Move up', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-up', disabled: price_index==0}) }}</form>
 										<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/move" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="direction" value="down">{{ ui('action.button', {label: 'Down', aria_label: 'Move down', variant: 'quiet', size: 'small', type: 'submit', icon: 'action-move-down', disabled: price_index+1==course.price_variants|length}) }}</form>
@@ -209,8 +209,8 @@
 									<td class="cell-actions">
 										{% embed ui_template('action.row') with {props: ui_props('action.row', {})} %}
 {% block body %}
-											<form id="{{ price_form }}" action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit'}) }}</form>
-											{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'small', href: tab_url ~ '#price-' ~ price.id}) }}
+											<form id="{{ price_form }}" action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Save', variant: 'primary', size: 'small', type: 'submit', icon: 'action-save-changes'}) }}</form>
+											{{ ui('action.link', {label: 'Cancel', variant: 'quiet', size: 'small', href: tab_url ~ '#price-' ~ price.id, icon: 'action-cancel'}) }}
 {% endblock %}
 {% endembed %}
 									</td>
@@ -223,11 +223,11 @@
 										{{ ui('feedback.badge', {label: (price.is_active ? 'Active' : 'Inactive'), tone: price.is_active ? 'success' : 'neutral', size: 'small'}) }}
 									</td>
 									<td class="cell-actions">
-										{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true})} %}
+										{% embed ui_template('action.row') with {props: ui_props('action.row', {narrow_menu: true, icon: 'action-more'})} %}
 {% block body %}
-											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: tab_url ~ '&edit_price=' ~ price.id ~ '#price-' ~ price.id}) }}
+											{{ ui('action.link', {label: 'Edit', variant: 'secondary', size: 'small', href: tab_url ~ '&edit_price=' ~ price.id ~ '#price-' ~ price.id, icon: 'action-edit'}) }}
 											{% if not price.is_default %}
-												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', type: 'submit'}) }}</form>
+												<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/default" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Make default', variant: 'secondary', size: 'small', type: 'submit', icon: 'action-default'}) }}</form>
 											{% endif %}
 											<form action="/admin/courses/{{ course.id }}/pricing/{{ price.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete', variant: 'danger', size: 'small', type: 'submit', confirm: 'Delete this price option?', icon: 'action-remove'}) }}</form>
 {% endblock %}
@@ -268,7 +268,7 @@
 						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Make this the default catalogue price', span: 'quarter'})} %}{% block control %}<input type="checkbox" name="is_default" value="1">{% endblock %}{% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
 {% block primary_actions %}{{ ui('action.button', {label: 'Add price option', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-add'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 {% endblock %}
 {% endembed %}
@@ -277,7 +277,7 @@
 
 			{% if active_tab == 'content' %}
 				{% embed ui_template('layout.section-head') with {props: ui_props('layout.section-head', {heading: 'Course content', heading_level: 2, summary: 'The nested course structure, built from reusable Course Items and course-specific placements. This outline is read-only; arrange the course in the Course Content editor.'})} %}
-{% block section_actions %}{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content'}) }}{% endblock %}
+{% block section_actions %}{{ ui('action.link', {label: 'Open Course Content editor', variant: 'primary', size: 'small', href: '/admin/courses/' ~ course.id ~ '/content', icon: 'action-edit'}) }}{% endblock %}
 {% endembed %}
 				{% if content_summary.outline %}
 					{% embed ui_template('data.table') with {props: ui_props('data.table', {density: 'compact', caption: content_summary.item_count ~ ' Course Items' ~ (content_summary.section_count ? ' in ' ~ content_summary.section_count ~ ' sections' : '')})} %}
@@ -318,8 +318,8 @@
 {% block control %}<textarea class="cl-input cl-mono" id="presentation-css" name="presentation_css" rows="24" spellcheck="false" autocomplete="off" {{ ui_field_attrs(props) }}>{{ course.presentation_css }}</textarea>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save stylesheet', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save stylesheet', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 {% endblock %}
 {% endembed %}
@@ -333,8 +333,8 @@
 {% block control %}<input class="cl-input" id="presentation-file" type="file" name="course_html" accept=".html,.htm,text/html" required {{ ui_field_attrs(props) }}>{% endblock %}
 {% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Import and replace stylesheet', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Import and replace stylesheet', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-import'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 {% endblock %}
 {% endembed %}
@@ -383,8 +383,8 @@
 {% endembed %}
 					<p class="cl-ui-field-help">To add a band, fill in the empty last row; leave it empty to skip it. You only set where each band starts: To % is worked out from the band above, and rows are sorted when you save. The lowest band must start at 0%.</p>
 					{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Save grading scale', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Save grading scale', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 				</form>
 				<div class="mt-7">{{ ui('layout.section-head', {heading: 'What learners see', heading_level: 2, summary: 'Shown on the public course page and wherever [grading-scale] appears in course content.'}) }}</div>
@@ -414,8 +414,8 @@
 {% endembed %}
 							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings', span: 'two-thirds'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
 							{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Change status', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
-{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Change status', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.link', {label: 'Cancel changes', variant: 'quiet', size: 'normal', href: tab_url, icon: 'action-cancel'}) }}{% endblock %}
 {% endembed %}
 {% endblock %}
 {% endembed %}
@@ -426,7 +426,7 @@
 						{{ ui('data.key-value-list', {items: [{label: 'Current approval', value: course.publication_approval_status|capitalize}]}) }}
 						{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Override publication warnings'})} %}{% block control %}<input type="checkbox" name="override_publication_warnings" value="1">{% endblock %}{% endembed %}
 						{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
-{% block primary_actions %}{{ ui('action.button', {label: 'Submit for approval', variant: 'primary', size: 'normal', type: 'submit'}) }}{% endblock %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Submit for approval', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-send'}) }}{% endblock %}
 {% endembed %}
 					</form>
 				{% endif %}
@@ -464,13 +464,18 @@
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact', tone: 'danger'})} %}
 {% block surface_body %}
 						{{ ui('layout.section-head', {heading: 'Reset course content', heading_level: 3, summary: 'Removes course content and learner test data. The empty course shell remains for re-import.'}) }}
-						<form action="/admin/courses/{{ course.id }}/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset course content', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reset this course now? Course content and learner test data will be removed, but the empty course shell will remain for re-import.', icon: 'action-remove'}) }}</form>
+						<form action="/admin/courses/{{ course.id }}/reset" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Reset course content', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Reset this course now? Course content and learner test data will be removed, but the empty course shell will remain for re-import.', icon: 'action-reset'}) }}</form>
 {% endblock %}
 {% endembed %}
 					{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {variant: 'compact', tone: 'danger'})} %}
 {% block surface_body %}
+						{# A course that was bought keeps its orders, invoices and receipts for good, so it is never deleted (owner, 2026-10-21). #}
+						{% if course.buying_orders > 0 %}
+						{{ ui('layout.section-head', {heading: 'This course cannot be deleted', heading_level: 3, summary: 'It has been bought (' ~ (course.buying_orders == 1 ? '1 order' : course.buying_orders ~ ' orders') ~ '), and orders, invoices and receipts are kept for good. ' ~ (course.status == 'retired' ? 'It is retired: it is out of the catalogue and nobody can buy it.' : 'Retire it on the Publication tab instead: it leaves the catalogue and nobody can buy it.')}) }}
+						{% else %}
 						{{ ui('layout.section-head', {heading: 'Delete course permanently', heading_level: 3, summary: 'Deletes the course and removes all associated learner access, progress, attempts and results.'}) }}
 						<form action="/admin/courses/{{ course.id }}/delete" method="post"><input type="hidden" name="csrf" value="{{ csrf }}">{{ ui('action.button', {label: 'Delete course permanently', variant: 'danger', size: 'normal', type: 'submit', confirm: 'Permanently delete this course and scrub all associated learner access, progress, attempts and results?', icon: 'action-remove'}) }}</form>
+						{% endif %}
 {% endblock %}
 {% endembed %}
 {% endblock %}
