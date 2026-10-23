@@ -541,7 +541,8 @@ final class CourseItemRepository
     {
         $row = $this->db->fetchAssociative(
             'INSERT INTO resources (public_id,title,description,filename,original_filename,resource_type,mime_type,byte_size,created_by_user_id,updated_at) VALUES (:public_id,:title,:description,:filename,:original,:type,:mime,:size,:user,:updated) RETURNING id',
-            ['public_id' => Uuid::v4(), 'title' => $data['title'], 'description' => $data['description'], 'filename' => $data['filename'], 'original' => $data['original_filename'], 'type' => $data['resource_type'], 'mime' => $data['mime_type'], 'size' => $data['byte_size'], 'user' => $userId, 'updated' => $data['updated_at'] ?? date(DATE_ATOM)]
+            // A Resource a catalogue package carries keeps the public id it had where it came from (owner, 2026-10-23).
+            ['public_id' => (string) ($data['public_id'] ?? '') !== '' ? (string) $data['public_id'] : Uuid::v4(), 'title' => $data['title'], 'description' => $data['description'], 'filename' => $data['filename'], 'original' => $data['original_filename'], 'type' => $data['resource_type'], 'mime' => $data['mime_type'], 'size' => $data['byte_size'], 'user' => $userId, 'updated' => $data['updated_at'] ?? date(DATE_ATOM)]
         );
         return (int) ($row['id'] ?? 0);
     }

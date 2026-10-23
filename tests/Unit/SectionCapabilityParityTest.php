@@ -94,7 +94,7 @@ final class SectionCapabilityParityTest extends TestCase
         // render passes through: the identity model BaseController builds, the section data the
         // service builds, and the controller's own shared presentation builder.
         $source = self::controllerSource();
-        foreach (['/../../src/Http/Controller/BaseController.php', '/../../src/Application/PlatformAdministrationService.php'] as $file) {
+        foreach (['/../../src/Http/ViewIdentity.php', '/../../src/Application/PlatformAdministrationService.php'] as $file) {
             $source .= (string) file_get_contents(__DIR__ . $file);
         }
 

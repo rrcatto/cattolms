@@ -320,14 +320,14 @@ final class RenderHarness
                 'enrolment_count' => 0, 'created_at' => '2026-01-01',
             ]],
             'courses' => [[
-                'id' => 1, 'title' => 'T', 'slug' => 't', 'status' => 'draft', 'category_name' => 'Cat',
+                'id' => 1, 'code' => 'T-101', 'title' => 'T', 'slug' => 't', 'status' => 'draft', 'category_name' => 'Cat',
                 'module_count' => 1, 'question_count' => 0, 'owner_company_name' => 'C',
                 'owner_person_name' => 'A', 'owner_user_id' => 1, 'owner_person_reference' => 'CL202601010001K', 'editor_count' => 0, 'learner_count' => 0, 'bought_lines' => 0,
                 'started_count' => 0, 'revision_number' => 1, 'updated_at' => '2026-01-01',
                 'public_id' => 'c1', 'summary' => '', 'subtitle' => '', 'level' => '',
                 'price' => ['price_label' => 'R 1 200,00', 'was_label' => 'R 1 800,00', 'saving_label' => 'R 600,00 (33%)', 'saving_percent' => 33, 'period_label' => '1 year'],
             ], [
-                'id' => 2, 'title' => 'U', 'slug' => 'u', 'status' => 'draft', 'category_name' => 'Cat',
+                'id' => 2, 'code' => 'U-101', 'title' => 'U', 'slug' => 'u', 'status' => 'draft', 'category_name' => 'Cat',
                 'module_count' => 1, 'question_count' => 0, 'owner_company_name' => 'C',
                 'owner_person_name' => 'A', 'owner_user_id' => null, 'owner_person_reference' => null, 'editor_count' => 0, 'learner_count' => 0, 'bought_lines' => 2,
                 'started_count' => 0, 'revision_number' => 1, 'updated_at' => '2026-01-01',

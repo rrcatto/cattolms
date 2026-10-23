@@ -11,6 +11,8 @@ Description:
 Creates the complete Catto Learning PostgreSQL schema and its reference data for a clean disposable development installation, as the one canonical migration. There is one kind of data. SYSTEM.* is reserved for platform infrastructure. While the system is not live, a schema change is made here and the database is reset and rebuilt; incremental migrations begin only once production is declared.
 
 Changelog:
+2026/10/23 SAST (course codes)
+- Course codes (owner, 2026-10-23: "Surely we need to introduce a course code instead so that small changes to the title don't throw things off?"): courses.code, unique, capital letters and digits joined by hyphens (GDN-101), searched in Administration -> Courses (courses_code_trgm_idx). Every import matches a course by it.
 2026/10/20 SAST (marked-down prices and automatic promotions)
 - Related courses (owner, 2026-10-20: "the relationship must be bijective ... if I relate one course to another, then the other course must reciprocally related"): course_relations keeps each related pair once, the lower course id first, so a relation is the same from either course and can never be one-sided.
 - Catalogue order (owner, 2026-10-20): courses.catalogue_position, an optional whole number set on the course's Details tab. The catalogue lists numbered courses first, lowest first, then the rest newest first; numbering in hundreds leaves room between courses.
@@ -114,6 +116,7 @@ private const SEARCH_INDEXES = [
         'users_display_name_trgm_idx' => 'users USING GIN ((display_name::text) gin_trgm_ops)',
         'user_emails_email_trgm_idx' => 'user_emails USING GIN ((email::text) gin_trgm_ops)',
         'courses_title_trgm_idx' => 'courses USING GIN ((title::text) gin_trgm_ops)',
+        'courses_code_trgm_idx' => 'courses USING GIN ((code::text) gin_trgm_ops)',
         'users_account_reference_trgm_idx' => 'users USING GIN ((account_reference::text) gin_trgm_ops)',
         'companies_account_reference_trgm_idx' => 'companies USING GIN ((account_reference::text) gin_trgm_ops)',
     ];
@@ -867,6 +870,10 @@ CREATE INDEX tags_name_idx ON tags(name);
 CREATE TABLE courses (
     id BIGSERIAL PRIMARY KEY,
     public_id UUID NOT NULL UNIQUE,
+    -- The course's own code (owner, 2026-10-23): chosen by its author, the same on every site, and what every
+    -- import matches a course by. A course made without one gets a random C- code.
+    code VARCHAR(20) NOT NULL UNIQUE DEFAULT ('C-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)))
+        CHECK (code ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' AND length(code) >= 2),
     category_id BIGINT NULL REFERENCES course_categories(id) ON DELETE SET NULL,
     slug VARCHAR(180) NOT NULL UNIQUE,
     title VARCHAR(240) NOT NULL,
@@ -901,6 +908,8 @@ CREATE TABLE courses (
     cover_svg TEXT NOT NULL DEFAULT '',
     catalogue_position INTEGER NULL CHECK (catalogue_position BETWEEN 1 AND 2000000000)
 );
+COMMENT ON COLUMN courses.code IS
+    'The course code (owner, 2026-10-23): capital letters and digits in parts joined by hyphens, such as GDN-101. Set by the course HTML file''s cattolms:course-code meta, the import review, the Details tab or a course package, and the same on every site, so a catalogue import matches the course by it, never by title or slug.';
 COMMENT ON COLUMN courses.catalogue_position IS
     'Where the course stands in the catalogue (owner, 2026-10-20): numbered courses first, lowest first, then the rest newest first. Number in hundreds (100, 200, 300) to leave room for courses in between.';
 COMMENT ON COLUMN courses.cover_svg IS

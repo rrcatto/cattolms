@@ -166,6 +166,40 @@ final class ResourceLibraryService
         return $this->records->createResource($this->metadata($filename, $input, $path, (int) filesize($path)), $userId);
     }
 
+    /**
+     * A file a catalogue package carries, kept as the Resource it was on the site it came from: the same public id, so
+     * the package's courses find it (owner, 2026-10-23). A file or title already used here keeps its own; this one takes
+     * a free name ("guide-2.pdf", "Guide (2)").
+     *
+     * @param array<string,mixed> $input title, description, resource_type, original_filename
+     */
+    public function install(string $publicId, string $filename, string $bytes, array $input, int $userId): int
+    {
+        if ($this->records->resourceByPublicId($publicId) !== null) {
+            throw new InvalidArgumentException('The Resource ' . $publicId . ' is already installed.');
+        }
+        $name = $this->filename($filename);
+        $directory = $this->directory();
+        $stem = pathinfo($name, PATHINFO_FILENAME);
+        $extension = pathinfo($name, PATHINFO_EXTENSION);
+        for ($n = 2; is_file($directory . '/' . $name); $n++) {
+            $name = $stem . '-' . $n . ($extension !== '' ? '.' . $extension : '');
+        }
+        $path = $directory . '/' . $name;
+        if (file_put_contents($path, $bytes, LOCK_EX) === false) {
+            throw new RuntimeException('The Resource file ' . $name . ' could not be saved.');
+        }
+        $title = trim((string) ($input['title'] ?? '')) ?: $name;
+        $base = $title;
+        for ($n = 2; $this->records->resourceTitleTaken($title); $n++) {
+            $title = $base . ' (' . $n . ')';
+        }
+        $type = (string) ($input['resource_type'] ?? '');
+        if (!in_array($type, self::TYPES, true)) $type = self::classify($name);
+        $data = $this->metadata($name, ['title' => $title, 'resource_type' => $type] + $input, $path, strlen($bytes));
+        return $this->records->createResource(['public_id' => $publicId] + $data, $userId);
+    }
+
     public function delete(int $id): void
     {
         $resource = $this->records->resource($id);

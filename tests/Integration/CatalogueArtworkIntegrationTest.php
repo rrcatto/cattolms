@@ -16,7 +16,8 @@ use PHPUnit\Framework\TestCase;
  * The catalogue's own categories and tags, each with an icon, and each course's tags and cover picture
  * (owner, 2026-10-20: "custom svg images … for each course … a custom svg icon … for each category. each
  * tag also needs a custom svg icon"; "1 - 3 tags per course"), kept in the catalogue file and put back
- * after a rebuild ("save it to a format you can reimport each time you reset the db").
+ * after a rebuild ("save it to a format you can reimport each time you reset the db"). Since 2026-10-23 the file holds
+ * the categories and tags; each course carries its own in its package (CataloguePackageIntegrationTest).
  */
 final class CatalogueArtworkIntegrationTest extends TestCase
 {
@@ -52,48 +53,47 @@ final class CatalogueArtworkIntegrationTest extends TestCase
 
     public function testTheCatalogueFileIsImportedOnceAndExportedAsItWasLoaded(): void
     {
-        $owner = $this->fixture->createUser('Catalogue course owner');
-        $company = $this->fixture->createCompany($owner, 'Catalogue provider ' . $this->suffix, $this->suffix . '.catalogue.example.test');
-        $slug = 'catalogue-course-' . $this->suffix;
-        $course = $this->fixture->createCourse($owner, $company, $slug, 'Catalogue course', 'published');
+        // Version 2 (owner, 2026-10-23): the categories and tags; each course's settings travel in its own package.
         $catalogue = [
-            'format' => 'cattolms-catalogue', 'version' => 1,
+            'format' => 'cattolms-catalogue', 'version' => 2,
             'categories' => [['name' => 'Catalogue root ' . $this->suffix, 'slug' => 'catalogue-root-' . $this->suffix, 'description' => 'The root.', 'icon' => self::ICON,
                 'children' => [['name' => 'Catalogue child ' . $this->suffix, 'slug' => 'catalogue-child-' . $this->suffix, 'description' => '', 'icon' => self::OTHER_ICON]]]],
             'tags' => [['name' => 'Catalogue tag ' . $this->suffix, 'icon' => self::ICON], ['name' => 'Second tag ' . $this->suffix, 'icon' => self::OTHER_ICON]],
-            'courses' => [['slug' => $slug, 'position' => 300, 'tags' => ['Catalogue tag ' . $this->suffix, 'Second tag ' . $this->suffix], 'cover' => self::COVER], ['slug' => 'no-such-course-' . $this->suffix]],
         ];
         $file = IntegrationContainer::get()->get(CatalogueFile::class);
-        $report = $file->import($catalogue);
-        self::assertSame(['categories_created' => 2, 'categories_kept' => 0, 'tags_created' => 2, 'tags_kept' => 0, 'courses_updated' => 1, 'courses_missing' => ['no-such-course-' . $this->suffix]], $report);
+        $plan = $file->plan($catalogue);
+        self::assertSame(['Catalogue root ' . $this->suffix, 'Catalogue root ' . $this->suffix . ' › Catalogue child ' . $this->suffix], $plan['categories_new'], 'The review names each category it would make by its path.');
+        self::assertSame(['Catalogue tag ' . $this->suffix, 'Second tag ' . $this->suffix], $plan['tags_new']);
+        $report = $file->import($catalogue, $this->admin);
+        self::assertSame(['categories_created' => 2, 'categories_kept' => 0, 'tags_created' => 2, 'tags_kept' => 0], $report);
 
         $root = $this->db->fetchAssociative('SELECT id, icon_svg, description FROM course_categories WHERE slug = :s', ['s' => 'catalogue-root-' . $this->suffix]);
         $child = $this->db->fetchAssociative('SELECT parent_id, level, icon_svg FROM course_categories WHERE slug = :s', ['s' => 'catalogue-child-' . $this->suffix]);
         self::assertSame([self::ICON, 'The root.', (int) $root['id'], 2, self::OTHER_ICON], [$root['icon_svg'], $root['description'], (int) $child['parent_id'], (int) $child['level'], $child['icon_svg']], 'The hierarchy and the icons are kept.');
-        self::assertSame(self::COVER, $this->db->fetchOne('SELECT cover_svg FROM courses WHERE id = :id', ['id' => $course]));
-        self::assertSame(['Catalogue tag ' . $this->suffix, 'Second tag ' . $this->suffix], $this->db->fetchFirstColumn('SELECT t.name FROM course_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.course_id = :c ORDER BY t.name', ['c' => $course]));
 
         $exported = $file->export();
+        self::assertSame([2, false], [$exported['version'], array_key_exists('courses', $exported)], 'The file holds categories and tags only.');
         $exportedRoot = array_values(array_filter($exported['categories'], fn(array $node): bool => $node['slug'] === 'catalogue-root-' . $this->suffix))[0];
         self::assertSame(['Catalogue root ' . $this->suffix, self::ICON, 'catalogue-child-' . $this->suffix, self::OTHER_ICON], [$exportedRoot['name'], $exportedRoot['icon'], $exportedRoot['children'][0]['slug'], $exportedRoot['children'][0]['icon']]);
-        $exportedCourse = array_values(array_filter($exported['courses'], static fn(array $entry): bool => $entry['slug'] === $slug))[0];
-        self::assertSame([['Catalogue tag ' . $this->suffix, 'Second tag ' . $this->suffix], self::COVER, '', 300], [$exportedCourse['tags'], $exportedCourse['cover'], $exportedCourse['category'], $exportedCourse['position']], 'Its tags, cover and position in the catalogue (owner, 2026-10-20) go out as they came in.');
 
-        $again = $file->import($catalogue);
+        $again = $file->import($catalogue, $this->admin);
         self::assertSame([0, 2, 0, 2], [$again['categories_created'], $again['categories_kept'], $again['tags_created'], $again['tags_kept']], 'Importing again creates nothing twice.');
+        self::assertSame([[], [], 2, 2], [($second = $file->plan($catalogue))['categories_new'], $second['tags_new'], $second['categories_kept'], $second['tags_kept']]);
     }
 
     public function testACatalogueFileIsCheckedBeforeAnythingIsKept(): void
     {
         $file = IntegrationContainer::get()->get(CatalogueFile::class);
-        try {
-            $file->import(['format' => 'something-else', 'version' => 1]);
-            self::fail('Only a catalogue file is imported.');
-        } catch (InvalidArgumentException $refused) {
-            self::assertSame('This is not a CattoLMS catalogue file (format "cattolms-catalogue", version 1).', $refused->getMessage());
+        foreach ([['format' => 'something-else', 'version' => 2], ['format' => 'cattolms-catalogue', 'version' => 1]] as $wrong) {
+            try {
+                $file->import($wrong, $this->admin);
+                self::fail('Only a catalogue file of this version is imported.');
+            } catch (InvalidArgumentException $refused) {
+                self::assertSame('This is not a CattoLMS catalogue file (format "cattolms-catalogue", version 2).', $refused->getMessage());
+            }
         }
         $this->expectExceptionMessage('The icon of the tag "Bad tag ' . $this->suffix . '" must be a picture only: it contains a <script> element.');
-        $file->import(['format' => 'cattolms-catalogue', 'version' => 1, 'categories' => [], 'tags' => [['name' => 'Bad tag ' . $this->suffix, 'icon' => '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>']]]);
+        $file->import(['format' => 'cattolms-catalogue', 'version' => 2, 'categories' => [], 'tags' => [['name' => 'Bad tag ' . $this->suffix, 'icon' => '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>']]], $this->admin);
     }
 
     public function testADetailsFormSetsTheCoursesTagsAndCoverAndTheFormsSetIcons(): void

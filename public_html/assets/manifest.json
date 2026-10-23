@@ -1,7 +1,8 @@
 {
-    "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-T2xpg2J.js",
+    "@symfony\/stimulus-bundle\/controllers.js": "\/assets\/@symfony\/stimulus-bundle\/controllers-sv7lsxd.js",
     "@symfony\/stimulus-bundle\/loader.js": "\/assets\/@symfony\/stimulus-bundle\/loader-IOzBDLu.js",
     "app.js": "\/assets\/app-we5Kv_X.js",
+    "controllers\/catalogue_export_controller.js": "\/assets\/controllers\/catalogue_export_controller-93SjUjn.js",
     "controllers\/category_tree_controller.js": "\/assets\/controllers\/category_tree_controller-wWZLLo_.js",
     "controllers\/certificate_preview_controller.js": "\/assets\/controllers\/certificate_preview_controller-nvs8RB-.js",
     "controllers\/course_content_controller.js": "\/assets\/controllers\/course_content_controller-CeeAsVC.js",

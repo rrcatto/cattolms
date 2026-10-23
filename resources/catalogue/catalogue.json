@@ -1,6 +1,6 @@
 {
     "format": "cattolms-catalogue",
-    "version": 1,
+    "version": 2,
     "categories": [
         {
             "name": "Finance and Accounting",
@@ -203,6 +203,5 @@
             "slug": "web-hosting",
             "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"7.5\" r=\"5\"/><ellipse cx=\"12\" cy=\"7.5\" rx=\"2.1\" ry=\"5\"/><path d=\"M7 7.5h10\"/><path d=\"M12 12.5V15\"/><rect x=\"2.5\" y=\"15\" width=\"19\" height=\"6.5\" rx=\"1.75\"/><path d=\"M6 18.25h.01M9.25 18.25h.01M13.5 18.25h4.5\"/></svg>"
         }
-    ],
-    "courses": []
+    ]
 }

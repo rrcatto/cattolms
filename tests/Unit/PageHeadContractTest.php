@@ -66,7 +66,6 @@ final class PageHeadContractTest extends TestCase
      */
     private const WITHOUT_HEADER = [
         'home.html.twig' => 'Its own hero; a header would be a second title.',
-        'error.html.twig' => 'No context to describe.',
         'course-detail.html.twig' => 'The course is the hero.',
         'bundle-detail.html.twig' => 'The bundle is the hero, as a course is on its own page.',
         'landing-page.html.twig' => 'A course landing page opens with its hero in the page-head band, as the course page does.',

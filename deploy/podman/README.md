@@ -60,7 +60,7 @@ The pod reaches the server's `127.0.0.1` at `10.0.2.2`, and the server sees thos
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/rrcatto/cattolms/main/deploy/podman/cattolms-podman.sh
-bash cattolms-podman.sh install --version 0.9.7 --port 8081
+bash cattolms-podman.sh install --version 0.9.8 --port 8081
 ```
 
 It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables, installs the themes, copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.

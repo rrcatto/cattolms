@@ -1,20 +1,49 @@
 {% extends layout %}
 {% block page_body %}
+	{#
+		Every error in plain words (owner, 2026-10-23: "should it not fail more gracefully?"), built like every other page:
+		a title that says what happened, the reason under it, and a card with what the reader can do next. The status
+		code stays in small print, for reporting a fault. ErrorPageListener chooses the kind and puts the reason in words.
+	#}
+	{% set ph_kicker = 'Error ' ~ status %}
+	{% set ph_title = {not_found: 'We could not find that page', forbidden: 'You can\'t open this page', broken: 'Something went wrong on our side', other: 'That could not be done'}[kind] %}
+	{% set ph_lead = message %}
+	{% include '@platform/partials/page-head.html.twig' %}
 	<section class="cl-page-section">
-		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {tone: 'danger'})} %}
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
 {% block surface_body %}
-
-				<div class="cl-display-4 fw-bold cl-text-danger">
-					{{ status }}
-				</div>
-				<h1 class="h3 mt-5">
-					Request failed
-				</h1>
-				<p>
-					{{ message }}
-				</p>
-				{{ ui('action.link', {label: 'Return home', variant: 'primary', size: 'normal', href: '/', icon: 'nav-home'}) }}
-
+			{{ ui('layout.section-head', {heading: 'What you can do', heading_level: 2, summary: {
+				not_found: 'Check the address, or find what you were looking for from here.',
+				forbidden: is_authenticated ? 'This page belongs to someone else or needs a permission your account does not have. If you meant to use another account, sign out and sign in with it.' : 'Sign in, and the page opens if your account may see it.',
+				broken: 'Try again in a moment. If it keeps happening, tell us what you were doing and we will look into it.',
+				other: 'Go back and try again, or start again from here.',
+			}[kind]}) }}
+			{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}
+				{% if kind == 'broken' and retry_url %}
+					{{ ui('action.link', {label: 'Try again', variant: 'primary', size: 'normal', href: retry_url, icon: 'action-refresh'}) }}
+				{% elseif kind == 'forbidden' and not is_authenticated %}
+					{{ ui('action.link', {label: 'Sign in', variant: 'primary', size: 'normal', href: '/login', icon: 'nav-signin'}) }}
+				{% elseif kind == 'forbidden' %}
+					{{ ui('action.link', {label: 'Go to your account', variant: 'primary', size: 'normal', href: '/account/courses', icon: 'nav-account'}) }}
+				{% else %}
+					{{ ui('action.link', {label: 'Go to the home page', variant: 'primary', size: 'normal', href: '/', icon: 'nav-home'}) }}
+				{% endif %}
+{% endblock %}
+{% block secondary_actions %}
+				{% if kind == 'forbidden' and is_authenticated %}
+					<form action="/logout" method="post">
+						<input type="hidden" name="csrf" value="{{ csrf }}">
+						{{ ui('action.button', {label: 'Sign out', variant: 'secondary', size: 'normal', type: 'submit', icon: 'nav-signout'}) }}
+					</form>
+				{% elseif kind == 'broken' %}
+					{{ ui('action.link', {label: 'Contact us', variant: 'secondary', size: 'normal', href: '/contact', icon: 'nav-contact'}) }}
+				{% else %}
+					{{ ui('action.link', {label: 'Browse the catalogue', variant: 'secondary', size: 'normal', href: '/courses', icon: 'nav-catalogue'}) }}
+					{% if is_authenticated %}{{ ui('action.link', {label: 'My courses', variant: 'quiet', size: 'normal', href: '/account/courses', icon: 'nav-learning'}) }}{% endif %}
+				{% endif %}
+{% endblock %}
+{% endembed %}
 {% endblock %}
 {% endembed %}
 	</section>

@@ -188,7 +188,7 @@ final class MarkedDownPriceIntegrationTest extends TestCase
         $rows = array_column($data['courses'], null, 'id');
         self::assertSame(['price_label' => $this->rand(1200000), 'period_label' => '1 year', 'was_label' => $this->rand(2500000), 'saving_label' => $this->rand(1300000) . ' (52%)', 'saving_percent' => 52], $rows[$marked]['price']);
         self::assertNull($rows[$unpriced]['price'], 'No price set: the cell stays blank.');
-        self::assertSame(['position', 'title', 'price', 'status', 'learners', 'updated', 'category', 'ownership', 'actions'], array_column($data['courses_sort_headers'], 'key'), 'The position leads (owner, 2026-10-20), the price follows the course; category and ownership come last; there is no Started column.');
+        self::assertSame(['position', 'code', 'title', 'price', 'status', 'learners', 'updated', 'category', 'ownership', 'actions'], array_column($data['courses_sort_headers'], 'key'), 'The position leads (owner, 2026-10-20), then the course code (2026-10-23), and the price follows the course; category and ownership come last; there is no Started column.');
     }
 
     private function course(string $title, string $status = 'draft'): int

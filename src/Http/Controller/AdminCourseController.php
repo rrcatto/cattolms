@@ -11,6 +11,9 @@ Description:
 Handles web requests for admin course operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/23 SAST
+- The import review gives the course its code (the file's, a replaced course's, else a suggestion), offers the course
+  with the file's code for replacement and chooses a course package's category (owner, 2026-10-23).
 2026/10/07 SAST
 - Import review: when every key collision belongs to one course already on the site, the review
   says so once and chooses that course under Replace, instead of listing each key.
@@ -78,7 +81,8 @@ final class AdminCourseController extends BaseController
         private readonly CourseService $courses,
         private readonly CoursePortabilityService $portability,
         private readonly PlatformAdministrationService $platformAdministration,
-        private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages
+        private readonly \CattoLearning\Course\Landing\LandingPageRepository $landingPages,
+        private readonly \CattoLearning\Course\CourseCatalogueSettings $catalogueSettings
     ) {
         parent::__construct($auth, $view, $requests);
     }
@@ -500,19 +504,30 @@ final class AdminCourseController extends BaseController
             // A course imported a second time collides with its own Course Items. Say that once and
             // choose it under Replace, rather than listing every key as a problem to resolve.
             $holder = $this->portability->courseHoldingConflicts($analysis);
+            // The course with the file's code is the same course (owner, 2026-10-23), before any key collision says so.
+            $fileCode = (string) ($analysis['course']['code'] ?? '');
+            $byCode = $this->portability->courseWithCode($fileCode);
             $existingCourse = null;
             foreach ($replaceable as $course) {
-                if ((int) $course['id'] === $holder) {
-                    $existingCourse = ['id' => (int) $course['id'], 'title' => (string) $course['title']];
+                if ($byCode !== null && (int) $course['id'] === (int) $byCode['id']) {
+                    $existingCourse = ['id' => (int) $course['id'], 'title' => (string) $course['title'], 'code' => (string) $course['code'], 'by_code' => true];
+                } elseif ($existingCourse === null && (int) $course['id'] === $holder) {
+                    $existingCourse = ['id' => (int) $course['id'], 'title' => (string) $course['title'], 'code' => (string) $course['code'], 'by_code' => false];
                 }
             }
             if ($existingCourse !== null) {
                 $analysis['warnings'] = array_values(array_diff((array) ($analysis['warnings'] ?? []), (array) ($analysis['key_conflicts'] ?? [])));
             }
+            // The code it will have: the file's, a replaced course's own, else one suggested from its title.
+            $importCode = $fileCode !== '' ? $fileCode : ($existingCourse !== null ? $existingCourse['code'] : $this->courses->suggestCourseCode((string) ($analysis['course']['title'] ?? '')));
+            // A course package names its category: chosen already when the site has it (owner, 2026-10-23).
+            $packageCategory = is_array($analysis['catalogue'] ?? null) ? $this->catalogueSettings->categoryIdByPath((string) ($analysis['catalogue']['category'] ?? '')) : null;
             return $this->render('admin-course-import-preview', [
                 'title' => 'Review course import',
                 'analysis' => $analysis,
-                'category_picker' => $this->courses->courseCategoryPicker(null),
+                'import_code' => $importCode,
+                'import_code_from_file' => $fileCode !== '',
+                'category_picker' => $this->courses->courseCategoryPicker($packageCategory),
                 'category_places' => $this->courses->categoryLocationPicker(),
                 'replaceable_courses' => $replaceable,
                 'existing_course' => $existingCourse,
@@ -529,11 +544,12 @@ final class AdminCourseController extends BaseController
         $key = trim((string) ($_POST['import_key'] ?? ''));
         $categoryId = (int) ($_POST['category_id'] ?? 0);
         $replaceCourseId = (int) ($_POST['replace_course_id'] ?? 0);
-        return $this->handle(function () use ($user, $key, $categoryId, $replaceCourseId): void {
+        $code = trim((string) ($_POST['code'] ?? ''));
+        return $this->handle(function () use ($user, $key, $categoryId, $replaceCourseId, $code): void {
             if ($replaceCourseId > 0) {
                 $this->requireManagedCourse($replaceCourseId);
             }
-            $courseId = $this->portability->commitImport($key, $categoryId, $user->id, $replaceCourseId > 0 ? $replaceCourseId : null);
+            $courseId = $this->portability->commitImport($key, $categoryId, $user->id, $replaceCourseId > 0 ? $replaceCourseId : null, $code);
             $this->flash('success', 'The course was imported into PostgreSQL as a draft.');
             $this->redirect('/admin/courses/' . $courseId);
         }, '/admin/courses/import/preview?key=' . rawurlencode($key));
@@ -703,6 +719,7 @@ final class AdminCourseController extends BaseController
         return [
             'id' => 0,
             'category_id' => 0,
+            'code' => '',
             'slug' => '',
             'title' => '',
             'subtitle' => '',

@@ -16,11 +16,14 @@ step a new installation needs, in order, each with what it is for, where it is d
 A step is done by what the site holds where that can be told (the Site Owner's details, a payment method, the
 categories, courses, prices, published courses, the scheduler's runs). A step that is a matter of judgement (the
 site mode, fees, the theme, the designs, reading the legal pages) is marked done by ADMIN, and can be marked
-not done again; a test email marks the mail step. The catalogue steps run here: loading the catalogue file's
-categories and tags, and, after courses are imported, giving the courses it knows their categories, tags and
-covers (CatalogueFile; never prices).
+not done again; a test email marks the mail step. The catalogue step loads the starter categories and tags published
+with the code here (CatalogueFile), or opens Import & Export Catalogue, where a catalogue package from another site
+brings its categories, tags and courses (CataloguePackage, owner 2026-10-23).
 
 Changelog:
+2026/10/23 SAST
+- The catalogue step opens Courses -> Import & Export Catalogue (owner, 2026-10-23: "I should be able to import the
+  catalogue.json myself without learning a CLI command"); no step names a console command.
 2026/10/20 SAST
 - Created.
 */
@@ -109,15 +112,15 @@ final class SetupChecklist
                 'Choose how the site looks. Six themes are installed.',
                 'Choose one, then mark this step done.', $manual('theme'), '/admin/themes', 'Open Themes'),
             $step('catalogue', 'Courses', 'Categories and tags',
-                'Load the starter categories and tags, each with its icon, from the catalogue file published with the code (resources/catalogue/catalogue.json). Change them afterwards under Course Categories and Course Tags.',
+                'Load the starter categories and tags, each with its icon, published with the code. Or, if you have a catalogue package from another site, import it at Courses → Import & Export Catalogue: it brings the categories, tags and every course with its cover, tags and prices. Change them afterwards under Course Categories and Course Tags.',
                 $counts['categories'] > 0 ? $counts['categories'] . ' categories and ' . $counts['tags'] . ' tags.' : 'No categories yet.',
-                $counts['categories'] > 0, '/admin/courses/categories', 'Open Course Categories', 'load-catalogue'),
+                $counts['categories'] > 0, '/admin/courses/catalogue', 'Open Import & Export Catalogue', 'load-catalogue'),
             $step('courses', 'Courses', 'Import your courses',
-                'Import each course from its HTML file under Courses → Import. Each import is reviewed before it is saved.',
+                'Import a catalogue package at Courses → Import & Export Catalogue, or each course from its HTML or JSON file under Courses → Import. Each import is reviewed before it is saved.',
                 $counts['courses'] === 0 ? 'No courses yet.' : $counts['courses'] . ' ' . ($counts['courses'] === 1 ? 'course' : 'courses') . ' on the site.',
                 $counts['courses'] > 0, '/admin/courses/import', 'Import a course'),
             $step('course-details', 'Courses', 'Categories, tags and covers for your courses',
-                'Give each course its category, one to three tags and a cover picture on its Details tab. If you keep your own catalogue file with your courses, `php bin/console catalogue:import <file>` does it for every course it knows (prices are never taken from a file).',
+                'Give each course its category, one to three tags and a cover picture on its Details tab. A catalogue package brings them with its courses.',
                 $counts['courses'] === 0 ? 'Import courses first.' : ($counts['uncategorised'] === 0 ? 'Every course has a category.' : $counts['uncategorised'] . ' ' . ($counts['uncategorised'] === 1 ? 'course has' : 'courses have') . ' no category.'),
                 $counts['courses'] > 0 && $counts['uncategorised'] === 0, '/admin/courses', 'Open Courses'),
             $step('publish', 'Courses', 'Price and publish your courses',
@@ -163,8 +166,7 @@ final class SetupChecklist
     }
 
     /**
-     * Loads the catalogue file published with the code: its categories and tags, and for each course already on
-     * the site that it knows, its tags, cover and (when it has none) category.
+     * Loads the catalogue file published with the code: its categories and tags.
      *
      * @return array<string,mixed> what the import did
      */
@@ -173,11 +175,11 @@ final class SetupChecklist
         $json = is_file(CatalogueFile::bundledPath()) ? (string) file_get_contents(CatalogueFile::bundledPath()) : '';
         if ($json === '') throw new InvalidArgumentException('The catalogue file resources/catalogue/catalogue.json is missing from the code.');
         try {
-            $report = $this->catalogue->import(json_decode($json, true, 64, JSON_THROW_ON_ERROR));
+            $report = $this->catalogue->import(json_decode($json, true, 64, JSON_THROW_ON_ERROR), $actorId);
         } catch (JsonException) {
             throw new InvalidArgumentException('The catalogue file is not valid JSON.');
         }
-        $this->audit->record($actorId, 'setup.catalogue_loaded', ['categories_created' => $report['categories_created'], 'tags_created' => $report['tags_created'], 'courses_updated' => $report['courses_updated']]);
+        $this->audit->record($actorId, 'setup.catalogue_loaded', ['categories_created' => $report['categories_created'], 'tags_created' => $report['tags_created']]);
         return $report;
     }
 }

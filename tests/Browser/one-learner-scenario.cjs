@@ -1,19 +1,20 @@
 /* One learner buys one course, everything made through the pages as people would do it (owner, 2026-10-19:
  * "No check may ever write records a real person could not have produced").
  *
- * It runs on a demo site with a clean database and a catalogue file with its courses (CATTO_CATALOGUE; the
- * file published with the code holds only categories and tags) and the courses' HTML files (CATTO_COURSES_DIR).
- * ADMIN signs in for the first time with the sign-in link Mailpit receives (that makes the ADMIN account) and
- * gives its date of birth, sets the card provider's transaction fee to 3% in Settings and loads the catalogue
- * file (`catalogue:import`): the categories as a tree and the tags, each with its icon. Then, for every course
- * the file lists, ADMIN imports it into its category, gives it its 12-month price and was price, ticks its tags,
- * uploads its cover picture and enters its position in the catalogue on its Details tab, and publishes it. ADMIN adds the learner Thandi Nkosi under
+ * It runs on a demo site with a clean database and the site's catalogue package (CATTO_CATALOGUE, or the private
+ * CATALOGUE/cattolms-catalogue.zip beside the code tree; owner, 2026-10-23). ADMIN signs in for the first time with
+ * the sign-in link Mailpit receives (that makes the ADMIN account) and gives its date of birth, sets the card
+ * provider's transaction fee to 3% in Settings and imports the package at Administration -> Courses -> Import &
+ * Export Catalogue: the review lists every course as new, and Import brings the categories as a tree and the tags,
+ * each with its icon, and every course with its code, category, tags, cover, position, related courses and the
+ * package's 12-month price and was price, published. ADMIN adds the learner Thandi Nkosi under
  * People. Thandi signs in with her own link and gives her date of birth (a date under 18 is refused first). Nothing
  * about her identity is asked before she buys. Thandi puts one course (CATTO_BOUGHT, or the catalogue's first)
  * in her cart, gives her details at checkout and pays with the simulated card, which stands in for the card
  * provider on a demo site. The course starts at once. Last, ADMIN's order page is read for what was recorded,
  * and Mailpit for what was sent: Thandi's order confirmation with her receipt attached and the email saying her
- * course has started, which the commerce worker sends within a minute.
+ * course has started, which the commerce worker sends within a minute. The catalogue package downloaded from the
+ * site at the end holds what was loaded.
  *
  * It leaves everything it makes. It refuses to run when a course from the catalogue is already on the site.
  * Screenshots, results.json and summary.json are written to /tmp/catto-one-learner-scenario
@@ -28,28 +29,36 @@ const mailpit = process.env.CATTO_MAILPIT_URL || 'http://127.0.0.1:8025';
 const root = path.resolve(__dirname, '..', '..');
 const workspace = path.resolve(root, '..', '..');
 const output = process.env.CATTO_BROWSER_OUTPUT || '/tmp/catto-one-learner-scenario';
-const coursesDir = process.env.CATTO_COURSES_DIR || path.join(workspace, 'COURSES');
 fs.mkdirSync(output, {recursive: true});
+const {execFileSync} = require('node:child_process');
 
 /* The administrator's address, from the instance's .env; never printed. */
 const adminEmail = process.env.CATTO_ADMIN_EMAIL || (() => {
     const line = fs.readFileSync(path.join(workspace, 'env', '.env'), 'utf8').split('\n').find((l) => l.startsWith('APP_ADMIN_EMAIL='));
     return (line || '').slice('APP_ADMIN_EMAIL='.length).replace(/["'\s]/g, '');
 })();
-/* The catalogue file: the categories, tags, icons and covers, and for each course its category, tags,
- * 12-month price and was price. Written by `catalogue:export`, read back here. */
-// The site's own catalogue file, with its courses (the file published with the code holds only the categories and
-// tags): CATTO_CATALOGUE, or the private copy beside the code tree.
-const catalogueFile = process.env.CATTO_CATALOGUE || path.join(workspace, 'CATALOGUE', 'catalogue.json');
-const CATALOGUE = JSON.parse(fs.readFileSync(catalogueFile, 'utf8'));
-// The course the learner buys: CATTO_BOUGHT names its file, or the catalogue's first course.
-const BOUGHT = process.env.CATTO_BOUGHT || (CATALOGUE.courses[0] || {}).file;
-if (!BOUGHT) throw new Error(`The catalogue file ${catalogueFile} lists no courses: give CATTO_CATALOGUE a catalogue with its courses.`);
-const COURSES = CATALOGUE.courses.map((course) => ({...course, was: course.was_price, bought: course.file === BOUGHT}));
-const container = process.env.CATTO_PHP_CONTAINER || 'env_php_1';
-const {execFileSync} = require('node:child_process');
-/* A console command in the PHP container, with what it printed to standard output (Symfony's debug log goes to standard error). */
-const console_ = (command, input = undefined) => execFileSync('podman', ['exec', '-i', '-u', 'cattotest', container, 'sh', '-lc', `php bin/console ${command} 2>/dev/null`], {input, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024}).trim();
+/* The site's own catalogue package: catalogue.json (the categories and tags, and the courses' codes in catalogue
+ * order) and one course package per course, read with Python's zipfile so the checks know what it holds. */
+const catalogueFile = process.env.CATTO_CATALOGUE || path.join(workspace, 'CATALOGUE', 'cattolms-catalogue.zip');
+const readPackage = (file) => JSON.parse(execFileSync('python3', ['-I', '-c', `
+import json, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+cat = json.loads(z.read('catalogue.json'))
+courses = []
+for code in cat.get('courses', []):
+    p = json.loads(z.read('courses/' + code + '.json'))
+    c = p.get('catalogue') or {}
+    prices = c.get('prices') or [{}]
+    price = next((x for x in prices if x.get('default')), prices[0])
+    courses.append({'code': code, 'slug': p['course']['slug'], 'title': p['course']['title'], 'category': c.get('category', ''), 'position': c.get('position'),
+        'tags': c.get('tags', []), 'related': c.get('related', []), 'price': price.get('price'), 'was': price.get('was_price'), 'status': c.get('status')})
+print(json.dumps({'categories': cat['categories'], 'tags': cat['tags'], 'courses': courses}))
+`, file], {encoding: 'utf8', maxBuffer: 64 * 1024 * 1024}));
+const CATALOGUE = readPackage(catalogueFile);
+// The course the learner buys: CATTO_BOUGHT names its code, or the catalogue's first course.
+const BOUGHT = process.env.CATTO_BOUGHT || (CATALOGUE.courses[0] || {}).code;
+if (!BOUGHT) throw new Error(`The catalogue package ${catalogueFile} holds no courses: give CATTO_CATALOGUE the site's package.`);
+const COURSES = CATALOGUE.courses.map((course) => ({...course, bought: course.code === BOUGHT}));
 /* An amount as the pages print it, as a pattern: R 1 200,00 with any spaces. */
 const amount = (major) => {
     const [rands, cents] = Number(major).toFixed(2).split('.');
@@ -117,16 +126,16 @@ async function signIn(page, address) {
     await page.locator('#email').fill(address);
     await submit(page, page.locator('form[action="/login"] button[type=submit]'));
     const message = await mailSince(address, since, /sign/i);
-    const link = ((message.Text || '') + (message.HTML || '')).match(/https:\/\/[^\s"<>]+\/auth\/consume\?token=[^\s"<>&]+/);
+    const link = ((message.Text || '') + (message.HTML || '')).match(/https?:\/\/[^\s"<>]+\/auth\/consume\?token=[^\s"<>&]+/);
     assert.ok(link, 'the email holds a sign-in link');
-    await page.goto(link[0].replace(/^https:\/\/[^/]+/, base));
+    await page.goto(link[0].replace(/^https?:\/\/[^/]+/, base));
 }
 
 (async () => {
     assert.ok(adminEmail, 'APP_ADMIN_EMAIL is set');
     const started = Date.now();
     const browser = await playwright.chromium.launch({headless: true});
-    const adminCtx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 1100}, reducedMotion: 'reduce'});
+    const adminCtx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 1100}, reducedMotion: 'reduce', acceptDownloads: true});
     const learnerCtx = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 1100}, reducedMotion: 'reduce'});
     const admin = await adminCtx.newPage();
     const learner = await learnerCtx.newPage();
@@ -153,97 +162,40 @@ async function signIn(page, address) {
             assert.match(await flash(admin), /Commerce settings saved/);
         });
 
-        await step('3. ADMIN loads the catalogue file: the categories as a tree and the tags, each with its icon', async () => {
-            summary.catalogue_import = console_('catalogue:import -', fs.readFileSync(catalogueFile));
+        summary.courses = [];
+        await step(`3. ADMIN imports the catalogue package at Import & Export Catalogue: its categories as a tree, its tags and its ${COURSES.length} courses, each with its code, cover, tags, position, related courses and the package's prices, published`, async () => {
+            await admin.goto(`${base}/admin/courses/catalogue`);
+            await admin.locator('#catalogue-file').setInputFiles(catalogueFile);
+            await submit(admin, admin.getByRole('button', {name: 'Review import'}));
+            assert.match(new URL(admin.url()).pathname, /\/admin\/courses\/catalogue\/review$/, 'the upload opens its review: ' + await flash(admin));
+            assert.equal(await admin.locator('table tbody tr').count(), COURSES.length, 'the review lists every course of the package');
+            assert.equal(await admin.locator('input[name="courses[]"]:checked').count(), COURSES.length, 'each one new and ticked: run this on a clean database');
+            assert.ok(await admin.locator('input[name=prices]').isChecked(), 'new courses take the package\'s prices (owner, 2026-10-23)');
+            assert.ok(await admin.locator('input[name=publish]').isChecked(), 'and are published as they were');
+            await shot(admin, '03-catalogue-review');
+            await submit(admin, admin.getByRole('button', {name: 'Import', exact: true}));
+            assert.match(new URL(admin.url()).pathname, /\/admin\/courses\/catalogue\/result$/, 'the import ends on its result: ' + await flash(admin));
+            const outcomes = await admin.locator('table tbody tr').evaluateAll((rows) => rows.map((row) => ({code: row.cells[0].innerText.trim(),
+                href: (row.cells[1].querySelector('a') || {getAttribute: () => ''}).getAttribute('href') || '', title: row.cells[1].innerText.trim(),
+                outcome: row.cells[2].innerText.trim(), details: row.cells[3].innerText.replace(/\s+/g, ' ').trim()})));
+            summary.catalogue_import = outcomes;
+            for (const course of COURSES) {
+                const row = outcomes.find((outcome) => outcome.code === course.code);
+                assert.ok(row, course.code + ' is in the result');
+                assert.match(row.outcome, /imported/i, course.code + ' was imported: ' + row.details);
+                assert.ok(row.details.includes('Published'), course.code + ' was published: ' + row.details);
+                summary.courses.push({id: Number(row.href.split('/').pop()), title: row.title, slug: course.slug, code: course.code, price: course.price, was: course.was, tags: course.tags});
+            }
+            await shot(admin, '03-catalogue-result');
             const count = (nodes) => nodes.reduce((total, node) => total + 1 + count(node.children || []), 0);
-            assert.match(summary.catalogue_import, new RegExp(`Categories: ${count(CATALOGUE.categories)} created, 0 already there\\. Tags: ${CATALOGUE.tags.length} created, 0 already there\\.`));
             await admin.goto(`${base}/admin/courses/categories`);
-            assert.equal(await admin.locator('li.cl-tree-node').count(), count(CATALOGUE.categories), 'Course categories lists exactly the file\'s categories');
+            assert.equal(await admin.locator('li.cl-tree-node').count(), count(CATALOGUE.categories), 'Course categories lists exactly the package\'s categories');
             assert.equal(await admin.locator('li.cl-tree-node .cl-category-icon svg').count(), count(CATALOGUE.categories), 'each with its icon');
             await shot(admin, '03-categories');
             await admin.goto(`${base}/admin/courses/tags`);
-            assert.equal(await admin.locator('tbody tr').count(), CATALOGUE.tags.length, 'Course Tags lists the file\'s tags');
+            assert.equal(await admin.locator('tbody tr').count(), CATALOGUE.tags.length, 'Course Tags lists the package\'s tags');
             await shot(admin, '03-tags');
         });
-
-        summary.courses = [];
-        for (const course of COURSES) {
-            await step(`3. ADMIN imports ${course.file} into ${course.category}, prices it at R${course.price} (was R${course.was}) for 12 months, gives it its tags (${course.tags.join(', ')}) and cover, and publishes it`, async () => {
-                await admin.goto(`${base}/admin/courses/import`);
-                await admin.locator('#course-file').setInputFiles(path.join(coursesDir, course.file));
-                await submit(admin, admin.locator('form[action="/admin/courses/import"] button[type=submit]'));
-                // The review preselects the course already on the site when the file's keys collide with it.
-                assert.equal(await admin.locator('select[name=replace_course_id]').inputValue(), '0', 'the course is not on the site yet: run this on a clean database');
-                await chooseCategory(admin, 'import-category', course.category);
-                await submit(admin, admin.locator('form[action="/admin/courses/import/commit"] button[type=submit]'));
-                const id = Number(new URL(admin.url()).pathname.split('/').pop());
-                assert.ok(id > 0, 'the import opens the new course');
-                const title = clean(await admin.locator('h1').innerText());
-                await admin.goto(`${base}/admin/courses/${id}?tab=pricing`);
-                await admin.locator('#new-price-period').fill('12');
-                await admin.locator('#new-price-unit').selectOption('months');
-                await admin.locator('#new-price-amount').fill(course.price);
-                await admin.locator('#new-price-was').fill(course.was);
-                await admin.locator('#new-price-label').fill('12-month access');
-                await admin.locator('form[action$="/pricing"] input[name=is_default]').check();
-                await submit(admin, admin.getByRole('button', {name: 'Add price option'}));
-                // Its tags, its cover picture and its position in the catalogue, on its Details tab (owner, 2026-10-20).
-                await admin.goto(`${base}/admin/courses/${id}`);
-                if (course.position !== null && course.position !== undefined) await admin.locator('#catalogue-position').fill(String(course.position));
-                const tags = admin.locator('fieldset.cl-course-tags-choice');
-                for (const tag of course.tags) await tags.getByRole('checkbox', {name: tag, exact: true}).check();
-                const cover = path.join(output, 'covers', course.file.replace(/\.html$/, '.svg'));
-                fs.mkdirSync(path.dirname(cover), {recursive: true});
-                fs.writeFileSync(cover, course.cover);
-                await admin.locator('#course-cover').setInputFiles(cover);
-                await submit(admin, admin.getByRole('button', {name: 'Save course details'}));
-                assert.match(await flash(admin), /The course details were updated/);
-                await admin.goto(`${base}/admin/courses/${id}?tab=publication`);
-                await admin.locator('#course-status').selectOption('published');
-                await submit(admin, admin.getByRole('button', {name: 'Change status'}));
-                if (!/published/i.test(await flash(admin))) {
-                    // Publishing names what still needs attention; ADMIN publishes anyway, as the form allows.
-                    await admin.goto(`${base}/admin/courses/${id}?tab=publication`);
-                    await admin.locator('#course-status').selectOption('published');
-                    await admin.locator('input[name=override_publication_warnings]').check();
-                    await submit(admin, admin.getByRole('button', {name: 'Change status'}));
-                }
-                const slug = (clean(await admin.locator('main').innerText()).match(/ \/([a-z0-9-]+) /) || [])[1];
-                assert.equal(slug, course.slug, 'the course has the slug the catalogue file names');
-                summary.courses.push({id, title, slug, price: course.price, was: course.was, tags: course.tags, flash: await flash(admin).catch(() => '')});
-            });
-        }
-
-        // Related courses (owner, 2026-10-20: "the relationship must be bijective"), ticked on each course's Details tab.
-        // A relation is both courses', so a course whose partner was saved first already shows the partner ticked.
-        if (COURSES.some((course) => (course.related || []).length)) {
-            await step('3r. ADMIN relates the courses the catalogue file relates, and each relation shows on both courses', async () => {
-                const bySlug = Object.fromEntries(summary.courses.map((course) => [course.slug, course]));
-                const done = new Set();
-                for (const course of COURSES.filter((c) => (c.related || []).length)) {
-                    await admin.goto(`${base}/admin/courses/${bySlug[course.slug].id}`);
-                    const box = admin.locator('fieldset.cl-course-related-choice');
-                    let changed = false;
-                    for (const other of course.related) {
-                        const pair = [course.slug, other].sort().join('|');
-                        const checkbox = box.getByRole('checkbox', {name: bySlug[other].title, exact: true});
-                        if (done.has(pair)) {
-                            assert.ok(await checkbox.isChecked(), `${course.slug} already shows ${other}, related from the other course`);
-                        } else {
-                            assert.equal(await checkbox.isChecked(), false, `${other} is not yet related to ${course.slug}`);
-                            await checkbox.check();
-                            changed = true;
-                            done.add(pair);
-                        }
-                    }
-                    if (changed) {
-                        await submit(admin, admin.getByRole('button', {name: 'Save course details'}));
-                        assert.match(await flash(admin), /The course details were updated/);
-                    }
-                }
-                summary.related_pairs = done.size;
-            });
-        }
 
         await step('4. ADMIN adds the learner Thandi Nkosi under People, with the account email', async () => {
             await admin.goto(`${base}/admin/people`);
@@ -302,7 +254,7 @@ async function signIn(page, address) {
             // Its cover picture, large, with the title over it; access starts immediately; the content lists
             // no assessment; no Reviews section while there is none; grading is in the FAQ (owner, 2026-10-20).
             assert.equal(clean(await learner.locator('.cl-picture-head h1').innerText()), bought.title, 'the title sits over the cover picture');
-            const relatedTitles = (COURSES.find((course) => course.bought).related || []).map((slug) => summary.courses.find((c) => c.slug === slug).title).sort();
+            const relatedTitles = (COURSES.find((course) => course.bought).related || []).map((code) => summary.courses.find((c) => c.code === code).title).sort();
             assert.deepEqual((await learner.locator('section[aria-labelledby="related-courses-heading"] .cl-course-card-title').allInnerTexts()).map(clean).sort(), relatedTitles, 'its related courses are shown as cards');
             assert.equal(await learner.locator('.cl-picture-head-art svg').count(), 1);
             assert.match(clean(await learner.locator('.cl-course-head').innerText()), /Access starts Immediately/);
@@ -364,15 +316,23 @@ async function signIn(page, address) {
             summary.course_started_text = course.Text;
         });
 
-        await step('8b. The catalogue exported from the site matches the file it was loaded from', async () => {
-            const exported = JSON.parse(console_('catalogue:export -'));
+        await step('8b. The catalogue package downloaded from Import & Export Catalogue holds what was loaded', async () => {
+            // The courses to export are ticked first (owner, 2026-10-23); here every course, the package's own.
+            await admin.goto(`${base}/admin/courses/catalogue`);
+            await admin.getByRole('button', {name: 'Tick every course'}).click();
+            assert.equal(await admin.locator('input[name="courses[]"]:checked').count(), COURSES.length, 'every course is ticked');
+            const [download] = await Promise.all([admin.waitForEvent('download', {timeout: 300000}), admin.getByRole('button', {name: 'Download catalogue package (.zip)'}).click()]);
+            const saved = path.join(output, 'exported-catalogue.zip');
+            await download.saveAs(saved);
+            const exported = readPackage(saved);
             const shape = (nodes) => nodes.map((node) => ({name: node.name, slug: node.slug, children: shape(node.children || [])}));
             assert.deepEqual(shape(exported.categories), shape(CATALOGUE.categories), 'the same categories in the same tree');
             assert.deepEqual(exported.tags.map((tag) => tag.name).sort(), CATALOGUE.tags.map((tag) => tag.name).sort(), 'the same tags');
             for (const course of COURSES) {
-                const found = exported.courses.find((c) => c.slug === course.slug);
-                assert.ok(found, course.slug + ' is on the site');
-                assert.deepEqual([found.file, found.category, found.position ?? null, [...(found.related || [])].sort(), [...found.tags].sort(), found.price, found.was_price], [course.file, course.category, course.position ?? null, [...(course.related || [])].sort(), [...course.tags].sort(), course.price, course.was_price], course.slug + ' keeps its file, category, position, related courses, tags and prices');
+                const found = exported.courses.find((c) => c.code === course.code);
+                assert.ok(found, course.code + ' is on the site');
+                assert.deepEqual([found.slug, found.category, found.position ?? null, [...found.related].sort(), [...found.tags].sort(), found.price, found.was, found.status],
+                    [course.slug, course.category, course.position ?? null, [...course.related].sort(), [...course.tags].sort(), course.price, course.was, 'published'], course.code + ' keeps its address, category, position, related courses, tags and prices');
             }
         });
 

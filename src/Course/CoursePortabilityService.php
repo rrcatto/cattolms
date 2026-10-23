@@ -11,6 +11,11 @@ Description:
 Implements Catto Learning business and application logic for course portability operations.
 
 Changelog:
+2026/10/23 SAST
+- Course codes and course packages 2.1 (owner, 2026-10-23): exportCourse() writes the course's code and its catalogue
+  settings (CourseCatalogueSettings); an import gives the course the code its review chose, else the file's, else one
+  suggested from its title (importCode(), never another course's), and a 2.1 package's catalogue settings follow it.
+  importChecked() and analysePackage() serve the catalogue package.
 2026/10/07 SAST
 - courseHoldingConflicts() finds the one course on the site whose Course Items an import collides
   with - the same course imported before - so the review can offer it for replacement; a commit
@@ -58,6 +63,7 @@ final class CoursePortabilityService
         private readonly CourseItemRepository $courseItemRecords,
         private readonly AuditRepository $audit,
         private readonly CompanyRepository $companies,
+        private readonly CourseCatalogueSettings $catalogue,
         private readonly string $storageRoot,
         private readonly string $bundledImportRoot
     ) {
@@ -153,13 +159,50 @@ final class CoursePortabilityService
         return $analysis;
     }
 
-    public function commitImport(string $key, int $categoryId, int $userId, ?int $replaceCourseId = null): int
+    /**
+     * Imports a staged course file. $code is the course code the review gives it (owner, 2026-10-23); empty takes the
+     * file's own, else one suggested from the title. A 2.1 package's catalogue settings follow (its tags, cover,
+     * position and related courses, and its prices for a new course only); the course stays a draft.
+     */
+    public function commitImport(string $key, int $categoryId, int $userId, ?int $replaceCourseId = null, string $code = ''): int
     {
         // Checked again at commit rather than trusting the staging call: staging writes a file to
         // disk and the key travels through the browser, so this is the point that actually creates
         // the course.
         $this->refuseSeedImporter($userId);
         $analysis = $this->reanalyseImport($key);
+        $courseId = $this->importChecked($analysis, $categoryId, $userId, $replaceCourseId, $code);
+        if (is_array($analysis['catalogue'] ?? null)) {
+            // The category is the one the review chose, already given; the rest of the package's settings follow.
+            $settings = array_diff_key($analysis['catalogue'], ['category' => true]);
+            $this->catalogue->apply($courseId, $settings, $userId, $replaceCourseId === null);
+            $this->catalogue->relate($courseId, $settings);
+        }
+        [$path] = $this->staged($key);
+        @unlink($path);
+        @unlink($this->storageRoot . '/imports/' . $key . '.meta.json');
+        return $courseId;
+    }
+
+    /**
+     * A course package already read (a catalogue package's course): checked as a staged file is, then imported.
+     *
+     * @param array<string,mixed> $data the package
+     * @return array<string,mixed> its analysis
+     */
+    public function analysePackage(array $data, string $name): array
+    {
+        return $this->courseComponentAnalysis($this->jsonImporter->analyse($data, $name));
+    }
+
+    /**
+     * Imports an analysed course, refusing any conflict the review would have shown, and answers its id.
+     *
+     * @param array<string,mixed> $analysis
+     */
+    public function importChecked(array $analysis, int $categoryId, int $userId, ?int $replaceCourseId, string $code = ''): int
+    {
+        $this->refuseSeedImporter($userId);
         if ($replaceCourseId !== null) {
             $replaceableKeys = [];
             foreach ((array) ($analysis['course_items'] ?? []) as $item) {
@@ -183,11 +226,37 @@ final class CoursePortabilityService
             }
             throw new InvalidArgumentException(implode(' ', (array) $analysis['key_conflicts']));
         }
-        $courseId = $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId);
-        [$path] = $this->staged($key);
-        @unlink($path);
-        @unlink($this->storageRoot . '/imports/' . $key . '.meta.json');
-        return $courseId;
+        return $this->importAnalysis($analysis, $categoryId, $userId, $replaceCourseId, $code);
+    }
+
+    /**
+     * The code an import gives its course: the one chosen, else the file's, else one suggested from the title. No
+     * other course may have it; a replaced course may keep its own.
+     *
+     * @param array<string,mixed> $analysis
+     */
+    public function importCode(array $analysis, string $chosen = '', ?int $replaceCourseId = null): string
+    {
+        $input = trim($chosen) !== '' ? $chosen : (string) ($analysis['course']['code'] ?? '');
+        if (trim($input) === '' && $replaceCourseId !== null) $input = (string) ($this->requireCourse($replaceCourseId)['code'] ?? '');
+        $code = trim($input) === ''
+            ? CourseCode::suggest((string) ($analysis['course']['title'] ?? 'Course'), fn(string $candidate): bool => $this->courses->findByCode($candidate) !== null)
+            : CourseCode::validate($input);
+        $holder = $this->courses->findByCode($code);
+        if ($holder !== null && (int) $holder['id'] !== $replaceCourseId) {
+            throw new InvalidArgumentException('Another course already has the code ' . $code . ': ' . $holder['title'] . '. Each course has a code of its own.');
+        }
+        return $code;
+    }
+
+    /**
+     * The course with this code, if there is one (the review offers it for replacement).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function courseWithCode(string $code): ?array
+    {
+        return CourseCode::isValid($code) ? $this->courses->findByCode($code) : null;
     }
 
     /**
@@ -264,10 +333,12 @@ final class CoursePortabilityService
         }
         return [
             'format' => 'catto-learning-course',
-            'schema_version' => '2.0',
+            'schema_version' => '2.1',
             'exported_at' => date(DATE_ATOM),
             'course' => [
                 'public_id' => $course['public_id'],
+                // The course's code (owner, 2026-10-23): every import matches the course by it.
+                'code' => $course['code'],
                 'slug' => $course['slug'],
                 'title' => $course['title'],
                 'subtitle' => $course['subtitle'],
@@ -287,6 +358,8 @@ final class CoursePortabilityService
             'course_items' => array_values($courseItems),
             'structure' => $structure,
             'grade_bands' => $this->courses->gradeBands($courseId),
+            // Its place in the catalogue (owner, 2026-10-23): category, tags, cover, position, related courses, prices, status.
+            'catalogue' => $this->catalogue->export($courseId),
         ];
     }
 
@@ -347,10 +420,11 @@ final class CoursePortabilityService
     }
 
     /** @param array<string,mixed> $analysis */
-    private function importAnalysis(array $analysis, int $categoryId, int $userId, ?int $replaceCourseId): int
+    private function importAnalysis(array $analysis, int $categoryId, int $userId, ?int $replaceCourseId, string $code = ''): int
     {
         $input = (array) ($analysis['course'] ?? []);
         $data = $this->courseData($input, $categoryId, $userId);
+        $data['code'] = $this->importCode($analysis, $code, $replaceCourseId);
         // Decision D5: portability is REAL-only, so slug collisions are checked against the
         // genuine universe. A SEED course with the same slug is irrelevant here and must not
         // block a genuine import, nor be discoverable through one.

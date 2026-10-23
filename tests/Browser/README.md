@@ -413,17 +413,42 @@ CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Bro
 podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/commerce-wallets-fixture.php cleanup'   # only after a killed run
 ```
 
+## Order links and error pages
+
+`order-links.cjs` checks, in Chromium and Firefox, a buyer's order links opened by someone else and the error pages (owner, 2026-10-23: as ADMIN, a link in a buyer's email gave "403 Request failed This order belongs to another purchaser"): ADMIN opening the buyer's order lands on the same order in Administration, told whose it is, and the buyer's invoice link gives the same PDF from Administration; the buyer still opens their own order; anyone else, and an order that does not exist, finds no such order in their account (a 404 that names nobody); a signed-in reader refused a page keeps their header and identity band, with Go to your account and Sign out; a missing page is built like every other page (the page construction checks), in plain words. It uses the financial documents fixture, whose orders are placed through the real checkout:
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/financial-documents-fixture.php create'
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/order-links.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/financial-documents-fixture.php cleanup'
+```
+
+## Choosing the courses to export
+
+`catalogue-export.cjs` checks Administration → Courses → Import & Export Catalogue's tick boxes in Chromium and Firefox and without JavaScript (owner, 2026-10-23: ticking by hand did not change the count, and Clear the ticks did nothing after ticking by hand): the count follows boxes ticked by hand; Clear the ticks, Tick every course and Tick the published courses tick in place, without reloading; without JavaScript each of the three reloads the page with the boxes ticked; and the package downloaded holds exactly the course ticked by hand. It uses the section pages fixture's ADMIN session:
+
+```sh
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/section-pages-fixture.php create'
+podman exec -u cattotest env_php_1 cat /tmp/catto-section-pages-state.json > /tmp/catto-section-pages-state.json
+chmod 600 /tmp/catto-section-pages-state.json
+CATTO_PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright node tests/Browser/catalogue-export.cjs
+podman exec -u cattotest env_php_1 sh -lc 'cd /home/cattotest/code/current && php tests/Browser/section-pages-fixture.php cleanup'
+```
+
 ## One learner buys one course
 
-`one-learner-scenario.cjs` builds an example site on a demo site with a clean database, only through the pages, and leaves it all to follow. It needs a catalogue file with its courses (`CATTO_CATALOGUE`; the file published with the code holds only categories and tags) and the courses' HTML files (`CATTO_COURSES_DIR`):
+`one-learner-scenario.cjs` builds an example site on a demo site with a clean database, only through the pages, and leaves it all to follow. It needs the site's catalogue package (`CATTO_CATALOGUE`, by default the private `CATALOGUE/cattolms-catalogue.zip` beside the code tree; the file published with the code holds only categories and tags):
 
 1. ADMIN signs in with the link Mailpit receives for `APP_ADMIN_EMAIL` (never printed); the first sign-in makes the ADMIN account, which then gives its date of birth (adults only).
 2. ADMIN sets the card provider's transaction fee to 3% (Settings → Commerce fees).
-3. ADMIN loads the catalogue file (`catalogue:import`) and imports every course it lists into its category, with its 12-month price and was price, its tags and its cover picture, and publishes it.
+3. ADMIN imports the package at Courses → Import & Export Catalogue: the review lists every course as new, and Import brings the categories as a tree and the tags with their icons, and every course with its code, category, tags, cover, position, related courses and the package's 12-month price and was price, published.
 4. ADMIN adds the learner Thandi Nkosi, a made-up person, under People, with the account notification email.
 5. Thandi signs in with her own link and, her account having been made by ADMIN, gives her date of birth first (a date that makes her 17 is refused first). She puts one course (`CATTO_BOUGHT`, or the catalogue's first) in her cart; checkout asks nothing about her identity. She gives her details at checkout and pays with the simulated card, which stands in for the card provider on a demo site; the course starts at once.
 6. ADMIN's order page is read for its ledger lines (the payment and the provider's 3% fee), payment events, trail and documents (invoice and receipt).
 7. Thandi's order confirmation, with her receipt attached and her account reference, and the email saying her course has started, with its link, arrive in Mailpit (the commerce worker sends them within a minute; the script waits up to two and a half minutes), and every email sent is listed.
+8. The catalogue package downloaded from Import & Export Catalogue holds the same categories, tags and courses, each with its address, category, position, related courses, tags and prices.
+
+`CATTO_BASE_URL`, `CATTO_MAILPIT_URL` and `CATTO_ADMIN_EMAIL` point it at another site, such as a fresh test site installed with `deploy/podman/` (2026-10-23: run there against its own database and Mailpit, all 11 steps passed).
 
 It refuses to run when one of the courses is already on the site. Screenshots, `results.json` and `summary.json` go to `/tmp/catto-one-learner-scenario` (`CATTO_BROWSER_OUTPUT`). Rebuild the database (`docs/OPERATIONS.md`) and make the theme you want active first.
 

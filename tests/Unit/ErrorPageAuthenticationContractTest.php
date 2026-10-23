@@ -23,8 +23,10 @@ final class ErrorPageAuthenticationContractTest extends TestCase
         self::assertStringContainsString("view->render('error'", $listener);
 
         // Every flag the chrome reads is derived from the identity of the request that failed, so
-        // an error page shows the navigation the reader actually has rather than the public one.
-        $identity = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/BaseController.php');
+        // an error page shows the navigation the reader actually has rather than the public one: the
+        // listener gives it the reader through the same ViewIdentity every controller uses (2026-10-23).
+        self::assertStringContainsString('ViewIdentity::of($this->auth, $this->reader(),', $listener);
+        $identity = (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/ViewIdentity.php');
         foreach ([
             "\$data['is_authenticated'] = \$currentUser !== null;",
             "\$data['is_platform_admin'] = \$currentUser?->hasPermission('PLATFORM.DASHBOARD.VIEW') ?? false;",

@@ -433,6 +433,8 @@ summary{display:list-item;cursor:pointer}
 .cl-course-order-status.is-error{color:var(--cl-danger,#b42318);font-weight:600}
 .cl-course-order[aria-busy="true"] .cl-row-handle{cursor:progress}
 .cl-course-position{white-space:nowrap}
+.cl-course-code{white-space:nowrap;font-weight:600;font-size:.9em}
+.cl-catalogue-export-ticks{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
 .cl-course-position [data-position]{font-variant-numeric:tabular-nums;font-weight:600}
 .cl-row-handle{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0 .4rem 0 0;padding:0;vertical-align:middle;border:1px solid var(--cl-border,#dfe4ea);border-radius:.4rem;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;cursor:grab;touch-action:none}
 .cl-row-handle[hidden]{display:none}

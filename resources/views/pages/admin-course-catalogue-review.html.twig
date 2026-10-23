@@ -1,0 +1,100 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		The review of a catalogue import (owner, 2026-10-23): what the package would do, course by course, before anything
+		changes. Each new course or course already here can be left out; a course already here has its content replaced
+		only when that is ticked, and never once a learner has started it.
+	#}
+	{% set ph_back_href = '/admin/courses/catalogue' %}
+	{% set ph_back_label = 'Import & Export Catalogue' %}
+	{% set ph_kicker = 'Courses' %}
+	{% set ph_title = 'Review catalogue import' %}
+	{% set ph_lead = plan.filename ~ ': nothing has changed yet. Check what the import would do, then choose Import.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set counts = plan.counts %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'What the import would do', heading_level: 2, summary: plan.kind == 'json' ? 'A catalogue file holds categories and tags only.' : 'Courses are matched by their course code.'}) }}
+			{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 4})} %}{% block body %}
+				{{ ui('data.stat-card', {label: 'New courses', value: counts.new}) }}
+				{{ ui('data.stat-card', {label: 'Courses updated', value: counts.update}) }}
+				{{ ui('data.stat-card', {label: 'No change', value: counts.unchanged}) }}
+				{{ ui('data.stat-card', {label: 'Left out', value: counts.skip}) }}
+			{% endblock %}{% endembed %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Categories', value: (plan.catalogue.categories_new ? plan.catalogue.categories_new|length ~ ' new: ' ~ plan.catalogue.categories_new|join(', ') : 'None new') ~ (plan.catalogue.categories_kept ? ' · ' ~ plan.catalogue.categories_kept ~ ' already here' : '')},
+				{label: 'Tags', value: (plan.catalogue.tags_new ? plan.catalogue.tags_new|length ~ ' new: ' ~ plan.catalogue.tags_new|join(', ') : 'None new') ~ (plan.catalogue.tags_kept ? ' · ' ~ plan.catalogue.tags_kept ~ ' already here' : '')},
+				{label: 'Resource Library files', value: plan.files_new ? plan.files_new ~ ' new' : 'None new'},
+			]}) }}
+{% endblock %}
+{% endembed %}
+	</section>
+	{# Every choice belongs to the import form in the last card (the form attribute), so Import and Cancel sit side by side. #}
+		{% if plan.courses %}
+		<section class="cl-page-section">
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Courses', heading_level: 2, summary: 'Untick a course to leave it out. A course already on this site keeps its prices; tick Replace its content to bring its lessons and assessments from the package too.'}) }}
+				{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'The package\'s courses and what the import would do with each'})} %}
+{% block header %}
+					<tr>
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Import'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 9, label: 'Code'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 25, label: 'Course'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 11, label: 'What happens'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 31, label: 'Details'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Content'}} %}
+					</tr>
+{% endblock %}
+{% block body %}
+					{% for row in plan.courses %}
+					<tr>
+						<td>
+							{% if row.action != 'skip' %}
+							{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: row.action == 'new' ? 'Import' : 'Update'})} %}{% block control %}<input type="checkbox" form="catalogue-import" name="courses[]" value="{{ row.code }}" checked>{% endblock %}{% endembed %}
+							{% else %}—{% endif %}
+						</td>
+						<td>{% if row.code %}<code class="cl-course-code">{{ row.code }}</code>{% else %}—{% endif %}</td>
+						<td class="cell-text"><strong>{{ row.title }}</strong>{% if row.site_title|default('') and row.site_title != row.title %}<br><small class="cl-text-muted">Here: {{ row.site_title }}</small>{% endif %}</td>
+						<td>{{ ui('feedback.badge', {label: {new: 'New', update: 'Updated', unchanged: 'No change', skip: 'Left out'}[row.action], tone: {new: 'success', update: 'info', unchanged: 'neutral', skip: 'warning'}[row.action]}) }}</td>
+						<td class="cell-text">
+							{% if row.action == 'skip' %}{{ row.reason }}
+							{% elseif row.action == 'new' %}{{ row.changes|join(' · ') }}{% if row.status == 'published' %} · Published where it came from{% endif %}
+							{% elseif row.changes %}{{ row.changes|join(' · ') }}
+							{% else %}Its cover, tags and position are as the package has them.{% endif %}
+						</td>
+						<td>
+							{% if row.action in ['update', 'unchanged'] %}
+								{% if row.started %}<small class="cl-text-muted">Learners have started it: content kept</small>
+								{% else %}{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Replace its content'})} %}{% block control %}<input type="checkbox" form="catalogue-import" name="replace[]" value="{{ row.code }}">{% endblock %}{% endembed %}{% endif %}
+							{% elseif row.action == 'new' %}<small class="cl-text-muted">From the package</small>
+							{% else %}—{% endif %}
+						</td>
+					</tr>
+					{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+		</section>
+		{% endif %}
+		<section class="cl-page-section">
+			{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+				{{ ui('layout.section-head', {heading: 'Import', heading_level: 2, summary: 'Each course is imported on its own: if one fails, the result page says why and the rest still go in. Importing the same package again changes nothing.'}) }}
+				{% if counts.new > 0 %}
+				<fieldset class="mb-5">
+					<legend class="h6">New courses</legend>
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Give them the package\'s prices', help: can_price ? 'A course already on this site keeps its own prices.' : 'Setting prices needs the course pricing permission.'})} %}{% block control %}<input type="checkbox" form="catalogue-import" name="prices" value="1" {{ can_price ? 'checked' : 'disabled' }}>{% endblock %}{% endembed %}
+					{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Publish those that are published where they came from', help: can_publish ? 'Their publication warnings were accepted where they were published. One with an error, such as no price, stays a draft, and the result page says why.' : 'Publishing needs the course publishing permission: they stay drafts.'})} %}{% block control %}<input type="checkbox" form="catalogue-import" name="publish" value="1" {{ can_publish ? 'checked' : 'disabled' }}>{% endblock %}{% endembed %}
+				</fieldset>
+				{% endif %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}<form id="catalogue-import" action="/admin/courses/catalogue/review" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ plan.key }}">{{ ui('action.button', {label: 'Import', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-import'}) }}</form>{% endblock %}
+{% block secondary_actions %}<form action="/admin/courses/catalogue/cancel" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ plan.key }}">{{ ui('action.button', {label: 'Cancel this import', variant: 'quiet', size: 'normal', type: 'submit', icon: 'action-cancel'}) }}</form>{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+		</section>
+{% endblock %}

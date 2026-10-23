@@ -1,0 +1,12 @@
+import controller_0 from "../../controllers/catalogue_export_controller.js";
+import controller_1 from "../../controllers/category_tree_controller.js";
+import controller_2 from "../../controllers/certificate_preview_controller.js";
+import controller_3 from "../../controllers/course_content_controller.js";
+import controller_4 from "../../controllers/course_order_controller.js";
+import controller_5 from "../../controllers/landing_sections_controller.js";
+import controller_6 from "../../controllers/popular_courses_controller.js";
+import controller_7 from "../../controllers/profile_image_controller.js";
+import controller_8 from "../../controllers/tag_cloud_controller.js";
+export const eagerControllers = {"catalogue-export": controller_0, "category-tree": controller_1, "certificate-preview": controller_2, "course-content": controller_3, "course-order": controller_4, "landing-sections": controller_5, "popular-courses": controller_6, "profile-image": controller_7, "tag-cloud": controller_8};
+export const lazyControllers = {};
+export const isApplicationDebug = true;

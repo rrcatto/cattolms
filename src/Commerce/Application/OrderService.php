@@ -21,6 +21,7 @@ use CattoLearning\Support\Money;
 use CattoLearning\Support\Uuid;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use RuntimeException;
 
 /**
@@ -403,16 +404,42 @@ final class OrderService
         return $paymentId;
     }
 
-    /** @return array<string,mixed> */
+    /** What anyone but an order's purchaser is told when they open it: that it is not theirs is not said (owner, 2026-10-23). */
+    public const NOT_YOURS = 'We could not find that order in your account.';
+
+    /**
+     * The purchaser's own order. To anyone else, as to an order that does not exist, it is not found (owner, 2026-10-23:
+     * "should it not fail more gracefully?"): order numbers count up, and "it belongs to another purchaser" told a
+     * stranger that order exists. Administration opens every order on its own pages.
+     *
+     * @return array<string,mixed>
+     */
     public function view(CurrentUser $actor, int $orderId): array
     {
         self::requireCapability($actor,'COMMERCE.ORDER.VIEW');
-        $order=$this->records->order($orderId);
-        if ((int)$order['purchaser_user_id']!==$actor->id) throw new AccessDeniedHttpException('This order belongs to another purchaser.');
+        $order=$this->purchaser($orderId) === null ? null : $this->records->order($orderId);
+        if ($order === null || (int)$order['purchaser_user_id']!==$actor->id) throw new NotFoundHttpException(self::NOT_YOURS);
         $order['details']=CommerceRepository::decode((string)$order['snapshot']);
         $order['documents']=$this->records->documents($orderId);
         $order['payments']=$this->records->payments($orderId);
         return $order;
+    }
+
+    /**
+     * Who placed an order: their id and the name the order keeps, or null when there is no such order. An order link
+     * opened by someone else (owner, 2026-10-23) goes to Administration for those who manage orders.
+     *
+     * @return array{id:int,name:string}|null
+     */
+    public function purchaser(int $orderId): ?array
+    {
+        try {
+            $order = $this->records->order($orderId);
+        } catch (RuntimeException) {
+            return null;
+        }
+        $snapshot = CommerceRepository::decode((string) $order['snapshot']);
+        return ['id' => (int) $order['purchaser_user_id'], 'name' => trim((string) ($snapshot['purchaser_name'] ?? '')) ?: 'the purchaser'];
     }
 
     /**

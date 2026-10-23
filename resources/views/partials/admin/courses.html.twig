@@ -34,6 +34,7 @@
 											{% if arrange %}<button type="button" class="cl-row-handle" aria-label="Move {{ course.title }}" aria-describedby="course-order-keys" data-course-order-target="handle" data-action="pointerdown->course-order#arm keydown->course-order#key" hidden>{{ ui('icon', {name: 'action-drag'}) }}</button>{% endif %}
 											<span data-position>{{ course.catalogue_position|default('') }}</span>
 										</td>
+										<td><code class="cl-course-code">{{ course.code }}</code></td>
 										{# The whole title wraps (owner, 2026-10-20): two courses that differ only at the end, such as the parts of a series, stay told apart. #}
 										<td class="cell-text">
 											<strong>{{ course.title }}</strong>

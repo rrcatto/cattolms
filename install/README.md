@@ -56,7 +56,7 @@ It then does the following:
 
 | Option | Meaning |
 |---|---|
-| `--version 0.9.7` | Install this version. The default is the newest release. |
+| `--version 0.9.8` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -74,9 +74,9 @@ It then does the following:
    - fees and periods;
    - identity verification with Didit;
    - the theme;
-   - the categories and tags: the starter set, from `resources/catalogue/catalogue.json`;
-   - importing your courses from their HTML files;
-   - giving each course its category, tags and cover picture (or loading your own catalogue file with them);
+   - the categories and tags: the starter set, from `resources/catalogue/catalogue.json`, or a catalogue package from another site (Courses → Import & Export Catalogue), which brings its courses too;
+   - importing your courses from a catalogue package or from their HTML files;
+   - giving each course its category, tags and cover picture (a catalogue package brings them);
    - pricing and publishing the courses;
    - the certificate design;
    - the design of invoices, receipts and credit notes;
@@ -88,8 +88,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  0.9.7/                    the code of each installed version (root)
-  current -> 0.9.7          the version the site runs
+  0.9.8/                    the code of each installed version (root)
+  current -> 0.9.8          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

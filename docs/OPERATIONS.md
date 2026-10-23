@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 0.9.7 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later.
+**LMS:** 0.9.8 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later.
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -37,7 +37,7 @@ php bin/console cache:clear
 
 Then publish changed `public_html/css`, `js`, `img` and compiled `assets/` to the instance web root. On a clean database the ADMIN account is made by the first sign-in with `APP_ADMIN_EMAIL` (the link arrives in Mailpit). Make your theme active and your certificate design the default again, and build test data through the pages (`tests/Browser/one-learner-scenario.cjs`): test data is made through the application's own workflows, never inserted.
 
-The baseline ships no categories. `resources/catalogue/catalogue.json` holds the starter categories and tags, each with its icon. After ADMIN's first sign-in, load it with `php bin/console catalogue:import` (or Administration → System → Setup). A site's own catalogue file can also hold its courses' categories, tags, covers and prices: write it with `php bin/console catalogue:export - > <private file>`, keep it privately, and load it after a rebuild with `catalogue:import <private file>`. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources` when needed.
+The baseline ships no categories. `resources/catalogue/catalogue.json` holds the starter categories and tags, each with its icon. After ADMIN's first sign-in, load it from Administration → System → Setup. A site's catalogue (the courses ADMIN ticks, each with its content, course code, cover, tags, position, related courses among the ticked ones and prices, and only their categories and tags) is one catalogue package: Administration → Courses → Import & Export Catalogue downloads it, and imports it on a rebuilt or new site after a review that shows each course as new, updated, unchanged or left out. Courses are matched by their course code only (`courses.code`, such as GDN-101). Keep a site's package privately. For scripts, `php bin/console catalogue:export <file.zip>` and `catalogue:import <file>` do the same without the review. A package carries the Resource Library files its courses use. Files in `storage/course-resources` survive a rebuild but are no longer registered; register them again from `/admin/resources`, or import the site's package, which brings them with their courses.
 
 To change the schema, edit the baseline and rebuild. Before replacing a large part of it, an equivalence check is cheap. Create two scratch databases, apply the old and new baselines to them through a copy of `phinx.php` that names the scratch database, and compare `pg_dump --schema-only --no-owner -T phinxlog` and a `--data-only --inserts` dump with timestamps masked.
 
@@ -136,12 +136,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.7`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.8`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.7   # the tag being released
+   V=v0.9.8   # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

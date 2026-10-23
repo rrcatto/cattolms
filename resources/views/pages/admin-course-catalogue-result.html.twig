@@ -1,0 +1,60 @@
+{% extends layout %}
+{% block page_body %}
+	{# What a catalogue import did (owner, 2026-10-23), course by course, each course opening its page. #}
+	{% set ph_back_href = '/admin/courses/catalogue' %}
+	{% set ph_back_label = 'Import & Export Catalogue' %}
+	{% set ph_kicker = 'Courses' %}
+	{% set ph_title = 'Catalogue imported' %}
+	{% set ph_lead = report.filename ~ (report.counts.failed ? ': ' ~ report.counts.failed ~ (report.counts.failed == 1 ? ' course' : ' courses') ~ ' could not be imported, as listed below.' : ': done.') %}
+	{% set ph_actions %}{{ ui('action.link', {label: 'Open Courses', variant: 'secondary', size: 'normal', href: '/admin/courses', icon: 'action-open'}) }}{% endset %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{% set counts = report.counts %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'What was done', heading_level: 2, summary: 'Recorded in the Activity log as yours.'}) }}
+			{% embed ui_template('data.stat-grid') with {props: ui_props('data.stat-grid', {density: 'compact', columns: 5})} %}{% block body %}
+				{{ ui('data.stat-card', {label: 'Courses imported', value: counts.imported}) }}
+				{{ ui('data.stat-card', {label: 'Courses updated', value: counts.updated + counts.replaced}) }}
+				{{ ui('data.stat-card', {label: 'Unchanged', value: counts.unchanged}) }}
+				{{ ui('data.stat-card', {label: 'Left out or skipped', value: counts.left_out + counts.skipped}) }}
+				{{ ui('data.stat-card', {label: 'Failed', value: counts.failed}) }}
+			{% endblock %}{% endembed %}
+			{{ ui('data.key-value-list', {items: [
+				{label: 'Categories', value: report.catalogue.categories_created ~ ' made · ' ~ report.catalogue.categories_kept ~ ' already here'},
+				{label: 'Tags', value: report.catalogue.tags_created ~ ' made · ' ~ report.catalogue.tags_kept ~ ' already here'},
+				{label: 'Resource Library files', value: report.files_installed ~ ' installed'},
+			]}) }}
+{% endblock %}
+{% endembed %}
+	</section>
+	{% if report.courses %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Courses', heading_level: 2}) }}
+			{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Each course of the package and what was done with it'})} %}
+{% block header %}
+				<tr>
+					{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 10, label: 'Code'}} %}
+					{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 30, label: 'Course'}} %}
+					{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 14, label: 'Outcome'}} %}
+					{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 46, label: 'Details'}} %}
+				</tr>
+{% endblock %}
+{% block body %}
+				{% for course in report.courses %}
+				<tr>
+					<td><code class="cl-course-code">{{ course.code ?: '—' }}</code></td>
+					<td class="cell-text">{% if course.course_id %}<a href="/admin/courses/{{ course.course_id }}">{{ course.title }}</a>{% else %}{{ course.title }}{% endif %}</td>
+					<td>{{ ui('feedback.badge', {label: course.outcome|capitalize, tone: {'imported': 'success', 'updated': 'info', 'content replaced': 'info', 'unchanged': 'neutral', 'left out': 'neutral', 'skipped': 'warning', 'failed': 'danger'}[course.outcome]|default('neutral')}) }}</td>
+					<td class="cell-text">{{ course.details ? course.details|join(' · ') : '—' }}</td>
+				</tr>
+				{% endfor %}
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+{% endblock %}

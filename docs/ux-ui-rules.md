@@ -300,7 +300,9 @@ A category shows every course in it and in all its subcategories, down to the th
 
 **11.1 A catch-all route is matched last.** A route with a placeholder that can also match a literal route beside it declares a negative priority. Declaration order across controller files is decided by the filename, so moving a controller between directories is enough to make one route swallow another — and the symptom is a truthful 404 answering the wrong question. → Enforced by `RoutePrecedenceContractTest`.
 
-**11.2 Every page renders through `BaseController`.** A controller that calls the view renderer directly gets no identity model, so the page renders as though nobody is signed in. That is what `/courses/tags` did.
+**11.2 Every page renders through `BaseController`.** A controller that calls the view renderer directly gets no identity model, so the page renders as though nobody is signed in. That is what `/courses/tags` did. The error page, drawn by `ErrorPageListener` outside any controller, gets the same model from `Http\ViewIdentity` (2026-10-23: a signed-in reader refused a page saw the signed-out header and a Sign in button).
+
+**11.3 An error says what happened in plain words.** The error page is built like every page: a title that names the kind (We could not find that page, You can't open this page, Something went wrong on our side), the reason as a plain sentence (the router's "No route found" and an expired form's token are put in words), a card with what the reader can do next, and the status code in small print. A record that is someone else's is not found to them, as a record that does not exist, never "it belongs to another …": numbers count up, and that sentence tells a stranger the record exists. Someone who manages it is taken to it in Administration instead (an order link opened by ADMIN opens the order there). → `tests/Browser/order-links.cjs`.
 
 ---
 
@@ -317,6 +319,10 @@ A category shows every course in it and in all its subcategories, down to the th
 ---
 
 ## Changelog
+
+2026/10/23 SAST (errors in plain words)
+
+- 11.2: the error page gets the reader from `Http\ViewIdentity`. 11.3: errors in plain words, built like every page; someone else's record is not found to them, and someone who manages it goes to it in Administration.
 
 2026/10/17 SAST (tables on phones)
 

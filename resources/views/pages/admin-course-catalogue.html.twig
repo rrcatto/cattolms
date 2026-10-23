@@ -1,0 +1,89 @@
+{% extends layout %}
+{% block page_body %}
+	{#
+		Administration → Courses → Import & Export Catalogue (owner, 2026-10-23: "I want to manage everything from the web
+		app"). A catalogue package carries the categories and tags, and every course with its content, code, cover, tags,
+		position, related courses and prices, so a site's whole catalogue moves to another site in one file.
+	#}
+	{% set ph_kicker = 'Courses' %}
+	{% set ph_title = 'Import & Export Catalogue' %}
+	{% set ph_lead = 'Move the whole catalogue between sites in one file: the categories and tags, and every course with its content, code, cover, tags and prices.' %}
+	{% include '@platform/partials/page-head.html.twig' %}
+	{# Stimulus, for the export's tick buttons and count (catalogue_export_controller.js). #}
+	{% if can_export %}{{ importmap() }}{% endif %}
+	{% if can_export %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Export this site\'s catalogue', heading_level: 2, summary: 'Tick the courses to export. A catalogue package is a .zip file holding those courses as they stand on this site, each with its lessons and assessments, course code, cover, category, tags, position in the catalogue, prices and whether it is published, and only their categories and tags with their icons, and any Resource Library files they use. A course not ticked is left out, and so is a related course link to it. Keep the package as a backup, or import it on another site.'}) }}
+			{# The courses to export (owner, 2026-10-23: "first select the courses I wish to export"). The three tick buttons
+			   tick in place (catalogue_export_controller.js) and keep the count right as boxes are ticked by hand; without
+			   JavaScript they submit the form back to the page, which always reloads it with the boxes ticked (a link to
+			   the page's own address only jumped to its anchor, so Clear the ticks did nothing after ticking by hand). #}
+			{% set ticked = export_choices|filter(c => c.ticked)|length %}
+			<form action="/admin/courses/catalogue/export" method="get" autocomplete="off" data-controller="catalogue-export" data-action="change->catalogue-export#update">
+			<p class="cl-catalogue-export-ticks" id="export-courses">
+				{{ ui('action.button', {label: 'Tick every course', variant: 'secondary', size: 'small', type: 'submit', form_action: '/admin/courses/catalogue#export-courses', name: 'tick', value: 'all', stimulus_action: 'catalogue-export#tick', icon: 'action-done'}) }}
+				{{ ui('action.button', {label: 'Tick the published courses', variant: 'secondary', size: 'small', type: 'submit', form_action: '/admin/courses/catalogue#export-courses', name: 'tick', value: 'published', stimulus_action: 'catalogue-export#tick', icon: 'action-publish'}) }}
+				{{ ui('action.button', {label: 'Clear the ticks', variant: 'quiet', size: 'small', type: 'submit', form_action: '/admin/courses/catalogue#export-courses', name: 'tick', value: 'none', stimulus_action: 'catalogue-export#tick', icon: 'action-clear'}) }}
+			</p>
+				{% if export_choices %}
+				{% embed ui_template('data.table') with {props: ui_props('data.table', {caption: 'Every course on this site, in catalogue order: tick the ones to export'})} %}
+{% block header %}
+					<tr>
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Export'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Code'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 38, label: 'Course'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 26, label: 'Category'}} %}
+						{% include '@platform/partials/sortable-header.html.twig' with {sh: {sortable: false, width: 12, label: 'Status'}} %}
+					</tr>
+{% endblock %}
+{% block body %}
+					{% for course in export_choices %}
+					<tr>
+						<td>{% embed ui_template('form.choice') with {props: ui_props('form.choice', {label: 'Export'})} %}{% block control %}<input type="checkbox" name="courses[]" value="{{ course.id }}" {{ course.ticked ? 'checked' : '' }} data-catalogue-export-target="box" data-status="{{ course.status }}" aria-label="Export {{ course.code }} {{ course.title }}">{% endblock %}{% endembed %}</td>
+						<td><code class="cl-course-code">{{ course.code }}</code></td>
+						<td class="cell-text">{{ course.title }}</td>
+						<td class="cell-text">{{ course.category ?: 'Uncategorised' }}</td>
+						<td>{{ ui('feedback.badge', {label: course.status|capitalize, tone: {published: 'success', draft: 'neutral', retired: 'warning', archived: 'neutral'}[course.status]|default('neutral')}) }}</td>
+					</tr>
+					{% endfor %}
+{% endblock %}
+{% endembed %}
+				{% else %}
+				<p>There are no courses on this site yet.</p>
+				{% endif %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Download catalogue package (.zip)', variant: 'primary', size: 'normal', type: 'submit', name: 'what', value: 'package', icon: 'action-download'}) }}{% endblock %}
+{% block secondary_actions %}{{ ui('action.button', {label: 'Download their categories and tags (.json)', variant: 'secondary', size: 'normal', type: 'submit', name: 'what', value: 'categories', icon: 'action-export', title: 'Only the categories and tags of the ticked courses; with none ticked, every category and tag on this site.'}) }}{% endblock %}
+{% endembed %}
+				<p class="help" aria-live="polite"><span data-catalogue-export-target="count">{{ ticked ? ticked ~ (ticked == 1 ? ' course is' : ' courses are') ~ ' ticked.' : 'No course is ticked.' }}</span> The categories and tags file holds only the ticked courses' categories and tags, or every category and tag when none is ticked.</p>
+			</form>
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+	{% if can_import %}
+	<section class="cl-page-section">
+		{% embed ui_template('layout.surface') with {props: ui_props('layout.surface', {section_spacing: true})} %}
+{% block surface_body %}
+			{{ ui('layout.section-head', {heading: 'Import a catalogue', heading_level: 2, summary: 'Upload a catalogue package made by Export on this site or another, or a catalogue file of categories and tags. The next page shows what the import would do, course by course, and nothing changes until you choose Import.'}) }}
+			<form action="/admin/courses/catalogue/import" method="post" enctype="multipart/form-data">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Catalogue package (.zip) or catalogue file (.json)', for: 'catalogue-file', required: true, help: 'Up to ' ~ upload_limit_mb ~ ' MB.'})} %}
+{% block control %}<input class="cl-input" id="catalogue-file" type="file" name="catalogue" accept=".zip,.json,application/zip,application/json" required {{ ui_field_attrs(props) }}>{% endblock %}
+{% endembed %}
+				{% embed ui_template('form.actions') with {props: ui_props('form.actions', {})} %}
+{% block primary_actions %}{{ ui('action.button', {label: 'Review import', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-inspect'}) }}{% endblock %}
+{% endembed %}
+			</form>
+			{% embed ui_template('feedback.notice') with {props: ui_props('feedback.notice', {tone: 'info', heading: 'How courses are matched', section_spacing: true})} %}
+{% block body %}
+				<p class="mb-0">A course is known by its course code alone, such as GDN-101, never by its title or address. A course whose code is not on this site is imported as a new course. A course whose code is here already is updated: its cover, tags and position in the catalogue, its category only when it has none, and never its prices. Its lessons and assessments are replaced only if you tick that for it on the review page, and never once a learner has started it.</p>
+{% endblock %}
+{% endembed %}
+{% endblock %}
+{% endembed %}
+	</section>
+	{% endif %}
+{% endblock %}

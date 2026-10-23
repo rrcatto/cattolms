@@ -277,7 +277,9 @@ final class FinancialDocumentIntegrationTest extends TestCase
         try {
             InProcessPage::run($this->buyer('Someone Else'), CommerceController::class, 'document', ['id' => $orderId, 'document' => (int) $invoice['id']]);
             self::fail('Another person opened the invoice.');
-        } catch (AccessDeniedHttpException) {
+        } catch (NotFoundHttpException $notFound) {
+            // Not found, as an order that does not exist: nothing says whose it is (owner, 2026-10-23).
+            self::assertSame('We could not find that order in your account.', $notFound->getMessage());
         }
         $orders = $this->staff(['PLATFORM.ORDER.VIEW']);
         self::assertSame($this->documents->pdf($invoice), InProcessPage::run($orders, PaymentAdministrationController::class, 'document', ['id' => $orderId, 'document' => (int) $invoice['id']])['body']);

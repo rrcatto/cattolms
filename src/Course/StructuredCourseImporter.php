@@ -11,6 +11,10 @@ Description:
 Provides course-domain functionality for structured course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/10/23 SAST
+- Reads schema 2.1: 2.0 with the course's code and its catalogue settings (category, tags, cover, position, related
+  courses, prices, status), passed on as analysis['catalogue'] (owner, 2026-10-23). A 2.1 package may hold a course
+  with no content yet.
 2026/10/07 SAST
 - Certificate designs: reads the accreditation line instead of the certificate title, body, footer and signatory.
 2026/10/07 SAST
@@ -71,7 +75,7 @@ final class StructuredCourseImporter
             throw new InvalidArgumentException('Unsupported course JSON format.');
         }
         $schemaVersion = (string) ($data['schema_version'] ?? '1.0');
-        if (!in_array($schemaVersion, ['1.0','2.0'], true)) {
+        if (!in_array($schemaVersion, ['1.0','2.0','2.1'], true)) {
             throw new InvalidArgumentException('Unsupported course JSON schema version: ' . $schemaVersion);
         }
 
@@ -80,18 +84,22 @@ final class StructuredCourseImporter
         if ($title === '') {
             throw new InvalidArgumentException('The course JSON does not contain a course title.');
         }
-        if ($schemaVersion === '2.0') {
+        // 2.1 is 2.0 with the course's code and its catalogue settings (owner, 2026-10-23).
+        if ($schemaVersion === '2.0' || $schemaVersion === '2.1') {
             $items = array_values(array_filter((array) ($data['course_items'] ?? []), 'is_array'));
             $structure = array_values(array_filter((array) ($data['structure'] ?? []), 'is_array'));
-            if ($items === [] || $structure === []) { throw new InvalidArgumentException('Course JSON schema 2.0 requires Course Items and course structure.'); }
+            // A 2.1 package may be a course with no content yet (a course made by hand and exported before it had any).
+            if ($schemaVersion === '2.0' && ($items === [] || $structure === [])) { throw new InvalidArgumentException('Course JSON schema 2.0 requires Course Items and course structure.'); }
             foreach ($items as &$item) {
                 $item['description_html'] = $this->courseHtml->preserve((string) ($item['description_html'] ?? ''));
                 $item['content_source'] = $this->courseHtml->preserve((string) ($item['content_source'] ?? ''));
             }
             unset($item);
             $courseInput['slug'] = trim((string) ($courseInput['slug'] ?? '')) ?: Slug::from($title);
+            $courseInput['code'] = CourseCode::normalise((string) ($courseInput['code'] ?? ''));
             $courseInput['source_filename'] = $sourceFilename;
-            return ['format' => 'catto-learning-course', 'schema_version' => '2.0', 'course' => $courseInput, 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
+            return ['format' => 'catto-learning-course', 'schema_version' => $schemaVersion, 'course' => $courseInput,
+                'catalogue' => is_array($data['catalogue'] ?? null) ? $data['catalogue'] : null, 'resources' => array_values(array_filter((array) ($data['resources'] ?? []), 'is_array')), 'course_items' => $items, 'structure' => $structure, 'grade_bands' => array_values(array_filter((array) ($data['grade_bands'] ?? []), 'is_array')), 'warnings' => [], 'statistics' => ['course_item_count' => count($items), 'structure_node_count' => count($structure), 'question_count' => array_sum(array_map(static fn(array $item): int => count((array) ($item['questions'] ?? [])), $items))]];
         }
 
         $modules = [];

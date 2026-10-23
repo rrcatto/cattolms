@@ -113,7 +113,7 @@ final class DatasetSearchIndexTest extends TestCase
     public function testTheMigrationDeclaresItsIndexes(): void
     {
         self::assertNotSame([], self::indexes(), 'The index declarations could not be read.');
-        self::assertCount(9, self::indexes(), 'Six name, email and title indexes, the account references of people and companies (2026-10-17) and the full name with middle names (2026-10-21).');
+        self::assertCount(10, self::indexes(), 'Six name, email and title indexes, the account references of people and companies (2026-10-17), the full name with middle names (2026-10-21) and the course code (2026-10-23).');
     }
 
     /**

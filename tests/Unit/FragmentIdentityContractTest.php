@@ -44,6 +44,12 @@ final class FragmentIdentityContractTest extends TestCase
         return (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controller/BaseController.php');
     }
 
+    /** The identity block itself, shared with the error page since 2026-10-23. */
+    private static function identity(): string
+    {
+        return (string) file_get_contents(dirname(__DIR__, 2) . '/src/Http/ViewIdentity.php');
+    }
+
     /** One method defines the identity and capability values, and both render paths call it. */
     public function testBothRenderPathsApplyTheSameIdentityBlock(): void
     {
@@ -81,13 +87,9 @@ final class FragmentIdentityContractTest extends TestCase
     public function testCapabilityFlagsAreDefinedOnlyInTheSharedBlock(): void
     {
         $source = self::source();
-        $at = strpos($source, 'protected function viewIdentity(array $data): array');
-        self::assertIsInt($at);
-        $end = strpos($source, 'protected function render(string $page', $at);
-        self::assertIsInt($end);
-
-        $shared = substr($source, $at, $end - $at);
-        $elsewhere = substr($source, 0, $at) . substr($source, $end);
+        self::assertStringContainsString('return ViewIdentity::of($this->auth, $this->currentUser(), $data);', $source, 'viewIdentity() is the shared block.');
+        $shared = self::identity();
+        $elsewhere = $source;
 
         self::assertGreaterThan(
             10,

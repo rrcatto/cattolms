@@ -25,7 +25,16 @@ Two rules it keeps from the handler it replaces:
   the API surface is left alone. It answers with a problem document of its own and a themed HTML
   page would be an unparseable response to a JSON client.
 
+It says what happened in plain words (owner, 2026-10-23: "should it not fail more gracefully?"): the kind of error
+(not found, not allowed, something broken, or a request the site could not take) chooses the page's title and what
+the reader can do next, and the router's own messages ("No route found for ...") and an expired form's token are
+put in words a reader understands. The status code stays in small print, for reporting a fault.
+
 Changelog:
+2026/10/23 SAST
+- The page in plain words: a kind for the status, the router's and the form token's messages translated, the address
+  asked for, and the reader as every page knows them (ViewIdentity), so a signed-in reader keeps their header
+  (owner, 2026-10-23).
 2026/09/10 01:15 SAST
 - Created when Symfony took over routing and Fat-Free's ONERROR handler went with it.
 */
@@ -34,6 +43,8 @@ declare(strict_types=1);
 
 namespace CattoLearning\Http\Symfony\Listener;
 
+use CattoLearning\Auth\AuthService;
+use CattoLearning\Http\ViewIdentity;
 use CattoLearning\Support\Env;
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -46,7 +57,7 @@ use Throwable;
 #[AsEventListener(event: KernelEvents::EXCEPTION, priority: -16)]
 final class ErrorPageListener
 {
-    public function __construct(private readonly ThemeRenderer $view)
+    public function __construct(private readonly ThemeRenderer $view, private readonly AuthService $auth)
     {
     }
 
@@ -65,17 +76,24 @@ final class ErrorPageListener
         }
 
         $message = $status >= 500 && !Env::bool('APP_DEBUG', false)
-            ? 'An unexpected error occurred.'
-            : $exception->getMessage();
+            ? 'The page could not be shown. It is not something you did.'
+            : self::plain($exception->getMessage(), $status);
+        $kind = match (true) {
+            $status === 404 => 'not_found',
+            $status === 403 => 'forbidden',
+            $status >= 500 => 'broken',
+            default => 'other',
+        };
 
         try {
-            $event->setResponse(new Response($this->view->render('error', [
-                'title' => 'Error',
-                'page_title' => 'Something went wrong',
-                'page_kicker' => 'Error ' . $status,
+            // The reader as every page knows them, so a signed-in reader keeps their header and identity band.
+            $event->setResponse(new Response($this->view->render('error', ViewIdentity::of($this->auth, $this->reader(), [
+                'title' => ['not_found' => 'Not found', 'forbidden' => 'Not allowed', 'broken' => 'Something went wrong', 'other' => 'Not done'][$kind],
                 'status' => $status,
-                'message' => $message !== '' ? $message : 'Request failed.',
-            ], $status), $status));
+                'kind' => $kind,
+                'message' => $message,
+                'retry_url' => $event->getRequest()->getMethod() === 'GET' ? $event->getRequest()->getRequestUri() : '',
+            ]), $status), $status));
         } catch (Throwable $renderFailure) {
             // The theme itself failed. Say so in plain HTML rather than recursing into the same
             // renderer that just threw.
@@ -84,10 +102,35 @@ final class ErrorPageListener
                 '<!doctype html><html lang="en"><meta charset="utf-8">'
                 . '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Error</title>'
                 . '<body style="font-family:system-ui;padding:3rem"><h1>Request failed</h1><p>'
-                . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p></body></html>',
+                . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p><p><a href="/">Home</a></p></body></html>',
                 $status,
                 ['Content-Type' => 'text/html; charset=utf-8']
             ));
         }
+    }
+
+    /** Who is reading, or nobody when that cannot be told (the error may be the database's own). */
+    private function reader(): ?\CattoLearning\Auth\CurrentUser
+    {
+        try {
+            return $this->auth->currentUser();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * An exception's message in words a reader understands: the router's and the form token's messages are the site's
+     * own wording, and an empty message says only what kind of error it was.
+     */
+    private static function plain(string $message, int $status): string
+    {
+        return match (true) {
+            str_starts_with($message, 'No route found') && $status === 405 => 'That address does not take this kind of request. Go back and use the page\'s own buttons and links.',
+            str_starts_with($message, 'No route found') => 'The address may be mistyped, or the page has moved or been removed.',
+            $message === 'Invalid request token.' => 'The form had expired, or was sent from a page opened long ago. Go back, reload the page and send it again.',
+            trim($message) === '' => $status === 404 ? 'The address may be mistyped, or the page has moved or been removed.' : 'The request could not be completed.',
+            default => $message,
+        };
     }
 }

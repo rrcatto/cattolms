@@ -13,6 +13,9 @@ The Administration course list and the public published catalogue are bounded an
 the home page asks for only the handful of courses it renders.
 
 Changelog:
+2026/10/23 SAST
+- Course codes (owner, 2026-10-23): createCourse() stores the code given, else a random C- one; updateCourse() writes it when
+  given; findByCode(); Administration -> Courses searches and sorts by code too.
 2026/10/20 SAST
 - Price options store their optional was price (was_price_minor_units), and the catalogue card row the default price's (owner, 2026-10-20).
 2026/10/19 SAST
@@ -152,6 +155,8 @@ final class CourseRepository
     public const ADMIN_COURSE_SORTS = [
         // Its place in the catalogue (owner, 2026-10-20); the courses without one follow, newest first.
         'position' => 'c.catalogue_position',
+        // Its code (owner, 2026-10-23).
+        'code' => 'c.code',
         'title' => 'c.title',
         // What the course is sold at now (owner, 2026-10-20): its active default price.
         'price' => '(SELECT spv.price_minor_units FROM course_price_variants spv WHERE spv.course_id = c.id AND spv.is_active = TRUE AND spv.is_default = TRUE)',
@@ -336,8 +341,9 @@ final class CourseRepository
             return ['', []];
         }
 
+        // By title or code (owner, 2026-10-23): GDN-101 finds its course.
         return [
-            ' AND c.title::text ILIKE :search_term',
+            ' AND (c.title::text ILIKE :search_term OR c.code::text ILIKE :search_term)',
             ['search_term' => '%' . addcslashes($term, '%_\\') . '%'],
         ];
     }
@@ -606,7 +612,7 @@ final class CourseRepository
 
     private static function courseAdministrationDetail(): string
     {
-        return "SELECT c.id, c.public_id, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position,
+        return "SELECT c.id, c.public_id, c.code, c.slug, c.title, c.subtitle, c.summary, c.status, c.level, c.catalogue_position,
                     c.updated_at, c.published_at, c.owner_user_id, c.owner_company_id,
                     cc.name AS category_name,
                     oc.name AS owner_company_name,
@@ -1409,24 +1415,26 @@ final class CourseRepository
     }
 
     /**
-     * Every course with what the catalogue file keeps of it: where it came from, its category, its tags,
-     * its cover and its default price.
+     * Every course's id in catalogue order (owner, 2026-10-23: a catalogue package lists its courses so).
      *
-     * @return list<array<string,mixed>>
+     * @return list<int>
      */
-    public function catalogueCourses(): array
+    public function catalogueOrderIds(): array
     {
-        return $this->db->fetchAllAssociative(
-            "SELECT c.id, c.slug, c.title, c.status, c.source_filename, c.category_id, c.cover_svg, c.catalogue_position,
-                    COALESCE((SELECT string_agg(o.slug, '|' ORDER BY o.slug) FROM course_relations r JOIN courses o
-                               ON o.id = CASE WHEN r.course_low_id = c.id THEN r.course_high_id ELSE r.course_low_id END
-                              WHERE r.course_low_id = c.id OR r.course_high_id = c.id), '') AS related_slugs,
-                    dpv.price_minor_units, dpv.was_price_minor_units, dpv.access_period_seconds,
-                    COALESCE((SELECT string_agg(t.name, '|' ORDER BY t.name) FROM course_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.course_id = c.id), '') AS tag_names
-               FROM courses c
-               LEFT JOIN course_price_variants dpv ON dpv.course_id = c.id AND dpv.is_active = TRUE AND dpv.is_default = TRUE
-              ORDER BY c.id"
-        );
+        return array_map('intval', $this->db->fetchFirstColumn('SELECT c.id FROM courses c ORDER BY ' . self::ADMIN_COURSE_ORDER));
+    }
+
+    /**
+     * Every course in catalogue order with what the export form shows of it (owner, 2026-10-23: "first select the courses
+     * I wish to export").
+     *
+     * @return list<array{id:int,code:string,title:string,status:string,category_id:int|null}>
+     */
+    public function catalogueExportRows(): array
+    {
+        return array_map(static fn(array $row): array => ['id' => (int) $row['id'], 'code' => (string) $row['code'], 'title' => (string) $row['title'],
+            'status' => (string) $row['status'], 'category_id' => $row['category_id'] === null ? null : (int) $row['category_id']],
+            $this->db->fetchAllAssociative('SELECT c.id, c.code, c.title, c.status, c.category_id FROM courses c ORDER BY ' . self::ADMIN_COURSE_ORDER));
     }
 
     /** A course's cover picture, replaced with one ADMIN uploaded (owner, 2026-10-20). */
@@ -1843,6 +1851,24 @@ final class CourseRepository
         return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
     }
 
+    /**
+     * The course with this code (owner, 2026-10-23), the one thing every import matches a course by.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function findByCode(string $code): ?array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT c.*, cc.name AS category_name, cc.slug AS category_slug
+             FROM courses c
+             LEFT JOIN course_categories cc ON cc.id = c.category_id
+             WHERE c.code = :code
+             LIMIT 1',
+            ['code' => CourseCode::normalise($code)]
+        );
+        return isset($rows[0]) ? $this->normaliseRow($rows[0]) : null;
+    }
+
     /** @return list<array<string,mixed>> */
     public function gradeBands(int $courseId): array
     {
@@ -1897,13 +1923,13 @@ final class CourseRepository
         $publicId = Uuid::v4();
         $rows = $this->db->fetchAllAssociative(
             'INSERT INTO courses
-                 (public_id,category_id,slug,title,subtitle,summary,description_html,level,
+                 (public_id,code,category_id,slug,title,subtitle,summary,description_html,level,
                   estimated_minutes,status,default_access_period_seconds,introduction_html,show_outline_on_intro,
                   certificate_enabled,certificate_accreditation,
                   course_style_key,presentation_css,source_filename,owner_company_id,owner_user_id,
                   publication_approval_status,interchange_schema_version,created_by_user_id,updated_by_user_id,
                   created_at,updated_at,cover_svg)
-             VALUES (:public_id,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
+             VALUES (:public_id,:code,:category_id,:slug,:title,:subtitle,:summary,:description_html,:level,
                      :estimated_minutes,:status,:default_access_period_seconds,:introduction_html,:show_outline_on_intro,
                      :certificate_enabled,:certificate_accreditation,
                      :course_style_key,:presentation_css,:source_filename,:owner_company_id,:owner_user_id,
@@ -1912,6 +1938,8 @@ final class CourseRepository
              RETURNING id',
             [
                 'public_id' => $publicId,
+                // The code it was given (owner, 2026-10-23), else a random one, as the column's own default.
+                'code' => trim((string) ($data['code'] ?? '')) !== '' ? CourseCode::validate((string) $data['code']) : CourseCode::generated(),
                 'category_id' => $data['category_id'] ?: null,
                 'slug' => (string) $data['slug'],
                 'title' => (string) $data['title'],
@@ -1982,6 +2010,7 @@ final class CourseRepository
         // Columns only written when the caller supplied them: an editor form that does not carry
         // ownership must not blank it.
         $optional = [
+            'code' => 'code',
             'presentation_css' => 'presentation_css',
             'owner_company_id' => 'owner_company_id',
             'owner_user_id' => 'owner_user_id',

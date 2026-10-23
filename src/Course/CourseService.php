@@ -11,6 +11,9 @@ Description:
 Implements Catto Learning business and application logic for course operations.
 
 Changelog:
+2026/10/23 SAST
+- Course codes (owner, 2026-10-23): every course saved has a code, the one typed (tidied, checked, its own) or one
+  suggested from the title (courseCode(), suggestCourseCode()).
 2026/10/20 SAST
 - A price option may carry a was price, shown struck through beside its price (owner, 2026-10-20); catalogue cards carry the default price's (default_was_label).
 
@@ -1841,6 +1844,26 @@ final class CourseService
     }
 
     /**
+     * The course's code (owner, 2026-10-23): the one typed, tidied and checked, else a suggestion from the title. No
+     * other course may have it.
+     */
+    public function courseCode(string $input, string $title, int $courseId = 0): string
+    {
+        $code = trim($input) === '' ? CourseCode::suggest($title, fn(string $candidate): bool => $this->courses->findByCode($candidate) !== null) : CourseCode::validate($input);
+        $holder = $this->courses->findByCode($code);
+        if ($holder !== null && (int) $holder['id'] !== $courseId) {
+            throw new InvalidArgumentException('Another course already has the code ' . $code . ': ' . $holder['title'] . '. Each course has a code of its own.');
+        }
+        return $code;
+    }
+
+    /** A free code to offer for a course with this title. */
+    public function suggestCourseCode(string $title): string
+    {
+        return CourseCode::suggest($title, fn(string $candidate): bool => $this->courses->findByCode($candidate) !== null);
+    }
+
+    /**
      * @param array<string,mixed> $existing
      * @param array<string,mixed> $input
      * @return array<string,mixed>
@@ -1853,6 +1876,7 @@ final class CourseService
         }
         $slugInput = trim((string) ($input['slug'] ?? $existing['slug'] ?? ''));
         $slug = $slugInput !== '' ? Slug::validate($slugInput) : Slug::from($title);
+        $code = $this->courseCode((string) ($input['code'] ?? $existing['code'] ?? ''), $title, (int) ($existing['id'] ?? 0));
         $period = array_key_exists('access_days', $input)
             ? max(1, (int) $input['access_days']) * 86400
             : (int) ($input['default_access_period_seconds'] ?? $existing['default_access_period_seconds'] ?? 31536000);
@@ -1861,6 +1885,7 @@ final class CourseService
         }
         return [
             'category_id' => (int) ($input['category_id'] ?? $existing['category_id'] ?? 0),
+            'code' => $code,
             'slug' => $slug,
             'title' => $title,
             'subtitle' => trim((string) ($input['subtitle'] ?? $existing['subtitle'] ?? '')),

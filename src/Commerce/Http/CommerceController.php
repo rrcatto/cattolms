@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace CattoLearning\Commerce\Http;
 
 use CattoLearning\Auth\AuthService;
+use CattoLearning\Auth\CurrentUser;
 use CattoLearning\Application\PlatformAdministrationService;
 use CattoLearning\Commerce\Application\{BillingProfileService,OrderService,PaymentService,FulfilmentService,CartService,CheckoutService,PromotionService};
 use CattoLearning\Commerce\Domain\{BillingDetails,OrderTotals,PromotionRejected};
@@ -227,10 +228,29 @@ final class CommerceController extends BaseController
         return $this->render('commerce-orders',$data+['title'=>'My Orders','active_nav'=>'account']);
     }
 
+    /**
+     * An order link opened by someone other than its purchaser (owner, 2026-10-23: as ADMIN, a link in a buyer's email
+     * refused with "This order belongs to another purchaser"): whoever manages orders goes to the same order, or the
+     * same invoice or receipt, in Administration, where it is managed; anyone else finds no such order in their account.
+     * The buyer's own page is never shown to anyone else, since its buttons act as the buyer.
+     */
+    private function sendElsewhereIfNotTheirs(CurrentUser $actor, int $orderId, ?int $documentId = null): void
+    {
+        $purchaser = $this->orders->purchaser($orderId);
+        if ($purchaser !== null && $purchaser['id'] === $actor->id) return;
+        if ($purchaser !== null && $actor->hasPermission('PLATFORM.ORDER.VIEW')) {
+            if ($documentId === null) $this->flash('info', 'This is ' . $purchaser['name'] . '\'s order. It opens here in Administration, where you manage it.');
+            $this->redirect('/admin/commerce/orders/' . $orderId . ($documentId === null ? '' : '/documents/' . $documentId));
+        }
+        throw $this->notFound(OrderService::NOT_YOURS);
+    }
+
     #[Route('/account/orders/{id}',name:'commerce_order',requirements:['id'=>'[0-9]+'],methods:['GET'])]
     public function order(): Response
     {
-        $actor=$this->requirePermission('COMMERCE.ORDER.VIEW');$id=(int)$this->param('id');
+        $id=(int)$this->param('id');
+        $this->sendElsewhereIfNotTheirs($this->requireUser(),$id);
+        $actor=$this->requirePermission('COMMERCE.ORDER.VIEW');
         $order=$this->orders->view($actor,$id);
         $this->orders->cancelDue($id);$order=$this->orders->view($actor,$id);
         $canPay=$order['state']==='awaiting_payment';
@@ -292,6 +312,7 @@ final class CommerceController extends BaseController
     #[Route('/account/orders/{id}/documents/{document}',name:'commerce_document',requirements:['id'=>'[0-9]+','document'=>'[0-9]+'],methods:['GET'])]
     public function document(): Response
     {
+        $this->sendElsewhereIfNotTheirs($this->requireUser(),(int)$this->param('id'),(int)$this->param('document'));
         $order=$this->orders->view($this->requirePermission('COMMERCE.ORDER.VIEW'),(int)$this->param('id'));
         foreach($order['documents'] as $document) {
             if ((int)$document['id']!==(int)$this->param('document')) continue;

@@ -8,14 +8,22 @@
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', span: 'third', for: 'slug'})} %}
+	{# The course's code (owner, 2026-10-23): every site and catalogue file knows the course by it. #}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Course code', span: 'third', for: 'code', help: 'Capital letters and digits joined by hyphens, such as GDN-101. Every site and catalogue file knows the course by this code, so change it only if the course has not been exported. Left empty, a code is made from the title.'})} %}
+{% block control %}
+
+		<input class="cl-input text-uppercase" id="code" name="code" value="{{ course.code|default('') }}" maxlength="20" placeholder="GDN-101" autocomplete="off" {{ ui_field_attrs(props) }}>
+
+{% endblock %}
+{% endembed %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Slug', span: 'third', for: 'slug', help: 'The last part of the course\'s web address, /courses/' ~ (course.slug ?: 'the-slug') ~ '. Left empty, it is made from the title.'})} %}
 {% block control %}
 
 		<input class="cl-input" id="slug" name="slug" value="{{ course.slug }}" placeholder="generated-from-title" {{ ui_field_attrs(props) }}>
 
 {% endblock %}
 {% endembed %}
-	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subtitle', full_width: true, for: 'subtitle'})} %}
+	{% embed ui_template('form.field') with {props: ui_props('form.field', {label: 'Subtitle', span: 'two-thirds', for: 'subtitle'})} %}
 {% block control %}
 
 		<input class="cl-input" id="subtitle" name="subtitle" value="{{ course.subtitle }}" maxlength="320" {{ ui_field_attrs(props) }}>

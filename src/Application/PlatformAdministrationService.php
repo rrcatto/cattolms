@@ -1186,14 +1186,16 @@ final class PlatformAdministrationService
                     + $this->sortView('courses', $sort, '/admin/courses', [
                         // What matters most first (owner, 2026-10-20): the course and its price; category and
                         // ownership last. A bought course starts at once, so there is no Started column.
-                        'position' => 'Position|8',
-                        'title' => 'Course|22',
-                        'price' => 'Price|15',
+                        'position' => 'Position|7',
+                        // Its code (owner, 2026-10-23), the name every import knows it by.
+                        'code' => 'Code|7',
+                        'title' => 'Course|20',
+                        'price' => 'Price|14',
                         'status' => 'Status|8',
                         'learners' => 'Learners|7',
                         'updated' => 'Updated|9',
-                        'category' => 'Category|12',
-                        'ownership' => 'Ownership|13',
+                        'category' => 'Category|11',
+                        'ownership' => 'Ownership|11',
                         'actions' => 'Actions|6',
                     ], array_keys(CourseRepository::ADMIN_COURSE_SORTS), $searchFilter, [
                         'editors' => SortOrder::DESCENDING,

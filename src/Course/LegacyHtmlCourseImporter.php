@@ -11,6 +11,8 @@ Description:
 Provides course-domain functionality for legacy html course importer, including the structured learning, import, assessment or authoring workflow represented by this class.
 
 Changelog:
+2026/10/23 SAST
+- Reads the course's code from <meta name="cattolms:course-code" content="GDN-101"> in the file's head (owner, 2026-10-23).
 2026/10/07 SAST
 - No certificate title: a course holds only its certificate switch and accreditation line, and is drawn in the default certificate design.
 2026/08/12 23:56 SAST
@@ -365,6 +367,8 @@ final class LegacyHtmlCourseImporter
 
         return [
             'course' => [
+                // The course's code from its head, <meta name="cattolms:course-code" content="GDN-101"> (owner, 2026-10-23).
+                'code' => $this->courseCode($xpath),
                 'slug' => Slug::from($title),
                 'title' => $title,
                 'subtitle' => $courseSubtitle,
@@ -1044,6 +1048,14 @@ final class LegacyHtmlCourseImporter
             'structural_warning_count' => $structural,
             'messages' => $messages,
         ];
+    }
+
+    /** The code the file gives its course, tidied, or empty when it gives none (a review shows a suggestion). */
+    private function courseCode(DOMXPath $xpath): string
+    {
+        $nodes = $xpath->query('//meta[@name="' . CourseCode::META_NAME . '"]/@content');
+        $value = $nodes->length > 0 ? (string) $nodes->item(0)?->nodeValue : '';
+        return CourseCode::normalise($value);
     }
 
     private function detectLevel(DOMXPath $xpath): string

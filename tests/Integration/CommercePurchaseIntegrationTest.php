@@ -251,12 +251,22 @@ final class CommercePurchaseIntegrationTest extends TestCase
         $this->expectException(\Doctrine\DBAL\Exception::class);
         $this->db->executeStatement("UPDATE commerce_documents SET snapshot='{}' WHERE order_id=:id",['id'=>$id]);
     }
-    public function testAnotherPurchaserCannotReadAnOrder(): void
+    public function testAnotherPurchaserFindsNoSuchOrder(): void
     {
+        // Owner, 2026-10-23: "should it not fail more gracefully?": to anyone but its purchaser an order is not found, as
+        // an order that does not exist is, and nothing says it is someone else's.
         $id=$this->place();
+        self::assertSame($this->actor->id, $this->orders->purchaser($id)['id'] ?? null, 'The purchaser is known for a link opened by someone else.');
+        self::assertNull($this->orders->purchaser(999999999), 'No such order: no purchaser, never an error.');
         $other=new CurrentUser($this->actor->id+999999,Uuid::v4(),'other@example.invalid','Other',[],['COMMERCE.ORDER.VIEW'],Uuid::v4());
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException::class);
-        $this->orders->view($other,$id);
+        foreach ([$id, 999999999] as $orderId) {
+            try {
+                $this->orders->view($other,$orderId);
+                self::fail('Another purchaser does not read the order.');
+            } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $notFound) {
+                self::assertSame('We could not find that order in your account.', $notFound->getMessage());
+            }
+        }
     }
     public function testPendingConfirmationAndAmountMismatchDoNotFulfil(): void
     {

@@ -534,7 +534,12 @@
     const fitAndExplain = root => { fitTableColumns(root); applyCellTooltips(root); fitPagination(root); fitFigures(root); };
     fitAndExplain(document);
     // Again once the theme's web fonts have arrived: a figure or a column measured in the fallback font can change width.
+    // A font that starts loading later (a style the page reaches only after a theme's palette is applied) is fitted when
+    // it arrives, and everything once more when the page has loaded (2026-10-23: a dashboard amount was seen past its
+    // card once in Gilded Noir, measured before its font).
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitAndExplain(document));
+    if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => fitAndExplain(document));
+    window.addEventListener('load', () => fitAndExplain(document));
     // htmx 4's event name; the swapped element can be gone (an outerHTML swap), so the page is looked at again.
     document.addEventListener('htmx:after:swap', () => fitAndExplain(document));
     // A table inside a section that was closed had no width to share out until it opened.

@@ -528,13 +528,25 @@ The course grade bands are the only definition of a course's grading scale. They
 
 HTML import reads the scale from the file: the shown `ul.scale-list` first, then the `bandFor()`/`gradeBand()` grading function; codes come from that function, otherwise from a trailing "(A)"; bands whose label contains "fail" are not passing. With neither, the standard five bands are used and the import review says so. On the owner's instruction, and as a deliberate exception to preserving authored content, import also removes from the introduction the parts that only worked in the standalone file: the static scale list (replaced by `[grading-scale]`), the `#resetBtn` Reset all saved progress button, and sentences saying progress is saved in the browser. The import review lists each change.
 
-### Structured interchange 2.0
+### Structured interchange 2.0 and 2.1
 
-The JSON package uses `format: catto-learning-course`, `schema_version: 2.0`, course metadata, `course_items`, `structure`, Resource metadata and assessment banks. Each item contains its exact `item_key`, `item_type`, title/description, source, type configuration, Resource public identifier where relevant and assessment configuration/questions. Each structure row has `node_key`, optional `parent_node_key`, `node_type`, position and relative delay; item rows reference `item_key` and carry placement overrides/public/final settings. Parents precede children. Export includes items reachable through shortcodes, preserving source. Question and option database IDs are excluded so import creates independent identities. Resource files must be registered explicitly on the target instance; export does not duplicate physical files. Existing keys are not silently reused or overwritten when a package also defines them.
+The JSON package uses `format: catto-learning-course`, `schema_version: 2.1` (2.0 is still read), course metadata, `course_items`, `structure`, Resource metadata and assessment banks. Each item contains its exact `item_key`, `item_type`, title/description, source, type configuration, Resource public identifier where relevant and assessment configuration/questions. Each structure row has `node_key`, optional `parent_node_key`, `node_type`, position and relative delay; item rows reference `item_key` and carry placement overrides/public/final settings. Parents precede children. Export includes items reachable through shortcodes, preserving source. Question and option database IDs are excluded so import creates independent identities. Resource files must be registered explicitly on the target instance; export does not duplicate physical files. Existing keys are not silently reused or overwritten when a package also defines them.
+
+Schema 2.1 (2026-10-23) adds the course's `code` to the course metadata and a `catalogue` block: `category` (the path of names joined by ` › `), `tags` (names), `cover` (SVG text), `position`, `related` (other courses' codes), `status` and `prices` (each `period`, `unit`, `price`, `was_price`, `currency`, `label`, `active`, `default`). A 2.1 package may hold a course with no content yet. An import applies the block after the content: the tags (a missing tag is made), the cover and the position, the related courses that are on the site (adding only), and the prices only for a course the import creates. A catalogue package (Administration → Courses → Import & Export Catalogue) is a zip of `catalogue.json` (categories and tags, version 2), one 2.1 package per course in `courses/` and the Resource Library files they use in `resources/<public id>/`; its files keep their public ids, so its courses find them.
+
+### Course code
+
+Every course has a code (`courses.code`): capital letters and digits in parts joined by hyphens, 2 to 20 characters, such as `GDN-101`, unique on the site. It is the author's, the same on every site, and every import matches a course by it, never by title or slug. A course HTML file names its code in its head:
+
+```html
+<meta name="cattolms:course-code" content="GDN-101">
+```
+
+The import review shows the file's code, or suggests one from the title (its main words' initials and the first free number from 101), and offers for replacement the course already on the site with that code. The Details tab shows the code and lets ADMIN change it, with a warning that other sites and catalogue files know the course by it. A course made without one, by a script or a seed, has a random `C-` code.
 
 ### Category on import
 
-Neither the HTML nor the JSON format carries a course category, and export writes none. The import review chooses it in the shared category picker (UX rule 4.6): Uncategorised by default, any of the three levels, or a category made there with + New; the commit files the course in it (`category_id`, 0 for none).
+The HTML format carries no course category. A 2.1 JSON package names one in its `catalogue` block, and the import review preselects it when the site has that category. The review chooses it in the shared category picker (UX rule 4.6): Uncategorised by default, any of the three levels, or a category made there with + New; the commit files the course in it (`category_id`, 0 for none). A catalogue package files each new course in its own category, made by the package's `catalogue.json` when the site lacks it.
 
 ### Publication
 

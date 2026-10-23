@@ -32,7 +32,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Tests\Unit;
 
-use CattoLearning\Http\Controller\BaseController;
+use CattoLearning\Http\ViewIdentity;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
 
@@ -121,7 +121,7 @@ final class IdentityDisplayNameContractTest extends TestCase
      */
     private function identityBranches(): array
     {
-        $method = new ReflectionMethod(BaseController::class, 'viewIdentity');
+        $method = new ReflectionMethod(ViewIdentity::class, 'of');
         $file = (string) file_get_contents((string) $method->getFileName());
         $lines = explode("\n", $file);
         $body = implode("\n", array_slice(
@@ -131,9 +131,9 @@ final class IdentityDisplayNameContractTest extends TestCase
         ));
 
         $opening = strpos($body, 'if ($currentUser !== null) {');
-        self::assertNotFalse($opening, 'viewIdentity() no longer branches on the current user.');
+        self::assertNotFalse($opening, 'ViewIdentity::of() no longer branches on the current user.');
         $else = strpos($body, '} else {', $opening);
-        self::assertNotFalse($else, 'viewIdentity() has no signed-out branch.');
+        self::assertNotFalse($else, 'ViewIdentity::of() has no signed-out branch.');
         $closing = strpos($body, "\n        }\n", $else);
         self::assertNotFalse($closing, 'The signed-out branch is not closed where this scan expects.');
 

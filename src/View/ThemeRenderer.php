@@ -10,6 +10,10 @@ Description:
 Renders platform-owned Catto Learning page bodies independently of themes, then applies an optional Theme Package 4.0 page-family wrapper and the active theme base.html shell. Child-theme template lookup is limited to child then direct parent. HTML comments are stripped from every finished response so template metadata headers and developer notes are never served to the public.
 
 Changelog:
+2026/10/23 SAST
+- Administration -> Courses -> Import & Export Catalogue, after Course Tags (owner, 2026-10-23).
+2026/10/23 SAST (v0.9.8)
+- Advanced PLATFORM_ASSET_VERSION to 0.9.8.
 2026/10/22 SAST (v0.9.7)
 - Advanced PLATFORM_ASSET_VERSION to 0.9.7.
 2026/10/20 SAST (v0.9.6)
@@ -116,7 +120,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.7';
+    private const PLATFORM_ASSET_VERSION = '0.9.8';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,
@@ -638,6 +642,11 @@ final class ThemeRenderer
                 }
                 if ($sectionKey === 'courses' && $this->can($data, 'COURSE.TAG.MANAGE')) {
                     $grandchildren[] = $child('admin-course-tags', 'Course Tags', '/admin/courses/tags', 'courses');
+                }
+                // The whole catalogue in one file, to another site or back (owner, 2026-10-23: "I want to manage
+                // everything from the web app. This means building an import catalogue menu item").
+                if ($sectionKey === 'courses' && ($this->can($data, 'COURSE.EXPORT') || ($this->can($data, 'COURSE.IMPORT') && $this->can($data, 'COURSE.CATEGORY.MANAGE') && $this->can($data, 'COURSE.TAG.MANAGE')))) {
+                    $grandchildren[] = $child('admin-course-catalogue', 'Import & Export Catalogue', '/admin/courses/catalogue', 'courses');
                 }
                 // Reviews waiting for a decision are counted in the label, so the queue is visible
                 // from anywhere in Administration without opening it.
