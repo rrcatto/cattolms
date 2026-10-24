@@ -110,12 +110,48 @@ fetch_release() {
     fi
 }
 
+# A new release's vendor starts as hard links to the running release's (2026-10-24: two releases kept 8,164 identical
+# files twice, 116 MB each), so a package both use takes its space once and each release still has a whole vendor of its
+# own: a release is never changed under a running site, and going back is one link. Composer replaces a package that
+# changed by deleting its folder and unpacking the new one, which leaves the old release's files alone. The files
+# Composer writes in place are real copies: its record and autoloader (vendor/composer), the loose files in vendor
+# (autoload.php, autoload_runtime.php) and vendor/bin.
+share_vendor() {
+    local target="$1" running
+    running="$(readlink -f "$APP/current" 2>/dev/null || true)"
+    [ -n "$running" ] && [ -d "$running/vendor" ] && [ "$running" != "$(readlink -f "$target")" ] && [ ! -e "$target/vendor" ] || return 0
+    cp -al "$running/vendor" "$target/vendor" || { rm -rf -- "${target:?}/vendor"; note "The packages could not be shared with $running; they are installed in full."; return 0; }
+    local own
+    for own in "$target/vendor/composer" "$target/vendor/bin"; do
+        [ -e "$own" ] || continue
+        rm -rf -- "$own"; cp -a "$running/vendor/${own##*/}" "$own"
+    done
+    find "$target/vendor" -maxdepth 1 -type f | while IFS= read -r own; do rm -f -- "$own"; cp -a "$running/vendor/${own##*/}" "$own"; done
+    note "The packages the running release has are shared with it (hard links); Composer adds what changed."
+}
+
+# The releases kept after a switch: the one now running and the one before it, to go back to. Older ones are deleted,
+# with their image's name (2026-10-24).
+prune_releases() {
+    local now="$1" before="$2" dir name
+    for dir in "$APP/releases"/*/; do
+        name="$(basename "$dir")"
+        [ "$name" = "$now" ] || [ "$name" = "$before" ] && continue
+        rm -rf -- "${APP:?}/releases/${name:?}"
+        # Never --force: that would take the running pod's containers with an image they share. Without it the name goes,
+        # and the image too unless another release or a container still uses it.
+        podman rmi "$(image_for "$name")" >/dev/null 2>&1 || true
+        note "Deleted the release $name (kept: $now${before:+ and $before})."
+    done
+}
+
 build_release() {
     local version="$1" mode="$2" target="$APP/releases/$1"
     say "The image for $version (PHP and its extensions)"
     podman build -q -t "$(image_for "$version")" -f "$target/deploy/podman/Containerfile" "$target/deploy/podman" >/dev/null || fail "the image was not built"
     podman pull -q "$WEB_IMAGE" >/dev/null || fail "the web server's image could not be fetched"
     say "Composer packages for $version"
+    share_vendor "$target"
     local flags=(--no-interaction --no-progress --optimize-autoloader)
     [ "$mode" = demo ] || flags+=(--no-dev)
     mkdir -p "$SITE/.cache/composer"
@@ -203,10 +239,13 @@ install)
         note "Emptied."
     fi
 
+    previous="$(basename "$(readlink -f "$APP/current" 2>/dev/null || true)")"
     build_site "$VERSION" "$MODE"
     write_pod "$VERSION"
     say "Starting the pod"
     start_pod
+    [ "$previous" = "$VERSION" ] && previous=""
+    prune_releases "$VERSION" "$previous"
     say "CattoLMS $VERSION is installed."
     note "Sign in at $(envval APP_URL)/login with $(envval APP_ADMIN_EMAIL), then open Administration -> System -> Setup."
     ;;
@@ -216,12 +255,15 @@ update)
     MODE="$(envval APP_SITE_MODE)"; [ "$MODE" = live ] || MODE=demo
     [ -n "$VERSION" ] || fail "give the version: --version X.Y.Z"
     say "CattoLMS on rootless Podman: update to $VERSION"
+    previous="$(basename "$(readlink -f "$APP/current" 2>/dev/null || true)")"
     fetch_release "$VERSION"
     build_release "$VERSION" "$MODE"
     build_site "$VERSION" "$MODE"
     write_pod "$VERSION"
     start_pod
-    say "CattoLMS $VERSION is running. The previous versions stay in $APP/releases until you delete them."
+    [ "$previous" = "$VERSION" ] && previous=""
+    prune_releases "$VERSION" "$previous"
+    say "CattoLMS $VERSION is running.${previous:+ $previous is kept in $APP/releases to go back to.}"
     ;;
 status)  systemctl --user status "$UNIT.service" --no-pager || true; podman pod ps --filter "name=$UNIT" ;;
 restart) systemctl --user restart "$UNIT.service" ;;

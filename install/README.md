@@ -43,7 +43,7 @@ The installer asks two things:
 It then does the following:
 
 1. Copies the chosen version from GitHub to `/usr/local/lib/php/cattolms/<version>`, owned by root, and installs its Composer packages there. A directory from before the rename, `/usr/local/lib/php/catto-learning`, is renamed `cattolms`.
-2. Writes the settings to `/home/<username>/.env` (mode 640). An existing `.env` is kept as `.env.before-<version>`, and its values are offered as the defaults.
+2. Writes the settings to `/home/<username>/.env` (mode 640). An existing `.env` is kept as `.env.before-<version>`, and its values are offered as the defaults. How the program runs (`APP_ENV`) is never changed by an install: an existing site keeps its value, and a new site starts as `development`, with debugging, which follows it. Changing a site to `production` is its owner's decision, made by editing `.env`.
 3. Prepares the database named in `.env`:
    - creates it, when PostgreSQL runs on this server and it is missing;
    - empties it, when it already holds tables. This is a clean installation, so every table and everything in it is deleted. The installer asks you to type the username first.
@@ -56,7 +56,7 @@ It then does the following:
 
 | Option | Meaning |
 |---|---|
-| `--version 0.9.8` | Install this version. The default is the newest release. |
+| `--version 0.9.9` | Install this version. The default is the newest release. |
 | `--mode demo` or `--mode live` | Answer the demo or live question in advance. |
 | `--answers FILE` | Give settings in advance as `KEY=value` lines. The rest are still asked. |
 | `--php-fpm-user USER` | The account PHP-FPM runs as, when it is not the site's own. |
@@ -88,8 +88,8 @@ It then does the following:
 
 ```text
 /usr/local/lib/php/cattolms/
-  0.9.8/                    the code of each installed version (root)
-  current -> 0.9.8          the version the site runs
+  0.9.9/                    the code of each installed version (root)
+  current -> 0.9.9          the version the site runs
   .env -> /home/<user>/.env for commands run without CATTO_LEARNING_ENV_FILE (the first site only)
 /home/<user>/
   .env                      the site's settings

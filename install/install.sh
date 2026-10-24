@@ -34,7 +34,7 @@
 #
 set -euo pipefail
 # The site's own .env decides how the program runs: settings the calling shell happens to carry (a development
-# machine's APP_DEBUG, for one) must not reach the commands below.
+# machine's APP_ENV, for one, or the APP_DEBUG that earlier releases read) must not reach the commands below.
 unset APP_ENV APP_DEBUG SHELL_VERBOSITY
 
 REPO="https://github.com/rrcatto/cattolms.git"

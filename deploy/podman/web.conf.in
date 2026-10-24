@@ -35,6 +35,9 @@ server {
         fastcgi_param PATH_INFO $fastcgi_path_info;
         fastcgi_param HTTPS $cattolms_https if_not_empty;
         fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+        # As long as the server's web server waits (proxy_read_timeout 180s): a long request, such as importing a
+        # catalogue package of many courses, is answered, not cut off at nginx's default 60 seconds.
+        fastcgi_read_timeout 180s;
         fastcgi_pass 127.0.0.1:9000;
     }
 

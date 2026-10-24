@@ -11,6 +11,9 @@ Description:
 Provides application-layer coordination for cli bootstrap, connecting Catto Learning domain services, persistence and HTTP workflows.
 
 Changelog:
+2026/10/24 SAST
+- The kernel's environment and debugging come from Configuration\RunMode: APP_ENV alone, development unless it says
+  production; APP_DEBUG is no longer read (owner, 2026-10-24).
 2026/08/12 23:56 SAST
 - Updated source metadata for the Catto Learning 0.5.5 release.
 2026/08/11 23:24 SAST
@@ -25,6 +28,7 @@ declare(strict_types=1);
 
 namespace CattoLearning\Application;
 
+use CattoLearning\Configuration\RunMode;
 use CattoLearning\Support\Env;
 use CattoLearning\Kernel;
 use Dotenv\Dotenv;
@@ -67,7 +71,7 @@ final class CliBootstrap
 
         // The same container the web request builds. A tool that assembled its own graph would be
         // a second wiring to keep in step with the first, and the two would drift.
-        $kernel = new Kernel(Env::string('APP_ENV', 'production'), Env::bool('APP_DEBUG', false), $instanceRoot);
+        $kernel = new Kernel(RunMode::environment(), RunMode::debug(), $instanceRoot);
         $kernel->boot();
         $container = $kernel->getContainer();
 

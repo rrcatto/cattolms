@@ -10,11 +10,24 @@ Version: 0.9.6
 Description:
 Who may sign in (owner, 2026-10-21: "an option where I can disallow all non-admin logins ... a whitelist of allowed
 emails, so I can ask friends to check my site for me on approved email addresses"). Administration → Settings → Who can
-sign in: everyone (the default), or administrators and the email addresses listed only. While it is restricted, anyone
-else is refused at sign-in and registration, and a session they already hold stops working. A listed address needs no
-approval on a demo site: listing it is the approval.
+sign in: everyone, or administrators and the email addresses listed only. While it is restricted, anyone else is refused
+at sign-in and registration, and a session they already hold stops working. A listed address needs no approval on a
+demo site: listing it is the approval.
+
+The site's .env sets it too (owner, 2026-10-24: "we need a .env var to bar everyone from logging in - we can't rely
+solely on a db setting"), like every setting: AUTH_SIGNIN is ADMIN (administrators and the listed addresses only) or
+EVERYONE, in either case; with no value, any other value or no AUTH_SIGNIN at all it is ADMIN (owner, 2026-10-24: "by
+default I want every .env to only allow Admin + whitelist to be able to sign in ... If the var has no value (or a value
+other than ADMIN or EVERYONE) or the var is absent then it must default to ADMIN"). AUTH_SIGNIN_ALLOWED_EMAILS lists the
+addresses, separated by commas; without it the list is empty. What the Settings page saves overrides both, as it does
+every .env value (owner, 2026-10-24: "we have an established protocol that .env vars can be overridden by the settings
+page and I do not want to change that rule"), and Reset returns to them. A rebuilt database has nothing saved, so the
+site follows .env again.
 
 Changelog:
+2026/10/24 SAST
+- AUTH_SIGNIN (ADMIN or EVERYONE, ADMIN unless it says EVERYONE) and AUTH_SIGNIN_ALLOWED_EMAILS in .env, overridden
+  by the Settings page, with Reset (owner, 2026-10-24).
 2026/10/21 SAST
 - Created.
 */
@@ -25,12 +38,18 @@ namespace CattoLearning\Auth;
 
 use CattoLearning\Infrastructure\Persistence\OptionRepository;
 use CattoLearning\Support\EmailAddress;
+use CattoLearning\Support\Env;
 use InvalidArgumentException;
 
 final class SignInRestriction
 {
     public const RESTRICTED_KEY = 'signin.restricted';
     public const ALLOWED_KEY = 'signin.allowed_emails';
+    /** The .env settings the Settings page overrides: AUTH_SIGNIN is ADMIN or EVERYONE, and ADMIN unless it says EVERYONE. */
+    public const ENV_SIGNIN = 'AUTH_SIGNIN';
+    public const ENV_ALLOWED = 'AUTH_SIGNIN_ALLOWED_EMAILS';
+    public const ADMIN = 'ADMIN';
+    public const EVERYONE = 'EVERYONE';
     public const REFUSED = 'This site is open only to invited people for now. Ask the site\'s administrator to add your email address.';
 
     /** @var list<string>|null */
@@ -41,23 +60,49 @@ final class SignInRestriction
     {
     }
 
-    /** Whether only administrators and the listed addresses may sign in. */
+    /** Whether only administrators and the listed addresses may sign in: the saved setting, else .env (ADMIN unless EVERYONE). */
     public function restricted(): bool
     {
-        return $this->restricted ??= ($this->options?->get(self::RESTRICTED_KEY, '0') ?? '0') === '1';
+        return $this->restricted ??= $this->source() === 'database'
+            ? ($this->options?->get(self::RESTRICTED_KEY, '0') ?? '0') === '1'
+            : $this->environmentRestricted();
     }
 
-    /** @return list<string> the listed addresses, lower case */
+    /**
+     * Where the choice comes from: 'database' (saved on the Settings page), 'environment' (AUTH_SIGNIN says ADMIN or
+     * EVERYONE) or 'default' (AUTH_SIGNIN is missing, empty or something else, so ADMIN).
+     */
+    public function source(): string
+    {
+        if ($this->options?->find(self::RESTRICTED_KEY) !== null) return 'database';
+        return self::environmentValue() !== null ? 'environment' : 'default';
+    }
+
+    /** What .env says, which Reset returns to: true (ADMIN) unless AUTH_SIGNIN says EVERYONE. */
+    public function environmentRestricted(): bool
+    {
+        return self::environmentValue() !== self::EVERYONE;
+    }
+
+    /** AUTH_SIGNIN as ADMIN or EVERYONE, in either case; null when it is missing, empty or anything else. */
+    private static function environmentValue(): ?string
+    {
+        $value = strtoupper(Env::string(self::ENV_SIGNIN));
+        return in_array($value, [self::ADMIN, self::EVERYONE], true) ? $value : null;
+    }
+
+    /** @return list<string> the listed addresses, lower case: the saved list, else .env's */
     public function allowedEmails(): array
     {
-        if ($this->allowed === null) {
-            $this->allowed = [];
-            foreach (preg_split('/\R/', (string) ($this->options?->get(self::ALLOWED_KEY, '') ?? '')) ?: [] as $line) {
-                $line = strtolower(trim($line));
-                if ($line !== '') $this->allowed[] = $line;
-            }
-        }
-        return $this->allowed;
+        return $this->allowed ??= $this->source() === 'database'
+            ? self::addresses((string) ($this->options?->get(self::ALLOWED_KEY, '') ?? ''))
+            : $this->environmentEmails();
+    }
+
+    /** @return list<string> the addresses .env lists, lower case (none without AUTH_SIGNIN_ALLOWED_EMAILS); one that is not an address is left out */
+    public function environmentEmails(): array
+    {
+        return self::addresses(Env::string(self::ENV_ALLOWED));
     }
 
     public function isListed(string $email): bool
@@ -72,8 +117,8 @@ final class SignInRestriction
     }
 
     /**
-     * Saves the choice and the list: one address a line (commas and semicolons separate too); each must be an email
-     * address.
+     * Saves the choice and the list, which then override .env: one address a line (commas and semicolons separate
+     * too); each must be an email address.
      *
      * @return array{restricted:bool,emails:list<string>}
      */
@@ -97,5 +142,29 @@ final class SignInRestriction
         $this->restricted = $restricted;
         $this->allowed = $list;
         return ['restricted' => $restricted, 'emails' => $list];
+    }
+
+    /** Removes what the Settings page saved: the site follows .env again. */
+    public function reset(): void
+    {
+        $this->options?->delete(self::RESTRICTED_KEY);
+        $this->options?->delete(self::ALLOWED_KEY);
+        $this->restricted = null;
+        $this->allowed = null;
+    }
+
+    /** @return list<string> */
+    private static function addresses(string $text): array
+    {
+        $list = [];
+        foreach (preg_split('/[\s,;]+/', $text) ?: [] as $entry) {
+            if (trim($entry) === '') continue;
+            try {
+                $list[] = strtolower(EmailAddress::normalize($entry));
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        return array_values(array_unique($list));
     }
 }

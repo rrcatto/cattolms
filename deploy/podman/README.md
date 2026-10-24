@@ -41,6 +41,10 @@ The pod reaches the server's `127.0.0.1` at `10.0.2.2`, and the server sees thos
 3. Forward the site to the pod. Choose a free port for each site (8081, 8082, …). nginx, in the site's HTTPS server block, in place of its PHP handling:
 
    ```nginx
+   # In the server block itself, so they hold whoever edits the location below.
+   proxy_read_timeout 180s;
+   client_max_body_size 64M;
+
    location ^~ /.well-known/ {
        try_files $uri =404;
    }
@@ -49,35 +53,37 @@ The pod reaches the server's `127.0.0.1` at `10.0.2.2`, and the server sees thos
        proxy_set_header Host $host;
        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
        proxy_set_header X-Forwarded-Proto $scheme;
-       proxy_read_timeout 180s;
-       client_max_body_size 64M;
    }
    ```
 
-   Keep `/.well-known/` served from the site's own directory, so certificate renewal still works. With Virtualmin, first set the domain's PHP mode to none (`virtualmin modify-web --domain <domain> --mode none`), so it no longer adds its PHP handling, then edit the domain's nginx file. Test with `nginx -t`, then reload.
+   Keep `/.well-known/` served from the site's own directory, so certificate renewal still works. The timeout matches the pod's own (180 seconds), so a long request such as importing a catalogue package is answered; the upload limit matches PHP's. With Virtualmin, first set the domain's PHP mode to none (`virtualmin modify-web --domain <domain> --mode none`), so it no longer adds its PHP handling, then edit the domain's nginx file. Virtualmin lists that `location /` as the domain's proxy path (Web Configuration → Proxy Paths, `virtualmin list-proxies`); saving the proxy there writes the block again with its own headers, so add `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` back afterwards, or the site sees every visitor as the server itself. Test with `nginx -t`, then reload.
 
 ## 2. As the site's user
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/rrcatto/cattolms/main/deploy/podman/cattolms-podman.sh
-bash cattolms-podman.sh install --version 0.9.8 --port 8081
+bash cattolms-podman.sh install --version 0.9.9 --port 8081
 ```
 
-It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables, installs the themes, copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.
+It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600; `APP_ENV` keeps the site's existing value, `development` for a new site, and only the site's owner changes it to production), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables, installs the themes, copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.
 
 Then sign in at the site with the administrator's email address and open Administration → System → Setup.
 
 ## Running it
 
+Before an update, fetch the script again (the `curl` line above), so the update runs the new release's kit, not the one you installed with.
+
 ```sh
-bash cattolms-podman.sh update --version 0.9.8     # the next release: code, packages, tables, themes, restart
+bash cattolms-podman.sh update --version 0.9.9     # the next release: code, packages, tables, themes, restart
 bash cattolms-podman.sh status                     # the service and the pod
 bash cattolms-podman.sh logs web|php|scheduler     # a container's log
 bash cattolms-podman.sh console about              # php bin/console in the running pod
 bash cattolms-podman.sh restart|stop|start
 ```
 
-An update keeps the previous versions in `~/cattolms/releases`: going back is `ln -sfn releases/<old version> ~/cattolms/current` and a restart, with a database the old version can read.
+An update keeps two versions in `~/cattolms/releases`: the one now running and the one before it. Older ones are deleted after the new one answers, with their image's name. Going back is `ln -sfn releases/<previous version> ~/cattolms/current` and a restart, with a database the previous version can read (not after a clean installation, which rebuilds the database for the new version).
+
+Each release has a whole `vendor` folder of its own, so a release is never changed under a running site, but a new release starts its `vendor` as hard links to the running release's files: a Composer package both use takes its space once (about 115 MB saved per release), and Composer replaces only the packages that changed, as new files. Composer's own record and autoloader (`vendor/composer`), `vendor/bin` and the loose files in `vendor` are real copies, because Composer rewrites them.
 
 A PHP security release: raise the PHP version in `deploy/podman/Containerfile` (a CattoLMS release does this), then update. The web server's image is pinned in `cattolms-podman.sh`.
 

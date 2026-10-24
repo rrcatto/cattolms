@@ -822,6 +822,19 @@ final class AdminController extends BaseController
         }, '/admin/settings?section=sign-in#settings-sign-in');
     }
 
+    /** Removes what Who can sign in saved: the site follows AUTH_SIGNIN and AUTH_SIGNIN_ALLOWED_EMAILS again. */
+    #[Route('/admin/settings/sign-in/reset', name: 'admin_reset_sign_in', methods: ['POST'])]
+    public function resetSignIn(): Response
+    {
+        $this->requireCsrf();
+        $user = $this->requirePermission('SYSTEM.SETTING.MANAGE');
+        $this->signIn->reset();
+        $this->auditLog->record($user->id, 'platform.setting_reset', ['setting' => 'sign_in', 'source' => '.env']);
+        $this->flash('success', 'Who can sign in now follows AUTH_SIGNIN and AUTH_SIGNIN_ALLOWED_EMAILS in .env: '
+            . ($this->signIn->restricted() ? 'administrators and the ' . count($this->signIn->allowedEmails()) . ' listed ' . (count($this->signIn->allowedEmails()) === 1 ? 'address' : 'addresses') . ' only.' : 'everyone.'));
+        $this->redirect('/admin/settings?section=sign-in#settings-sign-in');
+    }
+
     #[Route('/admin/settings/site-mode/reset', name: 'admin_reset_site_mode', methods: ['POST'])]
     public function resetSiteMode(): Response
     {
@@ -1018,7 +1031,9 @@ final class AdminController extends BaseController
         }
         if (in_array('settings', $sectionKeys, true)) {
             // Who can sign in (owner, 2026-10-21).
-            $data['sign_in'] = ['restricted' => $this->signIn->restricted(), 'emails' => implode("\n", $this->signIn->allowedEmails())];
+            // What is in force, where it comes from, and what .env says, which Reset returns to (owner, 2026-10-24).
+            $data['sign_in'] = ['restricted' => $this->signIn->restricted(), 'emails' => implode("\n", $this->signIn->allowedEmails()), 'source' => $this->signIn->source(),
+                'environment' => $this->signIn->environmentRestricted(), 'environment_emails' => $this->signIn->environmentEmails()];
             $data['maintenance'] = $this->maintenance->pending();
             // Each scheduled job's last run, the payment methods and identity verification (owner, 2026-10-19).
             $data['scheduled_jobs'] = $this->scheduledJobs->jobs();

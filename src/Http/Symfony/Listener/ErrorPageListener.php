@@ -31,6 +31,9 @@ the reader can do next, and the router's own messages ("No route found for ...")
 put in words a reader understands. The status code stays in small print, for reporting a fault.
 
 Changelog:
+2026/10/24 SAST
+- A server error's reason is shown while the kernel debugs, which follows APP_ENV (Configuration\RunMode); APP_DEBUG is
+  no longer read (owner, 2026-10-24).
 2026/10/23 SAST
 - The page in plain words: a kind for the status, the router's and the form token's messages translated, the address
   asked for, and the reader as every page knows them (ViewIdentity), so a signed-in reader keeps their header
@@ -45,8 +48,8 @@ namespace CattoLearning\Http\Symfony\Listener;
 
 use CattoLearning\Auth\AuthService;
 use CattoLearning\Http\ViewIdentity;
-use CattoLearning\Support\Env;
 use CattoLearning\View\ThemeRenderer;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -57,8 +60,11 @@ use Throwable;
 #[AsEventListener(event: KernelEvents::EXCEPTION, priority: -16)]
 final class ErrorPageListener
 {
-    public function __construct(private readonly ThemeRenderer $view, private readonly AuthService $auth)
-    {
+    public function __construct(
+        private readonly ThemeRenderer $view,
+        private readonly AuthService $auth,
+        #[Autowire('%kernel.debug%')] private readonly bool $debug = false,
+    ) {
     }
 
     public function __invoke(ExceptionEvent $event): void
@@ -75,7 +81,7 @@ final class ErrorPageListener
             error_log($exception->__toString());
         }
 
-        $message = $status >= 500 && !Env::bool('APP_DEBUG', false)
+        $message = $status >= 500 && !$this->debug
             ? 'The page could not be shown. It is not something you did.'
             : self::plain($exception->getMessage(), $status);
         $kind = match (true) {

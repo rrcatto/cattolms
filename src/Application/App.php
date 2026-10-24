@@ -11,6 +11,9 @@ Description:
 Provides application-layer coordination for app, connecting Catto Learning domain services, persistence and HTTP workflows.
 
 Changelog:
+2026/10/24 SAST
+- The kernel's environment and debugging come from Configuration\RunMode: APP_ENV alone, development unless it says
+  production; APP_DEBUG is no longer read (owner, 2026-10-24).
 2026/09/08 21:10 SAST
 - Offers each request to the Symfony kernel before Fat-Free, and returns when it owns the route. GET /api/v1 is the first route it owns.
 - GET /api/v1/me moved to the Symfony kernel, behind the API firewall.
@@ -70,6 +73,7 @@ use CattoLearning\Plugin\PluginContext;
 use CattoLearning\Plugin\PluginManager;
 use CattoLearning\View\ThemeRenderer;
 use CattoLearning\Kernel;
+use CattoLearning\Configuration\RunMode;
 use CattoLearning\Support\Env;
 use Dotenv\Dotenv;
 use RuntimeException;
@@ -148,11 +152,8 @@ final class App
      */
     private static function handleWithSymfony(string $instanceRoot): void
     {
-        $kernel = new Kernel(
-            Env::string('APP_ENV', 'production'),
-            Env::bool('APP_DEBUG', false),
-            $instanceRoot
-        );
+        // How the program runs: APP_ENV alone, debugging following it (Configuration\RunMode, owner 2026-10-24).
+        $kernel = new Kernel(RunMode::environment(), RunMode::debug(), $instanceRoot);
         $kernel->boot();
 
         $request = Request::createFromGlobals();

@@ -48,6 +48,8 @@
     {% embed ui_template('overlay.accordion-section') with {props: ui_props('overlay.accordion-section', {heading: 'Who can sign in', summary: sign_in.restricted ? 'Administrators and the listed addresses only.' : 'Everyone.', id: 'settings-sign-in', open: settings_open_section|default('') == 'sign-in'})} %}
 {% block body %}
 			<p>Everyone, or administrators and the email addresses you list only. While it is limited, anyone else is refused when they sign in or register, and a session they already have stops working at once. A listed address needs no approval on a demo site: listing it is the approval.</p>
+			{# Where it comes from, as Site mode says (owner, 2026-10-24): what is saved here overrides .env, and Reset returns to it. #}
+			<p>{% if sign_in.source == 'database' %}This is saved here and overrides <span class="mono">AUTH_SIGNIN</span> and <span class="mono">AUTH_SIGNIN_ALLOWED_EMAILS</span> in <span class="mono">.env</span>, which say {{ sign_in.environment ? 'administrators and the listed addresses only' : 'everyone' }}{% if sign_in.environment and sign_in.environment_emails %}, listing {{ sign_in.environment_emails|join(', ') }}{% endif %}.{% elseif sign_in.source == 'environment' %}<span class="mono">AUTH_SIGNIN={{ sign_in.environment ? 'ADMIN' : 'EVERYONE' }}</span>{% if sign_in.environment %} and <span class="mono">AUTH_SIGNIN_ALLOWED_EMAILS</span>{% endif %} in <span class="mono">.env</span> set it.{% else %}<span class="mono">AUTH_SIGNIN</span> in <span class="mono">.env</span> is not ADMIN or EVERYONE (or is not there), so only administrators and the listed addresses can sign in.{% endif %}</p>
 			<form action="/admin/settings/sign-in" method="post">
 				<input type="hidden" name="csrf" value="{{ csrf }}">
 				{{ ui('form.picture-choice', {name: 'sign_in', legend: 'Who can sign in', id: 'sign-in-choice', size: 'small', selected: sign_in.restricted ? 'listed' : 'everyone', items: [
@@ -61,6 +63,12 @@
 {% block primary_actions %}{{ ui('action.button', {label: 'Save who can sign in', variant: 'primary', size: 'normal', type: 'submit', icon: 'action-save-changes'}) }}{% endblock %}
 {% endembed %}
 			</form>
+			{% if sign_in.source == 'database' %}
+			<form action="/admin/settings/sign-in/reset" method="post" class="cl-mt-2">
+				<input type="hidden" name="csrf" value="{{ csrf }}">
+				{{ ui('action.button', {label: 'Reset who can sign in to .env', variant: 'danger', size: 'small', confirm: 'Remove what is saved here and follow AUTH_SIGNIN and AUTH_SIGNIN_ALLOWED_EMAILS in .env?', icon: 'action-reset'}) }}
+			</form>
+			{% endif %}
 {% endblock %}
 {% endembed %}
     {% endif %}

@@ -1,5 +1,5 @@
 /* Certificate designs, in a real browser. The Certificate designs list shows the six installed
- * designs as pictures, Classic the default, and nothing of the template engine. ADMIN makes a design
+ * designs as pictures, one of them the default (Classic on a new site; ADMIN may choose another), and nothing of the template engine. ADMIN makes a design
  * in the one-form editor - a look picked by picture, the wording in CKEditor with Insert field, a
  * signatory - while the preview above it, at the full width, redraws as the form changes; the course then picks that design by
  * picture with its own accreditation line and previews what issuing will draw. A verified learner
@@ -130,6 +130,13 @@ const pictureItem = (page, label) => page.locator('label.cl-ui-picture-choice-it
     .filter({has: page.locator('.cl-ui-picture-choice-label', {hasText: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)})});
 const pictureChoice = (page, label) => pictureItem(page, label).locator('input[type=radio]');
 const designRow = (page, name) => page.locator('tbody tr').filter({has: page.getByRole('link', {name, exact: true})});
+/* The design new courses start with, whichever ADMIN chose (owner, 2026-10-24: no check demands a particular one). */
+async function defaultDesign(page) {
+    await page.goto(`${base}/admin/certificates/designs`);
+    const rows = page.locator('tbody tr').filter({hasText: 'Default for new courses'});
+    assert.equal(await rows.count(), 1, 'one design is the default for new courses');
+    return (await rows.first().getByRole('link').first().innerText()).trim();
+}
 /* Types at the end of a CKEditor, on a new line. */
 async function typeAtEnd(page, editor, text) {
     await editor.click();
@@ -173,7 +180,7 @@ async function openCertificate(page) {
     const chromium = await playwright.chromium.launch();
     const firefox = await playwright.firefox.launch();
 
-    await scenario('the designs list shows the six installed designs as pictures, Classic the default, and no engine internals', 'chromium', async () => {
+    await scenario('the designs list shows the six installed designs as pictures, one the default, and no engine internals', 'chromium', async () => {
         const {ctx, page} = await open(chromium, admin());
         await page.goto(`${base}/admin/certificates/designs`);
         for (const name of INSTALLED) {
@@ -182,7 +189,8 @@ async function openCertificate(page) {
             assert.equal(await row.count(), 1, `${name} is listed`);
             assert.ok(await row.locator('img.cl-certificate-design-thumb').evaluate((img) => img.complete && img.naturalWidth > 0), `${name} shows its picture`);
         }
-        assert.ok(await designRow(page, 'Classic').getByText('Default for new courses').isVisible(), 'Classic is the default for new courses');
+        const chosen = await defaultDesign(page);
+        assert.ok(await designRow(page, chosen).getByText('Default for new courses').isVisible(), `${chosen} says it is the default for new courses`);
         const text = await page.locator('main').textContent();
         for (const internal of ['Published', 'Draft', 'Archived', 'Version', '{{', 'HTML', 'CSS']) {
             assert.ok(!text.includes(internal), `the list says nothing of ${internal}`);
@@ -240,10 +248,11 @@ async function openCertificate(page) {
 
     await scenario('the course picks that design by picture with its own accreditation line, and previews what issuing will draw', 'chromium', async () => {
         const {ctx, page, previews} = await open(chromium, admin());
+        const chosen = await defaultDesign(page);
         await page.goto(base + settingsUrl);
         step = 'course page';
         assert.equal(await page.locator('textarea, .ck-editor').count(), 0, 'the course holds no wording');
-        assert.ok(await pictureChoice(page, 'Classic').isChecked(), 'the course starts with the default design');
+        assert.ok(await pictureChoice(page, chosen).isChecked(), `the course starts with the default design (${chosen})`);
         let text = await nextPreview(previews, () => pictureChoice(page, DESIGN).check(), 'pick the design');
         assert.ok(text.includes('Browser edition one') && text.includes(state.course_title) && text.includes('Sample Learner'), `the preview is this course in the design, for a sample learner (an issued certificate carries the verified name) (${text.slice(0, 160)})`);
         text = await nextPreview(previews, () => page.locator('#certificate-accreditation').fill(ACCREDITATION), 'accreditation');

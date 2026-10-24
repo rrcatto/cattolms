@@ -17,6 +17,9 @@ into the wrong tree and disagree with the running site about which release it is
 The 17 scripts under tools/ become commands here as the migration reaches them.
 
 Changelog:
+2026/10/24 SAST
+- The kernel's environment and debugging come from Configuration\RunMode: APP_ENV alone, development unless it says
+  production; APP_DEBUG is no longer read (owner, 2026-10-24).
 2026/09/08 SAST
 - Created for the v0.7 Symfony migration.
 */
@@ -24,6 +27,7 @@ Changelog:
 declare(strict_types=1);
 
 use CattoLearning\Application\CliBootstrap;
+use CattoLearning\Configuration\RunMode;
 use CattoLearning\Kernel;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Input\ArgvInput;
@@ -35,8 +39,6 @@ $boot = CliBootstrap::boot();
 $instanceRoot = (string) $boot['instance_root'];
 $_SERVER['CATTO_INSTANCE_ROOT'] = $_ENV['CATTO_INSTANCE_ROOT'] = $instanceRoot;
 
-$environment = (string) ($_SERVER['APP_ENV'] ?? 'development');
-$debug = filter_var($_SERVER['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOL);
-
-$kernel = new Kernel($environment, $debug, $instanceRoot);
+// How the program runs, as the web request reads it: APP_ENV alone, debugging following it.
+$kernel = new Kernel(RunMode::environment(), RunMode::debug(), $instanceRoot);
 exit((new Application($kernel))->run(new ArgvInput()));

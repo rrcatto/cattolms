@@ -12,7 +12,7 @@
  * scrolling.
  *
  * Run against the development instance with demo-site-fixture.php (catto.test is a demo site: env/.env
- * says APP_SITE_MODE=demo). catto.test runs with APP_DEBUG on, so Symfony adds
+ * says APP_SITE_MODE=demo). catto.test runs in development (APP_ENV), so Symfony adds
  * X-Robots-Tag: noindex to every response by itself; the live check therefore looks for the absence of
  * the demo site's own "noindex, nofollow". Orders and their documents are immutable and stay behind. */
 const playwright = require(process.env.CATTO_PLAYWRIGHT_MODULE || 'playwright');

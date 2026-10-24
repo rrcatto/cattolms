@@ -26,6 +26,10 @@ uploaded background, and open only to those with the certificate design permissi
 Every test runs inside a transaction that is rolled back.
 
 Changelog:
+2026/10/24 SAST
+- No test demands Classic as the default design (owner, 2026-10-24: "there doesn't seem to be any rational reason for
+  any test to demand that certificates be a certain option"): they run on a development database, where ADMIN may
+  have chosen another default, and assumed a new site's Classic.
 2026/10/19 SAST
 - A certificate proves that the learner took the course (owner, 2026-10-19): a failed final earns it,
   only a verified account receives it, in the verified name, with its transcript; an unverified
@@ -210,9 +214,10 @@ final class CertificateIntegrationTest extends TestCase
         // design's wording, and which design the course uses.
         $this->db->executeStatement("UPDATE users SET display_name = 'Renamed Learner', first_name = 'Renamed' WHERE id = :id", ['id' => $learnerId]);
         $this->db->executeStatement("UPDATE courses SET title = 'Renamed Course Title', certificate_accreditation = 'New line' WHERE id = :id", ['id' => $courseId]);
-        $classic = $this->designs->find((int) $first['template_id']);
-        self::assertNotNull($classic);
-        $saved = $this->service->save($classic['id'], $this->form('Classic', '<p class="cert-title">Edition two</p><p>' . CertificateWording::chip('learner.name') . ' · ' . CertificateWording::chip('course.title') . '</p>'), [], $this->adminId);
+        // The course's design is the site's default, whichever ADMIN chose: it keeps its own name.
+        $design = $this->designs->find((int) $first['template_id']);
+        self::assertNotNull($design);
+        $saved = $this->service->save($design['id'], $this->form((string) $design['name'], '<p class="cert-title">Edition two</p><p>' . CertificateWording::chip('learner.name') . ' · ' . CertificateWording::chip('course.title') . '</p>'), [], $this->adminId);
         self::assertSame([], $saved['errors']);
 
         $stored = $this->certificates->byPublicId((string) $first['public_id']);
@@ -311,7 +316,9 @@ final class CertificateIntegrationTest extends TestCase
         self::assertSame('no-referrer', $page['headers']['referrer-policy'] ?? null);
         self::assertStringContainsString('no-store', $page['headers']['cache-control'] ?? '');
         self::assertStringNotContainsString('Drawn in the design', $page['body'], 'Only design viewers see the design line.');
-        self::assertStringContainsString('Drawn in the design “Classic”', InProcessPage::run($this->admin, CertificateController::class, 'show', $id)['body']);
+        $design = $this->designs->find((int) $certificate['template_id']);
+        self::assertNotNull($design, 'The design the certificate was drawn in, the site\'s default, whichever ADMIN chose.');
+        self::assertStringContainsString('Drawn in the design “' . $design['name'] . '”', InProcessPage::run($this->admin, CertificateController::class, 'show', $id)['body']);
         $pdf = InProcessPage::run(null, CertificateController::class, 'pdf', $id);
         self::assertStringStartsWith('%PDF-', $pdf['body']);
         self::assertSame(1, self::pages($pdf['body']));

@@ -14,7 +14,6 @@ use CattoLearning\Support\{Csrf,Money,Pagination,Uuid};
 use CattoLearning\View\ThemeRenderer;
 use Symfony\Component\HttpFoundation\{RequestStack,Response};
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /** Authenticated commerce pages; browser payment forms never provide payment confirmation evidence. */
 final class CommerceController extends BaseController
@@ -36,7 +35,8 @@ final class CommerceController extends BaseController
 
     private function csrf(): void
     {
-        if (!Csrf::validate($this->posted('csrf'))) throw new AccessDeniedHttpException('Invalid request token.');
+        // A missing or expired token is a request the site could not take (400), as on every other form (2026-10-24).
+        if (!Csrf::validate($this->posted('csrf'))) throw new \Symfony\Component\HttpKernel\Exception\BadRequestHttpException('Invalid request token.');
     }
 
     #[Route('/cart',name:'commerce_cart',methods:['GET'])]

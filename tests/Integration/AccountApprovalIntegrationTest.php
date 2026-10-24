@@ -166,6 +166,79 @@ final class AccountApprovalIntegrationTest extends TestCase
         }
     }
 
+    public function testEnvSetsWhoCanSignInAndTheSettingsPageOverridesIt(): void
+    {
+        // Owner, 2026-10-24: "we need a .env var to bar everyone from logging in"; "we have an established protocol that
+        // .env vars can be overridden by the settings page"; "the options should be ADMIN or EVERYONE ... If the var has
+        // no value (or a value other than ADMIN or EVERYONE) or the var is absent then it must default to ADMIN ... If
+        // the whitelist var is missing, then it is deemed to be empty"; lower case the same as upper case.
+        $container = CliBootstrap::boot()['container'];
+        $db = $container->get(Database::class);
+        $db->beginTransaction();
+        $fixture = new DevelopmentFixture($db);
+        $suffix = $fixture->suffix();
+        $tester = 'env-tester-' . $suffix . '@example.test';
+        $member = 'env-member-' . $suffix . '@example.test';
+        $fixture->createUser('Env member', $member);
+        $keys = ['AUTH_SIGNIN', 'AUTH_SIGNIN_ALLOWED_EMAILS'];
+        // phpunit.xml gives the suite AUTH_SIGNIN=EVERYONE in $_ENV, $_SERVER and getenv(): each is set, or cleared for absent.
+        $before = array_map(static fn(string $key): array => [$_ENV[$key] ?? null, $_SERVER[$key] ?? null, getenv($key)], $keys);
+        $options = $container->get(\CattoLearning\Infrastructure\Persistence\OptionRepository::class);
+        $env = static function (?string $signIn, ?string $emails) use ($keys): void {
+            foreach (array_combine($keys, [$signIn, $emails]) as $key => $value) {
+                if ($value === null) {
+                    unset($_ENV[$key], $_SERVER[$key]);
+                    putenv($key);
+                } else {
+                    $_ENV[$key] = $_SERVER[$key] = $value;
+                    putenv($key . '=' . $value);
+                }
+            }
+        };
+        $fresh = static fn(): \CattoLearning\Auth\SignInRestriction => new \CattoLearning\Auth\SignInRestriction($options);
+        try {
+            $fresh()->reset();
+            foreach ([['ADMIN', 'environment', true], ['admin', 'environment', true], ['EVERYONE', 'environment', false], ['everyone', 'environment', false],
+                ['Everyone', 'environment', false], ['', 'default', true], ['yes', 'default', true], ['false', 'default', true], [null, 'default', true]] as [$value, $source, $restricted]) {
+                $env($value, null);
+                self::assertSame([$source, $restricted, []], [$fresh()->source(), $fresh()->restricted(), $fresh()->allowedEmails()],
+                    'AUTH_SIGNIN ' . ($value === null ? 'absent' : '"' . $value . '"') . '; no list is an empty list.');
+            }
+
+            $env('ADMIN', strtoupper($tester) . ', not-an-address');
+            $restriction = $fresh();
+            self::assertSame([$tester], $restriction->allowedEmails(), 'The .env list, lower case; what is not an address is left out.');
+            $mailer = new FakeMailer();
+            $auth = $this->auth($container, $mailer, 'demo', $restriction);
+            try {
+                $auth->requestLogin($member);
+                self::fail('A member not listed signs in under ADMIN.');
+            } catch (RuntimeException $refused) {
+                self::assertSame(\CattoLearning\Auth\SignInRestriction::REFUSED, $refused->getMessage());
+            }
+            self::assertTrue($restriction->allows($tester, false), 'An address listed in .env may sign in.');
+            self::assertTrue($restriction->allows('anyone@example.test', true), 'An administrator is never kept out.');
+
+            $restriction->save(false, '');
+            self::assertSame(['database', false, []], [$fresh()->source(), $fresh()->restricted(), $fresh()->allowedEmails()], 'The Settings page overrides .env.');
+            self::assertTrue($fresh()->allows($member, false), 'Everyone, as saved.');
+            $fresh()->save(true, 'settings-' . $suffix . '@example.test');
+            self::assertSame(['settings-' . $suffix . '@example.test'], $fresh()->allowedEmails(), 'The saved list replaces .env\'s.');
+
+            $fresh()->reset();
+            self::assertSame(['environment', true, [$tester]], [$fresh()->source(), $fresh()->restricted(), $fresh()->allowedEmails()], 'Reset follows .env again.');
+        } finally {
+            foreach ($keys as $index => $key) {
+                [$inEnv, $inServer, $fromGetenv] = $before[$index];
+                if ($inEnv === null) unset($_ENV[$key]); else $_ENV[$key] = $inEnv;
+                if ($inServer === null) unset($_SERVER[$key]); else $_SERVER[$key] = $inServer;
+                putenv($fromGetenv === false ? $key : $key . '=' . $fromGetenv);
+            }
+            unset($_COOKIE['catto_learning_session']);
+            if ($db->isTransactionActive()) $db->rollBack();
+        }
+    }
+
     /**
      * What the fake mailer has sent, read through a call: PHPStan otherwise keeps the empty list it saw assigned.
      *

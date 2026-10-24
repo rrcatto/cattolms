@@ -11,6 +11,8 @@ Description:
 Handles web requests for base operations, enforcing access rules and coordinating Catto Learning application services and views.
 
 Changelog:
+2026/10/24 SAST
+- requireCsrf() refuses a missing or expired token with a 400, not a 500.
 2026/10/23 SAST
 - viewIdentity() is ViewIdentity::of(), shared with the error page.
 2026/10/17 SAST
@@ -127,9 +129,17 @@ abstract class BaseController
         return $this->requirePermission('COURSE.EDIT');
     }
 
+    /**
+     * A form sent without its token, or with an expired one, is a request the site could not take (400), never a fault
+     * on the site's side (2026-10-24: it answered 500, "Something went wrong on our side").
+     */
     protected function requireCsrf(): void
     {
-        Csrf::requireValid(is_string($_POST['csrf'] ?? null) ? $_POST['csrf'] : null);
+        try {
+            Csrf::requireValid(is_string($_POST['csrf'] ?? null) ? $_POST['csrf'] : null);
+        } catch (RuntimeException $invalid) {
+            throw new \Symfony\Component\HttpKernel\Exception\BadRequestHttpException($invalid->getMessage(), $invalid);
+        }
     }
 
     /**

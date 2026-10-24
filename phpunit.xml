@@ -8,6 +8,9 @@
     <!-- The whole suite runs in one process. With a cold Symfony/Twig cache it compiles the container
          and templates as it goes and exceeds PHP's default 128M; give it explicit headroom. -->
     <ini name="memory_limit" value="512M"/>
+    <!-- The tests sign learners in; a site's .env admits only administrators and listed addresses unless AUTH_SIGNIN
+         says EVERYONE. The tests of who can sign in set it themselves (AccountApprovalIntegrationTest). -->
+    <env name="AUTH_SIGNIN" value="EVERYONE" force="true"/>
   </php>
   <testsuites>
     <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>

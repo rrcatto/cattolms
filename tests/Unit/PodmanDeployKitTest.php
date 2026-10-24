@@ -59,6 +59,7 @@ final class PodmanDeployKitTest extends TestCase
         self::assertStringContainsString('UserNS=keep-id', $unit, 'The site\'s own user inside.');
         self::assertStringContainsString('Network=slirp4netns:allow_host_loopback=true', $unit, 'The server\'s PostgreSQL and mail at 10.0.2.2.');
         self::assertStringContainsString('fastcgi_pass 127.0.0.1:9000;', self::kit('web.conf.in'));
+        self::assertStringContainsString('fastcgi_read_timeout 180s;', self::kit('web.conf.in'), 'A long request (a catalogue import) is not cut off at 60 seconds (2026-10-24).');
         self::assertStringContainsString("'listen = 127.0.0.1:9000'", self::kit('Containerfile'), 'PHP-FPM listens inside the pod only.');
     }
 
@@ -73,6 +74,23 @@ final class PodmanDeployKitTest extends TestCase
         self::assertStringContainsString('[ "$(id -u)" -ne 0 ] || fail', self::kit('cattolms-podman.sh'), 'The site runs as its own user, never root.');
         self::assertStringContainsString('[ "$(id -u)" -eq 0 ] || fail', self::kit('root-prepare.sh'));
         self::assertStringContainsString('chmod 600 "$SITE/.env"', self::kit('cattolms-podman.sh'), 'The settings are the site user\'s alone.');
+    }
+
+    public function testAReleaseSharesItsPackagesAndTwoReleasesAreKept(): void
+    {
+        // 2026-10-24: two releases held the same 116 MB of packages twice. A new release's vendor starts as hard links to
+        // the running release's, but what Composer rewrites in place is a real copy, or an update would change the
+        // release still running and going back would break.
+        $kit = self::kit('cattolms-podman.sh');
+        self::assertStringContainsString('cp -al "$running/vendor" "$target/vendor"', $kit, 'The packages are shared as hard links.');
+        self::assertStringContainsString('for own in "$target/vendor/composer" "$target/vendor/bin"; do', $kit, 'Composer\'s record and autoloader, and vendor/bin, are real copies.');
+        self::assertStringContainsString('find "$target/vendor" -maxdepth 1 -type f', $kit, 'And the loose files in vendor.');
+        $shared = strpos($kit, '    share_vendor "$target"');
+        $installed = strpos($kit, 'composer install "${flags[@]}"');
+        self::assertTrue($shared !== false && $installed !== false && $shared < $installed, 'Shared before Composer installs.');
+        // The running release and the one before it are kept; older ones go after the new one answers.
+        self::assertSame(2, substr_count($kit, 'prune_releases "$VERSION" "$previous"'), 'Install and update both prune, after start_pod.');
+        self::assertDoesNotMatchRegularExpression('/podman rmi -f|podman rmi --force/', $kit, 'Never forced: that would take the running pod\'s containers with an image they share.');
     }
 
     public function testTheKitNamesNoParticularServer(): void

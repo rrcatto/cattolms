@@ -10,13 +10,17 @@ Version: 0.8.8.10
 Description:
 The document template engine against the database: every document type has its installed
 templates (the financial documents' source defaults; for certificates, the six installed designs
-compiled from their looks, Classic the default for new courses), a published version can never be
+compiled from their looks, Classic the default for new courses on a new site), a published version can never be
 changed or deleted yet still renders exactly as it was, a stored document image can never be changed
 or deleted, and the renderer embeds stored images and refuses a missing one.
 
 Every test runs inside a transaction that is rolled back.
 
 Changelog:
+2026/10/24 SAST
+- No test demands Classic as the default design (owner, 2026-10-24: "there doesn't seem to be any rational reason for
+  any test to demand that certificates be a certain option"): they run on a development database, where ADMIN may
+  have chosen another default, and assumed a new site's Classic.
 2026/10/08 SAST
 - The installed invoice, receipt and credit note are the standard financial document design, compiled (Phase K).
 - An installed design is compared by its first version, so a design ADMIN has since saved again
@@ -89,7 +93,7 @@ final class DocumentTemplateIntegrationTest extends TestCase
         }
     }
 
-    public function testTheSixLooksAreInstalledAsDesignsWithClassicTheDefault(): void
+    public function testTheSixLooksAreInstalledAsDesignsWithClassicTheDefaultOfANewSite(): void
     {
         $designs = $this->designs->list();
         $byName = array_column($designs, null, 'name');
@@ -107,8 +111,14 @@ final class DocumentTemplateIntegrationTest extends TestCase
             self::assertStringContainsString('Thandiwe Mokoena', $document->body);
             self::assertStringContainsString('src="data:image/png;base64,', $document->body, 'The stored background is embedded.');
         }
-        self::assertSame((int) $byName['Classic']['id'], $this->designs->defaultId());
-        self::assertTrue($byName['Classic']['is_current']);
+        // A new site starts with Classic, the first look installed (the baseline marks position 0 the default). This
+        // database is a development site, where ADMIN may since have chosen another: it needs one default, any of them,
+        // never Classic in particular.
+        self::assertSame('classic', array_key_first(CertificateLooks::installed()));
+        self::assertStringContainsString("(\$position === 0 ? ', is_current = TRUE' : '')", (string) file_get_contents(dirname(__DIR__, 2) . '/database/migrations/20261006120000_create_v088_baseline.php'));
+        $defaults = array_values(array_filter($designs, static fn(array $design): bool => $design['is_current']));
+        self::assertCount(1, $defaults, 'One design is the default for new courses.');
+        self::assertSame($this->designs->defaultId(), (int) $defaults[0]['id']);
     }
 
     public function testAPublishedVersionNeverChangesAndStillRendersExactlyAsItWas(): void

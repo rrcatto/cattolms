@@ -16,8 +16,10 @@ Each variable is shown with the comment above it in .env.example and a default: 
 there is one, a value worked out from what was already answered (the site's address from its domain, the mail
 sender from the domain), a newly generated key or password, or the example's value. Enter keeps the default.
 Secrets are typed hidden. A value is checked before it is accepted (an email address, an address starting
-https://, a yes/no, a number). The code path, the site mode and how the program runs are set by the install,
-not asked. The file is written with the example's comments, in its order.
+https://, a yes/no, a number). The code path and the site mode are set by the install, not asked. How the program
+runs (APP_ENV) is never chosen by the install: it keeps the site's existing value, and a new site starts with the
+example's, development; only the site's owner changes a site to production. The file is
+written with the example's comments, in its order.
 
   php env-wizard.php --example <.env.example> --output <.env> --codebase <path> --mode demo|live
                      --username <name> [--existing <old .env>] [--answers <file>]
@@ -26,6 +28,13 @@ not asked. The file is written with the example's comments, in its order.
 install.
 
 Changelog:
+2026/10/24 SAST
+- APP_DEBUG is gone: debugging follows APP_ENV (owner, 2026-10-24, option 1). AUTH_SIGNIN is checked (ADMIN or
+  EVERYONE).
+- APP_ENV and APP_DEBUG are no longer forced to production and false (owner, 2026-10-24: "it must remain development
+  until such time as I tell you the site is in production ... ONLY I have the authority to change its mode to
+  production"; an install had turned a site's development into production): they keep
+  the existing .env's values, else the example's (development, true), and are checked like any other setting.
 2026/10/20 SAST
 - Created.
 */
@@ -105,6 +114,10 @@ function refuse(string $key, string $value): ?string
         in_array($key, ['DB_PORT', 'AUTH_MAGIC_LINK_TTL', 'AUTH_SESSION_TTL', 'AUTH_SESSION_TOUCH_INTERVAL', 'AUTH_REQUEST_WINDOW', 'AUTH_REQUEST_LIMIT_EMAIL', 'AUTH_REQUEST_LIMIT_IP', 'PHP_SESSION_TTL'], true)
             && preg_match('/^[0-9]+$/', $value) !== 1 => 'Enter a whole number.',
         in_array($key, ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'], true) && $value === '' => 'This cannot be empty.',
+        $key === 'APP_ENV' && !in_array(strtolower($value), ['development', 'production'], true) => 'Enter development or production.',
+        $key === 'AUTH_SIGNIN' && !in_array(strtoupper($value), ['ADMIN', 'EVERYONE'], true) => 'Enter ADMIN (administrators and the listed addresses only) or EVERYONE.',
+        $key === 'AUTH_SIGNIN_ALLOWED_EMAILS' && array_filter(preg_split('/[\s,;]+/', $value) ?: [], static fn(string $email): bool => $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) !== []
+            => 'Enter email addresses separated by commas, or nothing.',
         in_array($key, ['DB_NAME', 'DB_USER'], true) && preg_match('/^[a-z_][a-z0-9_]{0,62}$/', $value) !== 1 => 'Use lower-case letters, digits and underscores, starting with a letter.',
         default => null,
     };
@@ -112,7 +125,8 @@ function refuse(string $key, string $value): ?string
 
 $secret = static fn(string $key): bool => preg_match('/(PASSWORD|SECRET|API_KEY|_KEY$|MAILER_DSN)/', $key) === 1 && $key !== 'APP_KEY';
 $generated = ['APP_KEY' => bin2hex(random_bytes(32)), 'DB_PASSWORD' => rtrim(strtr(base64_encode(random_bytes(18)), '+/', 'Ab'), '=')];
-$fixed = ['APP_CODEBASE_PATH' => (string) $options['codebase'], 'APP_SITE_MODE' => $mode, 'APP_ENV' => 'production', 'APP_DEBUG' => 'false'];
+// Set by the install. APP_ENV is not: the site's own value is kept, and only its owner changes it.
+$fixed = ['APP_CODEBASE_PATH' => (string) $options['codebase'], 'APP_SITE_MODE' => $mode];
 $slug = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) $options['username'])) ?: 'cattolms';
 $answers = [];
 
