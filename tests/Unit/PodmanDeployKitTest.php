@@ -20,6 +20,9 @@ lines of its files, so each is held here:
   names nothing of any particular server.
 
 Changelog:
+2026/10/24 SAST (v0.9.10)
+- A release's own Symfony cache: deleted before its first console step, the running release's never touched, the
+  folders of releases not kept pruned (2026-10-24: an update of a running site loaded the running release's container).
 2026/10/22 SAST
 - Created with the kit.
 */
@@ -91,6 +94,24 @@ final class PodmanDeployKitTest extends TestCase
         // The running release and the one before it are kept; older ones go after the new one answers.
         self::assertSame(2, substr_count($kit, 'prune_releases "$VERSION" "$previous"'), 'Install and update both prune, after start_pod.');
         self::assertDoesNotMatchRegularExpression('/podman rmi -f|podman rmi --force/', $kit, 'Never forced: that would take the running pod\'s containers with an image they share.');
+    }
+
+    public function testAReleaseBuildsItsOwnCacheAndNeverTouchesTheRunningOnes(): void
+    {
+        // 2026-10-24: the update of a running site stopped at its first console step, "Cannot redeclare interface ...
+        // HttpKernelInterface": the new release had loaded the running release's compiled container from the cache
+        // folder every release shared, and deleting that folder would only have let the running site build it again.
+        foreach (['deploy/podman/cattolms-podman.sh' => ['"${SITE:?}/storage/cache/symfony/${version:?}-"*', 'in_release "$version" "$target" php bin/console asset-map:compile'],
+            'install/install.sh' => ['"${HOME_DIR:?}/storage/cache/symfony/${VERSION:?}-"*', 'php bin/console asset-map:compile']] as $file => [$ownCache, $firstConsole]) {
+            $script = (string) file_get_contents(dirname(__DIR__, 2) . '/' . $file);
+            $cleared = strpos($script, 'rm -rf -- ' . $ownCache);
+            $console = strpos($script, $firstConsole);
+            self::assertTrue($cleared !== false && $console !== false && $cleared < $console, $file . ': the release\'s own cache is cleared before its first console step.');
+            self::assertDoesNotMatchRegularExpression('#rm -rf -- "\$\{(SITE|HOME_DIR):\?\}/storage/cache/symfony"(\s|$)#', $script, $file . ': the cache folder of every release is never deleted.');
+        }
+        $kit = self::kit('cattolms-podman.sh');
+        self::assertStringContainsString('case "$name" in "$now"-*) continue ;; esac', $kit, 'Pruning keeps the running release\'s cache.');
+        self::assertStringContainsString('[ -n "$before" ] && case "$name" in "$before"-*) continue ;; esac', $kit, 'And the one before it.');
     }
 
     public function testTheKitNamesNoParticularServer(): void

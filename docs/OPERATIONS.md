@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 0.9.9 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later.
+**LMS:** 0.9.10 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later.
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -117,7 +117,7 @@ Administration → Settings → Who can sign in: everyone, or administrators and
 
 ## How the program runs (`APP_ENV`)
 
-`APP_ENV` is the one setting for how the program runs, and it says nothing about whether the site is real (`APP_SITE_MODE` does, below). `development`: a server error shows its reason, templates are rebuilt when they change and every database query is logged. `production`: a server error says only "The page could not be shown", everything is compiled once and the log stays quiet. A site is production only when `APP_ENV` says `production`, in either case; an empty value, any other value or no `APP_ENV` is development. Debugging follows it: there is no `APP_DEBUG` (a line left in an old `.env` is ignored, and the setup wizard drops it). Every entry point reads it through `Configuration\RunMode`; it is read before the database is reached, so no Settings page overrides it. An install never changes it, and only the site's owner changes a site to production, in `.env`. The cache is kept per environment (`storage/cache/symfony/<environment>`), so after changing it remove the old folder and restart the site.
+`APP_ENV` is the one setting for how the program runs, and it says nothing about whether the site is real (`APP_SITE_MODE` does, below). `development`: a server error shows its reason, templates are rebuilt when they change and every database query is logged. `production`: a server error says only "The page could not be shown", everything is compiled once and the log stays quiet. A site is production only when `APP_ENV` says `production`, in either case; an empty value, any other value or no `APP_ENV` is development. Debugging follows it: there is no `APP_DEBUG` (a line left in an old `.env` is ignored, and the setup wizard drops it). Every entry point reads it through `Configuration\RunMode`; it is read before the database is reached, so no Settings page overrides it. An install never changes it, and only the site's owner changes a site to production, in `.env`. Each release keeps its own compiled cache, one folder per environment: `storage/cache/symfony/<release>/<environment>`, the release being its code's folder name and 8 hex digits of its full path (`Kernel::releaseCacheKey`, since v0.9.10). A compiled container names the files of the code it was compiled from, so a release being installed never reads the running one's, and an update needs no stop. After changing `APP_ENV`, restart the site; the other environment's folder can be deleted.
 
 ## Demo site or live site (`APP_SITE_MODE`)
 
@@ -142,12 +142,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.9`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.10`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.9   # the tag being released
+   V=v0.9.10  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

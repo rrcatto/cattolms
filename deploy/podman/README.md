@@ -62,7 +62,7 @@ The pod reaches the server's `127.0.0.1` at `10.0.2.2`, and the server sees thos
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/rrcatto/cattolms/main/deploy/podman/cattolms-podman.sh
-bash cattolms-podman.sh install --version 0.9.9 --port 8081
+bash cattolms-podman.sh install --version 0.9.10 --port 8081
 ```
 
 It copies the release to `~/cattolms/releases/<version>`, builds the image, installs the Composer packages, asks the site's settings (every setting in `.env.example`, written to `~/.env`, mode 600; `APP_ENV` keeps the site's existing value, `development` for a new site, and only the site's owner changes it to production), checks the database (and empties it, after you confirm, when it already holds tables: this is a clean installation), builds the tables, installs the themes, copies the web files to `~/public_html`, and starts the pod as a systemd user service (Quadlet, `~/.config/containers/systemd/cattolms.kube`). The database host is `10.0.2.2` unless your answers say otherwise. `--mode demo|live`, `--answers FILE` (settings given in advance) and `--empty-database` answer the questions in advance.
@@ -74,7 +74,7 @@ Then sign in at the site with the administrator's email address and open Adminis
 Before an update, fetch the script again (the `curl` line above), so the update runs the new release's kit, not the one you installed with.
 
 ```sh
-bash cattolms-podman.sh update --version 0.9.9     # the next release: code, packages, tables, themes, restart
+bash cattolms-podman.sh update --version 0.9.10    # the next release: code, packages, tables, themes, restart
 bash cattolms-podman.sh status                     # the service and the pod
 bash cattolms-podman.sh logs web|php|scheduler     # a container's log
 bash cattolms-podman.sh console about              # php bin/console in the running pod
@@ -84,6 +84,8 @@ bash cattolms-podman.sh restart|stop|start
 An update keeps two versions in `~/cattolms/releases`: the one now running and the one before it. Older ones are deleted after the new one answers, with their image's name. Going back is `ln -sfn releases/<previous version> ~/cattolms/current` and a restart, with a database the previous version can read (not after a clean installation, which rebuilds the database for the new version).
 
 Each release has a whole `vendor` folder of its own, so a release is never changed under a running site, but a new release starts its `vendor` as hard links to the running release's files: a Composer package both use takes its space once (about 115 MB saved per release), and Composer replaces only the packages that changed, as new files. Composer's own record and autoloader (`vendor/composer`), `vendor/bin` and the loose files in `vendor` are real copies, because Composer rewrites them.
+
+Each release also compiles its own cache, in `~/storage/cache/symfony/<version>-<hash>/` (since v0.9.10): the update builds the new release while the site runs and never reads or deletes the running release's cache, so the site stays up until the restart that switches it. The update deletes the cache folders of the releases it deletes, and the one releases before v0.9.10 shared (`~/storage/cache/symfony/<environment>`). Updating from v0.9.9 or earlier, fetch this script first: the update then builds 0.9.10 or later in its own folder.
 
 A PHP security release: raise the PHP version in `deploy/podman/Containerfile` (a CattoLMS release does this), then update. The web server's image is pinned in `cattolms-podman.sh`.
 

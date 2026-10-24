@@ -20,12 +20,19 @@ three-root deployment model that App::run() already encodes:
     to a release directory that several instances may share and that a deployment replaces
     wholesale; writing a compiled container into it would put instance state inside a release. The
     instance root is the writable tree, and it is already where the compiled cache and the application log
-    live.
+    live. Each release has a cache folder of its own there (v0.9.10): storage/cache/symfony/<release>/<environment>,
+    <release> being the code's folder name and a short hash of its full path. A compiled container names the files
+    of the code it was compiled from, so a release being built, or switched to, must never read the running one's
+    (2026-10-24: updating a running site stopped with "Cannot redeclare interface ... HttpKernelInterface", the new
+    release having loaded the running release's container from the folder they shared).
   - Configuration comes from the instance `.env`, the same file App::run() reads through vlucas
     dotenv. Symfony's own Dotenv is not used, because two loaders reading two files is how a
     platform ends up with a setting that is displayed from one place and used from another.
 
 Changelog:
+2026/10/24 SAST (v0.9.10)
+- A cache folder per release (releaseCacheKey()), so an update never loads the running release's compiled container
+  and no update needs the site stopped (owner, 2026-10-24: "yes, build the per-release cache fix as v0.9.10").
 2026/09/09 00:20 SAST
 - Publishes the three roots as container parameters, so services.yaml can bind them by name.
 2026/09/08 SAST
@@ -61,9 +68,22 @@ final class Kernel extends BaseKernel
         return dirname(__DIR__);
     }
 
+    /** This release's own cache: storage/cache/symfony/<release>/<environment>. */
     public function getCacheDir(): string
     {
-        return $this->instanceRoot . '/storage/cache/symfony/' . $this->environment;
+        return $this->instanceRoot . '/storage/cache/symfony/' . self::releaseCacheKey($this->getProjectDir()) . '/' . $this->environment;
+    }
+
+    /**
+     * The release's part of the cache folder: the code's folder name (0.9.10, or a checkout's name), in letters, digits,
+     * dots, hyphens and underscores, then 8 hex digits of its full path, so two folders of one name in different places
+     * never meet. The installers delete "<version>-*" before they build a release and prune the folders of releases
+     * they delete.
+     */
+    public static function releaseCacheKey(string $projectDir): string
+    {
+        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', basename($projectDir)), '-');
+        return ($name !== '' ? $name : 'release') . '-' . substr(hash('sha256', $projectDir), 0, 8);
     }
 
     public function getBuildDir(): string

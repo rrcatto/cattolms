@@ -131,9 +131,18 @@ share_vendor() {
 }
 
 # The releases kept after a switch: the one now running and the one before it, to go back to. Older ones are deleted,
-# with their image's name (2026-10-24).
+# with their image's name (2026-10-24), and every Symfony cache folder but theirs: those of deleted releases, and the
+# one all releases before 0.9.10 shared (storage/cache/symfony/<environment>), which the release before rebuilds if
+# you go back to it.
 prune_releases() {
     local now="$1" before="$2" dir name
+    for dir in "$SITE/storage/cache/symfony"/*/; do
+        [ -d "$dir" ] || continue
+        name="$(basename "$dir")"
+        case "$name" in "$now"-*) continue ;; esac
+        [ -n "$before" ] && case "$name" in "$before"-*) continue ;; esac
+        rm -rf -- "${SITE:?}/storage/cache/symfony/${name:?}"
+    done
     for dir in "$APP/releases"/*/; do
         name="$(basename "$dir")"
         [ "$name" = "$now" ] || [ "$name" = "$before" ] && continue
@@ -163,11 +172,15 @@ build_site() {
     local version="$1" mode="$2" target="$APP/releases/$1"
     say "Building the site"
     for dir in public_html storage storage/cache storage/logs storage/tmp themes; do mkdir -p "$SITE/$dir"; done
+    # Each release compiles its own cache, storage/cache/symfony/<version>-<hash>/ (since 0.9.10), so the running site's
+    # is never read, nor deleted, while this one is built (2026-10-24: an update had loaded the running release's
+    # container from the folder they shared). This release's own starts empty: a release folder replaced under the
+    # same version gets a clean build.
+    rm -rf -- "${SITE:?}/storage/cache/symfony/${version:?}-"*
     in_release "$version" "$target" php bin/console asset-map:compile --no-debug >/dev/null || fail "the browser assets were not compiled"
     cp -a "$target/public_html/." "$SITE/public_html/"
     find "$SITE/public_html" -type d -exec chmod 755 {} + ; find "$SITE/public_html" -type f -exec chmod 644 {} +
     chmod -R u=rwX,g=rwX,o= "$SITE/storage"; chmod 755 "$SITE/themes"
-    rm -rf -- "${SITE:?}/storage/cache/symfony"
     in_release "$version" "$target" php vendor/bin/phinx migrate -c phinx.php -e production -q || fail "the database's tables were not built"
     in_release "$version" "$target" php tools/install-bundled-themes.php >/dev/null || fail "the themes were not installed"
     in_release "$version" "$target" php tools/sync-themes.php >/dev/null || fail "the themes were not synchronised"

@@ -169,13 +169,15 @@ fi
 # 6. The site's files, the database's tables and the themes ------------------------------------------------
 say "Building the site"
 for dir in public_html storage storage/cache storage/logs storage/tmp themes; do mkdir -p "$HOME_DIR/$dir"; done
+# Each release compiles its own cache, storage/cache/symfony/<version>-<hash>/ (since 0.9.10), so the running site's is
+# never read, nor deleted, while this one is built. This release's own starts empty.
+rm -rf -- "${HOME_DIR:?}/storage/cache/symfony/${VERSION:?}-"*
 (cd "$TARGET" && CATTO_LEARNING_ENV_FILE="$ENV_FILE" php bin/console asset-map:compile --no-debug >/dev/null) || fail "the browser assets were not compiled"
 cp -a "$TARGET/public_html/." "$HOME_DIR/public_html/"
 chown -R root:root "$TARGET"
 chown -R "$USERNAME:$FPM_GROUP" "$HOME_DIR/public_html" "$HOME_DIR/storage" "$HOME_DIR/themes"
 find "$HOME_DIR/public_html" -type d -exec chmod 755 {} + ; find "$HOME_DIR/public_html" -type f -exec chmod 644 {} +
 chmod -R u=rwX,g=rwX,o= "$HOME_DIR/storage"; chmod 755 "$HOME_DIR/themes"
-rm -rf -- "${HOME_DIR:?}/storage/cache/symfony"
 cd "$TARGET"
 as_site php vendor/bin/phinx migrate -c phinx.php -e production -q || fail "the database's tables were not built"
 as_site php tools/install-bundled-themes.php >/dev/null || fail "the themes were not installed"

@@ -2,6 +2,14 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-10-24 — v0.9.10 A cache folder per release, so an update never stops the site
+
+- **Fixed: updating a running site stopped.** The Podman kit's `update` of a running site stopped at its first console step with "Cannot redeclare interface ... HttpKernelInterface": every release shared one compiled cache, `storage/cache/symfony/<environment>`, and a compiled container names the files of the code it was compiled from, so the new release loaded the running release's. Deleting the folder first would not help, because the running site builds it again within seconds.
+- **A cache folder per release.** The kernel keeps its cache in `storage/cache/symfony/<release>/<environment>`, the release being its code's folder name (`0.9.10`) and 8 hex digits of its full path. A release being installed builds its own and never meets the running one's, so the site keeps running while an update builds, until the restart that switches it, which takes about a second. Going back to the release before uses its own folder, or builds it again.
+- **The installers.** `cattolms-podman.sh` and `install/install.sh` clear only the new release's folder, before its first console step, and never the running release's; the kit deletes the folders of the releases it deletes and the one releases before v0.9.10 shared. Fetch the kit script again before updating from v0.9.9 or earlier.
+- **Tested** on a throwaway kit site receiving a request every half second: updating it with v0.9.9's code stopped as on the server, the site still running the old release; updating it with this code, from v0.9.9's layout and then again, succeeded with the site running, and it answered every request but those of the second or so of each restart that switched the release.
+- **Updating.** The schema is unchanged: update a v0.9.9 site in place. The cache of the old layout is deleted by the kit; on a site installed with `install/install.sh`, `storage/cache/symfony/<environment>` can be deleted after the update.
+
 ## 2026-10-24 — v0.9.9 Who can sign in from .env, APP_ENV alone, and the Podman kit's shared packages
 
 - **Who can sign in from `.env`.** `AUTH_SIGNIN` is `ADMIN` (administrators and the listed addresses only) or `EVERYONE`, in either case; with no value, any other value or no `AUTH_SIGNIN` at all it is `ADMIN`. `AUTH_SIGNIN_ALLOWED_EMAILS` lists the addresses, separated by commas, and is empty when it is missing. Administration → Settings → Who can sign in overrides both, as Settings overrides every `.env` value, says where the choice comes from, and Reset who can sign in to .env returns to them. A new site starts with `AUTH_SIGNIN=ADMIN`. A site with nothing saved in Settings and no `AUTH_SIGNIN` now admits only administrators: to keep it open, set `AUTH_SIGNIN=EVERYONE` or choose Everyone in Settings.
