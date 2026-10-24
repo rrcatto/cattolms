@@ -200,6 +200,11 @@ services:
         arguments: ['%env(APP_TIMEZONE)%']
         tags: ['doctrine.middleware']
 
+    # PostgreSQL 18 reports a RESTRICT foreign key's refusal as restrict_violation (23001); both connections report it
+    # as the foreign key violation it is, as on 16 (2026-10-24).
+    CattoLearning\Infrastructure\Persistence\RestrictViolationMiddleware:
+        tags: ['doctrine.middleware']
+
     # Identity verification through Didit (owner, 2026-10-19). A decision and the webhook signature are
     # values and rules, and the refusal is an exception, not a service.
     CattoLearning\Identity\:

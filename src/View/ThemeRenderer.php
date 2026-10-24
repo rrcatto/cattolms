@@ -12,6 +12,8 @@ Renders platform-owned Catto Learning page bodies independently of themes, then 
 Changelog:
 2026/10/23 SAST
 - Administration -> Courses -> Import & Export Catalogue, after Course Tags (owner, 2026-10-23).
+2026/10/24 SAST (v0.9.11)
+- Advanced PLATFORM_ASSET_VERSION to 0.9.11.
 2026/10/24 SAST (v0.9.10)
 - Advanced PLATFORM_ASSET_VERSION to 0.9.10.
 2026/10/24 SAST (v0.9.9)
@@ -124,7 +126,7 @@ use RuntimeException;
 
 final class ThemeRenderer
 {
-    private const PLATFORM_ASSET_VERSION = '0.9.10';
+    private const PLATFORM_ASSET_VERSION = '0.9.11';
 
     /**
      * Every page is the one standard width (wide), the width of every other boxed page (owner,

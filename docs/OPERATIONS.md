@@ -1,6 +1,6 @@
 # Operations
 
-**LMS:** 0.9.10 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later.
+**LMS:** 0.9.11 **Runtime:** PHP >=8.5.12 <9.0 (8.5.12 fixes CVE-2026-109618 and CVE-2026-109619, remote code execution), PostgreSQL 13 or later (developed and tested on 18.6).
 
 How to install, run, check and release CattoLMS. A server is installed with `install/install.sh` ([install/README.md](../install/README.md)), then set up in Administration → System → Setup. Commands run in the code directory as the site's user with the site's `.env` (`CATTO_LEARNING_ENV_FILE`).
 
@@ -10,7 +10,7 @@ A development setup can run the services in one rootless Podman pod (any equival
 
 | Container | Image | Job |
 |---|---|---|
-| PostgreSQL | `postgres:16` | the database |
+| PostgreSQL | `postgres:18.6-trixie` | the database (18 keeps its data in `/var/lib/postgresql/18/docker`: mount the host folder at `/var/lib/postgresql`) |
 | Mailpit | `axllent/mailpit` | catches every email (http://127.0.0.1:8025) |
 | PHP | a PHP 8.5 image with the extensions `composer.json` requires | PHP-FPM and the command line, in the code directory |
 | Scheduler | the same PHP image | `php bin/console schedule:run --watch --no-debug` |
@@ -142,12 +142,12 @@ Set the Site Owner's bank details (`SITE_OWNER_BANK_*` or Administration → Set
 Releases are made by the maintainer of the repository:
 
 1. Update the version (`composer.json`, the API and MCP status, `ThemeRenderer::PLATFORM_ASSET_VERSION` and the validators that name it), `README.md` (its current release line and release history) and `CHANGELOG.md`, and pass the gate (`composer qa`, Twig lint, AssetMapper compile, `git diff --check` and the browser checks). Run it with a bundled theme active: integration tests draw pages through the active theme. `tools/validate-release.php` refuses a `README.md` whose current release, or a `CHANGELOG.md` without a heading, for the `composer.json` version.
-2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.10`).
+2. Commit and create the annotated tag: the version with a leading `v` (`v0.9.11`).
 3. Push the commit to `main` and push the tag, without checking out branches in a served directory.
 4. Build the source zip from the tag and publish it as the GitHub release of that version:
 
    ```sh
-   V=v0.9.10  # the tag being released
+   V=v0.9.11  # the tag being released
    git archive --format=zip --prefix=cattolms-$V/ -o cattolms-$V.zip $V
    gh release create $V cattolms-$V.zip --verify-tag --latest --title "CattoLMS $V" --notes-file <notes>
    ```

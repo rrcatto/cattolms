@@ -2,6 +2,13 @@
 
 What each release brought. Releases are tagged in the repository and published on GitHub with a source zip; versions before v0.8.6 are listed by tag only.
 
+## 2026-10-24 — v0.9.11 PostgreSQL 18
+
+- **Fixed on PostgreSQL 18: a delete refused by a foreign key.** PostgreSQL 18 reports a delete refused by an `ON DELETE RESTRICT` foreign key with SQLSTATE 23001 (restrict_violation), where 16 reported 23503 (foreign_key_violation), and Doctrine DBAL 4.4 recognises only 23503. Deleting a promotion or a bundle that orders refer to was therefore a server error on 18 instead of "it is kept for their history". Both database connections now report 23001 as the foreign key violation it is (`Infrastructure\Persistence\RestrictViolationMiddleware`), on every PostgreSQL version.
+- **PostgreSQL 18.6.** CattoLMS is developed and tested on PostgreSQL 18.6, the version Ubuntu 26.04 installs. It still runs on PostgreSQL 13 or later. A development pod moving from 16 to 18 needs a dump and a restore: the official 18 image keeps its data in `/var/lib/postgresql/18/docker`, so its folder is mounted at `/var/lib/postgresql`.
+- **A test that ran out of time.** A wallet test froze its clock on 17 October but opened an order page that runs on the real clock, so its order fell overdue a week later and the test failed. Its clock now starts at the real time.
+- **Updating.** The schema is unchanged: update a v0.9.10 site in place.
+
 ## 2026-10-24 — v0.9.10 A cache folder per release, so an update never stops the site
 
 - **Fixed: updating a running site stopped.** The Podman kit's `update` of a running site stopped at its first console step with "Cannot redeclare interface ... HttpKernelInterface": every release shared one compiled cache, `storage/cache/symfony/<environment>`, and a compiled container names the files of the code it was compiled from, so the new release loaded the running release's. Deleting the folder first would not help, because the running site builds it again within seconds.

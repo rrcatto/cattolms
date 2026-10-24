@@ -258,6 +258,10 @@ final class WalletLedgerIntegrationTest extends TestCase
 
     public function testAnEftThatIsTooLittleWaitsAndOneThatIsTooMuchCreditsTheWallet(): void
     {
+        // The order's page below runs through the application on the real clock, and cancels an order past its
+        // deadline. This test's clock starts at the real time, or its order is overdue from a week after 2026-10-17
+        // (it failed from 10:00 on 2026-10-24).
+        $this->clock->modify(sprintf('%+d seconds', time() - $this->clock->now()->getTimestamp()));
         $buyer = $this->buyer();
         $admin = $this->admin();
         $this->orders->changeCart($buyer, $this->course['A']['variant']);

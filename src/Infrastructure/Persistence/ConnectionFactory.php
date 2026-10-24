@@ -14,6 +14,8 @@ Architectural boundary: connection plumbing only. It knows the environment varia
 the database and nothing about what is stored in it.
 
 Changelog:
+2026/10/24 SAST
+- RestrictViolationMiddleware, so PostgreSQL 18's restrict_violation (23001) is a foreign key violation here too.
 2026/09/08 19:52 SAST
 - Opens a Doctrine DBAL connection through DriverManager rather than an F3 DB\SQL wrapped by a
   shared-PDO driver. The sharing existed only so converted and unconverted repositories could take
@@ -48,7 +50,8 @@ final class ConnectionFactory
         // DoctrineBundle's connection - configured separately, in config/packages/doctrine.yaml -
         // gets it on exactly the same terms. See SessionTimeZoneMiddleware.
         $configuration = new Configuration();
-        $configuration->setMiddlewares([new SessionTimeZoneMiddleware()]);
+        // And PostgreSQL 18's restrict_violation reported as the foreign key violation it is (RestrictViolationMiddleware).
+        $configuration->setMiddlewares([new SessionTimeZoneMiddleware(), new RestrictViolationMiddleware()]);
 
         return DriverManager::getConnection([
             'driver' => 'pdo_pgsql',
