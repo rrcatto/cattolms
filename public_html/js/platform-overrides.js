@@ -522,13 +522,30 @@
     };
     /* A small stat card's money amount stays on one line inside its card (owner, 2026-10-21: the dashboard's amounts ran
        out of their cards). Core draws it at 0.88 of the theme's own size; an amount still too wide for its card, a very
-       large one or a card on a narrow screen, is drawn smaller until it fits. */
+       large one or a card on a narrow screen, is drawn smaller until it fits.
+       Each amount is fitted again whenever it or its card changes size, whatever the cause: a web font arriving at any
+       moment, or the card narrowing with the window (2026-10-25: Gilded Noir's Net money was still seen past its card
+       once after a late font, though the page refits on every font and load event). The amount is an inline-block so
+       its width can be watched. The fit runs in the next frame, never inside the observer's own delivery, so resizing
+       the amount cannot loop. */
+    const fitFigure = amount => {
+      amount.style.fontSize = '';
+      const room = amount.parentElement.clientWidth, width = amount.getBoundingClientRect().width;
+      if (room && width > room) amount.style.fontSize = (parseFloat(getComputedStyle(amount).fontSize) * room / width * 0.98).toFixed(2) + 'px';
+    };
+    const figureWatch = 'ResizeObserver' in window ? new ResizeObserver(entries => requestAnimationFrame(() => {
+      new Set(entries.map(entry => entry.target.matches('.cl-ui-stat-value') ? entry.target.querySelector(':scope > span') : entry.target))
+        .forEach(amount => { if (amount && amount.isConnected) fitFigure(amount); });
+    })) : null;
     const fitFigures = root => {
       const scope = root instanceof Element ? root : document;
       within(scope, '.cl-ui-stat-card--small .cl-ui-stat-value > span').forEach(amount => {
-        amount.style.fontSize = '';
-        const room = amount.parentElement.clientWidth, width = amount.getBoundingClientRect().width;
-        if (room && width > room) amount.style.fontSize = (parseFloat(getComputedStyle(amount).fontSize) * room / width * 0.98).toFixed(2) + 'px';
+        fitFigure(amount);
+        if (figureWatch && !('figureWatched' in amount.dataset)) {
+          amount.dataset.figureWatched = '';
+          figureWatch.observe(amount);
+          figureWatch.observe(amount.parentElement);
+        }
       });
     };
     const fitAndExplain = root => { fitTableColumns(root); applyCellTooltips(root); fitPagination(root); fitFigures(root); };

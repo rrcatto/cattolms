@@ -164,6 +164,19 @@ final class PaginationUiContractTest extends TestCase
     }
 
     /**
+     * A dashboard amount is fitted to its card again whenever it or its card changes size (2026-10-25: Gilded Noir's Net
+     * money was seen past its card once after a late font, though the page refits on every font and load event).
+     */
+    public function testAnAmountIsFittedAgainWheneverItOrItsCardChangesSize(): void
+    {
+        $script = self::read('public_html/js/platform-overrides.js');
+        self::assertStringContainsString("new ResizeObserver(entries => requestAnimationFrame(", $script, 'Fitted in the next frame, so resizing the amount cannot loop.');
+        self::assertStringContainsString('figureWatch.observe(amount);', $script);
+        self::assertStringContainsString('figureWatch.observe(amount.parentElement);', $script, 'And its card.');
+        self::assertStringContainsString('.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block}', self::read('public_html/css/catto-platform.css'), 'An inline-block, so its width can be watched.');
+    }
+
+    /**
      * The numbered pages are never a select. A four-thousand-option element is the same
      * whole-table control this platform removed from every other screen.
      */

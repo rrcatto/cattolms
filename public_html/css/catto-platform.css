@@ -1420,7 +1420,7 @@ body .cl-ui-choice label{display:flex;align-items:center;gap:.5rem}.cl-ui-choice
 .cl-ui-stat-icon{display:inline-grid;place-items:center;width:2.25rem;height:2.25rem;margin-bottom:.6rem;border-radius:var(--cl-radius,.5rem);color:var(--cl-accent,var(--cl-primary,currentColor));background:color-mix(in srgb,currentColor 12%,transparent)}
 .cl-ui-stat-icon .cl-ui-icon{width:1.25rem;height:1.25rem}
 .cl-ui-stat-card--small .cl-ui-stat-value{white-space:nowrap;overflow:hidden}
-.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em}
+.cl-ui-stat-card--small .cl-ui-stat-value>span{font-size:.88em;display:inline-block}
 /* A stat card that opens what it counts (the dashboard's money figures): the card is the link, in the card's own colours. */
 a.cl-ui-stat-link{display:block;color:inherit;text-decoration:none}a.cl-ui-stat-link:hover{border-color:var(--cl-primary,var(--cl-accent,#2f4a7c))}a.cl-ui-stat-link:focus-visible{outline:2px solid var(--cl-primary,var(--cl-accent,#2f4a7c));outline-offset:1px}a.cl-ui-stat-link .cl-ui-stat-label{text-decoration:underline;text-underline-offset:.2em}
 .cl-ui-list{display:grid;gap:.75rem}.cl-ui-list-item{display:flex;flex-wrap:wrap;align-items:start;justify-content:space-between;gap:.5rem 1rem;min-width:0}.cl-ui-list-item>div{min-width:0}
